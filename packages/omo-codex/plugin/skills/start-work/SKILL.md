@@ -30,12 +30,13 @@ handoff. Role selection requires `agent_type`; `model` +
 worker. Prefer `fork_turns: "none"` unless full history is truly
 required; paste only the context the child needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles capped at 30000 ms (timeout_ms <= 30000) and sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, require the child to send
 `WORKING: <task> - <current phase>` before long reading, testing, or
 review passes, and `BLOCKED: <reason>` only when it cannot progress.
+- Never mark a step, criterion, lane, review, or plan complete while any named child that owns required evidence is active; an active child is unresolved work, not approval.
 While any child is active, keep the parent visibly alive with active
 subagent count, agent names, latest `WORKING:` phase, and whether the
 parent is waiting for mailbox updates. Track spawned agent names

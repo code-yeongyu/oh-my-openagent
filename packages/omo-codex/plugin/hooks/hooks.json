@@ -78,13 +78,13 @@
 				]
 			},
 			{
-				"matcher": "^create_goal$",
+				"matcher": "^(create_goal|wait_agent|update_goal|update_plan)$",
 				"hooks": [
 					{
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Enforcing Unlimited Goal Budget"
+						"statusMessage": "LazyCodex(0.1.0): Enforcing Ulw-Loop Orchestration"
 					}
 				]
 			}

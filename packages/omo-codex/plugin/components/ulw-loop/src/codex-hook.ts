@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import type { UlwLoopScope } from "./paths.js";
 import { parseUlwLoopSteeringDirective, steerUlwLoop } from "./steering.js";
 
@@ -35,8 +37,20 @@ interface PreToolUseHookOutput {
 }
 
 const CREATE_GOAL_TOOL_NAME = "create_goal";
+const WAIT_AGENT_TOOL_NAME = "wait_agent";
+const UPDATE_GOAL_TOOL_NAME = "update_goal";
+const UPDATE_PLAN_TOOL_NAME = "update_plan";
+const MAX_WAIT_AGENT_TIMEOUT_MS = 30000;
 const CREATE_GOAL_PAYLOAD_WARNING =
 	"Use create_goal with objective only. Omit token_budget so the goal stays unlimited, and put lifecycle status changes on update_goal.";
+const WAIT_AGENT_TIMEOUT_WARNING =
+	"Use wait_agent with timeout_ms <= 30000 for plan/reviewer agents; long waits hide stuck children and block recovery.";
+const ACTIVE_CHILD_COMPLETION_WARNING =
+	"A running child agent is still active in the transcript. Do not mark dependent reviewer/subagent work or the root goal complete until the child result is integrated, recorded inconclusive, or closed and respawned.";
+
+interface PreToolUseGuardOptions {
+	readonly readTranscript?: (path: string) => string | null;
+}
 
 export function parseUserPromptSubmitPayload(raw: string): UserPromptSubmitPayload | null {
 	if (raw.trim().length === 0) return null;
@@ -83,19 +97,19 @@ function payloadScope(payload: UserPromptSubmitPayload): UlwLoopScope {
 	return { sessionId: payload.session_id };
 }
 
-export function applyPreToolUseGoalBudgetGuard(payload: PreToolUsePayload): string {
+export function applyPreToolUseGoalBudgetGuard(
+	payload: PreToolUsePayload,
+	options: PreToolUseGuardOptions = {},
+): string {
 	if (payload.hook_event_name !== "PreToolUse") return "";
-	if (payload.tool_name !== CREATE_GOAL_TOOL_NAME) return "";
-	if (!hasInvalidCreateGoalInput(payload.tool_input)) return "";
-	const output: PreToolUseHookOutput = {
-		hookSpecificOutput: {
-			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
-			permissionDecisionReason: CREATE_GOAL_PAYLOAD_WARNING,
-			additionalContext: CREATE_GOAL_PAYLOAD_WARNING,
-		},
-	};
-	return `${JSON.stringify(output)}\n`;
+	if (payload.tool_name === CREATE_GOAL_TOOL_NAME && hasInvalidCreateGoalInput(payload.tool_input)) {
+		return denyPreToolUse(CREATE_GOAL_PAYLOAD_WARNING);
+	}
+	if (payload.tool_name === WAIT_AGENT_TOOL_NAME && hasOversizedWaitAgentInput(payload.tool_input)) {
+		return denyPreToolUse(WAIT_AGENT_TIMEOUT_WARNING);
+	}
+	if (isUnsafeCompletionWithActiveChild(payload, options)) return denyPreToolUse(ACTIVE_CHILD_COMPLETION_WARNING);
+	return "";
 }
 
 export async function runUlwLoopHookCli(stdin: NodeJS.ReadableStream, stdout: NodeJS.WritableStream): Promise<void> {
@@ -149,6 +163,74 @@ function isPreToolUsePayload(value: unknown): value is PreToolUsePayload {
 		(value["transcript_path"] === null || typeof value["transcript_path"] === "string") &&
 		typeof value["turn_id"] === "string" &&
 		Object.hasOwn(value, "tool_input")
+	);
+}
+
+function denyPreToolUse(reason: string): string {
+	const output: PreToolUseHookOutput = {
+		hookSpecificOutput: {
+			hookEventName: "PreToolUse",
+			permissionDecision: "deny",
+			permissionDecisionReason: reason,
+			additionalContext: reason,
+		},
+	};
+	return `${JSON.stringify(output)}\n`;
+}
+
+function hasOversizedWaitAgentInput(value: unknown): boolean {
+	if (!isRecord(value)) return false;
+	const timeoutMs = value["timeout_ms"];
+	return typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > MAX_WAIT_AGENT_TIMEOUT_MS;
+}
+
+function isUnsafeCompletionWithActiveChild(payload: PreToolUsePayload, options: PreToolUseGuardOptions): boolean {
+	if (!isDependentCompletionTransition(payload)) return false;
+	return transcriptHasRunningChild(payload, options);
+}
+
+function isDependentCompletionTransition(payload: PreToolUsePayload): boolean {
+	if (!isRecord(payload.tool_input)) return false;
+	if (payload.tool_name === UPDATE_GOAL_TOOL_NAME) return payload.tool_input["status"] === "complete";
+	if (payload.tool_name === UPDATE_PLAN_TOOL_NAME) return updatePlanCompletesDependentStep(payload.tool_input);
+	return false;
+}
+
+function updatePlanCompletesDependentStep(input: Record<string, unknown>): boolean {
+	const plan = input["plan"];
+	if (!Array.isArray(plan)) return false;
+	return plan.some((item) => isCompletedDependentPlanItem(item));
+}
+
+function isCompletedDependentPlanItem(value: unknown): boolean {
+	if (!isRecord(value)) return false;
+	const step = value["step"];
+	return (
+		value["status"] === "completed" &&
+		typeof step === "string" &&
+		/(?:agent|subagent|child|review|reviewer|wait_agent)/i.test(step)
+	);
+}
+
+function transcriptHasRunningChild(payload: PreToolUsePayload, options: PreToolUseGuardOptions): boolean {
+	if (payload.transcript_path === null) return false;
+	const transcript = readTranscript(payload.transcript_path, options);
+	return transcript !== null && containsRunningChildAgent(transcript);
+}
+
+function readTranscript(path: string, options: PreToolUseGuardOptions): string | null {
+	if (options.readTranscript !== undefined) return options.readTranscript(path);
+	try {
+		return readFileSync(path, "utf8");
+	} catch (error) {
+		if (error instanceof Error) return null;
+		return null;
+	}
+}
+
+function containsRunningChildAgent(transcript: string): boolean {
+	return /"agent_name"\s*:\s*"\/root\/[^"\n]+"[\s\S]{0,500}"agent_status"\s*:\s*"running"|"agent_status"\s*:\s*"running"[\s\S]{0,500}"agent_name"\s*:\s*"\/root\/[^"\n]+"/.test(
+		transcript,
 	);
 }
 

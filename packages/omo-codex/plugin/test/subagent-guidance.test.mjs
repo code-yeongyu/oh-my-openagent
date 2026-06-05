@@ -18,6 +18,9 @@ const AGENT_FILES = [
 	"components/ultrawork/agents/plan.toml",
 ];
 
+const boundedWaitPattern = /wait_agent\(\.\.\.timeout_ms <= 30000\)|wait_agent cycles? capped at 30000 ms|timeout_ms <= 30000/s;
+const dependentChildBarrierPattern = /(?:Do not mark|Never mark)[\s\S]*complete\b[\s\S]*while[\s\S]*child[\s\S]*active/s;
+
 test("#given orchestration skills #when inspected #then Codex subagent delegation is hardened", async () => {
 	// given
 	const skillPaths = SKILLS.map((skillName) => join("skills", skillName, "SKILL.md"));
@@ -38,7 +41,9 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 			!/single long blocking wait/.test(text) ||
 			!/A timeout only means no new mailbox update arrived/i.test(text) ||
 			!/WORKING:/.test(text) ||
-			!/single `list_agents`/.test(text)
+			!/single `list_agents`/.test(text) ||
+			!boundedWaitPattern.test(text) ||
+			!dependentChildBarrierPattern.test(text)
 		) {
 			missing.push(skillPath);
 		}
@@ -63,6 +68,8 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /timeout only means no new mailbox update arrived/i);
 	assert.match(text, /WORKING:/);
 	assert.match(text, /single `list_agents`/);
+	assert.match(text, boundedWaitPattern);
+	assert.match(text, dependentChildBarrierPattern);
 });
 
 test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {

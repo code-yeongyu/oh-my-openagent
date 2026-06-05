@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -54,7 +54,7 @@ function payload(prompt: string, cwd: string): UserPromptSubmitPayload {
 	return { cwd, hook_event_name: "UserPromptSubmit", prompt, session_id: DEFAULT_SESSION_ID };
 }
 
-function preToolPayload(toolName: string, toolInput: unknown): PreToolUsePayload {
+function preToolPayload(toolName: string, toolInput: unknown, transcriptPath: string | null = null): PreToolUsePayload {
 	return {
 		cwd: "/repo",
 		hook_event_name: "PreToolUse",
@@ -64,9 +64,21 @@ function preToolPayload(toolName: string, toolInput: unknown): PreToolUsePayload
 		tool_input: toolInput,
 		tool_name: toolName,
 		tool_use_id: "call-1",
-		transcript_path: null,
+		transcript_path: transcriptPath,
 		turn_id: "turn-1",
 	};
+}
+
+async function runningChildTranscript(): Promise<string> {
+	const root = await mkdtemp(join(tmpdir(), "ug-active-child-"));
+	const transcriptPath = join(root, "transcript.jsonl");
+	await writeFile(
+		transcriptPath,
+		`${JSON.stringify({ agents: [{ agent_name: "/root/issue30_reviewer", agent_status: "running" }] })}
+`,
+		"utf8",
+	);
+	return transcriptPath;
 }
 
 function payloadWithRuntimeEvent(hookEventName: string): UserPromptSubmitPayload {
@@ -276,6 +288,78 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 	it("#given a neighboring tool includes token_budget text #when PreToolUse runs #then it stays silent", () => {
 		// given
 		const input = preToolPayload("update_goal", { status: "complete", token_budget: 5000, statusText: "done" });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given wait_agent exceeds the orchestration cap #when PreToolUse runs #then it blocks with bounded-wait guidance", () => {
+		// given
+		const input = preToolPayload("wait_agent", { timeout_ms: 300001 });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		const parsed = JSON.parse(output);
+		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("timeout_ms <= 30000");
+	});
+
+	it("#given wait_agent is within the orchestration cap #when PreToolUse runs #then it stays silent", () => {
+		// given
+		const input = preToolPayload("wait_agent", { timeout_ms: 30000 });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given a child is still running #when update_goal marks the root complete #then it blocks", async () => {
+		// given
+		const transcriptPath = await runningChildTranscript();
+		const input = preToolPayload("update_goal", { status: "complete" }, transcriptPath);
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		const parsed = JSON.parse(output);
+		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("running child");
+	});
+
+	it("#given a child is still running #when update_plan completes a reviewer step #then it blocks", async () => {
+		// given
+		const transcriptPath = await runningChildTranscript();
+		const input = preToolPayload(
+			"update_plan",
+			{ plan: [{ step: "Run reviewer gate and fix findings", status: "completed" }] },
+			transcriptPath,
+		);
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		const parsed = JSON.parse(output);
+		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("running child");
+	});
+
+	it("#given a child is still running #when update_plan completes an unrelated local step #then it stays silent", async () => {
+		// given
+		const transcriptPath = await runningChildTranscript();
+		const input = preToolPayload(
+			"update_plan",
+			{ plan: [{ step: "Inspect package metadata", status: "completed" }] },
+			transcriptPath,
+		);
 
 		// when
 		const output = applyPreToolUseGoalBudgetGuard(input);

@@ -92,11 +92,11 @@ describe("hooks/hooks.json", () => {
 		expect(command).toContain("hook user-prompt-submit");
 	});
 
-	it("#given ulw-loop component is enabled #when hooks are inspected #then create_goal PreToolUse guard is registered", async () => {
+	it("#given ulw-loop component is enabled #when hooks are inspected #then orchestration PreToolUse guard is registered", async () => {
 		const text = await readText("hooks/hooks.json");
 
 		expect(text).toContain('"PreToolUse"');
-		expect(text).toContain('"matcher": "^create_goal$"');
+		expect(text).toContain('"matcher": "^(create_goal|wait_agent|update_goal|update_plan)$"');
 		expect(text).toContain("hook pre-tool-use");
 	});
 });

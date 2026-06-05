@@ -130,7 +130,7 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 	assert.match(text, /Resetting Git Bash Mcp Reminder/);
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
-	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
+	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^(create_goal|wait_agent|update_goal|update_plan)$"]);
 });
 
 test("#given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered", async () => {

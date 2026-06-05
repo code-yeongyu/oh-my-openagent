@@ -242,17 +242,19 @@ work likely to exceed one wait cycle, tell the child to send
 `WORKING: <task> - <current phase>` before long reading, testing, or
 review passes, and `BLOCKED: <reason>` only when it cannot progress.
 Track spawned agent names locally. Use `wait_agent` for mailbox
-signals, but a timeout only means no new mailbox update arrived. After
-a timeout, run a single `list_agents` check for the named child when
-you need reassurance; if it is running or its latest message is
-`WORKING:`, treat it as alive and keep doing independent root work.
-Do not use `list_agents` as a polling loop or status feed; it can
-replay large payloads. Send `TASK STILL ACTIVE: return <deliverable> or
-BLOCKED: <reason>` only when the child is completed without the
-deliverable, ack-only, or no longer running. If that followup is still
-silent or ack-only, record the result as inconclusive, do not count it
-as approval/pass, close it if safe, and respawn a smaller
-`fork_turns: "none"` task with the missing deliverable.
+signals with cycles capped at 30000 ms (`timeout_ms <= 30000`); a
+timeout only means no new mailbox update arrived. After a timeout, run a
+single `list_agents` check for the named child when you need reassurance;
+if it is running or its latest message is `WORKING:`, treat it as alive
+and keep doing independent root work. Never mark a step, criterion, lane,
+review, or plan complete while any named child that owns required evidence
+is active; an active child is unresolved work, not approval. Do not use
+`list_agents` as a polling loop or status feed; it can replay large payloads.
+Send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>` only
+when the child is completed without the deliverable, ack-only, or no
+longer running. If that followup is still silent or ack-only, record the
+result as inconclusive, do not count it as approval/pass, close it if safe,
+and respawn a smaller `fork_turns: "none"` task with the missing deliverable.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 

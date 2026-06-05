@@ -120,8 +120,9 @@ If the user wants maximum rigor, `spawn_agent(agent_type="momus", fork_turns="no
 
 ## Delegation discipline (Codex)
 - Every `spawn_agent` message starts with `TASK:`, then `DELIVERABLE`, `SCOPE`, `VERIFY`. `agent_type` selects the role; `model` + `reasoning_effort` alone creates a default agent, not that role. Prefer `fork_turns: "none"`.
-- Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
+- Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles capped at 30000 ms (timeout_ms <= 30000). Never use a single long blocking wait for them.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops.
+- Never mark a step, criterion, lane, review, or plan complete while any named child that owns required evidence is active; an active child is unresolved work, not approval.
 - Keep yourself visibly alive while children run: active subagent count, agent names, latest `WORKING:` phase, and whether you are waiting on mailbox updates.
 - Use `wait_agent` for mailbox signals, not proof. A timeout only means no new mailbox update arrived; after a timeout, run a single `list_agents` check for the named child when you need reassurance. If it is running or its latest message is `WORKING:`, treat it as alive. Do not use `list_agents` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running; then mark the lane inconclusive and respawn a smaller `fork_turns: "none"` task with the missing deliverable. `close_agent` after integrating each result.
 
