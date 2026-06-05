@@ -10,7 +10,7 @@ const FALLBACK_CODEX_MODEL_CATALOG = {
 	},
 	managedProfiles: [
 		{
-			model: "gpt-5.4",
+			model: "gpt-5.5",
 			modelContextWindow: 1_000_000,
 			modelReasoningEffort: "high",
 			planModeReasoningEffort: "xhigh",

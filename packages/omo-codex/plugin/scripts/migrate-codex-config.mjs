@@ -22,13 +22,13 @@ const FALLBACK_CATALOG = {
 			plan_mode_reasoning_effort: "xhigh",
 		},
 		verifier: { model: "gpt-5.5", model_reasoning_effort: "xhigh" },
-		worker: { model: "gpt-5.4", model_reasoning_effort: "high" },
+		worker: { model: "gpt-5.5", model_reasoning_effort: "high" },
 	},
 	managedProfiles: [
 		{
-			version: "legacy.gpt-5.4-1m",
+			version: "legacy.gpt-5.5-1m",
 			match: {
-				model: "gpt-5.4",
+				model: "gpt-5.5",
 				model_context_window: 1_000_000,
 				model_reasoning_effort: "high",
 				plan_mode_reasoning_effort: "xhigh",

@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
+import { readCodexModelCatalog } from "./codex-model-catalog"
 
 describe("codex-config-reasoning", () => {
   test("#given empty Codex config #when updating config #then sets worker model and reasoning defaults", async () => {
@@ -141,5 +142,17 @@ describe("codex-config-reasoning", () => {
     expect(content).toContain("model_context_window = 123456")
     expect(content).toContain('model_reasoning_effort = "medium"')
     expect(content).toContain('plan_mode_reasoning_effort = "high"')
+  })
+
+  test("#given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-fallback-catalog-"))
+
+    // when
+    const catalog = await readCodexModelCatalog(root)
+
+    // then
+    expect(catalog.current.model).toBe("gpt-5.5")
+    expect(catalog.managedProfiles.map(profile => profile.model)).not.toContain("gpt-5.4")
   })
 })
