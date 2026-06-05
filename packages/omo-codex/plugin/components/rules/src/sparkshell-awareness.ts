@@ -17,12 +17,18 @@ export function isCodexAppServerActive(env: RuntimeEnv = process.env): boolean {
 	);
 }
 
+function isSparkShellAppServerConfigured(env: RuntimeEnv = process.env): boolean {
+	const codexSocketPath = env["CODEX_APP_SERVER_SOCKET"]?.trim() ?? "";
+	const omoSocketPath = env["OMO_SPARKSHELL_APP_SERVER_SOCKET"]?.trim() ?? "";
+	return codexSocketPath.length > 0 || omoSocketPath.length > 0;
+}
+
 export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env): string {
 	const override = env["OMO_SPARKSHELL_AWARENESS"] ?? env["LAZYCODEX_SPARKSHELL_AWARENESS"];
 	if (isFalsy(override)) {
 		return "";
 	}
-	if (!isTruthy(override) && !isCodexAppServerActive(env)) {
+	if (!isTruthy(override) && !isCodexAppServerActive(env) && !isSparkShellAppServerConfigured(env)) {
 		return "";
 	}
 

@@ -33,6 +33,21 @@ describe("sparkshell runtime awareness", () => {
     expect(context).toBe("")
   })
 
+  test("#given Codex CLI appserver socket env #when resolving runtime awareness #then returns Sparkshell guidance", () => {
+    // given
+    const env = {
+      OMO_SPARKSHELL_APP_SERVER_SOCKET: "/tmp/app-server-control.sock",
+      CODEX_THREAD_ID: "thread-sparkshell-cli",
+    }
+
+    // when
+    const context = getSparkShellRuntimeAwareness(env)
+
+    // then
+    expect(context).toContain("omo sparkshell <command>")
+    expect(context).toContain("repo inspection")
+  })
+
   test("#given explicit force-off env #when Codex Desktop is present #then returns empty context", () => {
     // given
     const env = {

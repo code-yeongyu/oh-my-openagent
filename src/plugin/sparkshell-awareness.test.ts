@@ -46,6 +46,27 @@ describe("OpenCode Sparkshell awareness system transform", () => {
     expect(output.system).toEqual(["base system prompt"])
   })
 
+  test("#given Codex CLI appserver socket env #when system transform runs #then appends Sparkshell guidance", async () => {
+    // given
+    const handler = createSystemTransformHandler(undefined, undefined, {
+      OMO_SPARKSHELL_APP_SERVER_SOCKET: "/tmp/app-server-control.sock",
+      CODEX_THREAD_ID: "thread-sparkshell-cli",
+    })
+    const output = { system: ["base system prompt"] }
+
+    // when
+    await handler(
+      {
+        sessionID: "session-sparkshell-cli-wrapper",
+        model: { id: "gpt-5.5", providerID: "openai" },
+      },
+      output,
+    )
+
+    // then
+    expect(output.system.join("\n")).toContain("omo sparkshell <command>")
+  })
+
   test("#given explicit force-on env #when system transform runs #then appends Sparkshell guidance", async () => {
     // given
     const handler = createSystemTransformHandler(undefined, undefined, {

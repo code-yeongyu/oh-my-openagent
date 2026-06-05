@@ -96,6 +96,32 @@ describe("Codex Sparkshell awareness", () => {
 		expect(output).toBe("");
 	});
 
+	it("#given Codex CLI appserver socket env #when SessionStart runs #then emits Sparkshell guidance", async () => {
+		// given
+		const env = {
+			OMO_SPARKSHELL_APP_SERVER_SOCKET: "/tmp/app-server-control.sock",
+			CODEX_THREAD_ID: "thread-sparkshell-cli",
+			CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+		};
+
+		// when
+		const output = await runSessionStartHook(
+			{
+				session_id: "session-sparkshell-cli-wrapper",
+				transcript_path: null,
+				cwd: process.cwd(),
+				hook_event_name: "SessionStart",
+				model: "gpt-5.5",
+				permission_mode: "default",
+				source: "startup",
+			},
+			{ env },
+		);
+
+		// then
+		expect(parseAdditionalContext(output)).toContain("omo sparkshell <command>");
+	});
+
 	it("#given explicit force-on env #when SessionStart runs #then emits Sparkshell guidance", async () => {
 		// given
 		const env = {
