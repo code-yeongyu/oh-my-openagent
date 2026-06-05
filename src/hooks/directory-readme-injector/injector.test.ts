@@ -7,12 +7,17 @@ import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 const storageMaps = new Map<string, Set<string>>()
+const logMock = mock(() => undefined)
 
 mock.module("./storage", () => ({
   loadInjectedPaths: (sessionID: string) => storageMaps.get(sessionID) ?? new Set<string>(),
   saveInjectedPaths: (sessionID: string, paths: Set<string>) => {
     storageMaps.set(sessionID, paths)
   },
+}))
+
+mock.module("../../shared/logger", () => ({
+  log: logMock,
 }))
 
 afterAll(() => {
@@ -45,6 +50,7 @@ describe("processFilePathForReadmeInjection", () => {
     testRoot = join(tmpdir(), `directory-readme-injector-${randomUUID()}`)
     mkdirSync(testRoot, { recursive: true })
     storageMaps.clear()
+    logMock.mockClear()
   })
 
   afterEach(() => {
@@ -238,5 +244,48 @@ describe("processFilePathForReadmeInjection", () => {
 
     // then
     expect(output.output).toBe("unchanged")
+  })
+
+  it("logs and skips a README when truncation fails", async () => {
+    // given
+    const sourceDirectory = join(testRoot, "src")
+    mkdirSync(sourceDirectory, { recursive: true })
+    const readmePath = join(sourceDirectory, "README.md")
+    writeFileSync(readmePath, "# Source README")
+
+    const { processFilePathForReadmeInjection } = await import("./injector")
+    const output = { title: "Result", output: "base", metadata: {} }
+    const sessionID = "session-truncation-failure"
+    const sessionCaches = new Map<string, Set<string>>()
+    const truncator = {
+      truncate: async (_sessionID: string, _content: string) => {
+        throw new Error("truncator unavailable")
+      },
+      getUsage: async (_sessionID: string) => null,
+      truncateSync: (value: string) => ({ result: value, truncated: false }),
+    }
+
+    // when
+    await processFilePathForReadmeInjection({
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches,
+      filePath: join(sourceDirectory, "file.ts"),
+      sessionID,
+      output,
+    })
+
+    // then
+    expect(output.output).toBe("base")
+    expect(storageMaps.has(sessionID)).toBe(false)
+    expect(sessionCaches.get(sessionID)?.has(sourceDirectory)).toBe(false)
+    expect(logMock).toHaveBeenCalledWith(
+      "[directory-readme-injector] Skipped README injection after read/truncate failure",
+      {
+        error: "truncator unavailable",
+        readmePath,
+        sessionID,
+      },
+    )
   })
 })

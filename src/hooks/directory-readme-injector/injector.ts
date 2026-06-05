@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { createDynamicTruncator } from "../../shared/dynamic-truncator";
+import { log } from "../../shared/logger";
 import { findReadmeMdUp, resolveFilePath } from "./finder";
 import { loadInjectedPaths, saveInjectedPaths } from "./storage";
 
@@ -18,6 +19,11 @@ function getSessionCache(
   return sessionCaches.get(sessionID)!;
 }
 
+function describeReadmeInjectionError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export async function processFilePathForReadmeInjection(input: {
   ctx: PluginInput;
   truncator: DynamicTruncator;
@@ -31,7 +37,7 @@ export async function processFilePathForReadmeInjection(input: {
 
   const dir = dirname(resolved);
   const cache = getSessionCache(input.sessionCaches, input.sessionID);
-   const readmePaths = await findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
+  const readmePaths = await findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
 
   let dirty = false;
   for (const readmePath of readmePaths) {
@@ -50,7 +56,13 @@ export async function processFilePathForReadmeInjection(input: {
       input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
       cache.add(readmeDir);
       dirty = true;
-    } catch {}
+    } catch (error) {
+      log("[directory-readme-injector] Skipped README injection after read/truncate failure", {
+        error: describeReadmeInjectionError(error),
+        readmePath,
+        sessionID: input.sessionID,
+      });
+    }
   }
 
   if (dirty) {
