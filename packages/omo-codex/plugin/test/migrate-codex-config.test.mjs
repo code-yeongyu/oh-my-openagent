@@ -134,6 +134,29 @@ test("#given model catalog is unavailable and stale 272k config #when migrating 
 	assert.match(content, /model_context_window = 400000/);
 });
 
+test("#given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-config-malformed-catalog-"));
+	const codexHome = join(root, "codex-home");
+	const catalogPath = join(root, "model-catalog.json");
+	await mkdir(codexHome, { recursive: true });
+	await writeFile(catalogPath, "{not-json");
+	await writeFile(join(codexHome, "config.toml"), 'model = "gpt-5.5"\nmodel_context_window = 272000\n');
+
+	const result = await migrateCodexConfig({
+		env: {
+			CODEX_HOME: codexHome,
+			LAZYCODEX_MODEL_CATALOG_PATH: catalogPath,
+			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
+		},
+		cwd: root,
+	});
+
+	const content = await readFile(join(codexHome, "config.toml"), "utf8");
+	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
+	assert.match(content, /model = "gpt-5\.5"/);
+	assert.match(content, /model_context_window = 400000/);
+});
+
 test("#given user-customized Codex model config #when migrating #then user values are preserved", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-config-custom-"));
 	const codexHome = join(root, "codex-home");
@@ -160,6 +183,26 @@ test("#given user-customized Codex model config #when migrating #then user value
 	assert.match(content, /model_context_window = 123456/);
 	assert.match(content, /model_reasoning_effort = "medium"/);
 	assert.match(content, /plan_mode_reasoning_effort = "medium"/);
+});
+
+test("#given managed config state is malformed #when migrating #then migration ignores stale state safely", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-config-malformed-state-"));
+	const codexHome = join(root, "codex-home");
+	const statePath = join(root, "model-state.json");
+	await mkdir(codexHome, { recursive: true });
+	await writeFile(statePath, "[broken-json");
+	await writeFile(join(codexHome, "config.toml"), 'model = "gpt-5.5"\nmodel_context_window = 272000\n');
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: statePath },
+		cwd: root,
+	});
+
+	const content = await readFile(join(codexHome, "config.toml"), "utf8");
+	const state = JSON.parse(await readFile(statePath, "utf8"));
+	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
+	assert.match(content, /model_context_window = 400000/);
+	assert.equal(state.files[join(codexHome, "config.toml")].managed, true);
 });
 
 test("#given managed catalog state #when catalog version advances #then only previously managed config is updated", async () => {
