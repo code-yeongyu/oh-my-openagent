@@ -1,32 +1,20 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
-  completeBoulder,
-  formatDurationHuman,
-  getPlanProgress,
-  getWorkForSession,
-  getTaskSessionState,
   normalizeSessionId,
-  readBoulderState,
-  readCurrentTopLevelTask,
   resolveBoulderPlanPath,
 } from "../../features/boulder-state"
-import {
-  getSessionAgent,
-  isAgentRegistered,
-  resolveRegisteredAgentName,
-} from "../../features/claude-code-session-state"
-import { getLastAgentFromSession } from "./session-last-agent"
-import { isSessionInBoulderLineage } from "./boulder-session-lineage"
-import { createInternalAgentContinuationTextPart } from "../../shared"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
-import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
-import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
+import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
+import { hasRunningBackgroundTasks, injectContinuation, scheduleRetry } from "./idle-continuation"
+import {
+  CONTINUATION_COOLDOWN_MS,
+  FAILURE_BACKOFF_MS,
+  MAX_CONSECUTIVE_PROMPT_FAILURES,
+} from "./idle-constants"
+import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
-import { BOULDER_COMPLETE_PROMPT } from "./system-reminder-templates"
 import {
   markContinuationStalled,
   resetStallStateForPlanChange,
@@ -34,197 +22,6 @@ import {
   updateNoToolProgressIterations,
 } from "./tool-progress"
 import type { AtlasHookOptions, SessionState } from "./types"
-
-const CONTINUATION_COOLDOWN_MS = 5000
-const FAILURE_BACKOFF_MS = 5 * 60 * 1000
-const MAX_CONSECUTIVE_PROMPT_FAILURES = 10
-const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
-
-function getTaskLabelSortValue(taskLabel: string): number {
-  const parsed = Number.parseInt(taskLabel.replace(/[^0-9]/g, ""), 10)
-  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed
-}
-
-function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
-  const backgroundManager = options?.backgroundManager
-  return backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
-    : false
-}
-
-async function injectContinuation(input: {
-  ctx: PluginInput
-  sessionID: string
-  sessionState: SessionState
-  options?: AtlasHookOptions
-  planName: string
-  progress: { total: number; completed: number }
-  agent?: string
-  worktreePath?: string
-  idleSettleMs?: number
-}): Promise<void> {
-  const remaining = input.progress.total - input.progress.completed
-  if (input.sessionState.isInjectingContinuation) {
-    scheduleRetry({
-      ctx: input.ctx,
-      sessionID: input.sessionID,
-      sessionState: input.sessionState,
-      options: input.options,
-    })
-    return
-  }
-
-  input.sessionState.isInjectingContinuation = true
-
-  try {
-    const currentBoulder = readBoulderState(input.ctx.directory)
-    const normalizedSessionID = normalizeSessionId(input.sessionID)
-    const currentPlanPath = currentBoulder
-      ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
-      : null
-    const currentTask = currentBoulder
-      && currentPlanPath
-      ? readCurrentTopLevelTask(currentPlanPath)
-      : null
-    const preferredTaskSession = currentTask
-      ? getTaskSessionState(input.ctx.directory, currentTask.key)
-      : null
-
-    if (!currentBoulder) {
-      return
-    }
-
-    const canContinueSession = await canContinueTrackedBoulderSession({
-      client: input.ctx.client,
-      sessionID: input.sessionID,
-      sessionOrigin: currentBoulder.session_origins?.[normalizedSessionID],
-      boulderSessionIDs: currentBoulder.session_ids,
-      requiredAgent: currentBoulder.agent,
-    })
-    if (!canContinueSession) {
-      log(`[${HOOK_NAME}] Skipped: tracked descendant agent does not match boulder agent`, {
-        sessionID: input.sessionID,
-        requiredAgent: currentBoulder.agent ?? "atlas",
-      })
-      return
-    }
-
-    const result = await injectBoulderContinuation({
-      ctx: input.ctx,
-      sessionID: input.sessionID,
-      planName: input.planName,
-      remaining,
-      total: input.progress.total,
-      agent: input.agent,
-      worktreePath: input.worktreePath,
-      preferredTaskSessionId: preferredTaskSession?.session_id,
-      preferredTaskTitle: preferredTaskSession?.task_title,
-      backgroundManager: input.options?.backgroundManager,
-      sessionState: input.sessionState,
-      idleSettleMs: input.idleSettleMs,
-    })
-
-    if (result === "injected") {
-      if (input.sessionState.pendingRetryTimer) {
-        clearTimeout(input.sessionState.pendingRetryTimer)
-        input.sessionState.pendingRetryTimer = undefined
-      }
-      input.sessionState.lastContinuationInjectedAt = Date.now()
-      return
-    }
-
-    if (result === "skipped_background_tasks") {
-      scheduleRetry({
-        ctx: input.ctx,
-        sessionID: input.sessionID,
-        sessionState: input.sessionState,
-        options: input.options,
-      })
-      return
-    }
-
-    if (result === "failed") {
-      scheduleRetry({
-        ctx: input.ctx,
-        sessionID: input.sessionID,
-        sessionState: input.sessionState,
-        options: input.options,
-      })
-    }
-  } catch (error) {
-    log(`[${HOOK_NAME}] Failed to inject boulder continuation`, { sessionID: input.sessionID, error })
-    input.sessionState.promptFailureCount += 1
-    input.sessionState.lastFailureAt = Date.now()
-    scheduleRetry({
-      ctx: input.ctx,
-      sessionID: input.sessionID,
-      sessionState: input.sessionState,
-      options: input.options,
-    })
-  } finally {
-    input.sessionState.isInjectingContinuation = false
-  }
-}
-
-function scheduleRetry(input: {
-  ctx: PluginInput
-  sessionID: string
-  sessionState: SessionState
-  options?: AtlasHookOptions
-}): void {
-  const { ctx, sessionID, sessionState, options } = input
-  if (sessionState.pendingRetryTimer) {
-    return
-  }
-
-  sessionState.pendingRetryTimer = setTimeout(async () => {
-    sessionState.pendingRetryTimer = undefined
-
-    if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
-    if (sessionState.stalledContinuationReason) return
-    if (sessionState.waitingForFinalWaveApproval) return
-
-    const now = Date.now()
-    if (
-      sessionState.lastContinuationInjectedAt
-      && now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS
-    ) {
-      return
-    }
-
-    const currentBoulder = readBoulderState(ctx.directory)
-    if (!currentBoulder) return
-    const normalizedSessionID = normalizeSessionId(sessionID)
-    if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
-
-    const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
-    if (currentProgress.isComplete) return
-    if (options?.isContinuationStopped?.(sessionID)) return
-    const canContinueSession = await canContinueTrackedBoulderSession({
-      client: ctx.client,
-      sessionID,
-      sessionOrigin: currentBoulder.session_origins?.[normalizedSessionID],
-      boulderSessionIDs: currentBoulder.session_ids,
-      requiredAgent: currentBoulder.agent,
-    })
-    if (!canContinueSession) return
-    if (hasRunningBackgroundTasks(sessionID, options)) {
-      scheduleRetry({ ctx, sessionID, sessionState, options })
-      return
-    }
-
-    await injectContinuation({
-      ctx,
-      sessionID,
-      sessionState,
-      options,
-      planName: currentBoulder.plan_name,
-      progress: currentProgress,
-      agent: currentBoulder.agent,
-      worktreePath: currentBoulder.worktree_path,
-    })
-  }, RETRY_DELAY_MS)
-}
 
 export async function handleAtlasSessionIdle(input: {
   ctx: PluginInput
@@ -250,105 +47,7 @@ export async function handleAtlasSessionIdle(input: {
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (progress.isComplete) {
-    if (sessionState.pendingRetryTimer) {
-      clearTimeout(sessionState.pendingRetryTimer)
-      sessionState.pendingRetryTimer = undefined
-    }
-
-    const work = getWorkForSession(ctx.directory, sessionID)
-    if (work) {
-      completeBoulder(ctx.directory, work.work_id)
-    } else {
-      completeBoulder(ctx.directory, boulderState.active_work_id)
-    }
-
-    if (!work || work.status === "abandoned") {
-      log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
-      return
-    }
-
-    if (options?.isContinuationStopped?.(sessionID)) {
-      log(`[${HOOK_NAME}] Boulder completion nudge skipped because continuation stopped`, { sessionID, plan: boulderState.plan_name })
-      return
-    }
-
-    if (sessionState.boulderCompletionNudgedAt?.[work.work_id]) {
-      log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
-      return
-    }
-
-    const elapsedMilliseconds = work.elapsed_ms ?? (Date.now() - new Date(work.started_at).getTime())
-    const elapsedHuman = formatDurationHuman(elapsedMilliseconds)
-
-    const taskBreakdown = Object.values(work.task_sessions ?? {})
-      .sort((left, right) => {
-        const leftSortValue = getTaskLabelSortValue(left.task_label)
-        const rightSortValue = getTaskLabelSortValue(right.task_label)
-        if (leftSortValue !== rightSortValue) {
-          return leftSortValue - rightSortValue
-        }
-
-        return left.task_label.localeCompare(right.task_label)
-      })
-      .map((task) => {
-        if (typeof task.elapsed_ms === "number") {
-          return `- ${task.task_label} ${task.task_title}: ${formatDurationHuman(task.elapsed_ms)}`
-        }
-
-        return `- ${task.task_label} ${task.task_title}: (no timing)`
-      })
-      .join("\n")
-
-    const prompt = BOULDER_COMPLETE_PROMPT
-      .replace(/{PLAN_NAME}/g, work.plan_name)
-      .replace(/{ELAPSED_HUMAN}/g, elapsedHuman)
-      .replace(/{TASK_BREAKDOWN}/g, taskBreakdown.length > 0 ? taskBreakdown : "- (no task timings)")
-
-    const atlasAgent = resolveRegisteredAgentName(
-      boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
-    )
-    if (atlasAgent && isAgentRegistered(atlasAgent)) {
-      if (!(await shouldPromptAfterSessionIdle(ctx.client, sessionID, options?.idleSettleMs))) {
-        log(`[${HOOK_NAME}] Boulder completion nudge skipped because session is active`, { sessionID })
-        return
-      }
-
-      const promptResult = await dispatchInternalPrompt({
-        mode: "async",
-        client: ctx.client,
-        sessionID,
-        source: HOOK_NAME,
-        settleMs: options?.idleSettleMs,
-        queueBehavior: "defer",
-        input: {
-          path: { id: sessionID },
-          body: {
-            agent: atlasAgent,
-            parts: [createInternalAgentContinuationTextPart(prompt)],
-          },
-          query: { directory: ctx.directory },
-        },
-      })
-      if (!isInternalPromptDispatchAccepted(promptResult)) {
-        if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
-          sessionState.boulderCompletionNudgedAt = {
-            ...(sessionState.boulderCompletionNudgedAt ?? {}),
-            [work.work_id]: Date.now(),
-          }
-        }
-        log(`[${HOOK_NAME}] Boulder completion nudge skipped by promptAsync gate`, {
-          sessionID,
-          status: promptResult.status,
-        })
-        return
-      }
-      sessionState.boulderCompletionNudgedAt = {
-        ...(sessionState.boulderCompletionNudgedAt ?? {}),
-        [work.work_id]: Date.now(),
-      }
-    }
-
-    log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+    await handleCompletedBoulderIdle({ ctx, options, sessionID, sessionState, boulderState })
     return
   }
 
@@ -472,44 +171,4 @@ export async function handleAtlasSessionIdle(input: {
     worktreePath: boulderState.worktree_path,
     idleSettleMs: options?.idleSettleMs ?? 0,
   })
-}
-
-async function canContinueTrackedBoulderSession(input: {
-  client: PluginInput["client"]
-  sessionID: string
-  sessionOrigin?: "direct" | "appended"
-  boulderSessionIDs: string[]
-  requiredAgent?: string
-}): Promise<boolean> {
-  const normalizedSessionID = normalizeSessionId(input.sessionID)
-  if (input.sessionOrigin === "direct") {
-    return true
-  }
-
-  const ancestorSessionIDs = input.boulderSessionIDs
-    .map((sessionID) => normalizeSessionId(sessionID))
-    .filter((trackedSessionID) => trackedSessionID !== normalizedSessionID)
-  if (ancestorSessionIDs.length === 0) {
-    return true
-  }
-
-  const isTrackedDescendant = await isSessionInBoulderLineage({
-    client: input.client,
-    sessionID: input.sessionID,
-    boulderSessionIDs: ancestorSessionIDs,
-  })
-  if (!isTrackedDescendant) {
-    return false
-  }
-
-  const sessionAgent = await getLastAgentFromSession(input.sessionID, input.client)
-    ?? getSessionAgent(input.sessionID)
-  if (!sessionAgent) {
-    return false
-  }
-
-  const requiredAgentKey = getAgentConfigKey(input.requiredAgent ?? "atlas")
-  const sessionAgentKey = getAgentConfigKey(sessionAgent)
-  return sessionAgentKey === requiredAgentKey
-    || (requiredAgentKey === getAgentConfigKey("atlas") && sessionAgentKey === getAgentConfigKey("sisyphus"))
 }

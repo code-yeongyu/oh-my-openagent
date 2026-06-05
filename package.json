@@ -69,7 +69,7 @@
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
-    "typecheck": "tsgo --noEmit && bun run typecheck:packages",
+    "typecheck": "tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages",
     "typecheck:packages": "tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json",
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
     "test": "bun test",
