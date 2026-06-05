@@ -55,7 +55,9 @@ async function outputIsCurrent(content) {
 }
 
 if (await outputIsCurrent(out)) {
-  process.stdout.write("Docs content already current with " + SECTIONS.length + " HTML-compiled docs\n")
+  process.stdout.write(
+    "Docs content already current with " + SECTIONS.length + " HTML-compiled docs\n",
+  )
 } else {
   await writeFile(OUTPUT, out)
   process.stdout.write("Generated " + OUTPUT + " with " + SECTIONS.length + " HTML-compiled docs\n")
