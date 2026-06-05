@@ -1,5 +1,5 @@
-import type { CommentCheckRequest } from "./core.js";
-import { getString, isRecord } from "./core-values.js";
+import { getString, isRecord } from "./record.js";
+import type { CommentCheckRequest } from "./types.js";
 
 type ApplyPatchAccumulator = {
 	operation: "add" | "delete" | "update";
