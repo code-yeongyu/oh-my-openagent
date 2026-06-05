@@ -34,6 +34,20 @@ const UNSUPPORTED_FORMATS = new Set([
 
 const CONVERSION_TIMEOUT_MS = 30_000
 
+function cleanupTemporaryFileAfterFailure(filePath: string): void {
+  try {
+    if (existsSync(filePath)) {
+      unlinkSync(filePath)
+    }
+  } catch (cleanupError) {
+    const cleanupErrorDescription =
+      cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+    log(
+      `[image-converter] Ignored temporary cleanup failure for ${filePath}: ${cleanupErrorDescription}`
+    )
+  }
+}
+
 export function needsConversion(mimeType: string): boolean {
   if (SUPPORTED_FORMATS.has(mimeType)) {
     return false
@@ -70,7 +84,9 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
           return outputPath
         }
       } catch (sipsError) {
-        log(`[image-converter] sips failed: ${sipsError}`)
+        const sipsErrorDescription =
+          sipsError instanceof Error ? sipsError.message : String(sipsError)
+        log(`[image-converter] sips failed: ${sipsErrorDescription}`)
       }
     }
 
@@ -87,7 +103,9 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
         return outputPath
       }
     } catch (convertError) {
-      log(`[image-converter] ImageMagick convert failed: ${convertError}`)
+      const convertErrorDescription =
+        convertError instanceof Error ? convertError.message : String(convertError)
+      log(`[image-converter] ImageMagick convert failed: ${convertErrorDescription}`)
     }
 
     throw new Error(
@@ -97,11 +115,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
       `  RHEL/CentOS: sudo yum install ImageMagick`
     )
   } catch (error) {
-    try {
-      if (existsSync(outputPath)) {
-        unlinkSync(outputPath)
-      }
-    } catch {}
+    cleanupTemporaryFileAfterFailure(outputPath)
 
     if (error instanceof Error) {
       const conversionError = error as Error & { temporaryOutputPath?: string }
@@ -124,7 +138,8 @@ export function cleanupConvertedImage(filePath: string): void {
       log(`[image-converter] Cleaned up temporary directory: ${tempDirectory}`)
     }
   } catch (error) {
-    log(`[image-converter] Failed to cleanup ${filePath}: ${error}`)
+    const cleanupErrorDescription = error instanceof Error ? error.message : String(error)
+    log(`[image-converter] Failed to cleanup ${filePath}: ${cleanupErrorDescription}`)
   }
 }
 
@@ -154,11 +169,9 @@ export function convertBase64ImageToJpeg(
     
     return { base64: convertedBase64, tempFiles }
   } catch (error) {
-    tempFiles.forEach(file => {
-      try {
-        if (existsSync(file)) unlinkSync(file)
-      } catch {}
-    })
+    for (const file of tempFiles) {
+      cleanupTemporaryFileAfterFailure(file)
+    }
     throw error
   }
 }
