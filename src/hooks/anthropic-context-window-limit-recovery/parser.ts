@@ -77,10 +77,21 @@ function stringifyErrorObject(errObj: Record<string, unknown>): string | null {
   try {
     return JSON.stringify(errObj) ?? null
   } catch (error) {
-    if (error instanceof Error) {
+    if (error instanceof TypeError) {
       return null
     }
-    return null
+    throw error
+  }
+}
+
+function parseJsonOrNull(text: string): unknown | null {
+  try {
+    return JSON.parse(text)
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return null
+    }
+    throw error
   }
 }
 
@@ -147,43 +158,39 @@ function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitErro
   if (!isTokenLimitError(combinedText)) return null
 
   if (typeof responseBody === "string") {
-    try {
-      const jsonPatterns = [
-        // Greedy match to last } for nested JSON
-        /data:\s*(\{[\s\S]*\})\s*$/m,
-        /(\{"type"\s*:\s*"error"[\s\S]*\})/,
-        /(\{[\s\S]*"error"[\s\S]*\})/,
-      ]
+    const jsonPatterns = [
+      // Greedy match to last } for nested JSON
+      /data:\s*(\{[\s\S]*\})\s*$/m,
+      /(\{"type"\s*:\s*"error"[\s\S]*\})/,
+      /(\{[\s\S]*"error"[\s\S]*\})/,
+    ]
 
-      for (const pattern of jsonPatterns) {
-        const dataMatch = responseBody.match(pattern)
-        if (dataMatch) {
-          try {
-            const jsonData: AnthropicErrorData = JSON.parse(dataMatch[1])
-            const message = jsonData.error?.message || ""
-            const tokens = extractTokensFromMessage(message)
+    for (const pattern of jsonPatterns) {
+      const dataMatch = responseBody.match(pattern)
+      if (dataMatch) {
+        const jsonData = parseJsonOrNull(dataMatch[1]) as AnthropicErrorData | null
+        const message = jsonData?.error?.message || ""
+        const tokens = extractTokensFromMessage(message)
 
-            if (tokens) {
-              return {
-                currentTokens: tokens.current,
-                maxTokens: tokens.max,
-                requestId: jsonData.request_id,
-                errorType: jsonData.error?.type || "token_limit_exceeded",
-              }
-            }
-          } catch {}
+        if (tokens) {
+          return {
+            currentTokens: tokens.current,
+            maxTokens: tokens.max,
+            requestId: jsonData?.request_id,
+            errorType: jsonData?.error?.type || "token_limit_exceeded",
+          }
         }
       }
+    }
 
-      const bedrockJson = JSON.parse(responseBody)
-      if (typeof bedrockJson.message === "string" && isTokenLimitError(bedrockJson.message)) {
-        return {
-          currentTokens: 0,
-          maxTokens: 0,
-          errorType: "bedrock_input_too_long",
-        }
+    const bedrockJson = parseJsonOrNull(responseBody) as Record<string, unknown> | null
+    if (typeof bedrockJson?.message === "string" && isTokenLimitError(bedrockJson.message)) {
+      return {
+        currentTokens: 0,
+        maxTokens: 0,
+        errorType: "bedrock_input_too_long",
       }
-    } catch {}
+    }
   }
 
   for (const text of textSources) {
