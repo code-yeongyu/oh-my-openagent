@@ -272,7 +272,7 @@ describe("createHttpClient cleanup failures", () => {
     configureNextClient = (client) => {
       client.connect.mockImplementation(async () => {
         throw new Error(
-          '{"headers":{"X-API-Key":"tiny","x-auth-token":"mini"},"detail":"api-key=short"} X-API-Key: "small"; api-key="brief"',
+          '{"headers":{"X-API-Key":"tiny","x-auth-token":"mini"},"detail":"api-key=short"} X-API-Key: "small"; api-key="brief"; {\'X-API-Key\':\'little\', \'x-auth-token\':\'tokenlet\'}',
         )
       })
     }
@@ -290,7 +290,9 @@ describe("createHttpClient cleanup failures", () => {
     expect(message).toContain('"x-auth-token":"[REDACTED]"')
     expect(message).toContain('"detail":"api-key=[REDACTED]"')
     expect(message).toContain('X-API-Key: "[REDACTED]"; api-key="[REDACTED]"')
-    expect(message).not.toMatch(/tiny|mini|api-key=short|small|brief/)
+    expect(message).toContain("'X-API-Key':'[REDACTED]'")
+    expect(message).toContain("'x-auth-token':'[REDACTED]'")
+    expect(message).not.toMatch(/tiny|mini|api-key=short|small|brief|little|tokenlet/)
   })
 
   it("#given shutdown completes during HTTP connect and cleanup rejects #when creating the client #then the shutdown error is preserved", async () => {
