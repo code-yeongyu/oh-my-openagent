@@ -377,6 +377,56 @@ describe("createRuleInjectionProcessor", () => {
 		}
 	});
 
+	it("#given multiple matching rules #when processing a file #then injects nearest first with truncation notice", async () => {
+		// given
+		const rootRuleFile = join(projectRoot, ".omo", "rules", "root.md");
+		const nestedRuleFile = join(projectRoot, "src", ".omo", "rules", "nested.md");
+		mkdirSync(join(projectRoot, ".omo", "rules"), { recursive: true });
+		mkdirSync(join(projectRoot, "src", ".omo", "rules"), { recursive: true });
+		writeFileSync(rootRuleFile, "root-rule\n");
+		writeFileSync(nestedRuleFile, "nested-rule\n");
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: `truncated:${content.trim()}`,
+					truncated: true,
+				}),
+			},
+			getSessionCache: () => ({
+				contentHashes: new Set<string>(),
+				realPaths: new Set<string>(),
+			}),
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+				cache.has(realPath),
+			createContentHash: (content: string) => `hash:${content}`,
+			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+				cache.has(hash),
+			saveInjectedRules: () => undefined,
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			output,
+		);
+
+		// then
+		expect(output.output).toContain("[Rule: src/.omo/rules/nested.md]");
+		expect(output.output).toContain("[Rule: .omo/rules/root.md]");
+		expect(
+			output.output.indexOf("[Rule: src/.omo/rules/nested.md]"),
+		).toBeLessThan(output.output.indexOf("[Rule: .omo/rules/root.md]"));
+		expect(output.output).toContain("[Match: matched]\ntruncated:nested-rule");
+		expect(output.output).toContain(
+			"[Note: Content was truncated to save context window space. For full context, please read the file directly: src/.omo/rules/nested.md]",
+		);
+	});
+
 	it("falls back to direct read and parse when statSync throws", async () => {
 		// given
 		statSnapshots = [new Error("stat failed"), new Error("stat failed")];
