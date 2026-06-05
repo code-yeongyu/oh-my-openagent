@@ -54,7 +54,7 @@ export class ConcurrencyManager {
 
   async acquire(model: string, taskId?: string): Promise<void> {
     const key = this.getConcurrencyKey(model)
-    const limit = this.getConcurrencyLimit(key)
+    const limit = this.getConcurrencyLimit(model)
     if (limit === Infinity) {
       return
     }
@@ -86,11 +86,6 @@ export class ConcurrencyManager {
 
   release(model: string): void {
     const key = this.getConcurrencyKey(model)
-    const limit = this.getConcurrencyLimit(key)
-    if (limit === Infinity) {
-      return
-    }
-
     const queue = this.queues.get(key)
 
     // Try to hand off to a waiting entry (skip any settled entries from cancelWaiters)

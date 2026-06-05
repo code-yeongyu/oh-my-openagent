@@ -39,4 +39,33 @@ describe("ConcurrencyManager normalized acquire/release keys", () => {
     manager.release(normalizedKey)
     await reacquire
   })
+
+  test("should resolve the limit from the raw model before storing by provider key", async () => {
+    // given
+    const rawModel = "anthropic/claude-sonnet-4-6"
+    const config: BackgroundTaskConfig = {
+      modelConcurrency: { anthropic: 99 },
+      providerConcurrency: { anthropic: 1 },
+    }
+    const manager = new ConcurrencyManager(config)
+    const normalizedKey = manager.getConcurrencyKey(rawModel)
+    await manager.acquire(rawModel)
+
+    // when
+    const secondAcquire = manager.acquire(rawModel, "second-task").then(
+      () => "acquired",
+      () => "cancelled",
+    )
+    const countAfterSecondAcquire = manager.getCount(normalizedKey)
+    const queueLengthAfterSecondAcquire = manager.getQueueLength(normalizedKey)
+
+    // then
+    expect(normalizedKey).toBe("anthropic")
+    expect(countAfterSecondAcquire).toBe(1)
+    expect(queueLengthAfterSecondAcquire).toBe(1)
+
+    manager.cancelWaiters(normalizedKey)
+    await secondAcquire
+    manager.release(normalizedKey)
+  })
 })
