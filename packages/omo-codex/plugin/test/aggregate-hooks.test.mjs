@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -8,6 +10,7 @@ import {
 	readComponentHookManifests,
 	readJson,
 	readPluginVersion,
+	root,
 } from "./aggregate-plugin-fixture.mjs";
 
 test("#given isolated components #when hooks are inspected #then commands stay inside component roots", async () => {
@@ -64,6 +67,20 @@ test("#given aggregate hook commands #when inspected #then every command exposes
 
 	// then
 	assert.deepEqual(missingStatusMessages, []);
+});
+
+test("#given aggregate hook commands #when inspected #then commands stay Node-based and platform-neutral", async () => {
+	// given
+	const hooks = await readJson("hooks/hooks.json");
+
+	// when
+	const commands = collectCommandHooks(hooks, "hooks/hooks.json").map(({ handler }) => handler.command);
+
+	// then
+	assert(!commands.some((command) => /\bpython3?\b/i.test(command)));
+	assert(commands.includes('node "${PLUGIN_ROOT}/components/ultrawork/dist/cli.js" hook user-prompt-submit'));
+	assert(commands.every((command) => command.startsWith("node ")));
+	assert(commands.every((command) => !command.includes("\\")));
 });
 
 test("#given component hook commands #when inspected #then standalone packages expose Codex status messages", async () => {
@@ -132,4 +149,16 @@ test("#given aggregate SessionStart hooks #when inspected #then LazyCodex auto-u
 	assert.match(text, /scripts\/auto-update\.mjs/);
 	assert.match(text, /Checking Auto Update/);
 	assert(sessionStartCommands.some((command) => command.includes("scripts/auto-update.mjs")));
+});
+
+test("#given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free", async () => {
+	// given
+	const hooksText = await readFile(join(root, "hooks/hooks.json"), "utf8");
+	const aggregateTestText = await readFile(join(root, "test/aggregate.test.mjs"), "utf8");
+
+	// when
+	const aggregateText = `${hooksText}\n${aggregateTestText}`;
+
+	// then
+	assert.doesNotMatch(aggregateText, /\bpython3?\b|ultrawork-detector\.py/);
 });
