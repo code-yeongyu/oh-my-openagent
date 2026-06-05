@@ -62,17 +62,48 @@ function exitFromResult(result, failureLabel) {
 }
 
 function shouldRunLazyCodexInstaller() {
-  if (!lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
-    return false;
-  }
-
-  const command = process.argv[2];
-  return command === undefined ||
+  const args = process.argv.slice(2);
+  const command = readInstallerCommand(args);
+  const platformArg = readPlatformArg(args);
+  if (lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+    if ((command === "install" || command === "setup") && platformArg !== undefined && platformArg !== "codex") {
+      return false;
+    }
+    return command === undefined ||
     command === "--help" ||
     command === "-h" ||
     command === "--version" ||
     command === "-v" ||
     lazyCodexInstallerCommands.has(command);
+  }
+
+  return (command === "install" || command === "setup") && platformArg === "codex";
+}
+
+function readInstallerCommand(args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--platform" || arg === "--repo-root") {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    return arg;
+  }
+  return undefined;
+}
+
+function readPlatformArg(args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--platform") {
+      return args[index + 1];
+    }
+    if (arg.startsWith("--platform=")) {
+      return arg.slice("--platform=".length);
+    }
+  }
+  return undefined;
 }
 
 if (shouldRunLazyCodexInstaller()) {
