@@ -231,12 +231,21 @@ export function terminateCommandProcess(proc: KillableProcess, signal: NodeJS.Si
       try {
         process.kill(-proc.pid, signal)
         return
-      } catch {
+      } catch (groupKillError) {
+        if (groupKillError instanceof Error) {
+          proc.kill(signal)
+          return
+        }
         proc.kill(signal)
         return
       }
     }
 
     proc.kill(signal)
-  } catch {}
+  } catch (directKillError) {
+    if (directKillError instanceof Error) {
+      return
+    }
+    return
+  }
 }

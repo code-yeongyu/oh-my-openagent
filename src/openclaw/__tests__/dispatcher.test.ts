@@ -178,6 +178,17 @@ describe("OpenClaw Dispatcher", () => {
     }
   })
 
+  test("terminateCommandProcess suppresses direct kill failures", () => {
+    const proc = {
+      kill: mock(() => {
+        throw new Error("process already exited")
+      }),
+    }
+
+    expect(() => terminateCommandProcess(proc, "SIGKILL")).not.toThrow()
+    expect(proc.kill).toHaveBeenCalledWith("SIGKILL")
+  })
+
   test("wakeCommandGateway returns correlation metadata from stdout JSON", async () => {
     const result = await wakeCommandGateway(
       "command",
