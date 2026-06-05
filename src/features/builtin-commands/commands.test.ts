@@ -285,6 +285,30 @@ describe("loadBuiltinCommands - team mode gating for remove-ai-slops", () => {
 })
 
 describe("REFACTOR_TEMPLATE", () => {
+  test("should preserve the base refactor command section order", () => {
+    //#given - the base slash command template shown when team mode is disabled
+    const expectedMarkers = [
+      "## Codex Harness Tool Compatibility",
+      "## Usage",
+      "# PHASE 0: INTENT GATE",
+      "# PHASE 1: CODEBASE ANALYSIS",
+      "# PHASE 2: BUILD CODEMAP",
+      "# PHASE 3: TEST ASSESSMENT",
+      "# PHASE 4: PLAN GENERATION",
+      "# PHASE 5: EXECUTE REFACTORING",
+      "# PHASE 6: FINAL VERIFICATION",
+      "# Tool Usage Philosophy",
+      "<user-request>",
+    ]
+
+    //#when
+    const markerIndexes = expectedMarkers.map((marker) => REFACTOR_TEMPLATE.indexOf(marker))
+
+    //#then
+    expect(markerIndexes.every((index) => index >= 0)).toBe(true)
+    expect(markerIndexes).toEqual([...markerIndexes].sort((left, right) => left - right))
+  })
+
   test("should explain Codex tool compatibility before OpenCode orchestration examples", () => {
     //#given - the slash command template can be surfaced in Codex-compatible harnesses
 
@@ -308,6 +332,25 @@ describe("REFACTOR_TEMPLATE", () => {
 })
 
 describe("REFACTOR_TEAM_MODE_ADDENDUM", () => {
+  test("should preserve the team mode override section order", () => {
+    //#given - the addendum appended only when team mode is enabled
+    const expectedMarkers = [
+      "# Team Mode Protocol",
+      "## Phase 4 override",
+      "## Phase 5 override",
+      "## Phase 5.1-T",
+      "## Phase 6 override",
+      "## MUST NOT",
+    ]
+
+    //#when
+    const markerIndexes = expectedMarkers.map((marker) => REFACTOR_TEAM_MODE_ADDENDUM.indexOf(marker))
+
+    //#then
+    expect(markerIndexes.every((index) => index >= 0)).toBe(true)
+    expect(markerIndexes).toEqual([...markerIndexes].sort((left, right) => left - right))
+  })
+
   test("should define the refactor-squad team spec and lifecycle", () => {
     //#given - the team mode addendum, injected only when team mode is enabled
 
