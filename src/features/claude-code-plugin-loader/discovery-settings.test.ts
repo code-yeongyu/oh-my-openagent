@@ -82,4 +82,44 @@ describe("discoverInstalledPlugins settings", () => {
     expect(discovered.errors).toHaveLength(0)
     expect(discovered.plugins).toHaveLength(0)
   })
+
+  it("#given malformed enabledPlugins settings #when discovery runs #then the plugin still loads", async () => {
+    //#given
+    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
+    const installPath = createTemporaryDirectory("omo-settings-malformed-install-")
+    const settingsPath = join(createTemporaryDirectory("omo-claude-settings-"), "settings.json")
+    process.env.CLAUDE_SETTINGS_PATH = settingsPath
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ enabledPlugins: "not-an-object" }),
+      "utf-8",
+    )
+    writeDatabase(pluginsHome, {
+      version: 2,
+      plugins: {
+        "malformed-settings-plugin@market": [
+          {
+            scope: "user",
+            installPath,
+            version: "1.0.0",
+            installedAt: "2026-03-26T00:00:00Z",
+            lastUpdated: "2026-03-26T00:00:00Z",
+          },
+        ],
+      },
+    })
+
+    //#when
+    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-settings-malformed`)
+    const discovered = discoverInstalledPlugins({
+      pluginsHomeOverride: pluginsHome,
+      loadPluginManifestOverride: () => null,
+    })
+
+    //#then
+    expect(discovered.errors).toHaveLength(0)
+    expect(discovered.plugins.map((plugin) => plugin.pluginKey)).toEqual([
+      "malformed-settings-plugin@market",
+    ])
+  })
 })

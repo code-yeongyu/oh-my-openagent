@@ -23,14 +23,24 @@ export function loadClaudeSettings(): ClaudeSettings | null {
 
 export function isPluginEnabled(
   pluginKey: string,
-  settingsEnabledPlugins: Record<string, boolean> | undefined,
-  overrideEnabledPlugins: Record<string, boolean> | undefined,
+  settingsEnabledPlugins: unknown,
+  overrideEnabledPlugins: unknown,
 ): boolean {
-  if (overrideEnabledPlugins && pluginKey in overrideEnabledPlugins) {
-    return overrideEnabledPlugins[pluginKey]
+  if (isEnabledPluginsRecord(overrideEnabledPlugins) && pluginKey in overrideEnabledPlugins) {
+    const overrideEnabled = overrideEnabledPlugins[pluginKey]
+    if (typeof overrideEnabled === "boolean") {
+      return overrideEnabled
+    }
   }
-  if (settingsEnabledPlugins && pluginKey in settingsEnabledPlugins) {
-    return settingsEnabledPlugins[pluginKey]
+  if (isEnabledPluginsRecord(settingsEnabledPlugins) && pluginKey in settingsEnabledPlugins) {
+    const settingsEnabled = settingsEnabledPlugins[pluginKey]
+    if (typeof settingsEnabled === "boolean") {
+      return settingsEnabled
+    }
   }
   return true
+}
+
+function isEnabledPluginsRecord(value: unknown): value is Record<string, boolean> {
+  return typeof value === "object" && value !== null
 }
