@@ -15,13 +15,19 @@ import {
 
 const MAX_REPLY_LISTENER_LOG_SIZE_BYTES = 1024 * 1024
 
+function ignoreReplyListenerLogError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export function writeSecureReplyListenerFile(filePath: string, content: string): void {
   ensureReplyListenerStateDir()
   writeFileSync(filePath, content, { mode: REPLY_LISTENER_SECURE_FILE_MODE })
 
   try {
     chmodSync(filePath, REPLY_LISTENER_SECURE_FILE_MODE)
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerLogError(error)
   }
 }
 
@@ -37,7 +43,8 @@ function rotateReplyListenerLogIfNeeded(logPath: string): void {
       unlinkSync(backupPath)
     }
     renameSync(logPath, backupPath)
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerLogError(error)
   }
 }
 
@@ -50,6 +57,7 @@ export function logReplyListenerMessage(message: string): void {
     appendFileSync(logFilePath, `[${timestamp}] ${message}\n`, {
       mode: REPLY_LISTENER_SECURE_FILE_MODE,
     })
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerLogError(error)
   }
 }

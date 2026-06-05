@@ -36,6 +36,11 @@ const REPLY_LISTENER_DAEMON_ENV_ALLOWLIST = [
   "COMSPEC",
 ] as const
 
+function ignoreReplyListenerProcessProbeError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export function createReplyListenerDaemonEnv(extraEnv: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {}
 
@@ -53,7 +58,8 @@ export function isReplyListenerProcessRunning(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerProcessProbeError(error)
     return false
   }
 }
@@ -72,7 +78,8 @@ export async function isReplyListenerDaemonProcess(pid: number): Promise<boolean
     const stdout = await new Response(processInfo.stdout).text()
     if (processInfo.exitCode !== 0) return false
     return stdout.includes(REPLY_LISTENER_DAEMON_IDENTITY_MARKER)
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerProcessProbeError(error)
     return false
   }
 }
