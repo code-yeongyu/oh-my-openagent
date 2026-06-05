@@ -61,7 +61,7 @@ function redactCleanupErrorMessage(message: string): string {
   const messageWithRedactedAuthorization = message
     .replace(/("authorization"\s*:\s*")([^"]*)(")/gi, "$1[REDACTED]$3")
     .replace(/(\bauthorization\s*:\s*)([^\n,;}]*)/gi, "$1[REDACTED]")
-    .replace(/(\bauthorization\s*=\s*)([^\s,;}]*)/gi, "$1[REDACTED]")
+    .replace(/(\bauthorization\s*=\s*)([^\n,;}]*)/gi, "$1[REDACTED]")
   const messageWithRedactedSecrets = redactSensitiveData(messageWithRedactedAuthorization)
   return messageWithRedactedSecrets.replace(/https?:\/\/[^\s"'<>)}\]]+/g, (url) => redactUrl(url))
 }
