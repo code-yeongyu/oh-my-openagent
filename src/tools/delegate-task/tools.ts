@@ -34,6 +34,11 @@ export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 
+function ignoreSystemDefaultModelError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 const delegateTaskArgsSchema = {
   load_skills: tool.schema
     .array(tool.schema.string())
@@ -107,7 +112,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       try {
         const openCodeConfig = await options.client.config.get()
         systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
-      } catch {
+      } catch (error) {
+        ignoreSystemDefaultModelError(error)
         systemDefaultModel = undefined
       }
 
