@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CommentCheckRequest, ToolResultLike } from "../src/core.ts";
+import type { CheckerEdit, CheckerToolInput, CommentCheckRequest, ToolResultLike } from "../src/core.ts";
 import { extractCommentCheckRequests, parseApplyPatchRequests, toHookInput } from "../src/core.ts";
 
 describe("extractCommentCheckRequests", () => {
@@ -133,6 +133,51 @@ describe("toHookInput", () => {
 			hook_event_name: "PostToolUse",
 			tool_input: request.toolInput,
 		});
+	});
+});
+
+describe("public contract mutability", () => {
+	it("#given exported core types #when consumers mutate fields #then the compatibility contract is preserved", () => {
+		// given
+		const edit: CheckerEdit = {
+			old_string: "const value = 1;\n",
+			new_string: "const value = 2;\n",
+		};
+		const toolInput: CheckerToolInput = {
+			file_path: "src/example.ts",
+			edits: [edit],
+		};
+		const request: CommentCheckRequest = {
+			sourceToolName: "multi_edit",
+			toolName: "MultiEdit",
+			filePath: "src/example.ts",
+			toolInput,
+		};
+		const event: ToolResultLike = {
+			toolName: "write",
+			input: {},
+			content: [{ type: "text", text: "ok" }],
+		};
+
+		// when
+		edit.new_string = "const value = 3;\n";
+		toolInput.file_path = "src/renamed.ts";
+		toolInput.edits?.push({
+			old_string: "const other = 1;\n",
+			new_string: "const other = 2;\n",
+		});
+		request.filePath = "src/renamed.ts";
+		event.toolName = "edit";
+		event.content?.push({ type: "text", text: "still ok" });
+
+		// then
+		expect(request.filePath).toBe("src/renamed.ts");
+		expect(request.toolInput.edits).toHaveLength(2);
+		expect(event.toolName).toBe("edit");
+		expect(event.content).toEqual([
+			{ type: "text", text: "ok" },
+			{ type: "text", text: "still ok" },
+		]);
 	});
 });
 
