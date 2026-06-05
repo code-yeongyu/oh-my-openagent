@@ -164,6 +164,8 @@ describe("plugin bundled rules", () => {
 		expect(output).toContain('"hookEventName":"SessionStart"');
 		expect(output).toContain(`Instructions from: ${bundledRulePath}`);
 		expect(output).toContain(BUNDLED_BODY);
+		expect(output).not.toContain("## Project Instructions");
+		expect(output).not.toContain("must read project rules:");
 		expect(output).not.toContain(`- [hephaestus.md]{${bundledRulePath}}`);
 	});
 

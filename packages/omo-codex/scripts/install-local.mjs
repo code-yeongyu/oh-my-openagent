@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
 	installCachedPlugin,
 	linkCachedPluginBins,
+	linkRootRuntimeBin,
 	pruneMarketplaceCache,
 	pruneMarketplacePluginCaches,
 } from "./install/cache.mjs";
@@ -110,6 +111,10 @@ export async function installMarketplaceLocally(options = {}) {
 		const binLinks = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
 		for (const link of binLinks) {
 			log(`Linked ${link.name} -> ${link.target}`);
+		}
+		if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
+			const runtimeLink = await linkRootRuntimeBin({ binDir, codexHome, repoRoot, platform });
+			if (runtimeLink !== null) log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
 		}
 		pluginSources.push({ name: entry.name, sourcePath });
 		installed.push(plugin);

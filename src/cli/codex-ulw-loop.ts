@@ -17,11 +17,18 @@ type ResolveCodexUlwLoopCommandInput = {
 export function resolveCodexUlwLoopCommand(input: ResolveCodexUlwLoopCommandInput = {}): CodexUlwLoopCommand | null {
   const env = input.env ?? process.env
   const homeDir = input.homeDir ?? homedir()
-  const localBin = resolveLocalOmoBin(env, homeDir, input.currentExecutablePaths ?? [process.argv[1]].filter((value): value is string => typeof value === "string"))
-  if (localBin !== null) return { executable: localBin, argsPrefix: ["ulw-loop"] }
+  const localComponentBin = resolveLocalUlwLoopBin(env, homeDir)
+  if (localComponentBin !== null) return { executable: localComponentBin, argsPrefix: [] }
 
   const componentCli = resolveNewestCachedUlwLoopCli(env.CODEX_HOME ?? join(homeDir, ".codex"))
   if (componentCli !== null) return { executable: process.execPath, argsPrefix: [componentCli] }
+
+  const legacyLocalBin = resolveLegacyLocalOmoBin(
+    env,
+    homeDir,
+    input.currentExecutablePaths ?? [process.argv[1]].filter((value): value is string => typeof value === "string"),
+  )
+  if (legacyLocalBin !== null) return { executable: legacyLocalBin, argsPrefix: ["ulw-loop"] }
 
   return null
 }
@@ -43,7 +50,17 @@ export async function codexUlwLoop(args: readonly string[]): Promise<number> {
   })
 }
 
-function resolveLocalOmoBin(env: NodeJS.ProcessEnv, homeDir: string, currentExecutablePaths: readonly string[]): string | null {
+function resolveLocalUlwLoopBin(env: NodeJS.ProcessEnv, homeDir: string): string | null {
+  const candidates = [
+    env.CODEX_LOCAL_BIN_DIR ? join(env.CODEX_LOCAL_BIN_DIR, "omo-ulw-loop") : undefined,
+    join(homeDir, ".local", "bin", "omo-ulw-loop"),
+    join(homeDir, ".codex", "bin", "omo-ulw-loop"),
+  ].filter((value): value is string => typeof value === "string")
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? null
+}
+
+function resolveLegacyLocalOmoBin(env: NodeJS.ProcessEnv, homeDir: string, currentExecutablePaths: readonly string[]): string | null {
   const candidates = [
     env.CODEX_LOCAL_BIN_DIR ? join(env.CODEX_LOCAL_BIN_DIR, "omo") : undefined,
     join(homeDir, ".local", "bin", "omo"),

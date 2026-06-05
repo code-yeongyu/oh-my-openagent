@@ -23,7 +23,7 @@
 		"typescript"
 	],
 	"bin": {
-		"omo": "./dist/cli.js"
+		"omo-ulw-loop": "./dist/cli.js"
 	},
 	"files": [
 		"dist",

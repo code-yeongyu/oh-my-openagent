@@ -34,12 +34,15 @@ describe("sparkshell CLI", () => {
     // given
     const calls: string[][] = []
     const commandChecks: string[] = []
+    const stderr: string[] = []
 
     // when
     const exitCode = await runSparkShell(["git", "status"], {
       env: {},
       appServerClient: null,
-      writeStderr: () => {},
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
       commandExists: (command: string) => {
         commandChecks.push(command)
         return false
@@ -54,6 +57,7 @@ describe("sparkshell CLI", () => {
     expect(exitCode).toBe(0)
     expect(calls).toEqual([["git", "status"]])
     expect(commandChecks).toEqual([])
+    expect(stderr.join("")).toBe("")
   })
 
   test("#given command-owned options #when native sidecar is absent #then preserves argv after the command boundary", async () => {
@@ -115,7 +119,7 @@ describe("sparkshell CLI", () => {
       // then
       expect(result.exitCode).toBe(0)
       expect(textDecoder.decode(result.stdout)).toBe("--help")
-      expect(textDecoder.decode(result.stderr)).toContain("native sidecar unavailable")
+      expect(textDecoder.decode(result.stderr)).toBe("")
     }
   })
 

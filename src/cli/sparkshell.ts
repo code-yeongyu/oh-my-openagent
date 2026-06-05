@@ -103,7 +103,6 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
     return 1
   }
 
-  writeStderr("[sparkshell] native sidecar unavailable; falling back to raw command execution without summary support.\n")
   const [command, ...commandArgs] = invocation.argv
   if (command === undefined) {
     writeStderr(`Missing command to run.\n${SPARKSHELL_USAGE}\n`)

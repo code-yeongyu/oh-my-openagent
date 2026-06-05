@@ -77,17 +77,17 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 	const orderedRules = orderStaticRules(uniqueRulesByBody(rules));
 	const hephaestusRules = orderedRules.filter(isHephaestusRule);
 	const otherRules = orderedRules.filter((rule) => !isHephaestusRule(rule));
-	const blocks = ["## Project Instructions"];
+	const blocks: string[] = [];
 
 	if (hephaestusRules.length > 0) {
-		blocks.push("", truncateRules(hephaestusRules, options).map(formatRule).join("\n\n"));
+		blocks.push(truncateRules(hephaestusRules, options).map(formatRule).join("\n\n"));
 	}
 
 	if (otherRules.length > 0) {
-		blocks.push("", "must read project rules:", otherRules.map(formatStaticRuleReference).join("\n"));
+		blocks.push(["## Project Instructions", "", "must read project rules:", otherRules.map(formatStaticRuleReference).join("\n")].join("\n"));
 	}
 
-	return blocks.join("\n");
+	return blocks.join("\n\n");
 }
 
 function orderStaticRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {

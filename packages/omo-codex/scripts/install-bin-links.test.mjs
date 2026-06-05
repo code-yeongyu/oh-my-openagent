@@ -99,6 +99,88 @@ test("#given managed legacy Codex LSP symlink #when linking bins #then removes s
 	assert.equal(await readlink(join(binDir, "omo")), join(pluginRoot, "dist", "cli.js"));
 });
 
+test("#given nested component declares reserved omo bin #when linking bins #then skips the nested top-level command", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const componentRoot = join(pluginRoot, "components", "ulw-loop");
+	const binDir = join(root, "bin");
+
+	await mkdir(join(componentRoot, "dist"), { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/omo",
+	});
+	await writeJson(join(componentRoot, "package.json"), {
+		name: "@example/ulw-loop",
+		bin: {
+			omo: "./dist/cli.js",
+			"omo-ulw-loop": "./dist/cli.js",
+		},
+	});
+	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+
+	const linked = await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" });
+
+	assert.deepEqual(linked, [
+		{ name: "omo-ulw-loop", path: join(binDir, "omo-ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
+	]);
+	await assert.rejects(readlink(join(binDir, "omo")));
+	assert.equal(await readlink(join(binDir, "omo-ulw-loop")), join(componentRoot, "dist", "cli.js"));
+});
+
+test("#given stale managed ulw-loop omo symlink #when linking bins #then removes it without touching user-owned omo", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const componentRoot = join(pluginRoot, "components", "rules");
+	const binDir = join(root, "bin");
+	const oldTarget = join(root, "codex-home", "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js");
+
+	await mkdir(join(componentRoot, "dist"), { recursive: true });
+	await mkdir(join(root, "codex-home", "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/omo",
+	});
+	await writeJson(join(componentRoot, "package.json"), {
+		name: "@example/rules",
+		bin: { "omo-rules": "./dist/cli.js" },
+	});
+	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+	await writeFile(oldTarget, "#!/usr/bin/env node\n");
+	await symlink(oldTarget, join(binDir, "omo"));
+
+	await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" });
+
+	await assert.rejects(readlink(join(binDir, "omo")));
+	assert.equal(await readlink(join(binDir, "omo-rules")), join(componentRoot, "dist", "cli.js"));
+});
+
+test("#given stale local-source ulw-loop omo symlink #when linking bins #then removes it", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const componentRoot = join(pluginRoot, "components", "rules");
+	const binDir = join(root, "bin");
+	const oldTarget = join(root, "repo", "packages", "omo-codex", "plugin", "components", "ulw-loop", "dist", "cli.js");
+
+	await mkdir(join(componentRoot, "dist"), { recursive: true });
+	await mkdir(join(root, "repo", "packages", "omo-codex", "plugin", "components", "ulw-loop", "dist"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/omo",
+	});
+	await writeJson(join(componentRoot, "package.json"), {
+		name: "@example/rules",
+		bin: { "omo-rules": "./dist/cli.js" },
+	});
+	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+	await writeFile(oldTarget, "#!/usr/bin/env node\n");
+	await symlink(oldTarget, join(binDir, "omo"));
+
+	await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" });
+
+	await assert.rejects(readlink(join(binDir, "omo")));
+	assert.equal(await readlink(join(binDir, "omo-rules")), join(componentRoot, "dist", "cli.js"));
+});
+
 test("#given user-owned legacy Codex symlink #when linking bins #then preserves the user symlink", async () => {
 	const root = await makeTempDir();
 	const pluginRoot = join(root, "plugin");

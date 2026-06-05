@@ -8,13 +8,14 @@ import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 
 const EXPECTED_OMO_COMPONENT_BINS = [
-  { name: "omo", target: join("components", "ulw-loop", "dist", "cli.js") },
+  { name: "omo", target: join("dist", "cli", "index.js"), kind: "runtime-wrapper" },
   { name: "omo-comment-checker", target: join("components", "comment-checker", "dist", "cli.js") },
   { name: "omo-git-bash-hook", target: join("components", "git-bash", "dist", "cli.js") },
   { name: "omo-lsp", target: join("components", "lsp", "dist", "cli.js") },
   { name: "omo-rules", target: join("components", "rules", "dist", "cli.js") },
   { name: "omo-start-work-continuation", target: join("components", "start-work-continuation", "dist", "cli.js") },
   { name: "omo-telemetry", target: join("components", "telemetry", "dist", "cli.js") },
+  { name: "omo-ulw-loop", target: join("components", "ulw-loop", "dist", "cli.js") },
   { name: "omo-ultrawork", target: join("components", "ultrawork", "dist", "cli.js") },
 ] as const
 
@@ -259,14 +260,24 @@ describe("install-codex", () => {
     expect(linkedNames).toEqual(EXPECTED_OMO_COMPONENT_BINS.map((entry) => expectedBinName(entry.name)).sort())
     for (const entry of EXPECTED_OMO_COMPONENT_BINS) {
       const linkPath = join(binDir, expectedBinName(entry.name))
-      const expectedTarget = join(pluginPath, entry.target)
-      if (process.platform === "win32") {
+      if ("kind" in entry && entry.kind === "runtime-wrapper") {
+        const expectedTarget = join(repoRoot, entry.target)
+        expect((await stat(linkPath)).isFile()).toBe(true)
+        const wrapper = await readFile(linkPath, "utf8")
+        expect(wrapper).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
+        expect(wrapper).toContain(expectedTarget)
+        expect(wrapper).toContain(`CODEX_HOME`)
+        expect(wrapper).toContain("OMO_SPARKSHELL_APP_SERVER_SOCKET")
+        expect(wrapper).toContain("omo-ulw-loop")
+      } else if (process.platform === "win32") {
+        const expectedTarget = join(pluginPath, entry.target)
         expect((await stat(linkPath)).isFile()).toBe(true)
         expect(await readFile(linkPath, "utf8")).toContain(expectedTarget)
       } else {
+        const expectedTarget = join(pluginPath, entry.target)
         expect(await readlink(linkPath)).toBe(expectedTarget)
+        expect((await stat(expectedTarget)).isFile()).toBe(true)
       }
-      expect((await stat(expectedTarget)).isFile()).toBe(true)
     }
     for (const staleName of STALE_CODEX_COMPONENT_BINS) {
       expect(linkedNames).not.toContain(staleName)
