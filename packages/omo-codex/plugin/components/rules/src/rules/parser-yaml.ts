@@ -83,8 +83,9 @@ function parseGlobValue(rawValue: string, lines: readonly string[], lineIndex: n
 		return parseMultilineArray(lines, lineIndex);
 	}
 
+	const quotedScalar = isQuotedScalar(rawValue);
 	const value = parseStringValue(rawValue);
-	if (value.includes(",")) {
+	if (!quotedScalar && value.includes(",")) {
 		return {
 			values: value
 				.split(",")
@@ -95,6 +96,10 @@ function parseGlobValue(rawValue: string, lines: readonly string[], lineIndex: n
 	}
 
 	return { values: [value], consumed: 1 };
+}
+
+function isQuotedScalar(value: string): boolean {
+	return value.startsWith('"') || value.startsWith("'");
 }
 
 function parseMultilineArray(lines: readonly string[], lineIndex: number): ParsedGlobValue {

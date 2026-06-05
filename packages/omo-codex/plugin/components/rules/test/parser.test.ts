@@ -83,6 +83,28 @@ describe("parseRule", () => {
 		});
 	});
 
+	it("#given quoted scalar glob with comma #when parsing #then the comma remains part of one glob", () => {
+		// given
+		const content = ["---", 'globs: "src/foo,bar.ts"', "---", "", "Prefer precise glob parsing."].join("\n");
+
+		// when
+		const parsed = parseRule(content);
+
+		// then
+		expect(parsed.frontmatter.globs).toBe("src/foo,bar.ts");
+	});
+
+	it("#given unquoted scalar glob list with comma #when parsing #then it remains split into multiple globs", () => {
+		// given
+		const content = ["---", "globs: src/foo.ts, src/bar.ts", "---", "", "Prefer precise glob parsing."].join("\n");
+
+		// when
+		const parsed = parseRule(content);
+
+		// then
+		expect(parsed.frontmatter.globs).toEqual(["src/foo.ts", "src/bar.ts"]);
+	});
+
 	it("#given multiline array with comments and blanks #when parsing #then items are collected until next key", () => {
 		// given
 		const content = [
