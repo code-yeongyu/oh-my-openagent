@@ -9,7 +9,7 @@ import { isInteractiveBashEnabled } from "../create-runtime-tmux-config"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { log } from "../shared"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
-import { createCoreTools, createLookAtTools } from "./tool-registry-core-tools"
+import { createCoreTools } from "./tool-registry-core-tools"
 import { defaultToolRegistryFactories } from "./tool-registry-factories"
 import {
   createConsensusToolsRecord,
@@ -58,7 +58,6 @@ export function createToolRegistry(args: {
       availableCategories,
       factories,
     }),
-    ...createLookAtTools({ ctx, pluginConfig, factories }),
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createTaskToolsRecord({ taskSystemEnabled, pluginConfig, ctx, factories }),

@@ -4,7 +4,7 @@ import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
-import type { PluginContext } from "./types"
+import type { PluginContext, ToolsRecord } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
@@ -29,6 +29,9 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+  )
+  const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
+    (agent) => agent.toLowerCase() === "multimodal-looker",
   )
   const delegateTask = factories.createDelegateTask({
     manager: managers.backgroundManager,
@@ -103,26 +106,19 @@ export function createCoreTools(args: {
     includeSkillsInDescription: true,
   })
 
-  return {
+  const tools: ToolsRecord = {
     ...factories.createGrepTools(ctx),
     ...factories.createGlobTools(ctx),
     ...factories.createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
-    task: delegateTask,
-    skill_mcp: skillMcpTool,
-    skill: skillTool,
   }
-}
+  if (isMultimodalLookerEnabled) {
+    tools.look_at = factories.createLookAt(ctx)
+  }
+  tools.task = delegateTask
+  tools.skill_mcp = skillMcpTool
+  tools.skill = skillTool
 
-export function createLookAtTools(args: {
-  readonly ctx: PluginContext
-  readonly pluginConfig: OhMyOpenCodeConfig
-  readonly factories: ToolRegistryFactories
-}): Record<string, ToolDefinition> {
-  const { ctx, pluginConfig, factories } = args
-  const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
-    (agent) => agent.toLowerCase() === "multimodal-looker",
-  )
-  return isMultimodalLookerEnabled ? { look_at: factories.createLookAt(ctx) } : {}
+  return tools
 }
