@@ -22,6 +22,11 @@ function parseTelegramUpdatesResponse(body: unknown): TelegramUpdate[] {
   return Array.isArray(result) ? result : []
 }
 
+function ignoreTelegramAcknowledgementError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export async function pollTelegramReplies(
   config: OpenClawConfig,
   state: ReplyListenerDaemonState,
@@ -76,7 +81,8 @@ export async function pollTelegramReplies(
               reply_to_message_id: message.message_id,
             }),
           })
-        } catch {
+        } catch (error) {
+          ignoreTelegramAcknowledgementError(error)
         }
       } else {
         state.errors += 1
