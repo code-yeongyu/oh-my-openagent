@@ -6,17 +6,26 @@ import { exists, isRecord } from "./utils.mjs";
 import { COMMAND_SHIM_MARKER } from "./command-shim.mjs";
 import { removeLegacyCodexComponentBins } from "./legacy-bins.mjs";
 
-export async function installCachedPlugin({ buildSource = true, codexHome, marketplaceName, name, runCommand, sourcePath, version }) {
+export async function installCachedPlugin({ buildSource = true, codexHome, marketplaceName, name, renameDirectory = rename, runCommand, sourcePath, version }) {
 	if (buildSource) {
 		await maybeRunNpmInstall(sourcePath, runCommand);
 		await maybeRunNpmBuild(sourcePath, runCommand);
 	}
 
 	const targetPath = join(codexHome, "plugins", "cache", marketplaceName, name, version);
-	await replaceDirectory(sourcePath, targetPath, shouldCopyPluginPath);
-	await rewriteCachedPackageLocalFileDependencies(targetPath, sourcePath);
-	await maybeRunNpmInstall(targetPath, runCommand, ["install", "--omit=dev"]);
-	await rewriteCachedMcpManifest(targetPath, sourcePath);
+	const tempPath = createTempSiblingPath(targetPath);
+	await rm(tempPath, { recursive: true, force: true });
+	try {
+		await copyDirectory(sourcePath, tempPath, shouldCopyPluginPath);
+		await rewriteCachedPackageLocalFileDependencies(tempPath, sourcePath);
+		await maybeRunNpmInstall(tempPath, runCommand, ["install", "--omit=dev"]);
+		await rewriteCachedMcpManifest(tempPath, sourcePath);
+		await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
+		await promoteDirectory(tempPath, targetPath, renameDirectory);
+	} catch (error) {
+		await rm(tempPath, { recursive: true, force: true });
+		throw error;
+	}
 	return { name, version, path: targetPath };
 }
 
@@ -78,16 +87,43 @@ async function maybeRunNpmBuild(cwd, runCommand) {
 	await runCommand("npm", ["run", "build"], { cwd });
 }
 
-async function replaceDirectory(sourcePath, targetPath, filter) {
+function createTempSiblingPath(targetPath) {
+	return join(dirname(targetPath), `.tmp-${basename(targetPath)}-${process.pid}-${Date.now()}`);
+}
+
+function createBackupSiblingPath(targetPath) {
+	return join(dirname(targetPath), `.backup-${basename(targetPath)}-${process.pid}-${Date.now()}`);
+}
+
+async function copyDirectory(sourcePath, targetPath, filter) {
 	await mkdir(dirname(targetPath), { recursive: true });
-	const tempPath = join(dirname(targetPath), `.tmp-${basename(targetPath)}-${process.pid}-${Date.now()}`);
-	await rm(tempPath, { recursive: true, force: true });
-	await cp(sourcePath, tempPath, {
+	await cp(sourcePath, targetPath, {
 		recursive: true,
 		filter: (source) => filter(source, sourcePath),
 	});
+}
+
+async function promoteDirectory(tempPath, targetPath, renameDirectory) {
+	const backupPath = createBackupSiblingPath(targetPath);
+	await rm(backupPath, { recursive: true, force: true });
+	let backupMoved = false;
+	try {
+		if (await exists(targetPath)) {
+			await renameDirectory(targetPath, backupPath);
+			backupMoved = true;
+		}
+		await renameDirectory(tempPath, targetPath);
+	} catch (error) {
+		if (backupMoved) await restoreBackupDirectory(backupPath, targetPath, renameDirectory);
+		throw error;
+	}
+	if (backupMoved) await rm(backupPath, { recursive: true, force: true });
+}
+
+async function restoreBackupDirectory(backupPath, targetPath, renameDirectory) {
+	if (!(await exists(backupPath))) return;
 	await rm(targetPath, { recursive: true, force: true });
-	await rename(tempPath, targetPath);
+	await renameDirectory(backupPath, targetPath);
 }
 
 async function discoverPackageBins(root) {
@@ -192,6 +228,30 @@ export async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRo
 		const nextArgs = await Promise.all(
 			server.args.map((arg) => rewriteRuntimeArg({ arg, pluginRoot, serverName, sourceRoot })),
 		);
+		if (nextArgs.some((value, index) => value !== server.args[index])) {
+			server.args = nextArgs;
+			changed = true;
+		}
+	}
+	if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`);
+}
+
+async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
+	const manifestPath = join(pluginRoot, ".mcp.json");
+	if (!(await exists(manifestPath))) return;
+	const raw = await readFile(manifestPath, "utf8");
+	const parsed = JSON.parse(raw);
+	if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return;
+	let changed = false;
+	for (const server of Object.values(parsed.mcpServers)) {
+		if (!isRecord(server) || !Array.isArray(server.args)) continue;
+		const nextArgs = server.args.map((arg) => {
+			if (typeof arg !== "string") return arg;
+			if (arg === fromRoot) return toRoot;
+			const prefix = `${fromRoot}${sep}`;
+			if (!arg.startsWith(prefix)) return arg;
+			return `${toRoot}${arg.slice(fromRoot.length)}`;
+		});
 		if (nextArgs.some((value, index) => value !== server.args[index])) {
 			server.args = nextArgs;
 			changed = true;

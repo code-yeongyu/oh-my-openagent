@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import test from "node:test";
 
 import { installCachedPlugin } from "./install/cache.mjs";
@@ -27,4 +27,70 @@ test("#given source plugin has a stale npm lockfile #when caching plugin #then l
 
 	// then
 	await assert.rejects(stat(join(installed.path, "package-lock.json")));
+});
+
+test("#given existing cache #when npm install fails #then previous active cache is preserved", async () => {
+	// given
+	const root = await makeTempDir();
+	const codexHome = join(root, "codex-home");
+	const sourceRoot = join(root, "plugin");
+	const cacheRoot = join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0");
+	await mkdir(sourceRoot, { recursive: true });
+	await mkdir(cacheRoot, { recursive: true });
+	await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }));
+	await writeFile(join(cacheRoot, "package.json"), JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }));
+
+	// when
+	await assert.rejects(
+		installCachedPlugin({
+			codexHome,
+			marketplaceName: "debug",
+			name: "omo",
+			sourcePath: sourceRoot,
+			version: "0.1.0",
+			runCommand: async (_command, args) => {
+				if (args.join(" ") === "install --omit=dev") throw new Error("spawn npm ENOENT");
+			},
+		}),
+		/spawn npm ENOENT/,
+	);
+
+	// then
+	assert.equal(await readFile(join(cacheRoot, "package.json"), "utf8"), JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }));
+	const cacheParentEntries = await readdir(join(codexHome, "plugins", "cache", "debug", "omo"));
+	assert.deepEqual(cacheParentEntries, ["0.1.0"]);
+});
+
+test("#given existing cache #when final promotion fails #then previous active cache is restored", async () => {
+	// given
+	const root = await makeTempDir();
+	const codexHome = join(root, "codex-home");
+	const sourceRoot = join(root, "plugin");
+	const cacheRoot = join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0");
+	await mkdir(sourceRoot, { recursive: true });
+	await mkdir(cacheRoot, { recursive: true });
+	await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }));
+	await writeFile(join(cacheRoot, "package.json"), JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }));
+
+	// when
+	await assert.rejects(
+		installCachedPlugin({
+			codexHome,
+			marketplaceName: "debug",
+			name: "omo",
+			sourcePath: sourceRoot,
+			version: "0.1.0",
+			runCommand: async () => undefined,
+			renameDirectory: async (fromPath, toPath) => {
+				if (toPath === cacheRoot && basename(fromPath).startsWith(".tmp-")) throw new Error("rename final failed");
+				await rename(fromPath, toPath);
+			},
+		}),
+		/rename final failed/,
+	);
+
+	// then
+	assert.equal(await readFile(join(cacheRoot, "package.json"), "utf8"), JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }));
+	const cacheParentEntries = await readdir(join(codexHome, "plugins", "cache", "debug", "omo"));
+	assert.deepEqual(cacheParentEntries, ["0.1.0"]);
 });

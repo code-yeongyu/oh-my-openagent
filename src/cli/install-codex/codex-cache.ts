@@ -8,12 +8,14 @@ import { resolveCachedRuntimePath } from "./codex-cache-paths"
 import type { InstalledPlugin, RunCommand } from "./types"
 
 type LinkPlatform = NodeJS.Platform
+type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
 
 export async function installCachedPlugin(input: {
   readonly buildSource?: boolean
   readonly codexHome: string
   readonly marketplaceName: string
   readonly name: string
+  readonly renameDirectory?: RenameDirectory
   readonly sourcePath: string
   readonly version: string
   readonly runCommand: RunCommand
@@ -24,11 +26,20 @@ export async function installCachedPlugin(input: {
   }
 
   const targetPath = join(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version)
-  await replaceDirectory(input.sourcePath, targetPath)
-  await rewriteCachedPackageLocalFileDependencies(targetPath, input.sourcePath)
-  await copyBundledMcpRuntimeDists({ pluginRoot: targetPath, sourceRoot: input.sourcePath })
-  await maybeRunNpmInstall(targetPath, input.runCommand, ["install", "--omit=dev"])
-  await rewriteCachedMcpManifest(targetPath, input.sourcePath)
+  const tempPath = createTempSiblingPath(targetPath)
+  await rm(tempPath, { recursive: true, force: true })
+  try {
+    await copyDirectory(input.sourcePath, tempPath)
+    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
+    await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
+    await maybeRunNpmInstall(tempPath, input.runCommand, ["install", "--omit=dev"])
+    await rewriteCachedMcpManifest(tempPath, input.sourcePath)
+    await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
+    await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
+  } catch (error) {
+    await rm(tempPath, { recursive: true, force: true })
+    throw error
+  }
   return { name: input.name, version: input.version, path: targetPath }
 }
 
@@ -125,6 +136,32 @@ export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = 
   if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)
 }
 
+async function rewriteCachedManifestRoot(pluginRoot: string, fromRoot: string, toRoot: string): Promise<void> {
+  const manifestPath = join(pluginRoot, ".mcp.json")
+  if (!(await exists(manifestPath))) return
+  const raw = await readFile(manifestPath, "utf8")
+  const parsed: unknown = JSON.parse(raw)
+  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return
+  let changed = false
+  for (const server of Object.values(parsed.mcpServers)) {
+    if (!isRecord(server)) continue
+    const currentArgs = server.args
+    if (!Array.isArray(currentArgs)) continue
+    const nextArgs = currentArgs.map((arg) => {
+      if (typeof arg !== "string") return arg
+      if (arg === fromRoot) return toRoot
+      const prefix = `${fromRoot}${sep}`
+      if (!arg.startsWith(prefix)) return arg
+      return `${toRoot}${arg.slice(fromRoot.length)}`
+    })
+    if (nextArgs.some((value, index) => value !== currentArgs[index])) {
+      server.args = nextArgs
+      changed = true
+    }
+  }
+  if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
 async function maybeRunNpmInstall(cwd: string, runCommand: RunCommand, args: readonly string[] = ["install"]): Promise<void> {
   if (!(await exists(join(cwd, "package.json")))) return
   await runCommand("npm", args, { cwd })
@@ -139,13 +176,40 @@ async function maybeRunNpmBuild(cwd: string, runCommand: RunCommand): Promise<vo
   await runCommand("npm", ["run", "build"], { cwd })
 }
 
-async function replaceDirectory(sourcePath: string, targetPath: string): Promise<void> {
+function createTempSiblingPath(targetPath: string): string {
+  return join(dirname(targetPath), `.tmp-${basename(targetPath)}-${process.pid}-${Date.now()}`)
+}
+
+function createBackupSiblingPath(targetPath: string): string {
+  return join(dirname(targetPath), `.backup-${basename(targetPath)}-${process.pid}-${Date.now()}`)
+}
+
+async function copyDirectory(sourcePath: string, targetPath: string): Promise<void> {
   await mkdir(dirname(targetPath), { recursive: true })
-  const tempPath = join(dirname(targetPath), `.tmp-${basename(targetPath)}-${process.pid}-${Date.now()}`)
-  await rm(tempPath, { recursive: true, force: true })
-  await cp(sourcePath, tempPath, { recursive: true, filter: (source) => shouldCopyPluginPath(source, sourcePath) })
+  await cp(sourcePath, targetPath, { recursive: true, filter: (source) => shouldCopyPluginPath(source, sourcePath) })
+}
+
+async function promoteDirectory(tempPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
+  const backupPath = createBackupSiblingPath(targetPath)
+  await rm(backupPath, { recursive: true, force: true })
+  let backupMoved = false
+  try {
+    if (await exists(targetPath)) {
+      await renameDirectory(targetPath, backupPath)
+      backupMoved = true
+    }
+    await renameDirectory(tempPath, targetPath)
+  } catch (error) {
+    if (backupMoved) await restoreBackupDirectory(backupPath, targetPath, renameDirectory)
+    throw error
+  }
+  if (backupMoved) await rm(backupPath, { recursive: true, force: true })
+}
+
+async function restoreBackupDirectory(backupPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
+  if (!(await exists(backupPath))) return
   await rm(targetPath, { recursive: true, force: true })
-  await rename(tempPath, targetPath)
+  await renameDirectory(backupPath, targetPath)
 }
 
 async function discoverPackageBins(root: string): Promise<readonly { name: string; target: string }[]> {

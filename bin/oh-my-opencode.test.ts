@@ -23,11 +23,7 @@ describe("lazycodex bin wrapper", () => {
     // #when
     const result = spawnSync(nodePath, [fixture.lazycodexBin, "install", "--no-tui"], {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
-      },
+      env: createWrapperTestEnv(fixture),
     });
 
     // #then
@@ -49,11 +45,7 @@ describe("lazycodex bin wrapper", () => {
     // #when
     const result = spawnSync(nodePath, [fixture.lazycodexBin, "install", "--no-tui"], {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
-      },
+      env: createWrapperTestEnv(fixture),
     });
 
     // #then
@@ -74,11 +66,7 @@ describe("lazycodex bin wrapper", () => {
     // #when
     const result = spawnSync(nodePath, [fixture.wrapperBin, "install", "--no-tui"], {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
-      },
+      env: createWrapperTestEnv(fixture),
     });
 
     // #then
@@ -99,11 +87,7 @@ describe("lazycodex bin wrapper", () => {
     // #when
     const result = spawnSync(nodePath, [fixture.wrapperBin, "install", "--no-tui"], {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
-      },
+      env: createWrapperTestEnv(fixture),
     });
 
     // #then
@@ -124,13 +108,12 @@ describe("lazycodex bin wrapper", () => {
     // #when
     const result = spawnSync(nodePath, [fixture.lazycodexBin, "update", "--dry-run"], {
       encoding: "utf8",
-      env: {
-        ...process.env,
+      env: createWrapperTestEnv(fixture, {
         CAPTURE_DIR: fixture.captureDir,
         LAZYCODEX_CURRENT_VERSION: "1.0.0",
         LAZYCODEX_LATEST_VERSION: "1.0.1",
         PATH: fixture.fakeBinDir,
-      },
+      }),
     });
 
     // #then
@@ -149,11 +132,7 @@ describe("lazycodex bin wrapper", () => {
     // #when
     const result = spawnSync(nodePath, [fixture.lazycodexBin, "uninstall", "--dry-run", "--project", "/tmp/lazycodex-qa"], {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
-      },
+      env: createWrapperTestEnv(fixture),
     });
 
     // #then
@@ -166,6 +145,19 @@ describe("lazycodex bin wrapper", () => {
     ]);
   });
 });
+
+function createWrapperTestEnv(
+  fixture: { readonly captureDir: string; readonly fakeBinDir: string },
+  overrides: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  const { OMO_INVOCATION_NAME: _invocationName, OMO_WRAPPER_PACKAGE_ROOT: _wrapperPackageRoot, ...baseEnv } = process.env;
+  return {
+    ...baseEnv,
+    CAPTURE_DIR: fixture.captureDir,
+    PATH: fixture.fakeBinDir,
+    ...overrides,
+  };
+}
 
 async function createLazyCodexFixture(options: { packageName?: string; wrapperFileName?: string } = {}) {
   const root = await mkdtemp(join(tmpdir(), "lazycodex-bin-wrapper-"));
