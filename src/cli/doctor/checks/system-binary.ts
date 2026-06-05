@@ -14,7 +14,11 @@ function isExecutable(path: string): boolean {
   try {
     accessSync(path, constants.X_OK)
     return true
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return false
+    }
+
     return false
   }
 }
@@ -154,7 +158,11 @@ export async function getOpenCodeVersion(
     const result = await spawnWithTimeout(command, { stdout: "pipe", stderr: "pipe" })
     if (result.timedOut || result.exitCode !== 0) return null
     return extractSemverFromOutput(result.stdout)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
     return null
   }
 }
