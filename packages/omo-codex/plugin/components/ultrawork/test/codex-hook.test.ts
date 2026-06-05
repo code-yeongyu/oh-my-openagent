@@ -31,6 +31,28 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/First user-visible line this turn MUST be exactly:/);
 	});
 
+	it("#given Windows cwd #when hook sees ultrawork prompt #then emits directive as Codex hook JSON", () => {
+		// given
+		const payload = {
+			cwd: "C:\\Users\\codex\\project",
+			hook_event_name: "UserPromptSubmit",
+			model: "gpt-5.5",
+			permission_mode: "default",
+			prompt: "please ulw this change",
+			session_id: "s",
+			transcript_path: null,
+			turn_id: "t",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+	});
+
 	it("#given transcript already contains ultrawork directive #when hook sees ultrawork prompt #then it does not repeat directive", () => {
 		// given
 		const payload = {

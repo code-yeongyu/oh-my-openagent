@@ -4470,6 +4470,101 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(updatedTask1?.concurrencyKey).toBe("anthropic")
       expect(updatedTask2?.concurrencyKey).toBeUndefined()
     })
+
+    test("should resolve limits from raw model keys while queueing by provider key", async () => {
+      // given
+      const config = {
+        modelConcurrency: { anthropic: 99 },
+        providerConcurrency: { anthropic: 1 },
+      }
+      manager.shutdown()
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config })
+
+      const input1 = {
+        description: "Task 1",
+        prompt: "Do something",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-opus-4.7" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      const input2 = {
+        description: "Task 2",
+        prompt: "Do something else",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4.6" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      // when
+      const task1 = await manager.launch(input1)
+      const task2 = await manager.launch(input2)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // then
+      const updatedTask1 = manager.getTask(task1.id)
+      const updatedTask2 = manager.getTask(task2.id)
+      const concurrencyManager = getConcurrencyManager(manager)
+
+      expect(updatedTask1?.status).toBe("running")
+      expect(updatedTask2?.status).toBe("pending")
+      expect(updatedTask1?.concurrencyKey).toBe("anthropic")
+      expect(updatedTask2?.concurrencyKey).toBeUndefined()
+      expect(concurrencyManager.getCount("anthropic")).toBe(1)
+      expect(concurrencyManager.getQueueLength("anthropic")).toBe(1)
+    })
+
+    test("should remove cancelled pending model task from provider queue", async () => {
+      // given
+      const config = { providerConcurrency: { anthropic: 1 } }
+      manager.shutdown()
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config })
+
+      const input1 = {
+        description: "Task 1",
+        prompt: "Do something",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-opus-4.7" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      const input2 = {
+        description: "Task 2",
+        prompt: "Do something else",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4.6" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      const input3 = {
+        description: "Task 3",
+        prompt: "Do a third thing",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-haiku-4.5" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      await manager.launch(input1)
+      await manager.launch(input2)
+      const task3 = await manager.launch(input3)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // when
+      const cancelled = await manager.cancelTask(task3.id, { abortSession: false, skipNotification: true })
+
+      // then
+      const providerQueue = getQueuesByKey(manager).get("anthropic")
+      const providerQueuedTaskIds = providerQueue?.map(item => item.task.id) ?? []
+      expect(cancelled).toBe(true)
+      expect(providerQueuedTaskIds).not.toContain(task3.id)
+      expect(getQueuesByKey(manager).get("anthropic/claude-haiku-4.5")).toBeUndefined()
+      expect(manager.getTask(task3.id)?.status).toBe("cancelled")
+    })
   })
 
   describe("TTL uses queuedAt for pending, startedAt for running", () => {

@@ -3,30 +3,27 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
-const ultraworkRoot = join(repoRoot, "packages/omo-codex/plugin/components/ultrawork")
+const aggregatePluginRoot = join(repoRoot, "packages/omo-codex/plugin")
 
 describe("omo-codex Python migration regression", () => {
-  it("keeps package scripts and plugin packaging Python-free", () => {
+  it("keeps aggregate plugin packaging Python-free", () => {
     // given
-    const componentPackage = readJson(join(ultraworkRoot, "package.json"))
-    const aggregateHooks = readFileSync(join(repoRoot, "packages/omo-codex/plugin/hooks/hooks.json"), "utf8")
-    const componentHooks = readFileSync(join(ultraworkRoot, "hooks/hooks.json"), "utf8")
-    const aggregateTest = readFileSync(join(repoRoot, "packages/omo-codex/plugin/test/aggregate.test.mjs"), "utf8")
+    const aggregatePackageText = readFileSync(join(aggregatePluginRoot, "package.json"), "utf8")
+    const aggregatePackage = readJson(join(aggregatePluginRoot, "package.json"))
+    const aggregateHooks = readFileSync(join(aggregatePluginRoot, "hooks/hooks.json"), "utf8")
+    const aggregateTest = readFileSync(join(aggregatePluginRoot, "test/aggregate.test.mjs"), "utf8")
 
     // when
-    const packagedFiles = isRecord(componentPackage) && Array.isArray(componentPackage["files"])
-      ? componentPackage["files"]
+    const scripts = isRecord(aggregatePackage) && isRecord(aggregatePackage["scripts"]) ? aggregatePackage["scripts"] : {}
+    const workspaces = isRecord(aggregatePackage) && Array.isArray(aggregatePackage["workspaces"])
+      ? aggregatePackage["workspaces"]
       : []
-    const scripts = isRecord(componentPackage) && isRecord(componentPackage["scripts"]) ? componentPackage["scripts"] : {}
-    const bin = isRecord(componentPackage) && isRecord(componentPackage["bin"]) ? componentPackage["bin"] : {}
 
     // then
-    expect(scripts["build"]).toBe("tsc -p tsconfig.build.json")
-    expect(scripts["test"]).toBe("vitest --run")
-    expect(bin["omo-ultrawork"]).toBe("./dist/cli.js")
-    expect(packagedFiles).toContain("dist")
-    expect(packagedFiles).not.toContain("hooks/ultrawork-detector.py")
-    expect(`${aggregateHooks}\n${componentHooks}\n${aggregateTest}`).not.toMatch(/\bpython3?\b|ultrawork-detector\.py/)
+    expect(scripts["build"]).toContain("node scripts/build-components.mjs")
+    expect(scripts["test"]).toBe("node --test test/*.test.mjs")
+    expect(workspaces).toContain("components/ultrawork")
+    expect(`${aggregatePackageText}\n${aggregateHooks}\n${aggregateTest}`).not.toMatch(/\bpython3?\b|ultrawork-detector\.py/)
   })
 })
 
