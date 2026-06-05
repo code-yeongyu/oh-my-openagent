@@ -15,7 +15,15 @@ mock.module("../../shared", () => ({
   log: () => {},
   isSqliteBackend: () => false,
   patchPart: async () => true,
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData) => response.data ?? fallback,
+  normalizeSDKResponse: <TData>(response: unknown, fallback: TData) => {
+    if (Array.isArray(response)) {
+      return response as TData
+    }
+    if (response != null && typeof response === "object" && "data" in response) {
+      return (response as { data?: TData }).data ?? fallback
+    }
+    return fallback
+  },
 }))
 
 const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")

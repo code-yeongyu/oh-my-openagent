@@ -183,6 +183,57 @@ describe("session-recovery hook persistent dedupe", () => {
     expect(secondResult).toBe(true)
     expect(promptAsyncCalls).toHaveLength(1)
   })
+
+  test("#given session.messages returns a bare SDK data array #when recovering without an assistant message id #then recovery still finds the failed assistant", async () => {
+    // given
+    const sessionID = "ses_recovery_array_response"
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const failedAssistant = {
+      info: {
+        id: "msg_tool_missing_array_response",
+        role: "assistant",
+        error: { message: "messages.3 has tool_use without a matching tool_result" },
+      },
+      parts: [
+        {
+          type: "tool_use",
+          id: "toolu_array_response",
+          name: "bash",
+          input: {},
+          state: { status: "running" },
+        },
+      ],
+    }
+    const ctx = {
+      client: {
+        session: {
+          abort: async () => ({}),
+          messages: async () => [failedAssistant],
+          promptAsync: async (call: PromptAsyncCall) => {
+            promptAsyncCalls.push(call)
+            return {}
+          },
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/session-recovery-array-response-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+
+    // when
+    const result = await hook.handleSessionRecovery({
+      role: "assistant",
+      sessionID,
+      error: failedAssistant.info.error,
+    })
+
+    // then
+    expect(result).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.parts[0]?.toolUseId).toBe("toolu_array_response")
+  })
 })
 
 describe("session-recovery hook interrupted idle recovery", () => {
