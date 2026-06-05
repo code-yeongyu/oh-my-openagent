@@ -8,14 +8,34 @@ export const LOCK_WAIT_TIMEOUT_MS = 4000
 export const LOCK_RETRY_MS = 20
 export const LOCK_STALE_MS = 10000
 
+type RegistryPaths = {
+  readonly openClawStorageDir: string
+  readonly registryPath: string
+  readonly registryLockPath: string
+}
+
+let cachedRegistryPaths: RegistryPaths | null = null
+
+function resolveRegistryPaths(): RegistryPaths {
+  if (cachedRegistryPaths !== null) return cachedRegistryPaths
+
+  const openClawStorageDir = join(getOpenCodeStorageDir(), "openclaw")
+  cachedRegistryPaths = {
+    openClawStorageDir,
+    registryPath: join(openClawStorageDir, "reply-session-registry.jsonl"),
+    registryLockPath: join(openClawStorageDir, "reply-session-registry.lock"),
+  }
+  return cachedRegistryPaths
+}
+
 export function getOpenClawStorageDir(): string {
-  return join(getOpenCodeStorageDir(), "openclaw")
+  return resolveRegistryPaths().openClawStorageDir
 }
 
 export function getRegistryPath(): string {
-  return join(getOpenClawStorageDir(), "reply-session-registry.jsonl")
+  return resolveRegistryPaths().registryPath
 }
 
 export function getRegistryLockPath(): string {
-  return join(getOpenClawStorageDir(), "reply-session-registry.lock")
+  return resolveRegistryPaths().registryLockPath
 }

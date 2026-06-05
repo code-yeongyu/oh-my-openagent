@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as sessionRegistryModule from "../session-registry"
+import { getRegistryPath } from "../session-registry-paths"
 import type { SessionMapping } from "../session-registry"
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
@@ -60,6 +61,38 @@ describe("session-registry", () => {
     // then
     expect(sessionRegistryModule.loadAllMappings()).toEqual([firstMapping, secondMapping])
     expect(existsSync(lockPath)).toBe(false)
+  })
+
+  test("keeps the registry path stable after first path resolution", () => {
+    // given
+    const firstResolvedPath = getRegistryPath()
+    const otherDataHome = mkdtempSync(join(tmpdir(), "openclaw-session-registry-other-"))
+    const mapping = createMapping()
+
+    try {
+      process.env.XDG_DATA_HOME = otherDataHome
+
+      // when
+      expect(sessionRegistryModule.registerMessage(mapping)).toBe(true)
+
+      // then
+      expect(firstResolvedPath).toBe(registryPath)
+      expect(readFileSync(registryPath, "utf-8")).toContain(JSON.stringify(mapping))
+      expect(
+        existsSync(
+          join(
+            otherDataHome,
+            "opencode",
+            "storage",
+            "openclaw",
+            "reply-session-registry.jsonl",
+          ),
+        ),
+      ).toBe(false)
+    } finally {
+      rmSync(otherDataHome, { recursive: true, force: true })
+      process.env.XDG_DATA_HOME = tempDataHome
+    }
   })
 
   test("looks up mappings by platform and message id", () => {
