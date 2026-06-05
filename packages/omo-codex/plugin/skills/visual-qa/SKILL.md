@@ -28,7 +28,7 @@ Verify a rendered UI against intent using objective script evidence plus two par
 ## Purpose and when to use
 
 - Use after you build or change any UI, before calling it done. Covers web/page UIs and TUI/terminal UIs.
-- Use when output must match a mock, a baseline, or a stated design intent; when you suspect a regression; when CJK (Korean/Japanese/Chinese) text may clip or misalign; when a claimed design system might actually be a flat image; when a terminal layout may overflow or its borders may break.
+- Use when output must match a mock, a baseline, or a stated design intent; when you suspect a regression; when CJK (Korean/Japanese/Chinese) text may clip, misalign, or wrap awkwardly; when a claimed design system might actually be a flat image; when a terminal layout may overflow or its borders may break.
 - Skip when there is no rendered surface (pure backend or library logic with no visual or terminal output). For broad post-implementation review use review-work; this skill is the visual specialist.
 
 In the commands below, `$SKILL_DIR` is this skill's own directory (the folder containing this SKILL.md). The bundled script lives at `scripts/cli.ts` inside it.
@@ -73,11 +73,11 @@ Key fields: `maxWidth`, `overflowLines[]`, `borderMisaligned`, `wideCharColumns[
 
 This JSON (diff ratio, similarity score, hotspots or overflow lines, border alignment, wide-char columns, alpha) is REFERENCE evidence to aim the reviewers. It is not the verdict by itself.
 
-## Step 3 - Dispatch two read-only QA passes in parallel
+## Step 3 - Dispatch two read-only QA subagents in parallel
 
-Send BOTH task calls in a single message so they run concurrently. Each oracle is read-only: it reviews and reports, it cannot modify files. Each returns PASS, REVISE, or FAIL with concrete, located findings.
+Send BOTH task calls in a single message so they run concurrently. Each oracle is read-only: it reviews and reports, it cannot modify files. Each returns PASS, REVISE, or FAIL with concrete, located findings. Pass A proves the surface is a real design-system implementation, not a mock-only or faked-image substitute. Pass B directly opens screenshots and inspects source/content for visual and CJK defects.
 
-Paste evidence directly into each prompt, because the oracle works only from the prompt text: source code, the plain-text TUI captures, the script JSON, and the screenshot paths plus your described observations for web. The two passes differ in depth by charter, not by any model or effort setting, which cannot be pinned per call.
+Paste evidence directly into each prompt: source code, the plain-text TUI captures, the script JSON, and the screenshot paths plus your described observations for web. The two passes differ in depth by charter, not by any model or effort setting, which cannot be pinned per call.
 
 ### Pass A - Design-system and functional integrity (deeper, strict)
 
@@ -88,7 +88,7 @@ task(subagent_type="oracle",
   description="Visual QA pass A: design-system and functional integrity",
   prompt="""
 REVIEW TYPE: DESIGN-SYSTEM AND FUNCTIONAL INTEGRITY (read-only)
-TIER INTENT: Treat this as the deeper, stricter pass. Reason exhaustively before concluding. Assume a plausible-looking surface may be faked until the source proves otherwise.
+TIER INTENT: Treat this as the deeper, stricter pass. Reason exhaustively before concluding. Assume a plausible-looking surface may be faked or mock-only until the source proves otherwise.
 
 INTENT:
 {What the user asked for, the mock or baseline, and the constraints.}
@@ -105,7 +105,7 @@ SHARED SCRIPT EVIDENCE (reference, not verdict):
 {Paste the image-diff or tui-check JSON. Use alphaChannelIntact for the transparency check.}
 
 CHECK EACH:
-1. Real design system vs ad-hoc: are styles driven by coherent design tokens and reused primitives, or one-off hardcoded values scattered per element?
+1. Real design system vs ad-hoc/mock-only: are styles driven by coherent design tokens and reused primitives, or one-off hardcoded values scattered per element? Treat mock-only screens, static compositions, or one-page hardcoded styling with no reusable system as BLOCKING unless the user explicitly requested a throwaway mock.
 2. Faked-with-an-image anti-pattern: is the UI a real DOM/component tree, or a pasted raster/screenshot or background-image standing in for live elements? For TUI: a real layout that reflows, or hardcoded pre-rendered text at fixed widths?
 3. Alpha and transparency: handled correctly, with no unexpected opaque or black fills and correct PNG/CSS alpha? Cross-check alphaChannelIntact.
 4. Code style and implementation quality.
@@ -132,7 +132,7 @@ task(subagent_type="oracle",
   description="Visual QA pass B: visual fidelity and CJK precision",
   prompt="""
 REVIEW TYPE: VISUAL FIDELITY AND CJK PRECISION (read-only)
-TIER INTENT: Treat this as the focused visual pass. Anchor every claim to the script evidence and the captures.
+TIER INTENT: Treat this as the focused visual pass. Directly open the screenshots with the available image-viewing tool (`view_image`, `look_at`, or browser inspection) before judging. Anchor every claim to the script evidence, source code, and captures.
 
 INTENT:
 {What the user requested and the mock or baseline to match.}
@@ -142,17 +142,20 @@ SURFACE: {web | tui | both}
 CAPTURES:
 {Web: actual and reference screenshot paths plus your described observations. TUI: paste capture.txt and capture-ansi.txt inline.}
 
+SOURCE CODE:
+{For web: include the rendered text/content, components, typography, layout, and style code. For TUI: include render code that controls wrapping, width, and wide-character handling.}
+
 SCRIPT EVIDENCE (required, consume every field):
 {Paste the image-diff or tui-check JSON.}
 
 USE THE EVIDENCE:
-- Web (image-diff): start from diffRatio and similarityScore, then open every hotspots[] entry (gridX, gridY, x, y, width, height, diffRatio) and explain the visual cause of each flagged region.
+- Web (image-diff): start from diffRatio and similarityScore, then directly open every screenshot path and inspect every hotspots[] entry (gridX, gridY, x, y, width, height, diffRatio). Explain the visual cause of each flagged region from the pixels and source/content together.
 - TUI (tui-check): inspect maxWidth vs expectedColumns, every overflowLines[] entry, borderMisaligned, and wideCharColumns[].
 
 CHECK:
 1. Does the rendered output match what the user requested: layout, spacing, color, type, alignment?
 2. CJK precision:
-   - Web: baseline/descender clipping, dropped glyphs (tofu), broken line-breaking, mismatched font metrics between reference and actual.
+   - Web: natural CJK line breaking for display and body text. Flag oversized headings that create orphaned one-character or final-syllable lines, split Korean/Japanese/Chinese semantic phrases unnaturally, detach labels such as `[Image #1]` from their content, clip baselines/descenders, drop glyphs (tofu), or show font metric mismatch. Treat the screenshot pattern `에이전트 오케스트 / 레이션 현황 및 미 / 래` as REVISE/FAIL, not acceptable wrapping.
    - TUI: wide-character column drift (CJK cells counted as 1 instead of 2), box-drawing border misalignment, content overflowing past the terminal width.
 
 OUTPUT:
