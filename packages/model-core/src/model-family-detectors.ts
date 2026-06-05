@@ -70,3 +70,28 @@ export function isGeminiModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return modelName.startsWith("gemini-")
 }
+
+export function isDeepSeekV4Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("deepseek-v4")
+}
+
+export function isDeepSeekV4ProModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("deepseek-v4-pro")
+}
+
+export function isDeepSeekV4FlashModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("deepseek-v4-flash")
+}
+
+export function isDeepSeekR1Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("deepseek-r1") || modelName.includes("deepseek-reasoner")
+}
+
+export function isMimoV25ProModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("mimo-v2.5-pro") || modelName.includes("mimo-v2-5-pro")
+}
