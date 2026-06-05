@@ -169,6 +169,68 @@ describe("buildStartWorkContextInfo", () => {
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
 
+  test("#given multiple incomplete plans and a preferred session plan #when no work exists #then preferred plan is started", () => {
+    // given
+    const ignoredPlanPath = writePlan("ignored-plan", "## TODOs\n- [ ] 1. Ignored")
+    const preferredPlanPath = writePlan("preferred-plan", "## TODOs\n- [ ] 1. Preferred")
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: null,
+      existingState: null,
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: "/tmp/preferred-worktree",
+      worktreeBlock: "## Worktree\n/tmp/preferred-worktree",
+      preferredPlanPath,
+    })
+
+    // then
+    expect(contextInfo).toContain("Auto-Selected Plan")
+    expect(contextInfo).toContain("preferred-plan")
+    expect(contextInfo).toContain(preferredPlanPath)
+    expect(contextInfo).toContain("Most recently referenced plan in this session")
+    expect(contextInfo).not.toContain(ignoredPlanPath)
+
+    const nextState = readBoulderState(testDirectory)
+    expect(nextState?.active_plan).toBe(preferredPlanPath)
+    expect(nextState?.session_ids).toEqual(["opencode:session-current"])
+    expect(nextState?.agent).toBe("atlas")
+    expect(nextState?.worktree_path).toBe("/tmp/preferred-worktree")
+  })
+
+  test("#given existing active state with stale agent and worktree #when resuming #then state is rewritten for current session", () => {
+    // given
+    const planPath = writePlan("resume-existing-plan", "## TODOs\n- [ ] 1. Continue")
+    const initialState = createBoulderState(planPath, "session-old", "sisyphus", "/tmp/old-worktree")
+    writeBoulderState(testDirectory, initialState)
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: null,
+      existingState: readExistingState(),
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: "/tmp/new-worktree",
+      worktreeBlock: "## Worktree\n/tmp/new-worktree",
+    })
+
+    // then
+    expect(contextInfo).toContain("RESUMING existing work")
+    expect(contextInfo).toContain("resume-existing-plan")
+    expect(contextInfo).toContain("## Worktree\n/tmp/new-worktree")
+    expect(contextInfo).toContain("session-current")
+
+    const nextState = readBoulderState(testDirectory)
+    expect(nextState?.agent).toBe("atlas")
+    expect(nextState?.worktree_path).toBe("/tmp/new-worktree")
+    expect(nextState?.session_ids).toEqual(["opencode:session-old", "opencode:session-current"])
+  })
+
   test("auto-selects the only incomplete plan when explicit plan name misses", () => {
     // given
     const clearSpy = spyOn(boulderState, "clearBoulderState")
@@ -237,16 +299,23 @@ describe("buildStartWorkContextInfo", () => {
     )
     writeBoulderState(testDirectory, initialState)
 
-    const workAId = initialState.active_work_id!
+    const workAId = initialState.active_work_id
+    if (!workAId) {
+      throw new Error("expected initial state to include active work id")
+    }
     const withSecondWork = addBoulderWork(testDirectory, {
       planPath: workBPath,
       sessionId: "session-b",
       agent: "atlas",
       worktreePath: "/tmp/worktree-b",
     })
-    expect(withSecondWork).not.toBeNull()
-    const workBId = Object.keys(withSecondWork!.works!).find((workId) => workId !== workAId)
-    expect(workBId).toBeDefined()
+    if (!withSecondWork?.works) {
+      throw new Error("expected second work to be added")
+    }
+    const workBId = Object.keys(withSecondWork.works).find((workId) => workId !== workAId)
+    if (!workBId) {
+      throw new Error("expected second work id to be present")
+    }
 
     // when
     buildStartWorkContextInfo({
@@ -265,9 +334,11 @@ describe("buildStartWorkContextInfo", () => {
     const workIds = Object.keys(nextState?.works ?? {})
     expect(workIds.length).toBe(3)
     expect(workIds).toContain(workAId)
-    expect(workIds).toContain(workBId!)
+    expect(workIds).toContain(workBId)
     const workC = getWorkByPlanName(testDirectory, "new-plan-c")
-    expect(workC).not.toBeNull()
-    expect(workIds).toContain(workC!.work_id)
+    if (!workC) {
+      throw new Error("expected new plan work to be present")
+    }
+    expect(workIds).toContain(workC.work_id)
   })
 })
