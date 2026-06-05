@@ -143,6 +143,30 @@ describe("linkCachedPluginAgents", () => {
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
   })
 
+  test("migrates old reviewer default reasoning to the bundled reviewer default", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ultrawork", "agents", "codex-ultrawork-reviewer.toml"),
+      'name = "codex-ultrawork-reviewer"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high"\n',
+    )
+    await writeFile(
+      join(agentsDir, "codex-ultrawork-reviewer.toml"),
+      'name = "codex-ultrawork-reviewer"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+    )
+    const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux", preservedReasoning })
+
+    // then
+    const content = await readFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), "utf8")
+    expect(content).toContain('model_reasoning_effort = "high"')
+    expect(content).not.toContain('model_reasoning_effort = "xhigh"')
+  })
+
   test("writes a manifest under the plugin cache listing installed agent paths for clean uninstall", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()

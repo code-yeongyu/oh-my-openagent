@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 
-import { aggregateCodexObjectiveForScope } from "./goal-status.js";
+import { aggregateCodexObjectiveForScope, isUlwLoopDone } from "./goal-status.js";
 import { type UlwLoopScope, ulwLoopBriefPath, ulwLoopBriefRelativePath, ulwLoopDir, ulwLoopGoalsPath, ulwLoopGoalsRelativePath, ulwLoopLedgerPath, ulwLoopLedgerRelativePath } from "./paths.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
@@ -55,7 +55,11 @@ function clearGoalBlockerFields(goal: UlwLoopItem): void {
 
 export async function createUlwLoopPlan(repoRoot: string, args: { brief: string; codexGoalMode?: UlwLoopCodexGoalMode; force?: boolean }, scope?: UlwLoopScope): Promise<UlwLoopPlan> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
-		if (!args.force && existsSync(ulwLoopGoalsPath(repoRoot, scope))) throw new UlwLoopError(`Refusing to overwrite existing ${ulwLoopGoalsRelativePath(scope)}; pass --force to recreate it.`, "ULW_LOOP_PLAN_EXISTS");
+		if (!args.force && existsSync(ulwLoopGoalsPath(repoRoot, scope))) {
+			const existing = await readUlwLoopPlan(repoRoot, scope);
+			if (isUlwLoopDone(existing)) throw completedPlanExistsError(scope);
+			throw new UlwLoopError(`Refusing to overwrite existing ${ulwLoopGoalsRelativePath(scope)}; pass --force to recreate it.`, "ULW_LOOP_PLAN_EXISTS");
+		}
 		const now = iso();
 		const goals = deriveGoalCandidates(args.brief).map((goal, index) => makeGoal(goal.title, goal.objective, index, now));
 		const plan: UlwLoopPlan = { version: 1, createdAt: now, updatedAt: now, briefPath: ulwLoopBriefRelativePath(scope), goalsPath: ulwLoopGoalsRelativePath(scope), ledgerPath: ulwLoopLedgerRelativePath(scope), codexGoalMode: args.codexGoalMode ?? "aggregate", goals };
@@ -67,6 +71,17 @@ export async function createUlwLoopPlan(repoRoot: string, args: { brief: string;
 		await appendLedger(repoRoot, { at: now, kind: "plan_created", message: `${goals.length} goal(s) created` }, scope);
 		return plan;
 	});
+}
+
+function completedPlanExistsError(scope?: UlwLoopScope): UlwLoopError {
+	return new UlwLoopError(
+		[
+			`Existing ulw-loop aggregate is already complete at ${ulwLoopGoalsRelativePath(scope)}.`,
+			"Start a new run with `omo ulw-loop create-goals --session-id <new-id> ...` to isolate fresh state.",
+			"Use --force only when you intentionally want to overwrite the completed evidence.",
+		].join(" "),
+		"ULW_LOOP_PLAN_EXISTS_COMPLETE",
+	);
 }
 
 export async function addUlwLoopGoal(repoRoot: string, args: { title: string; objective: string }, scope?: UlwLoopScope): Promise<{ plan: UlwLoopPlan; goal: UlwLoopItem }> {
