@@ -1,5 +1,11 @@
 export type ToolPermission = boolean | "allow" | "deny" | "ask"
 
+export interface StoredMessage {
+  agent?: string
+  model?: { providerID?: string; modelID?: string; variant?: string }
+  tools?: Record<string, ToolPermission>
+}
+
 export interface MessageMeta {
   id: string
   sessionID: string
