@@ -2,7 +2,7 @@
 
 import { describe, expect, spyOn, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoSisyphusGptHook } from "./index"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
@@ -30,7 +30,7 @@ function createHookContext(showToast: (input: unknown) => Promise<unknown>): Plu
 
 describe("no-sisyphus-gpt hook", () => {
   test("shows toast on every chat.message when sisyphus uses gpt model", async () => {
-    // given - sisyphus (display name) with gpt model
+    // given - sisyphus (display name) with a non-native gpt model
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
 
@@ -41,18 +41,18 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: "openai", modelID: "gpt-4o" },
     }, output1)
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: "openai", modelID: "gpt-4o" },
     }, output2)
 
     // then - toast is shown for every message
     expect(showToast).toHaveBeenCalledTimes(2)
-    expect(output1.message.agent).toBe("hephaestus")
-    expect(output2.message.agent).toBe("hephaestus")
+    expect(output1.message.agent).toBe(HEPHAESTUS_DISPLAY)
+    expect(output2.message.agent).toBe(HEPHAESTUS_DISPLAY)
     const firstToastCall = (showToast.mock.calls as Array<Array<unknown>>)[0]?.[0]
     expect(firstToastCall).toMatchObject({
       body: {
@@ -196,6 +196,25 @@ describe("no-sisyphus-gpt hook", () => {
 
     // then - toast shown via session-agent fallback
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(output.message.agent).toBe("hephaestus")
+    expect(output.message.agent).toBe(HEPHAESTUS_DISPLAY)
   })
+
+  test("stores the registered display name on the session, not the config key (regression #4140)", async () => {
+    // given - a fresh session using Sisyphus on a non-native GPT model
+    _resetForTesting()
+    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const hook = createNoSisyphusGptHook(createHookContext(showToast))
+
+    // when - the hook redirects to Hephaestus
+    await hook["chat.message"]?.({
+      sessionID: "ses_regression",
+      agent: SISYPHUS_DISPLAY,
+      model: { providerID: "openai", modelID: "gpt-4o" },
+    }, createOutput())
+
+    // then - session stores the REGISTERED name so later prompts resolve
+    // (raw "hephaestus" would later fail with "Agent not found")
+    expect(getSessionAgent("ses_regression")).toBe(HEPHAESTUS_DISPLAY)
+  })
+
 })

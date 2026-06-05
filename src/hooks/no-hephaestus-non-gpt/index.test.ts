@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, spyOn, test } from "bun:test"
-import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoHephaestusNonGptHook } from "./index"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
@@ -41,8 +41,8 @@ describe("no-hephaestus-non-gpt hook", () => {
 
     // then - toast is shown and agent is switched to sisyphus
     expect(showToast).toHaveBeenCalledTimes(2)
-    expect(output1.message.agent).toBe("sisyphus")
-    expect(output2.message.agent).toBe("sisyphus")
+    expect(output1.message.agent).toBe(SISYPHUS_DISPLAY)
+    expect(output2.message.agent).toBe(SISYPHUS_DISPLAY)
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Hephaestus with Non-GPT",
@@ -142,6 +142,27 @@ describe("no-hephaestus-non-gpt hook", () => {
 
     // then - toast shown via session-agent fallback, switched to sisyphus
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(output.message.agent).toBe("sisyphus")
+    expect(output.message.agent).toBe(SISYPHUS_DISPLAY)
   })
+
+  test("stores the registered display name on the session, not the config key (regression #4140)", async () => {
+    // given - a fresh session using Hephaestus on a non-GPT model
+    _resetForTesting()
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
+      client: { tui: { showToast } },
+    }))
+
+    // when - the hook redirects to Sisyphus
+    await hook["chat.message"]?.({
+      sessionID: "ses_regression",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+    }, createOutput())
+
+    // then - session stores the REGISTERED name so later prompts resolve
+    // (raw "sisyphus" would later fail with "Agent not found")
+    expect(getSessionAgent("ses_regression")).toBe(SISYPHUS_DISPLAY)
+  })
+
 })
