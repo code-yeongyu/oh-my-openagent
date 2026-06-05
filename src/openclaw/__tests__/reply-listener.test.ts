@@ -469,6 +469,57 @@ describe("startReplyListener", () => {
     }
   })
 
+  test("#given daemon identity probing fails but the old pid is still alive #when restarting #then it does not spawn a replacement yet", async () => {
+    // given
+    const existingPid = 3210
+    livePids.add(existingPid)
+    daemonPids.add(existingPid)
+    writeFileSync(pidFilePath, `${existingPid}`)
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
+    )
+    writeFileSync(
+      configFilePath,
+      JSON.stringify({
+        ...createConfig(),
+        replyListener: {
+          ...createConfig().replyListener,
+          discordChannelId: "stale-channel",
+        },
+      }, null, 2),
+    )
+
+    let spawnCalls = 0
+    spawnImplementation = () => {
+      spawnCalls += 1
+      return {
+        pid: 4321,
+        unref() {
+        },
+      }
+    }
+    const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
+      if (pid === existingPid) {
+        daemonPids.delete(existingPid)
+      }
+      return true
+    })
+
+    try {
+      // when
+      const result = await replyListenerModule.startReplyListener(createConfig())
+
+      // then
+      expect(result.success).toBe(false)
+      expect(result.message).toContain("Timed out")
+      expect(spawnCalls).toBe(0)
+      expect(killSpy).toHaveBeenCalledWith(existingPid, "SIGTERM")
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
   test("#given the module path contains encoded characters #when resolving the daemon script #then the filesystem path is decoded", () => {
     // given
     const currentFilePath = join(tempHome, "openclaw encoded dir", "reply-listener-start.ts")
