@@ -2374,6 +2374,45 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(abortedSessionIDs).toEqual(["session-1"])
   })
 
+  test("should fire onSubagentSessionDeleted callback on completion", async () => {
+    // #given
+    const deletedSessionIDs: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      onSubagentSessionDeleted: async (event) => {
+        deletedSessionIDs.push(event.sessionID)
+      },
+    })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-deleted-callback",
+      sessionId: "session-deleted-cb",
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "test task for deleted callback",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+
+    // #then
+    expect(deletedSessionIDs).toEqual(["session-deleted-cb"])
+  })
+
   test("should clean pendingByParent even when promptAsync notification fails", async () => {
     // given
     const client = {
