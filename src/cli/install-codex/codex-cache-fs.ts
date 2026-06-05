@@ -4,8 +4,9 @@ export async function exists(path: string): Promise<boolean> {
   try {
     await lstat(path)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return false
+    throw error
   }
 }
 

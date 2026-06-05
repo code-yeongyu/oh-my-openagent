@@ -1,5 +1,5 @@
 import { lstat, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
 import { isNodeErrorWithCode, isRecord } from "./codex-cache-fs"
 import { removeLegacyCodexComponentBins } from "./codex-cache-legacy-bins"
@@ -65,14 +65,32 @@ async function appendPackageBinLinks(packageJsonPath: string, packageRoot: strin
   const packageName = packageJson.name
   const packageBin = packageJson.bin
   if (typeof packageBin === "string" && typeof packageName === "string") {
-    links.push({ name: basename(packageName), target: join(packageRoot, packageBin) })
+    links.push({ name: assertSafeCommandName(basename(packageName)), target: resolvePackageBinTarget(packageRoot, packageBin) })
     return
   }
   if (!isRecord(packageBin)) return
   for (const [name, target] of Object.entries(packageBin)) {
     if (typeof target !== "string") continue
-    links.push({ name, target: join(packageRoot, target) })
+    links.push({ name: assertSafeCommandName(name), target: resolvePackageBinTarget(packageRoot, target) })
   }
+}
+
+function assertSafeCommandName(name: string): string {
+  if (name.length === 0 || name === "." || name === ".." || name.includes("/") || name.includes("\\") || name.includes("\0")) {
+    throw new Error(`Invalid package bin command name: ${name}`)
+  }
+  return name
+}
+
+function resolvePackageBinTarget(packageRoot: string, target: string): string {
+  if (target.includes("\0")) throw new Error("Package bin target must stay inside package root")
+  const root = resolve(packageRoot)
+  const resolvedTarget = resolve(root, target)
+  const relativeTarget = relative(root, resolvedTarget)
+  if (relativeTarget === "" || (relativeTarget !== ".." && !relativeTarget.startsWith(`..${sep}`) && !isAbsolute(relativeTarget))) {
+    return resolvedTarget
+  }
+  throw new Error("Package bin target must stay inside package root")
 }
 
 async function replaceSymlink(linkPath: string, targetPath: string): Promise<void> {
