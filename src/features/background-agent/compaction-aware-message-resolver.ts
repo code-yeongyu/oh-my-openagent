@@ -152,13 +152,21 @@ export function findNearestMessageExcludingCompaction(
           continue
         }
         messages.push(parsed)
-      } catch {
+      } catch (error) {
+        if (error instanceof Error) {
+          continue
+        }
+
         continue
       }
     }
 
     return mergeStoredMessages(messages, sessionID)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
     return null
   }
 }
