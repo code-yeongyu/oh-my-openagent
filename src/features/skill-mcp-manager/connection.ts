@@ -52,13 +52,25 @@ export async function getOrCreateClient(params: {
     const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
     if (isStale) {
       removeClientIfCurrent(state, clientKey, client)
-      try { await client.close() } catch {}
+      try {
+        await client.close()
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
+      }
       throw new Error(`Connection for "${info.sessionID}" was superseded by a newer connection attempt.`)
     }
 
     if (state.shutdownGeneration !== shutdownGenAtStart) {
       removeClientIfCurrent(state, clientKey, client)
-      try { await client.close() } catch {}
+      try {
+        await client.close()
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
+      }
       throw new Error(`Shutdown occurred during MCP connection for "${info.sessionID}"`)
     }
 
