@@ -21,8 +21,10 @@ export function inferMimeTypeFromBase64(base64Data: string): string {
       return "image/heif"
     }
     if (header.startsWith("%PDF")) return "application/pdf"
-  } catch {
-    // invalid base64 - fall through
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
   }
 
   return "image/png"
