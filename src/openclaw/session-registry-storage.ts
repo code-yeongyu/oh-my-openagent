@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { dirname } from "path"
-import { REGISTRY_PATH, SECURE_FILE_MODE } from "./session-registry-paths"
+import { getRegistryPath, SECURE_FILE_MODE } from "./session-registry-paths"
 import type { SessionMapping } from "./session-registry-types"
 
 function isSessionMapping(value: unknown): value is SessionMapping {
@@ -16,16 +16,17 @@ function isSessionMapping(value: unknown): value is SessionMapping {
 }
 
 export function ensureRegistryDir(): void {
-  const registryDir = dirname(REGISTRY_PATH)
+  const registryDir = dirname(getRegistryPath())
   if (!existsSync(registryDir)) {
     mkdirSync(registryDir, { recursive: true, mode: 0o700 })
   }
 }
 
 export function readAllMappingsUnsafe(): SessionMapping[] {
-  if (!existsSync(REGISTRY_PATH)) return []
+  const registryPath = getRegistryPath()
+  if (!existsSync(registryPath)) return []
   try {
-    const content = readFileSync(REGISTRY_PATH, "utf-8")
+    const content = readFileSync(registryPath, "utf-8")
     return content
       .split("\n")
       .filter((line) => line.trim())
@@ -47,10 +48,11 @@ export function readAllMappingsUnsafe(): SessionMapping[] {
 
 export function rewriteRegistryUnsafe(mappings: readonly SessionMapping[]): void {
   ensureRegistryDir()
+  const registryPath = getRegistryPath()
   if (mappings.length === 0) {
-    writeFileSync(REGISTRY_PATH, "", { mode: SECURE_FILE_MODE })
+    writeFileSync(registryPath, "", { mode: SECURE_FILE_MODE })
     return
   }
   const content = mappings.map((mapping) => JSON.stringify(mapping)).join("\n") + "\n"
-  writeFileSync(REGISTRY_PATH, content, { mode: SECURE_FILE_MODE })
+  writeFileSync(registryPath, content, { mode: SECURE_FILE_MODE })
 }
