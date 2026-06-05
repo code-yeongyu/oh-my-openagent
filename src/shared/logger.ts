@@ -40,7 +40,8 @@ function rotateLogFileIfNeeded(): void {
       }
     }
     fs.renameSync(logFile, `${logFile}.1`)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return
   }
 }
 
@@ -51,7 +52,8 @@ function flush(): void {
   try {
     fs.appendFileSync(logFile, data)
     rotateLogFileIfNeeded()
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return
   }
 }
 
@@ -73,7 +75,8 @@ export function log(message: string, data?: unknown): void {
     } else {
       scheduleFlush()
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return
   }
 }
 
