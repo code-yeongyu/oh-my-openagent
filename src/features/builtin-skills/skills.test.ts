@@ -107,6 +107,32 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
+	test("git-master skill keeps commit workflow phases in order", () => {
+		// #given
+		const skills = createBuiltinSkills()
+
+		// #when
+		const gitMaster = skills.find((skill) => skill.name === "git-master")
+		const template = gitMaster?.template ?? ""
+		const phaseHeadings = [
+			"## PHASE 0: Parallel Context Gathering",
+			"## PHASE 1: Style Detection",
+			"## PHASE 2: Branch Context Analysis",
+			"## PHASE 3: Atomic Unit Planning",
+			"## PHASE 4: Commit Strategy Decision",
+			"## PHASE 5: Commit Execution",
+			"## PHASE 6: Verification & Cleanup",
+		]
+		const phaseIndexes = phaseHeadings.map((heading) => template.indexOf(heading))
+
+		// #then
+		expect(gitMaster).toBeDefined()
+		expect(phaseIndexes.every((index) => index >= 0)).toBe(true)
+		expect(phaseIndexes).toEqual([...phaseIndexes].sort((left, right) => left - right))
+		expect(template).toContain("COMMIT PLAN\n===========")
+		expect(template).toContain("COMMIT SUMMARY:")
+	})
+
 	test("returns exactly 10 skills regardless of provider", () => {
 		// given
 
@@ -209,10 +235,10 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(initDeep).toBeDefined()
-		expect(initDeep!.description).toContain("hierarchical AGENTS.md")
-		expect(initDeep!.argumentHint).toBe("[--create-new] [--max-depth=N]")
-		expect(initDeep!.template).toContain("Generate hierarchical AGENTS.md files")
-		expect(initDeep!.template).toContain("Discovery + Analysis")
+		expect(initDeep?.description).toContain("hierarchical AGENTS.md")
+		expect(initDeep?.argumentHint).toBe("[--create-new] [--max-depth=N]")
+		expect(initDeep?.template).toContain("Generate hierarchical AGENTS.md files")
+		expect(initDeep?.template).toContain("Discovery + Analysis")
 	})
 
 	test("debugging skill is available from shared template", () => {
@@ -272,9 +298,9 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(removeAiSlops).toBeDefined()
-		expect(removeAiSlops!.description).toContain("AI-generated code smells")
-		expect(removeAiSlops!.template).toContain("Remove AI Slops Skill")
-		expect(removeAiSlops!.template).toContain("$omo:remove-ai-slops")
+		expect(removeAiSlops?.description).toContain("AI-generated code smells")
+		expect(removeAiSlops?.template).toContain("Remove AI Slops Skill")
+		expect(removeAiSlops?.template).toContain("$omo:remove-ai-slops")
 	})
 
 	test("security-research skill has correct structure", () => {

@@ -240,6 +240,20 @@ describe("mergeConfigs", () => {
         "anthropic",
       ]);
     });
+
+    it("should replace mcp_env_allowlist instead of merging it", () => {
+      const base = createConfig({
+        mcp_env_allowlist: ["USER_ONLY_TOKEN"],
+      });
+
+      const override = createConfig({
+        mcp_env_allowlist: ["PROJECT_TOKEN"],
+      });
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.mcp_env_allowlist).toEqual(["PROJECT_TOKEN"]);
+    });
   });
 });
 
@@ -353,6 +367,23 @@ describe("parseConfigPartially", () => {
       expect(result).not.toBeNull();
       expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
       expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
+    });
+
+    it("should skip invalid string-array sections without discarding other salvaged sections", () => {
+      const rawConfig = {
+        agents: {
+          oracle: { temperature: "not-a-number" },
+        },
+        disabled_hooks: ["comment-checker"],
+        mcp_env_allowlist: ["USER_TOKEN", 42],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result?.agents).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.mcp_env_allowlist).toBeUndefined();
     });
   });
 

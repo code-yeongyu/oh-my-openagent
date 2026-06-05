@@ -109,6 +109,10 @@ omo ulw-loop create-goals --brief "<brief>" --json
 omo ulw-loop create-goals --brief-file <path> --json
 cat <brief> | omo ulw-loop create-goals --from-stdin --json
 ```
+If the existing aggregate is already complete, do not steer or force the
+completed default state for unrelated new work. Start a fresh run with
+`omo ulw-loop create-goals --session-id <new-id> ...`; use `--force`
+only when deliberately overwriting completed evidence.
 Write state through the CLI path. Do not hand-edit state files.
 
 ### 2. Refine success criteria + a Prometheus-grade QA and parallelism plan per goal

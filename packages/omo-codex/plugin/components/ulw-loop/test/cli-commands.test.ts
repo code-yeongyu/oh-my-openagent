@@ -55,6 +55,14 @@ function stdoutJson(): Record<string, unknown> {
 function codexSnapshot(status: "active" | "complete" = "active"): string {
 	return JSON.stringify({ goal: { objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE, status } });
 }
+function qualityGate(): string {
+	return JSON.stringify({
+		aiSlopCleaner: { status: "passed", evidence: "no-op" },
+		verification: { status: "passed", commands: ["vitest"], evidence: "green" },
+		codeReview: { recommendation: "APPROVE", architectStatus: "CLEAR", evidence: "small test fixture" },
+		criteriaCoverage: { totalCriteria: 3, passCount: 3, adversarialClassesCovered: ["stale_state"] },
+	});
+}
 
 async function createPlan(brief = "- Goal A\n- Goal B"): Promise<Record<string, unknown>> {
 	resetOutput();
@@ -99,6 +107,33 @@ describe("ulwLoopCommand create-goals", () => {
 		expect(await readFile(join(testDir, ".omo/ulw-loop/brief.md"), "utf8")).toContain("Goal A");
 		expect(await readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).toContain("successCriteria");
 		expect(await readFile(join(testDir, ".omo/ulw-loop/ledger.jsonl"), "utf8")).toContain("plan_created");
+	});
+
+	it("#given completed default aggregate #when creating another default plan #then guides to a fresh session", async () => {
+		await createPlan("- Finished");
+		for (const criterionId of ["C001", "C002", "C003"]) await passCriterion("G001-finished", criterionId);
+		expect(
+			await ulwLoopCommand([
+				"checkpoint",
+				"--goal-id",
+				"G001-finished",
+				"--status",
+				"complete",
+				"--evidence",
+				"done",
+				"--codex-goal-json",
+				codexSnapshot("complete"),
+				"--quality-gate-json",
+				qualityGate(),
+			]),
+		).toBe(0);
+		resetOutput();
+
+		expect(await ulwLoopCommand(["create-goals", "--brief", "- New task"])).toBe(1);
+
+		expect(err.join("")).toContain("Existing ulw-loop aggregate is already complete");
+		expect(err.join("")).toContain("create-goals --session-id <new-id>");
+		expect(err.join("")).toContain("--force only");
 	});
 
 	it("#given two session ids #when creating goals #then writes isolated session-scoped plans", async () => {
