@@ -157,7 +157,7 @@ async function fetchContextWindowUsage(
 			.map((m) => m.info as AssistantMessageInfo);
 
 		if (assistantMessages.length === 0) return null;
-		
+
 		const lastAssistant = assistantMessages[assistantMessages.length - 1];
 		const lastTokens = lastAssistant?.tokens;
 		if (!lastAssistant || !lastTokens) return null;
