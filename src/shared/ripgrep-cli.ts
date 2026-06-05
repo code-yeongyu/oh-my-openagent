@@ -41,7 +41,11 @@ function findExecutable(name: string): string | null {
     if (result.status === 0 && stdout.trim()) {
       return getFirstExecutablePath(stdout)
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
     return null
   }
   return null
