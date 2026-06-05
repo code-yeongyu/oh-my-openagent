@@ -30,7 +30,7 @@ export const TMUX_ACTIVITY_EVENT_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 export function isCompactionAgent(agent: string): boolean {
-  return agent.toLowerCase() === "compaction";
+  return agent.trim().toLowerCase() === "compaction";
 }
 
 export async function dispatchOpenClawSessionEvent(args: {

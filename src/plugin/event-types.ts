@@ -1,4 +1,4 @@
-import type { CreatedHooks } from "../create-hooks";
+import type { Event } from "@opencode-ai/sdk";
 import type { PluginContext } from "./types";
 
 export type FirstMessageVariantGate = {
@@ -6,7 +6,7 @@ export type FirstMessageVariantGate = {
   clear: (sessionID: string) => void;
 };
 
-export type EventInput = Parameters<NonNullable<NonNullable<CreatedHooks["writeExistingFileGuard"]>["event"]>>[0];
+export type EventInput = { event: Event };
 
 type InternalTextPart = {
   type: "text";

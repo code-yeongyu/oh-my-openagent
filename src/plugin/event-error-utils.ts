@@ -29,6 +29,9 @@ export function extractErrorMessage(error: unknown): string {
     ];
 
     for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.length > 0) {
+        return candidate;
+      }
       if (isRecord(candidate) && typeof candidate.message === "string" && candidate.message.length > 0) {
         return candidate.message;
       }
@@ -73,6 +76,6 @@ export function resolveFallbackAgentName(params: {
 }): string | undefined {
   if (params.currentAgent) return params.currentAgent;
   if (params.sessionID !== params.mainSessionID) return undefined;
-  if (params.message.includes("gpt-5")) return "hephaestus";
+  if (params.message.toLowerCase().includes("gpt-5")) return "hephaestus";
   return "sisyphus";
 }

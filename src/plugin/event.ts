@@ -132,6 +132,7 @@ export function createEventHandler(args: {
     if (input.event.type === "session.idle") {
       const sessionID = getEventSessionID(input);
       if (sessionID) {
+        modelFallbackHandler.clearRetryDedupeAfterIdle(sessionID);
         const now = Date.now();
         const emittedAt = recentSyntheticIdles.get(sessionID);
         if (emittedAt !== undefined && now - emittedAt < dedupWindowMs) recentSyntheticIdles.delete(sessionID);
