@@ -45,9 +45,11 @@ treat it as alive. Do not use `list_agents` as a polling loop or status
 feed; it can replay large payloads. Fallback only when the child is
 completed without the deliverable, ack-only after followup, explicitly
 `BLOCKED:`, or no longer running. Then mark that review lane
-inconclusive, do not count it as PASS or approval, close if safe, and
+`INCONCLUSIVE`, do not count it as PASS or approval, close if safe, and
 respawn a smaller `fork_turns: "none"` reviewer with the missing
-deliverable.
+deliverable. Preserve completed lane results immediately. If the retry
+budget is exhausted, keep the lane `INCONCLUSIVE` and still emit a final
+aggregate result.
 
 # Review Work - 5-Agent Parallel Review Orchestrator
 
@@ -529,19 +531,27 @@ cycles. Do not treat a timeout, ack-only reply, or empty child result as
 a PASS.
 
 As each completes, collect via the Codex mapping above (`wait_agent`,
-then the child's substantive final result). Store each verdict:
+then the child's substantive final result). Preserve completed lane
+results immediately; never lose a PASS/FAIL because another lane is
+still running. Store each verdict independently:
 
 | Agent | Verdict | Notes |
 |-------|---------|-------|
-| 1. Goal Verification | pending | - |
-| 2. QA Execution | pending | - |
-| 3. Code Quality | pending | - |
-| 4. Security | pending | - |
-| 5. Context Mining | pending | - |
+| 1. Goal Verification | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 2. QA Execution | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 3. Code Quality | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 4. Security | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 5. Context Mining | pending/PASS/FAIL/INCONCLUSIVE | - |
 
-Do NOT deliver the final report until ALL 5 have completed.
+Do NOT deliver the final report until ALL 5 lanes have a terminal state:
+PASS, FAIL, or INCONCLUSIVE.
 If a lane remains silent after the reliability followup, record it as
 inconclusive and respawn a smaller reviewer/worker for that exact lane.
+If it still remains unfinished after that retry, close the still-running
+agent if safe, keep the lane INCONCLUSIVE, and emit the final aggregate
+review result with the incomplete lane named. Do not spin in repeated
+wait/followup cycles. Do not use `send_message` as an interrupt; queued
+followups are not cancellation.
 
 ---
 
@@ -551,6 +561,7 @@ inconclusive and respawn a smaller reviewer/worker for that exact lane.
 
 ALL 5 agents returned PASS → **REVIEW PASSED**
 ANY agent returned FAIL → **REVIEW FAILED - criteria not met**
+ANY lane is INCONCLUSIVE and none failed → **REVIEW INCONCLUSIVE - not approved**
 
 </verdict_logic>
 
@@ -559,15 +570,15 @@ Compile the final report in this format:
 ```markdown
 # Review Work - Final Report
 
-## Overall Verdict: PASSED / FAILED
+## Overall Verdict: PASSED / FAILED / INCONCLUSIVE
 
 | # | Review Area | Agent Type | Verdict | Confidence |
 |---|------------|------------|---------|------------|
-| 1 | Goal & Constraint Verification | Oracle | PASS/FAIL | HIGH/MED/LOW |
-| 2 | QA Execution | unspecified-high | PASS/FAIL | HIGH/MED/LOW |
-| 3 | Code Quality | Oracle | PASS/FAIL | HIGH/MED/LOW |
-| 4 | Security (supplementary) | Oracle | PASS/FAIL | Severity |
-| 5 | Context Mining | unspecified-high | PASS/FAIL | HIGH/MED/LOW |
+| 1 | Goal & Constraint Verification | Oracle | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 2 | QA Execution | unspecified-high | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 3 | Code Quality | Oracle | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 4 | Security (supplementary) | Oracle | PASS/FAIL/INCONCLUSIVE | Severity |
+| 5 | Context Mining | unspecified-high | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
 
 ## Blocking Issues
 [Aggregated from all agents - deduplicated, prioritized]
