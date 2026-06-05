@@ -14,6 +14,7 @@ import {
   buildPlanDiscoveryContext,
   shouldDiscoverPlans,
   shouldResumeExistingState,
+  shouldResumeSingleWorkOption,
 } from "./plan-discovery-context"
 import { HOOK_NAME } from "./start-work-hook"
 
@@ -54,8 +55,7 @@ export function buildStartWorkContextInfo(params: {
 
   if (!explicitPlanName && resumeOptions.length === 1) {
     const onlyOption = resumeOptions[0]
-    const matchesPreferred = !preferredPlanPath || onlyOption.active_plan === preferredPlanPath
-    if (matchesPreferred) {
+    if (shouldResumeSingleWorkOption({ directory, option: onlyOption, preferredPlanPath })) {
       const selectedState = selectActiveWork(directory, onlyOption.work_id)
       if (selectedState) {
         return buildExistingSessionContext({

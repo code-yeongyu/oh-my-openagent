@@ -2,7 +2,7 @@ import {
   findPrometheusPlans,
   getPlanProgress,
 } from "../../features/boulder-state"
-import type { BoulderState } from "../../features/boulder-state"
+import type { BoulderState, BoulderWorkResumeOption } from "../../features/boulder-state"
 import { buildAutoSelectedPlanContextWithStateInit } from "./work-initializer"
 import { formatIncompletePlanList, pickPreferredIncompletePlan } from "./plan-selection"
 
@@ -33,6 +33,21 @@ export function shouldDiscoverPlans(input: {
 }): boolean {
   const { existingState, explicitPlanName, preferredPlanPath } = input
   return !explicitPlanName && !shouldResumeExistingState({ existingState, preferredPlanPath })
+}
+
+export function shouldResumeSingleWorkOption(input: {
+  readonly directory: string
+  readonly option: BoulderWorkResumeOption
+  readonly preferredPlanPath: string | null
+}): boolean {
+  const { directory, option, preferredPlanPath } = input
+  if (!preferredPlanPath || option.active_plan === preferredPlanPath) {
+    return true
+  }
+
+  return !findPrometheusPlans(directory).some(
+    (planPath) => planPath === preferredPlanPath && !getPlanProgress(planPath).isComplete,
+  )
 }
 
 export function buildPlanDiscoveryContext(params: {

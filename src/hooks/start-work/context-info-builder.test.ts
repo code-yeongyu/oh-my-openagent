@@ -12,6 +12,7 @@ import {
   getBoulderFilePath,
   getWorkByPlanName,
   readBoulderState,
+  selectActiveWork,
   writeBoulderState,
 } from "../../features/boulder-state"
 import * as boulderState from "../../features/boulder-state"
@@ -229,6 +230,76 @@ describe("buildStartWorkContextInfo", () => {
     expect(nextState?.agent).toBe("atlas")
     expect(nextState?.worktree_path).toBe("/tmp/new-worktree")
     expect(nextState?.session_ids).toEqual(["opencode:session-old", "opencode:session-current"])
+  })
+
+  test("#given explicit completed work matches #when starting that plan #then active work remains unchanged", () => {
+    // given
+    const activePlanPath = writePlan("active-plan", "## TODOs\n- [ ] 1. Continue")
+    const completedPlanPath = writePlan("completed-plan", "## TODOs\n- [x] 1. Done")
+    const initialState = createBoulderState(activePlanPath, "session-active", "atlas", undefined)
+    writeBoulderState(testDirectory, initialState)
+    const completedState = addBoulderWork(testDirectory, {
+      planPath: completedPlanPath,
+      sessionId: "session-completed",
+      agent: "atlas",
+      worktreePath: undefined,
+    })
+    if (!completedState?.active_work_id) {
+      throw new Error("expected completed work to be added")
+    }
+    const activeWorkId = initialState.active_work_id
+    if (!activeWorkId) {
+      throw new Error("expected initial active work id")
+    }
+    const completedWorkId = completedState.active_work_id
+    selectActiveWork(testDirectory, activeWorkId)
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: "completed-plan",
+      existingState: readExistingState(),
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: undefined,
+      worktreeBlock: "",
+    })
+
+    // then
+    expect(contextInfo).toContain("Plan Already Complete")
+    expect(contextInfo).toContain("completed-plan")
+    const nextState = readBoulderState(testDirectory)
+    expect(nextState?.active_work_id).toBe(activeWorkId)
+    expect(nextState?.active_work_id).not.toBe(completedWorkId)
+  })
+
+  test("#given one active work and stale preferred plan #when starting work #then active work resumes", () => {
+    // given
+    const activePlanPath = writePlan("single-active-plan", "## TODOs\n- [ ] 1. Continue")
+    const stalePreferredPlanPath = join(testDirectory, ".omo", "plans", "missing-plan.md")
+    const initialState = createBoulderState(activePlanPath, "session-active", "atlas", undefined)
+    writeBoulderState(testDirectory, initialState)
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: null,
+      existingState: readExistingState(),
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: undefined,
+      worktreeBlock: "",
+      preferredPlanPath: stalePreferredPlanPath,
+    })
+
+    // then
+    expect(contextInfo).toContain("RESUMING existing work")
+    expect(contextInfo).toContain("single-active-plan")
+    expect(contextInfo).not.toContain("No Plans Found")
+    expect(contextInfo).not.toContain("Auto-Selected Plan")
+    expect(readBoulderState(testDirectory)?.active_plan).toBe(activePlanPath)
   })
 
   test("auto-selects the only incomplete plan when explicit plan name misses", () => {

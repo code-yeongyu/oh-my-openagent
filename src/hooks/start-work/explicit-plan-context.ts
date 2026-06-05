@@ -26,6 +26,14 @@ export function buildExplicitPlanContext(params: {
 
   const matchedWork = getWorkByPlanName(directory, explicitPlanName, { worktreePath })
   if (matchedWork) {
+    const matchedWorkProgress = getPlanProgress(matchedWork.active_plan)
+    if (matchedWorkProgress.isComplete) {
+      return buildPlanAlreadyCompleteContext({
+        planName: matchedWork.plan_name,
+        totalTasks: matchedWorkProgress.total,
+      })
+    }
+
     const selectedState = selectActiveWork(directory, matchedWork.work_id)
     if (selectedState) {
       return buildExistingSessionContext({
@@ -66,11 +74,10 @@ export function buildExplicitPlanContext(params: {
 
   const progress = getPlanProgress(matchedPlan)
   if (progress.isComplete) {
-    return `
-## Plan Already Complete
-
- The requested plan "${getPlanName(matchedPlan)}" has been completed.
- All ${progress.total} tasks are done. Create a new plan using the Prometheus agent.`
+    return buildPlanAlreadyCompleteContext({
+      planName: getPlanName(matchedPlan),
+      totalTasks: progress.total,
+    })
   }
 
   createNewWorkOrInitialize({
@@ -87,4 +94,17 @@ export function buildExplicitPlanContext(params: {
     timestamp,
     worktreeBlock,
   })
+}
+
+function buildPlanAlreadyCompleteContext(params: {
+  readonly planName: string
+  readonly totalTasks: number
+}): string {
+  const { planName, totalTasks } = params
+
+  return `
+## Plan Already Complete
+
+ The requested plan "${planName}" has been completed.
+ All ${totalTasks} tasks are done. Create a new plan using the Prometheus agent.`
 }
