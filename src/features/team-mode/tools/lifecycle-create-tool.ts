@@ -90,7 +90,7 @@ export function createTeamCreateTool(
       const spec = args.teamName
         ? await deps.loadTeamSpec(args.teamName, config, projectRoot, { callerTeamLead })
         : parseInlineTeamSpec(args.inline_spec, { callerTeamLead, defaultCategoryName })
-      const participantRuntime = await findParticipantRuntime(runtimeContext.sessionID, config, deps)
+      const participantRuntime = await findParticipantRuntime(leadSessionId, config, deps)
       if (participantRuntime && (participantRuntime.teamName !== spec.name || participantRuntime.leadSessionId !== leadSessionId)) {
         throw new Error(`team_create denied: session is already a participant of team ${participantRuntime.teamRunId}`)
       }

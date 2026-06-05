@@ -109,10 +109,12 @@ export async function approveShutdown(
 export async function rejectShutdown(
   teamRunId: string,
   memberName: string,
+  rejectorName: string,
   reason: string,
   config: TeamModeConfig,
 ): Promise<void> {
   const runtimeState = await loadRuntimeState(teamRunId, config)
+  getRuntimeMember(runtimeState, rejectorName)
   const shutdownRequestIndex = findLatestShutdownRequestIndex(runtimeState, memberName)
   if (shutdownRequestIndex < 0) {
     throw new Error(`shutdown request missing for '${memberName}'`)
@@ -124,10 +126,10 @@ export async function rejectShutdown(
   }
 
   await sendMessage(
-    createShutdownMessage(memberName, shutdownRequest.requesterName, "shutdown_rejected", reason),
+    createShutdownMessage(rejectorName, shutdownRequest.requesterName, "shutdown_rejected", reason),
     teamRunId,
     config,
-    createSendContext(runtimeState, memberName),
+    createSendContext(runtimeState, rejectorName),
   )
 
   await transitionRuntimeState(teamRunId, (currentRuntimeState) => {

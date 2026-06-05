@@ -1,5 +1,7 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
+import { lookupTeamSession, type TeamSessionEntry } from "../team-session-registry"
 import { listActiveTeams, loadRuntimeState } from "../team-state-store/store"
+import { getLeadMemberName } from "../team-runtime/shutdown-helpers"
 import type { RuntimeState } from "../types"
 
 const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>(["creating", "active", "shutdown_requested"])
@@ -18,10 +20,15 @@ export type TeamRuntimeStoreDeps = {
   loadRuntimeState: typeof loadRuntimeState
 }
 
-export function getLeadMemberName(runtimeState: RuntimeState): string {
-  const leadMember = runtimeState.members.find((member) => member.agentType === "leader")
-  if (!leadMember) throw new Error(`team '${runtimeState.teamRunId}' is missing a lead member`)
-  return leadMember.name
+function resolveRegisteredParticipant(
+  runtimeState: RuntimeState,
+  registryEntry: TeamSessionEntry,
+): TeamParticipant | undefined {
+  const member = runtimeState.members.find((candidate) => candidate.name === registryEntry.memberName)
+  if (!member) return undefined
+  return registryEntry.role === "lead"
+    ? { role: "lead", memberName: member.name }
+    : { role: "member", memberName: member.name }
 }
 
 export function sanitizeRuntimeState(runtimeState: RuntimeState): Omit<RuntimeState, "members"> & {
@@ -34,6 +41,14 @@ export function sanitizeRuntimeState(runtimeState: RuntimeState): Omit<RuntimeSt
 }
 
 export async function findParticipantRuntime(sessionID: string, config: TeamModeConfig, deps: TeamRuntimeStoreDeps): Promise<RuntimeState | undefined> {
+  const registryEntry = lookupTeamSession(sessionID)
+  if (registryEntry) {
+    const runtimeState = await deps.loadRuntimeState(registryEntry.teamRunId, config).catch(() => undefined)
+    if (runtimeState && ACTIVE_RUNTIME_STATUSES.has(runtimeState.status) && resolveRegisteredParticipant(runtimeState, registryEntry)) {
+      return runtimeState
+    }
+  }
+
   for (const activeTeam of await deps.listActiveTeams(config)) {
     const runtimeState = await deps.loadRuntimeState(activeTeam.teamRunId, config).catch(() => undefined)
     if (!runtimeState || !ACTIVE_RUNTIME_STATUSES.has(runtimeState.status)) continue
@@ -43,7 +58,13 @@ export async function findParticipantRuntime(sessionID: string, config: TeamMode
 }
 
 export async function resolveParticipant(teamRunId: string, sessionID: string, config: TeamModeConfig, deps: TeamRuntimeStoreDeps): Promise<{ runtimeState: RuntimeState; participant?: TeamParticipant }> {
+  const registryEntry = lookupTeamSession(sessionID)
   const runtimeState = await deps.loadRuntimeState(teamRunId, config)
+  if (registryEntry?.teamRunId === teamRunId) {
+    const participant = resolveRegisteredParticipant(runtimeState, registryEntry)
+    if (participant) return { runtimeState, participant }
+  }
+
   if (runtimeState.leadSessionId === sessionID) {
     return { runtimeState, participant: { role: "lead", memberName: getLeadMemberName(runtimeState) } }
   }

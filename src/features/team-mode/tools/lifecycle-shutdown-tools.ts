@@ -106,7 +106,7 @@ export function createTeamRejectShutdownTool(config: TeamModeConfig, client: Ope
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
       if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName)) throw new Error("team_reject_shutdown: caller must be target member or team lead")
-      await deps.rejectShutdown(args.teamRunId, args.memberName, args.reason, config)
+      await deps.rejectShutdown(args.teamRunId, args.memberName, participant.memberName, args.reason, config)
       return JSON.stringify({ teamRunId: args.teamRunId, memberName: args.memberName, rejectedBy: participant.memberName, reason: args.reason, status: "shutdown_rejected" })
     },
   })
