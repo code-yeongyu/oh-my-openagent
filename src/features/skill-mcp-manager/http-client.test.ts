@@ -209,6 +209,35 @@ describe("createHttpClient cleanup failures", () => {
     expect(message).not.toMatch(/secret-value|abcdefghijklmnopqrstuvwxyz/)
   })
 
+  it("#given HTTP connect failure includes non-bearer authorization secrets #when creating the client #then authorization values are redacted by key", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error(
+          '{"url":"https://example.com/mcp?api_key=secret-value","headers":{"Authorization":"Basic short-secret","authorization":"Bearer short"}}',
+        )
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toContain('"url":"https://example.com/mcp?api_key=***REDACTED***"')
+    expect(message).toContain('"Authorization":"[REDACTED]"')
+    expect(message).toContain('"authorization":"[REDACTED]"')
+    expect(message).not.toMatch(/secret-value|short-secret|Bearer short/)
+  })
+
   it("#given shutdown completes during HTTP connect and cleanup rejects #when creating the client #then the shutdown error is preserved", async () => {
     const state = createState()
     const info = createInfo()
