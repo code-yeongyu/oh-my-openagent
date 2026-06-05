@@ -8,7 +8,11 @@ import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 import { HOOK_NAME } from "./hook-name"
 import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
 import { hasRunningBackgroundTasks, injectContinuation, scheduleRetry } from "./idle-continuation"
-import { FAILURE_BACKOFF_MS, CONTINUATION_COOLDOWN_MS, MAX_CONSECUTIVE_PROMPT_FAILURES } from "./idle-constants"
+import {
+  CONTINUATION_COOLDOWN_MS,
+  FAILURE_BACKOFF_MS,
+  MAX_CONSECUTIVE_PROMPT_FAILURES,
+} from "./idle-constants"
 import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import {
