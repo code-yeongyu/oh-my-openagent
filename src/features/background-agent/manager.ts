@@ -606,9 +606,10 @@ export class BackgroundManager {
       }
 
       // Add to queue
-      const key = this.getConcurrencyKeyFromInput(input)
+      const rawConcurrencyKey = this.getRawConcurrencyKeyFromInput(input)
+      const key = this.concurrencyManager.getConcurrencyKey(rawConcurrencyKey)
       const queue = this.queuesByKey.get(key) ?? []
-      queue.push({ task, input, attemptID: firstAttempt.attemptId })
+      queue.push({ task, input, attemptID: firstAttempt.attemptId, rawConcurrencyKey })
       this.queuesByKey.set(key, queue)
 
       log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
@@ -657,7 +658,7 @@ export class BackgroundManager {
         }
 
         try {
-          await this.concurrencyManager.acquire(key, item.task.id)
+          await this.concurrencyManager.acquire(item.rawConcurrencyKey ?? key, item.task.id)
         } catch (error) {
           if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
             this.rollbackPreStartDescendantReservation(item.task)
@@ -1123,11 +1124,21 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
+    return this.concurrencyManager.getConcurrencyKey(this.getRawConcurrencyKeyFromInput(input))
+  }
+
+  private getRawConcurrencyKeyFromInput(input: LaunchInput): string {
     const modelKey = input.model
       ? `${input.model.providerID}/${input.model.modelID}`
       : input.agent
 
-    return this.concurrencyManager.getConcurrencyKey(modelKey)
+    return modelKey
+  }
+
+  private getRawConcurrencyKeyFromTask(task: Pick<BackgroundTask, "model" | "agent">): string {
+    return task.model
+      ? `${task.model.providerID}/${task.model.modelID}`
+      : task.agent
   }
 
   /**
@@ -2291,9 +2302,8 @@ The task was re-queued on a fallback model after a retryable failure.
     const reason = options?.reason
 
     if (task.status === "pending") {
-      const key = task.model
-        ? `${task.model.providerID}/${task.model.modelID}`
-        : task.agent
+      const rawKey = this.getRawConcurrencyKeyFromTask(task)
+      const key = this.concurrencyManager.getConcurrencyKey(rawKey)
       const queue = this.queuesByKey.get(key)
       if (queue) {
         const index = queue.findIndex(item => item.task.id === taskId)
@@ -2305,7 +2315,7 @@ The task was re-queued on a fallback model after a retryable failure.
         }
       }
       this.rollbackPreStartDescendantReservation(task)
-      this.concurrencyManager.cancelWaiter(key, taskId)
+      this.concurrencyManager.cancelWaiter(rawKey, taskId)
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 
@@ -2733,9 +2743,7 @@ The task was re-queued on a fallback model after a retryable failure.
           this.idleDeferralTimers.delete(taskId)
         }
         if (wasPending) {
-          const key = task.model
-            ? `${task.model.providerID}/${task.model.modelID}`
-            : task.agent
+          const key = this.concurrencyManager.getConcurrencyKey(this.getRawConcurrencyKeyFromTask(task))
           const queue = this.queuesByKey.get(key)
           if (queue) {
             const index = queue.findIndex((item) => item.task.id === taskId)
