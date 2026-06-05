@@ -1,15 +1,12 @@
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
-import { shouldRetryError } from "../../shared/model-error-classifier"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import { buildRecoveredSyncTaskCompletion, buildSyncTaskCompletion } from "./sync-completion-message"
-import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
 import { reserveSyncSubagentSpawn } from "./sync-spawn-reservation"
 import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
-import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import { publishSyncTaskMetadata } from "./sync-task-metadata"
+import { runSyncTaskLoop } from "./sync-task-runner"
 import { cleanupSyncSessionSideEffects, registerSyncSessionSideEffects } from "./sync-session-lifecycle"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
@@ -22,11 +19,10 @@ export async function executeSyncTask(
   categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
-  fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
+  fallbackChain?: FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { manager, client, directory, syncPollTimeoutMs } = executorCtx
-  const hasActiveChildBackgroundTasks = manager?.hasActiveChildTasks?.bind(manager)
+  const { client, directory, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -104,147 +100,40 @@ export async function executeSyncTask(
     }
     await publishSyncMetadata(sessionID, categoryModel, spawnContext.childDepth)
 
-    const syncPromptInput = {
-      sessionID,
-      agentToUse,
-      args,
-      systemContent,
-      directory: createSessionResult.parentDirectory,
-      toastManager,
-      taskId,
-      sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,
+    const setSyncSessionID = (currentSessionID: string): void => {
+      syncSessionID = currentSessionID
     }
-
-    let effectiveCategoryModel = categoryModel
-    let fallbackState: ModelFallbackState | undefined = effectiveCategoryModel && fallbackChain?.length
-      ? {
-          providerID: effectiveCategoryModel.providerID,
-          modelID: effectiveCategoryModel.modelID,
-          fallbackChain,
-          attemptCount: 0,
-          pending: true,
-        }
-      : undefined
-    let activeSessionID = sessionID
 
     const cleanupRetrySession = (currentSessionID: string): void => {
       cleanupSyncSessionSideEffects(currentSessionID, executorCtx)
     }
 
     try {
-      while (true) {
-        let promptError = await deps.sendSyncPrompt(client, {
-          ...syncPromptInput,
-          sessionID: activeSessionID,
-          categoryModel: effectiveCategoryModel,
-        })
-        if (promptError) {
-          const promptResult = await retrySyncPromptWithFallbacks({
-            sessionID: activeSessionID,
-            initialError: promptError,
-            categoryModel: effectiveCategoryModel,
-            fallbackChain,
-            sendPrompt: async (fallbackModel) => {
-              return deps.sendSyncPrompt(client, {
-                ...syncPromptInput,
-                sessionID: activeSessionID,
-                categoryModel: fallbackModel,
-              })
-            },
-          })
-
-          promptError = promptResult.promptError
-          effectiveCategoryModel = promptResult.categoryModel
-          fallbackState = promptResult.fallbackState ?? fallbackState
-
-          if (promptError) {
-            return promptError
-          }
-        }
-
-        const pollError = await deps.pollSyncSession(ctx, client, {
-          sessionID: activeSessionID,
-          agentToUse,
-          toastManager,
-          taskId,
-          hasActiveChildBackgroundTasks,
-        }, syncPollTimeoutMs)
-        if (pollError) {
-          if (shouldAttemptPollErrorRecovery(pollError)) {
-            const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
-              strictAbortRecovery: true,
-            })
-            if (recoveredResult.ok) {
-              return buildRecoveredSyncTaskCompletion({
-                activeSessionID,
-                agentToUse,
-                args,
-                effectiveCategoryModel,
-                parentContext,
-                startTime,
-                textContent: recoveredResult.textContent,
-              })
-            }
-          }
-
-          const nextFallbackModel = shouldRetryError({ message: pollError })
-            ? getNextSyncFallbackModel(activeSessionID, fallbackState)
-            : null
-          if (!nextFallbackModel) {
-            return pollError
-          }
-
-          cleanupRetrySession(activeSessionID)
-
-          const retrySessionResult = await deps.createSyncSession(client, {
-            parentSessionID: parentContext.sessionID,
-            agentToUse,
-            description: args.description,
-            defaultDirectory: directory,
-            categoryModel: nextFallbackModel,
-          })
-          if (!retrySessionResult.ok) {
-            return retrySessionResult.error
-          }
-
-          activeSessionID = retrySessionResult.sessionID
-          effectiveCategoryModel = nextFallbackModel
-          await registerSyncSession(activeSessionID)
-          if (toastManager && taskId) {
-            toastManager.addTask({
-              id: taskId,
-              sessionID: activeSessionID,
-              description: args.description,
-              agent: agentToUse,
-              isBackground: false,
-              category: args.category,
-              skills: args.load_skills,
-              modelInfo,
-            })
-          }
-          if (taskId) {
-            await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
-          }
-          continue
-        }
-
-        const result = await deps.fetchSyncResult(client, activeSessionID)
-        if (!result.ok) {
-          return result.error
-        }
-
-        await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
-
-        return buildSyncTaskCompletion({
-          activeSessionID,
-          agentToUse,
-          args,
-          effectiveCategoryModel,
-          parentContext,
-          startTime,
-          textContent: result.textContent,
-        })
-      }
+      return await runSyncTaskLoop({
+        args,
+        ctx,
+        executorCtx: {
+          ...executorCtx,
+          directory: createSessionResult.parentDirectory,
+        },
+        parentContext,
+        agentToUse,
+        categoryModel,
+        fallbackChain,
+        deps,
+        sessionID,
+        spawnDepth: spawnContext.childDepth,
+        taskId,
+        startTime,
+        syncPollTimeoutMs,
+        systemContent,
+        toastManager: toastManager ?? undefined,
+        modelInfo,
+        registerSyncSession,
+        publishSyncMetadata,
+        cleanupRetrySession,
+        setSyncSessionID,
+      })
     } finally {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)
