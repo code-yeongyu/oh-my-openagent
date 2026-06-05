@@ -65,6 +65,38 @@ describe("parseAnthropicTokenLimitError", () => {
     expect(result).not.toBeNull()
   })
 
+  it("#given token limit text only in fallback JSON #when parsing #then detects the token limit", () => {
+    //#given
+    const error = {
+      payload: {
+        reason: "prompt is too long: 250000 tokens > 200000 maximum",
+      },
+    }
+
+    //#when
+    const result = parseAnthropicTokenLimitError(error)
+
+    //#then
+    expect(result).not.toBeNull()
+    if (result === null) {
+      throw new Error("expected token limit parser result")
+    }
+    expect(result.currentTokens).toBe(250000)
+    expect(result.maxTokens).toBe(200000)
+  })
+
+  it("#given a circular reference error without string fields #when parsing #then returns null without crashing", () => {
+    //#given
+    const circular: Record<string, unknown> = { payload: { current: 1 } }
+    circular.self = circular
+
+    //#when
+    const result = parseAnthropicTokenLimitError(circular)
+
+    //#then
+    expect(result).toBeNull()
+  })
+
   it("#given an error where data.responseBody has invalid JSON #when parsing #then handles gracefully", () => {
     //#given
     const error = {
