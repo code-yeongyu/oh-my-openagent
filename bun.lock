@@ -65,7 +65,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@oh-my-opencode/rules-engine": "workspace:*",
-        "@oh-my-opencode/utils": "workspace:*",
       },
     },
     "packages/ast-grep-core": {
