@@ -18,7 +18,11 @@ function isExecutable(filePath: string): boolean {
   try {
     accessSync(filePath, constants.X_OK)
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) && Object.prototype.toString.call(error) !== "[object Error]") {
+      throw error
+    }
+
     return false
   }
 }
