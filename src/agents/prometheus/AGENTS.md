@@ -9,7 +9,7 @@ description: Developer reference for the Prometheus strategic planner agent prom
 
 ## OVERVIEW
 
-5 TypeScript files plus 3 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` only loads the right markdown variant and applies runtime tool gating.
+3 TypeScript files plus 3 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` routes model variants and applies runtime tool gating.
 
 This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users/yeongyu/local-workspaces/omo/ROADMAP.md): prompts are harness-neutral core assets, while the OpenCode adapter keeps only model routing and runtime integration.
 
@@ -19,8 +19,6 @@ This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users
 |------|---------|
 | `index.ts` | Barrel exports |
 | `system-prompt.ts` | Thin loader using `loadPromptSync()` and `prometheusPromptVariants` from `@oh-my-opencode/prompts-core`; exports prompt source routing and disabled-tool filtering |
-| `gpt.ts` | Thin loader for `PROMETHEUS_GPT_SYSTEM_PROMPT` from `packages/prompts-core/prompts/prometheus/gpt.md` |
-| `gemini.ts` | Thin loader for `PROMETHEUS_GEMINI_SYSTEM_PROMPT` from `packages/prompts-core/prompts/prometheus/gemini.md` |
 | `system-prompt.test.ts` | Runtime behavior tests for Question tool filtering |
 | `prometheus-byte-exactness.test.ts` | Byte-exact sha256 characterization tests for all variants and Question disabled state |
 | `packages/prompts-core/prompts/prometheus/default.md` | Default/Claude markdown prompt variant |
