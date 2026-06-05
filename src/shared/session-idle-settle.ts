@@ -68,7 +68,11 @@ export async function isSessionActive(
 
     const statusType = status.type
     return typeof statusType === "string" && isActiveSessionStatusType(statusType)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return false
+    }
+
     return false
   }
 }
