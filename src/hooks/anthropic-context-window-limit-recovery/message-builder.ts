@@ -10,7 +10,6 @@ import {
 } from "../session-recovery/storage"
 import { findMessagesWithEmptyTextPartsFromSDK, replaceEmptyTextPartsAsync } from "../session-recovery/storage/empty-text"
 import { injectTextPartAsync } from "../session-recovery/storage/text-part-injector"
-import type { Client } from "./client"
 
 export const PLACEHOLDER_TEXT = "[user interrupted]"
 
@@ -75,7 +74,10 @@ async function findEmptyMessageIdsFromSDK(
     }
 
     return emptyIds
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -155,12 +157,11 @@ export function formatBytes(bytes: number): string {
 
 export async function getLastAssistant(
   sessionID: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
+  client: OpencodeClient,
   directory: string,
 ): Promise<{ info: Record<string, unknown>; hasContent: boolean } | null> {
   try {
-    const resp = await (client as Client).session.messages({
+    const resp = await client.session.messages({
       path: { id: sessionID },
       query: { directory },
     })
@@ -184,7 +185,10 @@ export async function getLastAssistant(
       info,
       hasContent: messageHasContentFromSDK(message),
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
