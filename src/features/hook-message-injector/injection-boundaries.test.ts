@@ -84,6 +84,7 @@ afterAll(() => {
 
 describe("hook message injection boundaries", () => {
   it("writes message and synthetic text part with the original context", () => {
+    // given
     const result = injectHookMessage("ses_direct", "test content", {
       agent: "atlas",
       model: { providerID: "openai", modelID: "gpt-5", variant: "fast" },
@@ -91,8 +92,10 @@ describe("hook message injection boundaries", () => {
       tools: { edit: "allow", bash: false },
     })
 
+    // when
     expect(result).toBe(true)
 
+    // then
     const messageDir = join(TEST_MESSAGE_STORAGE, "ses_direct")
     const messageFiles = listJsonFiles(messageDir)
     expect(messageFiles).toHaveLength(1)
@@ -136,6 +139,7 @@ describe("hook message injection boundaries", () => {
   })
 
   it("uses nearest message fallback and existing nested session directory when original context is partial", () => {
+    // given
     const nestedMessageDir = join(TEST_MESSAGE_STORAGE, "project-a", "ses_nested")
     mkdirSync(nestedMessageDir, { recursive: true })
     writeFileSync(join(nestedMessageDir, "msg_existing.json"), JSON.stringify({
@@ -150,9 +154,11 @@ describe("hook message injection boundaries", () => {
       path: { cwd: "/workspace/nested", root: "/workspace" },
     })
 
+    // when
     expect(result).toBe(true)
     expect(existsSync(join(TEST_MESSAGE_STORAGE, "ses_nested"))).toBe(false)
 
+    // then
     const messageFiles = listJsonFiles(nestedMessageDir)
     const injectedFile = messageFiles.find((fileName) => fileName !== "msg_existing.json")
     expect(messageFiles).toHaveLength(2)
@@ -174,6 +180,7 @@ describe("hook message injection boundaries", () => {
 
 describe("hook message context resolution boundaries", () => {
   it("uses JSON ordering and skips compaction marker messages for first-agent lookup", () => {
+    // given
     const messageDir = createMessageDir()
     const compactionMessageID = "msg_test_injector_first_agent_compaction_marker"
     const partDir = getCompactionPartStorageDir(compactionMessageID)
@@ -190,12 +197,15 @@ describe("hook message context resolution boundaries", () => {
       time: { created: 20 },
     }))
 
+    // when
     const result = findFirstMessageWithAgent(messageDir)
 
+    // then
     expect(result).toBe("sisyphus")
   })
 
   it("uses SDK lookups for SQLite backend", async () => {
+    // given
     mockIsSqliteBackend.mockImplementation(() => true)
     const mockClient = createMockClient([
       {
@@ -208,8 +218,10 @@ describe("hook message context resolution boundaries", () => {
       },
     ])
 
+    // when
     const result = await resolveMessageContext("ses_sqlite", unsafeTestValue(mockClient), null)
 
+    // then
     expect(result).toEqual({
       prevMessage: {
         agent: "sisyphus",
@@ -221,6 +233,7 @@ describe("hook message context resolution boundaries", () => {
   })
 
   it("uses JSON lookups for stable backend", async () => {
+    // given
     const messageDir = createMessageDir()
     writeFileSync(join(messageDir, "msg_early.json"), JSON.stringify({
       agent: "atlas",
@@ -232,8 +245,10 @@ describe("hook message context resolution boundaries", () => {
       time: { created: 100 },
     }))
 
+    // when
     const result = await resolveMessageContext("ses_json", unsafeTestValue(createMockClient([])), messageDir)
 
+    // then
     expect(result).toEqual({
       prevMessage: {
         agent: "sisyphus",
