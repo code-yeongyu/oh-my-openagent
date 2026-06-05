@@ -96,8 +96,12 @@ function readMessageEntry(fileName: string, messageDir: string, missingCreatedAt
       hasCompactionMarker: hasCompactionPartInStorage(msg.id),
       createdAt: typeof msg.time?.created === "number" ? msg.time.created : missingCreatedAt,
     }
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
+    throw error
   }
 }
 
@@ -140,8 +144,12 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
         return entry.msg
       }
     }
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
+    throw error
   }
   return null
 }
@@ -164,8 +172,12 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
         return entry.msg.agent
       }
     }
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
+    throw error
   }
   return null
 }
