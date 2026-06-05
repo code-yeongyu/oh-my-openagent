@@ -30,7 +30,10 @@ export function isTrackedTaskChecked(planPath: string, taskKey: string): boolean
   try {
     const content = readFileSync(planPath, "utf-8")
     return matcher.test(content)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
@@ -84,7 +87,10 @@ export function readCheckedTaskKeysFromPlan(planPath: string): Set<string> {
 
   try {
     return parseCheckedTopLevelTaskKeys(readFileSync(planPath, "utf-8"))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return new Set<string>()
   }
 }
