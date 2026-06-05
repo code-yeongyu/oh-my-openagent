@@ -49,7 +49,10 @@ export async function findOrphanWorktrees(baseDir: string, _config: TeamModeConf
   let teamRunDirectories: string[]
   try {
     teamRunDirectories = await fs.readdir(worktreesDir)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return orphanWorktrees
   }
 
@@ -68,7 +71,10 @@ export async function findOrphanWorktrees(baseDir: string, _config: TeamModeConf
         if (state.status !== "active" && state.status !== "shutdown_requested") {
           orphanWorktrees.push(worktreePath)
         }
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
         orphanWorktrees.push(worktreePath)
       }
     }
