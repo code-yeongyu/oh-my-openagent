@@ -276,6 +276,33 @@ describe("createToolPairValidatorHook", () => {
     }
   })
 
+  it("leaves tracked subagent user turns unchanged when tool_result is missing", async () => {
+    //#given
+    _resetForTesting()
+    subagentSessions.add("ses_background_2")
+    const backgroundMessages = [
+      {
+        info: { role: "assistant", sessionID: "ses_background_2" },
+        parts: [{ type: "tool_use", id: "toolu_background_2" }],
+      },
+      {
+        info: { role: "user", sessionID: "ses_background_2" },
+        parts: [{ type: "text", text: "continue background session" }],
+      },
+    ] satisfies TestMessage[]
+    const originalBackgroundMessages = JSON.parse(JSON.stringify(backgroundMessages))
+
+    try {
+      //#when
+      await runTransform(backgroundMessages)
+
+      //#then
+      expect(backgroundMessages).toEqual(originalBackgroundMessages)
+    } finally {
+      _resetForTesting()
+    }
+  })
+
   it("treats existing camelCase toolUseId results as already paired", async () => {
     //#given
     const messages = [

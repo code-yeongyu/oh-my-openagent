@@ -8,6 +8,13 @@ export interface TrackedSession {
   lastSeenAt: Date
   closePending: boolean
   closeRetryCount: number
+  // Set by `finalizeForceRemoveCandidate` when MAX_CLOSE_RETRY_COUNT
+  // is reached with the pane still visible. `retryPendingCloses` checks
+  // this on subsequent passes: once `Date.now() >= cooldownUntil`, the
+  // retry counter and `closePending` reset so polling and retry can
+  // attempt the close again. Without this, a wedged pane stays in the
+  // tracked sessions map for the rest of the parent session's lifetime.
+  closeRetryCooldownUntil?: Date
   // Stability detection fields (prevents premature closure)
   lastMessageCount?: number
   stableIdlePolls?: number
