@@ -4,7 +4,7 @@ import type {
   AvailableSkill,
   AvailableTool,
 } from "./dynamic-agent-prompt-builder";
-import { buildDynamicSisyphusPromptContent } from "./sisyphus-dynamic-prompt-builder";
+import { buildSisyphusDynamicPromptContent } from "./sisyphus-dynamic-prompt-builder";
 import { applyGeminiFallbackOverrides } from "./sisyphus-gemini-fallback-overrides";
 
 export function buildDynamicSisyphusPrompt(
@@ -15,7 +15,7 @@ export function buildDynamicSisyphusPrompt(
   availableCategories: AvailableCategory[] = [],
   useTaskSystem = false,
 ): string {
-  return buildDynamicSisyphusPromptContent(
+  return buildSisyphusDynamicPromptContent(
     model,
     availableAgents,
     availableTools,

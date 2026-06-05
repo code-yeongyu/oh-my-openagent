@@ -23,7 +23,7 @@ ${sections.librarianSection}
 - Prefer tools over internal knowledge whenever you need specific data (files, configs, patterns)
 </tool_usage_rules>
 
-**Explore/Librarian = Grep, not consultants.
+**Explore/Librarian = Grep, not consultants.**
 
 \`\`\`typescript
 // CORRECT: Always background, always parallel

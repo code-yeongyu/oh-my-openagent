@@ -10,7 +10,7 @@ import { renderRoleAndIntentSections } from "./sisyphus-dynamic-prompt-role";
 import { buildSisyphusDynamicPromptSections } from "./sisyphus-dynamic-prompt-sections";
 import { renderToneAndConstraintsSection } from "./sisyphus-dynamic-prompt-style";
 
-export function buildDynamicSisyphusPromptContent(
+export function buildSisyphusDynamicPromptContent(
   model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[],
