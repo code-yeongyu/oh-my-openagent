@@ -39,6 +39,7 @@ import {
   filterProtectedAgentOverrides,
 } from "./agent-override-protection";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
+import { stripLspPromptReferences } from "../agents/builtin-agents/strip-lsp-references";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 import { adaptHostSkillConfig } from "../shared/host-skill-config";
 
@@ -196,6 +197,14 @@ export async function applyAgentConfig(params: {
     disableOmoEnv,
     params.pluginConfig.team_mode?.enabled ?? false,
   );
+
+  // Strip LSP tool references from agent prompts when LSP MCP is disabled (#4486)
+  const disabledMcps = params.pluginConfig.disabled_mcps ?? [];
+  if (disabledMcps.includes("lsp")) {
+    for (const agentName of Object.keys(builtinAgents)) {
+      builtinAgents[agentName] = stripLspPromptReferences(builtinAgents[agentName], disabledMcps);
+    }
+  }
 
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase())
