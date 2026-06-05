@@ -1,4 +1,5 @@
 import type { DelegateTaskArgs } from "./types"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { isCoordinatorAgent, COORDINATOR_AGENT_NAMES, isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { sanitizeSubagentType } from "./subagent-discovery"
@@ -28,8 +29,9 @@ export function validateSubagentRequest(
   }
 
   const agentName = sanitizeSubagentType(args.subagent_type)
+  const agentConfigKey = getAgentConfigKey(agentName)
 
-  if (!options.allowSisyphusJuniorDirect && agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
+  if (!options.allowSisyphusJuniorDirect && agentConfigKey === getAgentConfigKey(SISYPHUS_JUNIOR_AGENT)) {
     return {
       kind: "invalid",
       result: {
