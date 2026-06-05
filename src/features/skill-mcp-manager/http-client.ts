@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { log } from "../../shared/logger"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
+import { redactSensitiveData } from "./error-redaction"
 import { buildHttpRequestInit } from "./oauth-handler"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
 
@@ -56,6 +57,15 @@ function redactUrl(urlStr: string): string {
   }
 }
 
+function redactCleanupErrorMessage(message: string): string {
+  const messageWithRedactedAuthorization = message
+    .replace(/("authorization"\s*:\s*")([^"]*)(")/gi, "$1[REDACTED]$3")
+    .replace(/(\bauthorization\s*:\s*)([^\n,;}]*)/gi, "$1[REDACTED]")
+    .replace(/(\bauthorization\s*=\s*)([^\n,;}]*)/gi, "$1[REDACTED]")
+  const messageWithRedactedSecrets = redactSensitiveData(messageWithRedactedAuthorization)
+  return messageWithRedactedSecrets.replace(/https?:\/\/[^\s"'<>)}\]]+/g, (url) => redactUrl(url))
+}
+
 async function closeHttpResourceIgnoringFailure(
   close: () => Promise<void>,
   context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" },
@@ -66,7 +76,7 @@ async function closeHttpResourceIgnoringFailure(
     const message = error instanceof Error ? error.message : String(error)
     log("[skill-mcp-http-client] ignored cleanup failure", {
       ...context,
-      error: message,
+      error: redactCleanupErrorMessage(message),
     })
   }
 }
@@ -110,7 +120,7 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
       phase: "connect-failure",
     })
 
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = redactCleanupErrorMessage(error instanceof Error ? error.message : String(error))
     throw new Error(
       `Failed to connect to MCP server "${info.serverName}".\n\n` +
       `URL: ${redactUrl(config.url)}\n` +

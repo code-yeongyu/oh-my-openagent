@@ -1,5 +1,9 @@
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
+import { _flushForTesting, _resetLoggerForTesting, _setLoggerForTesting } from "../../shared/logger"
 import { disconnectAll } from "./cleanup"
 import { createHttpClient, setHttpClientDependenciesForTesting } from "./http-client"
 import type { McpTransport, SkillMcpClientInfo, SkillMcpManagerState } from "./types"
@@ -9,6 +13,7 @@ const createdClients: MockHttpClient[] = []
 const createdTransports: MockHttpTransport[] = []
 let configureNextClient: ((client: MockHttpClient) => void) | undefined
 let configureNextTransport: ((transport: MockHttpTransport) => void) | undefined
+let testLogDir: string | undefined
 
 class MockHttpClient {
   readonly close = mock(async () => {})
@@ -97,6 +102,7 @@ beforeEach(() => {
   createdTransports.length = 0
   configureNextClient = undefined
   configureNextTransport = undefined
+  testLogDir = undefined
   setHttpClientDependenciesForTesting({
     createClient: (clientInfo, options) => new MockHttpClient(clientInfo, options),
     createTransport: (url, options) => new MockHttpTransport(url, options),
@@ -113,6 +119,11 @@ afterEach(async () => {
   createdTransports.length = 0
   configureNextClient = undefined
   configureNextTransport = undefined
+  _resetLoggerForTesting()
+  if (testLogDir) {
+    fs.rmSync(testLogDir, { recursive: true, force: true })
+    testLogDir = undefined
+  }
   setHttpClientDependenciesForTesting()
 })
 
@@ -141,6 +152,117 @@ describe("createHttpClient cleanup failures", () => {
     expect(state.clients.has(clientKey)).toBe(false)
   })
 
+  it("#given HTTP connect failure includes URL and bearer secrets #when creating the client #then thrown reason redacts secrets", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error(
+          "connect failed for https://example.com/mcp?api_key=secret-value with Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+        )
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toMatch(
+      /Reason: connect failed for https:\/\/example\.com\/mcp\?api_key=\*\*\*REDACTED\*\*\* with Authorization: \[REDACTED\]/,
+    )
+    expect(message).not.toMatch(/secret-value|abcdefghijklmnopqrstuvwxyz/)
+  })
+
+  it("#given HTTP connect failure includes compact JSON secrets #when creating the client #then URL and bearer values are both redacted", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error(
+          '{"url":"https://example.com/mcp?api_key=secret-value","headers":{"Authorization":"Bearer abcdefghijklmnopqrstuvwxyz"}}',
+        )
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toContain('"url":"https://example.com/mcp?api_key=***REDACTED***"')
+    expect(message).toContain('"Authorization":"[REDACTED]"')
+    expect(message).not.toMatch(/secret-value|abcdefghijklmnopqrstuvwxyz/)
+  })
+
+  it("#given HTTP connect failure includes non-bearer authorization secrets #when creating the client #then authorization values are redacted by key", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error(
+          '{"url":"https://example.com/mcp?api_key=secret-value","headers":{"Authorization":"Basic short-secret","authorization":"Bearer short"}}',
+        )
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toContain('"url":"https://example.com/mcp?api_key=***REDACTED***"')
+    expect(message).toContain('"Authorization":"[REDACTED]"')
+    expect(message).toContain('"authorization":"[REDACTED]"')
+    expect(message).not.toMatch(/secret-value|short-secret|Bearer short/)
+  })
+
+  it("#given HTTP connect failure includes authorization equals secrets #when creating the client #then full values are redacted", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error("authorization=Basic short-secret; authorization=Bearer short")
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toContain("authorization=[REDACTED]; authorization=[REDACTED]")
+    expect(message).not.toMatch(/short-secret|Bearer short/)
+  })
+
   it("#given shutdown completes during HTTP connect and cleanup rejects #when creating the client #then the shutdown error is preserved", async () => {
     const state = createState()
     const info = createInfo()
@@ -167,5 +289,38 @@ describe("createHttpClient cleanup failures", () => {
     expect(createdClients[0]?.close).toHaveBeenCalledTimes(1)
     expect(createdTransports[0]?.close).toHaveBeenCalledTimes(1)
     expect(state.clients.has(clientKey)).toBe(false)
+  })
+
+  it("#given cleanup failure includes URL and bearer secrets #when the failure is logged #then secrets are redacted", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+    testLogDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-http-client-cleanup-"))
+    const logFilePath = path.join(testLogDir, "cleanup.log")
+
+    _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024 * 1024, maxBackups: 2 })
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error("connect boom")
+      })
+    }
+    configureNextTransport = (transport) => {
+      transport.close.mockImplementation(async () => {
+        throw new Error(
+          "cleanup failed for https://example.com/mcp?api_key=secret-value with Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+        )
+      })
+    }
+
+    await expect(createHttpClient({ state, clientKey, info, config })).rejects.toThrow(/connect boom/)
+    _flushForTesting()
+
+    const logContent = fs.readFileSync(logFilePath, "utf8")
+    expect(logContent).toContain("ignored cleanup failure")
+    expect(logContent).toContain("api_key=***REDACTED***")
+    expect(logContent).toContain("Authorization: [REDACTED]")
+    expect(logContent).not.toContain("secret-value")
+    expect(logContent).not.toContain("abcdefghijklmnopqrstuvwxyz")
   })
 })
