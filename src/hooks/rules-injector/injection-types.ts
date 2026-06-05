@@ -1,4 +1,3 @@
-import type { statSync } from "node:fs";
 import type { SessionInjectedRulesCache } from "./cache";
 import type { RuleMetadata } from "./types";
 
@@ -24,7 +23,9 @@ export type DynamicTruncator = {
 
 export type RuleFileReader = (path: string, encoding: "utf-8") => string;
 
-export type RuleStatReader = typeof statSync;
+export type RuleStatReader = (
+	path: string,
+) => { readonly mtimeMs: number; readonly size: number };
 
 export interface ParsedRuleEntry {
 	mtimeMs: number;

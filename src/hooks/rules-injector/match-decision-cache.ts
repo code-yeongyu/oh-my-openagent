@@ -43,7 +43,7 @@ export function setCachedMatchReason(
 	);
 	if (cacheKey === null) return;
 
-	if (cache.size >= MAX_MATCH_DECISION_CACHE_ENTRIES) {
+	if (!cache.has(cacheKey) && cache.size >= MAX_MATCH_DECISION_CACHE_ENTRIES) {
 		const oldestCacheKey = cache.keys().next().value;
 		if (oldestCacheKey !== undefined) {
 			cache.delete(oldestCacheKey);

@@ -76,7 +76,10 @@ function setParsedRuleCacheEntry(
 ): void {
 	if (Buffer.byteLength(entry.body, "utf8") > MAX_PARSED_RULE_CACHE_BODY_BYTES)
 		return;
-	if (parsedRuleCache.size >= MAX_PARSED_RULE_CACHE_ENTRIES) {
+	if (
+		!parsedRuleCache.has(realPath) &&
+		parsedRuleCache.size >= MAX_PARSED_RULE_CACHE_ENTRIES
+	) {
 		const oldestRealPath = parsedRuleCache.keys().next().value;
 		if (oldestRealPath !== undefined) {
 			parsedRuleCache.delete(oldestRealPath);
