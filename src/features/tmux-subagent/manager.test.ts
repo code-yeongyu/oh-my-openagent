@@ -2594,6 +2594,132 @@ describe('TmuxSessionManager', () => {
     })
   })
 
+  describe('retryPendingCloses zombie pane recovery via cooldown', () => {
+    test('stamps a close-retry cooldown on the tracked session when the pane refuses to die after max retries', async () => {
+      // given - direct-seed the zombie state: pending close, retries
+      // already at MAX, pane still visible in window state. The maintainer
+      // explicitly chose to keep the session in `this.sessions` here for
+      // operator visibility (zombie-pane.test.ts: "stays tracked for
+      // manual intervention"). Before this change there was no way out —
+      // polling skipped the entry via `!closePending`, retryPendingCloses
+      // skipped via `>= MAX`, so the entry stayed wedged forever and
+      // panes accumulated across long parent sessions.
+      //
+      // After this change: the entry stays in the map AND finalize stamps
+      // `closeRetryCooldownUntil` so a future pass can reset state and
+      // let polling re-queue the close.
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState({
+        agentPanes: [
+          { paneId: '%stuck', width: 40, height: 44, left: 110, top: 0, title: 'omo-subagent-zombie', isActive: false },
+        ],
+      }))
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+
+      const internalSessions = Reflect.get(manager, 'sessions') as Map<string, Record<string, unknown>>
+      internalSessions.set('ses_zombie', {
+        sessionId: 'ses_zombie',
+        paneId: '%stuck',
+        description: 'zombie',
+        closePending: true,
+        closeRetryCount: 3, // MAX_CLOSE_RETRY_COUNT
+        createdAt: new Date(),
+        lastSeenAt: new Date(),
+        activityVersion: 0,
+        attachActivated: false,
+      })
+
+      // when
+      const retryPendingCloses = Reflect.get(manager, 'retryPendingCloses') as () => Promise<void>
+      await retryPendingCloses.call(manager)
+
+      // then - session stays tracked (maintainer's intent), cooldown is set.
+      expect(internalSessions.has('ses_zombie')).toBe(true)
+      const stamped = internalSessions.get('ses_zombie')
+      expect(stamped?.closeRetryCooldownUntil).toBeInstanceOf(Date)
+      const cooldownMs = (stamped?.closeRetryCooldownUntil as Date).getTime() - Date.now()
+      expect(cooldownMs).toBeGreaterThan(0)
+    })
+
+    test('resets retry state once the cooldown elapses so polling can re-queue the close', async () => {
+      // given - same setup, but cooldown stamped in the past.
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState({
+        agentPanes: [
+          { paneId: '%stuck', width: 40, height: 44, left: 110, top: 0, title: 'omo-subagent-zombie', isActive: false },
+        ],
+      }))
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+
+      const internalSessions = Reflect.get(manager, 'sessions') as Map<string, Record<string, unknown>>
+      internalSessions.set('ses_zombie', {
+        sessionId: 'ses_zombie',
+        paneId: '%stuck',
+        description: 'zombie',
+        closePending: true,
+        closeRetryCount: 3,
+        closeRetryCooldownUntil: new Date(Date.now() - 1_000), // already elapsed
+        createdAt: new Date(),
+        lastSeenAt: new Date(),
+        activityVersion: 0,
+        attachActivated: false,
+      })
+
+      // when
+      const retryPendingCloses = Reflect.get(manager, 'retryPendingCloses') as () => Promise<void>
+      await retryPendingCloses.call(manager)
+
+      // then - retry state reset; polling's next pass can re-queue
+      // (closePending=false, counter back at 0, cooldown cleared).
+      const refreshed = internalSessions.get('ses_zombie')
+      expect(refreshed?.closePending).toBe(false)
+      expect(refreshed?.closeRetryCount).toBe(0)
+      expect(refreshed?.closeRetryCooldownUntil).toBeUndefined()
+    })
+
+    test('does not reset retry state while the cooldown is still active', async () => {
+      // given - cooldown stamped in the future.
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState({
+        agentPanes: [
+          { paneId: '%stuck', width: 40, height: 44, left: 110, top: 0, title: 'omo-subagent-zombie', isActive: false },
+        ],
+      }))
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+
+      const futureCooldown = new Date(Date.now() + 10 * 60 * 1000)
+      const internalSessions = Reflect.get(manager, 'sessions') as Map<string, Record<string, unknown>>
+      internalSessions.set('ses_zombie', {
+        sessionId: 'ses_zombie',
+        paneId: '%stuck',
+        description: 'zombie',
+        closePending: true,
+        closeRetryCount: 3,
+        closeRetryCooldownUntil: futureCooldown,
+        createdAt: new Date(),
+        lastSeenAt: new Date(),
+        activityVersion: 0,
+        attachActivated: false,
+      })
+
+      // when
+      const retryPendingCloses = Reflect.get(manager, 'retryPendingCloses') as () => Promise<void>
+      await retryPendingCloses.call(manager)
+
+      // then - state unchanged; we wait for the cooldown.
+      const same = internalSessions.get('ses_zombie')
+      expect(same?.closePending).toBe(true)
+      expect(same?.closeRetryCount).toBe(3)
+      expect(same?.closeRetryCooldownUntil).toBe(futureCooldown)
+    })
+  })
+
 })
 
 describe('DecisionEngine', () => {
