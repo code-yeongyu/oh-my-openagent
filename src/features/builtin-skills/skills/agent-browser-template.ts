@@ -1,19 +1,11 @@
 import agentBrowserSkillFile from "../agent-browser/SKILL.md" with { type: "text" }
+import { parseFrontmatter } from "../../../shared/frontmatter"
 
-const FRONTMATTER_BOUNDARY = "---"
+const EM_DASH = "\u2014"
 
-function stripSkillFrontmatter(markdown: string): string {
-  const lines = markdown.split("\n")
-  if (lines[0] !== FRONTMATTER_BOUNDARY) {
-    return markdown
-  }
-
-  const closingBoundaryIndex = lines.indexOf(FRONTMATTER_BOUNDARY, 1)
-  if (closingBoundaryIndex === -1) {
-    return markdown
-  }
-
-  return lines.slice(closingBoundaryIndex + 1).join("\n").trim().replaceAll(" — ", " - ")
+export function createAgentBrowserTemplate(markdown: string): string {
+  const { body } = parseFrontmatter(markdown)
+  return body.trim().replaceAll(` ${EM_DASH} `, " - ")
 }
 
-export const agentBrowserTemplate = stripSkillFrontmatter(agentBrowserSkillFile)
+export const agentBrowserTemplate = createAgentBrowserTemplate(agentBrowserSkillFile)
