@@ -16,6 +16,7 @@ export function createStaleSessionCleanup(
     sessionRetryInFlight,
     sessionAwaitingFallbackResult,
     sessionStatusRetryKeys,
+    internallyAbortedSessions,
   } = deps
 
   return () => {
@@ -27,6 +28,7 @@ export function createStaleSessionCleanup(
         sessionLastAccess.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
+        internallyAbortedSessions.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
         clearDelegatedChildSessionBootstrap(sessionID)
         SessionCategoryRegistry.remove(sessionID)
