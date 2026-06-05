@@ -91,7 +91,7 @@ export function loadAgentSources(params: ApplyAgentConfigParams): AgentSources {
     configAgent,
   };
 
-  log("[agent-config-handler] Agent sources loaded", sourceCounts);
+  log("[agent-source-loader] Agent sources loaded", sourceCounts);
 
   return {
     ...sources,
