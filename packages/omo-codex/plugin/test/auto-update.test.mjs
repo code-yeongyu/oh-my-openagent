@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
-import { resolveSpawnCommand } from "../scripts/spawn-command.mjs";
+import { resolveSpawnInvocation } from "../scripts/spawn-command.mjs";
 
 test("#given auto update is disabled #when resolving plan #then no command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
@@ -31,10 +31,22 @@ test("#given stale state #when resolving plan #then installer update command is 
 });
 
 test("#given Windows npm shims #when resolving spawn commands #then cmd shims are used", () => {
-	assert.equal(resolveSpawnCommand("npm", "win32"), "npm.cmd");
-	assert.equal(resolveSpawnCommand("npx", "win32"), "npx.cmd");
-	assert.equal(resolveSpawnCommand("node", "win32"), "node");
-	assert.equal(resolveSpawnCommand("npx", "darwin"), "npx");
+	assert.deepEqual(resolveSpawnInvocation("npm", ["install"], "win32"), {
+		command: "cmd.exe",
+		args: ["/d", "/s", "/c", "npm.cmd", "install"],
+	});
+	assert.deepEqual(resolveSpawnInvocation("npx", ["--yes", "lazycodex-ai@latest"], "win32"), {
+		command: "cmd.exe",
+		args: ["/d", "/s", "/c", "npx.cmd", "--yes", "lazycodex-ai@latest"],
+	});
+	assert.deepEqual(resolveSpawnInvocation("node", ["script.mjs"], "win32"), {
+		command: "node",
+		args: ["script.mjs"],
+	});
+	assert.deepEqual(resolveSpawnInvocation("npx", ["--yes"], "darwin"), {
+		command: "npx",
+		args: ["--yes"],
+	});
 });
 
 test("#given current version #when resolving update plan #then skips installer", () => {

@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
-import { resolveSpawnCommand } from "./spawn-command.mjs";
+import { resolveSpawnInvocation } from "./spawn-command.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
@@ -109,7 +109,8 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 	try {
 		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
-			const result = spawnSync(resolveSpawnCommand(plan.command), plan.args, {
+			const invocation = resolveSpawnInvocation(plan.command, plan.args);
+			const result = spawnSync(invocation.command, invocation.args, {
 				env: plan.env,
 				stdio: "ignore",
 			});
@@ -121,7 +122,8 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			return { started: true, status };
 		}
 
-		const child = spawn(resolveSpawnCommand(plan.command), plan.args, {
+		const invocation = resolveSpawnInvocation(plan.command, plan.args);
+		const child = spawn(invocation.command, invocation.args, {
 			env: plan.env,
 			stdio: "ignore",
 			detached: true,
@@ -171,7 +173,8 @@ function resolveCurrentVersion(env) {
 
 function resolveLatestVersion(env) {
 	if (env.LAZYCODEX_LATEST_VERSION?.trim()) return env.LAZYCODEX_LATEST_VERSION.trim();
-	const result = spawnSync(resolveSpawnCommand("npm"), ["view", "lazycodex-ai", "version", "--silent"], {
+	const invocation = resolveSpawnInvocation("npm", ["view", "lazycodex-ai", "version", "--silent"]);
+	const result = spawnSync(invocation.command, invocation.args, {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "ignore"],
 	});
@@ -182,7 +185,8 @@ function resolveLatestVersion(env) {
 
 function defaultRunCommandForManualUpdate(command, args, options) {
 	return new Promise((resolve, reject) => {
-		const child = spawn(resolveSpawnCommand(command), args, {
+		const invocation = resolveSpawnInvocation(command, args);
+		const child = spawn(invocation.command, invocation.args, {
 			cwd: options.cwd,
 			env: options.env,
 			stdio: "inherit",
