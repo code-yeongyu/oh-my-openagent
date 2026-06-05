@@ -73,14 +73,13 @@ agents/
 ├── metis.ts                                   # Pre-planning
 ├── momus.ts                                   # Plan review
 ├── atlas/agent.ts                             # Todo orchestrator
-├── prometheus/                                # Strategic planner thin loaders: system-prompt.ts, gemini.ts, gpt.ts; prompt content in packages/prompts-core/prompts/prometheus/
+├── prometheus/                                # Strategic planner prompt router; prompt content in packages/prompts-core/prompts/prometheus/
 ├── types.ts                                   # BuiltinAgentName, AgentMode, AgentConfig
 ├── builtin-agents.ts                          # agentSources registry (10 → 11 with sisyphus-junior)
 ├── builtin-agents/                            # maybeCreateXXXConfig conditional factories + general-agents.ts + available-skills.ts
 ├── agent-builder.ts                           # buildAgent() composition
 ├── utils.ts                                   # agent utilities
 ├── env-context.ts                             # environment context for prompts
-├── custom-agent-summaries.ts                  # custom-agent prompt summaries
 ├── dynamic-agent-prompt-builder.ts            # dynamic prompt builder
 ├── dynamic-agent-core-sections.ts             # core prompt sections
 ├── dynamic-agent-policy-sections.ts           # policy sections

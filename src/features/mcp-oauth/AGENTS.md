@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-18 files. Full OAuth 2.0 authorization flow for MCP servers requiring authentication. Implements PKCE (RFC 7636), Dynamic Client Registration (DCR, RFC 7591), and resource indicators (RFC 8707). Used by `bunx oh-my-opencode mcp-oauth login`.
+Full OAuth 2.0 authorization flow for MCP servers requiring authentication. Implements PKCE (RFC 7636) and Dynamic Client Registration (DCR, RFC 7591). Used by `bunx oh-my-opencode mcp-oauth login`.
 
 ## AUTHORIZATION FLOW
 
@@ -29,10 +29,8 @@
 | `provider.ts` | `OAuthProvider` — token exchange, refresh, revoke |
 | `discovery.ts` | Fetch + parse OAuth server metadata from well-known endpoint |
 | `dcr.ts` | Dynamic Client Registration — register this app with OAuth server |
-| `resource-indicator.ts` | RFC 8707 resource indicator handling |
 | `step-up.ts` | Handle step-up authentication challenges |
 | `storage.ts` | Persist tokens to `~/.config/opencode/mcp-oauth/{server-hash}.json` |
-| `schema.ts` | Zod schemas for OAuth server metadata, token response, DCR |
 
 ## PKCE IMPLEMENTATION
 

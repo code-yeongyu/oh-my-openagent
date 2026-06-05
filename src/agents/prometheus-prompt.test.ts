@@ -1,7 +1,8 @@
 import { describe, test, expect } from "bun:test"
-import { PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
-import { PROMETHEUS_GPT_SYSTEM_PROMPT } from "./prometheus/gpt"
-import { PROMETHEUS_GEMINI_SYSTEM_PROMPT } from "./prometheus/gemini"
+import { getPrometheusPrompt, PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
+
+const PROMETHEUS_GPT_SYSTEM_PROMPT = getPrometheusPrompt("gpt-5.5")
+const PROMETHEUS_GEMINI_SYSTEM_PROMPT = getPrometheusPrompt("gemini-3.1-pro")
 
 describe("PROMETHEUS_SYSTEM_PROMPT Momus invocation policy", () => {
   test("should direct providing ONLY the file path string when invoking Momus", () => {
