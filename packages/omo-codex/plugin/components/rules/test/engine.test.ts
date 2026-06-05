@@ -8,8 +8,8 @@ import type { RuleCandidate } from "../src/rules/types.js";
 
 const projectRoot = "/tmp/codex-rules-engine";
 
-function makeCandidate(): RuleCandidate {
-	return {
+function makeCandidate(overrides: Partial<RuleCandidate> = {}): RuleCandidate {
+	const candidate = {
 		path: join(projectRoot, ".omo", "rules", "typescript.md"),
 		realPath: join(projectRoot, ".omo", "rules", "typescript.md"),
 		source: ".omo/rules",
@@ -17,7 +17,8 @@ function makeCandidate(): RuleCandidate {
 		isGlobal: false,
 		isSingleFile: false,
 		relativePath: ".omo/rules/typescript.md",
-	};
+	} satisfies RuleCandidate;
+	return { ...candidate, ...overrides };
 }
 
 describe("rule engine dynamic matching", () => {
@@ -240,5 +241,66 @@ describe("rule engine default source selection", () => {
 		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(false);
 		expect(capturedDisabledSources?.has("plugin-bundled")).toBe(false);
 		expect(capturedDisabledSources?.has(".omo/rules")).toBe(true);
+	});
+});
+
+describe("rule engine static loading", () => {
+	it("#given multiple root single-file candidates #when loading static rules #then only one root single-file rule is selected", () => {
+		// given
+		const firstCandidate = makeCandidate({
+			path: join(projectRoot, "CONTEXT.md"),
+			realPath: join(projectRoot, "CONTEXT.md"),
+			source: "CONTEXT.md",
+			isSingleFile: true,
+			relativePath: "CONTEXT.md",
+		});
+		const secondCandidate = makeCandidate({
+			path: join(projectRoot, "nested", "CONTEXT.md"),
+			realPath: join(projectRoot, "nested", "CONTEXT.md"),
+			source: "CONTEXT.md",
+			isSingleFile: true,
+			relativePath: "nested/CONTEXT.md",
+		});
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [firstCandidate, secondCandidate],
+			readFile: () => "Shared project context.",
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(result.rules).toHaveLength(1);
+		expect(result.rules[0]?.matchReason).toBe("single-file");
+	});
+
+	it("#given project candidate resolves outside project #when loading static rules #then the rule is skipped with a diagnostic", () => {
+		// given
+		const outsidePath = "/tmp/codex-rules-outside/.omo/rules/typescript.md";
+		const outsideCandidate = makeCandidate({
+			path: outsidePath,
+			realPath: outsidePath,
+		});
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [outsideCandidate],
+			readFile: () => "Should not be read.",
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(result.rules).toEqual([]);
+		expect(result.diagnostics).toEqual([
+			{
+				severity: "warning",
+				source: outsidePath,
+				message: "Rule file resolves outside project root",
+			},
+		]);
 	});
 });
