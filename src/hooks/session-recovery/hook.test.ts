@@ -74,6 +74,55 @@ function createCountingCtx() {
 }
 
 describe("session-recovery hook persistent dedupe", () => {
+  test("#given a session recovery hook #when inspecting the public facade surface #then it exposes recoverability checks, recovery handlers, and shared callbacks", async () => {
+    // given
+    const aborts: string[] = []
+    const completions: string[] = []
+    const info = createPrefillErrorInfo()
+    const ctx = {
+      client: {
+        session: {
+          abort: async () => ({}),
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  id: info.id,
+                  role: "assistant",
+                  error: info.error,
+                },
+              },
+            ],
+          }),
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/session-recovery-facade-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+    hook.setOnAbortCallback((sessionID) => {
+      aborts.push(sessionID)
+    })
+    hook.setOnRecoveryCompleteCallback((sessionID) => {
+      completions.push(sessionID)
+    })
+
+    // when
+    const isRecoverable = hook.isRecoverableError(info.error)
+    const isNotRecoverable = hook.isRecoverableError({ message: "rate limit exceeded" })
+    const result = await hook.handleSessionRecovery(info)
+
+    // then
+    expect(isRecoverable).toBe(true)
+    expect(isNotRecoverable).toBe(false)
+    expect(result).toBe(false)
+    expect(typeof hook.handleInterruptedToolResultsOnIdle).toBe("function")
+    expect(aborts).toEqual([info.sessionID])
+    expect(completions).toEqual([info.sessionID])
+  })
+
   test("#given the same recoverable session.error fires twice for the same assistant message id #when handleSessionRecovery is called twice in sequence #then recovery side effects run only once", async () => {
     // given
     const { ctx, counts, info } = createCountingCtx()
