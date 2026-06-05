@@ -46,20 +46,20 @@ export function loadExplicitGitMasterOverrides(configPath: string): Record<strin
 
 export function parseConfigPartially(
   rawConfig: Record<string, unknown>
-): OhMyOpenCodeConfig | null {
+): Partial<OhMyOpenCodeConfig> | null {
   const fullResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
   if (fullResult.success) {
     return fullResult.data;
   }
 
-  const partialConfig: Record<string, unknown> = {};
+  const partialConfig: Partial<OhMyOpenCodeConfig> = {};
   const invalidSections: string[] = [];
 
   for (const key of Object.keys(rawConfig)) {
     if (PARTIAL_STRING_ARRAY_KEYS.has(key)) {
       const sectionValue = rawConfig[key];
       if (Array.isArray(sectionValue) && sectionValue.every((value) => typeof value === "string")) {
-        partialConfig[key] = sectionValue;
+        Object.assign(partialConfig, { [key]: sectionValue });
       }
       continue;
     }
@@ -68,7 +68,7 @@ export function parseConfigPartially(
     if (sectionResult.success) {
       const parsedEntry = Object.entries(sectionResult.data).find(([entryKey]) => entryKey === key);
       if (parsedEntry?.[1] !== undefined) {
-        partialConfig[key] = parsedEntry[1];
+        Object.assign(partialConfig, { [key]: parsedEntry[1] });
       }
     } else {
       const sectionErrors = sectionResult.error.issues
@@ -85,13 +85,13 @@ export function parseConfigPartially(
     log("Partial config loaded - invalid sections skipped:", invalidSections);
   }
 
-  return OhMyOpenCodeConfigSchema.parse(partialConfig);
+  return partialConfig;
 }
 
 export function loadConfigFromPath(
   configPath: string,
   _ctx: unknown
-): OhMyOpenCodeConfig | null {
+): Partial<OhMyOpenCodeConfig> | null {
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
