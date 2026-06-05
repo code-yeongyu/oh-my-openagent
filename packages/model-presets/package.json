@@ -1,0 +1,1 @@
+{ "name": "@oh-my-opencode/model-presets", "private": true, "type": "module", "main": "./src/index.ts", "types": "./src/index.ts" }

@@ -1,7 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { isDeepSeekV4Model, isDeepSeekV4ProModel, isMimoV25ProModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { resolveModelPreset, getBuiltinPresets, createPromptResolver, PROMPT_KEYS } from "@oh-my-opencode/model-presets"
+import type { PromptKey } from "@oh-my-opencode/model-presets"
 
 const MODE: AgentMode = "subagent"
 
@@ -342,25 +343,18 @@ export function createExploreAgent(model: string): AgentConfig {
     prompt: EXPLORE_DEFAULT_PROMPT,
   } as AgentConfig
 
-  if (isDeepSeekV4ProModel(model)) {
+  // ModelPreset resolver: replaces hardcoded isDeepSeekV4Model/isMimoV25ProModel checks
+  const presetResolver = createPromptResolver({
+    [PROMPT_KEYS.EXPLORE_DS_V4_PRO]: DEEPSEEK_V4_EXPLORE_PROMPT,
+    [PROMPT_KEYS.EXPLORE_DS_V4_FLASH]: DEEPSEEK_V4_FLASH_EXPLORE_PROMPT,
+    [PROMPT_KEYS.EXPLORE_MIMO_V25]: MIMO_V25_EXPLORE_PROMPT,
+  })
+  const preset = resolveModelPreset("explore", model, getBuiltinPresets())
+  if (preset?.promptKey) {
     return {
       ...base,
-      prompt: DEEPSEEK_V4_EXPLORE_PROMPT,
-      thinking: { type: "enabled", budgetTokens: 32000 },
-    } as AgentConfig
-  }
-
-  if (isDeepSeekV4Model(model)) {
-    return {
-      ...base,
-      prompt: DEEPSEEK_V4_FLASH_EXPLORE_PROMPT,
-    } as AgentConfig
-  }
-
-  if (isMimoV25ProModel(model)) {
-    return {
-      ...base,
-      prompt: MIMO_V25_EXPLORE_PROMPT,
+      prompt: presetResolver(preset.promptKey as PromptKey) ?? base.prompt,
+      ...(preset.config?.thinking ? { thinking: preset.config.thinking } : {}),
     } as AgentConfig
   }
 
