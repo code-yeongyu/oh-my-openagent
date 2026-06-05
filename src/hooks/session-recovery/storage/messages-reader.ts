@@ -43,7 +43,10 @@ export function readMessages(sessionID: string): StoredMessageMeta[] {
     try {
       const content = readFileSync(join(messageDir, file), "utf-8")
       messages.push(JSON.parse(content))
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
@@ -77,7 +80,10 @@ export async function readMessagesFromSDK(
       if (aTime !== bTime) return aTime - bTime
       return a.id.localeCompare(b.id)
     })
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
