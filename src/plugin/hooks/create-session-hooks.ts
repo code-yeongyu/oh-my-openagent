@@ -23,6 +23,7 @@ import {
   createSisyphusJuniorNotepadHook,
   createNoSisyphusGptHook,
   createNoHephaestusNonGptHook,
+  createHephaestusAgentsMdInjectorHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
@@ -33,11 +34,11 @@ import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
   log,
-  normalizeSDKResponse,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
 import { isTmuxIntegrationEnabled } from "../../create-runtime-tmux-config"
+import { createModelFallbackTitleUpdater } from "./model-fallback-title-updater"
 
 export type SessionHooks = {
   preemptiveCompaction: ReturnType<typeof createPreemptiveCompactionHook> | null
@@ -58,6 +59,7 @@ export type SessionHooks = {
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
   noHephaestusNonGpt: ReturnType<typeof createNoHephaestusNonGptHook> | null
+  hephaestusAgentsMdInjector: ReturnType<typeof createHephaestusAgentsMdInjectorHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook> | null
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
@@ -106,50 +108,9 @@ export function createSessionHooks(args: {
     : null
 
   const enableFallbackTitle = pluginConfig.experimental?.model_fallback_title ?? false
-  const fallbackTitleMaxEntries = 200
-  const fallbackTitleState = new Map<string, { baseTitle?: string; lastKey?: string }>()
-  const updateFallbackTitle = async (input: {
-    sessionID: string
-    providerID: string
-    modelID: string
-    variant?: string
-  }) => {
-    if (!enableFallbackTitle) return
-    const key = `${input.providerID}/${input.modelID}${input.variant ? `:${input.variant}` : ""}`
-    const existing = fallbackTitleState.get(input.sessionID) ?? {}
-    if (existing.lastKey === key) return
-
-    if (!existing.baseTitle) {
-      const sessionResp = await ctx.client.session.get({ path: { id: input.sessionID } }).catch(() => null)
-      const sessionInfo = sessionResp
-        ? normalizeSDKResponse(sessionResp, null as { title?: string } | null, { preferResponseOnMissingData: true })
-        : null
-      const rawTitle = sessionInfo?.title
-      if (typeof rawTitle === "string" && rawTitle.length > 0) {
-        existing.baseTitle = rawTitle.replace(/\s*\[fallback:[^\]]+\]$/i, "").trim()
-      } else {
-        existing.baseTitle = "Session"
-      }
-    }
-
-    const variantLabel = input.variant ? ` ${input.variant}` : ""
-    const newTitle = `${existing.baseTitle} [fallback: ${input.providerID}/${input.modelID}${variantLabel}]`
-
-    await ctx.client.session
-      .update({
-        path: { id: input.sessionID },
-        body: { title: newTitle },
-        query: { directory: ctx.directory },
-      })
-      .catch(() => {})
-
-    existing.lastKey = key
-    fallbackTitleState.set(input.sessionID, existing)
-    if (fallbackTitleState.size > fallbackTitleMaxEntries) {
-      const oldestKey = fallbackTitleState.keys().next().value
-      if (oldestKey) fallbackTitleState.delete(oldestKey)
-    }
-  }
+  const updateFallbackTitle = enableFallbackTitle
+    ? createModelFallbackTitleUpdater(ctx)
+    : undefined
 
   const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
   const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
@@ -241,6 +202,11 @@ export function createSessionHooks(args: {
       }))
     : null
 
+  const hephaestusAgentsMdInjector = isHookEnabled("hephaestus-agents-md-injector")
+    ? safeHook("hephaestus-agents-md-injector", () =>
+      createHephaestusAgentsMdInjectorHook(ctx, modelCacheState))
+    : null
+
   const questionLabelTruncator = isHookEnabled("question-label-truncator")
     ? safeHook("question-label-truncator", () => createQuestionLabelTruncatorHook())
     : null
@@ -288,6 +254,7 @@ export function createSessionHooks(args: {
     sisyphusJuniorNotepad,
     noSisyphusGpt,
     noHephaestusNonGpt,
+    hephaestusAgentsMdInjector,
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,

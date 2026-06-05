@@ -316,6 +316,7 @@ export function createEventHandler(args: {
     await runEventHookSafely("directoryAgentsInjector", hooks.directoryAgentsInjector?.event, input);
     await runEventHookSafely("directoryReadmeInjector", hooks.directoryReadmeInjector?.event, input);
     await runEventHookSafely("rulesInjector", hooks.rulesInjector?.event, input);
+    await runEventHookSafely("hephaestusAgentsMdInjector", hooks.hephaestusAgentsMdInjector?.event, input);
     await runEventHookSafely("thinkMode", hooks.thinkMode?.event, input);
     await runEventHookSafely(
       "anthropicContextWindowLimitRecovery",
