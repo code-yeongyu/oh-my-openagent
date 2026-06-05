@@ -13,10 +13,14 @@ function getSessionCache(
   sessionCaches: Map<string, Set<string>>,
   sessionID: string,
 ): Set<string> {
-  if (!sessionCaches.has(sessionID)) {
-    sessionCaches.set(sessionID, loadInjectedPaths(sessionID));
+  const existing = sessionCaches.get(sessionID);
+  if (existing) {
+    return existing;
   }
-  return sessionCaches.get(sessionID)!;
+
+  const loaded = loadInjectedPaths(sessionID);
+  sessionCaches.set(sessionID, loaded);
+  return loaded;
 }
 
 function describeReadmeInjectionError(error: unknown): string {
@@ -57,8 +61,11 @@ export async function processFilePathForReadmeInjection(input: {
       cache.add(readmeDir);
       dirty = true;
     } catch (error) {
+      const errorMessage = error instanceof Error
+        ? error.message
+        : describeReadmeInjectionError(error);
       log("[directory-readme-injector] Skipped README injection after read/truncate failure", {
-        error: describeReadmeInjectionError(error),
+        error: errorMessage,
         readmePath,
         sessionID: input.sessionID,
       });

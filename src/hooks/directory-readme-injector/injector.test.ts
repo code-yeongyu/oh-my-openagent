@@ -278,7 +278,7 @@ describe("processFilePathForReadmeInjection", () => {
     // then
     expect(output.output).toBe("base")
     expect(storageMaps.has(sessionID)).toBe(false)
-    expect(sessionCaches.get(sessionID)?.has(sourceDirectory)).toBe(false)
+    expect(sessionCaches.get(sessionID)?.has(sourceDirectory) ?? false).toBe(false)
     expect(logMock).toHaveBeenCalledWith(
       "[directory-readme-injector] Skipped README injection after read/truncate failure",
       {
