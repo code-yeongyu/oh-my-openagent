@@ -1,11 +1,11 @@
 import { constants, closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeSync } from "fs"
 import { randomUUID } from "crypto"
 import {
+  getRegistryLockPath,
   LOCK_RETRY_MS,
   LOCK_STALE_MS,
   LOCK_TIMEOUT_MS,
   LOCK_WAIT_TIMEOUT_MS,
-  REGISTRY_LOCK_PATH,
   SECURE_FILE_MODE,
 } from "./session-registry-paths"
 import { ensureRegistryDir } from "./session-registry-storage"
@@ -40,8 +40,9 @@ function isPidAlive(pid: number): boolean {
 
 function readLockSnapshot(): LockSnapshot | null {
   try {
-    if (!existsSync(REGISTRY_LOCK_PATH)) return null
-    const raw = readFileSync(REGISTRY_LOCK_PATH, "utf-8")
+    const registryLockPath = getRegistryLockPath()
+    if (!existsSync(registryLockPath)) return null
+    const raw = readFileSync(registryLockPath, "utf-8")
     const trimmed = raw.trim()
     if (!trimmed) return { raw, pid: null, token: null }
 
@@ -70,10 +71,11 @@ function readLockSnapshot(): LockSnapshot | null {
 
 function removeLockIfUnchanged(snapshot: LockSnapshot): boolean {
   try {
-    if (!existsSync(REGISTRY_LOCK_PATH)) return false
-    const currentRaw = readFileSync(REGISTRY_LOCK_PATH, "utf-8")
+    const registryLockPath = getRegistryLockPath()
+    if (!existsSync(registryLockPath)) return false
+    const currentRaw = readFileSync(registryLockPath, "utf-8")
     if (currentRaw !== snapshot.raw) return false
-    unlinkSync(REGISTRY_LOCK_PATH)
+    unlinkSync(registryLockPath)
     return true
   } catch (error) {
     if (error instanceof Error) return false
@@ -91,7 +93,7 @@ function closeLockFd(fd: number): void {
 
 function unlinkLockFile(): void {
   try {
-    unlinkSync(REGISTRY_LOCK_PATH)
+    unlinkSync(getRegistryLockPath())
   } catch (error) {
     if (error instanceof Error) return
   }
@@ -104,7 +106,7 @@ function acquireRegistryLock(): LockHandle | null {
     try {
       const token = randomUUID()
       const fd = openSync(
-        REGISTRY_LOCK_PATH,
+        getRegistryLockPath(),
         constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
         SECURE_FILE_MODE,
       )
@@ -126,7 +128,7 @@ function acquireRegistryLock(): LockHandle | null {
       if (error.code !== "EEXIST") throw error
 
       try {
-        const stats = statSync(REGISTRY_LOCK_PATH)
+        const stats = statSync(getRegistryLockPath())
         const lockAgeMs = Date.now() - stats.mtimeMs
         if (lockAgeMs > LOCK_STALE_MS) {
           const snapshot = readLockSnapshot()

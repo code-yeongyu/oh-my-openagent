@@ -1,18 +1,15 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import * as sessionRegistryModule from "../session-registry"
 import type { SessionMapping } from "../session-registry"
-
-type SessionRegistryModule = typeof import("../session-registry")
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
 const tempDataHome = mkdtempSync(join(tmpdir(), "openclaw-session-registry-"))
 const registryDir = join(tempDataHome, "opencode", "storage", "openclaw")
 const registryPath = join(registryDir, "reply-session-registry.jsonl")
 const lockPath = join(registryDir, "reply-session-registry.lock")
-
-let sessionRegistryModule: SessionRegistryModule
 
 function createMapping(overrides: Partial<SessionMapping> = {}): SessionMapping {
   return {
@@ -32,12 +29,8 @@ function resetRegistry(): void {
   mkdirSync(registryDir, { recursive: true })
 }
 
-beforeAll(async () => {
-  process.env.XDG_DATA_HOME = tempDataHome
-  sessionRegistryModule = await import("../session-registry")
-})
-
 beforeEach(() => {
+  process.env.XDG_DATA_HOME = tempDataHome
   resetRegistry()
 })
 
