@@ -1,51 +1,17 @@
-import { setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import { publishToolMetadata } from "../../features/tool-metadata-store"
-import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
-import {
-  clearDelegatedChildSessionBootstrap,
-  registerDelegatedChildSessionBootstrap,
-} from "../../shared/delegated-child-session-bootstrap"
-import { log } from "../../shared/logger"
 import { shouldRetryError } from "../../shared/model-error-classifier"
-import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import { buildTaskPrompt } from "./prompt-builder"
-import { resolveMetadataModel } from "./resolve-metadata-model"
-import { buildSyncPromptTools } from "./sync-prompt-sender"
+import { buildRecoveredSyncTaskCompletion, buildSyncTaskCompletion } from "./sync-completion-message"
+import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
+import { reserveSyncSubagentSpawn } from "./sync-spawn-reservation"
 import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
 import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
-import { formatDuration } from "./time-formatter"
+import { publishSyncTaskMetadata } from "./sync-task-metadata"
+import { cleanupSyncSessionSideEffects, registerSyncSessionSideEffects } from "./sync-session-lifecycle"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-
-function shouldAttemptPollErrorRecovery(pollError: string): boolean {
-  const trimmed = pollError.trim()
-
-  if (trimmed.length === 0) {
-    return false
-  }
-
-  if (/\bMessageAbortedError\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/\bDOMException\b/u.test(trimmed) && /\bAbortError\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/\bAbortError\b/u.test(trimmed) && !/\bTask aborted\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/^the operation was aborted\.?$/iu.test(trimmed)) {
-    return true
-  }
-
-  return false
-}
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -59,7 +25,7 @@ export async function executeSyncTask(
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { manager, client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
+  const { manager, client, directory, syncPollTimeoutMs } = executorCtx
   const hasActiveChildBackgroundTasks = manager?.hasActiveChildTasks?.bind(manager)
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
@@ -69,28 +35,9 @@ export async function executeSyncTask(
     | undefined
 
   try {
-    if (typeof manager?.reserveSubagentSpawn === "function") {
-      spawnReservation = await manager.reserveSubagentSpawn(parentContext.sessionID)
-    }
-
-    // Only default to childDepth: 1 for legacy managers that cannot enforce spawn depth.
-    let spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
-    if (spawnReservation?.spawnContext) {
-      spawnContext = spawnReservation.spawnContext
-    } else if (typeof manager?.assertCanSpawn === "function") {
-      spawnContext = await manager.assertCanSpawn(parentContext.sessionID)
-    } else {
-      log(
-        "[task] WARNING: BackgroundManager has no spawn enforcement methods (reserveSubagentSpawn / assertCanSpawn). " +
-        "Depth limits cannot be enforced for this task. This indicates an old SDK or a misconfiguration.",
-        { parentSessionID: parentContext.sessionID }
-      )
-      spawnContext = {
-        rootSessionID: parentContext.sessionID,
-        parentDepth: 0,
-        childDepth: 1,
-      }
-    }
+    const spawn = await reserveSyncSubagentSpawn(executorCtx, parentContext)
+    spawnReservation = spawn.reservation
+    const { spawnContext } = spawn
 
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
@@ -111,32 +58,15 @@ export async function executeSyncTask(
 
     const registerSyncSession = async (newSessionID: string): Promise<void> => {
       syncSessionID = newSessionID
-      subagentSessions.add(newSessionID)
-      syncSubagentSessions.add(newSessionID)
-      setSessionAgent(newSessionID, agentToUse)
-      registerDelegatedChildSessionBootstrap({
+      await registerSyncSessionSideEffects({
+        args,
+        executorCtx,
         sessionID: newSessionID,
-        promptText: buildTaskPrompt(args.prompt, agentToUse, executorCtx.sisyphusAgentConfig?.tdd),
+        parentContext,
+        agentToUse,
         fallbackChain,
-        category: args.category,
-        system: systemContent,
-        tools: buildSyncPromptTools(agentToUse),
-        modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
+        systemContent,
       })
-
-      if (onSyncSessionCreated) {
-        log("[task] Invoking onSyncSessionCreated callback", { sessionID: newSessionID, parentID: parentContext.sessionID })
-        try {
-          await onSyncSessionCreated({
-            sessionID: newSessionID,
-            parentID: parentContext.sessionID,
-            title: args.description,
-          })
-        } catch (error) {
-          log("[task] onSyncSessionCreated callback failed", { error: String(error) })
-        }
-        await new Promise(r => setTimeout(r, 200))
-      }
     }
 
     const publishSyncMetadata = async (
@@ -144,23 +74,14 @@ export async function executeSyncTask(
       currentModel: DelegatedModelConfig | undefined,
       spawnDepth: number,
     ): Promise<void> => {
-      await publishToolMetadata(ctx, {
-        title: args.description,
-        metadata: {
-          prompt: args.prompt,
-          agent: agentToUse,
-          category: args.category,
-          ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
-          load_skills: args.load_skills,
-          description: args.description,
-          run_in_background: args.run_in_background,
-          taskId: currentSessionID,
-          sessionId: currentSessionID,
-          sync: true,
-          spawnDepth,
-          command: args.command,
-          model: resolveMetadataModel(currentModel, parentContext.model),
-        },
+      await publishSyncTaskMetadata({
+        args,
+        ctx,
+        currentSessionID,
+        currentModel,
+        parentContext,
+        agentToUse,
+        spawnDepth,
       })
     }
 
@@ -207,11 +128,7 @@ export async function executeSyncTask(
     let activeSessionID = sessionID
 
     const cleanupRetrySession = (currentSessionID: string): void => {
-      subagentSessions.delete(currentSessionID)
-      syncSubagentSessions.delete(currentSessionID)
-      clearDelegatedChildSessionBootstrap(currentSessionID)
-      executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(currentSessionID)
-      SessionCategoryRegistry.remove(currentSessionID)
+      cleanupSyncSessionSideEffects(currentSessionID, executorCtx)
     }
 
     try {
@@ -258,25 +175,15 @@ export async function executeSyncTask(
               strictAbortRecovery: true,
             })
             if (recoveredResult.ok) {
-              const duration = formatDuration(startTime)
-
-              const actualModelStr = effectiveCategoryModel
-                ? `${effectiveCategoryModel.providerID}/${effectiveCategoryModel.modelID}`
-                : undefined
-              const parentModelStr = parentContext.model
-                ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
-                : undefined
-              let modelRoutingNote = ""
-              if (actualModelStr && parentModelStr && actualModelStr !== parentModelStr) {
-                modelRoutingNote = `\n⚠️  Model fallback used: requested ${parentModelStr}, executed ${actualModelStr}`
-              }
-
-              return `Task completed in ${duration}.\n\n---\n\n${recoveredResult.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock({
-                sessionId: activeSessionID,
-                taskId: activeSessionID,
-                agent: agentToUse,
-                category: args.category,
-              })}`
+              return buildRecoveredSyncTaskCompletion({
+                activeSessionID,
+                agentToUse,
+                args,
+                effectiveCategoryModel,
+                parentContext,
+                startTime,
+                textContent: recoveredResult.textContent,
+              })
             }
           }
 
@@ -322,41 +229,21 @@ export async function executeSyncTask(
         }
 
         const result = await deps.fetchSyncResult(client, activeSessionID)
-      if (!result.ok) {
-        return result.error
-      }
+        if (!result.ok) {
+          return result.error
+        }
 
-      const duration = formatDuration(startTime)
+        await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
 
-      const actualModelStr = effectiveCategoryModel
-        ? `${effectiveCategoryModel.providerID}/${effectiveCategoryModel.modelID}`
-        : undefined
-      const parentModelStr = parentContext.model
-        ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
-        : undefined
-      let modelRoutingNote = ""
-      if (actualModelStr && parentModelStr && actualModelStr !== parentModelStr) {
-        modelRoutingNote = `\n⚠️  Model routing: parent used ${parentModelStr}, this subagent used ${actualModelStr} (via category: ${args.category ?? "unknown"})`
-      } else if (actualModelStr) {
-        modelRoutingNote = `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
-      }
-
-      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
-
-      return `Task completed in ${duration}.
-
-Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}${modelRoutingNote}
-
----
-
-${result.textContent || "(No text output)"}
-
-${buildTaskMetadataBlock({
-        sessionId: activeSessionID,
-        taskId: activeSessionID,
-        agent: agentToUse,
-        category: args.category,
-      })}`
+        return buildSyncTaskCompletion({
+          activeSessionID,
+          agentToUse,
+          args,
+          effectiveCategoryModel,
+          parentContext,
+          startTime,
+          textContent: result.textContent,
+        })
       }
     } finally {
       if (toastManager && taskId !== undefined) {
@@ -365,7 +252,8 @@ ${buildTaskMetadataBlock({
     }
   } catch (error) {
     spawnReservation?.rollback()
-    return formatDetailedError(error, {
+    const errorToFormat = error instanceof Error ? error : String(error)
+    return formatDetailedError(errorToFormat, {
       operation: "Execute task",
       args,
       sessionID: syncSessionID,
@@ -374,11 +262,7 @@ ${buildTaskMetadataBlock({
     })
   } finally {
     if (syncSessionID) {
-      subagentSessions.delete(syncSessionID)
-      syncSubagentSessions.delete(syncSessionID)
-      clearDelegatedChildSessionBootstrap(syncSessionID)
-      executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(syncSessionID)
-      SessionCategoryRegistry.remove(syncSessionID)
+      cleanupSyncSessionSideEffects(syncSessionID, executorCtx)
     }
   }
 }
