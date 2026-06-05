@@ -4,7 +4,7 @@ import { MESSAGE_STORAGE } from "./constants"
 
 function isInsideStorage(path: string): boolean {
   const relativePath = relative(resolve(MESSAGE_STORAGE), resolve(path))
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
+  return relativePath === "" || (!/^\.\.(?:[\\/]|$)/.test(relativePath) && !isAbsolute(relativePath))
 }
 
 export function getOrCreateMessageDir(sessionID: string): string | null {
