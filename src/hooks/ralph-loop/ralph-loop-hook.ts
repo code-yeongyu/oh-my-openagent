@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
+import { log } from "../../shared/logger"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
 import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { HOOK_NAME } from "./constants"
@@ -19,6 +20,7 @@ export interface RalphLoopHook {
       strategy?: "reset" | "continue"
     }
   ) => boolean
+  resumeLoop: (sessionID: string) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
 }
@@ -94,9 +96,26 @@ export function createRalphLoopHook(
 					const messageCountAtStart = getMessageCountFromResponse(messagesResponse)
 					loopState.setMessageCountAtStart(sessionID, messageCountAtStart, expectedStartedAt)
 				})
-				.catch(() => {})
+				.catch((error: unknown) => {
+					log(`[${HOOK_NAME}] Failed to record loop start message count`, {
+						sessionID,
+						error: String(error),
+					})
+				})
 
 			return startSuccess
+		},
+		resumeLoop: (sessionID): boolean => {
+			const resumedState = loopState.resumeLoop(sessionID)
+			if (!resumedState) {
+				return false
+			}
+
+			releasePromptAsyncReservation(sessionID, "ralph-loop:resume-loop", {
+				reservedBy: HOOK_NAME,
+			})
+
+			return true
 		},
 		cancelLoop: loopState.cancelLoop,
 		getState: loopState.getState as () => RalphLoopState | null,

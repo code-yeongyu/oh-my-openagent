@@ -119,7 +119,7 @@ describe("team-runtime shutdown", () => {
     await requestShutdownOfMember(fixture.teamRunId, "member-a", "lead", fixture.config)
 
     // when
-    await rejectShutdown(fixture.teamRunId, "member-a", "not done yet", fixture.config)
+    await rejectShutdown(fixture.teamRunId, "member-a", "member-a", "not done yet", fixture.config)
 
     // then
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
@@ -134,6 +134,25 @@ describe("team-runtime shutdown", () => {
       && message.from === "member-a"
       && message.to === "lead"
       && message.body === "not done yet"
+    ))).toBe(true)
+  })
+
+  test("rejects shutdown requests from a lead caller as the lead member", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await requestShutdownOfMember(fixture.teamRunId, "member-a", "member-b", fixture.config)
+
+    // when
+    await rejectShutdown(fixture.teamRunId, "member-a", "lead", "still needed", fixture.config)
+
+    // then
+    const requesterInboxMessages = await readInboxMessages(fixture.teamRunId, "member-b", fixture.config)
+    expect(requesterInboxMessages.some((message) => (
+      message.kind === "shutdown_rejected"
+      && message.from === "lead"
+      && message.to === "member-b"
+      && message.body === "still needed"
     ))).toBe(true)
   })
 

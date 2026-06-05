@@ -1,103 +1,14 @@
-const { describe, it, expect, spyOn } = require("bun:test")
-import type { RunContext } from "./types"
-import { createEventState } from "./events"
-import { handleSessionStatus, handleMessagePartUpdated, handleMessageUpdated, handleTuiToast } from "./event-handlers"
+/// <reference path="../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+import { describe, expect, it, spyOn } from "bun:test"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
-
-const createMockContext = (sessionID: string = "test-session"): RunContext => ({
-  sessionID,
-} as RunContext)
-
-describe("handleSessionStatus", () => {
-  it("recognizes idle from session.status event (not just deprecated session.idle)", () => {
-    //#given - state with mainSessionIdle=false
-    const ctx = createMockContext("test-session")
-    const state = createEventState()
-    state.mainSessionIdle = false
-
-    const payload = {
-      type: "session.status",
-      properties: {
-        sessionID: "test-session",
-        status: { type: "idle" as const },
-      },
-    }
-
-    //#when - handleSessionStatus called with idle status
-    handleSessionStatus(ctx, unsafeTestValue(payload), state)
-
-    //#then - state.mainSessionIdle === true
-    expect(state.mainSessionIdle).toBe(true)
-  })
-
-  it("handleSessionStatus sets idle=false on busy", () => {
-    //#given - state with mainSessionIdle=true
-    const ctx = createMockContext("test-session")
-    const state = createEventState()
-    state.mainSessionIdle = true
-
-    const payload = {
-      type: "session.status",
-      properties: {
-        sessionID: "test-session",
-        status: { type: "busy" as const },
-      },
-    }
-
-    //#when - handleSessionStatus called with busy status
-    handleSessionStatus(ctx, unsafeTestValue(payload), state)
-
-    //#then - state.mainSessionIdle === false
-    expect(state.mainSessionIdle).toBe(false)
-    expect(state.mainSessionStarted).toBe(true)
-  })
-
-  it("does nothing for different session ID", () => {
-    //#given - state with mainSessionIdle=true
-    const ctx = createMockContext("test-session")
-    const state = createEventState()
-    state.mainSessionIdle = true
-
-    const payload = {
-      type: "session.status",
-      properties: {
-        sessionID: "other-session",
-        status: { type: "idle" as const },
-      },
-    }
-
-    //#when - handleSessionStatus called with different session ID
-    handleSessionStatus(ctx, unsafeTestValue(payload), state)
-
-    //#then - state.mainSessionIdle remains unchanged
-    expect(state.mainSessionIdle).toBe(true)
-  })
-
-  it("recognizes idle from camelCase sessionId", () => {
-    //#given - state with mainSessionIdle=false and payload using sessionId
-    const ctx = createMockContext("test-session")
-    const state = createEventState()
-    state.mainSessionIdle = false
-
-    const payload = {
-      type: "session.status",
-      properties: {
-        sessionId: "test-session",
-        status: { type: "idle" as const },
-      },
-    }
-
-    //#when - handleSessionStatus called with camelCase sessionId
-    handleSessionStatus(ctx, unsafeTestValue(payload), state)
-
-    //#then - state.mainSessionIdle === true
-    expect(state.mainSessionIdle).toBe(true)
-  })
-})
+import { createEventState } from "./events"
+import { handleMessagePartUpdated, handleMessageUpdated } from "./event-handlers"
+import { createMockContext, joinWriteCalls } from "./event-handler-test-support.test"
 
 describe("handleMessagePartUpdated", () => {
-  it("extracts sessionID from part (current OpenCode event structure)", () => {
-    //#given - message.part.updated with sessionID in part, not info
+  it("extracts sessionID from part", () => {
+    //#given
     const ctx = createMockContext("ses_main")
     const state = createEventState()
     const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
@@ -127,7 +38,7 @@ describe("handleMessagePartUpdated", () => {
   })
 
   it("skips events for different session", () => {
-    //#given - message.part.updated with different session
+    //#given
     const ctx = createMockContext("ses_main")
     const state = createEventState()
 
@@ -153,7 +64,7 @@ describe("handleMessagePartUpdated", () => {
   })
 
   it("handles tool part with running status", () => {
-    //#given - tool part in running state
+    //#given
     const ctx = createMockContext("ses_main")
     const state = createEventState()
     const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
@@ -183,7 +94,7 @@ describe("handleMessagePartUpdated", () => {
   })
 
   it("clears currentTool when tool completes", () => {
-    //#given - tool part in completed state
+    //#given
     const ctx = createMockContext("ses_main")
     const state = createEventState()
     state.currentTool = "read"
@@ -211,8 +122,8 @@ describe("handleMessagePartUpdated", () => {
     stdoutSpy.mockRestore()
   })
 
-  it("supports legacy info.sessionID for backward compatibility", () => {
-    //#given - legacy event with sessionID in info
+  it("supports legacy info.sessionID", () => {
+    //#given
     const ctx = createMockContext("ses_legacy")
     const state = createEventState()
     const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
@@ -238,9 +149,8 @@ describe("handleMessagePartUpdated", () => {
   })
 
   it("prints completion metadata once when assistant text part is completed", () => {
-    // given
+    //#given
     const nowSpy = spyOn(Date, "now").mockReturnValue(3400)
-
     const ctx = createMockContext("ses_main")
     const state = createEventState()
     const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
@@ -263,7 +173,7 @@ describe("handleMessagePartUpdated", () => {
     )
     state.messageStartedAtById["msg_1"] = 1000
 
-    // when
+    //#when
     handleMessagePartUpdated(
       ctx,
       unsafeTestValue({
@@ -281,7 +191,6 @@ describe("handleMessagePartUpdated", () => {
       }),
       state,
     )
-
     handleMessagePartUpdated(
       ctx,
       unsafeTestValue({
@@ -300,8 +209,8 @@ describe("handleMessagePartUpdated", () => {
       state,
     )
 
-    // then
-    const output = stdoutSpy.mock.calls.map(call => String(call[0])).join("")
+    //#then
+    const output = joinWriteCalls(stdoutSpy.mock.calls)
     const metaCount = output.split("Sisyphus · claude-sonnet-4-6 · 2.4s").length - 1
     expect(metaCount).toBe(1)
     expect(state.completionMetaPrintedByMessageId["msg_1"]).toBe(true)
@@ -311,47 +220,51 @@ describe("handleMessagePartUpdated", () => {
   })
 })
 
-describe("handleTuiToast", () => {
-  it("marks main session as error when toast variant is error", () => {
-    //#given - toast error payload
-    const ctx = createMockContext("test-session")
+describe("handleMessageUpdated", () => {
+  it("resets streamed text and reasoning state for a new assistant message", () => {
+    //#given
+    const nowSpy = spyOn(Date, "now").mockReturnValue(9000)
+    const ctx = createMockContext("ses_main")
     const state = createEventState()
+    state.currentMessageId = "msg_old"
+    state.lastPartText = "old text"
+    state.lastReasoningText = "old reasoning"
+    state.hasPrintedThinkingLine = true
+    state.lastThinkingSummary = "old summary"
+    state.textAtLineStart = false
+    state.thinkingAtLineStart = true
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
 
     const payload = {
-      type: "tui.toast.show",
+      type: "message.updated",
       properties: {
-        title: "Auth",
-        message: "Invalid API key",
-        variant: "error" as const,
+        info: {
+          id: "msg_new",
+          sessionID: "ses_main",
+          role: "assistant",
+          agent: "Atlas",
+          modelID: "gpt-5.2",
+          variant: "low",
+        },
       },
     }
 
     //#when
-    handleTuiToast(ctx, unsafeTestValue(payload), state)
+    handleMessageUpdated(ctx, unsafeTestValue(payload), state)
 
     //#then
-    expect(state.mainSessionError).toBe(true)
-    expect(state.lastError).toBe("Auth: Invalid API key")
-  })
+    expect(state.currentMessageId).toBe("msg_new")
+    expect(state.messageCount).toBe(1)
+    expect(state.lastPartText).toBe("")
+    expect(state.lastReasoningText).toBe("")
+    expect(state.hasPrintedThinkingLine).toBe(false)
+    expect(state.lastThinkingSummary).toBe("")
+    expect(state.textAtLineStart).toBe(true)
+    expect(state.thinkingAtLineStart).toBe(false)
+    expect(state.messageStartedAtById["msg_new"]).toBe(9000)
+    expect(state.completionMetaPrintedByMessageId["msg_new"]).toBe(false)
 
-  it("does not mark session error for warning toast", () => {
-    //#given - toast warning payload
-    const ctx = createMockContext("test-session")
-    const state = createEventState()
-
-    const payload = {
-      type: "tui.toast.show",
-      properties: {
-        message: "Retrying provider",
-        variant: "warning" as const,
-      },
-    }
-
-    //#when
-    handleTuiToast(ctx, unsafeTestValue(payload), state)
-
-    //#then
-    expect(state.mainSessionError).toBe(false)
-    expect(state.lastError).toBe(null)
+    stdoutSpy.mockRestore()
+    nowSpy.mockRestore()
   })
 })
