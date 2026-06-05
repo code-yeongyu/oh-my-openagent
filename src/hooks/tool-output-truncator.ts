@@ -55,8 +55,10 @@ export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOu
       if (truncated) {
         output.output = result
       }
-    } catch {
-      // Graceful degradation - don't break tool execution
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
     }
   }
 
