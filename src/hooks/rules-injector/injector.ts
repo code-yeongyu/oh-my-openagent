@@ -5,6 +5,7 @@ export {
 export type {
 	DynamicTruncator,
 	RuleFileReader,
+	RuleInjectionProcessorDeps,
 	RuleToInject,
 	ToolExecuteOutput,
 	TranscriptHydrationHook,
