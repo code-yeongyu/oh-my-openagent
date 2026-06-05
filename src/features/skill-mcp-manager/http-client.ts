@@ -58,10 +58,11 @@ function redactUrl(urlStr: string): string {
 }
 
 function redactCleanupErrorMessage(message: string): string {
+  const sensitiveHeaderKey = "(?:authorization|x-api-key|api-key|x-auth-token|auth-token|x-access-token|access-token)"
   const messageWithRedactedAuthorization = message
-    .replace(/("authorization"\s*:\s*")([^"]*)(")/gi, "$1[REDACTED]$3")
-    .replace(/(\bauthorization\s*:\s*)([^\n,;}]*)/gi, "$1[REDACTED]")
-    .replace(/(\bauthorization\s*=\s*)([^\n,;}]*)/gi, "$1[REDACTED]")
+    .replace(new RegExp(`("${sensitiveHeaderKey}"\\s*:\\s*")([^"]*)(")`, "gi"), "$1[REDACTED]$3")
+    .replace(new RegExp(`(\\b${sensitiveHeaderKey}\\s*:\\s*)([^\\n,;}]*)`, "gi"), "$1[REDACTED]")
+    .replace(new RegExp(`(\\b${sensitiveHeaderKey}\\s*=\\s*)([^\\n,;}]*)`, "gi"), "$1[REDACTED]")
   const messageWithRedactedSecrets = redactSensitiveData(messageWithRedactedAuthorization)
   return messageWithRedactedSecrets.replace(/https?:\/\/[^\s"'<>)}\]]+/g, (url) => redactUrl(url))
 }
