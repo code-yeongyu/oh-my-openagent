@@ -16,6 +16,7 @@ type ParentWakePromptDispatchInput = {
   readonly sessionID: string
   readonly latestWake: PendingParentWake
   readonly forceNoReply?: boolean
+  readonly retainPendingWake?: boolean
   readonly emptyAssistantTurnRetry: boolean
   readonly toolWaitDecision: ToolWaitDeferralDecision
   readonly getDispatchedWake: () => PendingParentWake | undefined
@@ -57,7 +58,8 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         const dispatchedWake = cloneParentWake(input.latestWake)
         dispatchedWake.dispatchedAt = dispatchStartedAt
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
-          input.trackDispatchedWake(input.latestWake, dispatchStartedAt)
+          markRetainedNoReplyAdmission(input, dispatchStartedAt)
+          input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
           log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
             sessionID: input.sessionID,
             error: promptResult.error,
@@ -93,11 +95,31 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     }
     log("[background-agent] Sent deferred parent wake:", { sessionID: input.sessionID })
     delete input.latestWake.allowEmptyAssistantTurnRetry
-    input.trackDispatchedWake(input.latestWake, dispatchStartedAt)
+    markRetainedNoReplyAdmission(input, dispatchStartedAt)
+    input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
   } catch (error) {
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
     input.requeueWake(input.latestWake)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })
+  }
+}
+
+function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, dispatchStartedAt: number): void {
+  if (input.retainPendingWake !== true || input.forceNoReply !== true || !input.latestWake.shouldReply) {
+    return
+  }
+  input.latestWake.noReplyAdmittedAt = dispatchStartedAt
+  input.scheduleFlush()
+}
+
+function createTrackedDispatchedWake(wake: PendingParentWake, forceNoReply: boolean | undefined): PendingParentWake {
+  if (forceNoReply !== true || !wake.shouldReply) {
+    return wake
+  }
+
+  return {
+    ...cloneParentWake(wake),
+    shouldReply: false,
   }
 }

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
-import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../../hooks/shared/prompt-async-gate"
 
 type PromptAsyncCall = {
   path: { id: string }
@@ -97,6 +97,13 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingP
   return parentWakeNotifier.getPendingParentWakes()
 }
 
+function getPendingParentWakeTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>>
+  }
+  return parentWakeNotifier.getPendingParentWakeTimers()
+}
+
 async function notifyParentSessionForTest(manager: BackgroundManager, task: BackgroundTask): Promise<void> {
   const notifyParentSession = Reflect.get(manager, "notifyParentSession") as (task: BackgroundTask) => Promise<void>
   return notifyParentSession.call(manager, task)
@@ -108,7 +115,7 @@ async function flushPendingParentWakeForTest(manager: BackgroundManager, session
 }
 
 describe("BackgroundManager parent wake active turn events", () => {
-  test("#when background task completes during active parent turn #then parent wake is recorded without forking a reply", async () => {
+  test("#when background task completes during active parent turn #then noReply admission is followed by idle resume", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -132,10 +139,27 @@ describe("BackgroundManager parent wake active turn events", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
+    expect(getPendingParentWakeTimers(manager).has("parent-1")).toBe(true)
+
+    // when
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(1)
+    releasePromptAsyncReservation("parent-1", "background-agent-parent-wake")
+
+    // when
+    sessionStatuses["parent-1"] = { type: "idle" }
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(2)
+    expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
     expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
   })
 
-  test("#when duplicate background completions overlap an active parent turn #then one coalesced admit-only wake is recorded", async () => {
+  test("#when duplicate background completions overlap an active parent turn #then coalesced noReply admission is followed by idle resume", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -171,11 +195,21 @@ describe("BackgroundManager parent wake active turn events", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
+    releasePromptAsyncReservation("parent-1", "background-agent-parent-wake")
+
+    // when
+    sessionStatuses["parent-1"] = { type: "idle" }
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(2)
+    expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+    expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
     expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
   })
 
-  test("#when background task fails during active parent turn #then parent wake is recorded without forking a reply", async () => {
+  test("#when background task fails during active parent turn #then reply wake stays pending", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -198,12 +232,11 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
-  test("#when parent reasoning delta is newer than stale idle state #then background completion records an admit-only wake", async () => {
+  test("#when parent reasoning delta is newer than stale idle state #then completion wake is admitted as noReply and retained", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "idle" },
@@ -235,10 +268,10 @@ describe("BackgroundManager parent wake active turn events", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
-  test("#when parent idle event follows fresh reasoning delta #then background completion still records an admit-only wake", async () => {
+  test("#when parent idle event follows fresh reasoning delta #then completion wake is admitted as noReply and retained", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "idle" },
@@ -271,6 +304,6 @@ describe("BackgroundManager parent wake active turn events", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 })

@@ -133,7 +133,7 @@ describe("ParentWakeNotifier non-Error retry recovery", () => {
     }
   })
 
-  test("#given session.messages rejects with a string after the retry timer is cleared #when the wake flush runs #then the final wake is recorded without a reply", async () => {
+  test("#given session.messages rejects with a string after the retry timer is cleared #when the wake flush runs #then the final wake is admitted without consuming reply liveness", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier({
       sessionMessagesImpl: async (attempt) => {
@@ -163,7 +163,7 @@ describe("ParentWakeNotifier non-Error retry recovery", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+      expect(notifier.getPendingParentWakes().get(sessionID)?.shouldReply).toBe(true)
     } finally {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()

@@ -73,6 +73,7 @@ export class ParentWakePendingQueue {
       )
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
+      pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       return

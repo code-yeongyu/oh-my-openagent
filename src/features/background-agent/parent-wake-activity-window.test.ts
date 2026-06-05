@@ -8,7 +8,11 @@ import type { BackgroundTask } from "./types"
 
 type PromptAsyncCall = {
   readonly path: { readonly id: string }
-  readonly body: { readonly parts?: readonly unknown[] }
+  readonly body: { readonly noReply?: boolean; readonly parts?: readonly unknown[] }
+}
+
+type PendingParentWakeForTest = {
+  readonly shouldReply: boolean
 }
 
 let managerUnderTest: BackgroundManager | undefined
@@ -73,9 +77,9 @@ function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>
   return unsafeTestValue<Map<string, Set<string>>>(Reflect.get(manager, "pendingByParent"))
 }
 
-function getPendingParentWakes(manager: BackgroundManager): Map<string, unknown> {
+function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
   const notifier = unsafeTestValue<{
-    readonly getPendingParentWakes: () => Map<string, unknown>
+    readonly getPendingParentWakes: () => Map<string, PendingParentWakeForTest>
   }>(Reflect.get(manager, "parentWakeNotifier"))
   return notifier.getPendingParentWakes()
 }
@@ -91,7 +95,7 @@ async function flushPendingParentWakeForTest(manager: BackgroundManager, session
 }
 
 describe("BackgroundManager parent wake activity window", () => {
-  test("#given parent tool activity is within the tool deferral window #when stale idle flushes a wake #then wake is recorded without forking a reply", async () => {
+  test("#given parent tool activity is within the tool deferral window #when stale idle flushes a wake #then wake is admitted without consuming reply liveness", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -122,7 +126,7 @@ describe("BackgroundManager parent wake activity window", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+      expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     } finally {
       Date.now = originalDateNow
     }

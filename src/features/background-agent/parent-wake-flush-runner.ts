@@ -32,10 +32,17 @@ export class ParentWakeFlushRunner {
       if (await this.isSessionActive(sessionID)) {
         const latestWake = this.deps.pendingQueue.getWake(sessionID)
         if (latestWake) {
+          if (this.deferUnsafeReplyWake(sessionID, latestWake)) {
+            return
+          }
+          if (this.deferRetainedNoReplyWake(sessionID, latestWake)) {
+            return
+          }
           await this.sendParentWakePrompt(sessionID, latestWake, {
             emptyAssistantTurnRetry: false,
             toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
             forceNoReply: true,
+            retainPendingWake: isReplyRequiredFinalWake(latestWake),
           })
         }
         return
@@ -47,19 +54,33 @@ export class ParentWakeFlushRunner {
       return
     }
     if (sessionActive) {
+      if (this.deferUnsafeReplyWake(sessionID, latestWake)) {
+        return
+      }
+      if (this.deferRetainedNoReplyWake(sessionID, latestWake)) {
+        return
+      }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry: false,
         toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
         forceNoReply: true,
+        retainPendingWake: isReplyRequiredFinalWake(latestWake),
       })
       return
     }
 
     if (this.hasRecentParentSessionActivity(sessionID)) {
+      if (this.deferUnsafeReplyWake(sessionID, latestWake)) {
+        return
+      }
+      if (this.deferRetainedNoReplyWake(sessionID, latestWake)) {
+        return
+      }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry: false,
         toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
         forceNoReply: true,
+        retainPendingWake: isReplyRequiredFinalWake(latestWake),
       })
       log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
@@ -70,10 +91,17 @@ export class ParentWakeFlushRunner {
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const toolWaitDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
     if (toolWaitDecision.defer) {
+      if (this.deferUnsafeReplyWake(sessionID, latestWake)) {
+        return
+      }
+      if (this.deferRetainedNoReplyWake(sessionID, latestWake)) {
+        return
+      }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry,
         toolWaitDecision: { ...toolWaitDecision, skipPromptGateToolStateCheck: true },
         forceNoReply: true,
+        retainPendingWake: isReplyRequiredFinalWake(latestWake),
       })
       return
     }
@@ -85,10 +113,17 @@ export class ParentWakeFlushRunner {
       // @parcel/watcher TSFN callbacks firing into a torn-down JS env.
       // Store the wake as noReply so the user's own turn can consume it without
       // forking another assistant turn. See issue #4120.
+      if (this.deferUnsafeReplyWake(sessionID, latestWake)) {
+        return
+      }
+      if (this.deferRetainedNoReplyWake(sessionID, latestWake)) {
+        return
+      }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry,
         toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
         forceNoReply: true,
+        retainPendingWake: isReplyRequiredFinalWake(latestWake),
       })
       log("[background-agent] Recorded admit-only parent wake because user message just arrived:", {
         sessionID,
@@ -109,6 +144,24 @@ export class ParentWakeFlushRunner {
     })
   }
 
+  private deferUnsafeReplyWake(sessionID: string, latestWake: PendingParentWake): boolean {
+    if (!isFailureParentWake(latestWake)) {
+      return false
+    }
+    this.schedulePendingParentWakeFlush(sessionID)
+    log("[background-agent] Deferred failure parent wake until parent session is safe:", { sessionID })
+    return true
+  }
+
+  private deferRetainedNoReplyWake(sessionID: string, latestWake: PendingParentWake): boolean {
+    if (!isReplyRequiredFinalWake(latestWake) || latestWake.noReplyAdmittedAt === undefined) {
+      return false
+    }
+    this.schedulePendingParentWakeFlush(sessionID)
+    log("[background-agent] Deferred retained final parent wake until parent session is safe:", { sessionID })
+    return true
+  }
+
   schedulePendingParentWakeFlush(sessionID: string, delayMs?: number): void {
     this.deps.pendingQueue.scheduleFlush(sessionID, () => this.flushPendingParentWake(sessionID), delayMs)
   }
@@ -124,9 +177,12 @@ export class ParentWakeFlushRunner {
       readonly emptyAssistantTurnRetry: boolean
       readonly toolWaitDecision: ToolWaitDeferralDecision
       readonly forceNoReply?: boolean
+      readonly retainPendingWake?: boolean
     },
   ): Promise<void> {
-    this.deps.pendingQueue.deleteWake(sessionID)
+    if (options.retainPendingWake !== true) {
+      this.deps.pendingQueue.deleteWake(sessionID)
+    }
 
     await sendParentWakePrompt({
       client: this.deps.notifierDeps.client,
@@ -134,6 +190,7 @@ export class ParentWakeFlushRunner {
       sessionID,
       latestWake,
       ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
+      ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
       emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
       toolWaitDecision: options.toolWaitDecision,
       getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
@@ -167,4 +224,19 @@ export class ParentWakeFlushRunner {
   private requeueWake(sessionID: string, latestWake: PendingParentWake): void {
     this.deps.pendingQueue.requeueWake(sessionID, latestWake)
   }
+}
+
+function isReplyRequiredFinalWake(wake: PendingParentWake): boolean {
+  return wake.shouldReply && wake.notifications.some((notification) =>
+    notification.includes("[ALL BACKGROUND TASKS COMPLETE]")
+  )
+}
+
+function isFailureParentWake(wake: PendingParentWake): boolean {
+  return wake.shouldReply && wake.notifications.some((notification) =>
+    notification.includes("[BACKGROUND TASK ERROR]")
+    || notification.includes("[BACKGROUND TASK CANCELLED]")
+    || notification.includes("[BACKGROUND TASK INTERRUPTED]")
+    || notification.includes("[ALL BACKGROUND TASKS FINISHED")
+  )
 }

@@ -221,7 +221,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  test("#given all-complete wake arrives while prior assistant turn is still streaming #when the parent status is stale-idle #then the wake is recorded without forking a reply", async () => {
+  test("#given all-complete wake arrives while prior assistant turn is still streaming #when the parent status is stale-idle #then noReply admission is retained for later resume", async () => {
     // given
     const sessionMessages: SessionMessageStub[] = [
       {
@@ -263,7 +263,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(false)
+    expect(notifier.getPendingParentWakes().get("parent-stale-idle")?.shouldReply).toBe(true)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
@@ -447,7 +447,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  test("#given stale all-complete wake and gate sees a repaired user tail #when latest assistant is still waiting on tools #then wake is recorded without forking a reply", async () => {
+  test("#given stale all-complete wake and gate sees a repaired user tail #when latest assistant is still waiting on tools #then noReply admission is retained for later resume", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -526,7 +526,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(false)
+      expect(notifier.getPendingParentWakes().get("parent-repaired-tail")?.shouldReply).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
