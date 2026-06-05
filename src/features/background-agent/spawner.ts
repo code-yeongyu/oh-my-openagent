@@ -1,4 +1,4 @@
-import { createInternalAgentTextPart, getAgentToolRestrictions, log, promptWithRetryInDirectory } from "../../shared"
+import { log, promptWithRetryInDirectory } from "../../shared"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -8,40 +8,11 @@ import { getTaskToastManager } from "../task-toast-manager"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OnSubagentSessionCreated, OpencodeClient, QueueItem } from "./constants"
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
+import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner/fallback-agent"
+import { buildTaskRecord } from "./spawner/task-record"
+import { buildTaskPromptBody } from "./spawner/task-prompt-body"
 
-export const FALLBACK_AGENT = "general"
-
-export function isAgentNotFoundError(error: unknown): boolean {
-  const message =
-    typeof error === "string"
-      ? error
-      : error instanceof Error
-        ? error.message
-        : typeof error === "object" && error !== null && typeof (error as { message?: unknown }).message === "string"
-          ? (error as { message: string }).message
-          : String(error)
-  return (
-    message.includes("Agent not found") ||
-    message.includes("agent.name")
-  )
-}
-
-export function buildFallbackBody(
-  originalBody: Record<string, unknown>,
-  fallbackAgent: string,
-  options: { includeTeamToolDenylist?: boolean } = {},
-): Record<string, unknown> {
-  return {
-    ...originalBody,
-    agent: fallbackAgent,
-    tools: {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(fallbackAgent, options),
-    },
-  }
-}
+export { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError }
 
 export interface SpawnerContext {
   client: OpencodeClient
@@ -53,27 +24,7 @@ export interface SpawnerContext {
 }
 
 export function createTask(input: LaunchInput): BackgroundTask {
-  return {
-    id: `bg_${crypto.randomUUID().slice(0, 8)}`,
-    status: "pending",
-    queuedAt: new Date(),
-    description: input.description,
-    prompt: input.prompt,
-    agent: input.agent,
-    parentSessionId: input.parentSessionId,
-    parentMessageId: input.parentMessageId,
-    teamRunId: input.teamRunId,
-    parentModel: input.parentModel,
-    parentAgent: input.parentAgent,
-    parentTools: input.parentTools,
-    model: input.model,
-    fallbackChain: input.fallbackChain,
-    skillContent: input.skillContent,
-    sessionPermission: input.sessionPermission,
-    category: input.category,
-    isUnstableAgent: input.isUnstableAgent,
-    onSessionCreated: input.onSessionCreated,
-  }
+  return buildTaskRecord(input, `bg_${crypto.randomUUID().slice(0, 8)}`, new Date())
 }
 
 export async function startTask(
@@ -96,7 +47,7 @@ export async function startTask(
   const parentSession = await client.session.get({
     path: { id: input.parentSessionId },
     query: { directory },
-  }).catch((err) => {
+  }).catch((err: unknown) => {
     log(`[background-agent] Failed to get parent session: ${err}`)
     return null
   })
@@ -111,7 +62,7 @@ export async function startTask(
     query: {
       directory: parentDirectory,
     },
-  }).catch((error) => {
+  }).catch((error: unknown) => {
     concurrencyManager.release(concurrencyKey)
     throw error
   })
@@ -152,31 +103,16 @@ export async function startTask(
     promptLength: input.prompt.length,
   })
 
-  const launchModel = input.model
-    ? {
-        providerID: input.model.providerID,
-        modelID: input.model.modelID,
-      }
-    : undefined
-  const launchVariant = input.model?.variant
-
   applySessionPromptParams(sessionID, input.model)
 
-  const promptBody = {
+  const promptBody = buildTaskPromptBody({
+    kind: "launch",
     agent: normalizedAgent,
-    ...(launchModel ? { model: launchModel } : {}),
-    ...(launchVariant ? { variant: launchVariant } : {}),
     system: input.skillContent,
-    tools: {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(normalizedAgent, {
-        includeTeamToolDenylist: input.teamRunId === undefined,
-      }),
-    },
-    parts: [createInternalAgentTextPart(input.prompt)],
-  }
+    model: input.model,
+    prompt: input.prompt,
+    includeTeamToolDenylist: input.teamRunId === undefined,
+  })
   setSessionTools(sessionID, promptBody.tools)
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
@@ -297,30 +233,15 @@ export async function resumeTask(
     promptLength: input.prompt.length,
   })
 
-  const resumeModel = task.model
-    ? {
-        providerID: task.model.providerID,
-        modelID: task.model.modelID,
-      }
-    : undefined
-  const resumeVariant = task.model?.variant
-
   applySessionPromptParams(sessionID, task.model)
 
-  const resumeBody = {
+  const resumeBody = buildTaskPromptBody({
+    kind: "resume",
     agent: task.agent,
-    ...(resumeModel ? { model: resumeModel } : {}),
-    ...(resumeVariant ? { variant: resumeVariant } : {}),
-    tools: {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(task.agent, {
-        includeTeamToolDenylist: task.teamRunId === undefined,
-      }),
-    },
-    parts: [createInternalAgentTextPart(input.prompt)],
-  }
+    model: task.model,
+    prompt: input.prompt,
+    includeTeamToolDenylist: task.teamRunId === undefined,
+  })
   setSessionTools(sessionID, resumeBody.tools)
 
   promptWithRetryInDirectory(client, {
