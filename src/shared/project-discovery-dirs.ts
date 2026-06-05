@@ -15,7 +15,10 @@ function normalizePath(path: string): string {
 
   try {
     return realpathSync(resolvedPath)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return resolvedPath
   }
 }
@@ -74,7 +77,10 @@ export function detectWorktreePath(directory: string): string | undefined {
 
     worktreePathCache.set(resolvedDirectory, worktreePath)
     return worktreePath
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     worktreePathCache.set(resolvedDirectory, undefined)
     return undefined
   }
