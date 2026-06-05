@@ -73,6 +73,17 @@ function isTokenLimitError(text: string): boolean {
   return TOKEN_LIMIT_KEYWORDS.some((kw) => lower.includes(kw))
 }
 
+function stringifyErrorObject(errObj: Record<string, unknown>): string | null {
+  try {
+    return JSON.stringify(errObj) ?? null
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+    return null
+  }
+}
+
 export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitError | null {
   try {
     return parseAnthropicTokenLimitErrorUnsafe(err)
@@ -126,12 +137,10 @@ function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitErro
   if (typeof dataObj?.error === "string") textSources.push(dataObj.error as string)
 
   if (textSources.length === 0) {
-    try {
-      const jsonStr = JSON.stringify(errObj)
-      if (isTokenLimitError(jsonStr)) {
-        textSources.push(jsonStr)
-      }
-    } catch {}
+    const jsonStr = stringifyErrorObject(errObj)
+    if (jsonStr !== null && isTokenLimitError(jsonStr)) {
+      textSources.push(jsonStr)
+    }
   }
 
   const combinedText = textSources.join(" ")
