@@ -120,13 +120,13 @@ Fire ALL of these simultaneously using \`call_omo_agent\`:
 call_omo_agent(
   subagent_type="explore",
   run_in_background=true,
-  prompt="Find all occurrences and definitions of [TARGET]. 
+  prompt="Find all occurrences and definitions of [TARGET].${" "}
   Report: file paths, line numbers, usage patterns."
 )
 
 // Agent 2: Find related code
 call_omo_agent(
-  subagent_type="explore", 
+  subagent_type="explore",${" "}
   run_in_background=true,
   prompt="Find all code that imports, uses, or depends on [TARGET].
   Report: dependency chains, import graphs."

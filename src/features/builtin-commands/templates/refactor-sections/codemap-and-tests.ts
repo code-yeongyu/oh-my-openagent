@@ -15,8 +15,8 @@ Based on Phase 1 results, build:
 
 ### Dependency Graph
 \`\`\`
-[TARGET] 
-├── imports from: 
+[TARGET]${" "}
+├── imports from:${" "}
 │   ├── module-a (types)
 │   └── module-b (utils)
 ├── imported by:
