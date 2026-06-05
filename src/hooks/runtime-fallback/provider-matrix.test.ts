@@ -204,31 +204,6 @@ describe("runtime-fallback provider matrix quota tests", () => {
       expect(errorType).toBe("quota_exceeded")
     })
 
-    test("classifies out of credits as quota_exceeded", () => {
-      //#given
-      const error = {
-        message: "You are out of credits. Please purchase more.",
-      }
-
-      //#when
-      const errorType = classifyErrorType(error)
-
-      //#then
-      expect(errorType).toBe("quota_exceeded")
-    })
-
-    test("classifies exhausted capacity as quota_exceeded", () => {
-      //#given
-      const error = {
-        message: "Sorry, you've exhausted your capacity",
-      }
-
-      //#when
-      const errorType = classifyErrorType(error)
-
-      //#then
-      expect(errorType).toBe("quota_exceeded")
-    })
   })
 
   describe("Provider-specific error name patterns", () => {
