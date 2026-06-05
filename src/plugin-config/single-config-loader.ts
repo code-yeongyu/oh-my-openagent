@@ -8,18 +8,6 @@ import {
 } from "../shared";
 import { addAgentOrderWarnings } from "./agent-order-warnings";
 
-const PARTIAL_STRING_ARRAY_KEYS = new Set([
-  "disabled_mcps",
-  "disabled_agents",
-  "disabled_skills",
-  "disabled_hooks",
-  "disabled_commands",
-  "disabled_tools",
-  "disabled_providers",
-  "mcp_env_allowlist",
-  "agent_definitions",
-]);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -56,14 +44,6 @@ export function parseConfigPartially(
   const invalidSections: string[] = [];
 
   for (const key of Object.keys(rawConfig)) {
-    if (PARTIAL_STRING_ARRAY_KEYS.has(key)) {
-      const sectionValue = rawConfig[key];
-      if (Array.isArray(sectionValue) && sectionValue.every((value) => typeof value === "string")) {
-        Object.assign(partialConfig, { [key]: sectionValue });
-      }
-      continue;
-    }
-
     const sectionResult = OhMyOpenCodeConfigSchema.safeParse({ [key]: rawConfig[key] });
     if (sectionResult.success) {
       const parsedEntry = Object.entries(sectionResult.data).find(([entryKey]) => entryKey === key);

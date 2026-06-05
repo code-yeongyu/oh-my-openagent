@@ -369,19 +369,21 @@ describe("parseConfigPartially", () => {
       expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
     });
 
-    it("should return salvaged string-array sections without strict re-validation", () => {
+    it("should skip invalid string-array sections without discarding other salvaged sections", () => {
       const rawConfig = {
         agents: {
           oracle: { temperature: "not-a-number" },
         },
-        mcp_env_allowlist: ["bad-name"],
+        disabled_hooks: ["comment-checker"],
+        mcp_env_allowlist: ["USER_TOKEN", 42],
       };
 
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
       expect(result?.agents).toBeUndefined();
-      expect(result?.mcp_env_allowlist).toEqual(["bad-name"]);
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.mcp_env_allowlist).toBeUndefined();
     });
   });
 
