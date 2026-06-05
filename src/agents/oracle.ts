@@ -2,13 +2,12 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import {
   buildClaudeThinkingConfig,
-  isDeepSeekV4Model,
-  isDeepSeekV4ProModel,
   isGpt5_5Model,
   isGptModel,
-  isMimoV25ProModel,
 } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
+import { resolveModelPreset, getBuiltinPresets, createPromptResolver, PROMPT_KEYS } from "@oh-my-opencode/model-presets";
+import type { PromptKey } from "@oh-my-opencode/model-presets";
 
 const MODE: AgentMode = "subagent";
 
@@ -688,25 +687,18 @@ export function createOracleAgent(model: string): AgentConfig {
     prompt: ORACLE_DEFAULT_PROMPT,
   } as AgentConfig;
 
-  if (isDeepSeekV4ProModel(model)) {
+  // ── ModelPreset resolver: replaces hardcoded isDeepSeekV4Model/isMimoV25ProModel checks ──
+  const presetResolver = createPromptResolver({
+    [PROMPT_KEYS.ORACLE_DS_V4_PRO]: DEEPSEEK_V4_ORACLE_PROMPT,
+    [PROMPT_KEYS.ORACLE_DS_V4_FLASH]: DEEPSEEK_V4_FLASH_ORACLE_PROMPT,
+    [PROMPT_KEYS.ORACLE_MIMO_V25]: MIMO_V25_ORACLE_PROMPT,
+  });
+  const preset = resolveModelPreset("oracle", model, getBuiltinPresets());
+  if (preset?.promptKey) {
     return {
       ...base,
-      prompt: DEEPSEEK_V4_ORACLE_PROMPT,
-      thinking: { type: "enabled", budgetTokens: 32000 },
-    } as AgentConfig;
-  }
-
-  if (isDeepSeekV4Model(model)) {
-    return {
-      ...base,
-      prompt: DEEPSEEK_V4_FLASH_ORACLE_PROMPT,
-    } as AgentConfig;
-  }
-
-  if (isMimoV25ProModel(model)) {
-    return {
-      ...base,
-      prompt: MIMO_V25_ORACLE_PROMPT,
+      prompt: presetResolver(preset.promptKey as PromptKey) ?? base.prompt,
+      ...(preset.config?.thinking ? { thinking: preset.config.thinking } : {}),
     } as AgentConfig;
   }
 
