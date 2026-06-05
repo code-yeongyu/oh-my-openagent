@@ -33,8 +33,11 @@ export function findToolResultsBySize(sessionID: string): ToolResultInfo[] {
 						outputSize: part.state.output.length,
 					})
 				}
-			} catch {
-				continue
+			} catch (error) {
+				if (error instanceof Error) {
+					continue
+				}
+				throw error
 			}
 		}
 	}
@@ -83,7 +86,11 @@ export function truncateToolResult(partPath: string): {
 		writeFileSync(partPath, JSON.stringify(part, null, 2))
 
 		return { success: true, toolName, originalSize }
-	} catch {
+	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error
+		}
+
 		return { success: false }
 	}
 }
@@ -109,8 +116,11 @@ export function countTruncatedResults(sessionID: string): number {
 				if (part.truncated === true) {
 					count++
 				}
-			} catch {
-				continue
+			} catch (error) {
+				if (error instanceof Error) {
+					continue
+				}
+				throw error
 			}
 		}
 	}
