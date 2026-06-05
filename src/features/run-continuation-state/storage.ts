@@ -23,7 +23,11 @@ export function readContinuationMarker(
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
     return parsed as ContinuationMarker
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
+
     return null
   }
 }
@@ -62,7 +66,12 @@ export function clearContinuationMarker(directory: string, sessionID: string): v
 
   try {
     rmSync(markerPath)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return
+    }
+
+    return
   }
 }
 
