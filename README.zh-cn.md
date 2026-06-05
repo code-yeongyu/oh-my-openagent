@@ -338,7 +338,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 
    ```bash
    # 如果你有 jq 的话
-   jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
+   jq '.plugin = [.plugin[] | select(split("@")[0] != "oh-my-openagent" and split("@")[0] != "oh-my-opencode")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```
