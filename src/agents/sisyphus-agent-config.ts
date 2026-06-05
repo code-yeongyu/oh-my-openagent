@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 import { buildClaudeThinkingConfig } from "./types";
+import { isDeepSeekV4ProModel } from "./types";
 import type { AgentMode } from "./types";
 
 const SISYPHUS_DESCRIPTION =
@@ -51,5 +52,18 @@ export function buildClaudeSisyphusAgentConfig(
   return {
     ...buildBaseSisyphusAgentConfig(mode, model, prompt),
     ...buildClaudeThinkingConfig(model),
+  };
+}
+
+export function buildDeepSeekV4SisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return {
+    ...buildBaseSisyphusAgentConfig(mode, model, prompt),
+    ...(isDeepSeekV4ProModel(model)
+      ? { thinking: { type: "enabled" as const, budgetTokens: 32000 } }
+      : {}),
   };
 }
