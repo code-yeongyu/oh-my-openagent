@@ -28,17 +28,22 @@ export async function getFileMainSessions(directory?: string): Promise<SessionMe
           if (directory && meta.directory !== directory) continue
           sessions.push(meta)
         } catch (error) {
-          const stats = await stat(filePath)
+          let created = Date.now()
+          let updated = Date.now()
+          try {
+            const stats = await stat(filePath)
+            created = stats.mtimeMs
+            updated = stats.mtimeMs
+          } catch {
+            // stat failed (file removed between readdir and stat), use fallback timestamps
+          }
           sessions.push({
             id: file.replace(/\.json$/, ""),
             projectID: projectDir.name,
             directory: directory ?? "",
-            time: {
-              created: stats.mtimeMs,
-              updated: stats.mtimeMs,
-            },
+            time: { created, updated },
             load_error: (error as Error).message,
-          } as SessionMetadata)
+          })
         }
       }
     }

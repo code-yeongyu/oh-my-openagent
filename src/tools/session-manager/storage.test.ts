@@ -415,6 +415,35 @@ describe("session-manager storage - getMainSessions", () => {
     // then
     expect(sessions.length).toBe(2)
   })
+
+  test("getMainSessions handles corrupted session files with load_error instead of crashing", async () => {
+    // given
+    const projectID = "proj_corrupted"
+    const now = Date.now()
+
+    // valid session
+    createSessionMetadata(projectID, "ses_valid1", { directory: "/test", updated: now })
+
+    // corrupted session file (invalid JSON)
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    writeFileSync(join(projectDir, "ses_corrupted1.json"), "not valid json {{{")
+
+    createMessageForSession("ses_valid1", "msg_001", now)
+
+    // when
+    const sessions = await storage.getMainSessions({})
+
+    // then — corrupted file produces load_error entry, does not crash
+    const corrupted = sessions.find((s) => s.id === "ses_corrupted1")
+    expect(corrupted).toBeDefined()
+    expect(corrupted?.load_error).toBeDefined()
+    expect(typeof corrupted?.load_error).toBe("string")
+
+    // valid session is still returned
+    const valid = sessions.find((s) => s.id === "ses_valid1")
+    expect(valid).toBeDefined()
+    expect(valid?.load_error).toBeUndefined()
+  })
 })
 
 describe("session-manager storage - SDK path (beta mode)", () => {
