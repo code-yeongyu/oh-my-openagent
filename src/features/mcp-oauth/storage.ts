@@ -27,7 +27,8 @@ function normalizeHost(serverHost: string): string {
   if (host.includes("://")) {
     try {
       host = new URL(host).hostname
-    } catch {
+    } catch (urlError) {
+      if (!(urlError instanceof Error)) throw urlError
       host = host.split("/")[0]
     }
   } else {
@@ -68,7 +69,8 @@ function readStore(): TokenStore | null {
   try {
     const content = readFileSync(filePath, "utf-8")
     return JSON.parse(content) as TokenStore
-  } catch {
+  } catch (readError) {
+    if (!(readError instanceof Error)) throw readError
     return null
   }
 }
@@ -87,7 +89,8 @@ function writeStore(store: TokenStore): boolean {
     chmodSync(tempPath, 0o600)
     renameSync(tempPath, filePath)
     return true
-  } catch {
+  } catch (writeError) {
+    if (!(writeError instanceof Error)) throw writeError
     return false
   }
 }
@@ -125,7 +128,8 @@ export function deleteToken(serverHost: string, resource: string): boolean {
         unlinkSync(filePath)
       }
       return true
-    } catch {
+    } catch (deleteError) {
+      if (!(deleteError instanceof Error)) throw deleteError
       return false
     }
   }
