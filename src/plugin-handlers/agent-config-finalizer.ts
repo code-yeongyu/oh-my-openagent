@@ -30,7 +30,8 @@ export function finalizeAgentConfig(
     );
   }
 
-  const agentResult = params.config.agent as Record<string, unknown>;
+  const agentResult =
+    params.config.agent != null ? (params.config.agent as Record<string, unknown>) : {};
   clearRegisteredAgentNames();
   for (const name of Object.keys(agentResult)) {
     registerAgentName(name);
