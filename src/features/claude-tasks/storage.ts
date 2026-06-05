@@ -5,6 +5,11 @@ import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { z } from "zod"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 
+function ignoreClaudeTaskStorageError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
   const tasksConfig = config.sisyphus?.tasks
   const storagePath = tasksConfig?.storage_path
@@ -56,7 +61,8 @@ export function readJsonSafe<T>(filePath: string, schema: z.ZodType<T>): T | nul
     }
 
     return result.data
-  } catch {
+  } catch (error) {
+    ignoreClaudeTaskStorageError(error)
     return null
   }
 }
@@ -75,7 +81,8 @@ export function writeJsonAtomic(filePath: string, data: unknown): void {
       if (existsSync(tempPath)) {
         unlinkSync(tempPath)
       }
-    } catch {
+    } catch (cleanupError) {
+      ignoreClaudeTaskStorageError(cleanupError)
       // Ignore cleanup errors
     }
     throw error
@@ -113,7 +120,8 @@ export function acquireLock(dirPath: string): { acquired: boolean; release: () =
       const lockData = JSON.parse(lockContent)
       const lockAge = Date.now() - lockData.timestamp
       return lockAge > STALE_LOCK_THRESHOLD_MS
-    } catch {
+    } catch (error) {
+      ignoreClaudeTaskStorageError(error)
       return true
     }
   }
@@ -137,7 +145,8 @@ export function acquireLock(dirPath: string): { acquired: boolean; release: () =
   if (!acquired && isStale()) {
     try {
       unlinkSync(lockPath)
-    } catch {
+    } catch (error) {
+      ignoreClaudeTaskStorageError(error)
       // Ignore cleanup errors
     }
     acquired = tryAcquire()
@@ -161,7 +170,8 @@ export function acquireLock(dirPath: string): { acquired: boolean; release: () =
         const lockData = JSON.parse(lockContent)
         if (lockData.id !== lockId) return
         unlinkSync(lockPath)
-      } catch {
+      } catch (error) {
+        ignoreClaudeTaskStorageError(error)
         // Ignore cleanup errors
       }
     },
