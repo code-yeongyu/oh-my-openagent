@@ -1,10 +1,22 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
+
+function autoUpdateEnv(root, extra = {}) {
+	return {
+		CODEX_HOME: join(root, "codex-home"),
+		LAZYCODEX_CURRENT_VERSION: "1.0.0",
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+		LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
+		LAZYCODEX_AUTO_UPDATE_STATE_PATH: join(root, "state.json"),
+		LAZYCODEX_AUTO_UPDATE_LOG_PATH: join(root, "auto-update.log"),
+		...extra,
+	};
+}
 
 test("#given auto update is disabled #when resolving plan #then no command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
@@ -113,34 +125,26 @@ test("#given installed lazycodex version snapshot #when resolving auto update pl
 test("#given test command override #when running check #then records state and launches command", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-"));
 	const logPath = join(root, "spawn.log");
-	const updateLogPath = join(root, "auto-update.log");
-	const statePath = join(root, "state.json");
-	const codexHome = join(root, "codex-home");
+	const env = autoUpdateEnv(root, {
+		LAZYCODEX_AUTO_UPDATE_INTERVAL_MS: "0",
+		LAZYCODEX_AUTO_UPDATE_COMMAND: process.execPath,
+		LAZYCODEX_AUTO_UPDATE_ARGS_JSON: JSON.stringify(["-e", `require("node:fs").writeFileSync(${JSON.stringify(logPath)}, "ok")`]),
+		LAZYCODEX_AUTO_UPDATE_WAIT: "1",
+	});
 
 	const result = await runAutoUpdateCheck({
-		env: {
-			CODEX_HOME: codexHome,
-			LAZYCODEX_CURRENT_VERSION: "1.0.0",
-			LAZYCODEX_LATEST_VERSION: "1.0.1",
-			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
-			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
-			LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
-			LAZYCODEX_AUTO_UPDATE_INTERVAL_MS: "0",
-			LAZYCODEX_AUTO_UPDATE_COMMAND: process.execPath,
-			LAZYCODEX_AUTO_UPDATE_ARGS_JSON: JSON.stringify(["-e", `require("node:fs").writeFileSync(${JSON.stringify(logPath)}, "ok")`]),
-			LAZYCODEX_AUTO_UPDATE_WAIT: "1",
-		},
+		env,
 		now: 123_456,
 	});
 
 	assert.equal(result.started, true);
-	assert.deepEqual(JSON.parse(await readFile(statePath, "utf8")), {
+	assert.deepEqual(JSON.parse(await readFile(env.LAZYCODEX_AUTO_UPDATE_STATE_PATH, "utf8")), {
 		lastCheckedAt: 123_456,
 		lastAttemptedAt: 123_456,
 		lastStatus: "success",
 	});
 	assert.equal(await readFile(logPath, "utf8"), "ok");
-	const updateLog = (await readFile(updateLogPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+	const updateLog = (await readFile(env.LAZYCODEX_AUTO_UPDATE_LOG_PATH, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
 	assert.deepEqual(updateLog, [
 		{
 			timestamp: "1970-01-01T00:02:03.456Z",
@@ -154,25 +158,16 @@ test("#given test command override #when running check #then records state and l
 			status: 0,
 		},
 	]);
-	assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
+	assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
 });
 
 test("#given failed waited update #when retry window passes #then next update is not blocked by success throttle", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-retry-"));
-	const statePath = join(root, "state.json");
-	const updateLogPath = join(root, "auto-update.log");
 	const successPath = join(root, "success.log");
-	const codexHome = join(root, "codex-home");
-	const baseEnv = {
-		CODEX_HOME: codexHome,
-		LAZYCODEX_CURRENT_VERSION: "1.0.0",
-		LAZYCODEX_LATEST_VERSION: "1.0.1",
-		LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
-		LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
-		LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
+	const baseEnv = autoUpdateEnv(root, {
 		LAZYCODEX_AUTO_UPDATE_WAIT: "1",
 		LAZYCODEX_AUTO_UPDATE_COMMAND: process.execPath,
-	};
+	});
 
 	const failed = await runAutoUpdateCheck({
 		env: {
@@ -183,7 +178,7 @@ test("#given failed waited update #when retry window passes #then next update is
 	});
 	assert.equal(failed.started, true);
 	assert.equal(failed.status, 1);
-	assert.deepEqual(JSON.parse(await readFile(statePath, "utf8")), {
+	assert.deepEqual(JSON.parse(await readFile(baseEnv.LAZYCODEX_AUTO_UPDATE_STATE_PATH, "utf8")), {
 		lastAttemptedAt: 123_456,
 		lastStatus: "failed",
 	});
@@ -203,30 +198,51 @@ test("#given failed waited update #when retry window passes #then next update is
 
 test("#given active lock #when running check #then skips concurrent update", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-lock-"));
-	const statePath = join(root, "state.json");
 	const lockPath = join(root, "state.json.lock");
-	const updateLogPath = join(root, "auto-update.log");
-	const codexHome = join(root, "codex-home");
 	await writeFile(lockPath, "locked\n");
 
 	const result = await runAutoUpdateCheck({
-		env: {
-			CODEX_HOME: codexHome,
-			LAZYCODEX_CURRENT_VERSION: "1.0.0",
-			LAZYCODEX_LATEST_VERSION: "1.0.1",
-			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
-			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
-			LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
+		env: autoUpdateEnv(root, {
 			LAZYCODEX_AUTO_UPDATE_LOCK_PATH: lockPath,
 			LAZYCODEX_AUTO_UPDATE_INTERVAL_MS: "0",
 			LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS: "600000",
-		},
+		}),
 		now: 123_456,
 	});
 
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "locked");
-	assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model_context_window = 400000/);
+	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 400000/);
+});
+
+test("#given stale lock #when running check #then removes lock and runs update", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-stale-lock-"));
+	const lockPath = join(root, "state.json.lock");
+	const successPath = join(root, "success.log");
+	await writeFile(lockPath, "locked\n");
+	await utimes(lockPath, new Date(0), new Date(0));
+	const env = autoUpdateEnv(root, {
+		LAZYCODEX_AUTO_UPDATE_LOCK_PATH: lockPath,
+		LAZYCODEX_AUTO_UPDATE_INTERVAL_MS: "0",
+		LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS: "600000",
+		LAZYCODEX_AUTO_UPDATE_WAIT: "1",
+		LAZYCODEX_AUTO_UPDATE_COMMAND: process.execPath,
+		LAZYCODEX_AUTO_UPDATE_ARGS_JSON: JSON.stringify(["-e", `require("node:fs").writeFileSync(${JSON.stringify(successPath)}, "ok")`]),
+	});
+
+	const result = await runAutoUpdateCheck({
+		env,
+		now: 1_000_000,
+	});
+
+	assert.equal(result.started, true);
+	assert.equal(result.status, 0);
+	assert.equal(await readFile(successPath, "utf8"), "ok");
+	assert.deepEqual(JSON.parse(await readFile(env.LAZYCODEX_AUTO_UPDATE_STATE_PATH, "utf8")), {
+		lastCheckedAt: 1_000_000,
+		lastAttemptedAt: 1_000_000,
+		lastStatus: "success",
+	});
 });
 
 test("#given throttled updater and stale Codex config #when running check #then config migration still runs", async () => {
