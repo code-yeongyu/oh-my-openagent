@@ -66,7 +66,10 @@ async function findEmptyMessagesFromSDK(client: Client, sessionID: string): Prom
     }
 
     return emptyIds
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -104,7 +107,10 @@ async function findEmptyMessageByIndexFromSDK(
     }
 
     return null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
