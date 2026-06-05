@@ -696,6 +696,65 @@ describe("executeSyncTask - cleanup on error paths", () => {
     })
   })
 
+  test("#given no fallback chain #when poll returns retryable runtime error #then returns poll error without creating retry session", async () => {
+    //#given
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const createdSessions: string[] = []
+    const polledSessions: string[] = []
+
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_first" : "ses_second"
+        createdSessions.push(sessionID)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+        polledSessions.push(input.sessionID)
+        return "Forbidden: Selected provider is forbidden"
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "unused" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toBe("Forbidden: Selected provider is forbidden")
+    expect(createdSessions).toEqual(["ses_first"])
+    expect(polledSessions).toEqual(["ses_first"])
+    expect(deleteCalls).toContain("ses_first")
+  })
+
   test("registers child-session bootstrap before sync prompt and clears it after completion", async () => {
     const mockClient = {
       session: {
