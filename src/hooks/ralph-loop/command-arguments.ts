@@ -8,6 +8,11 @@ export type ParsedRalphLoopArguments = {
 }
 
 const DEFAULT_PROMPT = "Complete the task as instructed"
+const RESUME_ARGUMENT_PATTERN = /^["']?continue["']?$/i
+
+export function isRalphLoopResumeArgument(rawArguments: string): boolean {
+  return RESUME_ARGUMENT_PATTERN.test(rawArguments.trim())
+}
 
 export function parseRalphLoopArguments(rawArguments: string): ParsedRalphLoopArguments {
   const taskMatch = rawArguments.match(/^(["'])(.+?)\1/)
