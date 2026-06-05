@@ -67,7 +67,10 @@ async function readPartsFromSDKFallback(
       id: "callID" in part ? (part as { callID?: string }).callID : part.id,
       name: "name" in part && typeof part.name === "string" ? part.name : ("tool" in part && typeof (part as { tool?: unknown }).tool === "string" ? (part as { tool: string }).tool : undefined),
     }))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -134,7 +137,10 @@ export async function recoverUnavailableTool(
       return true
     }
     return isInternalPromptDispatchAccepted(promptResult)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
