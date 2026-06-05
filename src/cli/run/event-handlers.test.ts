@@ -1,12 +1,26 @@
-const { describe, it, expect, spyOn } = require("bun:test")
+/// <reference path="../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+import { describe, expect, it, spyOn } from "bun:test"
 import type { RunContext } from "./types"
 import { createEventState } from "./events"
-import { handleSessionStatus, handleMessagePartUpdated, handleMessageUpdated, handleTuiToast } from "./event-handlers"
+import {
+  handleMessagePartUpdated,
+  handleMessageUpdated,
+  handleSessionError,
+  handleSessionStatus,
+  handleToolExecute,
+  handleToolResult,
+  handleTuiToast,
+} from "./event-handlers"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   sessionID,
 } as RunContext)
+
+function joinWriteCalls(calls: readonly (readonly unknown[])[]): string {
+  return calls.map((call) => String(call[0] ?? "")).join("")
+}
 
 describe("handleSessionStatus", () => {
   it("recognizes idle from session.status event (not just deprecated session.idle)", () => {
@@ -92,6 +106,56 @@ describe("handleSessionStatus", () => {
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
+  })
+})
+
+describe("handleSessionError", () => {
+  it("records and prints matching session errors", () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+
+    const payload = {
+      type: "session.error",
+      properties: {
+        sessionID: "ses_main",
+        error: { message: "Provider timed out" },
+      },
+    }
+
+    //#when
+    handleSessionError(ctx, unsafeTestValue(payload), state)
+
+    //#then
+    expect(state.mainSessionError).toBe(true)
+    expect(state.lastError).toBe("Provider timed out")
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    errorSpy.mockRestore()
+  })
+
+  it("ignores errors from other sessions", () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+
+    const payload = {
+      type: "session.error",
+      properties: {
+        sessionID: "ses_other",
+        error: { message: "Other session failed" },
+      },
+    }
+
+    //#when
+    handleSessionError(ctx, unsafeTestValue(payload), state)
+
+    //#then
+    expect(state.mainSessionError).toBe(false)
+    expect(state.lastError).toBe(null)
+    expect(errorSpy).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
   })
 })
 
@@ -301,13 +365,105 @@ describe("handleMessagePartUpdated", () => {
     )
 
     // then
-    const output = stdoutSpy.mock.calls.map(call => String(call[0])).join("")
+    const output = joinWriteCalls(stdoutSpy.mock.calls)
     const metaCount = output.split("Sisyphus · claude-sonnet-4-6 · 2.4s").length - 1
     expect(metaCount).toBe(1)
     expect(state.completionMetaPrintedByMessageId["msg_1"]).toBe(true)
 
     stdoutSpy.mockRestore()
     nowSpy.mockRestore()
+  })
+})
+
+describe("handleMessageUpdated", () => {
+  it("resets streamed text and reasoning state for a new assistant message", () => {
+    //#given
+    const nowSpy = spyOn(Date, "now").mockReturnValue(9000)
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    state.currentMessageId = "msg_old"
+    state.lastPartText = "old text"
+    state.lastReasoningText = "old reasoning"
+    state.hasPrintedThinkingLine = true
+    state.lastThinkingSummary = "old summary"
+    state.textAtLineStart = false
+    state.thinkingAtLineStart = true
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    const payload = {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_new",
+          sessionID: "ses_main",
+          role: "assistant",
+          agent: "Atlas",
+          modelID: "gpt-5.2",
+          variant: "low",
+        },
+      },
+    }
+
+    //#when
+    handleMessageUpdated(ctx, unsafeTestValue(payload), state)
+
+    //#then
+    expect(state.currentMessageId).toBe("msg_new")
+    expect(state.messageCount).toBe(1)
+    expect(state.lastPartText).toBe("")
+    expect(state.lastReasoningText).toBe("")
+    expect(state.hasPrintedThinkingLine).toBe(false)
+    expect(state.lastThinkingSummary).toBe("")
+    expect(state.textAtLineStart).toBe(true)
+    expect(state.thinkingAtLineStart).toBe(false)
+    expect(state.messageStartedAtById["msg_new"]).toBe(9000)
+    expect(state.completionMetaPrintedByMessageId["msg_new"]).toBe(false)
+
+    stdoutSpy.mockRestore()
+    nowSpy.mockRestore()
+  })
+})
+
+describe("handleToolExecute and handleToolResult", () => {
+  it("prints tool output and resets stream state when a running tool completes", () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    state.lastPartText = "assistant text before tool"
+    state.textAtLineStart = false
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    const executePayload = {
+      type: "tool.execute",
+      properties: {
+        sessionID: "ses_main",
+        name: "read_file",
+        input: { filePath: "/src/index.ts" },
+      },
+    }
+    const resultPayload = {
+      type: "tool.result",
+      properties: {
+        sessionID: "ses_main",
+        name: "read_file",
+        output: "export const value = 1",
+      },
+    }
+
+    //#when
+    handleToolExecute(ctx, unsafeTestValue(executePayload), state)
+    handleToolResult(ctx, unsafeTestValue(resultPayload), state)
+
+    //#then
+    const rendered = joinWriteCalls(stdoutSpy.mock.calls)
+    expect(state.currentTool).toBe(null)
+    expect(state.lastPartText).toBe("")
+    expect(state.textAtLineStart).toBe(true)
+    expect(rendered).toContain("read_file")
+    expect(rendered).toContain("output")
+    expect(rendered).toContain("export const value = 1")
+
+    stdoutSpy.mockRestore()
   })
 })
 
