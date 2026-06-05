@@ -606,9 +606,10 @@ export class BackgroundManager {
       }
 
       // Add to queue
-      const key = this.getConcurrencyKeyFromInput(input)
+      const rawConcurrencyKey = this.getRawConcurrencyKeyFromInput(input)
+      const key = this.concurrencyManager.getConcurrencyKey(rawConcurrencyKey)
       const queue = this.queuesByKey.get(key) ?? []
-      queue.push({ task, input, attemptID: firstAttempt.attemptId })
+      queue.push({ task, input, attemptID: firstAttempt.attemptId, rawConcurrencyKey })
       this.queuesByKey.set(key, queue)
 
       log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
@@ -657,7 +658,7 @@ export class BackgroundManager {
         }
 
         try {
-          await this.concurrencyManager.acquire(key, item.task.id)
+          await this.concurrencyManager.acquire(item.rawConcurrencyKey ?? key, item.task.id)
         } catch (error) {
           if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
             this.rollbackPreStartDescendantReservation(item.task)
@@ -1123,11 +1124,15 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
+    return this.concurrencyManager.getConcurrencyKey(this.getRawConcurrencyKeyFromInput(input))
+  }
+
+  private getRawConcurrencyKeyFromInput(input: LaunchInput): string {
     const modelKey = input.model
       ? `${input.model.providerID}/${input.model.modelID}`
       : input.agent
 
-    return this.concurrencyManager.getConcurrencyKey(modelKey)
+    return modelKey
   }
 
   /**
