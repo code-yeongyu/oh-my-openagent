@@ -315,6 +315,86 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(readBoulderState(testDirectory)?.works?.[workId]?.status).toBe("abandoned")
   })
 
+  it("#given session work differs from active work #when completion handling runs #then session work is completed", async () => {
+    // given
+    const sessionPlanPath = join(testDirectory, "session-plan.md")
+    const otherPlanPath = join(testDirectory, "other-plan.md")
+    writeFileSync(sessionPlanPath, "## TODOs\n- [x] 1. Finish session work\n")
+    writeFileSync(otherPlanPath, "## TODOs\n- [ ] 1. Keep working\n")
+
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-other",
+      active_plan: otherPlanPath,
+      started_at: "2026-01-02T10:00:00.000Z",
+      updated_at: "2026-01-02T10:00:00.000Z",
+      session_ids: ["other-session"],
+      plan_name: "other-plan",
+      status: "active",
+      works: {
+        "work-session": {
+          work_id: "work-session",
+          active_plan: sessionPlanPath,
+          plan_name: "session-plan",
+          started_at: "2026-01-02T09:00:00.000Z",
+          updated_at: "2026-01-02T09:00:00.000Z",
+          session_ids: [SESSION_ID],
+          status: "active",
+          task_sessions: {},
+        },
+        "work-other": {
+          work_id: "work-other",
+          active_plan: otherPlanPath,
+          plan_name: "other-plan",
+          started_at: "2026-01-02T10:00:00.000Z",
+          updated_at: "2026-01-02T10:00:00.000Z",
+          session_ids: ["other-session"],
+          status: "active",
+          task_sessions: {},
+        },
+      },
+      task_sessions: {},
+    })
+
+    const persistedBoulder = readBoulderState(testDirectory)
+    if (!persistedBoulder) {
+      throw new Error("Expected persisted boulder state")
+    }
+
+    const promptAsyncMock = mock(async () => ({ data: {} }))
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: testDirectory,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+        },
+      },
+    })
+
+    // when
+    await handleCompletedBoulderIdle({
+      ctx,
+      sessionID: SESSION_ID,
+      sessionState: { promptFailureCount: 0 },
+      boulderState: {
+        ...persistedBoulder,
+        active_plan: sessionPlanPath,
+        plan_name: "session-plan",
+        session_ids: [SESSION_ID],
+      },
+      options: {
+        directory: testDirectory,
+        isContinuationStopped: (sessionId) => sessionId === SESSION_ID,
+      },
+    })
+
+    // then
+    const nextBoulder = readBoulderState(testDirectory)
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+    expect(nextBoulder?.works?.["work-session"]?.status).toBe("completed")
+    expect(nextBoulder?.works?.["work-other"]?.status).toBe("active")
+  })
+
   it("#given pending background task #when session idles #then continuation waits for retry instead of prompting", async () => {
     // given
     const planPath = join(testDirectory, "plan.md")

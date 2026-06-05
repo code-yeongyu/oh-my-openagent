@@ -37,10 +37,11 @@ export async function handleCompletedBoulderIdle(input: {
     sessionState.pendingRetryTimer = undefined
   }
 
-  const activeWork = boulderState.active_work_id
+  const sessionWork = getWorkForSession(ctx.directory, sessionID)
+  const activeWork = !sessionWork && boulderState.active_work_id
     ? getWorkById(ctx.directory, boulderState.active_work_id)
     : null
-  const work = activeWork ?? getWorkForSession(ctx.directory, sessionID)
+  const work = sessionWork ?? activeWork
   if (work?.status === "abandoned") {
     log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
     return
