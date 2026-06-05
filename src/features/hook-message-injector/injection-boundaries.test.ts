@@ -177,6 +177,40 @@ describe("hook message injection boundaries", () => {
     expect(message.tools).toEqual({ write: "deny" })
   })
 
+  it("#given original context and older fallback data #when injecting through the facade #then writes the original context metadata", () => {
+    // given
+    const messageDir = join(TEST_MESSAGE_STORAGE, "ses_original_context")
+    mkdirSync(messageDir, { recursive: true })
+    writeFileSync(join(messageDir, "msg_previous.json"), JSON.stringify({
+      id: "msg_previous",
+      agent: "fallback-agent",
+      model: { providerID: "fallback-provider", modelID: "fallback-model" },
+      tools: { write: "deny" },
+      time: { created: 1 },
+    }))
+
+    // when
+    const result = injectHookMessage("ses_original_context", "test content", {
+      agent: "original-agent",
+      model: { providerID: "original-provider", modelID: "original-model" },
+      tools: { write: "allow" },
+    })
+
+    // then
+    expect(result).toBe(true)
+    const injectedFile = listJsonFiles(messageDir).find((fileName) => fileName !== "msg_previous.json")
+    expect(injectedFile).toBeDefined()
+    const message = readJsonFile<{
+      readonly agent: string
+      readonly model: { readonly providerID: string; readonly modelID: string }
+      readonly tools: Record<string, string>
+    }>(join(messageDir, injectedFile ?? ""))
+
+    expect(message.agent).toBe("original-agent")
+    expect(message.model).toEqual({ providerID: "original-provider", modelID: "original-model" })
+    expect(message.tools).toEqual({ write: "allow" })
+  })
+
   it("rejects session IDs that would escape message storage", () => {
     // given
     expect(injectHookMessage("../ses_escape", "test content", {
