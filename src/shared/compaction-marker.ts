@@ -51,11 +51,19 @@ export function hasCompactionPartInStorage(messageID: string | undefined): boole
         try {
           const content = readFileSync(join(partDir, fileName), "utf-8")
           return isCompactionPart(JSON.parse(content))
-        } catch {
+        } catch (error) {
+          if (error instanceof Error) {
+            return false
+          }
+
           return false
         }
       })
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return false
+    }
+
     return false
   }
 }
