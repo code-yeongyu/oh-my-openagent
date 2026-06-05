@@ -2,6 +2,7 @@
 
 import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
+import { agentBrowserSkill, playwrightSkill } from "./skills/playwright"
 
 describe("createBuiltinSkills", () => {
 	test("returns playwright skill by default", () => {
@@ -15,6 +16,22 @@ describe("createBuiltinSkills", () => {
 		expect(browserSkill).toBeDefined()
 		expect(browserSkill?.description).toContain("browser")
 		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
+	})
+
+	test("exports browser skill contracts with stable tool surfaces", () => {
+		// #given - direct browser skill exports
+
+		// #when
+		const playwrightMcp = playwrightSkill.mcpConfig?.playwright
+
+		// #then
+		expect(playwrightSkill.name).toBe("playwright")
+		expect(playwrightMcp?.command).toBe("npx")
+		expect(playwrightMcp?.args).toEqual(["@playwright/mcp@latest"])
+		expect(agentBrowserSkill.name).toBe("agent-browser")
+		expect(agentBrowserSkill.allowedTools).toEqual(["Bash(agent-browser:*)"])
+		expect(agentBrowserSkill.template).toContain("agent-browser snapshot -i")
+		expect(agentBrowserSkill.template).toContain("AGENT_BROWSER_SESSION")
 	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
@@ -70,7 +87,7 @@ describe("createBuiltinSkills", () => {
 		expect(playwrightSkill).toBeUndefined()
 	})
 
-	test("agent-browser skill template is inlined (not loaded from file)", () => {
+	test("agent-browser skill template exposes bundled command documentation", () => {
 		// given
 		const options = { browserProvider: "agent-browser" as const }
 
@@ -78,7 +95,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 
-		// then - template should contain substantial content (inlined, not fallback)
+		// then
 		expect(agentBrowserSkill?.template).toContain("## Quick start")
 		expect(agentBrowserSkill?.template).toContain("## Commands")
 		expect(agentBrowserSkill?.template).toContain("agent-browser open")
