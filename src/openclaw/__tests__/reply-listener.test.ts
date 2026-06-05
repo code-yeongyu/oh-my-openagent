@@ -411,3 +411,70 @@ describe("startReplyListener", () => {
     }
   })
 })
+
+describe("isDaemonRunning", () => {
+  test("#given a stale pid file #when checking daemon status #then it reports stopped and removes the pid file", async () => {
+    // given
+    writeFileSync(pidFilePath, "2468")
+
+    // when
+    const result = await replyListenerModule.isDaemonRunning()
+
+    // then
+    expect(result).toBe(false)
+    expect(existsSync(pidFilePath)).toBe(false)
+  })
+})
+
+describe("stopReplyListener", () => {
+  test("#given a live non-daemon process owns the stored pid #when stopping #then it refuses to kill and cleans the stale pid", async () => {
+    // given
+    const reusedPid = 1357
+    livePids.add(reusedPid)
+    writeFileSync(pidFilePath, `${reusedPid}`)
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+
+    try {
+      // when
+      const result = await replyListenerModule.stopReplyListener()
+
+      // then
+      expect(result.success).toBe(false)
+      expect(result.message).toContain(`Refusing to kill PID ${reusedPid}`)
+      expect(killSpy).not.toHaveBeenCalled()
+      expect(existsSync(pidFilePath)).toBe(false)
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("#given a verified daemon process #when stopping #then it sends SIGTERM and persists stopped state", async () => {
+    // given
+    const daemonPid = 9753
+    livePids.add(daemonPid)
+    daemonPids.add(daemonPid)
+    writeFileSync(pidFilePath, `${daemonPid}`)
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({ isRunning: true, pid: daemonPid, startupToken: "token", errors: 0 }, null, 2),
+    )
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+
+    try {
+      // when
+      const result = await replyListenerModule.stopReplyListener()
+
+      // then
+      expect(result.success).toBe(true)
+      expect(killSpy).toHaveBeenCalledWith(daemonPid, "SIGTERM")
+      expect(existsSync(pidFilePath)).toBe(false)
+      expect(result.state).toMatchObject({
+        isRunning: false,
+        pid: null,
+        startupToken: null,
+      })
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+})
