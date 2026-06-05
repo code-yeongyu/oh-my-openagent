@@ -116,7 +116,7 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
       phase: "connect-failure",
     })
 
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = redactCleanupErrorMessage(error instanceof Error ? error.message : String(error))
     throw new Error(
       `Failed to connect to MCP server "${info.serverName}".\n\n` +
       `URL: ${redactUrl(config.url)}\n` +

@@ -152,6 +152,35 @@ describe("createHttpClient cleanup failures", () => {
     expect(state.clients.has(clientKey)).toBe(false)
   })
 
+  it("#given HTTP connect failure includes URL and bearer secrets #when creating the client #then thrown reason redacts secrets", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error(
+          "connect failed for https://example.com/mcp?api_key=secret-value with Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+        )
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toMatch(
+      /Reason: connect failed for https:\/\/example\.com\/mcp\?api_key=\*\*\*REDACTED\*\*\* with Authorization: \[REDACTED\]/,
+    )
+    expect(message).not.toMatch(/secret-value|abcdefghijklmnopqrstuvwxyz/)
+  })
+
   it("#given shutdown completes during HTTP connect and cleanup rejects #when creating the client #then the shutdown error is preserved", async () => {
     const state = createState()
     const info = createInfo()
