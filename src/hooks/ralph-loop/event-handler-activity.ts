@@ -5,6 +5,7 @@ import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { HOOK_NAME } from "./constants"
 import type { RalphLoopOptions } from "./types"
 import type { RalphLoopEventHandlerOptions } from "./event-handler-types"
+import { withTimeout } from "./with-timeout"
 
 const USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2000
 
@@ -105,10 +106,13 @@ export async function latestUserMessageIsInProgress(
 	now: number,
 ): Promise<boolean> {
 	try {
-		const messagesResponse = await ctx.client.session.messages({
-			path: { id: sessionID },
-			query: { directory: options.directory },
-		})
+		const messagesResponse = await withTimeout(
+			ctx.client.session.messages({
+				path: { id: sessionID },
+				query: { directory: options.directory },
+			}),
+			options.apiTimeoutMs,
+		)
 		const messages = getMessagesData(messagesResponse)
 		for (let index = messages.length - 1; index >= 0; index--) {
 			const message = messages[index]
