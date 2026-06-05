@@ -36,7 +36,7 @@ Build and publish automation scripts. Run via `bun run <script>` from root packa
 
 ## TSCONFIG
 
-`tsconfig.json` is script-specific (separate from `src/`). Includes only `publish-workflow.test.ts`.
+`tsconfig.json` is script-specific (separate from `src/`). It includes all top-level `script/*.ts` files so build and release automation stay in the Bun-typed TypeScript project instead of falling back to inferred LSP projects.
 
 ## NOTE
 
