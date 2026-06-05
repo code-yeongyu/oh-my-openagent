@@ -179,6 +179,35 @@ describe("createTeamSendMessageTool", () => {
     expect(message.from).toBe("m1")
   })
 
+  test("persists optional message metadata from tool arguments", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const correlationId = randomUUID()
+
+    // when
+    const result = await fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "hello with metadata",
+      correlationId,
+      summary: "metadata summary",
+      references: [{ path: "src/features/team-mode/tools/messaging.ts", description: "send tool" }],
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const parsedResult = JSON.parse(result)
+
+    // then
+    expect(parsedResult.deliveredTo).toEqual(["m2"])
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
+    const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
+    expect(message.kind).toBe("message")
+    expect(message.correlationId).toBe(correlationId)
+    expect(message.summary).toBe("metadata summary")
+    expect(message.references).toEqual([
+      { path: "src/features/team-mode/tools/messaging.ts", description: "send tool" },
+    ])
+  })
+
   test("gates broadcast to the lead and fans out to active members", async () => {
     // given
     const fixture = await createTeamFixture()
