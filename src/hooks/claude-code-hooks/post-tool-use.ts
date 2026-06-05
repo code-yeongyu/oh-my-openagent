@@ -154,7 +154,10 @@ export async function executePostToolUseHooks(
                 systemMessage: normalizeHookText(output.systemMessage),
               }
             }
-          } catch {
+          } catch (error) {
+            if (!(error instanceof Error)) {
+              throw error
+            }
             const stdout = normalizeHookText(result.stdout)
             if (stdout !== undefined) {
               messages.push(stdout)
@@ -180,7 +183,10 @@ export async function executePostToolUseHooks(
                 systemMessage: normalizeHookText(output.systemMessage),
               }
             }
-          } catch {
+          } catch (error) {
+            if (!(error instanceof Error)) {
+              throw error
+            }
             const stdout = normalizeHookText(result.stdout)
             if (stdout !== undefined) {
               messages.push(stdout)
