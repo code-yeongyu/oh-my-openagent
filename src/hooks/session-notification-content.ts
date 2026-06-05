@@ -87,7 +87,10 @@ async function readSessionTitle(
     if (sessionInfo?.title && sessionInfo.title.trim().length > 0) {
       return sessionInfo.title.trim()
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
   }
 
   return sessionID
@@ -112,7 +115,10 @@ async function readSessionMessages(
     })
 
     return Array.isArray(messages) ? messages : []
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
