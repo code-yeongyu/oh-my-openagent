@@ -75,7 +75,11 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
           Math.min(dispatchTimeoutMs, 5000),
           `[prompt-async-gate] ${sessionName} isSessionActive`,
         )
-      } catch {
+      } catch (error) {
+        if (error instanceof Error) {
+          sessionActive = false
+        }
+
         sessionActive = false
       }
     }
