@@ -5,6 +5,7 @@ import { createCleanMcpEnvironment } from "./env-cleaner"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { redactSensitiveData } from "./error-redaction"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
+import { log } from "../../shared/logger"
 
 type StdioClientFactory = (
   clientInfo: { name: string; version: string },
@@ -45,6 +46,21 @@ function getStdioCommand(config: ClaudeCodeMcpServer, serverName: string): strin
   return config.command
 }
 
+async function closeStdioResourceIgnoringFailure(
+  close: () => Promise<void>,
+  context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" }
+): Promise<void> {
+  try {
+    await close()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    log("[skill-mcp-stdio-client] ignored cleanup failure", {
+      ...context,
+      error: redactSensitiveData(message),
+    })
+  }
+}
+
 export async function createStdioClient(params: SkillMcpClientConnectionParams): Promise<McpClient> {
   const { state, clientKey, info, config } = params
   const shutdownGenAtStart = state.shutdownGeneration
@@ -71,12 +87,11 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
   try {
     await client.connect(transport)
   } catch (error) {
-    // Close transport to prevent orphaned MCP process on connection failure
-    try {
-      await transport.close()
-    } catch {
-      // Process may already be terminated
-    }
+    await closeStdioResourceIgnoringFailure(() => transport.close(), {
+      resource: "transport",
+      serverName: info.serverName,
+      phase: "connect-failure",
+    })
 
     const errorMessage = error instanceof Error ? error.message : String(error)
     const fullCommand = `${command} ${args.join(" ")}`
@@ -94,8 +109,16 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
   }
 
   if (state.shutdownGeneration !== shutdownGenAtStart) {
-    try { await client.close() } catch {}
-    try { await transport.close() } catch {}
+    await closeStdioResourceIgnoringFailure(() => client.close(), {
+      resource: "client",
+      serverName: info.serverName,
+      phase: "post-shutdown",
+    })
+    await closeStdioResourceIgnoringFailure(() => transport.close(), {
+      resource: "transport",
+      serverName: info.serverName,
+      phase: "post-shutdown",
+    })
     throw new Error(`MCP server "${info.serverName}" connection completed after shutdown`)
   }
 
