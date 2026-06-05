@@ -25,7 +25,11 @@ export function createInjectedPathsStorage(storageDir: string) {
       const content = readFileSync(filePath, "utf-8");
       const data: InjectedPathsData = JSON.parse(content);
       return new Set(data.injectedPaths);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        return new Set();
+      }
+
       return new Set();
     }
   };
