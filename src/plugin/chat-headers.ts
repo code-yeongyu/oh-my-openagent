@@ -93,7 +93,11 @@ async function hasInternalMarker(
     }
 
     return hasMarker
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     internalMarkerCache.set(cacheKey, false)
     if (internalMarkerCache.size > INTERNAL_MARKER_CACHE_LIMIT) {
       internalMarkerCache.clear()
