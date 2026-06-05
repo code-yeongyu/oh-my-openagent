@@ -146,7 +146,8 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
 
   const overwriteEnabled = isOverwriteEnabled(args?.overwrite)
   if (argsRecord && "overwrite" in argsRecord) {
-    delete argsRecord.overwrite
+    const { overwrite: _, ...rest } = argsRecord
+    ;(output as { args: Record<string, unknown> }).args = rest
   }
 
   if (!existsSync(resolvedPath)) {
