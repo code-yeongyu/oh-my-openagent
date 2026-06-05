@@ -144,7 +144,7 @@ describe("ralph-loop non-abort error continuation", () => {
 		expect(hook.getState()?.iteration).toBe(2)
 	})
 
-	test("keeps runtime retry dispatch reserved when activity is followed by immediate stale idle", async () => {
+	test("continues runtime retry after activity is followed by immediate real idle", async () => {
 		// given - an active loop retries a recoverable runtime error
 		const originalDateNow = Date.now
 		let currentNow = originalDateNow()
@@ -195,7 +195,7 @@ describe("ralph-loop non-abort error continuation", () => {
 				},
 			})
 
-			// when - retried-run activity is followed by a stale idle before the hold expires
+			// when - retried-run activity is followed by an immediate real idle
 			await hook.event({
 				event: {
 					type: "message.part.delta",
@@ -212,9 +212,9 @@ describe("ralph-loop non-abort error continuation", () => {
 				event: { type: "session.idle", properties: { sessionID: "session-123" } },
 			})
 
-			// then - the immediate stale idle is deferred by the prompt gate reservation
-			expect(promptCalls).toHaveLength(1)
-			expect(hook.getState()?.iteration).toBe(2)
+			// then - real activity clears stale-idle suppression and allows the next iteration
+			expect(promptCalls).toHaveLength(2)
+			expect(hook.getState()?.iteration).toBe(3)
 		} finally {
 			Date.now = originalDateNow
 		}
