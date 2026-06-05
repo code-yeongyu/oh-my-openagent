@@ -20,6 +20,11 @@ const defaultSessionLastAgentDeps: SessionLastAgentDeps = {
   isCompactionMessage,
 }
 
+function ignoreSessionLastAgentError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 type SessionMessagesClient = {
   session: {
     messages: (input: { path: { id: string } }) => Promise<unknown>
@@ -40,7 +45,8 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
             agent: parsed.agent,
             createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
           }
-        } catch {
+        } catch (error) {
+          ignoreSessionLastAgentError(error)
           return null
         }
       })
@@ -57,7 +63,8 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
         return message.agent.toLowerCase()
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreSessionLastAgentError(error)
     return null
   }
 
@@ -99,7 +106,8 @@ async function getLastAgentFromSessionMessages(
         return agent.toLowerCase()
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreSessionLastAgentError(error)
     return null
   }
 
@@ -139,7 +147,8 @@ export async function getLastAgentFromSession(
             agent: parsed.agent,
             createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
           }
-        } catch {
+        } catch (error) {
+          ignoreSessionLastAgentError(error)
           return null
         }
       })
@@ -156,7 +165,8 @@ export async function getLastAgentFromSession(
         return message.agent.toLowerCase()
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreSessionLastAgentError(error)
     return null
   }
 
