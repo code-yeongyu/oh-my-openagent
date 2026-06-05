@@ -40,12 +40,14 @@ function replaceOrInsertRootSetting(config, key, value) {
 	const output = [];
 	let replaced = false;
 	let inserted = false;
+	let inRoot = true;
 	for (const line of lines) {
-		if (!inserted && isSectionHeader(line)) {
+		const sectionHeader = isSectionHeader(line);
+		if (inRoot && !inserted && sectionHeader) {
 			if (!replaced) output.push(`${key} = ${value}`);
 			inserted = true;
 		}
-		if (isRootSetting(line, key)) {
+		if (inRoot && isRootSetting(line, key)) {
 			if (!replaced) {
 				output.push(`${key} = ${value}`);
 				replaced = true;
@@ -53,6 +55,7 @@ function replaceOrInsertRootSetting(config, key, value) {
 			continue;
 		}
 		output.push(line);
+		if (sectionHeader) inRoot = false;
 	}
 	if (!replaced && !inserted) output.push(`${key} = ${value}`);
 	return output.join("\n");

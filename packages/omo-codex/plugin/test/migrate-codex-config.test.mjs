@@ -32,6 +32,29 @@ test("#given stale root reasoning config #when ensuring config #then replaces st
 	assert.match(result, /\[features\]/);
 });
 
+test("#given section settings reuse managed root keys #when ensuring config #then section settings are preserved", () => {
+	const result = ensureCodexReasoningConfig(
+		[
+			'model = "gpt-5.5"',
+			"model_context_window = 272000",
+			"",
+			"[model_providers.openai]",
+			'model = "provider-scoped-value"',
+			"model_context_window = 123456",
+			"",
+			"[profiles.review]",
+			'model_reasoning_effort = "medium"',
+			'plan_mode_reasoning_effort = "medium"',
+			"",
+		].join("\n"),
+	);
+
+	assert.match(result, /^model = "gpt-5\.5"$/m);
+	assert.match(result, /^model_context_window = 400000$/m);
+	assert.match(result, /\[model_providers\.openai\]\nmodel = "provider-scoped-value"\nmodel_context_window = 123456/);
+	assert.match(result, /\[profiles\.review\]\nmodel_reasoning_effort = "medium"\nplan_mode_reasoning_effort = "medium"/);
+});
+
 test("#given project .codex is a symlink #when migrating #then project config is skipped", async (t) => {
 	if (!(await canCreateSymlink("dir"))) t.skip("symbolic links are unavailable in this environment");
 
@@ -202,6 +225,23 @@ test("#given managed config state is malformed #when migrating #then migration i
 	const state = JSON.parse(await readFile(statePath, "utf8"));
 	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
 	assert.match(content, /model_context_window = 400000/);
+	assert.equal(state.files[join(codexHome, "config.toml")].managed, true);
+});
+
+test("#given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-config-trimmed-state-"));
+	const codexHome = join(root, "codex-home");
+	const statePath = join(root, "model-state.json");
+	await mkdir(codexHome, { recursive: true });
+	await writeFile(join(codexHome, "config.toml"), 'model = "gpt-5.5"\nmodel_context_window = 272000\n');
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: `  ${statePath}  ` },
+		cwd: root,
+	});
+
+	const state = JSON.parse(await readFile(statePath, "utf8"));
+	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
 	assert.equal(state.files[join(codexHome, "config.toml")].managed, true);
 });
 
