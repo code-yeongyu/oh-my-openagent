@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
+import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { detectErrorType } from "./detect-error-type"
 import type { RecoveryErrorType } from "./detect-error-type"
@@ -53,7 +54,7 @@ export function createSessionErrorRecoveryHandler(
           path: { id: sessionID },
           query: { directory: ctx.directory },
         })
-        const msgs = (messagesResp as { data?: MessageData[] }).data
+        const msgs = normalizeSDKResponse(messagesResp, [] as MessageData[])
         const lastAssistant = msgs?.findLast((m) => m.info?.role === "assistant" && m.info?.error)
         assistantMsgID = lastAssistant?.info?.id
       } catch {
@@ -101,7 +102,7 @@ export function createSessionErrorRecoveryHandler(
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
-      const msgs = (messagesResp as { data?: MessageData[] }).data
+      const msgs = normalizeSDKResponse(messagesResp, [] as MessageData[])
 
       const failedMsg = msgs?.find((m) => m.info?.id === assistantMsgID)
       if (!failedMsg) {
