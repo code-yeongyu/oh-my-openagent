@@ -16,14 +16,10 @@ import {
 	isDuplicateByRealPath,
 	shouldApplyRule,
 } from "./matcher";
-import {
-	createMatchDecisionCache,
-	getCachedMatchReason,
-	setCachedMatchReason,
-	type MatchDecisionCache,
-} from "./match-decision-cache";
+import { createMatchDecisionCache } from "./match-decision-cache";
 import { createParsedRuleReader } from "./parsed-rule-cache";
 import { resolveFilePath } from "./path-resolution";
+import { getRuleMatchReason } from "./rule-match-reason";
 import type { FindRuleFilesOptions } from "./rule-file-finder";
 import type { RuleScanCache } from "./rule-scan-cache";
 import { saveInjectedRules } from "./storage";
@@ -171,58 +167,4 @@ export function createRuleInjectionProcessor(
 	}
 
 	return { processFilePathForInjection };
-}
-
-function getRuleMatchReason(input: {
-	matchDecisionCache: MatchDecisionCache;
-	isSingleFile: boolean | undefined;
-	projectRoot: string | null;
-	resolved: string;
-	realPath: string;
-	statFingerprint: string | null;
-	metadata: Parameters<typeof shouldApplyRule>[0];
-	shouldApplyRuleImpl: typeof shouldApplyRule;
-}): string | null {
-	if (input.isSingleFile) {
-		return "copilot-instructions (always apply)";
-	}
-
-	const cachedMatchReason = getCachedMatchReason(
-		input.matchDecisionCache,
-		input.projectRoot,
-		input.resolved,
-		input.realPath,
-		input.statFingerprint,
-	);
-	if (cachedMatchReason !== undefined) {
-		return cachedMatchReason;
-	}
-
-	const matchResult = input.shouldApplyRuleImpl(
-		input.metadata,
-		input.resolved,
-		input.projectRoot,
-	);
-	if (!matchResult.applies) {
-		setCachedMatchReason(
-			input.matchDecisionCache,
-			input.projectRoot,
-			input.resolved,
-			input.realPath,
-			input.statFingerprint,
-			null,
-		);
-		return null;
-	}
-
-	const matchReason = matchResult.reason ?? "matched";
-	setCachedMatchReason(
-		input.matchDecisionCache,
-		input.projectRoot,
-		input.resolved,
-		input.realPath,
-		input.statFingerprint,
-		matchReason,
-	);
-	return matchReason;
 }
