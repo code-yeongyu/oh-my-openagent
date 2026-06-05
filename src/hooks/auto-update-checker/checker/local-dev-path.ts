@@ -22,11 +22,17 @@ export function getLocalDevPath(directory: string): string | null {
         if (!ACCEPTED_PACKAGE_NAMES.some(name => entry.includes(name))) continue
         try {
           return fileURLToPath(entry)
-        } catch {
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            throw error
+          }
           return entry.replace("file://", "")
         }
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
