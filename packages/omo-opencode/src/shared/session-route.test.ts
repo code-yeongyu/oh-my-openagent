@@ -90,6 +90,32 @@ describe("promptAsyncInDirectory", () => {
     expect(result).toBeUndefined()
     expect(promptAsync).toHaveBeenCalledTimes(1)
   })
+
+  test("#given the session reports an active status #when routing a gated promptAsync request #then the active status defers the prompt", async () => {
+    // given
+    const promptAsync = mock(async () => ({ data: "sent" }))
+    const status = mock(async () => ({ data: { ses_route_active: { type: "running" } } }))
+    const client = {
+      session: {
+        promptAsync,
+        status,
+      },
+    }
+    const args = {
+      path: { id: "ses_route_active" },
+      body: { parts: [{ type: "text", text: "continue" }] },
+    }
+
+    // when, then
+    await expect(
+      promptAsyncInDirectory(
+        unsafeTestValue(client),
+        unsafeTestValue(args),
+        "/workspace/project",
+      ),
+    ).rejects.toThrow("promptAsync skipped by gate: active")
+    expect(promptAsync).toHaveBeenCalledTimes(0)
+  })
 })
 
 describe("promptWithRetryInDirectory", () => {
@@ -126,5 +152,32 @@ describe("promptWithRetryInDirectory", () => {
     await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")
     expect(promptAsync).toHaveBeenCalledTimes(1)
     expect(promptAsync.mock.calls[0]?.[0].query).toEqual({ directory: "/workspace/project" })
+  })
+
+  test("#given the session reports an active status #when routing a retry prompt for a background-agent dispatch #then the wrapper bypasses the status gate and still dispatches", async () => {
+    // given
+    const promptAsync = mock(async () => undefined)
+    const status = mock(async () => ({ data: { ses_retry_route_active: { type: "running" } } }))
+    const client = {
+      session: {
+        promptAsync,
+        status,
+      },
+    }
+    const args = {
+      path: { id: "ses_retry_route_active" },
+      body: { parts: [{ type: "text", text: "continue" }] },
+    }
+
+    // when
+    await promptWithRetryInDirectory(
+      unsafeTestValue(client),
+      unsafeTestValue(args),
+      "/workspace/project",
+    )
+
+    // then
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    expect(status).toHaveBeenCalledTimes(0)
   })
 })

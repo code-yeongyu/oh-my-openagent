@@ -87,7 +87,13 @@ export function promptWithRetryInDirectory(
   args: PromptRetryArgs,
   directory: string,
 ): Promise<void> {
-  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory), { queueBehavior: "defer" })
+  // Gate bypass mirrors sendSyncPrompt: background dispatch targets a manager-owned child
+  // session that can momentarily read as "active", which would otherwise interrupt the launch.
+  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory), {
+    queueBehavior: "defer",
+    checkStatus: false,
+    checkToolState: false,
+  })
 }
 
 export function promptSyncWithRetryInDirectory(
