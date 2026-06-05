@@ -43,7 +43,10 @@ function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
@@ -104,7 +107,10 @@ export async function detectStaleLock(lockPath: string, staleAfterMs: number): P
     if (isPidAlive(parsed.ownerPid)) return false
 
     return Date.now() - parsed.acquiredAtEpochMs > staleAfterMs
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
