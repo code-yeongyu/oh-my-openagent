@@ -1,9 +1,7 @@
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { findFirstMessageWithAgent, findNearestMessageWithFields } from "./json-message-lookup"
-import {
-  findMessageContextFromSDK,
-  type OpencodeClient,
-} from "./sdk-message-lookup"
+import { findMessageContextFromSDK } from "./sdk-message-context"
+import type { OpencodeClient } from "./sdk-message-lookup"
 import type { StoredMessage } from "./types"
 
 export async function resolveMessageContext(

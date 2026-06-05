@@ -6,6 +6,7 @@ import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
   findFirstMessageWithAgentFromSDK,
+  findMessageContextFromSDK,
   generateMessageId,
   generatePartId,
   injectHookMessage,
@@ -314,6 +315,51 @@ describe("findFirstMessageWithAgentFromSDK", () => {
     const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
 
     expect(result).toBeNull()
+  })
+})
+
+describe("findMessageContextFromSDK", () => {
+  it("#given SDK messages with different chronology #when resolving context through the injector facade #then returns nearest metadata and first agent from one fetch", async () => {
+    // given
+    const messages = [
+      {
+        id: "msg_late",
+        info: {
+          agent: "latest-agent",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { edit: true },
+          time: { created: 100 },
+        },
+      },
+      {
+        id: "msg_early",
+        info: {
+          agent: "first-agent",
+          model: { providerID: "anthropic", modelID: "claude-opus-4" },
+          time: { created: 10 },
+        },
+      },
+    ]
+    const messagesMock = vi.fn(async () => ({ data: messages }))
+    const mockClient = {
+      session: {
+        messages: messagesMock,
+      },
+    }
+
+    // when
+    const result = await findMessageContextFromSDK(unsafeTestValue(mockClient), "ses_123")
+
+    // then
+    expect(result).toEqual({
+      prevMessage: {
+        agent: "latest-agent",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        tools: { edit: true },
+      },
+      firstMessageAgent: "first-agent",
+    })
+    expect(messagesMock).toHaveBeenCalledTimes(1)
   })
 })
 

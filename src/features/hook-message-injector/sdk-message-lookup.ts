@@ -6,23 +6,23 @@ import type { StoredMessage, ToolPermission } from "./types"
 
 export type OpencodeClient = PluginInput["client"]
 
-interface SDKMessage {
-  id?: string
-  info?: {
-    agent?: string
-    model?: {
-      providerID?: string
-      modelID?: string
-      variant?: string
+export interface SDKMessage {
+  readonly id?: string
+  readonly info?: {
+    readonly agent?: string
+    readonly model?: {
+      readonly providerID?: string
+      readonly modelID?: string
+      readonly variant?: string
     }
-    providerID?: string
-    modelID?: string
-    tools?: Record<string, ToolPermission>
-    time?: {
-      created?: number
+    readonly providerID?: string
+    readonly modelID?: string
+    readonly tools?: Record<string, ToolPermission>
+    readonly time?: {
+      readonly created?: number
     }
   }
-  parts?: Array<{ type?: string }>
+  readonly parts?: readonly { readonly type?: string }[]
 }
 
 function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null {
@@ -50,7 +50,7 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
   }
 }
 
-async function fetchSDKMessages(client: OpencodeClient, sessionID: string): Promise<SDKMessage[] | null> {
+export async function fetchSDKMessages(client: OpencodeClient, sessionID: string): Promise<SDKMessage[] | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const emptyMessages: SDKMessage[] = []
@@ -65,7 +65,7 @@ async function fetchSDKMessages(client: OpencodeClient, sessionID: string): Prom
   return null
 }
 
-function findNearestMessageWithFieldsFromMessages(messages: readonly SDKMessage[]): StoredMessage | null {
+export function findNearestMessageWithFieldsFromMessages(messages: readonly SDKMessage[]): StoredMessage | null {
   const sortedMessages = messages
     .map((message) => ({
       stored: convertSDKMessageToStoredMessage(message),
@@ -91,7 +91,7 @@ function findNearestMessageWithFieldsFromMessages(messages: readonly SDKMessage[
   return null
 }
 
-function findFirstMessageWithAgentFromMessages(messages: readonly SDKMessage[]): string | null {
+export function findFirstMessageWithAgentFromMessages(messages: readonly SDKMessage[]): string | null {
   const sortedMessages = [...messages].sort((left, right) => {
     const leftTime = left.info?.time?.created ?? Number.POSITIVE_INFINITY
     const rightTime = right.info?.time?.created ?? Number.POSITIVE_INFINITY
@@ -125,19 +125,4 @@ export async function findFirstMessageWithAgentFromSDK(
 ): Promise<string | null> {
   const messages = await fetchSDKMessages(client, sessionID)
   return messages ? findFirstMessageWithAgentFromMessages(messages) : null
-}
-
-export async function findMessageContextFromSDK(
-  client: OpencodeClient,
-  sessionID: string
-): Promise<{ prevMessage: StoredMessage | null; firstMessageAgent: string | null }> {
-  const messages = await fetchSDKMessages(client, sessionID)
-  if (!messages) {
-    return { prevMessage: null, firstMessageAgent: null }
-  }
-
-  return {
-    prevMessage: findNearestMessageWithFieldsFromMessages(messages),
-    firstMessageAgent: findFirstMessageWithAgentFromMessages(messages),
-  }
 }
