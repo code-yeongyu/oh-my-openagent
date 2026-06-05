@@ -59,6 +59,8 @@ describe("sparkshell runtime awareness", () => {
 
     // then
     expect(context).toContain("omo sparkshell <command>")
+    expect(context).toContain("Prefer")
+    expect(context).toContain("CLI smoke tests")
     expect(context).toContain("--tmux-pane")
     expect(context).toContain("OMO_SPARKSHELL_BIN")
   })

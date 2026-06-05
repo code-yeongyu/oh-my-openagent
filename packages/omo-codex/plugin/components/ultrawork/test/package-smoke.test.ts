@@ -61,6 +61,7 @@ describe("codex ultrawork package metadata", () => {
 		expect(sparkshellIndex).toBeGreaterThanOrEqual(0);
 		expect(lspIndex).toBeGreaterThan(sparkshellIndex);
 		expect(structuralIndex).toBeGreaterThan(sparkshellIndex);
+		expect(guidance).toContain("prefer `omo sparkshell <command>` before raw shell commands");
 		expect(guidance).toContain("--shell '<command>'");
 		expect(guidance).toContain("--tmux-pane");
 	});

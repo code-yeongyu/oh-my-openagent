@@ -166,11 +166,11 @@ production code before its failing test → rewrite.
 Never guess from memory — locate with the right tool, and re-read before
 you claim or change. Fire 3+ independent lookups in one action;
 serialize only when one output strictly feeds the next.
-- Repo-wide inspection, git/history, bounded command output →
-  `omo sparkshell <command>` (use `omo sparkshell --shell '<cmd>'` only
-  when shell metacharacters are required; `--tmux-pane <id>
-  --tail-lines N` only to summarize an existing pane). Sparkshell is
-  your default lens on the tree.
+- Repo-wide inspection, CLI smoke tests, git/history, bounded command
+  output → prefer `omo sparkshell <command>` before raw shell commands
+  (use `omo sparkshell --shell '<cmd>'` only when shell metacharacters
+  are required; `--tmux-pane <id> --tail-lines N` only to inspect an
+  existing pane). Sparkshell is your default lens on the tree.
 - Symbols — definitions, references, rename impact, diagnostics →
   `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`,
   `lsp_diagnostics`. Use the LSP, not text search, for anything

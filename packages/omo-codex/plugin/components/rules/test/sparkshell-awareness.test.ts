@@ -198,7 +198,7 @@ describe("Codex Sparkshell awareness", () => {
 		const context = [
 			"## Sparkshell Runtime",
 			"",
-			"- Use `omo sparkshell <command>` for shell-native inspection.",
+			"- Prefer `omo sparkshell <command>` for shell-native inspection.",
 		].join("\n");
 
 		// when
