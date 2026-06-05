@@ -42,7 +42,11 @@ export function extractErrorMessage(error: unknown): string {
 
   try {
     return JSON.stringify(error);
-  } catch {
+  } catch (stringifyError) {
+    if (!(stringifyError instanceof Error)) {
+      throw stringifyError;
+    }
+
     return String(error);
   }
 }
