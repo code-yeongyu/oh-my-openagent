@@ -58,7 +58,10 @@ export function listWorktrees(directory: string): WorktreeEntry[] {
       stdio: ["pipe", "pipe", "pipe"],
     })
     return parseWorktreeListPorcelain(output)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -71,7 +74,10 @@ export function detectWorktreePath(directory: string): string | null {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
