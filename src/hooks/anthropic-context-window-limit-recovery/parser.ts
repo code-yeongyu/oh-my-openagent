@@ -45,6 +45,39 @@ function isThinkingBlockError(text: string): boolean {
 
 const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object"
+}
+
+function readProperty(source: Record<string, unknown>, key: string): unknown | undefined {
+  try {
+    return source[key]
+  } catch (error) {
+    if (error instanceof Error) {
+      return undefined
+    }
+    return undefined
+  }
+}
+
+function readStringProperty(source: Record<string, unknown>, key: string): string | undefined {
+  const value = readProperty(source, key)
+  return typeof value === "string" ? value : undefined
+}
+
+function isAnthropicErrorData(value: unknown): value is AnthropicErrorData {
+  if (!isRecord(value) || readProperty(value, "type") !== "error") {
+    return false
+  }
+
+  const error = readProperty(value, "error")
+  if (!isRecord(error)) {
+    return false
+  }
+
+  return typeof readProperty(error, "type") === "string" && typeof readProperty(error, "message") === "string"
+}
+
 function extractTokensFromMessage(message: string): { current: number; max: number } | null {
   for (const pattern of TOKEN_LIMIT_PATTERNS) {
     const match = message.match(pattern)
@@ -77,10 +110,10 @@ function stringifyErrorObject(errObj: Record<string, unknown>): string | null {
   try {
     return JSON.stringify(errObj) ?? null
   } catch (error) {
-    if (error instanceof TypeError) {
+    if (error instanceof Error) {
       return null
     }
-    throw error
+    return null
   }
 }
 
@@ -96,14 +129,6 @@ function parseJsonOrNull(text: string): unknown | null {
 }
 
 export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitError | null {
-  try {
-    return parseAnthropicTokenLimitErrorUnsafe(err)
-  } catch {
-    return null
-  }
-}
-
-function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitError | null {
   if (typeof err === "string") {
     if (err.toLowerCase().includes("non-empty content")) {
       return {
@@ -124,28 +149,39 @@ function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitErro
     return null
   }
 
-  if (!err || typeof err !== "object") return null
+  if (!isRecord(err)) return null
 
-  const errObj = err as Record<string, unknown>
+  const errObj = err
 
-  const dataObj = errObj.data as Record<string, unknown> | undefined
-  const responseBody = dataObj?.responseBody
-  const errorMessage = errObj.message as string | undefined
-  const errorData = errObj.error as Record<string, unknown> | undefined
-  const nestedError = errorData?.error as Record<string, unknown> | undefined
+  const data = readProperty(errObj, "data")
+  const dataObj = isRecord(data) ? data : undefined
+  const responseBody = dataObj ? readProperty(dataObj, "responseBody") : undefined
+  const errorMessage = readStringProperty(errObj, "message")
+  const errorValue = readProperty(errObj, "error")
+  const errorData = isRecord(errorValue) ? errorValue : undefined
+  const nestedErrorValue = errorData ? readProperty(errorData, "error") : undefined
+  const nestedError = isRecord(nestedErrorValue) ? nestedErrorValue : undefined
 
   const textSources: string[] = []
 
   if (typeof responseBody === "string") textSources.push(responseBody)
   if (typeof errorMessage === "string") textSources.push(errorMessage)
-  if (typeof errorData?.message === "string") textSources.push(errorData.message as string)
-  if (typeof errObj.body === "string") textSources.push(errObj.body as string)
-  if (typeof errObj.details === "string") textSources.push(errObj.details as string)
-  if (typeof errObj.reason === "string") textSources.push(errObj.reason as string)
-  if (typeof errObj.description === "string") textSources.push(errObj.description as string)
-  if (typeof nestedError?.message === "string") textSources.push(nestedError.message as string)
-  if (typeof dataObj?.message === "string") textSources.push(dataObj.message as string)
-  if (typeof dataObj?.error === "string") textSources.push(dataObj.error as string)
+  const errorDataMessage = errorData ? readStringProperty(errorData, "message") : undefined
+  if (errorDataMessage !== undefined) textSources.push(errorDataMessage)
+  const body = readStringProperty(errObj, "body")
+  if (body !== undefined) textSources.push(body)
+  const details = readStringProperty(errObj, "details")
+  if (details !== undefined) textSources.push(details)
+  const reason = readStringProperty(errObj, "reason")
+  if (reason !== undefined) textSources.push(reason)
+  const description = readStringProperty(errObj, "description")
+  if (description !== undefined) textSources.push(description)
+  const nestedErrorMessage = nestedError ? readStringProperty(nestedError, "message") : undefined
+  if (nestedErrorMessage !== undefined) textSources.push(nestedErrorMessage)
+  const dataMessage = dataObj ? readStringProperty(dataObj, "message") : undefined
+  if (dataMessage !== undefined) textSources.push(dataMessage)
+  const dataError = dataObj ? readStringProperty(dataObj, "error") : undefined
+  if (dataError !== undefined) textSources.push(dataError)
 
   if (textSources.length === 0) {
     const jsonStr = stringifyErrorObject(errObj)
@@ -167,8 +203,12 @@ function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitErro
 
     for (const pattern of jsonPatterns) {
       const dataMatch = responseBody.match(pattern)
-      if (dataMatch) {
-        const jsonData = parseJsonOrNull(dataMatch[1]) as AnthropicErrorData | null
+      const jsonText = dataMatch?.[1]
+      if (jsonText !== undefined) {
+        const jsonData = parseJsonOrNull(jsonText)
+        if (!isAnthropicErrorData(jsonData)) {
+          continue
+        }
         const message = jsonData?.error?.message || ""
         const tokens = extractTokensFromMessage(message)
 
@@ -183,8 +223,9 @@ function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitErro
       }
     }
 
-    const bedrockJson = parseJsonOrNull(responseBody) as Record<string, unknown> | null
-    if (typeof bedrockJson?.message === "string" && isTokenLimitError(bedrockJson.message)) {
+    const bedrockJson = parseJsonOrNull(responseBody)
+    const bedrockMessage = isRecord(bedrockJson) ? readStringProperty(bedrockJson, "message") : undefined
+    if (bedrockMessage !== undefined && isTokenLimitError(bedrockMessage)) {
       return {
         currentTokens: 0,
         maxTokens: 0,
