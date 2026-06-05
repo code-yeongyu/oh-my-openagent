@@ -35,11 +35,24 @@ type MessagesTransformHooks = {
   thinkingBlockValidator?: CreatedHooks["thinkingBlockValidator"]
   toolPairValidator?: CreatedHooks["toolPairValidator"]
 }
+type MessagesTransformHookKey = keyof MessagesTransformHooks
+type MessagesTransformHookEntry = {
+  readonly key: MessagesTransformHookKey
+  readonly name: string
+}
 type UserMessageInfo = Extract<Message, { role: "user" }>
 type ModelIdentifier = {
   providerID: string
   modelID: string
 }
+
+const MESSAGES_TRANSFORM_HOOKS = [
+  { key: "contextInjectorMessagesTransform", name: "contextInjectorMessagesTransform" },
+  { key: "teamModeStatusInjector", name: "teamModeStatusInjector" },
+  { key: "teamMailboxInjector", name: "teamMailboxInjector" },
+  { key: "thinkingBlockValidator", name: "thinkingBlockValidator" },
+  { key: "toolPairValidator", name: "toolPairValidator" },
+] satisfies readonly MessagesTransformHookEntry[]
 
 function getSessionID(message: MessageWithParts): string | undefined {
   return message.info.sessionID
@@ -226,50 +239,14 @@ export function createMessagesTransformHandler(args: {
   hooks: MessagesTransformHooks
 }): (input: Record<string, never>, output: MessagesTransformOutput) => Promise<void> {
   return async (input, output): Promise<void> => {
-    await runMessagesTransformHookSafely(
-      "contextInjectorMessagesTransform",
-      args.hooks.contextInjectorMessagesTransform?.[
-        "experimental.chat.messages.transform"
-      ],
-      input,
-      output,
-    )
-
-    await runMessagesTransformHookSafely(
-      "teamModeStatusInjector",
-      args.hooks.teamModeStatusInjector?.[
-        "experimental.chat.messages.transform"
-      ],
-      input,
-      output,
-    )
-
-    await runMessagesTransformHookSafely(
-      "teamMailboxInjector",
-      args.hooks.teamMailboxInjector?.[
-        "experimental.chat.messages.transform"
-      ],
-      input,
-      output,
-    )
-
-    await runMessagesTransformHookSafely(
-      "thinkingBlockValidator",
-      args.hooks.thinkingBlockValidator?.[
-        "experimental.chat.messages.transform"
-      ],
-      input,
-      output,
-    )
-
-    await runMessagesTransformHookSafely(
-      "toolPairValidator",
-      args.hooks.toolPairValidator?.[
-        "experimental.chat.messages.transform"
-      ],
-      input,
-      output,
-    )
+    for (const hook of MESSAGES_TRANSFORM_HOOKS) {
+      await runMessagesTransformHookSafely(
+        hook.name,
+        args.hooks[hook.key]?.["experimental.chat.messages.transform"],
+        input,
+        output,
+      )
+    }
 
     ensureUserTurnAfterAssistantTail(output)
   }
