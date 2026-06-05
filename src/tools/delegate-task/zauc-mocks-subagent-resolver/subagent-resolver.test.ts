@@ -663,6 +663,21 @@ describe("resolveSubagentExecution", () => {
     expect(result.categoryModel).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 
+  test("normalizes matched agent object model before returning categoryModel", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "oracle" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.5" } },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+  })
+
   test("matches agents even when zero-width characters are present in the requested name", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "\uFEFFSisyphus - Ultraworker" })
