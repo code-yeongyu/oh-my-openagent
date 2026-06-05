@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-4 non-test files (~622 LOC). File-based task persistence with atomic writes, locking, and OpenCode todo API sync.
+3 non-test files. File-based task persistence with atomic writes, locking, and OpenCode todo API sync.
 
 ## TASK SCHEMA
 
@@ -31,7 +31,6 @@ interface Task {
 |------|---------|
 | `types.ts` | Task interface + status types |
 | `storage.ts` | `readJsonSafe()`, `writeJsonAtomic()`, `acquireLock()`, `generateTaskId()` |
-| `session-storage.ts` | Per-session task storage, threadID auto-recording |
 | `index.ts` | Barrel exports |
 
 ## STORAGE
