@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { log } from "../../shared/logger"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
+import { redactSensitiveData } from "./error-redaction"
 import { buildHttpRequestInit } from "./oauth-handler"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
 
@@ -56,6 +57,11 @@ function redactUrl(urlStr: string): string {
   }
 }
 
+function redactCleanupErrorMessage(message: string): string {
+  const messageWithRedactedUrls = message.replace(/https?:\/\/[^\s]+/g, (url) => redactUrl(url))
+  return redactSensitiveData(messageWithRedactedUrls)
+}
+
 async function closeHttpResourceIgnoringFailure(
   close: () => Promise<void>,
   context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" },
@@ -66,7 +72,7 @@ async function closeHttpResourceIgnoringFailure(
     const message = error instanceof Error ? error.message : String(error)
     log("[skill-mcp-http-client] ignored cleanup failure", {
       ...context,
-      error: message,
+      error: redactCleanupErrorMessage(message),
     })
   }
 }
