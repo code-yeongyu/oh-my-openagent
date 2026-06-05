@@ -74,12 +74,20 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 		return "";
 	}
 
-	return [
-		"## Project Instructions",
-		"",
-		"must read project rules:",
-		orderStaticRules(uniqueRulesByBody(rules)).map(formatStaticRuleReference).join("\n"),
-	].join("\n");
+	const orderedRules = orderStaticRules(uniqueRulesByBody(rules));
+	const hephaestusRules = orderedRules.filter(isHephaestusRule);
+	const otherRules = orderedRules.filter((rule) => !isHephaestusRule(rule));
+	const blocks = ["## Project Instructions"];
+
+	if (hephaestusRules.length > 0) {
+		blocks.push("", truncateRules(hephaestusRules, options).map(formatRule).join("\n\n"));
+	}
+
+	if (otherRules.length > 0) {
+		blocks.push("", "must read project rules:", otherRules.map(formatStaticRuleReference).join("\n"));
+	}
+
+	return blocks.join("\n");
 }
 
 function orderStaticRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
