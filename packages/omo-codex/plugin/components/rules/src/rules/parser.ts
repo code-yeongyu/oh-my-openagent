@@ -72,6 +72,7 @@ function parseYamlFrontmatter(yamlContent: string): RuleFrontmatter {
 	const lines = yamlContent.replace(/\r\n/g, "\n").split("\n");
 	const frontmatter: RuleFrontmatter = {};
 	const globValues: string[] = [];
+	const seenGlobs = new Set<string>();
 	let lineIndex = 0;
 
 	while (lineIndex < lines.length) {
@@ -107,7 +108,10 @@ function parseYamlFrontmatter(yamlContent: string): RuleFrontmatter {
 		if (key === "globs" || key === "paths" || key === "applyTo") {
 			const parsed = parseGlobValue(rawValue, lines, lineIndex);
 			for (const glob of parsed.values) {
-				if (!globValues.includes(glob)) globValues.push(glob);
+				if (!seenGlobs.has(glob)) {
+					seenGlobs.add(glob);
+					globValues.push(glob);
+				}
 			}
 			lineIndex += parsed.consumed;
 			continue;
