@@ -26,9 +26,9 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env): st
   return [
     SPARKSHELL_AWARENESS_MARKER,
     "",
-    "- Codex app server context is active, so Sparkshell is available for shell-native inspection and bounded verification.",
-    "- Use `omo sparkshell <command>` for direct argv execution. Use `omo sparkshell --shell '<command>'` only when shell metacharacters are required.",
-    "- Use `omo sparkshell --tmux-pane <pane-id> --tail-lines 400` to summarize a tmux pane. Tail lines must stay between 100 and 1000.",
+    "- Prefer `omo sparkshell <command>` for repo inspection, CLI smoke tests, git/history checks, and bounded verification before falling back to raw shell commands.",
+    "- Use `omo sparkshell --shell '<command>'` only when shell metacharacters are required.",
+    "- Use `omo sparkshell --tmux-pane <pane-id> --tail-lines 400` to inspect an existing tmux pane. Tail lines must stay between 100 and 1000.",
     "- When no native sidecar or appserver is available, Sparkshell silently falls back to raw command execution. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
   ].join("\n")
 }
