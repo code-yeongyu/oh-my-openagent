@@ -1,6 +1,6 @@
 import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
 
-import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
+import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput } from "./model-resolver"
 import { _setModelResolutionLogImplementationForTesting } from "./model-resolution-pipeline"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
