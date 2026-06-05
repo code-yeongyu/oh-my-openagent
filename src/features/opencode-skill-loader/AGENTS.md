@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-28 files (~3.2k LOC). Discovers, parses, merges, and resolves SKILL.md files from 4 scopes with priority deduplication.
+25 files (~2.8k LOC). Discovers, parses, merges, and resolves SKILL.md files from 4 scopes with priority deduplication.
 
 ## 4-SCOPE PRIORITY (highest → lowest)
 
@@ -22,8 +22,6 @@ Same-named skill at higher scope overrides lower.
 | File | Purpose |
 |------|---------|
 | `loader.ts` | Main `loadSkills()` — orchestrates discovery → parse → merge |
-| `async-loader.ts` | Async variant for non-blocking skill loading |
-| `blocking.ts` | Sync variant for initial load |
 | `merger.ts` | Priority-based deduplication across scopes |
 | `skill-content.ts` | YAML frontmatter parsing from SKILL.md |
 | `skill-discovery.ts` | Find SKILL.md files in directory trees |
