@@ -15,7 +15,11 @@ export function loadOmoConfig(): OmoConfig | null {
     try {
       const content = readFileSync(projectDetected.path, "utf-8")
       return parseJsonc<OmoConfig>(content)
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        return null
+      }
+
       return null
     }
   }
@@ -29,7 +33,11 @@ export function loadOmoConfig(): OmoConfig | null {
     try {
       const content = readFileSync(userDetected.path, "utf-8")
       return parseJsonc<OmoConfig>(content)
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        return null
+      }
+
       return null
     }
   }
