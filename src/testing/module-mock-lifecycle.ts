@@ -24,10 +24,6 @@ type ModuleMockLifecycleOptions = {
 }
 
 function toError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error
-  }
-
   return new Error(String(error))
 }
 
@@ -82,7 +78,11 @@ function defaultGetCallerUrl(): string {
 function defaultResolveSpecifier(specifier: string, callerUrl: string): string {
   try {
     return import.meta.resolve(specifier, callerUrl)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return specifier
+    }
+
     return specifier
   }
 }
@@ -92,6 +92,10 @@ function defaultLoadOriginalModule(specifier: string, callerUrl: string): Module
     const require = createRequire(callerUrl)
     return { ok: true, value: require(specifier) }
   } catch (error) {
+    if (error instanceof Error) {
+      return { ok: false, error }
+    }
+
     return { ok: false, error: toError(error) }
   }
 }
