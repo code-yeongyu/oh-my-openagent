@@ -3,6 +3,7 @@ import type { BoulderState } from "../../features/boulder-state"
 import {
   completeBoulder,
   formatDurationHuman,
+  getWorkById,
   getWorkForSession,
 } from "../../features/boulder-state"
 import {
@@ -36,14 +37,22 @@ export async function handleCompletedBoulderIdle(input: {
     sessionState.pendingRetryTimer = undefined
   }
 
-  const work = getWorkForSession(ctx.directory, sessionID)
+  const activeWork = boulderState.active_work_id
+    ? getWorkById(ctx.directory, boulderState.active_work_id)
+    : null
+  const work = activeWork ?? getWorkForSession(ctx.directory, sessionID)
+  if (work?.status === "abandoned") {
+    log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+    return
+  }
+
   if (work) {
     completeBoulder(ctx.directory, work.work_id)
   } else {
     completeBoulder(ctx.directory, boulderState.active_work_id)
   }
 
-  if (!work || work.status === "abandoned") {
+  if (!work) {
     log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
     return
   }

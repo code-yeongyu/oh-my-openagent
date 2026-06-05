@@ -18,10 +18,14 @@ import {
 import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
 import type { AtlasHookOptions, SessionState } from "./types"
 
+const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+
 export function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
   return backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager
+        .getTasksByParentSession(sessionID)
+        .some((task: { status: string }) => ACTIVE_BACKGROUND_TASK_STATUSES.has(task.status))
     : false
 }
 
@@ -152,50 +156,58 @@ export function scheduleRetry(input: {
   }
 
   sessionState.pendingRetryTimer = setTimeout(async () => {
-    sessionState.pendingRetryTimer = undefined
+    try {
+      sessionState.pendingRetryTimer = undefined
 
-    if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
-    if (sessionState.stalledContinuationReason) return
-    if (sessionState.waitingForFinalWaveApproval) return
+      if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
+      if (sessionState.stalledContinuationReason) return
+      if (sessionState.waitingForFinalWaveApproval) return
 
-    const now = Date.now()
-    if (
-      sessionState.lastContinuationInjectedAt
-      && now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS
-    ) {
-      return
-    }
+      const now = Date.now()
+      if (
+        sessionState.lastContinuationInjectedAt
+        && now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS
+      ) {
+        return
+      }
 
-    const currentBoulder = readBoulderState(ctx.directory)
-    if (!currentBoulder) return
-    const normalizedSessionID = normalizeSessionId(sessionID)
-    if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
+      const currentBoulder = readBoulderState(ctx.directory)
+      if (!currentBoulder) return
+      const normalizedSessionID = normalizeSessionId(sessionID)
+      if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
 
-    const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
-    if (currentProgress.isComplete) return
-    if (options?.isContinuationStopped?.(sessionID)) return
-    const canContinueSession = await canContinueTrackedBoulderSession({
-      client: ctx.client,
-      sessionID,
-      sessionOrigin: currentBoulder.session_origins?.[normalizedSessionID],
-      boulderSessionIDs: currentBoulder.session_ids,
-      requiredAgent: currentBoulder.agent,
-    })
-    if (!canContinueSession) return
-    if (hasRunningBackgroundTasks(sessionID, options)) {
+      const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
+      if (currentProgress.isComplete) return
+      if (options?.isContinuationStopped?.(sessionID)) return
+      const canContinueSession = await canContinueTrackedBoulderSession({
+        client: ctx.client,
+        sessionID,
+        sessionOrigin: currentBoulder.session_origins?.[normalizedSessionID],
+        boulderSessionIDs: currentBoulder.session_ids,
+        requiredAgent: currentBoulder.agent,
+      })
+      if (!canContinueSession) return
+      if (hasRunningBackgroundTasks(sessionID, options)) {
+        scheduleRetry({ ctx, sessionID, sessionState, options })
+        return
+      }
+
+      await injectContinuation({
+        ctx,
+        sessionID,
+        sessionState,
+        options,
+        planName: currentBoulder.plan_name,
+        progress: currentProgress,
+        agent: currentBoulder.agent,
+        worktreePath: currentBoulder.worktree_path,
+      })
+    } catch (error) {
+      const loggedError = error instanceof Error ? error : String(error)
+      log(`[${HOOK_NAME}] Failed during boulder continuation retry`, { sessionID, error: loggedError })
+      sessionState.promptFailureCount += 1
+      sessionState.lastFailureAt = Date.now()
       scheduleRetry({ ctx, sessionID, sessionState, options })
-      return
     }
-
-    await injectContinuation({
-      ctx,
-      sessionID,
-      sessionState,
-      options,
-      planName: currentBoulder.plan_name,
-      progress: currentProgress,
-      agent: currentBoulder.agent,
-      worktreePath: currentBoulder.worktree_path,
-    })
   }, RETRY_DELAY_MS)
 }
