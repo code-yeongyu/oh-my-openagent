@@ -318,18 +318,21 @@ describe("startReplyListener", () => {
 
   test("restarts an already running daemon when runtime state config signature is stale even if persisted config matches", async () => {
     const existingPid = 3210
+    const replyListenerConfig = createConfig().replyListener
+    if (!replyListenerConfig) {
+      throw new Error("reply listener fixture must include listener config")
+    }
     const matchingConfig: OpenClawConfig = {
       ...createConfig(),
       replyListener: {
-        ...createConfig().replyListener!,
+        ...replyListenerConfig,
         pollIntervalMs: 500,
       },
     }
-    const baseConfig = matchingConfig
     const staleConfig: OpenClawConfig = {
-      ...baseConfig,
+      ...matchingConfig,
       replyListener: {
-        ...baseConfig.replyListener!,
+        ...replyListenerConfig,
         discordBotToken: "stale-token",
       },
     }
