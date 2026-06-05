@@ -31,9 +31,6 @@ function stripBom(content: string): string {
 }
 
 export function parseJsonc<T = unknown>(content: string): T {
-  // Strip UTF-8 BOM if present (Windows UTF-8 with BOM files)
-  content = content.replace(/^\uFEFF/, "")
-
   const errors: ParseError[] = []
   const result = parse(stripBom(content), errors, {
     allowTrailingComma: true,
