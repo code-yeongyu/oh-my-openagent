@@ -422,7 +422,7 @@ describe("sisyphus-task", () => {
       await tool.execute(args, toolContext)
 
       //#then
-      expect(args.load_skills).toEqual(["playwright", "git-master"])
+      expect(args.load_skills).toBe('["playwright", "git-master"]')
       expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
     }, { timeout: 10000 })
 
@@ -485,24 +485,28 @@ describe("sisyphus-task", () => {
       await tool.execute(args, toolContext)
 
       //#then
-      expect(args.load_skills).toEqual([])
+      expect(args.load_skills).toBe('["playwright", "git-master"')
       expect(resolveSkillContentSpy).toHaveBeenCalledWith([], expect.any(Object))
     }, { timeout: 10000 })
   })
 
   describe("category delegation config validation", () => {
-    test("fills subagent_type as sisyphus-junior when category is provided without subagent_type", async () => {
+    test("routes to sisyphus-junior when category is provided without subagent_type", async () => {
       // given
       const { createDelegateTask } = require("./tools")
+      let launchedAgent: string | undefined
 
       const mockManager = {
-        launch: async () => ({
-          id: "task-123",
-          status: "pending",
-          description: "Test task",
-          agent: "sisyphus-junior",
-          sessionID: "test-session",
-        }),
+        launch: async (input: { agent: string }) => {
+          launchedAgent = input.agent
+          return {
+            id: "task-123",
+            status: "pending",
+            description: "Test task",
+            agent: "sisyphus-junior",
+            sessionID: "test-session",
+          }
+        },
       }
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
@@ -551,21 +555,26 @@ describe("sisyphus-task", () => {
        await tool.execute(args, toolContext)
 
        // then
-       expect(args.subagent_type).toBe("Sisyphus-Junior")
+       expect(args.subagent_type).toBeUndefined()
+       expect(launchedAgent).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("prefers category over subagent_type when both are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
+      let launchedAgent: string | undefined
 
       const mockManager = {
-        launch: async () => ({
-          id: "task-override",
-          status: "pending",
-          description: "Override test",
-          agent: "sisyphus-junior",
-          sessionID: "test-session",
-        }),
+        launch: async (input: { agent: string }) => {
+          launchedAgent = input.agent
+          return {
+            id: "task-override",
+            status: "pending",
+            description: "Override test",
+            agent: "sisyphus-junior",
+            sessionID: "test-session",
+          }
+        },
       }
 
       const mockClient = {
@@ -609,7 +618,8 @@ describe("sisyphus-task", () => {
       await tool.execute(args, toolContext)
 
       //#then - category takes precedence, subagent_type is overridden to sisyphus-junior
-      expect(args.subagent_type).toBe("Sisyphus-Junior")
+      expect(args.subagent_type).toBe("oracle")
+      expect(launchedAgent).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
