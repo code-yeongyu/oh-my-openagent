@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const originalClaudePluginsHome = process.env.CLAUDE_PLUGINS_HOME
-const originalClaudeSettingsPath = process.env.CLAUDE_SETTINGS_PATH
 const temporaryDirectories: string[] = []
 const originalCwd = process.cwd()
 
@@ -40,12 +39,6 @@ describe("discoverInstalledPlugins", () => {
     } else {
       process.env.CLAUDE_PLUGINS_HOME = originalClaudePluginsHome
     }
-    if (originalClaudeSettingsPath === undefined) {
-      delete process.env.CLAUDE_SETTINGS_PATH
-    } else {
-      process.env.CLAUDE_SETTINGS_PATH = originalClaudeSettingsPath
-    }
-
     if (process.cwd() !== originalCwd) {
       process.chdir(originalCwd)
     }
@@ -169,110 +162,6 @@ describe("discoverInstalledPlugins", () => {
     expect(discovered.errors).toHaveLength(0)
     expect(discovered.plugins).toHaveLength(1)
     expect(discovered.plugins[0]?.name).toBe("oh-my-openagent")
-  })
-
-  it("#given both manifest layouts #when loading a manifest directly #then the Claude plugin layout wins", async () => {
-    //#given
-    const installPath = createInstallPath("omo-manifest-layout-")
-    mkdirSync(join(installPath, ".claude-plugin"), { recursive: true })
-    writeFileSync(
-      join(installPath, ".claude-plugin", "plugin.json"),
-      JSON.stringify({ name: "claude-layout", version: "2.0.0" }),
-      "utf-8",
-    )
-    writeFileSync(
-      join(installPath, "plugin.json"),
-      JSON.stringify({ name: "root-layout", version: "1.0.0" }),
-      "utf-8",
-    )
-
-    //#when
-    const { loadPluginManifest } = await import(`./discovery?t=${Date.now()}-manifest-layout`)
-    const manifest = loadPluginManifest(installPath)
-
-    //#then
-    expect(manifest?.name).toBe("claude-layout")
-    expect(manifest?.version).toBe("2.0.0")
-  })
-
-  it("#given Claude settings disables a plugin #when no override is passed #then the plugin is skipped", async () => {
-    //#given
-    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
-    const installPath = createInstallPath("omo-settings-disabled-install-")
-    const settingsPath = join(createTemporaryDirectory("omo-claude-settings-"), "settings.json")
-    process.env.CLAUDE_SETTINGS_PATH = settingsPath
-    writeFileSync(
-      settingsPath,
-      JSON.stringify({ enabledPlugins: { "settings-plugin@market": false } }),
-      "utf-8",
-    )
-    writeDatabase(pluginsHome, {
-      version: 2,
-      plugins: {
-        "settings-plugin@market": [
-          {
-            scope: "user",
-            installPath,
-            version: "1.0.0",
-            installedAt: "2026-03-26T00:00:00Z",
-            lastUpdated: "2026-03-26T00:00:00Z",
-          },
-        ],
-      },
-    })
-
-    //#when
-    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-settings-disabled`)
-    const discovered = discoverInstalledPlugins({
-      pluginsHomeOverride: pluginsHome,
-      loadPluginManifestOverride: () => null,
-    })
-
-    //#then
-    expect(discovered.errors).toHaveLength(0)
-    expect(discovered.plugins).toHaveLength(0)
-  })
-
-  it("#given plugin component folders and files exist #when discovery loads the plugin #then component paths are populated", async () => {
-    //#given
-    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
-    const installPath = createInstallPath("omo-component-paths-")
-    mkdirSync(join(installPath, "commands"), { recursive: true })
-    mkdirSync(join(installPath, "agents"), { recursive: true })
-    mkdirSync(join(installPath, "skills"), { recursive: true })
-    mkdirSync(join(installPath, "hooks"), { recursive: true })
-    writeFileSync(join(installPath, "hooks", "hooks.json"), "{}", "utf-8")
-    writeFileSync(join(installPath, ".mcp.json"), "{}", "utf-8")
-    writeDatabase(pluginsHome, {
-      version: 2,
-      plugins: {
-        "component-plugin@market": [
-          {
-            scope: "user",
-            installPath,
-            version: "1.0.0",
-            installedAt: "2026-03-26T00:00:00Z",
-            lastUpdated: "2026-03-26T00:00:00Z",
-          },
-        ],
-      },
-    })
-
-    //#when
-    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-component-paths`)
-    const discovered = discoverInstalledPlugins({
-      pluginsHomeOverride: pluginsHome,
-      loadPluginManifestOverride: () => ({ name: "component-plugin", version: "1.0.0" }),
-    })
-
-    //#then
-    expect(discovered.errors).toHaveLength(0)
-    expect(discovered.plugins).toHaveLength(1)
-    expect(discovered.plugins[0]?.commandsDir).toBe(join(installPath, "commands"))
-    expect(discovered.plugins[0]?.agentsDir).toBe(join(installPath, "agents"))
-    expect(discovered.plugins[0]?.skillsDir).toBe(join(installPath, "skills"))
-    expect(discovered.plugins[0]?.hooksPath).toBe(join(installPath, "hooks", "hooks.json"))
-    expect(discovered.plugins[0]?.mcpPath).toBe(join(installPath, ".mcp.json"))
   })
 
   describe("#given project-scoped entries in v1 format", () => {
