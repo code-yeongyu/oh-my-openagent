@@ -52,7 +52,10 @@ function redactUrl(urlStr: string): string {
       }
     }
     return u.toString()
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return urlStr
   }
 }
@@ -99,7 +102,10 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   let url: URL
   try {
     url = new URL(config.url)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     throw new Error(
       `MCP server "${info.serverName}" has invalid URL: ${redactUrl(config.url)}\n\n` +
       `Expected a valid URL like: https://mcp.example.com/mcp`
