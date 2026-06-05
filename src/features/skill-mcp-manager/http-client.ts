@@ -58,8 +58,8 @@ function redactUrl(urlStr: string): string {
 }
 
 function redactCleanupErrorMessage(message: string): string {
-  const messageWithRedactedUrls = message.replace(/https?:\/\/[^\s]+/g, (url) => redactUrl(url))
-  return redactSensitiveData(messageWithRedactedUrls)
+  const messageWithRedactedSecrets = redactSensitiveData(message)
+  return messageWithRedactedSecrets.replace(/https?:\/\/[^\s"'<>)}\]]+/g, (url) => redactUrl(url))
 }
 
 async function closeHttpResourceIgnoringFailure(
