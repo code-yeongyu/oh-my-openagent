@@ -55,12 +55,9 @@ export async function waitForReplyListenerProcessExit(pid: number, timeoutMs: nu
     if (!isReplyListenerProcessRunning(pid)) {
       return true
     }
-    if (!(await isReplyListenerDaemonProcess(pid))) {
-      return true
-    }
 
     await sleep(10)
   }
 
-  return !isReplyListenerProcessRunning(pid) || !(await isReplyListenerDaemonProcess(pid))
+  return !isReplyListenerProcessRunning(pid)
 }
