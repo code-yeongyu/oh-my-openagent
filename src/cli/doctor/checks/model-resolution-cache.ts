@@ -32,8 +32,12 @@ function loadCustomProviderNames(): string[] {
       if (data?.provider && typeof data.provider === "object") {
         return Object.keys(data.provider)
       }
-    } catch {
-      // ignore parse errors
+    } catch (error) {
+      if (error instanceof Error) {
+        continue
+      }
+
+      continue
     }
   }
 
@@ -69,7 +73,11 @@ export function loadAvailableModelsFromCache(): AvailableModelsInfo {
     const allProviders = [...new Set([...cacheProviders, ...customProviders])]
 
     return { providers: allProviders, modelCount, cacheExists: true }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return { providers: [], modelCount: 0, cacheExists: false }
+    }
+
     return { providers: [], modelCount: 0, cacheExists: false }
   }
 }
