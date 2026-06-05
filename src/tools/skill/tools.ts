@@ -25,6 +25,11 @@ import {
   mergeNativeSkills,
 } from "./native-skills"
 
+function ignoreNativeSkillsError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
 
@@ -45,7 +50,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       try {
         const nativeAll = await options.nativeSkills.all()
         mergeNativeSkills(allSkills, nativeAll)
-      } catch {
+      } catch (error) {
+        ignoreNativeSkillsError(error)
       }
     }
 
@@ -90,7 +96,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         } else {
           mergeNativeSkillInfos(skillInfos, nativeAll)
         }
-      } catch {
+      } catch (error) {
+        ignoreNativeSkillsError(error)
       }
     }
 
