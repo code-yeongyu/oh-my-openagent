@@ -87,7 +87,7 @@ describe("createBuiltinSkills", () => {
 		expect(playwrightSkill).toBeUndefined()
 	})
 
-	test("agent-browser skill template is inlined (not loaded from file)", () => {
+	test("agent-browser skill template exposes bundled command documentation", () => {
 		// given
 		const options = { browserProvider: "agent-browser" as const }
 
@@ -95,7 +95,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 
-		// then - template should contain substantial content (inlined, not fallback)
+		// then
 		expect(agentBrowserSkill?.template).toContain("## Quick start")
 		expect(agentBrowserSkill?.template).toContain("## Commands")
 		expect(agentBrowserSkill?.template).toContain("agent-browser open")
