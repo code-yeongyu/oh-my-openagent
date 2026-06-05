@@ -31,7 +31,10 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
     filePath = isAbsolute(expanded)
       ? expanded
       : resolve(configDir ?? process.cwd(), expanded)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return `[WARNING: Malformed file URI (invalid percent-encoding): ${promptAppend}]`
   }
 
@@ -52,7 +55,10 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
 
   try {
     return readFileSync(filePath, "utf8")
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return `[WARNING: Could not read file: ${promptAppend}]`
   }
 }
