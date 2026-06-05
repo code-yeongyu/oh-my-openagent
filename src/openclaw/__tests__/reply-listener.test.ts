@@ -1,7 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, mock, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
-import { join } from "path"
+import { dirname, join } from "path"
+import { pathToFileURL } from "url"
+import { shouldContinuePolling } from "../reply-listener-poll-loop"
+import {
+  createPendingReplyListenerState,
+  markReplyListenerStopped,
+  recordReplyListenerPoll,
+} from "../reply-listener-state"
 import type { OpenClawConfig } from "../types"
 
 interface MockSpawnProcess {
@@ -31,6 +38,7 @@ let spawnImplementation: SpawnImplementation = () => ({
 })
 
 let replyListenerModule: typeof import("../reply-listener")
+let replyListenerStartModule: typeof import("../reply-listener-start")
 
 function createConfig(): OpenClawConfig {
   return {
@@ -87,6 +95,7 @@ beforeAll(async () => {
   }))
 
   replyListenerModule = await import("../reply-listener")
+  replyListenerStartModule = await import("../reply-listener-start")
 })
 
 afterEach(() => {
@@ -318,18 +327,21 @@ describe("startReplyListener", () => {
 
   test("restarts an already running daemon when runtime state config signature is stale even if persisted config matches", async () => {
     const existingPid = 3210
+    const replyListenerConfig = createConfig().replyListener
+    if (!replyListenerConfig) {
+      throw new Error("reply listener fixture must include listener config")
+    }
     const matchingConfig: OpenClawConfig = {
       ...createConfig(),
       replyListener: {
-        ...createConfig().replyListener!,
+        ...replyListenerConfig,
         pollIntervalMs: 500,
       },
     }
-    const baseConfig = matchingConfig
     const staleConfig: OpenClawConfig = {
-      ...baseConfig,
+      ...matchingConfig,
       replyListener: {
-        ...baseConfig.replyListener!,
+        ...replyListenerConfig,
         discordBotToken: "stale-token",
       },
     }
@@ -406,6 +418,198 @@ describe("startReplyListener", () => {
       expect(result.success).toBe(true)
       expect(spawnCalls).toBe(1)
       expect(killSpy).toHaveBeenCalledWith(existingPid, "SIGTERM")
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("#given an old daemon remains alive after SIGTERM #when restarting #then it does not spawn a replacement yet", async () => {
+    // given
+    const existingPid = 3210
+    livePids.add(existingPid)
+    daemonPids.add(existingPid)
+    writeFileSync(pidFilePath, `${existingPid}`)
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
+    )
+    writeFileSync(
+      configFilePath,
+      JSON.stringify({
+        ...createConfig(),
+        replyListener: {
+          ...createConfig().replyListener,
+          discordChannelId: "stale-channel",
+        },
+      }, null, 2),
+    )
+
+    let spawnCalls = 0
+    spawnImplementation = () => {
+      spawnCalls += 1
+      return {
+        pid: 4321,
+        unref() {
+        },
+      }
+    }
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+
+    try {
+      // when
+      const result = await replyListenerModule.startReplyListener(createConfig())
+
+      // then
+      expect(result.success).toBe(false)
+      expect(result.message).toContain("Timed out")
+      expect(spawnCalls).toBe(0)
+      expect(killSpy).toHaveBeenCalledWith(existingPid, "SIGTERM")
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("#given daemon identity probing fails but the old pid is still alive #when restarting #then it does not spawn a replacement yet", async () => {
+    // given
+    const existingPid = 3210
+    livePids.add(existingPid)
+    daemonPids.add(existingPid)
+    writeFileSync(pidFilePath, `${existingPid}`)
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
+    )
+    writeFileSync(
+      configFilePath,
+      JSON.stringify({
+        ...createConfig(),
+        replyListener: {
+          ...createConfig().replyListener,
+          discordChannelId: "stale-channel",
+        },
+      }, null, 2),
+    )
+
+    let spawnCalls = 0
+    spawnImplementation = () => {
+      spawnCalls += 1
+      return {
+        pid: 4321,
+        unref() {
+        },
+      }
+    }
+    const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
+      if (pid === existingPid) {
+        daemonPids.delete(existingPid)
+      }
+      return true
+    })
+
+    try {
+      // when
+      const result = await replyListenerModule.startReplyListener(createConfig())
+
+      // then
+      expect(result.success).toBe(false)
+      expect(result.message).toContain("Timed out")
+      expect(spawnCalls).toBe(0)
+      expect(killSpy).toHaveBeenCalledWith(existingPid, "SIGTERM")
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("#given the module path contains encoded characters #when resolving the daemon script #then the filesystem path is decoded", () => {
+    // given
+    const currentFilePath = join(tempHome, "openclaw encoded dir", "reply-listener-start.ts")
+    const currentFileUrl = pathToFileURL(currentFilePath).href
+
+    // when
+    const daemonScript = replyListenerStartModule.resolveReplyListenerDaemonScript(currentFileUrl)
+
+    // then
+    expect(daemonScript).toBe(join(dirname(currentFilePath), "daemon.ts"))
+  })
+})
+
+describe("shouldContinuePolling", () => {
+  test("#given pending running and stopped daemon states #when checking poll continuation #then only pending and running continue", () => {
+    // given
+    const state = createPendingReplyListenerState("startup-token")
+
+    // when/then
+    expect(shouldContinuePolling(state)).toBe(true)
+
+    recordReplyListenerPoll(state, 2468)
+    expect(shouldContinuePolling(state)).toBe(true)
+
+    const stoppedState = markReplyListenerStopped(state)
+    expect(shouldContinuePolling(stoppedState)).toBe(false)
+  })
+})
+
+describe("isDaemonRunning", () => {
+  test("#given a stale pid file #when checking daemon status #then it reports stopped and removes the pid file", async () => {
+    // given
+    writeFileSync(pidFilePath, "2468")
+
+    // when
+    const result = await replyListenerModule.isDaemonRunning()
+
+    // then
+    expect(result).toBe(false)
+    expect(existsSync(pidFilePath)).toBe(false)
+  })
+})
+
+describe("stopReplyListener", () => {
+  test("#given a live non-daemon process owns the stored pid #when stopping #then it refuses to kill and cleans the stale pid", async () => {
+    // given
+    const reusedPid = 1357
+    livePids.add(reusedPid)
+    writeFileSync(pidFilePath, `${reusedPid}`)
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+
+    try {
+      // when
+      const result = await replyListenerModule.stopReplyListener()
+
+      // then
+      expect(result.success).toBe(false)
+      expect(result.message).toContain(`Refusing to kill PID ${reusedPid}`)
+      expect(killSpy).not.toHaveBeenCalled()
+      expect(existsSync(pidFilePath)).toBe(false)
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("#given a verified daemon process #when stopping #then it sends SIGTERM and persists stopped state", async () => {
+    // given
+    const daemonPid = 9753
+    livePids.add(daemonPid)
+    daemonPids.add(daemonPid)
+    writeFileSync(pidFilePath, `${daemonPid}`)
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({ isRunning: true, pid: daemonPid, startupToken: "token", errors: 0 }, null, 2),
+    )
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+
+    try {
+      // when
+      const result = await replyListenerModule.stopReplyListener()
+
+      // then
+      expect(result.success).toBe(true)
+      expect(killSpy).toHaveBeenCalledWith(daemonPid, "SIGTERM")
+      expect(existsSync(pidFilePath)).toBe(false)
+      expect(result.state).toMatchObject({
+        isRunning: false,
+        pid: null,
+        startupToken: null,
+      })
     } finally {
       killSpy.mockRestore()
     }

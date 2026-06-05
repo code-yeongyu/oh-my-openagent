@@ -49,6 +49,7 @@ export async function linkCachedPluginAgents(input: {
     const linkPath = join(agentsDir, agentFileName)
     await replaceWithCopy(linkPath, agentPath)
     await restorePreservedReasoning({
+      agentName,
       linkPath,
       target: agentPath,
       value: input.preservedReasoning?.get(agentName),
@@ -102,16 +103,31 @@ async function writeManifest(pluginRoot: string, agentPaths: readonly string[]):
 }
 
 async function restorePreservedReasoning(input: {
+  readonly agentName: string
   readonly linkPath: string
   readonly target: string
   readonly value: string | undefined
 }): Promise<void> {
   if (input.value === undefined) return
   const content = await readFile(input.target, "utf8")
-  if (extractReasoningEffort(content) === input.value) return
+  const bundledEffort = extractReasoningEffort(content)
+  if (bundledEffort === input.value) return
+  if (shouldUseBundledReasoning({ agentName: input.agentName, bundledEffort, preservedEffort: input.value })) return
   const replacement = replaceReasoningEffort(content, input.value)
   if (!replacement.replaced) return
   await writeFile(input.linkPath, replacement.content)
+}
+
+function shouldUseBundledReasoning(input: {
+  readonly agentName: string
+  readonly bundledEffort: string | null
+  readonly preservedEffort: string
+}): boolean {
+  return (
+    input.agentName === "codex-ultrawork-reviewer" &&
+    input.bundledEffort === "high" &&
+    input.preservedEffort === "xhigh"
+  )
 }
 
 async function readTextIfExists(path: string): Promise<string | null> {

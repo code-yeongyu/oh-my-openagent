@@ -105,6 +105,22 @@ export function createLoopStateController(options: {
 			return state
 		},
 
+		resumeLoop(sessionID: string): RalphLoopState | null {
+			const state = readState(directory, stateDir)
+			if (!state || !state.active) {
+				return null
+			}
+
+			state.session_id = sessionID
+			state.started_at = new Date().toISOString()
+			state.message_count_at_start = undefined
+			if (!writeState(directory, state, stateDir)) {
+				return null
+			}
+
+			return state
+		},
+
 		setMessageCountAtStart(
 			sessionID: string,
 			messageCountAtStart: number,

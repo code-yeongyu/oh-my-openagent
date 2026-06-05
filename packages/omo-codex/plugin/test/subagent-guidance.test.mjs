@@ -105,3 +105,16 @@ test("#given ultrawork agents #when inspected #then inter-agent commentary is tr
 	// then
 	assert.deepEqual(missing, []);
 });
+
+test("#given reviewer receives a targeted still-active followup #when prompt is inspected #then it must fail loud", async () => {
+	// given
+	const reviewerPath = "components/ultrawork/agents/codex-ultrawork-reviewer.toml";
+
+	// when
+	const text = await readFile(join(root, reviewerPath), "utf8");
+
+	// then
+	assert.match(text, /TASK STILL ACTIVE:/);
+	assert.match(text, /BLOCKED: <reason>/);
+	assert.match(text, /instead of continuing silently/);
+});
