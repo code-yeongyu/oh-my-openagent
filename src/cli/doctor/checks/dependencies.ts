@@ -16,8 +16,8 @@ async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
     if (path) {
       return { exists: true, path }
     }
-  } catch {
-    // intentionally empty - binary not found
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
   }
   return { exists: false, path: null }
 }
@@ -27,7 +27,8 @@ async function getBinaryVersion(binary: string): Promise<string | null> {
     const result = await spawnWithTimeout([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
     if (result.timedOut || result.exitCode !== 0) return null
     return result.stdout.trim().split("\n")[0] ?? null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
@@ -70,7 +71,8 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
       version: null,
       path: null,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     // Fallback: check common installation paths
     const { existsSync } = await import("fs")
     const { join } = await import("path")
@@ -118,8 +120,8 @@ export function findCommentCheckerPackageBinary(baseDirOverride?: string): strin
     if (existsSync(vendorPath)) return vendorPath
     const binPath = join(packageDir, "bin", binaryName)
     if (existsSync(binPath)) return binPath
-  } catch {
-    // intentionally empty - package not installed
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
   }
   return null
 }
