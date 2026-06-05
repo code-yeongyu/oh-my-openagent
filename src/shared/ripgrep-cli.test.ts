@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -26,6 +26,7 @@ describe("resolveGrepCli OpenCode cache fallback (#3805)", () => {
     else process.env.XDG_CACHE_HOME = originalCache
     if (originalData === undefined) delete process.env.XDG_DATA_HOME
     else process.env.XDG_DATA_HOME = originalData
+    mock.restore()
     try {
       rmSync(tempCache, { recursive: true, force: true })
       rmSync(tempData, { recursive: true, force: true })
@@ -52,5 +53,32 @@ describe("resolveGrepCli OpenCode cache fallback (#3805)", () => {
     const resolved = resolveGrepCli()
     expect(resolved.backend).toBe("rg")
     expect(resolved.path).toBe(cacheRg)
+  })
+
+  it("strips Windows CRLF from where.exe output before spawning ripgrep (#4512)", async () => {
+    const rawRgPath = "C:\\Users\\tester\\.local\\bin\\rg.exe"
+
+    mock.module("node:child_process", () => ({
+      spawnSync: () => ({
+        status: 0,
+        stdout: `${rawRgPath}\r\nC:\\Windows\\System32\\rg.exe\r\n`,
+      }),
+    }))
+    mock.module("node:fs", () => ({
+      existsSync: () => false,
+    }))
+    mock.module("../tools/grep/downloader", () => ({
+      downloadAndInstallRipgrep: async () => rawRgPath,
+      getInstalledRipgrepPath: () => null,
+    }))
+
+    delete require.cache[require.resolve("./ripgrep-cli")]
+    const { resolveGrepCli } = await import("./ripgrep-cli")
+
+    const resolved = resolveGrepCli()
+
+    expect(resolved.backend).toBe("rg")
+    expect(resolved.path).toBe(rawRgPath)
+    expect(resolved.path.endsWith("\r")).toBe(false)
   })
 })
