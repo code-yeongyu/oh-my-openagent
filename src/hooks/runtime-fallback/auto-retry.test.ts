@@ -101,7 +101,7 @@ describe("createAutoRetryHelpers", () => {
   })
   test("#given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085)", async () => {
     // given - capture the actual parts forwarded to client.session.promptAsync
-    const promptCalls = { count: 0, lastBody: undefined as unknown }
+    const promptCalls: { count: number; lastBody: unknown } = { count: 0, lastBody: undefined }
     const deps = createDeps(promptCalls)
     // Post-compact case: messages() returns no user role entries, so
     // getLastUserRetryPayload falls through to the synthetic "continue".
@@ -165,5 +165,41 @@ describe("createAutoRetryHelpers", () => {
     expect(promptCalls.count).toBe(1)
     expect(capturedBody?.messageID).toBe("msg_original_user")
     expect(capturedBody?.parts).toEqual([{ type: "text", text: "retry this", id: "prt_original" }])
+  })
+
+  test("#given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-internal-abort-refresh"
+    const staleLastAccess = Date.now() - 31 * 60 * 1000
+    deps.sessionLastAccess.set(sessionID, staleLastAccess)
+
+    // when
+    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+    expect(deps.sessionLastAccess.get(sessionID)).toBeGreaterThan(staleLastAccess)
+  })
+
+  test("#given stale internal abort marker #when stale session cleanup runs #then the marker is cleared", () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-stale-internal-abort"
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    deps.internallyAbortedSessions.add(sessionID)
+
+    // when
+    helpers.cleanupStaleSessions()
+
+    // then
+    expect(deps.sessionStates.has(sessionID)).toBe(false)
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
   })
 })
