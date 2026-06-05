@@ -41,7 +41,7 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG, previousState } = {}) {
 	const before = await readConfig(configPath);
 	const decision = shouldApplyCatalog(before, catalog, previousState);
-	if (!decision.apply) return { changed: false, written: readRootSettings(before), managed: false };
+	if (!decision.apply) return { changed: false, written: readRootSettings(before), managed: decision.managed };
 	const after = ensureCodexReasoningConfig(before, catalog.current);
 	if (after === before) return { changed: false, written: catalog.current, managed: true };
 	await mkdir(dirname(configPath), { recursive: true });
@@ -52,14 +52,14 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 function shouldApplyCatalog(config, catalog, previousState) {
 	const current = readRootSettings(config);
 	if (Object.keys(current).length === 0) return { apply: true, reason: "empty" };
-	if (matchesProfile(current, catalog.current)) return { apply: false, reason: "current" };
+	if (matchesProfile(current, catalog.current)) return { apply: false, reason: "current", managed: true };
 	if (previousState?.managed === true && matchesProfile(current, previousState.written)) {
 		return { apply: true, reason: "managed-state" };
 	}
 	for (const profile of catalog.managedProfiles) {
 		if (matchesProfile(current, profile.match)) return { apply: true, reason: profile.version };
 	}
-	return { apply: false, reason: "user-modified" };
+	return { apply: false, reason: "user-modified", managed: false };
 }
 
 function matchesProfile(current, profile) {

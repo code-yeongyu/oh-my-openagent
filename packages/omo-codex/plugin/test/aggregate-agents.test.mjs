@@ -41,14 +41,15 @@ test("#given planner agent prompt #when inspected #then generated artifacts stay
 	assert.doesNotMatch(prompt, /(?<!\.omo\/)evidence\/task-/);
 });
 
-test("#given reviewer agent prompt #when inspected #then default model is ChatGPT-account compatible", async () => {
+test("#given reviewer agent prompt #when inspected #then default model uses bounded reasoning", async () => {
 	const prompt = await readFile(
 		join(root, "components", "ultrawork", "agents", "codex-ultrawork-reviewer.toml"),
 		"utf8",
 	);
 
 	assert.match(prompt, /^model\s*=\s*"gpt-5\.5"$/m);
-	assert.match(prompt, /^model_reasoning_effort\s*=\s*"xhigh"$/m);
+	assert.match(prompt, /^model_reasoning_effort\s*=\s*"high"$/m);
+	assert.doesNotMatch(prompt, /^model_reasoning_effort\s*=\s*"xhigh"$/m);
 	assert.doesNotMatch(prompt, /^model\s*=\s*"gpt-5\.2"$/m);
 	assert.match(prompt, /ChatGPT account/);
 });

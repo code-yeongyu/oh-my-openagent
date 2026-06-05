@@ -15,7 +15,7 @@ test("#given bundled model catalog #when inspected #then default verifier and wo
 	assert.deepEqual(catalog.roles.default, catalog.current);
 	assert.deepEqual(catalog.roles.verifier, {
 		model: "gpt-5.5",
-		model_reasoning_effort: "xhigh",
+		model_reasoning_effort: "high",
 	});
 	assert.deepEqual(catalog.roles.worker, {
 		model: "gpt-5.5",
