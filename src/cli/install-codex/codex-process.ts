@@ -1,9 +1,32 @@
 import { spawn } from "../../shared/bun-spawn-shim"
 import type { RunCommand } from "./types"
 
+const WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"])
+
+export type RunCommandInvocation = {
+  readonly command: string
+  readonly args: readonly string[]
+}
+
+export function resolveRunCommandInvocation(
+  command: string,
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): RunCommandInvocation {
+  if (platform !== "win32" || !WINDOWS_CMD_SHIM_COMMANDS.has(command.toLowerCase())) {
+    return { command, args: [...args] }
+  }
+
+  return {
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", `${command}.cmd`, ...args],
+  }
+}
+
 export const defaultRunCommand: RunCommand = async (command, args, options) => {
+  const invocation = resolveRunCommandInvocation(command, args)
   const proc = spawn({
-    cmd: [command, ...args],
+    cmd: [invocation.command, ...invocation.args],
     cwd: options.cwd,
     stdin: "ignore",
     stdout: "inherit",
