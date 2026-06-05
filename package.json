@@ -12,6 +12,7 @@
     "packages/git-bash-mcp",
     "packages/utils",
     "packages/model-core",
+    "packages/model-presets",
     "packages/prompts-core",
     "packages/comment-checker-core",
     "packages/hashline-core",
