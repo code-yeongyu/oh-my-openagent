@@ -216,7 +216,18 @@ describe("archive extraction preflight", () => {
 		mkdirSync(zipDestDir, { recursive: true })
 		writeFileSync(join(sourceDir, "bin", "tool.txt"), "safe")
 		symlinkSync("tool.txt", join(sourceDir, "bin", "tool-link"))
-		runCommand(`tar -czf "${tarArchivePath}" -C "${sourceDir}" .`)
+		const scriptPath = writePythonScript(
+			rootDir,
+			"make-safe-tar.py",
+			[
+				"import sys",
+				"import tarfile",
+				"archive_path, source_dir = sys.argv[1], sys.argv[2]",
+				"with tarfile.open(archive_path, 'w:gz') as archive:",
+				"    archive.add(source_dir, arcname='.')",
+			].join("\n")
+		)
+		runCommand(`python3 "${scriptPath}" "${tarArchivePath}" "${sourceDir}"`)
 		runCommand(`zip -qry "${zipArchivePath}" .`, sourceDir)
 
 		//#when
