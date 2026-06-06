@@ -94,12 +94,21 @@ export function createWebFetchRedirectGuardHook(_ctx: PluginInput) {
           storedAt: Date.now(),
         })
       } catch (error) {
-        log("[webfetch-redirect-guard] Failed to pre-resolve redirects", {
-          sessionID: input.sessionID,
-          callID: input.callID,
-          url,
-          error,
-        })
+        if (error instanceof Error) {
+          log("[webfetch-redirect-guard] Failed to pre-resolve redirects", {
+            sessionID: input.sessionID,
+            callID: input.callID,
+            url,
+            error,
+          })
+        } else {
+          log("[webfetch-redirect-guard] Failed to pre-resolve redirects", {
+            sessionID: input.sessionID,
+            callID: input.callID,
+            url,
+            error,
+          })
+        }
       }
     },
 
