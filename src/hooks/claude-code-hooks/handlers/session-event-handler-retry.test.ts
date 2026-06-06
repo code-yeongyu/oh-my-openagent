@@ -64,6 +64,44 @@ describe("createSessionEventHandler retry behavior", () => {
       {},
     )
   })
+
+  test("#given parent lookup throws a non-Error value #when the next idle succeeds #then stop hooks receive the later parent session id", async () => {
+    //#given
+    let getCallCount = 0
+    const thrownValue = "temporary failure"
+    const handler = createSessionEventHandler(
+      {
+        directory: "/repo",
+        client: {
+          session: {
+            get: async () => {
+              getCallCount += 1
+              if (getCallCount === 1) {
+                throw thrownValue
+              }
+              return { data: { parentID: "ses_parent" } }
+            },
+            prompt: async () => undefined,
+          },
+        },
+      } as never,
+      {},
+    )
+
+    //#when
+    await handler({ event: { type: "session.idle", properties: { sessionID: "ses_retry_non_error" } } })
+    await handler({ event: { type: "session.idle", properties: { sessionID: "ses_retry_non_error" } } })
+
+    //#then
+    expect(getCallCount).toBe(2)
+    expect(executeStopHooks).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        parentSessionId: "ses_parent",
+      }),
+      null,
+      {},
+    )
+  })
 })
 
 export {}

@@ -19,7 +19,12 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 			let parsed: unknown
 			try {
 				parsed = JSON.parse(output.args.todos)
-			} catch {
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				log("todowrite todos JSON parse failed", {
+					sessionID: input.sessionID,
+					error: errorMessage,
+				})
 				throw new Error(
 					`[todowrite ERROR] Failed to parse todos string as JSON. ` +
 						`Received: ${
@@ -82,7 +87,13 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 						duration: 4000,
 					},
 				})
-				.catch(() => {})
+				.catch((error: unknown) => {
+					if (error instanceof Error) {
+						log("PreToolUse hook toast failed", { sessionID: input.sessionID, error: error.message })
+					} else {
+						log("PreToolUse hook toast failed", { sessionID: input.sessionID, error: String(error) })
+					}
+				})
 			throw new Error(result.reason ?? "Hook blocked the operation")
 		}
 

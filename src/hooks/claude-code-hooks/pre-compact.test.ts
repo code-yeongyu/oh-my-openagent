@@ -42,4 +42,30 @@ describe("executePreCompactHooks", () => {
     // then
     expect(result.context).toEqual(["first context\n  detail\nsecond context"])
   })
+
+  it("#given hook JSON parsing throws a non-Error value #when PreCompact runs #then raw stdout is preserved as context", async () => {
+    // given
+    spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
+      exitCode: 0,
+      stdout: "raw hook context",
+      stderr: "",
+    })
+    const thrownValue = "parse failed"
+    const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
+      throw thrownValue
+    })
+    const config = createConfig([
+      { matcher: "*", hooks: [{ type: "command", command: "pre-compact-hook" }] },
+    ])
+
+    try {
+      // when
+      const result = await executePreCompactHooks(createContext(), config)
+
+      // then
+      expect(result.context).toEqual(["raw hook context"])
+    } finally {
+      parseSpy.mockRestore()
+    }
+  })
 })

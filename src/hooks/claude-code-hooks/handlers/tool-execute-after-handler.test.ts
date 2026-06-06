@@ -177,4 +177,38 @@ describe("createToolExecuteAfterHandler", () => {
     )
     expect(output.output).not.toContain("\r")
   })
+
+  it("#given warning toast rejects with a non-Error value #when PostToolUse blocks #then output still receives hook sections", async () => {
+    // given
+    const thrownValue = "toast failed"
+    postToolUseResult = {
+      block: true,
+      reason: "warn",
+      warnings: ["warning from hook"],
+    }
+    const handler = createToolExecuteAfterHandler(
+      {
+        client: {
+          tui: {
+            showToast: async () => {
+              throw thrownValue
+            },
+          },
+        },
+        directory: "/repo",
+      } as never,
+      { disabledHooks: [] }
+    )
+    const output = {
+      title: "tool",
+      output: "",
+      metadata: {},
+    }
+
+    // when
+    await handler({ tool: "write", sessionID: "ses_test", callID: "call_test" }, output)
+
+    // then
+    expect(output.output).toBe("warning from hook")
+  })
 })
