@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import * as fs from "node:fs"
+import { fileURLToPath } from "node:url"
 
 type LoadOpencodePluginsModule = {
   loadOpencodePlugins: (directory: string) => string[]
@@ -13,19 +14,18 @@ type ReadFileEncoding = Parameters<typeof fs.readFileSync>[1]
 const defaultPluginConfig: string = `{
   "plugin": ["plugin-a", "plugin-b"]
 }`
-const existsSyncMock = mock((filePath: string) => (
+const existsSyncMock = mock((filePath: string): boolean => (
   filePath === "/some/fake/dir/.opencode/opencode.json"
-  || fs.existsSync(filePath)
 ))
 const readFileSyncMock = mock((filePath: string, encoding?: ReadFileEncoding) => {
   if (filePath === "/some/fake/dir/.opencode/opencode.json") {
     return defaultPluginConfig
   }
-  return encoding === undefined ? fs.readFileSync(filePath) : fs.readFileSync(filePath, encoding)
+  throw new Error(`Unexpected readFileSync path: ${String(filePath)} with encoding ${String(encoding)}`)
 })
 
 async function importFreshLoadOpencodePluginsModule(): Promise<LoadOpencodePluginsModule> {
-  const modulePath = `${new URL("./load-opencode-plugins.ts", import.meta.url).pathname}?test=${Date.now()}-${Math.random()}`
+  const modulePath = `${fileURLToPath(new URL("./load-opencode-plugins.ts", import.meta.url))}?test=${Date.now()}-${Math.random()}`
   return import(modulePath)
 }
 
@@ -37,16 +37,15 @@ describe("loadOpencodePlugins", () => {
     delete process.env.OPENCODE_CONFIG_DIR
 
     existsSyncMock.mockReset()
-    existsSyncMock.mockImplementation((filePath: string) => (
+    existsSyncMock.mockImplementation((filePath: string): boolean => (
       filePath === "/some/fake/dir/.opencode/opencode.json"
-      || fs.existsSync(filePath)
     ))
     readFileSyncMock.mockReset()
     readFileSyncMock.mockImplementation((filePath: string, encoding?: ReadFileEncoding) => {
       if (filePath === "/some/fake/dir/.opencode/opencode.json") {
         return defaultPluginConfig
       }
-      return encoding === undefined ? fs.readFileSync(filePath) : fs.readFileSync(filePath, encoding)
+      throw new Error(`Unexpected readFileSync path: ${String(filePath)} with encoding ${String(encoding)}`)
     })
 
     mock.module("node:fs", () => ({
@@ -119,7 +118,7 @@ describe("loadOpencodePlugins", () => {
       it("#then includes plugin entries from the profile config directory", async () => {
         // given
         process.env.OPENCODE_CONFIG_DIR = "/tmp/opencode-profile"
-        existsSyncMock.mockImplementation((filePath: string) => (
+        existsSyncMock.mockImplementation((filePath: string): boolean => (
           filePath === "/project/.opencode/opencode.json"
           || filePath === "/tmp/opencode-profile/opencode.json"
         ))
