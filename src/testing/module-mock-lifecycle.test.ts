@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, mock, test } from "bun:test"
-import { installModuleMockLifecycle, normalizeStackPath } from "./module-mock-lifecycle"
+import { getCallerUrlFromStack, installModuleMockLifecycle, normalizeStackPath } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
   test("#given a Windows stack path #when normalizing caller path #then it becomes a file URL rooted at the drive", () => {
@@ -10,6 +10,22 @@ describe("installModuleMockLifecycle", () => {
 
     // when
     const callerUrl = normalizeStackPath(stackPath)
+
+    // then
+    expect(callerUrl).toBe("file:///D:/a/oh-my-openagent/oh-my-openagent/src/hooks/example.test.ts")
+  })
+
+  test("#given Windows internal stack frames #when selecting caller url #then test setup and lifecycle frames are ignored", () => {
+    // given
+    const stack = [
+      "Error",
+      String.raw`    at mock.restore (D:\a\oh-my-openagent\oh-my-openagent\src\testing\module-mock-lifecycle.ts:287:23)`,
+      String.raw`    at afterEach (D:\a\oh-my-openagent\oh-my-openagent\test-setup.ts:72:10)`,
+      String.raw`    at module code (D:\a\oh-my-openagent\oh-my-openagent\src\hooks\example.test.ts:12:3)`,
+    ].join("\n")
+
+    // when
+    const callerUrl = getCallerUrlFromStack(stack, "file:///fallback.ts")
 
     // then
     expect(callerUrl).toBe("file:///D:/a/oh-my-openagent/oh-my-openagent/src/hooks/example.test.ts")

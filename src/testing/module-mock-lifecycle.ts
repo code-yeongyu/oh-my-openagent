@@ -72,8 +72,12 @@ export function normalizeStackPath(rawPath: string): string {
   return pathToFileURL(rawPath).href
 }
 
-function defaultGetCallerUrl(): string {
-  const stack = new Error().stack ?? ""
+function isInternalStackPath(candidatePath: string): boolean {
+  const normalizedPath = candidatePath.replace(/\\/g, "/")
+  return normalizedPath.includes("/test-setup.ts") || normalizedPath.includes("/src/testing/module-mock-lifecycle.ts")
+}
+
+export function getCallerUrlFromStack(stack: string, fallbackUrl: string): string {
   const lines = stack.split("\n")
 
   for (const line of lines) {
@@ -83,17 +87,18 @@ function defaultGetCallerUrl(): string {
       continue
     }
 
-    if (
-      candidatePath.includes("/test-setup.ts") ||
-      candidatePath.includes("/src/testing/module-mock-lifecycle.ts")
-    ) {
+    if (isInternalStackPath(candidatePath)) {
       continue
     }
 
     return normalizeStackPath(candidatePath)
   }
 
-  return import.meta.url
+  return fallbackUrl
+}
+
+function defaultGetCallerUrl(): string {
+  return getCallerUrlFromStack(new Error().stack ?? "", import.meta.url)
 }
 
 function defaultResolveSpecifier(specifier: string, callerUrl: string): string {
