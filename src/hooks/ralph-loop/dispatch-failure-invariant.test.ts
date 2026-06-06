@@ -17,6 +17,14 @@ describe("ralph-loop dispatch failure invariants", () => {
 	let messagesCalls: Array<{ sessionID: string }>
 	let createSessionCalls: Array<{ parentID: string }>
 
+	function requireState(state: RalphLoopState | null): RalphLoopState {
+		expect(state).not.toBeNull()
+		if (state === null) {
+			throw new Error("Expected ralph loop state")
+		}
+		return state
+	}
+
 	beforeEach(() => {
 		promptCalls = []
 		toastCalls = []
@@ -220,7 +228,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
 		writeState(testDirectory, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			iteration: 2,
 			verification_pending: true,
 			verification_session_id: "ses-oracle",
@@ -228,7 +236,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 			initial_completion_promise: "DONE",
 		})
 		writeState(testDirectory, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -292,7 +300,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
 		writeState(testDirectory, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			iteration: 2,
 			verification_pending: true,
 			verification_session_id: "ses-oracle",
@@ -411,7 +419,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 			event: { type: "session.idle", properties: { sessionID: "session-A" } },
 		})
 		await new Promise((resolve) => setTimeout(resolve, 10))
-		writeState(testDirectory, { ...hook.getState()!, session_id: "session-B" })
+		writeState(testDirectory, { ...requireState(hook.getState()), session_id: "session-B" })
 		await eventPromise
 
 		// then
