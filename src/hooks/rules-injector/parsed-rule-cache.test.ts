@@ -37,4 +37,41 @@ describe("parsed rule cache", () => {
 		expect(readCounts.get("/rules/0.md")).toBe(1);
 		expect(readCounts.get("/rules/100.md")).toBe(2);
 	});
+
+	it("#given stat throws an error #when reading a rule #then falls back to uncached content", () => {
+		// given
+		const readRule = createParsedRuleReader({
+			readFileSync: () => "---\ndescription: fallback\n---\nbody\n",
+			statSync: () => {
+				throw new Error("stat unavailable");
+			},
+		});
+
+		// when
+		const result = readRule("/rules/fallback.md", "/rules/fallback.md");
+
+		// then
+		expect(result.statFingerprint).toBeNull();
+		expect(result.metadata.description).toBe("fallback");
+		expect(result.body).toBe("body\n");
+	});
+
+	it("#given stat throws a non-error value #when reading a rule #then rethrows it", () => {
+		// given
+		const thrown = "stat unavailable";
+		const readRule = createParsedRuleReader({
+			readFileSync: () => "---\ndescription: fallback\n---\nbody\n",
+			statSync: () => {
+				throw thrown;
+			},
+		});
+
+		// when
+		const read = (): void => {
+			readRule("/rules/fallback.md", "/rules/fallback.md");
+		};
+
+		// then
+		expect(read).toThrow(thrown);
+	});
 });

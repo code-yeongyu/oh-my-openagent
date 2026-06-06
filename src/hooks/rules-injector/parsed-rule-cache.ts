@@ -62,7 +62,10 @@ export function createParsedRuleReader(options?: {
 				body,
 			});
 			return { metadata, body, statFingerprint };
-		} catch {
+		} catch (error) {
+			if (!(error instanceof Error)) {
+				throw error;
+			}
 			const rawContent = readRuleFileSync(filePath, "utf-8");
 			const { metadata, body } = parseRuleFrontmatter(rawContent);
 			return { metadata, body, statFingerprint: null };
