@@ -425,7 +425,7 @@ describe("thinking-prepend", () => {
     )
     const sessionID = "ses_thinking_prepend_async"
     const targetMessageID = "msg_target_async"
-    const patchPartMock = mock(async () => true)
+    const patchPartMock = mock(async (..._args: readonly unknown[]) => true)
     const originalPart = {
       id: "prt_prev_async",
       type: "thinking",
