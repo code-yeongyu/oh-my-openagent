@@ -234,6 +234,88 @@ describe("session-recovery hook persistent dedupe", () => {
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.parts[0]?.toolUseId).toBe("toolu_array_response")
   })
+
+  test("#given fallback message lookup fails #when recovering without an assistant message id #then recovery returns false", async () => {
+    // given
+    let messagesCalls = 0
+    const ctx = {
+      client: {
+        session: {
+          abort: async () => ({}),
+          messages: async () => {
+            messagesCalls += 1
+            throw new Error("messages unavailable")
+          },
+          promptAsync: async () => ({}),
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/session-recovery-message-fallback-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+
+    // when
+    const result = await hook.handleSessionRecovery({
+      role: "assistant",
+      sessionID: "ses_recovery_message_fallback",
+      error: { message: "messages.3 has tool_use without a matching tool_result" },
+    })
+
+    // then
+    expect(result).toBe(false)
+    expect(messagesCalls).toBe(1)
+  })
+
+  test("#given abort and toast fail #when handling unsupported prefill recovery #then recovery still completes", async () => {
+    // given
+    const calls = { abort: 0, messages: 0, toast: 0, complete: 0 }
+    const info = createPrefillErrorInfo()
+    const ctx = {
+      client: {
+        session: {
+          abort: async () => {
+            calls.abort += 1
+            throw new Error("abort unavailable")
+          },
+          messages: async () => {
+            calls.messages += 1
+            return {
+              data: [
+                {
+                  info: {
+                    id: info.id,
+                    role: "assistant",
+                    error: info.error,
+                  },
+                },
+              ],
+            }
+          },
+          promptAsync: async () => ({}),
+        },
+        tui: {
+          showToast: async () => {
+            calls.toast += 1
+            throw new Error("toast unavailable")
+          },
+        },
+      },
+      directory: "/tmp/session-recovery-swallow-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+    hook.setOnRecoveryCompleteCallback(() => {
+      calls.complete += 1
+    })
+
+    // when
+    const result = await hook.handleSessionRecovery(info)
+
+    // then
+    expect(result).toBe(false)
+    expect(calls).toEqual({ abort: 1, messages: 1, toast: 1, complete: 1 })
+  })
 })
 
 describe("session-recovery hook interrupted idle recovery", () => {
