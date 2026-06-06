@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { RULES_INJECTOR_STORAGE } from "./constants";
 import {
@@ -53,5 +53,19 @@ describe("storage", () => {
     expect([...firstLoaded.realPaths]).toEqual(["/tmp/first-rule.md"]);
     expect([...secondLoaded.contentHashes]).toEqual(["hash:second"]);
     expect([...secondLoaded.realPaths]).toEqual(["/tmp/second-rule.md"]);
+  });
+
+  it("#given malformed persisted data #when loading injected rules #then returns empty sets", () => {
+    // given
+    const sessionID = createSessionID("storage-malformed");
+    mkdirSync(RULES_INJECTOR_STORAGE, { recursive: true });
+    writeFileSync(getStoragePath(sessionID), "{");
+
+    // when
+    const loaded = loadInjectedRules(sessionID);
+
+    // then
+    expect([...loaded.contentHashes]).toEqual([]);
+    expect([...loaded.realPaths]).toEqual([]);
   });
 });
