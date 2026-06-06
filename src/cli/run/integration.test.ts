@@ -53,6 +53,15 @@ function createMockWriteStream(): MockWriteStream {
   }
 }
 
+function requireWrite(stream: MockWriteStream, index: number): string {
+  const value = stream.writes[index]
+  expect(value).toBeDefined()
+  if (value === undefined) {
+    throw new Error(`Expected write at index ${index}`)
+  }
+  return value
+}
+
 const createMockClient = (
   getResult?: { error?: unknown; data?: { id: string } }
 ): OpencodeClient => (unsafeTestValue<OpencodeClient>({
@@ -86,7 +95,7 @@ describe("integration: --json mode", () => {
 
     // then
     expect(mockStdout.writes).toHaveLength(1)
-    const emitted = mockStdout.writes[0]!
+    const emitted = requireWrite(mockStdout, 0)
     expect(() => JSON.parse(emitted)).not.toThrow()
     const parsed = JSON.parse(emitted) as RunResult
     expect(parsed.sessionId).toBe("test-session")
@@ -289,7 +298,7 @@ describe("integration: option combinations", () => {
 
     // then - json emits result AND on-complete hook runs
     expect(mockStdout.writes).toHaveLength(1)
-    const emitted = mockStdout.writes[0]!
+    const emitted = requireWrite(mockStdout, 0)
     expect(() => JSON.parse(emitted)).not.toThrow()
     expect(spawnSpy).toHaveBeenCalledTimes(1)
     const [args] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
