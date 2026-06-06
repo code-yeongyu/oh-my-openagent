@@ -22,7 +22,7 @@ interface OpencodeConfig {
 
 export interface FormatterClient {
   config: {
-    get: (options?: { query?: { directory?: string } }) => Promise<{ data?: OpencodeConfig }>
+    get: (options?: { query?: { directory?: string } }) => Promise<OpencodeConfig | { data: OpencodeConfig | undefined }>
   }
 }
 
@@ -33,6 +33,11 @@ const cachedFormattersByDirectory = new Map<string, FormatterMap>()
 
 function getFormatterCacheKey(directory: string): string {
   return path.resolve(directory)
+}
+
+function unwrapConfigResponse(response: OpencodeConfig | { data: OpencodeConfig | undefined }): OpencodeConfig | undefined {
+  if ("data" in response) return response.data
+  return response
 }
 
 export async function resolveFormatters(
@@ -47,7 +52,7 @@ export async function resolveFormatters(
 
   try {
     const response = await client.config.get({ query: { directory } })
-    const config = response.data
+    const config = unwrapConfigResponse(response)
     if (!config) return result
 
     if (config.formatter && typeof config.formatter === "object") {
