@@ -111,7 +111,10 @@ describe("ParentWakeNotifier late error recovery", () => {
       const requeued = await notifier.requeueDispatchedParentWake(sessionID, "late session.error")
 
       // then
-      expect(requeued).toBe(true)
+      // The recovery window now proactively requeues an accepted-but-unprocessed wake,
+      // so by the time a late session.error arrives the wake is already pending and this
+      // call is a no-op. The wake is NOT lost — it is requeued and redispatched (asserted below).
+      expect(requeued).toBe(false)
       expect(notifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([FINAL_WAKE])
       expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
       releaseParentWakeHold(sessionID)

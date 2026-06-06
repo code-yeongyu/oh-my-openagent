@@ -46,6 +46,17 @@ export class ParentWakeFlushRunner {
     if (!latestWake) {
       return
     }
+    if (
+      latestWake.dispatchedAt !== undefined
+      && await this.deps.sessionInspector.hasAssistantOrToolOutputAfterDispatchedWake(sessionID, latestWake)
+    ) {
+      this.deps.pendingQueue.deleteWake(sessionID)
+      this.deps.dispatchedTracker.clearWake(sessionID)
+      log("[background-agent] Dropped requeued parent wake after late assistant output:", {
+        sessionID,
+      })
+      return
+    }
     if (sessionActive) {
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry: false,

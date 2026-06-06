@@ -37,6 +37,9 @@ export class ParentWakeNotifier {
           wake,
           dispatchedTracker: this.dispatchedTracker,
           sessionInspector: this.sessionInspector,
+          requeueWake: (id, w) => this.requeueWake(id, w),
+          scheduleFlush: (id, delayMs) => this.schedulePendingParentWakeFlush(id, delayMs),
+          redispatchDelayMs: 16_000,
         }).catch((error: unknown) => {
           logParentWakeWindowRecoveryError(
             sessionID,
