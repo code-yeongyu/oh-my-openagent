@@ -6,7 +6,7 @@ import {
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { getAgentConfigKey, normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
 const TOAST_TITLE = "NEVER Use Hephaestus with Non-GPT"
 const TOAST_MESSAGE = [
@@ -56,11 +56,20 @@ export function createNoHephaestusNonGptHook(
         if (allowNonGptModel) {
           return
         }
-        input.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
+        // Prefer the live registered name; fall back to the static display name.
+        // resolveRegisteredAgentName returns the bare config key when the registry
+        // has not resolved it yet, which would later fail with "Agent not found"
+        // once stored on the session (#4140).
+        const registeredSisyphus = resolveRegisteredAgentName("sisyphus")
+        const sisyphusAgent = registeredSisyphus !== undefined
+          && registeredSisyphus !== getAgentConfigKey("sisyphus")
+          ? registeredSisyphus
+          : normalizeAgentForPrompt("sisyphus") ?? "sisyphus"
+        input.agent = sisyphusAgent
         if (output?.message) {
-          output.message.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
+          output.message.agent = sisyphusAgent
         }
-        updateSessionAgent(input.sessionID, "sisyphus")
+        updateSessionAgent(input.sessionID, sisyphusAgent)
       }
     },
   }
