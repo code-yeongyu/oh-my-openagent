@@ -9,7 +9,7 @@ import {
 import { getToolInput } from "../tool-input-cache"
 import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
-import { isHookDisabled } from "../../../shared"
+import { isHookDisabled, log } from "../../../shared"
 import { normalizeHookText, normalizeHookTextList } from "../hook-text"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -143,7 +143,19 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 						duration: 4000,
 					},
 				})
-				.catch(() => {})
+				.catch((error: unknown) => {
+					if (error instanceof Error) {
+						log("PostToolUse hook warning toast failed", {
+							sessionID: input.sessionID,
+							error: error.message,
+						})
+					} else {
+						log("PostToolUse hook warning toast failed", {
+							sessionID: input.sessionID,
+							error: String(error),
+						})
+					}
+				})
 		}
 
 		output.output = appendHookSections(output.output, [
@@ -164,7 +176,19 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 						duration: 2000,
 					},
 				})
-				.catch(() => {})
+				.catch((error: unknown) => {
+					if (error instanceof Error) {
+						log("PostToolUse hook success toast failed", {
+							sessionID: input.sessionID,
+							error: error.message,
+						})
+					} else {
+						log("PostToolUse hook success toast failed", {
+							sessionID: input.sessionID,
+							error: String(error),
+						})
+					}
+				})
 		}
 	}
 }

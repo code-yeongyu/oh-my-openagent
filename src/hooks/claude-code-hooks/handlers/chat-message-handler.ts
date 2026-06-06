@@ -69,8 +69,12 @@ export function createChatMessageHandler(
 				path: { id: input.sessionID },
 			})
 			parentSessionId = sessionInfo.data?.parentID
-		} catch {
-			parentSessionId = undefined
+		} catch (error) {
+			if (error instanceof Error) {
+				parentSessionId = undefined
+			} else {
+				parentSessionId = undefined
+			}
 		}
 
 		const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)

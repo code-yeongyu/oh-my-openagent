@@ -76,8 +76,12 @@ export function createSessionEventHandler(
 				})
 				parentSessionId = sessionInfo.data?.parentID
 				parentSessionIdCache.set(sessionID, parentSessionId)
-			} catch {
-				parentSessionId = undefined
+			} catch (error) {
+				if (error instanceof Error) {
+					parentSessionId = undefined
+				} else {
+					parentSessionId = undefined
+				}
 			}
 		}
 
