@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "fs"
-import { isAbsolute, resolve } from "path"
+import { isAbsolute, posix, resolve, win32 } from "path"
 import { isWithinProject } from "./contains-path"
 import { log } from "./logger"
 
@@ -11,6 +11,30 @@ interface FileMatch {
 }
 
 const FILE_REFERENCE_PATTERN = /@([^\s@]+)/g
+
+function isPosixAbsolutePath(filePath: string): boolean {
+  return filePath.startsWith("/")
+}
+
+function isWindowsAbsolutePath(filePath: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith("\\\\")
+}
+
+function resolvePathForInput(filePath: string, cwd: string): string {
+  if (isWindowsAbsolutePath(filePath)) {
+    return win32.resolve(filePath)
+  }
+
+  if (isPosixAbsolutePath(filePath) || isPosixAbsolutePath(cwd)) {
+    return posix.resolve(cwd, filePath)
+  }
+
+  if (isWindowsAbsolutePath(cwd)) {
+    return win32.resolve(cwd, filePath)
+  }
+
+  return resolve(cwd, filePath)
+}
 
 function findFileReferences(text: string): FileMatch[] {
   const matches: FileMatch[] = []
@@ -39,11 +63,11 @@ export function resolveFilePath(filePath: string, cwd: string): string {
     return process.env[variableName] ?? match
   })
 
-  if (isAbsolute(expanded)) {
-    return resolve(expanded)
+  if (isAbsolute(expanded) || isPosixAbsolutePath(expanded) || isWindowsAbsolutePath(expanded)) {
+    return resolvePathForInput(expanded, cwd)
   }
 
-  return resolve(cwd, expanded)
+  return resolvePathForInput(expanded, cwd)
 }
 
 function readFileContent(resolvedPath: string): string {

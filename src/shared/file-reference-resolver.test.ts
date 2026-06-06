@@ -1,7 +1,9 @@
+/// <reference types="bun-types" />
+
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { homedir, tmpdir } from "node:os"
+import { join, resolve, win32 } from "node:path"
 import { resolveFilePath, resolveFileReferencesInText } from "./file-reference-resolver"
 
 describe("resolveFilePath", () => {
@@ -9,10 +11,7 @@ describe("resolveFilePath", () => {
 
   test("expands bare environment variables before resolving absolute paths", () => {
     //#given
-    const homeDir = process.env.HOME
-    if (!homeDir) {
-      throw new Error("HOME must be set for file reference resolver tests")
-    }
+    const homeDir = process.env.HOME ?? homedir()
 
     //#when
     const resolved = resolveFilePath("$HOME/foo.md", cwd)
@@ -23,10 +22,7 @@ describe("resolveFilePath", () => {
 
   test("expands braced environment variables before resolving absolute paths", () => {
     //#given
-    const homeDir = process.env.HOME
-    if (!homeDir) {
-      throw new Error("HOME must be set for file reference resolver tests")
-    }
+    const homeDir = process.env.HOME ?? homedir()
 
     //#when
     const resolved = resolveFilePath("${HOME}/foo.md", cwd)
@@ -44,6 +40,17 @@ describe("resolveFilePath", () => {
 
     //#then
     expect(resolved).toBe(resolve(absolutePath))
+  })
+
+  test("keeps Windows absolute paths absolute when cwd is POSIX-shaped", () => {
+    //#given
+    const absolutePath = "C:\\Users\\alice\\note.md"
+
+    //#when
+    const resolved = resolveFilePath(absolutePath, cwd)
+
+    //#then
+    expect(resolved).toBe(win32.resolve(absolutePath))
   })
 
   test("resolves relative paths from cwd", () => {
