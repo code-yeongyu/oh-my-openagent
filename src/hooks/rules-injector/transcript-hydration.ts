@@ -1,5 +1,3 @@
-import type { PluginInput } from "@opencode-ai/plugin";
-
 /**
  * Pattern that matches the injector's own rule banner emitted into tool
  * outputs. The capture group is the rule's path relative to project root.
@@ -18,7 +16,7 @@ const HYDRATION_MAX_MESSAGES = 200;
 const HYDRATION_MAX_CHARS = 1_000_000;
 
 export interface TranscriptHydrationDeps {
-	readonly client: PluginInput["client"];
+	readonly client: TranscriptHydrationClient;
 }
 
 export interface TranscriptHydrationStore {
@@ -31,6 +29,14 @@ interface SessionHydrationState {
 	relativePaths: Set<string>;
 	hydrated: boolean;
 	inflight?: Promise<void>;
+}
+
+interface TranscriptHydrationClient {
+	readonly session: {
+		readonly messages: (args: {
+			readonly path: { readonly id: string };
+		}) => Promise<{ readonly data?: unknown }>;
+	};
 }
 
 /**
@@ -76,7 +82,10 @@ export function createTranscriptHydrationStore(
 					for (const relativePath of fetched) {
 						state.relativePaths.add(relativePath);
 					}
-				} catch {
+				} catch (error) {
+					if (!(error instanceof Error)) {
+						throw error;
+					}
 					// best-effort: a hydration failure must never block injection.
 				} finally {
 					state.hydrated = true;
@@ -102,13 +111,13 @@ export function createTranscriptHydrationStore(
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
 async function fetchTranscriptRelativePaths(
-	client: PluginInput["client"],
+	client: TranscriptHydrationClient,
 	sessionID: string,
 ): Promise<Set<string>> {
 	const relativePaths = new Set<string>();
-	const response = (await client.session.messages({
+	const response = await client.session.messages({
 		path: { id: sessionID },
-	})) as { data?: unknown };
+	});
 	const data = Array.isArray(response.data) ? response.data : [];
 	const start = Math.max(0, data.length - HYDRATION_MAX_MESSAGES);
 	let scannedChars = 0;
