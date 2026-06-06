@@ -190,7 +190,7 @@ export async function executeInteractiveBash(args: InteractiveBashArgs): Promise
             ignoreInteractiveBashKillError(error)
           })
         } catch (error) {
-          ignoreInteractiveBashKillError(error)
+          if (!(error instanceof Error)) throw error
           // Ignore kill errors; we'll still reject with timeoutError below
         }
         reject(timeoutError)
@@ -217,8 +217,9 @@ export async function executeInteractiveBash(args: InteractiveBashArgs): Promise
     }
 
     return stdout || "(no output)"
-  } catch (e) {
-    return `Error: ${e instanceof Error ? e.message : String(e)}`
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return `Error: ${message}`
   }
 }
 
