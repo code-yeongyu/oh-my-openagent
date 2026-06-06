@@ -28,7 +28,11 @@ export function getOrCreateMessageDir(sessionID: string): string | null {
         return sessionPath
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      mkdirSync(directPath, { recursive: true })
+      return directPath
+    }
     mkdirSync(directPath, { recursive: true })
     return directPath
   }
