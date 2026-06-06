@@ -83,10 +83,10 @@ export function createTranscriptHydrationStore(
 						state.relativePaths.add(relativePath);
 					}
 				} catch (error) {
-					if (!(error instanceof Error)) {
-						throw error;
+					if (error instanceof Error) {
+						return;
 					}
-					// best-effort: a hydration failure must never block injection.
+					throw error;
 				} finally {
 					state.hydrated = true;
 					state.inflight = undefined;
