@@ -1,93 +1,43 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
+import { request as httpRequest } from "node:http"
 import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
-const nativeFetch = Bun.fetch.bind(Bun)
-
-function supportsRealSocketBinding(): boolean {
-  try {
-    const server = Bun.serve({
-      port: 0,
-      hostname: HOSTNAME,
-      fetch: () => new Response("probe"),
-    })
-    server.stop(true)
-    return true
-  } catch {
-    return false
-  }
-}
-
-const canBindRealSockets = supportsRealSocketBinding()
-
-type MockServerState = {
-  port: number
-  stopped: boolean
-  fetch: (request: Request) => Response | Promise<Response>
-}
 
 describe("startCallbackServer", () => {
   let server: CallbackServer | null = null
-  let serveSpy: ReturnType<typeof spyOn> | null = null
-  let activeServer: MockServerState | null = null
 
-  async function request(url: string): Promise<Response> {
-    if (canBindRealSockets) {
-      return nativeFetch(url)
-    }
-
-    if (!activeServer || activeServer.stopped) {
-      throw new Error("Connection refused")
-    }
-
-    return await activeServer.fetch(new Request(url))
-  }
-
-  beforeEach(() => {
-    if (canBindRealSockets) {
-      return
-    }
-
-    activeServer = null
-    serveSpy = spyOn(Bun, "serve").mockImplementation((options: {
-      port: number
-      hostname?: string
-      fetch: (request: Request) => Response | Promise<Response>
-    }) => {
-      const state: MockServerState = {
-        port: options.port === 0 ? 19877 : options.port,
-        stopped: false,
-        fetch: options.fetch,
-      }
-
-      const handle = {
-        port: state.port,
-        stop: (_force?: boolean) => {
-          state.stopped = true
-          if (activeServer === state) {
-            activeServer = null
+  function request(url: string): Promise<Response> {
+    return new Promise<Response>((resolve, reject) => {
+      const req = httpRequest(url, (res) => {
+        const chunks: Uint8Array[] = []
+        res.on("data", (chunk: Buffer | string) => {
+          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk)
+        })
+        res.on("end", () => {
+          const headers = new Headers()
+          for (const [key, value] of Object.entries(res.headers)) {
+            if (Array.isArray(value)) {
+              for (const item of value) headers.append(key, item)
+            } else if (value !== undefined) {
+              headers.set(key, String(value))
+            }
           }
-        },
-      }
 
-      activeServer = state
-      return handle as ReturnType<typeof Bun.serve>
+          resolve(new Response(Buffer.concat(chunks), {
+            headers,
+            status: res.statusCode ?? 500,
+          }))
+        })
+      })
+      req.on("error", reject)
+      req.end()
     })
-  })
+  }
 
   afterEach(async () => {
     server?.close()
     server = null
-
-    if (serveSpy) {
-      serveSpy.mockRestore()
-      serveSpy = null
-    }
-    activeServer = null
-
-    if (canBindRealSockets) {
-      await Bun.sleep(10)
-    }
   })
 
   it("starts server and returns port", async () => {

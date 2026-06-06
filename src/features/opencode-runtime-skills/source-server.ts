@@ -2,6 +2,7 @@ import type { RuntimeSkillSourceEntry } from "./runtime-skill-config"
 
 export type RuntimeSkillSourceServer = {
   readonly url: string
+  readonly fetch: (request: Request) => Response | Promise<Response>
   readonly stop: () => void
 }
 
@@ -55,24 +56,27 @@ export function createRuntimeSkillSourceServer(options: {
     throw new Error("Runtime skill source server requires Bun.serve")
   }
 
+  function handleRequest(request: Request): Response | Promise<Response> {
+    const url = new URL(request.url)
+    if (url.pathname === "/" || url.pathname === "/index.json") {
+      return jsonResponse(index)
+    }
+
+    const markdown = skillMarkdownByPath.get(url.pathname)
+    if (markdown) return markdownResponse(markdown)
+
+    return new Response("not found", { status: 404 })
+  }
+
   const server = bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch(request) {
-      const url = new URL(request.url)
-      if (url.pathname === "/" || url.pathname === "/index.json") {
-        return jsonResponse(index)
-      }
-
-      const markdown = skillMarkdownByPath.get(url.pathname)
-      if (markdown) return markdownResponse(markdown)
-
-      return new Response("not found", { status: 404 })
-    },
+    fetch: handleRequest,
   })
 
   return {
     url: server.url.toString(),
+    fetch: handleRequest,
     stop: () => server.stop(true),
   }
 }
