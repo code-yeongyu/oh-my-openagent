@@ -99,7 +99,8 @@ function addAncestorCommandCandidates(
 function getModuleDirectory(moduleUrl: string): string | null {
   try {
     return dirname(fileURLToPath(moduleUrl))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
