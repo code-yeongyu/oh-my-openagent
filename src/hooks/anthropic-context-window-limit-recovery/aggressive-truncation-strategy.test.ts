@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
+import { restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 import type { AutoCompactState } from "./types"
 
 type PromptAsyncCall = {
@@ -94,7 +95,7 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
   })
 
   afterAll(() => {
-    mock.restore()
+    restoreModuleMocksForTestFile(import.meta.url)
   })
 
   test("includes the session's resolved agent on promptAsync when agent is known", async () => {

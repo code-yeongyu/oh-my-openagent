@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, afterEach, afterAll } from "bun:test"
+import { restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — must be registered BEFORE importing the handler so the
@@ -33,7 +34,7 @@ afterEach(() => {
 })
 
 afterAll(() => {
-  mock.restore()
+  restoreModuleMocksForTestFile(import.meta.url)
 })
 
 function makeEvent(sessionId: string, parentID = "parent-session"): SessionCreatedEvent {
