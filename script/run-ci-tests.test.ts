@@ -10,6 +10,15 @@ describe("plain test script policy", () => {
     expect(packageJson.scripts.test).toBe("bun test --max-concurrency=1")
   })
 
+  test("#given CI root tests #then GitHub Actions uses the serialized package script", async () => {
+    // given
+    const workflow = await Bun.file(".github/workflows/ci.yml").text()
+
+    // then
+    expect(workflow).toContain("run: bun run test")
+    expect(workflow).not.toContain("run: bun test\n")
+  })
+
   test("#given isolated test shards #when selecting targets #then shards are deterministic and complete", () => {
     // given
     const ciTestPlan = {
