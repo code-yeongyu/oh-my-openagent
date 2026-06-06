@@ -1,40 +1,48 @@
 import { describe, test, expect } from "bun:test"
 import { parseFrontmatter } from "./frontmatter"
 
+type FrontmatterCase = readonly [
+  label: string,
+  content: string,
+  expectedData: Record<string, unknown>,
+  expectedBody: string,
+]
+
 describe("parseFrontmatter", () => {
   // #region backward compatibility
-  test("parses simple key-value frontmatter", () => {
-    // given
-    const content = `---
+  const compatibilityCases = [
+    [
+      "parses simple key-value frontmatter",
+      `---
 description: Test command
 agent: build
 ---
-Body content`
-
-    // when
-    const result = parseFrontmatter(content)
-
-    // then
-    expect(result.data.description).toBe("Test command")
-    expect(result.data.agent).toBe("build")
-    expect(result.body).toBe("Body content")
-  })
-
-  test("parses boolean values", () => {
-    // given
-    const content = `---
+Body content`,
+      { description: "Test command", agent: "build" },
+      "Body content",
+    ],
+    [
+      "parses boolean values",
+      `---
 subtask: true
 enabled: false
 ---
-Body`
+Body`,
+      { subtask: true, enabled: false },
+      "Body",
+    ],
+  ] as const satisfies readonly FrontmatterCase[]
 
-    // when
-    const result = parseFrontmatter<{ subtask: boolean; enabled: boolean }>(content)
+  for (const [label, content, expectedData, expectedBody] of compatibilityCases) {
+    test(label, () => {
+      // when
+      const result = parseFrontmatter(content)
 
-    // then
-    expect(result.data.subtask).toBe(true)
-    expect(result.data.enabled).toBe(false)
-  })
+      // then
+      expect(result.data).toEqual(expectedData)
+      expect(result.body).toBe(expectedBody)
+    })
+  }
   // #endregion
 
   // #region complex YAML (handoffs support)
@@ -104,94 +112,76 @@ Content`
   // #endregion
 
   // #region edge cases
-  test("handles content without frontmatter", () => {
-    // given
-    const content = "Just body content"
-
-    // when
-    const result = parseFrontmatter(content)
-
-    // then
-    expect(result.data).toEqual({})
-    expect(result.body).toBe("Just body content")
-  })
-
-  test("handles empty frontmatter", () => {
-    // given
-    const content = `---
+  const edgeCases = [
+    ["handles content without frontmatter", "Just body content", {}, "Just body content"],
+    [
+      "handles empty frontmatter",
+      `---
 ---
-Body`
-
-    // when
-    const result = parseFrontmatter(content)
-
-    // then
-    expect(result.data).toEqual({})
-    expect(result.body).toBe("Body")
-  })
-
-  test("handles invalid YAML gracefully", () => {
-    // given
-    const content = `---
+Body`,
+      {},
+      "Body",
+    ],
+    [
+      "handles invalid YAML gracefully",
+      `---
 invalid: yaml: syntax: here
   bad indentation
 ---
-Body`
-
-    // when
-    const result = parseFrontmatter(content)
-
-    // then - should not throw, return empty data
-    expect(result.data).toEqual({})
-    expect(result.body).toBe("Body")
-  })
-
-  test("handles frontmatter with only whitespace", () => {
-    // given
-    const content = `---
+Body`,
+      {},
+      "Body",
+    ],
+    [
+      "handles frontmatter with only whitespace",
+      `---
    
 ---
-Body with whitespace-only frontmatter`
+Body with whitespace-only frontmatter`,
+      {},
+      "Body with whitespace-only frontmatter",
+    ],
+  ] as const satisfies readonly FrontmatterCase[]
 
-    // when
-    const result = parseFrontmatter(content)
+  for (const [label, content, expectedData, expectedBody] of edgeCases) {
+    test(label, () => {
+      // when
+      const result = parseFrontmatter(content)
 
-    // then
-    expect(result.data).toEqual({})
-    expect(result.body).toBe("Body with whitespace-only frontmatter")
-  })
+      // then
+      expect(result.data).toEqual(expectedData)
+      expect(result.body).toBe(expectedBody)
+    })
+  }
   // #endregion
 
   // #region mixed content
-  test("preserves multiline body content", () => {
-    // given
-    const content = `---
+  const mixedContentCases = [
+    [
+      "preserves multiline body content",
+      `---
 title: Test
 ---
 Line 1
 Line 2
 
-Line 4 after blank`
+Line 4 after blank`,
+      { title: "Test" },
+      "Line 1\nLine 2\n\nLine 4 after blank",
+    ],
+    ["handles CRLF line endings", "---\r\ndescription: Test\r\n---\r\nBody", { description: "Test" }, "Body"],
+  ] as const satisfies readonly FrontmatterCase[]
 
-    // when
-    const result = parseFrontmatter<{ title: string }>(content)
+  for (const [label, content, expectedData, expectedBody] of mixedContentCases) {
+    test(label, () => {
+      // when
+      const result = parseFrontmatter(content)
 
-    // then
-    expect(result.data.title).toBe("Test")
-    expect(result.body).toBe("Line 1\nLine 2\n\nLine 4 after blank")
-  })
-
-  test("handles CRLF line endings", () => {
-    // given
-    const content = "---\r\ndescription: Test\r\n---\r\nBody"
-
-    // when
-    const result = parseFrontmatter<{ description: string }>(content)
-
-    // then
-    expect(result.data.description).toBe("Test")
-    expect(result.body).toBe("Body")
-  })
+      // then
+      expect(result.data).toEqual(expectedData)
+      expect(result.body).toBe(expectedBody)
+    })
+  }
   // #endregion
 
   // #region extra fields tolerance
