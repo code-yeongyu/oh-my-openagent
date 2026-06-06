@@ -142,6 +142,17 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	}
 });
 
+test("#given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged", async () => {
+	// given
+	const aggregateSkillsRoot = join(root, "skills");
+
+	// when
+	const visualQaFiles = await listSkillFiles(join(aggregateSkillsRoot, "visual-qa"));
+
+	// then
+	assert.equal(visualQaFiles.some((file) => file.endsWith(".test.ts")), false);
+});
+
 test("#given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift", async () => {
 	// given
 	const aggregateSkillsRoot = join(root, "skills");
