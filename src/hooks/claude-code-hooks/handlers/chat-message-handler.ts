@@ -70,11 +70,12 @@ export function createChatMessageHandler(
 			})
 			parentSessionId = sessionInfo.data?.parentID
 		} catch (error) {
-			if (error instanceof Error) {
-				parentSessionId = undefined
-			} else {
-				parentSessionId = undefined
-			}
+			const errorMessage = error instanceof Error ? error.message : String(error)
+			log("chat.message parent session lookup failed", {
+				sessionID: input.sessionID,
+				error: errorMessage,
+			})
+			parentSessionId = undefined
 		}
 
 		const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)

@@ -20,17 +20,11 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 			try {
 				parsed = JSON.parse(output.args.todos)
 			} catch (error) {
-				if (!(error instanceof Error)) {
-					throw new Error(
-						`[todowrite ERROR] Failed to parse todos string as JSON. ` +
-							`Received: ${
-								output.args.todos.length > 100
-									? output.args.todos.slice(0, 100) + "..."
-									: output.args.todos
-							} ` +
-							`Expected: Valid JSON array. Pass todos as an array, not a string.`,
-					)
-				}
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				log("todowrite todos JSON parse failed", {
+					sessionID: input.sessionID,
+					error: errorMessage,
+				})
 				throw new Error(
 					`[todowrite ERROR] Failed to parse todos string as JSON. ` +
 						`Received: ${

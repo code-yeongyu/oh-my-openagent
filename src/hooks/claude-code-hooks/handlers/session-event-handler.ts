@@ -77,11 +77,12 @@ export function createSessionEventHandler(
 				parentSessionId = sessionInfo.data?.parentID
 				parentSessionIdCache.set(sessionID, parentSessionId)
 			} catch (error) {
-				if (error instanceof Error) {
-					parentSessionId = undefined
-				} else {
-					parentSessionId = undefined
-				}
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				log("session.idle parent session lookup failed", {
+					sessionID,
+					error: errorMessage,
+				})
+				parentSessionId = undefined
 			}
 		}
 

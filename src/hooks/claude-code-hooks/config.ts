@@ -4,6 +4,7 @@ import { getClaudeConfigDir } from "../../shared"
 import { bunFile } from "../../shared/bun-file-shim"
 import { getAllowedMcpEnvVars } from "../../features/claude-code-mcp-loader/configure-allowed-env-vars"
 import type { ClaudeHooksConfig, HookMatcher, HookAction, PluginHooksConfig } from "./types"
+import { log } from "../../shared/logger"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -250,9 +251,8 @@ export async function loadClaudeHooksConfig(
           mergedConfig = mergeHooksConfig(mergedConfig, normalizedHooks)
         }
       } catch (error) {
-        if (error instanceof Error) {
-          continue
-        }
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log("Failed to load Claude hooks settings", { settingsPath, error: errorMessage })
         continue
       }
     }

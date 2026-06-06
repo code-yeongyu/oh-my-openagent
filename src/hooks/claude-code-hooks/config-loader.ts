@@ -72,11 +72,8 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
     const content = await bunFile(path).text()
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
-    if (error instanceof Error) {
-      log("Failed to load config", { path, error })
-      return null
-    }
-    log("Failed to load config", { path, error: String(error) })
+    const loggedError = error instanceof Error ? error : String(error)
+    log("Failed to load config", { path, error: loggedError })
     return null
   }
 }
@@ -146,11 +143,8 @@ function getRegex(pattern: string): RegExp {
       regex = new RegExp(pattern)
       regexCache.set(pattern, regex)
     } catch (error) {
-      if (!(error instanceof Error)) {
-        regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        regexCache.set(pattern, regex)
-        return regex
-      }
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      log("Invalid disabled hook regex, using literal match", { pattern, error: errorMessage })
       regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       regexCache.set(pattern, regex)
     }
