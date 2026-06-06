@@ -1,38 +1,10 @@
 import { describe, expect, it } from "bun:test"
-import { request as httpRequest } from "node:http"
 import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
+const request = Bun.fetch.bind(Bun)
 
 describe("startCallbackServer", () => {
-  function request(url: string): Promise<Response> {
-    return new Promise<Response>((resolve, reject) => {
-      const req = httpRequest(url, (res) => {
-        const chunks: Uint8Array[] = []
-        res.on("data", (chunk: Buffer | string) => {
-          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk)
-        })
-        res.on("end", () => {
-          const headers = new Headers()
-          for (const [key, value] of Object.entries(res.headers)) {
-            if (Array.isArray(value)) {
-              for (const item of value) headers.append(key, item)
-            } else if (value !== undefined) {
-              headers.set(key, String(value))
-            }
-          }
-
-          resolve(new Response(Buffer.concat(chunks), {
-            headers,
-            status: res.statusCode ?? 500,
-          }))
-        })
-      })
-      req.on("error", reject)
-      req.end()
-    })
-  }
-
   function close(server: CallbackServer): void {
     server.close()
   }
