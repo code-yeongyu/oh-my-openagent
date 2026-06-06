@@ -11,9 +11,7 @@ type LoopStateController = {
 	markVerificationPending: (sessionID: string) => RalphLoopState | null
 }
 
-function ignoreBestEffortFailure(error: unknown): void {
-	void error
-}
+const ignoreBestEffortFailure = (): void => undefined
 
 function showToastBestEffort(
 	ctx: PluginInput,
@@ -21,12 +19,8 @@ function showToastBestEffort(
 ): void {
 	try {
 		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(ignoreBestEffortFailure)
-	} catch (error: unknown) {
-		if (error instanceof Error) {
-			ignoreBestEffortFailure(error)
-			return
-		}
-		ignoreBestEffortFailure(error)
+	} catch {
+		ignoreBestEffortFailure()
 	}
 }
 
