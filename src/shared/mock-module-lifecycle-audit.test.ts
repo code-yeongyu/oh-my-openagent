@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
