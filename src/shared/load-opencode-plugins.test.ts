@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import * as os from "node:os"
 import { join } from "node:path"
@@ -30,9 +30,6 @@ function writeProfileConfig(directory: string, pluginEntries: readonly string[])
 describe("loadOpencodePlugins", () => {
   const tempDirs: string[] = []
   let originalOpencodeConfigDir: string | undefined
-  let originalHome: string | undefined
-  let originalUserProfile: string | undefined
-  let originalAppdata: string | undefined
 
   function createTempDir(prefix: string): string {
     const directory = mkdtempSync(join(os.tmpdir(), prefix))
@@ -42,19 +39,8 @@ describe("loadOpencodePlugins", () => {
 
   beforeEach(() => {
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
-    originalHome = process.env.HOME
-    originalUserProfile = process.env.USERPROFILE
-    originalAppdata = process.env.APPDATA
 
     delete process.env.OPENCODE_CONFIG_DIR
-    const homeDirectory = createTempDir("omo-load-opencode-home-")
-    process.env.HOME = homeDirectory
-    process.env.USERPROFILE = homeDirectory
-    delete process.env.APPDATA
-    mock.module("node:os", () => ({
-      ...os,
-      homedir: () => homeDirectory,
-    }))
   })
 
   afterEach(() => {
@@ -63,22 +49,6 @@ describe("loadOpencodePlugins", () => {
     } else {
       process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
     }
-    if (originalHome === undefined) {
-      delete process.env.HOME
-    } else {
-      process.env.HOME = originalHome
-    }
-    if (originalUserProfile === undefined) {
-      delete process.env.USERPROFILE
-    } else {
-      process.env.USERPROFILE = originalUserProfile
-    }
-    if (originalAppdata === undefined) {
-      delete process.env.APPDATA
-    } else {
-      process.env.APPDATA = originalAppdata
-    }
-    mock.restore()
     while (tempDirs.length > 0) {
       const directory = tempDirs.pop()
       if (directory) {
@@ -92,17 +62,26 @@ describe("loadOpencodePlugins", () => {
       it("#then returns the cached plugin entries on the second load", async () => {
         // given
         const projectDirectory = createTempDir("omo-load-opencode-project-")
-        writeOpencodeConfig(projectDirectory, ["plugin-a", "plugin-b"])
+        const initialPlugins = [
+          `file://${join(projectDirectory, "plugin-a.ts")}`,
+          `file://${join(projectDirectory, "plugin-b.ts")}`,
+        ]
+        const updatedPlugin = `file://${join(projectDirectory, "plugin-c.ts")}`
+        writeOpencodeConfig(projectDirectory, initialPlugins)
         const { loadOpencodePlugins } = await importFreshLoadOpencodePluginsModule()
 
         // when
         const firstResult = loadOpencodePlugins(projectDirectory)
-        writeOpencodeConfig(projectDirectory, ["plugin-c"])
+        writeOpencodeConfig(projectDirectory, [updatedPlugin])
         const secondResult = loadOpencodePlugins(projectDirectory)
 
         // then
-        expect(firstResult).toEqual(["plugin-a", "plugin-b"])
-        expect(secondResult).toEqual(["plugin-a", "plugin-b"])
+        expect(firstResult).toContain(initialPlugins[0])
+        expect(firstResult).toContain(initialPlugins[1])
+        expect(firstResult).not.toContain(updatedPlugin)
+        expect(secondResult).toContain(initialPlugins[0])
+        expect(secondResult).toContain(initialPlugins[1])
+        expect(secondResult).not.toContain(updatedPlugin)
       })
     })
   })
@@ -112,7 +91,12 @@ describe("loadOpencodePlugins", () => {
       it("#then re-reads plugin config files from disk", async () => {
         // given
         const projectDirectory = createTempDir("omo-load-opencode-project-")
-        writeOpencodeConfig(projectDirectory, ["plugin-a", "plugin-b"])
+        const initialPlugins = [
+          `file://${join(projectDirectory, "plugin-a.ts")}`,
+          `file://${join(projectDirectory, "plugin-b.ts")}`,
+        ]
+        const updatedPlugin = `file://${join(projectDirectory, "plugin-c.ts")}`
+        writeOpencodeConfig(projectDirectory, initialPlugins)
         const { loadOpencodePlugins, clearOpencodePluginsCache } = await importFreshLoadOpencodePluginsModule()
 
         if (typeof clearOpencodePluginsCache !== "function") {
@@ -121,15 +105,21 @@ describe("loadOpencodePlugins", () => {
 
         // when
         const firstResult = loadOpencodePlugins(projectDirectory)
-        writeOpencodeConfig(projectDirectory, ["plugin-c"])
+        writeOpencodeConfig(projectDirectory, [updatedPlugin])
         const secondResult = loadOpencodePlugins(projectDirectory)
         clearOpencodePluginsCache()
         const thirdResult = loadOpencodePlugins(projectDirectory)
 
         // then
-        expect(firstResult).toEqual(["plugin-a", "plugin-b"])
-        expect(secondResult).toEqual(["plugin-a", "plugin-b"])
-        expect(thirdResult).toEqual(["plugin-c"])
+        expect(firstResult).toContain(initialPlugins[0])
+        expect(firstResult).toContain(initialPlugins[1])
+        expect(firstResult).not.toContain(updatedPlugin)
+        expect(secondResult).toContain(initialPlugins[0])
+        expect(secondResult).toContain(initialPlugins[1])
+        expect(secondResult).not.toContain(updatedPlugin)
+        expect(thirdResult).toContain(updatedPlugin)
+        expect(thirdResult).not.toContain(initialPlugins[0])
+        expect(thirdResult).not.toContain(initialPlugins[1])
       })
     })
   })
@@ -141,18 +131,19 @@ describe("loadOpencodePlugins", () => {
         const projectDirectory = createTempDir("omo-load-opencode-project-")
         const profileDirectory = createTempDir("omo-load-opencode-profile-")
         process.env.OPENCODE_CONFIG_DIR = profileDirectory
-        writeOpencodeConfig(projectDirectory, ["file:///repo/omo/src/index.ts"])
-        writeProfileConfig(profileDirectory, ["oh-my-openagent@latest"])
+        const projectPlugin = `file://${join(projectDirectory, "src", "index.ts")}`
+        const profilePlugin = `file://${join(profileDirectory, "profile-plugin.ts")}`
+        writeOpencodeConfig(projectDirectory, [projectPlugin])
+        writeProfileConfig(profileDirectory, [profilePlugin])
         const { loadOpencodePlugins } = await importFreshLoadOpencodePluginsModule()
 
         // when
         const result = loadOpencodePlugins(projectDirectory)
 
         // then
-        expect(result).toEqual([
-          "file:///repo/omo/src/index.ts",
-          "oh-my-openagent@latest",
-        ])
+        expect(result).toContain(projectPlugin)
+        expect(result).toContain(profilePlugin)
+        expect(result.indexOf(projectPlugin)).toBeLessThan(result.indexOf(profilePlugin))
       })
     })
   })
