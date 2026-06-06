@@ -83,11 +83,19 @@ export async function runSg(options: SgRunArgs, deps: SgRunnerDeps): Promise<SgR
   try {
     binary = await deps.resolveBinary()
   } catch (error) {
+    if (error instanceof Error || isNoEntryError(error)) {
+      return {
+        matches: [],
+        totalMatches: 0,
+        truncated: false,
+        error: isNoEntryError(error) ? SG_BINARY_NOT_FOUND_MESSAGE : `Failed to resolve ast-grep binary: ${errorMessage(error)}`,
+      }
+    }
     return {
       matches: [],
       totalMatches: 0,
       truncated: false,
-      error: isNoEntryError(error) ? SG_BINARY_NOT_FOUND_MESSAGE : `Failed to resolve ast-grep binary: ${errorMessage(error)}`,
+      error: `Failed to resolve ast-grep binary: ${errorMessage(error)}`,
     }
   }
 
