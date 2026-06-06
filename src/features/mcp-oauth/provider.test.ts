@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
-import { createHash, randomBytes } from "node:crypto"
+import { createHash } from "node:crypto"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { OAuthTokenData } from "./storage"
 import { resetDiscoveryCache } from "./discovery"
 
@@ -14,13 +17,32 @@ describe("McpOAuthProvider", () => {
   let generateCodeVerifier: ProviderModule["generateCodeVerifier"]
   let generateCodeChallenge: ProviderModule["generateCodeChallenge"]
   let buildAuthorizationUrl: ProviderModule["buildAuthorizationUrl"]
+  let originalConfigDir: string | undefined
+  let testConfigDir: string | null = null
 
   beforeEach(async () => {
+    originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    testConfigDir = mkdtempSync(join(tmpdir(), "mcp-oauth-provider-test-"))
+    process.env.OPENCODE_CONFIG_DIR = testConfigDir
+
     const providerModule = await importFreshProviderModule()
     McpOAuthProvider = providerModule.McpOAuthProvider
     generateCodeVerifier = providerModule.generateCodeVerifier
     generateCodeChallenge = providerModule.generateCodeChallenge
     buildAuthorizationUrl = providerModule.buildAuthorizationUrl
+  })
+
+  afterEach(() => {
+    if (originalConfigDir === undefined) {
+      delete process.env.OPENCODE_CONFIG_DIR
+    } else {
+      process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+    }
+
+    if (testConfigDir) {
+      rmSync(testConfigDir, { recursive: true, force: true })
+      testConfigDir = null
+    }
   })
 
   describe("generateCodeVerifier", () => {
@@ -170,26 +192,6 @@ describe("McpOAuthProvider", () => {
   })
 
   describe("saveTokens / tokens", () => {
-    let originalEnv: string | undefined
-
-    beforeEach(() => {
-      originalEnv = process.env.OPENCODE_CONFIG_DIR
-      const { mkdirSync } = require("node:fs")
-      const { tmpdir } = require("node:os")
-      const { join } = require("node:path")
-      const testDir = join(tmpdir(), "mcp-oauth-provider-test-" + Date.now())
-      mkdirSync(testDir, { recursive: true })
-      process.env.OPENCODE_CONFIG_DIR = testDir
-    })
-
-    afterEach(() => {
-      if (originalEnv === undefined) {
-        delete process.env.OPENCODE_CONFIG_DIR
-      } else {
-        process.env.OPENCODE_CONFIG_DIR = originalEnv
-      }
-    })
-
     it("persists and loads token data via storage", () => {
       // given
       const provider = new McpOAuthProvider({ serverUrl: "https://mcp.example.com" })
@@ -229,27 +231,14 @@ describe("McpOAuthProvider", () => {
 
   describe("refresh", () => {
     let originalFetch: typeof globalThis.fetch
-    let originalEnv: string | undefined
 
     beforeEach(() => {
       originalFetch = globalThis.fetch
-      originalEnv = process.env.OPENCODE_CONFIG_DIR
       resetDiscoveryCache()
-      const { mkdirSync } = require("node:fs")
-      const { tmpdir } = require("node:os")
-      const { join } = require("node:path")
-      const testDir = join(tmpdir(), `mcp-oauth-provider-refresh-test-${Date.now()}`)
-      mkdirSync(testDir, { recursive: true })
-      process.env.OPENCODE_CONFIG_DIR = testDir
     })
 
     afterEach(() => {
       globalThis.fetch = originalFetch
-      if (originalEnv === undefined) {
-        delete process.env.OPENCODE_CONFIG_DIR
-      } else {
-        process.env.OPENCODE_CONFIG_DIR = originalEnv
-      }
       resetDiscoveryCache()
     })
 
