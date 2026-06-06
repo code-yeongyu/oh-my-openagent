@@ -285,10 +285,8 @@ describe("McpOAuthProvider", () => {
           { status: 200, headers: { "content-type": "application/json" } },
         )
       })
-      const fetchMock = Object.assign(
-        async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> => fetchStub(...args),
-        { preconnect: originalFetch?.preconnect?.bind(originalFetch) ?? (() => {}) },
-      ) satisfies typeof fetch
+      const fetchMock = (async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> =>
+        fetchStub(...args)) satisfies typeof fetch
       globalThis.fetch = fetchMock
 
       // given
@@ -310,6 +308,58 @@ describe("McpOAuthProvider", () => {
       // then
       expect(result.accessToken).toBe("refreshed-access-token")
       expect(result.refreshToken).toBe("refresh-token-456") // preserved from input when absent in response
+    })
+
+    it("propagates non-Error token error-body parse failures", async () => {
+      // given
+      const nonErrorFailure = Object.freeze({ reason: "non-error json failure" })
+      const fetchStub = mock(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes("oauth-protected-resource")) {
+          return new Response(
+            JSON.stringify({ authorization_servers: ["https://auth.example.com"] }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          )
+        }
+        if (url.includes(".well-known")) {
+          return new Response(
+            JSON.stringify({
+              issuer: "https://auth.example.com",
+              authorization_endpoint: "https://auth.example.com/authorize",
+              token_endpoint: "https://auth.example.com/token",
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          )
+        }
+
+        const tokenResponse = new Response("", { status: 400 })
+        Object.defineProperty(tokenResponse, "json", {
+          value: async () => {
+            throw nonErrorFailure
+          },
+        })
+        return tokenResponse
+      })
+      const fetchMock = (async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> =>
+        fetchStub(...args)) satisfies typeof fetch
+      globalThis.fetch = fetchMock
+      const providerModule = await importFreshProviderModule()
+      const provider = new providerModule.McpOAuthProvider({
+        serverUrl: "https://mcp.example.com",
+        clientId: "my-client",
+      })
+      provider.saveTokens({
+        accessToken: "old-access-token",
+        refreshToken: "refresh-token-456",
+        expiresAt: Math.floor(Date.now() / 1000) - 60,
+        clientInfo: { clientId: "my-client" },
+      })
+
+      // when
+      const result = provider.refresh("refresh-token-456")
+
+      // then
+      await expect(result).rejects.toBe(nonErrorFailure)
     })
   })
 

@@ -75,7 +75,8 @@ export async function getOrRegisterClient(
 
     options.storage.setClientRegistration(serverIdentifier, parsed)
     return parsed
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return options.clientId ? { clientId: options.clientId } : null
   }
 }
