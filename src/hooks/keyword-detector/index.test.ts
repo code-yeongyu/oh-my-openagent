@@ -11,6 +11,18 @@ import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-m
 import { createKeywordDetectorHook } from "./index"
 
 type ToastOptions = { body: { title: string } }
+type OutputPart = { readonly type?: unknown; readonly text?: unknown }
+type TextOutputPart = { readonly type: "text"; readonly text: string }
+
+function isTextOutputPart(part: OutputPart): part is TextOutputPart {
+  return part.type === "text" && typeof part.text === "string"
+}
+
+function expectTextPartText(parts: readonly OutputPart[]): string {
+  const textPart = parts.find(isTextOutputPart)
+  expect(textPart).toBeDefined()
+  return textPart?.text ?? ""
+}
 
 function createPluginInputWithToast(showToast: (options: ToastOptions) => Promise<void>): PluginInput {
   const client = {} as PluginInput["client"]
@@ -67,11 +79,10 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - message should be prepended to text part with separator and original text
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("do something")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("---")
+    expect(text).toContain("do something")
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
   test("should prepend search message to text part", async () => {
@@ -89,11 +100,10 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - search message should be prepended to text part
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("for the bug")
-    expect(textPart!.text).toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("---")
+    expect(text).toContain("for the bug")
+    expect(text).toContain("[search-mode]")
   })
 
   test("should not prepend mode messages twice when an injected message is processed again", async () => {
@@ -121,11 +131,10 @@ describe("keyword-detector message transform", () => {
       await hook["chat.message"]({ sessionID }, output)
 
       // then - the mode prompt remains idempotent
-      const textPart = output.parts.find(p => p.type === "text")
-      expect(textPart).toBeDefined()
-      const markerMatches = textPart!.text!.split(testCase.marker).length - 1
+      const text = expectTextPartText(output.parts)
+      const markerMatches = text.split(testCase.marker).length - 1
       expect(markerMatches).toBe(1)
-      expect(textPart!.text).toContain(testCase.prompt)
+      expect(text).toContain(testCase.prompt)
 
       getMainSessionSpy?.mockRestore()
     }
@@ -145,11 +154,10 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - guidance should require evaluating skills, not hard-code an empty skill list
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("Evaluate available skills before dispatch")
-    expect(textPart!.text).toContain("pass [] ONLY when no skill matches")
-    expect(textPart!.text).not.toContain("ALWAYS include load_skills=[]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("Evaluate available skills before dispatch")
+    expect(text).toContain("pass [] ONLY when no skill matches")
+    expect(text).not.toContain("ALWAYS include load_skills=[]")
   })
 
   test("should NOT transform when no keywords detected", async () => {
@@ -166,9 +174,8 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - text should remain unchanged
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("just a normal message")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("just a normal message")
   })
 
   test("should not prepend mode instructions to synthetic team peer messages", async () => {
@@ -190,10 +197,9 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - peer message content is preserved without search-mode becoming part of the user turn
-    const textPart = output.parts.find((part) => part.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart?.text).toBe('<peer_message from="researcher">search the issue thread and report findings</peer_message>')
-    expect(textPart?.text).not.toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe('<peer_message from="researcher">search the issue thread and report findings</peer_message>')
+    expect(text).not.toContain("[search-mode]")
   })
 
   test("should not prepend mode instructions to internally marked peer messages", async () => {
@@ -236,9 +242,8 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - search should be blocked by allowlist even though it matches
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("search for the bug") // no search-mode injection
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("search for the bug") // no search-mode injection
   })
 
   test("should fire only allowed expansions from allowlist", async () => {
@@ -260,9 +265,8 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - analyze should fire because it's in the allowlist
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[analyze-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("[analyze-mode]")
   })
 
   test("should block all expansions when enabled_expansions is empty array", async () => {
@@ -284,9 +288,8 @@ describe("keyword-detector message transform", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - ultrawork should not fire
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork fix the bug") // no mode injection
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ultrawork fix the bug") // no mode injection
   })
 
   test("should allow both allowlist and denylist to coexist", async () => {
@@ -311,9 +314,8 @@ describe("keyword-detector message transform", () => {
     // Actually search is in enabled_expansions so it would fire, but disabled_keywords blocks it
     // Wait, let me reconsider: with enabled_expansions=["ultrawork", "search"], search passes the allowlist.
     // Then disabled_keywords=["search"] blocks it. So no injection.
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("search for the bug")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("search for the bug")
   })
 })
 
@@ -588,10 +590,9 @@ Please locate and scan the directory.
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should NOT trigger search mode (text should remain unchanged)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).toContain("<system-reminder>")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[search-mode]")
+    expect(text).toContain("<system-reminder>")
   })
 
   test("should NOT trigger analyze mode from keywords inside <system-reminder> tags", async () => {
@@ -614,10 +615,9 @@ Research the implementation details.
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should NOT trigger analyze mode
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[analyze-mode]")
-    expect(textPart!.text).toContain("<system-reminder>")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[analyze-mode]")
+    expect(text).toContain("<system-reminder>")
   })
 
   test("should detect keywords in user text even when system-reminder is present", async () => {
@@ -641,10 +641,9 @@ Please search for the bug in the code.`
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should trigger search mode from user text only
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[search-mode]")
-    expect(textPart!.text).toContain("Please search for the bug in the code.")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("[search-mode]")
+    expect(text).toContain("Please search for the bug in the code.")
   })
 
   test("should handle multiple system-reminder tags in message", async () => {
@@ -672,10 +671,9 @@ Second reminder with investigate and examine keywords.
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should NOT trigger any mode (only user text exists, no keywords)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).not.toContain("[analyze-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[search-mode]")
+    expect(text).not.toContain("[analyze-mode]")
   })
 
   test("should handle case-insensitive system-reminder tags", async () => {
@@ -697,9 +695,8 @@ System will search and find files.
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should NOT trigger search mode
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[search-mode]")
   })
 
   test("should handle multiline system-reminder content with search keywords", async () => {
@@ -726,9 +723,8 @@ Please explore the codebase and discover patterns.
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should NOT trigger search mode
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[search-mode]")
   })
 })
 
@@ -767,11 +763,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
     // then - ultrawork should be skipped for planner agents, text unchanged
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork plan this feature")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ultrawork plan this feature")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
   test("should skip ultrawork injection when agent name contains 'planner'", async () => {
@@ -788,10 +783,9 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID, agent: "Prometheus (Planner)" }, output)
 
     // then - ultrawork should be skipped, text unchanged
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ulw create a work plan")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ulw create a work plan")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 
   test("should skip ultrawork injection when agent name contains 'plan' token", async () => {
@@ -808,10 +802,9 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID, agent: "Plan Agent" }, output)
 
     //#then - ultrawork should be skipped, text unchanged
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork draft a plan")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ultrawork draft a plan")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 
   test("should use normal ultrawork message when agent is Sisyphus", async () => {
@@ -828,12 +821,11 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID, agent: "sisyphus" }, output)
 
     // then - should use normal ultrawork message with agent utilization instructions
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("implement this feature")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(text).toContain("---")
+    expect(text).toContain("implement this feature")
   })
 
   test("should use normal ultrawork message when agent is undefined", async () => {
@@ -850,12 +842,11 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - should use normal ultrawork message (default behavior)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("do something")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(text).toContain("---")
+    expect(text).toContain("do something")
   })
 
   test("should skip ultrawork for prometheus but inject for sisyphus", async () => {
@@ -880,13 +871,13 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID: sisyphusSessionID, agent: "sisyphus" }, sisyphusOutput)
 
     // then - prometheus should have no injection, sisyphus should have normal ultrawork
-    const prometheusTextPart = prometheusOutput.parts.find(p => p.type === "text")
-    expect(prometheusTextPart!.text).toBe("ultrawork plan")
+    const prometheusText = prometheusOutput.parts.find(isTextOutputPart)?.text
+    expect(prometheusText).toBe("ultrawork plan")
 
-    const sisyphusTextPart = sisyphusOutput.parts.find(p => p.type === "text")
-    expect(sisyphusTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(sisyphusTextPart!.text).toContain("---")
-    expect(sisyphusTextPart!.text).toContain("implement")
+    const sisyphusText = sisyphusOutput.parts.find(isTextOutputPart)?.text
+    expect(sisyphusText).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(sisyphusText).toContain("---")
+    expect(sisyphusText).toContain("implement")
   })
 
   test("should use session state agent over stale input.agent (bug fix)", async () => {
@@ -907,12 +898,11 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
     // then - should use Sisyphus from session state, NOT prometheus from stale input
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("implement this")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(text).toContain("---")
+    expect(text).toContain("implement this")
 
     // cleanup
     clearSessionAgent(sessionID)
@@ -936,10 +926,9 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
     // then - prometheus fallback from input.agent, ultrawork skipped
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork plan this")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ultrawork plan this")
+    expect(text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 })
 
@@ -978,9 +967,8 @@ describe("keyword-detector non-OMO agent skipping", () => {
     await hook["chat.message"]({ sessionID, agent: "OpenCode-Builder" }, output)
 
     // then - no keywords should be injected
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork search and analyze this code")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ultrawork search and analyze this code")
   })
 
   test("should skip all keyword injection for Plan agent", async () => {
@@ -997,9 +985,8 @@ describe("keyword-detector non-OMO agent skipping", () => {
     await hook["chat.message"]({ sessionID, agent: "Plan" }, output)
 
     // then - no keywords should be injected for non-OMO Plan agent
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("search mode analyze mode ultrawork")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("search mode analyze mode ultrawork")
   })
 
   test("should still inject keywords for OMO agents like Sisyphus", async () => {
@@ -1016,10 +1003,9 @@ describe("keyword-detector non-OMO agent skipping", () => {
     await hook["chat.message"]({ sessionID, agent: "sisyphus" }, output)
 
     // then - keywords should be injected normally
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).toContain("implement this")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).toContain("implement this")
   })
 
   test("should skip keyword injection for agent names containing 'builder'", async () => {
@@ -1036,10 +1022,9 @@ describe("keyword-detector non-OMO agent skipping", () => {
     await hook["chat.message"]({ sessionID, agent: "Custom-Builder" }, output)
 
     // then - search-mode should NOT be injected
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("search this codebase")
-    expect(textPart!.text).not.toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("search this codebase")
+    expect(text).not.toContain("[search-mode]")
   })
 })
 
@@ -1087,14 +1072,13 @@ describe("keyword-detector team mode", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - team-mode message should be prepended with team_* tool guidance
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[team-mode]")
-    expect(textPart!.text).toContain("team_create")
-    expect(textPart!.text).toContain("team_task_create")
-    expect(textPart!.text).toContain("team_send_message")
-    expect(textPart!.text).toContain("NEVER substitute with delegate_task")
-    expect(textPart!.text).toContain("for this task")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("[team-mode]")
+    expect(text).toContain("team_create")
+    expect(text).toContain("team_task_create")
+    expect(text).toContain("team_send_message")
+    expect(text).toContain("NEVER substitute with delegate_task")
+    expect(text).toContain("for this task")
   })
 
   test("should NOT trigger team-mode on bare 'team' without 'mode'", async () => {
@@ -1112,9 +1096,8 @@ describe("keyword-detector team mode", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - team-mode should NOT be triggered
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[team-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[team-mode]")
   })
 
   test("should filter team-mode keyword in non-main session (only ultrawork allowed there)", async () => {
@@ -1133,10 +1116,9 @@ describe("keyword-detector team mode", () => {
     await hook["chat.message"]({ sessionID: subagentSessionID }, output)
 
     // then - team-mode message should NOT be injected in subagent session
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("team mode please")
-    expect(textPart!.text).not.toContain("[team-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("team mode please")
+    expect(text).not.toContain("[team-mode]")
   })
 })
 
@@ -1191,10 +1173,9 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - search-mode injection should be skipped
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("search for the bug in the code")
-    expect(textPart!.text).not.toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("search for the bug in the code")
+    expect(text).not.toContain("[search-mode]")
   })
 
   test("should NOT inject analyze-mode when disabled_keywords includes 'analyze'", async () => {
@@ -1216,10 +1197,9 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - analyze-mode injection should be skipped
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("how to do this")
-    expect(textPart!.text).not.toContain("[analyze-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("how to do this")
+    expect(text).not.toContain("[analyze-mode]")
   })
 
   test("should NOT inject team-mode when disabled_keywords includes 'team'", async () => {
@@ -1241,10 +1221,9 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - team-mode injection should be skipped
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("let's use team mode for this")
-    expect(textPart!.text).not.toContain("[team-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("let's use team mode for this")
+    expect(text).not.toContain("[team-mode]")
   })
 
   test("should NOT inject ultrawork message AND not show toast when disabled_keywords includes 'ultrawork'", async () => {
@@ -1266,10 +1245,9 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - neither toast nor injection should occur
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork do this task")
-    expect(textPart!.text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("ultrawork do this task")
+    expect(text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
     expect(toastCalls).not.toContain("Ultrawork Mode Activated")
   })
 
@@ -1292,11 +1270,10 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - neither mode should inject
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("search and analyze the codebase")
-    expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).not.toContain("[analyze-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toBe("search and analyze the codebase")
+    expect(text).not.toContain("[search-mode]")
+    expect(text).not.toContain("[analyze-mode]")
   })
 
   test("should let other keywords through when only one is disabled", async () => {
@@ -1318,11 +1295,10 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - analyze should still inject, search should be skipped
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).toContain("[analyze-mode]")
-    expect(textPart!.text).toContain("search and analyze the codebase")
+    const text = expectTextPartText(output.parts)
+    expect(text).not.toContain("[search-mode]")
+    expect(text).toContain("[analyze-mode]")
+    expect(text).toContain("search and analyze the codebase")
   })
 
   test("should behave normally (all keywords enabled) when config is undefined", async () => {
@@ -1344,9 +1320,8 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - search-mode should inject as usual
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[search-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("[search-mode]")
   })
 
   test("should behave normally when disabled_keywords is an empty array", async () => {
@@ -1368,8 +1343,7 @@ describe("keyword-detector disabled_keywords config", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - analyze-mode should still inject
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[analyze-mode]")
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("[analyze-mode]")
   })
 })
