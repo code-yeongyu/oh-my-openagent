@@ -42,7 +42,10 @@ function removeFromTextBunLock(lockPath: string, packageNames: readonly string[]
     }
 
     return removed
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
@@ -52,7 +55,10 @@ function deleteBinaryBunLock(lockPath: string): boolean {
     fs.unlinkSync(lockPath)
     log(`[auto-update-checker] Removed bun.lockb to force re-resolution`)
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
@@ -146,8 +152,11 @@ export function invalidatePackage(
     }
 
     return true
-  } catch (err) {
-    log("[auto-update-checker] Failed to invalidate package:", err)
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+    log("[auto-update-checker] Failed to invalidate package:", error)
     return false
   }
 }
