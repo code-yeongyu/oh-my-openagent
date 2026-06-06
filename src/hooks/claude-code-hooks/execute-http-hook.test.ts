@@ -211,6 +211,18 @@ describe("executeHttpHook", () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('"decision":"allow"')
     })
+
+    it("#when response has non-JSON body #then returns body as stdout", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(new Response("plain output", { status: 200 }))
+      )
+      const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
+      const { executeHttpHook } = await import("./execute-http-hook")
+
+      const result = await executeHttpHook(hook, "{}")
+
+      expect(result).toEqual({ exitCode: 0, stdout: "plain output", stderr: "" })
+    })
   })
 
   describe("#given a failing HTTP response", () => {
@@ -225,6 +237,29 @@ describe("executeHttpHook", () => {
 
       expect(result.exitCode).toBe(1)
       expect(result.stderr).toContain("400")
+    })
+
+    it("#when response body read fails #then keeps HTTP error result with empty stdout", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          unsafeTestValue<Response>({
+            ok: false,
+            status: 502,
+            statusText: "Bad Gateway",
+            text: () => Promise.reject(new Error("body unavailable")),
+          })
+        )
+      )
+      const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
+      const { executeHttpHook } = await import("./execute-http-hook")
+
+      const result = await executeHttpHook(hook, "{}")
+
+      expect(result).toEqual({
+        exitCode: 1,
+        stderr: "HTTP hook returned status 502: Bad Gateway",
+        stdout: "",
+      })
     })
 
     it("#when fetch throws network error #then returns exit code 1", async () => {
