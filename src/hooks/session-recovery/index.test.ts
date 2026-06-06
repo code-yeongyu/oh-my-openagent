@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, describe, expect, it, mock } from "bun:test"
 import { detectErrorType } from "./index"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `session-recovery-thinking-prepend-${randomUUID()}`)
@@ -25,6 +25,10 @@ mock.module("../../shared", () => ({
     return fallback
   },
 }))
+
+afterEach(() => mock.restore())
+
+afterAll(() => rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true }))
 
 const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")
 const { injectTextPart } = await import("./storage/text-part-injector")
