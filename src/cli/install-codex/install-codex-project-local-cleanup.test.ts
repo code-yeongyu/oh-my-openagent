@@ -7,6 +7,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 
+const resolveTestGitBash = () => ({ found: true, path: "C:\\Git\\bin\\bash.exe", source: "env" }) as const
+
 async function createPackagedCodexRepoRoot(): Promise<string> {
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-cleanup-repo-"))
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
@@ -27,7 +29,7 @@ async function createPackagedCodexRepoRoot(): Promise<string> {
   )
   await writeFile(
     join(pluginRoot, "package.json"),
-    JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0", bin: { omo: "dist/cli.js" } }),
+    JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }),
   )
   await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
   await writeFile(join(pluginRoot, "hooks", "hooks.json"), JSON.stringify({ hooks: {} }))
@@ -65,6 +67,8 @@ describe("install-codex project-local cleanup", () => {
       binDir,
       repoRoot,
       projectDirectory,
+      platform: "win32",
+      gitBashResolver: resolveTestGitBash,
       runCommand: async () => undefined,
     })
 
@@ -110,6 +114,8 @@ describe("install-codex project-local cleanup", () => {
       binDir,
       repoRoot,
       projectDirectory,
+      platform: "win32",
+      gitBashResolver: resolveTestGitBash,
       runCommand: async () => undefined,
     })
 
@@ -137,6 +143,8 @@ describe("install-codex project-local cleanup", () => {
       binDir,
       repoRoot,
       projectDirectory,
+      platform: "win32",
+      gitBashResolver: resolveTestGitBash,
       runCommand: async () => undefined,
       log: (message) => logs.push(message),
     })
