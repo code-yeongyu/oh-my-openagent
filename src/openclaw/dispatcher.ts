@@ -94,7 +94,8 @@ function parseWakeMetadata(raw: string): Pick<WakeResult, "messageId" | "platfor
   if (!trimmed) return {}
   try {
     return extractWakeMetadata(JSON.parse(trimmed))
-  } catch {
+  } catch (parseError) {
+    if (!(parseError instanceof Error)) throw parseError
     const messageId = trimmed.match(/message\s+id:\s*([^\s]+)/i)?.[1]
     const platform = trimmed.match(/sent\s+via\s+([a-z0-9_-]+)/i)?.[1]?.toLowerCase()
     return {
