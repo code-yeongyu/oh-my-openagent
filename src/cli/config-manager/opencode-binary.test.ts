@@ -175,9 +175,12 @@ describe("getOpenCodeVersion (installer)", () => {
         throw unknownFailure
       })
 
-      const promise = getOpenCodeVersion()
+      const result = await getOpenCodeVersion().then(
+        () => "resolved",
+        (error: unknown) => error,
+      )
 
-      await expect(promise).rejects.toBe(unknownFailure)
+      expect(result).toBe(unknownFailure)
     })
   })
 })

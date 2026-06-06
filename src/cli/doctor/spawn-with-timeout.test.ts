@@ -89,10 +89,13 @@ describe("spawnWithTimeout", () => {
       )
 
       // when
-      const promise = spawnWithMockedSpawn(["test-command"], { stdout: "pipe", stderr: "pipe" })
+      const result = await spawnWithMockedSpawn(["test-command"], { stdout: "pipe", stderr: "pipe" }).then(
+        () => "resolved",
+        (error: unknown) => error,
+      )
 
       // then
-      await expect(promise).rejects.toBe(unknownFailure)
+      expect(result).toBe(unknownFailure)
     })
   })
 })
