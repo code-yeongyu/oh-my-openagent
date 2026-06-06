@@ -15,18 +15,22 @@ type LoopStateController = {
 	clear: () => boolean
 }
 
+function ignoreBestEffortFailure(error: unknown): void {
+	void error
+}
+
 function showToastBestEffort(
 	ctx: PluginInput,
 	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
 ): void {
 	try {
-		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch((error: unknown) => {
-			if (error instanceof Error) return
-		})
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(ignoreBestEffortFailure)
 	} catch (error: unknown) {
 		if (error instanceof Error) {
+			ignoreBestEffortFailure(error)
 			return
 		}
+		ignoreBestEffortFailure(error)
 	}
 }
 
@@ -143,9 +147,7 @@ export async function handleFailedVerification(
 	}
 
 	if (state.verification_session_id) {
-		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch((error: unknown) => {
-			if (error instanceof Error) return
-		})
+		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(ignoreBestEffortFailure)
 	}
 
 	const clearedState = loopState.clearVerificationState(
@@ -182,9 +184,7 @@ export async function handleFailedVerification(
 			variant: "warning",
 			duration: 5000,
 		},
-	}).catch((error: unknown) => {
-		if (error instanceof Error) return
-	})
+	}).catch(ignoreBestEffortFailure)
 
 	return true
 }
