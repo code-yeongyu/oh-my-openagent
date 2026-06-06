@@ -1,10 +1,18 @@
 import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
 
-import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput } from "./model-resolver"
+import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult } from "./model-resolver"
 import { _setModelResolutionLogImplementationForTesting } from "./model-resolution-pipeline"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 const logMock = mock(() => {})
+
+function expectResolved(result: ModelResolutionResult | undefined): ModelResolutionResult {
+  expect(result).toBeDefined()
+  if (result === undefined) {
+    throw new Error("expected model resolution result")
+  }
+  return result
+}
 
 describe("resolveModel", () => {
   describe("priority chain", () => {
@@ -132,8 +140,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/big-pickle")
-      expect(result!.source).toBe("override")
+      expect(expectResolved(result).model).toBe("opencode/big-pickle")
+      expect(expectResolved(result).source).toBe("override")
       expect(logMock).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/big-pickle" })
     })
 
@@ -150,8 +158,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/big-pickle")
-      expect(result!.source).toBe("override")
+      expect(expectResolved(result).model).toBe("opencode/big-pickle")
+      expect(expectResolved(result).source).toBe("override")
     })
 
     test("whitespace-only uiSelectedModel is treated as not provided", () => {
@@ -167,7 +175,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
       expect(logMock).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-7" })
     })
 
@@ -184,7 +192,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
     })
   })
 
@@ -204,8 +212,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("override")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("override")
       expect(logMock).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-7" })
     })
 
@@ -224,8 +232,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("custom/my-model")
-      expect(result!.source).toBe("override")
+      expect(expectResolved(result).model).toBe("custom/my-model")
+      expect(expectResolved(result).source).toBe("override")
     })
 
     test("whitespace-only userModel is treated as not provided", () => {
@@ -243,7 +251,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.source).not.toBe("override")
+      expect(expectResolved(result).source).not.toBe("override")
     })
 
     test("empty string userModel is treated as not provided", () => {
@@ -261,7 +269,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.source).not.toBe("override")
+      expect(expectResolved(result).source).not.toBe("override")
     })
   })
 
@@ -280,8 +288,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("github-copilot/claude-opus-4-7-preview")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("github-copilot/claude-opus-4-7-preview")
+      expect(expectResolved(result).source).toBe("provider-fallback")
       expect(logMock).toHaveBeenCalledWith("Model resolved via fallback chain (availability confirmed)", {
         provider: "github-copilot",
         model: "claude-opus-4-7",
@@ -304,8 +312,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("openai/gpt-5.4")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("openai/gpt-5.4")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("tries next provider when first provider has no match", () => {
@@ -322,8 +330,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/gpt-5-nano")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("opencode/gpt-5-nano")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("uses fuzzy matching within provider", () => {
@@ -340,8 +348,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("skips fallback chain when not provided", () => {
@@ -355,7 +363,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).source).toBe("system-default")
     })
 
     test("skips fallback chain when empty", () => {
@@ -370,7 +378,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).source).toBe("system-default")
     })
 
     test("case-insensitive fuzzy matching", () => {
@@ -387,8 +395,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("cross-provider fuzzy match when preferred provider unavailable (librarian scenario)", () => {
@@ -406,8 +414,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should find glm-5 from opencode via cross-provider fuzzy match
-      expect(result!.model).toBe("opencode/glm-5")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("opencode/glm-5")
+      expect(expectResolved(result).source).toBe("provider-fallback")
       expect(logMock).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
         model: "glm-5",
         match: "opencode/glm-5",
@@ -429,8 +437,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should prefer zai-coding-plan (specified provider) over opencode
-      expect(result!.model).toBe("zai-coding-plan/glm-5")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("zai-coding-plan/glm-5")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("cross-provider match preserves variant from entry", () => {
@@ -447,8 +455,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - variant should be preserved
-      expect(result!.model).toBe("opencode/glm-5")
-      expect(result!.variant).toBe("high")
+      expect(expectResolved(result).model).toBe("opencode/glm-5")
+      expect(expectResolved(result).variant).toBe("high")
     })
 
     test("cross-provider match tries next entry if no match found anywhere", () => {
@@ -466,8 +474,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should fall through to second entry
-      expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("anthropic/claude-sonnet-4-6")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
   })
 
@@ -486,8 +494,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("google/gemini-3.1-pro")
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro")
+      expect(expectResolved(result).source).toBe("system-default")
       expect(logMock).toHaveBeenCalledWith("No available model found in fallback chain, falling through to system default")
     })
 
@@ -525,8 +533,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should use connected provider (openai) from fallback chain
-      expect(result!.model).toBe("openai/claude-opus-4-7")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("openai/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -546,8 +554,8 @@ describe("resolveModelWithFallback", () => {
 
       // then - should use github-copilot (second provider) since google not connected
       // model name is transformed to preview variant for github-copilot provider
-      expect(result!.model).toBe("github-copilot/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("github-copilot/gemini-3.1-pro-preview")
+      expect(expectResolved(result).source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -566,8 +574,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - no provider in fallback is connected, fall through to system default
-      expect(result!.model).toBe("anthropic/claude-opus-4-7-20251101")
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7-20251101")
+      expect(expectResolved(result).source).toBe("system-default")
       cacheSpy.mockRestore()
     })
 
@@ -586,8 +594,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should fall through to system default
-      expect(result!.model).toBe("google/gemini-3.1-pro")
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro")
+      expect(expectResolved(result).source).toBe("system-default")
       cacheSpy.mockRestore()
     })
 
@@ -602,8 +610,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("google/gemini-3.1-pro")
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro")
+      expect(expectResolved(result).source).toBe("system-default")
     })
   })
 
@@ -623,8 +631,8 @@ describe("resolveModelWithFallback", () => {
       })
 
       // then
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("tries all providers in first entry before moving to second entry", () => {
@@ -642,8 +650,8 @@ describe("resolveModelWithFallback", () => {
       })
 
       // then
-      expect(result!.model).toBe("google/gemini-3.1-pro")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("returns first matching entry even if later entries have better matches", () => {
@@ -664,8 +672,8 @@ describe("resolveModelWithFallback", () => {
       })
 
       // then
-      expect(result!.model).toBe("openai/gpt-5.4")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("openai/gpt-5.4")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("falls through to system default when none match availability", () => {
@@ -684,8 +692,8 @@ describe("resolveModelWithFallback", () => {
       })
 
       // then
-      expect(result!.model).toBe("system/default")
-      expect(result!.source).toBe("system-default")
+      expect(expectResolved(result).model).toBe("system/default")
+      expect(expectResolved(result).source).toBe("system-default")
     })
   })
 
@@ -703,8 +711,8 @@ describe("resolveModelWithFallback", () => {
 
       // then
       expect(result).toBeDefined()
-      expect(typeof result!.model).toBe("string")
-      expect(["override", "provider-fallback", "system-default"]).toContain(result!.source)
+      expect(typeof expectResolved(result).model).toBe("string")
+      expect(["override", "provider-fallback", "system-default"]).toContain(expectResolved(result).source)
     })
   })
 
@@ -724,8 +732,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should fuzzy match gemini-3.1-pro → gemini-3.1-pro-preview
-      expect(result!.model).toBe("google/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("category-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro-preview")
+      expect(expectResolved(result).source).toBe("category-default")
     })
 
     test("categoryDefaultModel uses exact match when available", () => {
@@ -743,8 +751,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should use exact match
-      expect(result!.model).toBe("google/gemini-3.1-pro")
-      expect(result!.source).toBe("category-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro")
+      expect(expectResolved(result).source).toBe("category-default")
     })
 
     test("categoryDefaultModel falls through to fallbackChain when no match in availableModels", () => {
@@ -762,8 +770,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should fall through to fallbackChain
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
 
     test("userModel takes priority over categoryDefaultModel", () => {
@@ -782,8 +790,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - userModel wins
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("override")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("override")
     })
 
     test("categoryDefaultModel works when availableModels is empty but connected provider exists", () => {
@@ -799,8 +807,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should use transformed categoryDefaultModel since google is connected
-      expect(result!.model).toBe("google/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("category-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro-preview")
+      expect(expectResolved(result).source).toBe("category-default")
       cacheSpy.mockRestore()
     })
 
@@ -817,8 +825,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - gemini-3-flash should be transformed to gemini-3-flash-preview
-      expect(result!.model).toBe("google/gemini-3-flash-preview")
-      expect(result!.source).toBe("category-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3-flash-preview")
+      expect(expectResolved(result).source).toBe("category-default")
       cacheSpy.mockRestore()
     })
 
@@ -835,8 +843,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should NOT become gemini-3.1-pro-preview-preview
-      expect(result!.model).toBe("google/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("category-default")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro-preview")
+      expect(expectResolved(result).source).toBe("category-default")
       cacheSpy.mockRestore()
     })
 
@@ -855,8 +863,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should transform to preview variant for google provider
-      expect(result!.model).toBe("google/gemini-3.1-pro-preview")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("google/gemini-3.1-pro-preview")
+      expect(expectResolved(result).source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
@@ -873,8 +881,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should pass through unchanged
-      expect(result!.model).toBe("google/gemini-2.5-flash")
-      expect(result!.source).toBe("category-default")
+      expect(expectResolved(result).model).toBe("google/gemini-2.5-flash")
+      expect(expectResolved(result).source).toBe("category-default")
       cacheSpy.mockRestore()
     })
   })
@@ -924,8 +932,8 @@ describe("resolveModelWithFallback", () => {
 
       // then
       expect(result).toBeDefined()
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("override")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("override")
     })
 
     test("still returns fallback match when systemDefaultModel undefined", () => {
@@ -943,8 +951,8 @@ describe("resolveModelWithFallback", () => {
 
       // then
       expect(result).toBeDefined()
-      expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(result!.source).toBe("provider-fallback")
+      expect(expectResolved(result).model).toBe("anthropic/claude-opus-4-7")
+      expect(expectResolved(result).source).toBe("provider-fallback")
     })
   })
 })
