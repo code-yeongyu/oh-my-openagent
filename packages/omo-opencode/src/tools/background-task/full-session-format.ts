@@ -94,6 +94,9 @@ export async function formatFullSession(
       if (part.type === "tool_result") {
         return includeToolResults
       }
+      if (part.type === "tool_use" || part.type === "tool") {
+        return includeToolResults
+      }
       return part.type === "text"
     })
 
@@ -147,6 +150,9 @@ export async function formatFullSession(
         for (const toolText of toolTexts) {
           lines.push(`[tool result] ${toolText}`)
         }
+      } else if ((part.type === "tool_use" || part.type === "tool") && part.tool) {
+        const input = part.input === undefined ? "" : truncateText(JSON.stringify(part.input), thinkingMaxChars)
+        lines.push(`[tool: ${part.tool}] ${input}`.trimEnd())
       }
     }
   }
