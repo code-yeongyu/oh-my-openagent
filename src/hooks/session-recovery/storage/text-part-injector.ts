@@ -33,7 +33,10 @@ export function injectTextPart(sessionID: string, messageID: string, text: strin
   try {
     writeFileSync(join(partDir, `${partId}.json`), JSON.stringify(part, null, 2))
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
@@ -57,6 +60,9 @@ export async function injectTextPartAsync(
   try {
     return await patchPart(client, sessionID, messageID, partId, part)
   } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     log("[session-recovery] injectTextPartAsync failed", { error: String(error) })
     return false
   }

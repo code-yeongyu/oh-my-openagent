@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -27,6 +27,7 @@ mock.module("../../shared", () => ({
 }))
 
 const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")
+const { injectTextPart } = await import("./storage/text-part-injector")
 
 describe("detectErrorType", () => {
   describe("thinking_block_order errors", () => {
@@ -549,5 +550,22 @@ describe("thinking-prepend", () => {
 
     expect(result).toBe(false)
     expect(patchPartMock).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe("text-part-injector", () => {
+  it("returns false when part storage cannot accept a new injected part", () => {
+    // given
+    const messageID = "msg_text_injector_blocked"
+    mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    writeFileSync(join(TEST_PART_STORAGE, messageID), "not a directory")
+
+    // when
+    const result = injectTextPart("ses_text_injector", messageID, "visible answer")
+
+    // then
+    expect(result).toBe(false)
+
+    rmSync(join(TEST_PART_STORAGE, messageID), { force: true })
   })
 })
