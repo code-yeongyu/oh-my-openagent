@@ -63,8 +63,20 @@ gh issue list --repo "$TARGET_REPO" --search "<short error or symptom>" --state 
 ```
 
 8. If a matching open issue exists, add a comment with the new evidence instead of creating a duplicate.
-9. If no matching issue exists, create the issue with `gh` and apply the `lazycodex-generated` label.
-10. Create a PR only when the user asked for a PR, the fix is already implemented on a branch, or the smallest correct fix can be safely made in the selected repo. Apply the `lazycodex-generated` label to every PR created by this skill. Otherwise create an issue with fix guidance.
+9. Ensure the generated label exists in repositories you control:
+
+```bash
+LABEL_ARGS=()
+if gh label create lazycodex-generated --repo "$TARGET_REPO" --color "7C3AED" --description "Created by LazyCodex" --force; then
+  LABEL_ARGS=(--label lazycodex-generated)
+else
+  echo "Label management unavailable for $TARGET_REPO; keeping the footer tag only."
+fi
+```
+
+If the selected repo is `openai/codex` and label management is not available, still include the footer tag in the body and continue without claiming label creation succeeded.
+10. If no matching issue exists, create the issue with `gh` and apply the `lazycodex-generated` label.
+11. Create a PR only when the user asked for a PR, the fix is already implemented on a branch, or the smallest correct fix can be safely made in the selected repo. Apply the `lazycodex-generated` label to every PR created by this skill. Otherwise create an issue with fix guidance.
 
 ## Required Label And Footer
 
@@ -164,7 +176,7 @@ Prefer `gh`:
 ```bash
 ISSUE_BODY="/tmp/lcx-report-bug-$(date +%Y%m%d-%H%M%S).md"
 $EDITOR "$ISSUE_BODY"
-gh issue create --repo "$TARGET_REPO" --title "<clear title>" --label lazycodex-generated --body-file "$ISSUE_BODY"
+gh issue create --repo "$TARGET_REPO" --title "<clear title>" "${LABEL_ARGS[@]}" --body-file "$ISSUE_BODY"
 ```
 
 If `$EDITOR` is not usable, write the file with the available file-editing tool, then run the same `gh issue create` command.
@@ -174,14 +186,16 @@ For an existing issue:
 ```bash
 COMMENT_BODY="/tmp/lcx-report-bug-comment-$(date +%Y%m%d-%H%M%S).md"
 gh issue comment "<issue-number>" --repo "$TARGET_REPO" --body-file "$COMMENT_BODY"
-gh issue edit "<issue-number>" --repo "$TARGET_REPO" --add-label lazycodex-generated
+if [ "${#LABEL_ARGS[@]}" -gt 0 ]; then
+  gh issue edit "<issue-number>" --repo "$TARGET_REPO" --add-label lazycodex-generated
+fi
 ```
 
 For a PR from a branch pushed to the selected repo or fork:
 
 ```bash
 PR_BODY="/tmp/lcx-report-bug-pr-$(date +%Y%m%d-%H%M%S).md"
-gh pr create --repo "$TARGET_REPO" --title "<clear title>" --label lazycodex-generated --body-file "$PR_BODY"
+gh pr create --repo "$TARGET_REPO" --title "<clear title>" "${LABEL_ARGS[@]}" --body-file "$PR_BODY"
 ```
 
 After creating or commenting, return the issue or PR URL and a short summary of the evidence used.
