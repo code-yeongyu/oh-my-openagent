@@ -123,7 +123,12 @@ export function injectHookMessage(
     writeFileSync(messagePath, JSON.stringify(messageMeta, null, 2))
 
     return true
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      removeInjectionArtifact(join(messageDir, `${messageID}.json`), sessionID)
+      removeInjectionArtifact(join(PART_STORAGE, messageID), sessionID)
+      return false
+    }
     removeInjectionArtifact(join(messageDir, `${messageID}.json`), sessionID)
     removeInjectionArtifact(join(PART_STORAGE, messageID), sessionID)
     return false
