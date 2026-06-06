@@ -73,6 +73,7 @@ async function detectOracleVerificationFromParentSession(
 
 		return undefined
 	} catch (error) {
+		if (!(error instanceof Error)) throw error
 		log(`[${HOOK_NAME}] Failed to scan parent session for oracle verification evidence`, {
 			parentSessionID,
 			error: String(error),
@@ -112,6 +113,7 @@ function showCompletionToastBestEffort(ctx: PluginInput, state: RalphLoopState):
 	try {
 		void Promise.resolve(showToast(toastBody)).catch(logToastError)
 	} catch (error) {
+		if (!(error instanceof Error)) throw error
 		logToastError(error)
 	}
 }

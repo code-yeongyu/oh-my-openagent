@@ -21,7 +21,8 @@ function showToastBestEffort(
 ): void {
 	try {
 		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
-	} catch {
+	} catch (error) {
+		if (!(error instanceof Error)) throw error
 	}
 }
 
@@ -74,6 +75,7 @@ export async function handleFailedVerification(
 	try {
 		messageCountAtStart = await getSessionMessageCount(ctx, parentSessionID, directory)
 	} catch (error) {
+		if (!(error instanceof Error)) throw error
 		log(`[${HOOK_NAME}] Failed to read parent session before verification retry`, {
 			parentSessionID,
 			error: String(error),
@@ -121,6 +123,7 @@ export async function handleFailedVerification(
 			return false
 		}
 	} catch (error) {
+		if (!(error instanceof Error)) throw error
 		log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
 			parentSessionID,
 			error: String(error),

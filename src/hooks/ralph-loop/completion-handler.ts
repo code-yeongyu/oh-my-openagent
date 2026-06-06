@@ -17,7 +17,8 @@ function showToastBestEffort(
 ): void {
 	try {
 		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
-	} catch {
+	} catch (error) {
+		if (!(error instanceof Error)) throw error
 	}
 }
 

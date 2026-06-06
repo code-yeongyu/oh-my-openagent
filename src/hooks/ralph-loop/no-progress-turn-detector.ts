@@ -109,6 +109,7 @@ export async function latestAssistantTurnMadeNoProgress(
 		}
 		return false
 	} catch (error) {
+		if (!(error instanceof Error)) throw error
 		log("[ralph-loop] Failed to detect no-progress assistant turn", {
 			sessionID: input.sessionID,
 			error: String(error),
