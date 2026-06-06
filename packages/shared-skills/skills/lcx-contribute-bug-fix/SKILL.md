@@ -22,8 +22,8 @@ Create a PR that includes:
 - reproduction logs from before the fix
 - the smallest implementation that fixes the defect
 - verification logs from after the fix
-- the GitHub label `lazycodex-generated`
-- the required LazyCodex footer tag
+- apply `lazycodex-generated` when label management is available
+- the required LazyCodex footer tag `Tag: lazycodex-generated`
 - cleanup of temporary worktrees and clones
 
 ## Required Workflow
@@ -51,23 +51,50 @@ If `gh` cannot clone, use `git clone --depth=1 "https://github.com/$TARGET_REPO"
 6. Write or update a failing regression test before production changes. Confirm it fails for the bug, not for a missing fixture or typo.
 7. Implement the smallest correct fix. Avoid refactors unless the fix cannot be made safely without one.
 8. Run the regression test, adjacent tests, and the smallest real-surface QA command that proves the user-visible behavior changed.
-9. Generate the PR body with `scripts/create-pr-body.mjs`.
-10. Ensure the generated label exists, then push and create the PR:
+9. Commit the verified fix before pushing. Inspect the status first so the PR cannot be empty or stale:
 
 ```bash
-gh label create lazycodex-generated --repo "$TARGET_REPO" --color "7C3AED" --description "Created by LazyCodex" ||
-  gh label edit lazycodex-generated --repo "$TARGET_REPO" --color "7C3AED" --description "Created by LazyCodex"
-
-git push -u origin "$BRANCH_NAME"
-gh pr create --repo "$TARGET_REPO" --title "<short fix title>" --label lazycodex-generated --body-file "$PR_BODY"
+git status --short
+git add -A
+git commit -m "fix: <short bug-fix summary>"
+git log --oneline "origin/$BASE_BRANCH..HEAD"
 ```
 
-11. Clean up:
+10. Generate the PR body with `scripts/create-pr-body.mjs`.
+11. Ensure the generated label exists when the target repo allows label management. Keep the footer tag even when label creation is unavailable:
+
+```bash
+LABEL_ARGS=()
+if gh label create lazycodex-generated --repo "$TARGET_REPO" --color "7C3AED" --description "Created by LazyCodex" --force; then
+  LABEL_ARGS=(--label lazycodex-generated)
+else
+  echo "Label management unavailable for $TARGET_REPO; keeping the footer tag only."
+fi
+```
+
+12. Push to a writable remote, then create the PR. For upstream `openai/codex`, fork first and use the fork as the head repository:
+
+```bash
+PUSH_REMOTE="origin"
+PR_HEAD="$BRANCH_NAME"
+if [ "$TARGET_REPO" = "openai/codex" ]; then
+  gh repo fork "$TARGET_REPO" --remote --remote-name fork
+  PUSH_REMOTE="fork"
+  GH_USER="$(gh api user --jq .login)"
+  PR_HEAD="$GH_USER:$BRANCH_NAME"
+fi
+
+git push -u "$PUSH_REMOTE" "$BRANCH_NAME"
+gh pr create --repo "$TARGET_REPO" --base "$BASE_BRANCH" --head "$PR_HEAD" --title "<short fix title>" "${LABEL_ARGS[@]}" --body-file "$PR_BODY"
+```
+
+13. Clean up:
 
 ```bash
 cd /
 git -C "$WORK_ROOT/repo" worktree remove "$WORK_ROOT/worktree"
-rm -rf "$WORK_ROOT"
+find "$WORK_ROOT" -mindepth 1 -maxdepth 1 -exec rm -r -- {} +
+rmdir "$WORK_ROOT"
 ```
 
 Return the PR URL, the reproduction command, the verification command, and the cleanup receipt.
@@ -144,6 +171,6 @@ Do not open:
 
 - a PR without a failing-before and passing-after test
 - a PR without a real-surface QA command
-- a PR without the `lazycodex-generated` label
+- a PR without the `Tag: lazycodex-generated` footer
 - a vague fix that does not identify the root cause
 - a broad refactor disguised as a bug fix
