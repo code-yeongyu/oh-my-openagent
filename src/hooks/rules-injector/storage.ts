@@ -28,7 +28,10 @@ export function loadInjectedRules(sessionID: string): {
       contentHashes: new Set(data.injectedHashes),
       realPaths: new Set(data.injectedRealPaths ?? []),
     };
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
     return { contentHashes: new Set(), realPaths: new Set() };
   }
 }
