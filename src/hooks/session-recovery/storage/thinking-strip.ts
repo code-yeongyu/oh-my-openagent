@@ -28,7 +28,10 @@ export function stripThinkingParts(messageID: string): boolean {
         unlinkSync(filePath)
         anyRemoved = true
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
@@ -61,6 +64,9 @@ export async function stripThinkingPartsAsync(
 
     return anyRemoved
   } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     log("[session-recovery] stripThinkingPartsAsync failed", { error: String(error) })
     return false
   }
