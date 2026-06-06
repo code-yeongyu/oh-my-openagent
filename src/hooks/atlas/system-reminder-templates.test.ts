@@ -7,11 +7,37 @@ import {
   VERIFICATION_REMINDER_GEMINI,
 } from "./system-reminder-templates"
 
+function requireContinuationRulesSection(): string {
+  const rulesSection = BOULDER_CONTINUATION_PROMPT.split("RULES:")[1]
+  expect(rulesSection).toBeDefined()
+  if (rulesSection === undefined) {
+    throw new Error("Expected boulder continuation rules section")
+  }
+  return rulesSection
+}
+
+function requireFirstRule(rulesSection: string): string {
+  const firstRule = rulesSection.split("\n")[1]
+  expect(firstRule).toBeDefined()
+  if (firstRule === undefined) {
+    throw new Error("Expected first boulder continuation rule")
+  }
+  return firstRule.trim()
+}
+
+function requireMatchIndex(match: RegExpMatchArray | null, label: string): number {
+  expect(match).not.toBeNull()
+  if (match === null || match.index === undefined) {
+    throw new Error(`Expected ${label} match index`)
+  }
+  return match.index
+}
+
 describe("BOULDER_CONTINUATION_PROMPT", () => {
   describe("checkbox-first priority rules", () => {
     it("first rule after RULES: mentions both reading the plan AND marking a still-unchecked completed task", () => {
-      const rulesSection = BOULDER_CONTINUATION_PROMPT.split("RULES:")[1]!
-      const firstRule = rulesSection.split("\n")[1]!.trim()
+      const rulesSection = requireContinuationRulesSection()
+      const firstRule = requireFirstRule(rulesSection)
 
       expect(firstRule).toContain("Read the plan")
       expect(firstRule).toContain("mark")
@@ -19,23 +45,20 @@ describe("BOULDER_CONTINUATION_PROMPT", () => {
     })
 
     it("first rule includes IMMEDIATELY keyword", () => {
-      const rulesSection = BOULDER_CONTINUATION_PROMPT.split("RULES:")[1]!
-      const firstRule = rulesSection.split("\n")[1]!.trim()
+      const rulesSection = requireContinuationRulesSection()
+      const firstRule = requireFirstRule(rulesSection)
 
       expect(firstRule).toContain("IMMEDIATELY")
     })
 
     it("checkbox-marking guidance appears BEFORE Proceed without asking for permission", () => {
-      const rulesSection = BOULDER_CONTINUATION_PROMPT.split("RULES:")[1]!
+      const rulesSection = requireContinuationRulesSection()
 
       const checkboxMarkingMatch = rulesSection.match(/- \[x\]/i)
       const proceedMatch = rulesSection.match(/Proceed without asking for permission/)
 
-      expect(checkboxMarkingMatch).not.toBeNull()
-      expect(proceedMatch).not.toBeNull()
-
-      const checkboxPosition = checkboxMarkingMatch!.index ?? -1
-      const proceedPosition = proceedMatch!.index ?? -1
+      const checkboxPosition = requireMatchIndex(checkboxMarkingMatch, "checkbox marking")
+      const proceedPosition = requireMatchIndex(proceedMatch, "proceed guidance")
 
       expect(checkboxPosition).toBeLessThan(proceedPosition)
     })

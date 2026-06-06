@@ -173,10 +173,13 @@ describe("resizeImageFallback", () => {
 
       //#then
       expect(result).not.toBeNull()
-      expect(result?.original).toEqual({ width: 2000, height: 1500 })
-      expect(result?.resized).toEqual({ width: 1568, height: 1176 })
+      if (result === null) {
+        throw new Error("Expected resized image result")
+      }
+      expect(result.original).toEqual({ width: 2000, height: 1500 })
+      expect(result.resized).toEqual({ width: 1568, height: 1176 })
 
-      const parsed = parseImageDimensions(result!.resizedDataUrl, "image/png")
+      const parsed = parseImageDimensions(result.resizedDataUrl, "image/png")
       expect(parsed).toEqual({ width: 1568, height: 1176 })
     })
 
@@ -189,7 +192,10 @@ describe("resizeImageFallback", () => {
 
       //#then
       expect(result).not.toBeNull()
-      const parsed = parseImageDimensions(result!.resizedDataUrl, "image/png")
+      if (result === null) {
+        throw new Error("Expected resized image result")
+      }
+      const parsed = parseImageDimensions(result.resizedDataUrl, "image/png")
       expect(parsed).toEqual({ width: 100, height: 100 })
     })
 
