@@ -168,40 +168,26 @@ describe("run environment setup", () => {
 describe("run with invalid model", () => {
   it("given invalid --model value, when run, then returns exit code 1 with error message", async () => {
     // given
-    const originalExit = process.exit
     const originalError = console.error
     const errorMessages: string[] = []
-    const exitCodes: number[] = []
 
     console.error = (...args: unknown[]) => {
       errorMessages.push(args.map(String).join(" "))
     }
-    process.exit = ((code?: number) => {
-      exitCodes.push(code ?? 0)
-      throw new Error("exit")
-    }) as typeof process.exit
 
     try {
       // when
-      // Note: This will actually try to run - but the issue is that resolveRunModel
-      // is called BEFORE the try block, so it throws an unhandled exception
-      // We're testing the runner's error handling
       const { run } = await import("./runner")
+      const exitCode = await run({
+        message: "test",
+        model: "invalid",
+      })
 
-      // This will throw because model "invalid" is invalid format
-      try {
-        await run({
-          message: "test",
-          model: "invalid",
-        })
-      } catch {
-        // Expected to potentially throw due to unhandled model resolution error
-      }
+      // then
+      expect(exitCode).toBe(1)
+      expect(errorMessages.join("\n")).toContain("Model string must be in 'provider/model' format")
     } finally {
-      // then - verify error handling
-      // Currently this will fail because the error is not caught properly
       console.error = originalError
-      process.exit = originalExit
     }
   })
 })
