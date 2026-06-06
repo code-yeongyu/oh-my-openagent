@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -49,6 +49,10 @@ async function setupRuntime(memberNames: string[]): Promise<{ teamRunId: string;
 
 afterEach(() => {
   ackCallCount = 0
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 describe("pollAndBuildInjection", () => {

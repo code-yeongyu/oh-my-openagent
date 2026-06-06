@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { selectCiTestTargets } from "./run-ci-tests"
 
 describe("plain test script policy", () => {
-  test("#given mock.module tests in the suite #then bun run test remains the package test script", async () => {
+  test("#given global mock tests in the suite #then bun run test keeps one process with serialized scheduling", async () => {
     //#given
     const packageJson = await Bun.file("package.json").json()
 
     //#then
-    expect(packageJson.scripts.test).toBe("bun test")
+    expect(packageJson.scripts.test).toBe("bun test --max-concurrency=1")
   })
 
   test("#given isolated test shards #when selecting targets #then shards are deterministic and complete", () => {
