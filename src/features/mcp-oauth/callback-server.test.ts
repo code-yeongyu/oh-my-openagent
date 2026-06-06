@@ -3,7 +3,6 @@ import { request as httpRequest } from "node:http"
 import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
-const BASE_TEST_PORT = 19877
 
 describe("startCallbackServer", () => {
   function request(url: string): Promise<Response> {
@@ -39,10 +38,10 @@ describe("startCallbackServer", () => {
   }
 
   it("starts server and returns port", async () => {
-    const server = await startCallbackServer(BASE_TEST_PORT)
+    const server = await startCallbackServer(0)
 
     try {
-      expect(server.port).toBeGreaterThanOrEqual(BASE_TEST_PORT)
+      expect(server.port).toBeGreaterThan(0)
       expect(typeof server.waitForCallback).toBe("function")
       expect(typeof server.close).toBe("function")
     } finally {
@@ -51,7 +50,7 @@ describe("startCallbackServer", () => {
   })
 
   it("resolves callback with code and state from query params", async () => {
-    const server = await startCallbackServer(BASE_TEST_PORT + 10)
+    const server = await startCallbackServer(0)
 
     try {
       const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=test-code&state=test-state`
@@ -70,7 +69,7 @@ describe("startCallbackServer", () => {
   })
 
   it("returns 404 for non-callback routes", async () => {
-    const server = await startCallbackServer(BASE_TEST_PORT + 20)
+    const server = await startCallbackServer(0)
 
     try {
       const response = await request(`http://${HOSTNAME}:${server.port}/other`)
@@ -82,7 +81,7 @@ describe("startCallbackServer", () => {
   })
 
   it("returns 400 and rejects when code is missing", async () => {
-    const server = await startCallbackServer(BASE_TEST_PORT + 30)
+    const server = await startCallbackServer(0)
 
     try {
       const callbackRejection = server.waitForCallback().catch((error: Error) => error)
@@ -91,14 +90,17 @@ describe("startCallbackServer", () => {
       expect(response.status).toBe(400)
       const error = await callbackRejection
       expect(error).toBeInstanceOf(Error)
-      expect((error as Error).message).toContain("missing code or state")
+      if (!(error instanceof Error)) {
+        throw new Error("Expected callback rejection to be an Error")
+      }
+      expect(error.message).toContain("missing code or state")
     } finally {
       close(server)
     }
   })
 
   it("returns 400 and rejects when state is missing", async () => {
-    const server = await startCallbackServer(BASE_TEST_PORT + 40)
+    const server = await startCallbackServer(0)
 
     try {
       const callbackRejection = server.waitForCallback().catch((error: Error) => error)
@@ -107,14 +109,17 @@ describe("startCallbackServer", () => {
       expect(response.status).toBe(400)
       const error = await callbackRejection
       expect(error).toBeInstanceOf(Error)
-      expect((error as Error).message).toContain("missing code or state")
+      if (!(error instanceof Error)) {
+        throw new Error("Expected callback rejection to be an Error")
+      }
+      expect(error.message).toContain("missing code or state")
     } finally {
       close(server)
     }
   })
 
   it("close stops the server immediately", async () => {
-    const server = await startCallbackServer(BASE_TEST_PORT + 50)
+    const server = await startCallbackServer(0)
     const port = server.port
 
     server.close()
