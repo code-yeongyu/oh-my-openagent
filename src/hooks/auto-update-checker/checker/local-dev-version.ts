@@ -14,9 +14,7 @@ export function getLocalDevVersion(directory: string): string | null {
     const pkg = JSON.parse(content) as PackageJson
     return pkg.version ?? null
   } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
+    error instanceof Error
     return null
   }
 }

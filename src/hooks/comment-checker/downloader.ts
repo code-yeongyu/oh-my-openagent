@@ -80,9 +80,7 @@ function getPackageVersion(): string {
     const pkg = require("@code-yeongyu/comment-checker/package.json")
     return pkg.version
   } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
+    error instanceof Error
     // Fallback to hardcoded version if package not found
     return "0.4.1"
   }

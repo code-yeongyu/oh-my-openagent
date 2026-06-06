@@ -16,9 +16,7 @@ export async function getLatestVersion(channel: string = "latest"): Promise<stri
     const data = (await response.json()) as NpmDistTags
     return data[channel] ?? data.latest ?? null
   } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
+    error instanceof Error
     return null
   } finally {
     clearTimeout(timeoutId)

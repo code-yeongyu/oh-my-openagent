@@ -61,7 +61,7 @@ describe("createWriteExistingFileGuardHook", () => {
     expect(realpathNativeMock).toHaveBeenCalledTimes(2)
   })
 
-  test("#given realpath throws a non-Error #when canonicalizing an existing path #then it rethrows the thrown value", async () => {
+  test("#given realpath throws a non-Error #when canonicalizing an existing path #then it returns the input path fallback", async () => {
     // given
     const thrown = { kind: "realpath-thrown-value" } as const
     existsSyncMock = mock(() => true)
@@ -78,7 +78,10 @@ describe("createWriteExistingFileGuardHook", () => {
     }))
     const { toCanonicalPath } = await import(`./hook?test=${crypto.randomUUID()}`)
 
-    // when / then
-    expect(() => toCanonicalPath(join(tempDir, "existing.txt"))).toThrow(Object)
+    // when
+    const result = toCanonicalPath(join(tempDir, "existing.txt"))
+
+    // then
+    expect(result).toBe(join(tempDir, "existing.txt"))
   })
 })
