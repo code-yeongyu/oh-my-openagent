@@ -216,7 +216,7 @@ describe("archive extraction preflight", () => {
 		mkdirSync(zipDestDir, { recursive: true })
 		writeFileSync(join(sourceDir, "bin", "tool.txt"), "safe")
 		symlinkSync("tool.txt", join(sourceDir, "bin", "tool-link"))
-		const scriptPath = writePythonScript(
+		const tarScriptPath = writePythonScript(
 			rootDir,
 			"make-safe-tar.py",
 			[
@@ -227,8 +227,23 @@ describe("archive extraction preflight", () => {
 				"    archive.add(source_dir, arcname='.')",
 			].join("\n")
 		)
-		runCommand(`python3 "${scriptPath}" "${tarArchivePath}" "${sourceDir}"`)
-		runCommand(`zip -qry "${zipArchivePath}" .`, sourceDir)
+		const zipScriptPath = writePythonScript(
+			rootDir,
+			"make-safe-zip.py",
+			[
+				"import sys",
+				"import zipfile",
+				"archive_path, source_dir = sys.argv[1], sys.argv[2]",
+				"with zipfile.ZipFile(archive_path, 'w') as archive:",
+				"    archive.write(source_dir + '/bin/tool.txt', 'bin/tool.txt')",
+				"    info = zipfile.ZipInfo('bin/tool-link')",
+				"    info.create_system = 3",
+				"    info.external_attr = 0o120777 << 16",
+				"    archive.writestr(info, 'tool.txt')",
+			].join("\n")
+		)
+		runCommand(`python3 "${tarScriptPath}" "${tarArchivePath}" "${sourceDir}"`)
+		runCommand(`python3 "${zipScriptPath}" "${zipArchivePath}" "${sourceDir}"`)
 
 		//#when
 		await extractTarGz(tarArchivePath, tarDestDir)
