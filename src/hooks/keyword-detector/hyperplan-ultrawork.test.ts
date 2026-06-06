@@ -34,6 +34,15 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     })
   }
 
+  function textOf(output: { readonly parts: readonly { readonly type: string; readonly text?: string }[] }): string {
+    const textPart = output.parts.find((part) => part.type === "text")
+    expect(textPart).toBeDefined()
+    if (!textPart || typeof textPart.text !== "string") {
+      throw new Error("expected text part")
+    }
+    return textPart.text
+  }
+
   test("should inject combo message when user types 'hpp ulw' (forward order)", async () => {
     // given - main session with adjacent forward-order combo keywords
     const sessionID = "combo-forward-session"
@@ -48,11 +57,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - combo banner and embedded ultrawork content both present
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).toContain("<ultrawork-mode>")
-    expect(textPart!.text).toContain("refactor the auth module")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<ultrawork-mode>")
+    expect(text).toContain("refactor the auth module")
   })
 
   test("should inject combo message when user types 'ulw hpp' (reverse order)", async () => {
@@ -69,11 +77,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - combo fires identically regardless of word order
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).toContain("<ultrawork-mode>")
-    expect(textPart!.text).toContain("ship this feature")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<ultrawork-mode>")
+    expect(text).toContain("ship this feature")
   })
 
   test("should NOT trigger combo on non-adjacent 'hpp do ulw' but fire both standalones instead", async () => {
@@ -90,11 +97,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - combo absent, both standalone banners injected separately
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).toContain("<hyperplan-mode>")
-    expect(textPart!.text).toContain("<ultrawork-mode>")
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<hyperplan-mode>")
+    expect(text).toContain("<ultrawork-mode>")
   })
 
   test("should suppress standalone messages when combo fires (only ONE banner injected)", async () => {
@@ -111,11 +117,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - only combo banner present, standalone hyperplan suppressed, ultrawork content appears once via embed
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
-    const ultraworkMatches = textPart!.text!.match(/<ultrawork-mode>/g) ?? []
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-ultrawork-mode>")
+    expect(text).not.toContain("<hyperplan-mode>")
+    const ultraworkMatches = text.match(/<ultrawork-mode>/g) ?? []
     expect(ultraworkMatches).toHaveLength(1)
   })
 
@@ -158,11 +163,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - combo absent, both individual standalones still match and inject
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).toContain("<hyperplan-mode>")
-    expect(textPart!.text).toContain("<ultrawork-mode>")
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<hyperplan-mode>")
+    expect(text).toContain("<ultrawork-mode>")
   })
 
   test("should block combo via intersection rule when disabled_keywords includes 'ultrawork'", async () => {
@@ -185,11 +189,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - no combo, no ultrawork content leaks; standalone hyperplan still fires
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).not.toContain("<ultrawork-mode>")
-    expect(textPart!.text).toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-ultrawork-mode>")
+    expect(text).not.toContain("<ultrawork-mode>")
+    expect(text).toContain("<hyperplan-mode>")
     expect(toastCalls).not.toContain("Hyperplan Ultrawork Mode Activated")
     expect(toastCalls).not.toContain("Ultrawork Mode Activated")
   })
@@ -209,11 +212,10 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID: subagentSessionID }, output)
 
     // then - combo banner reaches non-main session (whitelisted alongside standalone ultrawork)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).toContain("<ultrawork-mode>")
-    expect(textPart!.text).toContain("run this")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<ultrawork-mode>")
+    expect(text).toContain("run this")
   })
 
   test("should filter combo when agent is prometheus (planner)", async () => {
@@ -229,12 +231,11 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
     // then - text untouched: combo, ultrawork, and hyperplan all filtered for planner
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("hpp ulw plan stuff")
-    expect(textPart!.text).not.toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).not.toContain("<ultrawork-mode>")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("hpp ulw plan stuff")
+    expect(text).not.toContain("<hyperplan-ultrawork-mode>")
+    expect(text).not.toContain("<ultrawork-mode>")
+    expect(text).not.toContain("<hyperplan-mode>")
   })
 
   test("should reuse ultrawork variant: combo with GPT model embeds GPT ultrawork content", async () => {
@@ -254,9 +255,8 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     )
 
     // then - combo banner present and GPT-variant ultrawork content embedded (output_verbosity_spec is GPT-only)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-ultrawork-mode>")
-    expect(textPart!.text).toContain("<output_verbosity_spec>")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-ultrawork-mode>")
+    expect(text).toContain("<output_verbosity_spec>")
   })
 })
