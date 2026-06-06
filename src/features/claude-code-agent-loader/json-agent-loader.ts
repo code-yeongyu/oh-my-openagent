@@ -47,7 +47,8 @@ export function parseJsonAgentFile(filePath: string, scope: AgentScope): LoadedA
       config,
       scope,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return null
     return null
   }
 }
