@@ -169,6 +169,26 @@ describe("system loaded version", () => {
       expect(loadedVersion.loadedVersion).toBe("7.7.7")
     })
 
+    it("returns null versions when selected package JSON files are invalid", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+
+      writeFileSync(join(configDir, "package.json"), "{not json", "utf-8")
+      const installedPackagePath = join(configDir, "node_modules", PACKAGE_NAME, "package.json")
+      mkdirSync(dirname(installedPackagePath), { recursive: true })
+      writeFileSync(installedPackagePath, "{not json", "utf-8")
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.installedPackagePath).toBe(installedPackagePath)
+      expect(loadedVersion.expectedVersion).toBeNull()
+      expect(loadedVersion.loadedVersion).toBeNull()
+    })
+
     it("resolves symlinked config directories before selecting install path", () => {
       //#given
       const realConfigDir = createTemporaryDirectory("omo-real-config-")
