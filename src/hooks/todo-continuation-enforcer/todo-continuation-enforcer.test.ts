@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { createTodoContinuationEnforcer } from "."
 import {
   CONTINUATION_COOLDOWN_MS,
@@ -16,7 +17,6 @@ type FakeTimerID = number & ReturnType<typeof setTimeout> & ReturnType<typeof se
 
 interface FakeTimers {
   advanceBy: (ms: number, advanceClock?: boolean) => Promise<void>
-  advanceClockBy: (ms: number) => Promise<void>
   restore: () => void
 }
 
@@ -43,7 +43,7 @@ function createFakeTimers(): FakeTimers {
     return delay < 0 ? 0 : delay
   }
 
-  const flushMicrotasks = async (iterations: number = 5) => {
+  const flushMicrotasks = async (iterations: number = 25) => {
     for (let index = 0; index < iterations; index++) {
       await Promise.resolve()
     }
@@ -144,12 +144,6 @@ function createFakeTimers(): FakeTimers {
     await flushMicrotasks()
   }
 
-  const advanceClockBy = async (ms: number) => {
-    const clamped = Math.max(0, ms)
-    clockNow += clamped
-    await flushMicrotasks()
-  }
-
   const restore = () => {
     globalThis.setTimeout = original.setTimeout
     globalThis.clearTimeout = original.clearTimeout
@@ -158,7 +152,7 @@ function createFakeTimers(): FakeTimers {
     Date.now = original.dateNow
   }
 
-  return { advanceBy, advanceClockBy, restore }
+  return { advanceBy, restore }
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -241,6 +235,7 @@ describe("todo-continuation-enforcer", () => {
 
   beforeEach(() => {
     fakeTimers = createFakeTimers()
+    releaseAllPromptAsyncReservationsForTesting()
     _resetForTesting()
     promptCalls = []
     toastCalls = []
@@ -249,6 +244,7 @@ describe("todo-continuation-enforcer", () => {
 
   afterEach(() => {
     fakeTimers.restore()
+    releaseAllPromptAsyncReservationsForTesting()
     _resetForTesting()
   })
 
@@ -763,7 +759,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
@@ -835,7 +831,7 @@ describe("todo-continuation-enforcer", () => {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
       if (index < MAX_CONSECUTIVE_FAILURES - 1) {
-        await fakeTimers.advanceClockBy(1_000_000)
+        await fakeTimers.advanceBy(1_000_000, true)
       }
     }
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -871,7 +867,7 @@ describe("todo-continuation-enforcer", () => {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
       if (index < MAX_CONSECUTIVE_FAILURES - 1) {
-        await fakeTimers.advanceClockBy(1_000_000)
+        await fakeTimers.advanceBy(1_000_000, true)
       }
     }
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -917,14 +913,14 @@ describe("todo-continuation-enforcer", () => {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
       if (index < MAX_CONSECUTIVE_FAILURES - 1) {
-        await fakeTimers.advanceClockBy(1_000_000)
+        await fakeTimers.advanceBy(1_000_000, true)
       }
     }
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
-    await fakeTimers.advanceClockBy(FAILURE_RESET_WINDOW_MS)
+    await fakeTimers.advanceBy(FAILURE_RESET_WINDOW_MS, true)
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
@@ -951,10 +947,10 @@ describe("todo-continuation-enforcer", () => {
     //#when
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
@@ -986,10 +982,10 @@ describe("todo-continuation-enforcer", () => {
     //#when
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 2)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS * 2, true)
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
@@ -1011,19 +1007,19 @@ describe("todo-continuation-enforcer", () => {
     //#when — 5 consecutive idle cycles with unchanged todos
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
@@ -1083,6 +1079,7 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.deleted", properties: { info: { id: sessionID } } },
     })
+    releaseAllPromptAsyncReservationsForTesting()
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
@@ -2183,7 +2180,7 @@ describe("todo-continuation-enforcer", () => {
     await fakeTimers.advanceBy(2500, true)
 
     // when - wait past any cooldown, try again
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 100)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS * 100, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
@@ -2222,7 +2219,7 @@ describe("todo-continuation-enforcer", () => {
     await fakeTimers.advanceBy(2500, true)
 
     // when - wait past cooldown, try again
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 2)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS * 2, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
