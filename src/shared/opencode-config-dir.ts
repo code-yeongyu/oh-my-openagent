@@ -97,7 +97,8 @@ function getCliDefaultConfigDir(): string {
   const xdgConfig = shouldIgnoreWindowsXdg
     ? posix.join(getWslLinuxHomeDir(envXdgConfig) ?? "/home", ".config")
     : envXdgConfig || join(homedir(), ".config")
-  return resolveConfigPath(join(xdgConfig, "opencode"))
+  const configDir = isWslEnvironment() ? posix.join(xdgConfig, "opencode") : join(xdgConfig, "opencode")
+  return resolveConfigPath(configDir)
 }
 
 function getCliCustomConfigDir(): string | null {
