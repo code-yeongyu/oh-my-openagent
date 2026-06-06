@@ -300,7 +300,7 @@ export function installModuleMockLifecycle(
 
     if (activeMocks.size > 0) {
       const result = delegateRestore()
-      replayActiveMocks()
+      restoreUnpreservedModuleMocks()
       return result
     }
 
