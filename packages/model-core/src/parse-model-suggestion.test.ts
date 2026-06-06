@@ -65,4 +65,11 @@ describe("parseModelSuggestion", () => {
     expect(parseModelSuggestion(new Error("Connection timeout"))).toBeNull()
     expect(parseModelSuggestion(null)).toBeNull()
   })
+
+  it("returns null for circular object payloads without messages", () => {
+    const error: { self?: unknown } = {}
+    error.self = error
+
+    expect(parseModelSuggestion(error)).toBeNull()
+  })
 })

@@ -4,16 +4,27 @@ export interface ModelSuggestionInfo {
   suggestion: string
 }
 
+function hasProperty(value: object, key: PropertyKey): value is object & Record<PropertyKey, unknown> {
+  return key in value
+}
+
+function readProperty(value: unknown, key: PropertyKey): unknown {
+  if (typeof value !== "object" || value === null) return undefined
+  if (!hasProperty(value, key)) return undefined
+  return value[key]
+}
+
 function extractMessage(error: unknown): string {
   if (typeof error === "string") return error
   if (error instanceof Error) return error.message
   if (typeof error === "object" && error !== null) {
-    const obj = error as Record<string, unknown>
-    if (typeof obj.message === "string") return obj.message
+    const message = readProperty(error, "message")
+    if (typeof message === "string") return message
     try {
       return JSON.stringify(error)
-    } catch {
-      return ""
+    } catch (jsonError) {
+      if (jsonError instanceof TypeError) return ""
+      throw jsonError
     }
   }
   return String(error)
@@ -23,15 +34,13 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
   if (!error) return null
 
   if (typeof error === "object") {
-    const errObj = error as Record<string, unknown>
-
-    if (errObj.name === "ProviderModelNotFoundError" && typeof errObj.data === "object" && errObj.data !== null) {
-      const data = errObj.data as Record<string, unknown>
-      const suggestions = data.suggestions
-      if (Array.isArray(suggestions) && suggestions.length > 0 && typeof suggestions[0] === "string") {
+    if (readProperty(error, "name") === "ProviderModelNotFoundError") {
+      const data = readProperty(error, "data")
+      const suggestions = readProperty(data, "suggestions")
+      if (typeof data === "object" && data !== null && Array.isArray(suggestions) && typeof suggestions[0] === "string") {
         return {
-          providerID: String(data.providerID ?? ""),
-          modelID: String(data.modelID ?? ""),
+          providerID: String(readProperty(data, "providerID") ?? ""),
+          modelID: String(readProperty(data, "modelID") ?? ""),
           suggestion: suggestions[0],
         }
       }
@@ -39,7 +48,7 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
     }
 
     for (const key of ["data", "error", "cause"] as const) {
-      const nested = errObj[key]
+      const nested = readProperty(error, key)
       if (nested && typeof nested === "object") {
         const result = parseModelSuggestion(nested)
         if (result) return result
@@ -53,13 +62,14 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
   const modelMatch = message.match(/model not found:\s*([^/\s]+)\s*\/\s*([^.\s]+)/i)
   const suggestionMatch = message.match(/did you mean:\s*([^,?]+)/i)
 
-  if (modelMatch && suggestionMatch) {
-    return {
-      providerID: modelMatch[1].trim(),
-      modelID: modelMatch[2].trim(),
-      suggestion: suggestionMatch[1].trim(),
-    }
-  }
+  const providerID = modelMatch?.[1]
+  const modelID = modelMatch?.[2]
+  const suggestion = suggestionMatch?.[1]
+  if (!providerID || !modelID || !suggestion) return null
 
-  return null
+  return {
+    providerID: providerID.trim(),
+    modelID: modelID.trim(),
+    suggestion: suggestion.trim(),
+  }
 }
