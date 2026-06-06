@@ -85,7 +85,10 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
           : undefined,
       strategy: data.strategy === "reset" || data.strategy === "continue" ? data.strategy : undefined,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
@@ -148,7 +151,10 @@ ${state.prompt}
 
     writeFileSync(filePath, content, "utf-8")
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
@@ -161,7 +167,10 @@ export function clearState(directory: string, customPath?: string): boolean {
       unlinkSync(filePath)
     }
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
