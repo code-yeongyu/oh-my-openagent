@@ -76,12 +76,7 @@ describe("sendMessage", () => {
     const result = sendMessage(message, randomUUID(), config, { isLead: false, activeMembers: ["m1"] })
 
     // then
-    try {
-      await result
-      throw new Error("expected sendMessage to reject")
-    } catch (error) {
-      expect(error).toBeInstanceOf(PayloadTooLargeError)
-    }
+    await expect(result).rejects.toBeInstanceOf(PayloadTooLargeError)
   })
 
   test("rejects sends when recipient unread bytes exceed the backpressure limit", async () => {
@@ -97,12 +92,7 @@ describe("sendMessage", () => {
     const result = sendMessage(createMessage(), teamRunId, config, { isLead: false, activeMembers: ["m1"] })
 
     // then
-    try {
-      await result
-      throw new Error("expected sendMessage to reject")
-    } catch (error) {
-      expect(error).toBeInstanceOf(RecipientBackpressureError)
-    }
+    await expect(result).rejects.toBeInstanceOf(RecipientBackpressureError)
   })
 
   test("counts in-flight .delivering-* reservations toward recipient backpressure", async () => {
@@ -123,12 +113,7 @@ describe("sendMessage", () => {
     const result = sendMessage(createMessage(), teamRunId, config, { isLead: false, activeMembers: ["m1"] })
 
     // then
-    try {
-      await result
-      throw new Error("expected sendMessage to reject")
-    } catch (error) {
-      expect(error).toBeInstanceOf(RecipientBackpressureError)
-    }
+    await expect(result).rejects.toBeInstanceOf(RecipientBackpressureError)
   })
 
   test("rejects duplicate message ids for the same recipient", async () => {
@@ -143,12 +128,7 @@ describe("sendMessage", () => {
     const result = sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["m1"] })
 
     // then
-    try {
-      await result
-      throw new Error("expected sendMessage to reject")
-    } catch (error) {
-      expect(error).toBeInstanceOf(DuplicateMessageIdError)
-    }
+    await expect(result).rejects.toBeInstanceOf(DuplicateMessageIdError)
   })
 
   test("gates broadcasts to leads and fans out to each active member", async () => {
@@ -169,12 +149,7 @@ describe("sendMessage", () => {
     })
 
     // then
-    try {
-      await rejectedSend
-      throw new Error("expected sendMessage to reject")
-    } catch (error) {
-      expect(error).toBeInstanceOf(BroadcastNotPermittedError)
-    }
+    await expect(rejectedSend).rejects.toBeInstanceOf(BroadcastNotPermittedError)
 
     expect(await deliveredSend).toEqual({
       messageId: broadcastMessage.messageId,

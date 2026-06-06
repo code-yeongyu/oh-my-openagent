@@ -51,15 +51,10 @@ test("claimTask rejects blocked tasks until blockers complete", async () => {
     )
 
     // when
-    let blockedError: unknown = null
-    try {
-      await claimTask(fixture.teamRunId, blockedTask.id, "member-a", fixture.config)
-    } catch (error) {
-      blockedError = error
-    }
+    const blockedClaim = claimTask(fixture.teamRunId, blockedTask.id, "member-a", fixture.config)
 
     // then
-    expect(blockedError).toBeInstanceOf(BlockedByError)
+    await expect(blockedClaim).rejects.toBeInstanceOf(BlockedByError)
 
     // given
     await claimTask(fixture.teamRunId, blockerTask.id, "member-b", fixture.config)
@@ -81,11 +76,11 @@ test("claimTask reaps a stale claim lock before claiming", async () => {
   // given
   const fixture = await createTasklistFixture()
 
-    try {
-      const task = await createTask(fixture.teamRunId, createTaskInput(), fixture.config)
-      const tasksDirectory = getTasksDir(resolveBaseDir(fixture.config), fixture.teamRunId)
-      const staleLockPath = path.join(tasksDirectory, "claims", `${task.id}.lock`)
-      await writeFile(staleLockPath, `member-z\n999999\n${Date.now() - 600_000}\n`)
+  try {
+    const task = await createTask(fixture.teamRunId, createTaskInput(), fixture.config)
+    const tasksDirectory = getTasksDir(resolveBaseDir(fixture.config), fixture.teamRunId)
+    const staleLockPath = path.join(tasksDirectory, "claims", `${task.id}.lock`)
+    await writeFile(staleLockPath, `member-z\n999999\n${Date.now() - 600_000}\n`)
 
     // when
     const claimedTask = await claimTask(fixture.teamRunId, task.id, "member-a", fixture.config)

@@ -64,16 +64,14 @@ test("updateTaskStatus rejects reverse transitions", async () => {
     )
 
     // when
-    let thrownError: unknown = null
-    try {
-      await updateTaskStatus(fixture.teamRunId, task.id, "claimed", "member-a", fixture.config)
-    } catch (error) {
-      thrownError = error
-    }
+    const reversedTransition = updateTaskStatus(fixture.teamRunId, task.id, "claimed", "member-a", fixture.config)
 
     // then
-    expect(thrownError).toBeInstanceOf(InvalidTaskTransitionError)
-    expect(thrownError).toHaveProperty("message", "no reverse transitions from completed to claimed")
+    await expect(reversedTransition).rejects.toBeInstanceOf(InvalidTaskTransitionError)
+    await expect(reversedTransition).rejects.toHaveProperty(
+      "message",
+      "no reverse transitions from completed to claimed",
+    )
   } finally {
     await fixture.cleanup()
   }
@@ -91,15 +89,10 @@ test("updateTaskStatus rejects non-owner updates except deletion", async () => {
     )
 
     // when
-    let crossOwnerError: unknown = null
-    try {
-      await updateTaskStatus(fixture.teamRunId, task.id, "in_progress", "member-b", fixture.config)
-    } catch (error) {
-      crossOwnerError = error
-    }
+    const crossOwnerUpdate = updateTaskStatus(fixture.teamRunId, task.id, "in_progress", "member-b", fixture.config)
 
     // then
-    expect(crossOwnerError).toBeInstanceOf(CrossOwnerUpdateError)
+    await expect(crossOwnerUpdate).rejects.toBeInstanceOf(CrossOwnerUpdateError)
 
     // when
     const deletedTask = await updateTaskStatus(fixture.teamRunId, task.id, "deleted", "lead-member", fixture.config)
