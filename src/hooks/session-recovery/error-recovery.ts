@@ -57,8 +57,11 @@ export function createSessionErrorRecoveryHandler(
         const msgs = normalizeSDKResponse(messagesResp, [] as MessageData[])
         const lastAssistant = msgs?.findLast((m) => m.info?.role === "assistant" && m.info?.error)
         assistantMsgID = lastAssistant?.info?.id
-      } catch {
-        log("[session-recovery] Failed to fetch messages for messageID fallback", { sessionID })
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
+        log("[session-recovery] Failed to fetch messages for messageID fallback", { sessionID, error })
       }
     }
 
@@ -96,7 +99,12 @@ export function createSessionErrorRecoveryHandler(
         callbacks.onAbortCallback(sessionID)
       }
 
-      await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+      await ctx.client.session.abort({ path: { id: sessionID } }).catch((error: unknown) => {
+        if (!(error instanceof Error)) {
+          throw error
+        }
+        log("[session-recovery] Failed to abort session before recovery", { sessionID, error })
+      })
 
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
@@ -118,7 +126,12 @@ export function createSessionErrorRecoveryHandler(
             duration: 3000,
           },
         })
-        .catch(() => {})
+        .catch((error: unknown) => {
+          if (!(error instanceof Error)) {
+            throw error
+          }
+          log("[session-recovery] Failed to show recovery toast", { sessionID, error })
+        })
 
       let success = false
 
@@ -152,6 +165,9 @@ export function createSessionErrorRecoveryHandler(
       }
       return success
     } catch (err) {
+      if (!(err instanceof Error)) {
+        throw err
+      }
       log("[session-recovery] Recovery failed:", err)
       return false
     } finally {
