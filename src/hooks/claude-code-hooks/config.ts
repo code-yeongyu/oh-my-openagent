@@ -249,7 +249,10 @@ export async function loadClaudeHooksConfig(
           const normalizedHooks = normalizeHooksConfig(settings.hooks)
           mergedConfig = mergeHooksConfig(mergedConfig, normalizedHooks)
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof Error) {
+          continue
+        }
         continue
       }
     }

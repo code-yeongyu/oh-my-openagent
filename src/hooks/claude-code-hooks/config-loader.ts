@@ -72,7 +72,11 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
     const content = await bunFile(path).text()
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
-    log("Failed to load config", { path, error })
+    if (error instanceof Error) {
+      log("Failed to load config", { path, error })
+      return null
+    }
+    log("Failed to load config", { path, error: String(error) })
     return null
   }
 }
@@ -141,7 +145,12 @@ function getRegex(pattern: string): RegExp {
     try {
       regex = new RegExp(pattern)
       regexCache.set(pattern, regex)
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        regexCache.set(pattern, regex)
+        return regex
+      }
       regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       regexCache.set(pattern, regex)
     }

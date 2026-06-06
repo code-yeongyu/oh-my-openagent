@@ -1,4 +1,4 @@
-const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -66,6 +66,25 @@ describe("loadClaudeHooksConfig", () => {
     expect(getStopCommands(ttlReloaded)).not.toContain("first-stop-command")
     expect(getStopCommands(manuallyReloaded)).toContain("third-stop-command")
     expect(getStopCommands(manuallyReloaded)).not.toContain("second-stop-command")
+  })
+
+  test("#given settings parsing throws a non-Error value #when hooks config loads #then it falls back to no config", async () => {
+    //#given
+    writeSettingsFile(customSettingsPath, "stop-command")
+    const thrownValue = "parse failed"
+    const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
+      throw thrownValue
+    })
+
+    try {
+      //#when
+      const result = await loadClaudeHooksConfig(customSettingsPath)
+
+      //#then
+      expect(result).toBeNull()
+    } finally {
+      parseSpy.mockRestore()
+    }
   })
 })
 
