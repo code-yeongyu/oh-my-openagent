@@ -1,9 +1,9 @@
 declare const require: (name: string) => any
-const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")
+const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:test")
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 let readConnectedProvidersCacheSpy: ReturnType<typeof spyOn> | undefined
-const { shouldRetryError, selectFallbackProvider, isRetryableModelError } = await import("./model-error-classifier")
+const { shouldRetryError, selectFallbackProvider, isRetryableModelError, isProviderScopedError } = await import("./model-error-classifier")
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
@@ -115,6 +115,58 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(result).toBe(false)
+  })
+
+  describe("isProviderScopedError", () => {
+    const quotaCases = [
+      { label: "QuotaExceededError", error: { name: "QuotaExceededError" } },
+      { label: "quotaexceedederror", error: { name: "quotaexceedederror" } },
+      { label: "InsufficientCreditsError", error: { name: "InsufficientCreditsError" } },
+      { label: "insufficientcreditserror", error: { name: "insufficientcreditserror" } },
+      { label: "FreeUsageLimitError", error: { name: "FreeUsageLimitError" } },
+      { label: "freeusagelimiterror", error: { name: "freeusagelimiterror" } },
+      { label: "quota exceeded", error: { message: "quota exceeded for this billing period" } },
+      { label: "insufficient credits", error: { message: "insufficient credits to complete this request" } },
+      { label: "account in arrears", error: { message: "Your account is in arrears, please recharge and try again." } },
+      { label: "daily call limit", error: { message: "Daily call limit for this API key has been reached." } },
+      { label: "localized quota", error: { message: "额度不足" } },
+    ]
+
+    for (const quotaCase of quotaCases) {
+      test(`treats ${quotaCase.label} as provider-scoped and non-retryable`, () => {
+        //#given
+        const error = quotaCase.error
+
+        //#when
+        const providerScoped = isProviderScopedError(error)
+        const retryable = shouldRetryError(error)
+
+        //#then
+        expect(providerScoped).toBe(true)
+        expect(retryable).toBe(false)
+      })
+    }
+
+    const nonQuotaCases = [
+      { label: "rate limit message", error: { message: "rate limit reached" } },
+      { label: "503 message", error: { message: "503 Service Unavailable" } },
+      { label: "overloaded message", error: { message: "Provider is overloaded" } },
+      { label: "429 status only", error: { statusCode: 429 } },
+      { label: "RateLimitError name only", error: { name: "RateLimitError" } },
+    ]
+
+    for (const nonQuotaCase of nonQuotaCases) {
+      test(`does not treat ${nonQuotaCase.label} as provider-scoped`, () => {
+        //#given
+        const error = nonQuotaCase.error
+
+        //#when
+        const result = isProviderScopedError(error)
+
+        //#then
+        expect(result).toBe(false)
+      })
+    }
   })
 
   test("treats insufficientcreditserror (lowercase name) as non-retryable STOP error", () => {

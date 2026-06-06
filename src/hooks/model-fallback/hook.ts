@@ -27,6 +27,7 @@ export type ModelFallbackState = {
   fallbackChain: FallbackEntry[]
   attemptCount: number
   pending: boolean
+  requiresProviderSwitch: boolean
 }
 
 type ModelFallbackControllerWithState = Pick<
@@ -88,12 +89,14 @@ export function setPendingModelFallback(
   agentName: string,
   currentProviderID: string,
   currentModelID: string,
+  requiresProviderSwitch: boolean,
 ): boolean {
   return controller.setPendingModelFallback(
     sessionID,
     agentName,
     currentProviderID,
     currentModelID,
+    requiresProviderSwitch,
   )
 }
 

@@ -201,6 +201,7 @@ export async function executeSyncTask(
           fallbackChain,
           attemptCount: 0,
           pending: true,
+          requiresProviderSwitch: false,
         }
       : undefined
     let activeSessionID = sessionID

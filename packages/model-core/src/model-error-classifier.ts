@@ -14,7 +14,17 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "authenticationerror",
 ])
 
-const STOP_ERROR_NAMES: Set<string> = new Set([])
+/**
+ * Provider-scoped quota/billing exhaustion error names. Permanent for the CURRENT
+ * provider but may succeed on a DIFFERENT provider (independent billing). Non-retryable
+ * on their own; surfaced via isProviderScopedError so the call site can retry only when
+ * the fallback switches providers.
+ */
+const STOP_ERROR_NAMES = new Set([
+  "quotaexceedederror",
+  "insufficientcreditserror",
+  "freeusagelimiterror",
+])
 
 /**
  * Error names that should NOT trigger retry.
@@ -84,12 +94,40 @@ const RETRYABLE_MESSAGE_PATTERNS = [
 ]
 
 /**
- * Message patterns that indicate a non-retryable STOP error.
- * These take precedence over RETRYABLE_MESSAGE_PATTERNS.
- * NOTE: Quota/billing patterns were removed to allow cross-provider fallback,
- * since different providers have independent billing/quota systems.
+ * Message patterns that indicate a provider-scoped quota/billing STOP error.
+ * These take precedence over RETRYABLE_MESSAGE_PATTERNS and are surfaced via
+ * isProviderScopedError for provider-aware fallback at the call site.
  */
-const STOP_MESSAGE_PATTERNS: string[] = []
+const STOP_MESSAGE_PATTERNS = [
+  "quota will reset after",
+  "quota exceeded",
+  "free usage limit",
+  "billing limit",
+  "billing hard limit",
+  "monthly limit",
+  "plan limit",
+  "subscription quota",
+  "subscription limit",
+  "payment required",
+  "out of credits",
+  "credits exhausted",
+  "insufficient credits",
+  "insufficient balance",
+  "credit balance",
+  "usage limit for this month",
+  "exhausted your capacity",
+  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
+  "daily call limit",
+  "daily limit",
+  "usage limit reached for",
+  "in arrears",
+  "fair use policy",
+  "recharge and try",
+  "使用上限",
+  "额度不足",
+  "余额不足",
+  "已耗尽",
+]
 
 const AUTO_RETRY_GATE_PATTERNS = [
   "rate limit",
@@ -136,10 +174,8 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   const msg = error.message?.toLowerCase() ?? ""
 
   // STOP patterns take precedence over retryable patterns
-  for (const pattern of STOP_MESSAGE_PATTERNS) {
-    if (msg.includes(pattern)) {
-      return false
-    }
+  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+    return false
   }
 
   if (hasProviderAutoRetrySignal(msg)) {
@@ -164,6 +200,21 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
  */
 export function shouldRetryError(error: ErrorInfo): boolean {
   return isRetryableModelError(error)
+}
+
+/**
+ * Determines if an error is scoped to the CURRENT provider's quota/billing.
+ * Such errors are permanent for the current provider but a DIFFERENT provider
+ * (independent billing system) may still succeed. Unlike isRetryableModelError,
+ * which stays false for these, this lets the fallback call site retry quota/billing
+ * exhaustion only when the next fallback switches to another provider.
+ */
+export function isProviderScopedError(error: ErrorInfo): boolean {
+  if (error.name && STOP_ERROR_NAMES.has(error.name.toLowerCase())) {
+    return true
+  }
+  const msg = error.message?.toLowerCase() ?? ""
+  return STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 
 /**

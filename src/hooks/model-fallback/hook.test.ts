@@ -100,6 +100,7 @@ describe("model fallback hook", () => {
       "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-7-thinking",
+      false,
     )
     expect(set).toBe(true)
 
@@ -132,7 +133,7 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_main"
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7-thinking"),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7-thinking", false),
     ).toBe(true)
 
     const firstOutput = {
@@ -151,10 +152,10 @@ describe("model fallback hook", () => {
     })
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7", false),
     ).toBe(true)
 
-    const secondOutput = {
+    const secondOutput: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> } = {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
@@ -179,6 +180,7 @@ describe("model fallback hook", () => {
       "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-7-thinking",
+      false,
     )
     const secondSet = setPendingModelFallback(
       modelFallback,
@@ -186,6 +188,7 @@ describe("model fallback hook", () => {
       "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-7-thinking",
+      false,
     )
 
     expect(firstSet).toBe(true)
@@ -232,6 +235,7 @@ describe("model fallback hook", () => {
         "Sisyphus - Ultraworker",
         "anthropic",
         "claude-opus-4-7",
+        false,
       ),
     ).toBe(true)
 
@@ -274,6 +278,7 @@ describe("model fallback hook", () => {
         "Sisyphus - Ultraworker",
         "quotio",
         "claude-opus-4-7",
+        false,
       ),
     ).toBe(true)
 
@@ -318,6 +323,7 @@ describe("model fallback hook", () => {
         "Sisyphus - Ultraworker",
         "provider-x",
         "current-model",
+        false,
       ),
     ).toBe(true)
 
@@ -348,6 +354,7 @@ describe("model fallback hook", () => {
       "Sisyphus - Junior",
       "anthropic",
       "claude-sonnet-4-6",
+      false,
     )
 
     expect(set).toBe(false)
@@ -362,8 +369,8 @@ describe("model fallback hook", () => {
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
     }>(createModelFallbackHook({
-      toast: async ({ title, message }) => {
-        toastCalls.push({ title, message })
+      toast: async (input: { title: string; message: string }) => {
+        toastCalls.push({ title: input.title, message: input.message })
       },
     }))
 
@@ -373,6 +380,7 @@ describe("model fallback hook", () => {
       "Sisyphus - Ultraworker",
       "anthropic",
       "claude-opus-4-7-thinking",
+      false,
     )
     expect(set).toBe(true)
 
@@ -411,6 +419,7 @@ describe("model fallback hook", () => {
       "Atlas - Plan Executor",
       "github-copilot",
       "claude-sonnet-4-5",
+      false,
     )
     expect(set).toBe(true)
 
@@ -452,6 +461,7 @@ describe("model fallback hook", () => {
       "Oracle",
       "google",
       "gemini-3.1-pro-preview",
+      false,
     )
     expect(set).toBe(true)
 

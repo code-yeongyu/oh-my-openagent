@@ -240,7 +240,7 @@ describe("createEventHandler - model fallback", () => {
     let pendingFallbackArms = 0
     const modelFallback = unsafeTestValue({
       setSessionFallbackChain: () => {},
-      setPendingModelFallback: () => {
+      setPendingModelFallback: (..._args: [string, string, string, string, boolean]) => {
         pendingFallbackArms += 1
         return true
       },
@@ -311,7 +311,7 @@ describe("createEventHandler - model fallback", () => {
     let pendingFallbackArms = 0
     const modelFallback = unsafeTestValue({
       setSessionFallbackChain: () => {},
-      setPendingModelFallback: () => {
+      setPendingModelFallback: (..._args: [string, string, string, string, boolean]) => {
         pendingFallbackArms += 1
         return true
       },
@@ -371,7 +371,7 @@ describe("createEventHandler - model fallback", () => {
     let pendingFallbackArms = 0
     const modelFallback = unsafeTestValue({
       setSessionFallbackChain: () => {},
-      setPendingModelFallback: () => {
+      setPendingModelFallback: (..._args: [string, string, string, string, boolean]) => {
         pendingFallbackArms += 1
         return true
       },
@@ -423,7 +423,7 @@ describe("createEventHandler - model fallback", () => {
     let pendingFallbackArms = 0
     const modelFallback = unsafeTestValue({
       setSessionFallbackChain: () => {},
-      setPendingModelFallback: () => {
+      setPendingModelFallback: (..._args: [string, string, string, string, boolean]) => {
         pendingFallbackArms += 1
         return true
       },

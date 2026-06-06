@@ -2,7 +2,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
-import { getNextReachableFallback } from "./next-fallback"
+import { getNextReachableFallback, hasEligibleFallback } from "./next-fallback"
 
 type ModelFallbackStateLike = {
   providerID: string
@@ -10,6 +10,7 @@ type ModelFallbackStateLike = {
   fallbackChain: FallbackEntry[]
   attemptCount: number
   pending: boolean
+  requiresProviderSwitch: boolean
 }
 
 function canonicalizeModelIDForDuplicateCheck(modelID: string): string {
@@ -35,6 +36,7 @@ export type ModelFallbackStateController = {
     agentName: string,
     currentProviderID: string,
     currentModelID: string,
+    requiresProviderSwitch: boolean,
   ) => boolean
   getNextFallback: (sessionID: string) => ReturnType<typeof getNextReachableFallback>
   clearPendingModelFallback: (sessionID: string) => void
@@ -69,6 +71,7 @@ export function createModelFallbackStateController(input: {
     agentName: string,
     currentProviderID: string,
     currentModelID: string,
+    requiresProviderSwitch: boolean,
   ): boolean {
     const agentKey = getAgentConfigKey(agentName)
     const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
@@ -81,13 +84,19 @@ export function createModelFallbackStateController(input: {
 
     const existing = pendingModelFallbacks.get(sessionID)
     if (!existing) {
-      pendingModelFallbacks.set(sessionID, {
+      const state = {
         providerID: currentProviderID,
         modelID: currentModelID,
         fallbackChain,
         attemptCount: 0,
         pending: true,
-      })
+        requiresProviderSwitch,
+      }
+      if (requiresProviderSwitch && !hasEligibleFallback(state)) {
+        log(`[model-fallback] No cross-provider fallback for provider-scoped error in session: ${sessionID}`)
+        return false
+      }
+      pendingModelFallbacks.set(sessionID, state)
       log(`[model-fallback] Set pending fallback for session: ${sessionID}, agent: ${agentName}`)
       return true
     }
@@ -104,9 +113,15 @@ export function createModelFallbackStateController(input: {
 
     existing.providerID = currentProviderID
     existing.modelID = currentModelID
+    existing.requiresProviderSwitch = requiresProviderSwitch
     existing.pending = true
     if (existing.attemptCount >= existing.fallbackChain.length) {
       log(`[model-fallback] Fallback chain exhausted for session: ${sessionID}`)
+      return false
+    }
+    if (requiresProviderSwitch && !hasEligibleFallback(existing)) {
+      existing.pending = false
+      log(`[model-fallback] No cross-provider fallback for provider-scoped error in session: ${sessionID}`)
       return false
     }
     log(`[model-fallback] Re-armed pending fallback for session: ${sessionID}`)

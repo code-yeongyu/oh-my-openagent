@@ -43,6 +43,7 @@ export async function retrySyncPromptWithFallbacks(input: {
     fallbackChain,
     attemptCount: 0,
     pending: true,
+    requiresProviderSwitch: false,
   }
 
   let finalError = initialError

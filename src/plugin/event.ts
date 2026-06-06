@@ -31,7 +31,7 @@ import { readConnectedProvidersCache } from "../shared/connected-providers-cache
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { log } from "../shared/logger";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
-import { shouldRetryError } from "../shared/model-error-classifier";
+import { isProviderScopedError, shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state";
@@ -269,6 +269,9 @@ export function createEventHandler(args: {
 
     return "opencode";
   };
+
+  const hasReliableProviderSignal = (sessionID: string, providerHint?: string): boolean =>
+    !!providerHint?.trim() || !!getSessionModel(sessionID)?.providerID || !!lastKnownModelBySession.get(sessionID)?.providerID;
 
   const getEventSessionID = (input: EventInput): string | undefined => {
     const properties = input.event.properties;
@@ -802,8 +805,12 @@ export function createEventHandler(args: {
             const errorName = extractErrorName(assistantError);
             const errorMessage = extractErrorMessage(assistantError);
             const errorInfo = { name: errorName, message: errorMessage };
+            const providerHint = info?.providerID as string | undefined;
+            const providerScopedError = isProviderScopedError(errorInfo);
+            const requiresProviderSwitch = providerScopedError && hasReliableProviderSignal(sessionID, providerHint);
+            const errorAllowsFallback = requiresProviderSwitch || (!providerScopedError && shouldRetryError(errorInfo));
 
-            if (shouldRetryError(errorInfo)) {
+            if (errorAllowsFallback) {
               // Prefer the agent/model/provider from the assistant message payload.
               let agentName = agent ?? getSessionAgent(sessionID);
               if (!agentName && sessionID === getMainSessionID()) {
@@ -817,7 +824,6 @@ export function createEventHandler(args: {
               }
 
               if (agentName) {
-                const providerHint = info?.providerID as string | undefined;
                 const currentProvider = resolveFallbackProviderID(sessionID, providerHint);
                 const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-7";
                 const currentModel = normalizeFallbackModelID(rawModel);
@@ -834,7 +840,7 @@ export function createEventHandler(args: {
                   applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
 
                   const setFallback = modelFallback
-                    ? setPendingModelFallback(modelFallback, sessionID, agentName, currentProvider, currentModel)
+                    ? setPendingModelFallback(modelFallback, sessionID, agentName, currentProvider, currentModel, requiresProviderSwitch)
                     : false;
 
                   if (setFallback && shouldAutoContinue) {
@@ -865,18 +871,21 @@ export function createEventHandler(args: {
       if (sessionID && status?.type === "retry" && isModelFallbackEnabled && !isRuntimeFallbackEnabled) {
         try {
           const retryMessage = typeof status.message === "string" ? status.message : "";
-          const parsedForKey = extractProviderModelFromErrorMessage(retryMessage);
+          const parsed = extractProviderModelFromErrorMessage(retryMessage);
           const retryAttempt = extractRetryAttempt(status.attempt, retryMessage);
           // Deduplicate countdown updates for the same retry attempt/model.
           // Messages like "retrying in 7m 56s" change every second but should only trigger once.
-          const retryKey = `${retryAttempt}:${parsedForKey.providerID ?? ""}/${parsedForKey.modelID ?? ""}:${normalizeRetryStatusMessage(retryMessage)}`;
+          const retryKey = `${retryAttempt}:${parsed.providerID ?? ""}/${parsed.modelID ?? ""}:${normalizeRetryStatusMessage(retryMessage)}`;
           if (lastHandledRetryStatusKey.get(sessionID) === retryKey) {
             return;
           }
           lastHandledRetryStatusKey.set(sessionID, retryKey);
 
           const errorInfo = { name: undefined as string | undefined, message: retryMessage };
-          if (shouldRetryError(errorInfo)) {
+          const providerScopedError = isProviderScopedError(errorInfo);
+          const requiresProviderSwitch = providerScopedError && hasReliableProviderSignal(sessionID, parsed.providerID);
+          const errorAllowsFallback = requiresProviderSwitch || (!providerScopedError && shouldRetryError(errorInfo));
+          if (errorAllowsFallback) {
             let agentName = getSessionAgent(sessionID);
             if (!agentName && sessionID === getMainSessionID()) {
               if (retryMessage.includes("claude-opus") || retryMessage.includes("opus")) {
@@ -889,7 +898,6 @@ export function createEventHandler(args: {
             }
 
             if (agentName) {
-              const parsed = extractProviderModelFromErrorMessage(retryMessage);
               const lastKnown = lastKnownModelBySession.get(sessionID);
               const currentProvider = resolveFallbackProviderID(sessionID, parsed.providerID);
               let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-7";
@@ -907,7 +915,7 @@ export function createEventHandler(args: {
                 applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
 
                 const setFallback = modelFallback
-                  ? setPendingModelFallback(modelFallback, sessionID, agentName, currentProvider, currentModel)
+                  ? setPendingModelFallback(modelFallback, sessionID, agentName, currentProvider, currentModel, requiresProviderSwitch)
                   : false;
 
                 if (setFallback && shouldAutoContinue) {
@@ -930,6 +938,11 @@ export function createEventHandler(args: {
         const errorName = extractErrorName(error);
         const errorMessage = extractErrorMessage(error);
         const errorInfo = { name: errorName, message: errorMessage };
+        const parsed = extractProviderModelFromErrorMessage(errorMessage);
+        const providerHint = (props?.providerID as string | undefined) || parsed.providerID;
+        const providerScopedError = isProviderScopedError(errorInfo);
+        const requiresProviderSwitch = !!sessionID && providerScopedError && hasReliableProviderSignal(sessionID, providerHint);
+        const errorAllowsFallback = requiresProviderSwitch || (!providerScopedError && shouldRetryError(errorInfo));
 
         // First, try session recovery for internal errors (thinking blocks, tool results, etc.)
         if (hooks.sessionRecovery?.isRecoverableError(error)) {
@@ -982,7 +995,7 @@ export function createEventHandler(args: {
           }
         }
         // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
-        else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
+        else if (sessionID && errorAllowsFallback && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
           let agentName = getSessionAgent(sessionID);
 
           if (!agentName && sessionID === getMainSessionID()) {
@@ -996,10 +1009,8 @@ export function createEventHandler(args: {
           }
 
           if (agentName) {
-            const parsed = extractProviderModelFromErrorMessage(errorMessage);
-            const providerHint = (props?.providerID as string | undefined) || parsed.providerID;
             const currentProvider = resolveFallbackProviderID(sessionID, providerHint);
-            let currentModel = (props?.modelID as string) || parsed.modelID || "claude-opus-4-7";
+            let currentModel = (props?.modelID as string | undefined) || parsed.modelID || "claude-opus-4-7";
             currentModel = normalizeFallbackModelID(currentModel);
             const fallbackContext = {
               agentName,
@@ -1014,7 +1025,7 @@ export function createEventHandler(args: {
               applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
 
               const setFallback = modelFallback
-                ? setPendingModelFallback(modelFallback, sessionID, agentName, currentProvider, currentModel)
+                ? setPendingModelFallback(modelFallback, sessionID, agentName, currentProvider, currentModel, requiresProviderSwitch)
                 : false;
 
               if (setFallback && shouldAutoContinue) {

@@ -7,6 +7,7 @@ import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied
 const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock((): ProviderModelsCache | null => null)
+const isProviderScopedErrorMock = mock(() => false)
 const shouldRetryErrorMock = mock(() => true)
 const getNextFallbackMock = mock((chain: FallbackEntry[], attempt: number) => chain[attempt])
 const hasMoreFallbacksMock = mock((chain: FallbackEntry[], attempt: number) => attempt < chain.length)
@@ -21,6 +22,7 @@ const retryHandlerDeps: Partial<FallbackRetryHandlerDeps> = {
   log: sharedLogMock,
   readConnectedProvidersCache: readConnectedProvidersCacheMock,
   readProviderModelsCache: readProviderModelsCacheMock,
+  isProviderScopedError: isProviderScopedErrorMock,
   shouldRetryError: shouldRetryErrorMock,
   getNextFallback: getNextFallbackMock,
   hasMoreFallbacks: hasMoreFallbacksMock,
@@ -114,6 +116,7 @@ describe("tryFallbackRetry", () => {
   })
 
   beforeEach(() => {
+    isProviderScopedErrorMock.mockImplementation(() => false)
     shouldRetryErrorMock.mockImplementation(() => true)
     selectFallbackProviderMock.mockImplementation((providers: string[]) => providers[0])
     readProviderModelsCacheMock.mockReturnValue(null)
@@ -427,6 +430,86 @@ describe("tryFallbackRetry", () => {
       expect(args.task.model?.providerID).toBe("provider-b")
       expect(args.task.model?.modelID).toBe("fallback-model-2")
       expect(args.task.attemptCount).toBe(2)
+    })
+  })
+
+  describe("#given provider-scoped quota/billing error", () => {
+    test("skips same-provider candidate and retries onto a different provider", async () => {
+      //#given
+      isProviderScopedErrorMock.mockImplementation(() => true)
+      shouldRetryErrorMock.mockImplementation(() => false)
+      const args = createDefaultArgs({
+        model: { providerID: "provider-a", modelID: "original-model" },
+        fallbackChain: [
+          { model: "fallback-model-1", providers: ["provider-a"], variant: undefined },
+          { model: "fallback-model-2", providers: ["provider-b"], variant: undefined },
+        ],
+      })
+
+      //#when
+      const result = await tryFallbackRetry(args)
+
+      //#then
+      expect(result).toBe(true)
+      expect(args.task.model?.providerID).toBe("provider-b")
+      expect(args.task.model?.modelID).toBe("fallback-model-2")
+    })
+
+    test("returns false without retry side effects when only same-provider candidates exist", async () => {
+      //#given
+      isProviderScopedErrorMock.mockImplementation(() => true)
+      shouldRetryErrorMock.mockImplementation(() => false)
+      const args = createDefaultArgs({
+        sessionId: "session-to-abort",
+        model: { providerID: "provider-a", modelID: "original-model" },
+        fallbackChain: [
+          { model: "fallback-model-1", providers: ["provider-a"], variant: undefined },
+          { model: "fallback-model-2", providers: ["provider-a"], variant: undefined },
+        ],
+      })
+
+      //#when
+      const result = await tryFallbackRetry(args)
+
+      //#then
+      expect(result).toBe(false)
+      expect(args.processKey).not.toHaveBeenCalled()
+      expect(args.abortMock).not.toHaveBeenCalled()
+      expect(args.concurrencyManager.release).not.toHaveBeenCalled()
+      expect(args.task.model).toEqual({ providerID: "provider-a", modelID: "original-model" })
+    })
+
+    test("returns false when the current provider is unknown", async () => {
+      //#given
+      isProviderScopedErrorMock.mockImplementation(() => true)
+      shouldRetryErrorMock.mockImplementation(() => false)
+      const args = createDefaultArgs({ model: undefined })
+
+      //#when
+      const result = await tryFallbackRetry(args)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("allows same-provider different-model retry for transient errors", async () => {
+      //#given
+      isProviderScopedErrorMock.mockImplementation(() => false)
+      shouldRetryErrorMock.mockImplementation(() => true)
+      const args = createDefaultArgs({
+        model: { providerID: "provider-a", modelID: "model-x" },
+        fallbackChain: [
+          { model: "model-y", providers: ["provider-a"], variant: undefined },
+        ],
+      })
+
+      //#when
+      const result = await tryFallbackRetry(args)
+
+      //#then
+      expect(result).toBe(true)
+      expect(args.task.model?.providerID).toBe("provider-a")
+      expect(args.task.model?.modelID).toBe("model-y")
     })
   })
 

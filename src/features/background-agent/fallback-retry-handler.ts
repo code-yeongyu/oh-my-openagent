@@ -5,6 +5,7 @@ import type { OpencodeClient, QueueItem } from "./constants"
 import { log, readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
 import {
   shouldRetryError,
+  isProviderScopedError,
   getNextFallback,
   hasMoreFallbacks,
   selectFallbackProvider,
@@ -29,6 +30,7 @@ export type FallbackRetryHandlerDeps = {
   readProviderModelsCache: typeof readProviderModelsCache
   readConnectedProvidersCache: typeof readConnectedProvidersCache
   shouldRetryError: typeof shouldRetryError
+  isProviderScopedError: typeof isProviderScopedError
   getNextFallback: typeof getNextFallback
   hasMoreFallbacks: typeof hasMoreFallbacks
   selectFallbackProvider: typeof selectFallbackProvider
@@ -40,6 +42,7 @@ const defaultFallbackRetryHandlerDeps: FallbackRetryHandlerDeps = {
   readProviderModelsCache,
   readConnectedProvidersCache,
   shouldRetryError,
+  isProviderScopedError,
   getNextFallback,
   hasMoreFallbacks,
   selectFallbackProvider,
@@ -68,8 +71,14 @@ export async function tryFallbackRetry(args: {
   const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
   const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
   const fallbackChain = task.fallbackChain
+  // Provider-scoped quota/billing errors only retry onto a different provider, and only
+  // when the current provider is known. Transient errors keep same-provider retry.
+  const requiresProviderSwitch = deps.isProviderScopedError(errorInfo)
+  const errorAllowsRetry = requiresProviderSwitch
+    ? !!task.model?.providerID
+    : deps.shouldRetryError(errorInfo)
   const canRetry =
-    deps.shouldRetryError(errorInfo) &&
+    errorAllowsRetry &&
     fallbackChain &&
     fallbackChain.length > 0 &&
     deps.hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)
@@ -117,6 +126,19 @@ export async function tryFallbackRetry(args: {
         source,
         model: candidate.model,
         providers: candidate.providers,
+      })
+      continue
+    }
+    if (
+      requiresProviderSwitch &&
+      !!task.model &&
+      candidateProviderID.toLowerCase() === task.model.providerID.toLowerCase()
+    ) {
+      deps.log("[background-agent] Skipping same-provider fallback for provider-scoped error:", {
+        taskId: task.id,
+        source,
+        provider: candidateProviderID,
+        model: candidate.model,
       })
       continue
     }
