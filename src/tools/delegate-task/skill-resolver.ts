@@ -41,8 +41,9 @@ async function loadNativeSkillEntries(
     const list = await nativeSkills.all()
     return Array.isArray(list) ? list : []
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
     log("[skill-resolver] nativeSkills.all() failed; falling back to disk-only skills", {
-      error: String(err),
+      error: errorMessage,
     })
     return []
   }

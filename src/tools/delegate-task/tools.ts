@@ -25,7 +25,8 @@ async function loadNativeSkillEntries(
     const list = await nativeSkills.all()
     return Array.isArray(list) ? list : []
   } catch (err) {
-    log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: String(err) })
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: errorMessage })
     return []
   }
 }
@@ -33,11 +34,6 @@ async function loadNativeSkillEntries(
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
-
-function ignoreSystemDefaultModelError(error: unknown): void {
-  if (error instanceof Error) return
-  throw error
-}
 
 const delegateTaskArgsSchema = {
   load_skills: tool.schema
@@ -113,7 +109,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         const openCodeConfig = await options.client.config.get()
         systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
       } catch (error) {
-        ignoreSystemDefaultModelError(error)
+        if (!(error instanceof Error)) throw error
         systemDefaultModel = undefined
       }
 
