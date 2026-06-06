@@ -59,7 +59,8 @@ async function readTeamSpecDirectories(directoryPath: string, scope: "project" |
         scope,
         path: path.resolve(directoryPath, entry.name, "config.json"),
       }))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return []
   }
 }

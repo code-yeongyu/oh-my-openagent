@@ -14,7 +14,8 @@ async function readHighWatermark(watermarkPath: string): Promise<number> {
     const watermarkContent = (await readFile(watermarkPath, "utf8")).trim()
     const parsedWatermark = Number.parseInt(watermarkContent, 10)
     return Number.isInteger(parsedWatermark) && parsedWatermark >= 0 ? parsedWatermark : 0
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     await atomicWrite(watermarkPath, "0")
     return 0
   }

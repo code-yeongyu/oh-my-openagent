@@ -25,6 +25,7 @@ import type { Message } from "../types"
 import { MessageSchema } from "../types"
 import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
 import { createTeamSendMessageTool } from "./messaging"
+import { resolveTeamRuntimeDetails } from "./messaging-runtime"
 
 type PromptAsyncCall = {
   sessionId: string
@@ -159,6 +160,48 @@ async function createTeamFixture() {
 }
 
 describe("createTeamSendMessageTool", () => {
+  test("resolveTeamRuntimeDetails preserves Error fallback for missing runtime state", async () => {
+    // given
+    const config = createConfig(await createFixtureBaseDir())
+
+    // when
+    const runtimeDetails = await resolveTeamRuntimeDetails("team-run-missing", "session-missing", config, {
+      loadRuntimeState: async () => {
+        throw new Error("missing runtime state")
+      },
+    })
+
+    // then
+    expect(runtimeDetails).toEqual({
+      teamRunId: "team-run-missing",
+      isLead: false,
+      senderName: "unknown",
+      activeMembers: [],
+    })
+  })
+
+  test("resolveTeamRuntimeDetails rethrows non-Error runtime load failures", async () => {
+    // given
+    const config = createConfig(await createFixtureBaseDir())
+    const thrownValue = "missing runtime state"
+
+    // when
+    let caught: unknown
+    try {
+      await resolveTeamRuntimeDetails("team-run-missing", "session-missing", config, {
+        loadRuntimeState: async () => {
+          throw thrownValue
+        },
+      })
+    } catch (error) {
+      if (error instanceof Error) throw error
+      caught = error
+    }
+
+    // then
+    expect(caught).toBe(thrownValue)
+  })
+
   test("routes a member message to one recipient", async () => {
     // given
     const fixture = await createTeamFixture()
