@@ -1,4 +1,4 @@
-/// <reference path="../../bun-test.d.ts" />
+/// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import * as fs from "node:fs"
@@ -8,10 +8,21 @@ type LoadOpencodePluginsModule = {
   clearOpencodePluginsCache?: () => void
 }
 
-const existsSyncMock = mock((_path: string) => true)
-const readFileSyncMock = mock((_path: string, _encoding?: string) => `{
+type ReadFileEncoding = Parameters<typeof fs.readFileSync>[1]
+
+const defaultPluginConfig: string = `{
   "plugin": ["plugin-a", "plugin-b"]
-}`)
+}`
+const existsSyncMock = mock((filePath: string) => (
+  filePath === "/some/fake/dir/.opencode/opencode.json"
+  || fs.existsSync(filePath)
+))
+const readFileSyncMock = mock((filePath: string, encoding?: ReadFileEncoding) => {
+  if (filePath === "/some/fake/dir/.opencode/opencode.json") {
+    return defaultPluginConfig
+  }
+  return encoding === undefined ? fs.readFileSync(filePath) : fs.readFileSync(filePath, encoding)
+})
 
 async function importFreshLoadOpencodePluginsModule(): Promise<LoadOpencodePluginsModule> {
   const modulePath = `${new URL("./load-opencode-plugins.ts", import.meta.url).pathname}?test=${Date.now()}-${Math.random()}`
@@ -26,11 +37,17 @@ describe("loadOpencodePlugins", () => {
     delete process.env.OPENCODE_CONFIG_DIR
 
     existsSyncMock.mockReset()
-    existsSyncMock.mockImplementation((_path: string) => true)
+    existsSyncMock.mockImplementation((filePath: string) => (
+      filePath === "/some/fake/dir/.opencode/opencode.json"
+      || fs.existsSync(filePath)
+    ))
     readFileSyncMock.mockReset()
-    readFileSyncMock.mockImplementation((_path: string, _encoding?: string) => `{
-  "plugin": ["plugin-a", "plugin-b"]
-}`)
+    readFileSyncMock.mockImplementation((filePath: string, encoding?: ReadFileEncoding) => {
+      if (filePath === "/some/fake/dir/.opencode/opencode.json") {
+        return defaultPluginConfig
+      }
+      return encoding === undefined ? fs.readFileSync(filePath) : fs.readFileSync(filePath, encoding)
+    })
 
     mock.module("node:fs", () => ({
       ...fs,
@@ -106,7 +123,7 @@ describe("loadOpencodePlugins", () => {
           filePath === "/project/.opencode/opencode.json"
           || filePath === "/tmp/opencode-profile/opencode.json"
         ))
-        readFileSyncMock.mockImplementation((filePath: string, _encoding?: string) => {
+        readFileSyncMock.mockImplementation((filePath: string, _encoding?: ReadFileEncoding) => {
           if (filePath === "/project/.opencode/opencode.json") {
             return JSON.stringify({ plugin: ["file:///repo/omo/src/index.ts"] })
           }
