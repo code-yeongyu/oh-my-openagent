@@ -7,27 +7,31 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 
-const LSP_CLI_PATH = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "cli.js")
-
-async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T> {
-  let lspCliAlreadyPresent = true
-  try {
-    await stat(LSP_CLI_PATH)
-  } catch (error) {
-    if (!(error instanceof Error)) throw error
-    lspCliAlreadyPresent = false
-    await mkdir(join(process.cwd(), "packages", "lsp-tools-mcp", "dist"), { recursive: true })
-    await writeFile(LSP_CLI_PATH, "#!/usr/bin/env node\n")
-  }
-
-  try {
-    return await run()
-  } finally {
-    if (!lspCliAlreadyPresent) {
-      await rm(LSP_CLI_PATH, { force: true })
-      await rm(join(process.cwd(), "packages", "lsp-tools-mcp", "dist"), { recursive: true, force: true })
-    }
-  }
+async function createPackagedCodexRepoRoot(): Promise<string> {
+  const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-cleanup-repo-"))
+  const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
+  const pluginRoot = join(codexPackageRoot, "plugin")
+  await writeFile(join(repoRoot, "package.json"), JSON.stringify({ name: "oh-my-openagent", version: "4.5.12" }))
+  await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
+  await writeFile(join(repoRoot, "dist", "cli", "index.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
+  await mkdir(join(pluginRoot, "dist"), { recursive: true })
+  await mkdir(join(pluginRoot, "hooks"), { recursive: true })
+  await writeFile(
+    join(codexPackageRoot, "marketplace.json"),
+    JSON.stringify({ name: "sisyphuslabs", plugins: [{ name: "omo", source: "./plugin" }] }),
+  )
+  await writeFile(
+    join(pluginRoot, ".codex-plugin", "plugin.json"),
+    JSON.stringify({ name: "omo", version: "0.1.0", hooks: "hooks/hooks.json" }),
+  )
+  await writeFile(
+    join(pluginRoot, "package.json"),
+    JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0", bin: { omo: "dist/cli.js" } }),
+  )
+  await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await writeFile(join(pluginRoot, "hooks", "hooks.json"), JSON.stringify({ hooks: {} }))
+  return repoRoot
 }
 
 describe("install-codex project-local cleanup", () => {
@@ -38,6 +42,7 @@ describe("install-codex project-local cleanup", () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-cleanup-install-"))
     const projectDirectory = join(projectRoot, "nested")
     const projectConfigPath = join(projectRoot, ".codex", "config.toml")
+    const repoRoot = await createPackagedCodexRepoRoot()
     await mkdir(projectDirectory, { recursive: true })
     await mkdir(join(projectRoot, ".git"), { recursive: true })
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
@@ -55,13 +60,13 @@ describe("install-codex project-local cleanup", () => {
     )
 
     // when
-    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+    const result = await runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot,
       projectDirectory,
       runCommand: async () => undefined,
-    }))
+    })
 
     // then
     expect(result.projectCleanup.configPath).toBe(projectConfigPath)
@@ -83,6 +88,7 @@ describe("install-codex project-local cleanup", () => {
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-parent-cleanup-"))
     const projectDirectory = join(homeRoot, "workspace", "nested")
     const globalConfigPath = join(codexHome, "config.toml")
+    const repoRoot = await createPackagedCodexRepoRoot()
     await mkdir(projectDirectory, { recursive: true })
     await mkdir(codexHome, { recursive: true })
     await writeFile(
@@ -99,13 +105,13 @@ describe("install-codex project-local cleanup", () => {
     )
 
     // when
-    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+    const result = await runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot,
       projectDirectory,
       runCommand: async () => undefined,
-    }))
+    })
 
     // then
     expect(result.projectCleanup.configPath).toBeNull()
@@ -122,17 +128,18 @@ describe("install-codex project-local cleanup", () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-edge-"))
     const projectDirectory = join(projectRoot, "not-a-directory")
     const logs: string[] = []
+    const repoRoot = await createPackagedCodexRepoRoot()
     await writeFile(projectDirectory, "file, not directory\n")
 
     // when
-    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+    const result = await runCodexInstaller({
       codexHome,
       binDir,
-      repoRoot: process.cwd(),
+      repoRoot,
       projectDirectory,
       runCommand: async () => undefined,
       log: (message) => logs.push(message),
-    }))
+    })
 
     // then
     expect(result.projectCleanup.projectRoot).toBeNull()

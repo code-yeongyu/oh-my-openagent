@@ -22,19 +22,29 @@ describe("Git Bash runner", () => {
   it("#given fake bash executable #when command runs #then invokes bash with -lc and command payload", async () => {
     const directory = createTemporaryDirectory("omo-git-bash-runner-");
     const argvPath = join(directory, "argv.txt");
-    const fakeBashPath = join(directory, "bash.exe");
-    writeFileSync(
-      fakeBashPath,
-      [
+    const fakeBashPath = process.platform === "win32" ? join(directory, "bash.cmd") : join(directory, "bash");
+    const fakeBashScript = process.platform === "win32"
+      ? [
+        "@echo off",
+        "> \"%FAKE_BASH_ARGV_PATH%\" echo %1",
+        ">> \"%FAKE_BASH_ARGV_PATH%\" echo %2",
+        "echo fake stdout",
+        "echo fake stderr 1>&2",
+        "exit /b 7",
+        "",
+      ].join("\r\n")
+      : [
         "#!/bin/sh",
         "printf '%s\\n' \"$@\" > \"$FAKE_BASH_ARGV_PATH\"",
         "printf 'fake stdout\\n'",
         "printf 'fake stderr\\n' >&2",
         "exit 7",
         "",
-      ].join("\n"),
-    );
-    chmodSync(fakeBashPath, 0o755);
+      ].join("\n");
+    writeFileSync(fakeBashPath, fakeBashScript);
+    if (process.platform !== "win32") {
+      chmodSync(fakeBashPath, 0o755);
+    }
 
     const result = await runGitBashCommand({
       bashPath: fakeBashPath,
