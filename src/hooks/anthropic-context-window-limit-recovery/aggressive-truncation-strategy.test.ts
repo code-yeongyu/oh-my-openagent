@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 import type { AutoCompactState } from "./types"
 
@@ -91,6 +91,10 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
 
   afterEach(() => {
     resetSessionState()
+  })
+
+  afterAll(() => {
+    mock.restore()
   })
 
   test("includes the session's resolved agent on promptAsync when agent is known", async () => {

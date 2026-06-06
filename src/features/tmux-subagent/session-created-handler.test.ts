@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, afterEach } from "bun:test"
+import { describe, test, expect, mock, afterEach, afterAll } from "bun:test"
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — must be registered BEFORE importing the handler so the
@@ -30,6 +30,10 @@ import type { SessionCreatedEvent } from "./session-created-event"
 afterEach(() => {
   mockQueryWindowState.mockClear()
   mockExecuteActions.mockClear()
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 function makeEvent(sessionId: string, parentID = "parent-session"): SessionCreatedEvent {
@@ -147,7 +151,10 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
     expect(waitForSessionReady).toHaveBeenCalledTimes(1)
     expect(mockExecuteActions).not.toHaveBeenCalled()
 
-    resolveReadiness!(true)
+    if (!resolveReadiness) {
+      throw new Error("readiness resolver was not initialized")
+    }
+    resolveReadiness(true)
     await handlerPromise
 
     // Now executeActions must have fired exactly once, AFTER waitForSessionReady.
