@@ -130,7 +130,7 @@ export function installModuleMockLifecycle(
   restoreModuleMocksForTestFile: (callerUrl: string) => void
 } {
   const snapshots = new Map<string, ModuleSnapshot>()
-  const activeMocks = new Map<string, ActiveModuleMock>()
+  const activeMocks = new Map<string, ActiveModuleMock[]>()
   const delegateModule = mockApi.module.bind(mockApi)
   const delegateRestore = mockApi.restore.bind(mockApi)
   const getCallerUrl = options.getCallerUrl ?? defaultGetCallerUrl
@@ -140,10 +140,15 @@ export function installModuleMockLifecycle(
     return new Error().stack?.includes("/test-setup.ts") ?? false
   })
   const preserveOwners = new Set<string>()
-  let preservedDuringLastRestore = false
+  let handledPreserveCleanup = false
 
   function replayActiveMocks(ownerFilter?: (ownerUrl: string) => boolean): void {
-    for (const activeMock of activeMocks.values()) {
+    for (const activeMockStack of activeMocks.values()) {
+      const activeMock = activeMockStack.at(-1)
+      if (!activeMock) {
+        continue
+      }
+
       if (ownerFilter && !ownerFilter(activeMock.ownerUrl)) {
         continue
       }
@@ -152,17 +157,7 @@ export function installModuleMockLifecycle(
     }
   }
 
-  function restoreModuleMocks(): void {
-    if (shouldPreserveActiveMocksOnRestore()) {
-      if (preservedDuringLastRestore) {
-        preservedDuringLastRestore = false
-        return
-      }
-
-      replayActiveMocks()
-      return
-    }
-
+  function restoreAllModuleMocks(): void {
     for (const snapshot of snapshots.values()) {
       delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
     }
@@ -171,9 +166,46 @@ export function installModuleMockLifecycle(
     activeMocks.clear()
   }
 
+  function restoreUnpreservedModuleMocks(): void {
+    for (const [restoreSpecifier, activeMockStack] of activeMocks.entries()) {
+      const preservedMocks = activeMockStack.filter((activeMock) => preserveOwners.has(activeMock.ownerUrl))
+      const preservedMock = preservedMocks.at(-1)
+
+      if (preservedMock) {
+        delegateModule(preservedMock.specifier, preservedMock.factory)
+        activeMocks.set(restoreSpecifier, preservedMocks)
+        continue
+      }
+
+      const snapshot = snapshots.get(restoreSpecifier)
+      if (snapshot) {
+        delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+      }
+      snapshots.delete(restoreSpecifier)
+      activeMocks.delete(restoreSpecifier)
+    }
+  }
+
+  function restoreModuleMocks(): void {
+    if (shouldPreserveActiveMocksOnRestore()) {
+      if (handledPreserveCleanup) {
+        handledPreserveCleanup = false
+        return
+      }
+
+      restoreUnpreservedModuleMocks()
+      return
+    }
+
+    handledPreserveCleanup = false
+    restoreAllModuleMocks()
+  }
+
   function removeActiveMocksForTestFile(callerUrl: string): void {
-    for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
-      if (activeMock.ownerUrl !== callerUrl) {
+    for (const [restoreSpecifier, activeMockStack] of activeMocks.entries()) {
+      const remainingMocks = activeMockStack.filter((activeMock) => activeMock.ownerUrl !== callerUrl)
+      if (remainingMocks.length > 0) {
+        activeMocks.set(restoreSpecifier, remainingMocks)
         continue
       }
 
@@ -184,25 +216,9 @@ export function installModuleMockLifecycle(
     preserveOwners.delete(callerUrl)
   }
 
-  function restoreAndRemoveUnpreservedActiveMocks(): void {
-    for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
-      if (preserveOwners.has(activeMock.ownerUrl)) {
-        continue
-      }
-
-      const snapshot = snapshots.get(restoreSpecifier)
-      if (snapshot) {
-        delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
-      }
-
-      snapshots.delete(restoreSpecifier)
-      activeMocks.delete(restoreSpecifier)
-    }
-  }
-
   function hasActiveMocksForTestFile(callerUrl: string): boolean {
-    for (const activeMock of activeMocks.values()) {
-      if (activeMock.ownerUrl === callerUrl) {
+    for (const activeMockStack of activeMocks.values()) {
+      if (activeMockStack.some((activeMock) => activeMock.ownerUrl === callerUrl)) {
         return true
       }
     }
@@ -211,8 +227,15 @@ export function installModuleMockLifecycle(
   }
 
   function restoreModuleMocksForTestFile(callerUrl: string): void {
-    for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
-      if (activeMock.ownerUrl !== callerUrl) {
+    for (const [restoreSpecifier, activeMockStack] of activeMocks.entries()) {
+      if (!activeMockStack.some((activeMock) => activeMock.ownerUrl === callerUrl)) {
+        continue
+      }
+
+      const remainingMocks = activeMockStack.filter((activeMock) => activeMock.ownerUrl !== callerUrl)
+      const previousActiveMock = remainingMocks.at(-1)
+      if (previousActiveMock) {
+        delegateModule(previousActiveMock.specifier, previousActiveMock.factory)
         continue
       }
 
@@ -245,35 +268,40 @@ export function installModuleMockLifecycle(
       }
     }
 
-    activeMocks.set(restoreSpecifier, { specifier, factory, ownerUrl: callerUrl })
+    const activeMockStack = activeMocks.get(restoreSpecifier) ?? []
+    const nextActiveMockStack = activeMockStack.filter((activeMock) => activeMock.ownerUrl !== callerUrl)
+    nextActiveMockStack.push({ specifier, factory, ownerUrl: callerUrl })
+    activeMocks.set(restoreSpecifier, nextActiveMockStack)
     return delegateModule(specifier, factory)
   }
 
   mockApi.restore = (): unknown => {
     if (shouldPreserveActiveMocksOnRestore()) {
       const result = delegateRestore()
-      replayActiveMocks()
-      preservedDuringLastRestore = true
+      restoreUnpreservedModuleMocks()
+      handledPreserveCleanup = true
       return result
     }
 
-    preservedDuringLastRestore = false
+    handledPreserveCleanup = false
     const callerUrl = getCallerUrl()
-    const hadActiveMocks = activeMocks.size > 0
     if (hasActiveMocksForTestFile(callerUrl)) {
+      if (preserveOwners.has(callerUrl)) {
+        const result = delegateRestore()
+        replayActiveMocks()
+        return result
+      }
+
+      const result = delegateRestore()
       restoreModuleMocksForTestFile(callerUrl)
       replayActiveMocks()
-      return undefined
+      return result
     }
 
-    restoreAndRemoveUnpreservedActiveMocks()
-    replayActiveMocks((ownerUrl) => preserveOwners.has(ownerUrl))
     if (activeMocks.size > 0) {
-      return undefined
-    }
-
-    if (hadActiveMocks) {
-      return undefined
+      const result = delegateRestore()
+      restoreAllModuleMocks()
+      return result
     }
 
     return delegateRestore()

@@ -16,6 +16,7 @@ describe("project-discovery-dirs", () => {
   })
 
   afterEach(() => {
+    mock.restore()
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 

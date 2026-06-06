@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
 type PreToolUseMockResult = {
 	readonly decision?: "deny" | "allow"
@@ -26,6 +27,7 @@ mock.module("../pre-tool-use", () => ({
 
 afterAll(() => {
 	mock.restore()
+	restoreModuleMocksForTestFile(import.meta.url)
 })
 
 const { createToolExecuteBeforeHandler } = await import("./tool-execute-before-handler")
