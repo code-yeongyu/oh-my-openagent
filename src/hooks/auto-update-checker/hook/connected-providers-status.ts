@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { updateConnectedProvidersCache } from "../../../shared/connected-providers-cache"
 import { isModelCacheAvailable } from "../../../shared/model-availability"
 import { log } from "../../../shared/logger"
+import { ignoreToastError } from "./ignore-toast-error"
 
 const CACHE_UPDATE_TIMEOUT_MS = 10000
 
@@ -18,7 +19,8 @@ export async function updateAndShowConnectedProvidersCacheStatus(ctx: PluginInpu
         }),
       ])
     } catch (err) {
-      log("[auto-update-checker] Connected providers cache creation failed", { error: String(err) })
+      const message = err instanceof Error ? String(err) : String(err)
+      log("[auto-update-checker] Connected providers cache creation failed", { error: message })
     } finally {
       if (timeoutId) clearTimeout(timeoutId)
     }
@@ -33,7 +35,7 @@ export async function updateAndShowConnectedProvidersCacheStatus(ctx: PluginInpu
             duration: 8000,
           },
         })
-        .catch(() => {})
+        .catch(ignoreToastError)
 
       log("[auto-update-checker] Connected providers cache toast shown (creation failed)")
     } else {
@@ -41,7 +43,8 @@ export async function updateAndShowConnectedProvidersCacheStatus(ctx: PluginInpu
     }
   } else {
     updateConnectedProvidersCache(ctx.client).catch((err) => {
-      log("[auto-update-checker] Background cache update failed", { error: String(err) })
+      const message = err instanceof Error ? String(err) : String(err)
+      log("[auto-update-checker] Background cache update failed", { error: message })
     })
     log("[auto-update-checker] Connected providers cache exists, updating in background")
   }

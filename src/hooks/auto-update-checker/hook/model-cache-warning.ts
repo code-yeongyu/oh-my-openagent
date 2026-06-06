@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isModelCacheAvailable } from "../../../shared/model-availability"
 import { log } from "../../../shared/logger"
+import { ignoreToastError } from "./ignore-toast-error"
 
 export async function showModelCacheWarningIfNeeded(ctx: PluginInput): Promise<void> {
   if (isModelCacheAvailable()) return
@@ -15,7 +16,7 @@ export async function showModelCacheWarningIfNeeded(ctx: PluginInput): Promise<v
         duration: 10000,
       },
     })
-    .catch(() => {})
+    .catch(ignoreToastError)
 
   log("[auto-update-checker] Model cache warning shown")
 }
