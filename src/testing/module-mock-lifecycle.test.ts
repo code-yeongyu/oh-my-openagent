@@ -268,7 +268,7 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
-  test("#given restore caller has no owned module mocks #when mock.restore runs #then active module mocks are fully restored", () => {
+  test("#given restore caller has no owned module mocks #when mock.restore runs #then active module mocks are replayed", () => {
     // given
     const events: string[] = []
     let callerUrl = "file:///repo/tests/owner.test.ts"
@@ -297,7 +297,7 @@ describe("installModuleMockLifecycle", () => {
     expect(events).toEqual([
       "module:./dependency-a:mock-a",
       "delegate:restore",
-      "module:file:///repo/tests/owner.test.ts:./dependency-a:original",
+      "module:./dependency-a:mock-a",
     ])
   })
 
