@@ -1,5 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
-import { existsSync, unlinkSync, readFileSync } from "fs"
+import { existsSync, mkdirSync, rmSync, unlinkSync, readFileSync } from "fs"
 import {
   buildTranscriptFromSession,
   deleteTempTranscript,
@@ -209,5 +209,69 @@ describe("transcript caching", () => {
 
     deleteTempTranscript(firstPath)
     deleteTempTranscript(secondPath)
+  })
+
+  it("#given previous temp cleanup fails #when rebuilding cached transcript #then logs and returns the next transcript", async () => {
+    // given
+    const client = createMockClient([])
+    const firstPath = await buildTranscriptFromSession(
+      client,
+      "ses_cleanup_failure",
+      "/tmp",
+      "bash",
+      { command: "echo first" }
+    )
+    expect(firstPath).not.toBeNull()
+    if (!firstPath) return
+    unlinkSync(firstPath)
+    mkdirSync(firstPath)
+
+    try {
+      // when
+      const secondPath = await buildTranscriptFromSession(
+        client,
+        "ses_cleanup_failure",
+        "/tmp",
+        "read",
+        { filePath: "/tmp/second.txt" }
+      )
+
+      // then
+      expect(secondPath).not.toBeNull()
+      if (secondPath) {
+        expect(existsSync(secondPath)).toBe(true)
+      }
+      deleteTempTranscript(secondPath)
+    } finally {
+      rmSync(firstPath, { recursive: true, force: true })
+    }
+  })
+
+  it("#given session transcript build fails #when building transcript #then writes fallback current tool entry", async () => {
+    // given
+    const client = {
+      session: {
+        messages: mock(() => Promise.reject(new Error("session unavailable"))),
+      },
+    }
+
+    // when
+    const path = await buildTranscriptFromSession(
+      client,
+      "ses_fallback",
+      "/tmp",
+      "write",
+      { filePath: "/tmp/file.txt", content: "hello" }
+    )
+
+    // then
+    expect(path).not.toBeNull()
+    if (path) {
+      const content = readFileSync(path, "utf-8")
+      expect(content).toContain("Write")
+      expect(content).toContain("file.txt")
+    }
+
+    deleteTempTranscript(path)
   })
 })

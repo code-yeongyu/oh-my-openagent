@@ -46,6 +46,14 @@ function resolveHeaders(
   return headers
 }
 
+async function readResponseTextOrEmpty(response: Response): Promise<string> {
+  try {
+    return await response.text()
+  } catch {
+    return ""
+  }
+}
+
 export async function executeHttpHook(
   hook: HookHttp,
   stdin: string
@@ -94,7 +102,7 @@ export async function executeHttpHook(
       return {
         exitCode: 1,
         stderr: `HTTP hook returned status ${response.status}: ${response.statusText}`,
-        stdout: await response.text().catch(() => ""),
+        stdout: await readResponseTextOrEmpty(response),
       }
     }
 
