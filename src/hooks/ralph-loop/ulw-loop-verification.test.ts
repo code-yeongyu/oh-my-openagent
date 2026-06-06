@@ -6,6 +6,7 @@ import { createRalphLoopHook } from "./index"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { clearState, writeState } from "./storage"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import type { RalphLoopState } from "./types"
 
 describe("ulw-loop verification", () => {
 	const testDir = join(tmpdir(), `ulw-loop-verification-${Date.now()}`)
@@ -41,6 +42,14 @@ describe("ulw-loop verification", () => {
 			},
 			directory: testDir,
 		})
+	}
+
+	function requireState(state: RalphLoopState | null): RalphLoopState {
+		expect(state).not.toBeNull()
+		if (state === null) {
+			throw new Error("Expected ralph loop state")
+		}
+		return state
 	}
 
 	beforeEach(() => {
@@ -96,7 +105,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -122,7 +131,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -148,7 +157,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -203,7 +212,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -251,7 +260,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -352,7 +361,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle-old",
 		})
 		hook.startLoop("session-456", "Ship CLI", { ultrawork: true })
@@ -381,7 +390,7 @@ describe("ulw-loop verification", () => {
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle-old",
 		})
 		hook.startLoop("session-123", "Restarted task", { ultrawork: true })
@@ -542,7 +551,7 @@ session_id: ses-oracle
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -582,7 +591,7 @@ session_id: ses-oracle
 
 		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle",
 		})
 		writeFileSync(
@@ -598,7 +607,7 @@ session_id: ses-oracle
 			`${JSON.stringify({ type: "assistant", timestamp: new Date().toISOString(), content: "fixed it <promise>DONE</promise>" })}\n`,
 		)
 		writeState(testDir, {
-			...hook.getState()!,
+			...requireState(hook.getState()),
 			verification_session_id: "ses-oracle-old",
 		})
 
