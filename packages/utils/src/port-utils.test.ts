@@ -85,7 +85,11 @@ function startTrackedServer(port: number, hostname: string = DEFAULT_HOSTNAME): 
     } catch (error) {
       removeListeners()
       trackedServers.delete(server)
-      reject(error)
+      if (error instanceof Error) {
+        reject(error)
+        return
+      }
+      reject(new Error("Expected server startup failure to throw an Error instance"))
     }
   })
 }
@@ -134,7 +138,10 @@ async function canBindContiguousPorts(
     }
 
     return true
-  } catch {
+  } catch (error) {
+    if (!isExpectedBindFailure(error)) {
+      throw error
+    }
     return false
   } finally {
     await Promise.all(servers.map((server) => closeTrackedServer(server)))
@@ -173,7 +180,10 @@ async function startAlternateInterfaceBlockerWithDefaultHostFree(hostname: strin
         await closeTrackedServer(defaultHostProbe)
 
         return blocker
-      } catch {
+      } catch (error) {
+        if (!isExpectedBindFailure(error)) {
+          throw error
+        }
         if (blocker) {
           await closeTrackedServer(blocker)
         }
@@ -201,6 +211,18 @@ async function startConsecutiveBlockers(
     await Promise.all(servers.map((server) => closeTrackedServer(server)))
     throw error
   }
+}
+
+function isExpectedBindFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    throw new Error("Expected port bind failure to throw an Error instance")
+  }
+
+  if (!("code" in error)) {
+    throw error
+  }
+
+  return error.code === "EADDRINUSE" || error.code === "EACCES"
 }
 
 async function captureDefaultListenHostname(port: number): Promise<string | undefined> {

@@ -137,14 +137,13 @@ describe("deepMerge", () => {
       const result = deepMerge(base, override)
 
       // then
-      expect(result).toBeDefined()
-      if (!result) throw new Error("expected deepMerge to return an object")
-      expect(result.b).toBe(2)
+      const merged = expectMergedObject(result)
+      expect(merged.b).toBe(2)
       if (key === "prototype") {
-        expect(result.prototype).toBeUndefined()
+        expect(merged.prototype).toBeUndefined()
         return
       }
-      expect(result[key]).not.toEqual({ polluted: true })
+      expect(merged[key]).not.toEqual({ polluted: true })
     })
   })
 
@@ -162,12 +161,20 @@ describe("deepMerge", () => {
       const result = deepMerge(base, override)
 
       // then
-      let current: AnyObject = result as AnyObject
+      let current = expectMergedObject(result)
       for (let i = 0; i < 55; i++) {
-        current = current.nested as AnyObject
+        current = expectMergedObject(current.nested)
       }
       expect(current.overrideKey).toBe("override")
       expect(current.baseKey).toBeUndefined()
     })
   })
 })
+
+function expectMergedObject(value: unknown): AnyObject {
+  if (!isPlainObject(value)) {
+    throw new Error("expected deepMerge to return a plain object")
+  }
+
+  return value
+}
