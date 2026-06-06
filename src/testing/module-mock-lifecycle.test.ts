@@ -108,6 +108,38 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("#given two test files register module mocks #when one file restores scoped mocks #then the other mock stays active", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/first.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {}),
+    }
+
+    const lifecycle = installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => callerUrl,
+      resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
+    callerUrl = "file:///repo/tests/second.test.ts"
+    mockApi.module("./dependency-b", () => ({ named: "mock-b" }))
+
+    // when
+    lifecycle.restoreModuleMocksForTestFile("file:///repo/tests/first.test.ts")
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency-a:mock-a",
+      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:original",
+    ])
+  })
+
   test("captures the original module only once per resolved specifier", () => {
     // given
     let loadCount = 0

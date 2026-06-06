@@ -13,6 +13,7 @@ import { installModuleMockLifecycle } from "./src/testing/module-mock-lifecycle"
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
   shouldPreserveActiveMocksOnRestore: () => isGlobalMockCleanup,
+  registerGlobalRestore: true,
 })
 let environmentSnapshot: NodeJS.ProcessEnv = { ...process.env }
 let workingDirectorySnapshot = process.cwd()

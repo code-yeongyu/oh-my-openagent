@@ -20,6 +20,7 @@ type ModuleSnapshot = {
 type ActiveModuleMock = {
   specifier: string
   factory: MockModuleFactory
+  ownerUrl: string
 }
 
 type ModuleMockLifecycleOptions = {
@@ -27,7 +28,14 @@ type ModuleMockLifecycleOptions = {
   resolveSpecifier?: (specifier: string, callerUrl: string) => string
   loadOriginalModule?: (specifier: string, callerUrl: string) => ModuleLoadResult
   shouldPreserveActiveMocksOnRestore?: () => boolean
+  registerGlobalRestore?: boolean
 }
+
+type InstalledModuleMockLifecycle = {
+  restoreModuleMocksForTestFile: (callerUrl: string) => void
+}
+
+let installedLifecycle: InstalledModuleMockLifecycle | undefined
 
 function toError(error: unknown): Error {
   return new Error(String(error))
@@ -115,7 +123,7 @@ function defaultLoadOriginalModule(specifier: string, callerUrl: string): Module
 export function installModuleMockLifecycle(
   mockApi: MockApi,
   options: ModuleMockLifecycleOptions = {},
-): { restoreModuleMocks: () => void } {
+): { restoreModuleMocks: () => void; restoreModuleMocksForTestFile: (callerUrl: string) => void } {
   const snapshots = new Map<string, ModuleSnapshot>()
   const activeMocks = new Map<string, ActiveModuleMock>()
   const delegateModule = mockApi.module.bind(mockApi)
@@ -153,6 +161,21 @@ export function installModuleMockLifecycle(
     activeMocks.clear()
   }
 
+  function restoreModuleMocksForTestFile(callerUrl: string): void {
+    for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
+      if (activeMock.ownerUrl !== callerUrl) {
+        continue
+      }
+
+      const snapshot = snapshots.get(restoreSpecifier)
+      if (snapshot) {
+        delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+        snapshots.delete(restoreSpecifier)
+      }
+      activeMocks.delete(restoreSpecifier)
+    }
+  }
+
   mockApi.module = (specifier: string, factory: MockModuleFactory): unknown => {
     const callerUrl = getCallerUrl()
     const restoreSpecifier = resolveSpecifier(specifier, callerUrl)
@@ -169,7 +192,7 @@ export function installModuleMockLifecycle(
       }
     }
 
-    activeMocks.set(restoreSpecifier, { specifier, factory })
+    activeMocks.set(restoreSpecifier, { specifier, factory, ownerUrl: callerUrl })
     return delegateModule(specifier, factory)
   }
 
@@ -186,5 +209,13 @@ export function installModuleMockLifecycle(
     return result
   }
 
-  return { restoreModuleMocks }
+  if (options.registerGlobalRestore) {
+    installedLifecycle = { restoreModuleMocksForTestFile }
+  }
+
+  return { restoreModuleMocks, restoreModuleMocksForTestFile }
+}
+
+export function restoreModuleMocksForTestFile(callerUrl: string): void {
+  installedLifecycle?.restoreModuleMocksForTestFile(callerUrl)
 }

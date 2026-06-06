@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const TEST_STORAGE_ROOT = mkdtempSync(join(tmpdir(), "omo-injector-storage-"))
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -79,7 +80,7 @@ afterEach(() => {
 })
 
 afterAll(() => {
-  mock.restore()
+  restoreModuleMocksForTestFile(import.meta.url)
   rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
 })
 
