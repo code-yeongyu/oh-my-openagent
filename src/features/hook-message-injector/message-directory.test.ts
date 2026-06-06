@@ -16,6 +16,7 @@ mock.module("../../shared/opencode-storage-paths", () => ({
 const { getOrCreateMessageDir } = await import("./message-directory")
 
 afterAll(() => {
+  mock.restore()
   rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
 })
 

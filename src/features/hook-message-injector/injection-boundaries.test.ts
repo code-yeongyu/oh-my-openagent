@@ -79,6 +79,7 @@ afterEach(() => {
 })
 
 afterAll(() => {
+  mock.restore()
   rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
 })
 
