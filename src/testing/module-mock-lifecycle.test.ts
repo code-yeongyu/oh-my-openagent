@@ -42,7 +42,7 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
-  test("restores original exports after the delegate restore runs", () => {
+  test("restores original exports without running global delegate restore for scoped module mocks", () => {
     // given
     const events: string[] = []
     const mockApi = {
@@ -67,9 +67,31 @@ describe("installModuleMockLifecycle", () => {
     // then
     expect(events).toEqual([
       "module:./dependency:mocked",
-      "delegate:restore",
       "module:resolved:./dependency:original",
     ])
+  })
+
+  test("#given no active module mocks #when mock.restore runs #then it delegates to Bun restore", () => {
+    // given
+    const events: string[] = []
+    const mockApi = {
+      module: (_specifier: string, _factory: () => Record<string, unknown>) => {},
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => "file:///repo/tests/example.test.ts",
+      resolveSpecifier: (specifier) => `resolved:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    // when
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual(["delegate:restore"])
   })
 
   test("preserves active module mocks during global test setup cleanup", () => {
@@ -171,7 +193,6 @@ describe("installModuleMockLifecycle", () => {
     expect(events).toEqual([
       "module:./dependency-a:mock-a",
       "module:./dependency-b:mock-b",
-      "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
       "module:./dependency-b:mock-b",
     ])
@@ -206,7 +227,6 @@ describe("installModuleMockLifecycle", () => {
     // then
     expect(events).toEqual([
       "module:./dependency-a:mock-a",
-      "delegate:restore",
       "module:./dependency-a:mock-a",
     ])
   })
@@ -239,7 +259,6 @@ describe("installModuleMockLifecycle", () => {
     // then
     expect(events).toEqual([
       "module:./dependency-a:mock-a",
-      "delegate:restore",
       "module:file:///repo/tests/owner.test.ts:./dependency-a:original",
     ])
   })

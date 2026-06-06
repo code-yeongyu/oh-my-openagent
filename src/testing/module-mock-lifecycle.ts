@@ -250,8 +250,8 @@ export function installModuleMockLifecycle(
   }
 
   mockApi.restore = (): unknown => {
-    const result = delegateRestore()
     if (shouldPreserveActiveMocksOnRestore()) {
+      const result = delegateRestore()
       replayActiveMocks()
       preservedDuringLastRestore = true
       return result
@@ -259,20 +259,24 @@ export function installModuleMockLifecycle(
 
     preservedDuringLastRestore = false
     const callerUrl = getCallerUrl()
+    const hadActiveMocks = activeMocks.size > 0
     if (hasActiveMocksForTestFile(callerUrl)) {
       restoreModuleMocksForTestFile(callerUrl)
       replayActiveMocks()
-      return result
+      return undefined
     }
 
     restoreAndRemoveUnpreservedActiveMocks()
     replayActiveMocks((ownerUrl) => preserveOwners.has(ownerUrl))
     if (activeMocks.size > 0) {
-      return result
+      return undefined
     }
 
-    restoreModuleMocks()
-    return result
+    if (hadActiveMocks) {
+      return undefined
+    }
+
+    return delegateRestore()
   }
 
   if (options.registerGlobalRestore) {
