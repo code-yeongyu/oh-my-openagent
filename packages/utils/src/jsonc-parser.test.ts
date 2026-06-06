@@ -8,8 +8,6 @@ const pluginConfigDetectionOptions = {
   legacyBasenames: ["oh-my-opencode"],
 } as const
 
-type ConfigDetectionCase = readonly [label: string, extensions: readonly string[], expectedFormat: "json" | "jsonc"]
-
 describe("parseJsonc", () => {
   test("parses plain JSON", () => {
     // given
@@ -297,28 +295,24 @@ describe("detectConfigFile", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  const cases = [
+  test.each([
     ["prefers .jsonc over .json", ["json", "jsonc"], "jsonc"],
     ["detects .json when .jsonc doesn't exist", ["json"], "json"],
-  ] as const satisfies readonly ConfigDetectionCase[]
+  ] as const)("%s", (_label, extensions, expectedFormat) => {
+    // given
+    mkdirSync(testDir, { recursive: true })
+    const basePath = join(testDir, "config")
+    for (const extension of extensions) {
+      writeFileSync(`${basePath}.${extension}`, "{}")
+    }
 
-  for (const [label, extensions, expectedFormat] of cases) {
-    test(label, () => {
-      // given
-      mkdirSync(testDir, { recursive: true })
-      const basePath = join(testDir, "config")
-      for (const extension of extensions) {
-        writeFileSync(`${basePath}.${extension}`, "{}")
-      }
+    // when
+    const result = detectConfigFile(basePath)
 
-      // when
-      const result = detectConfigFile(basePath)
-
-      // then
-      expect(result.format).toBe(expectedFormat)
-      expect(result.path).toBe(`${basePath}.${expectedFormat}`)
-    })
-  }
+    // then
+    expect(result.format).toBe(expectedFormat)
+    expect(result.path).toBe(`${basePath}.${expectedFormat}`)
+  })
 
   test("returns none when neither exists", () => {
     // given
