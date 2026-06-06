@@ -69,6 +69,10 @@ function toReadableStream(stream: NodeJS.ReadableStream | null): ReadableStream<
         }
         controller.close();
       } catch (error) {
+        if (error instanceof Error) {
+          controller.error(error);
+          return;
+        }
         controller.error(error);
       }
     },

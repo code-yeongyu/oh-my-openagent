@@ -34,6 +34,29 @@ describe("ast-grep MCP stdio server", () => {
       },
     });
   });
+
+  it("#given Codex sends malformed content-length JSON #when stdio server handles it #then responds with a framed parse error", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const received = nextOutput(output);
+    const server = runMcpStdioServer(input, output);
+
+    input.write("Content-Length: 8\r\n\r\nnot-json");
+
+    const response = parseContentLengthFrame(await received);
+    input.end();
+    await server;
+
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32700,
+        message: "Parse error",
+        data: 'JSON Parse error: Unexpected identifier "not"',
+      },
+    });
+  });
 });
 
 function writeContentLengthFrame(input: PassThrough, message: unknown): void {

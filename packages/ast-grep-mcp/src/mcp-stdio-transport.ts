@@ -123,7 +123,10 @@ function parseJsonPayload(payload: string, responseMode: StdioJsonRpcResponseMod
   try {
     return { kind: "request", payload: JSON.parse(payload), responseMode };
   } catch (error) {
-    return { kind: "parse_error", message: messageFromError(error), responseMode };
+    if (error instanceof Error) {
+      return { kind: "parse_error", message: error.message, responseMode };
+    }
+    return { kind: "parse_error", message: String(error), responseMode };
   }
 }
 
@@ -131,8 +134,4 @@ function bufferFromChunk(chunk: unknown): Buffer<ArrayBufferLike> {
   if (Buffer.isBuffer(chunk)) return chunk;
   if (typeof chunk === "string") return Buffer.from(chunk);
   throw new TypeError(`Unsupported stdio chunk type: ${typeof chunk}`);
-}
-
-function messageFromError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
