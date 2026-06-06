@@ -36,6 +36,36 @@ describe("ralph-loop continuation prompt injector", () => {
     }
   })
 
+  test("#given promptAsync resolves circular SDK error #when injecting continuation prompt #then it returns rejection without throwing", async () => {
+    // given
+    const circularError: Record<string, unknown> = {}
+    circularError.self = circularError
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async () => ({
+            error: circularError,
+          }),
+        },
+      },
+    }
+
+    // when
+    const result = await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_rejected_circular_response",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("rejected")
+    if (result.status === "rejected") {
+      expect(String(result.error)).toContain("[object Object]")
+    }
+  })
+
   test("#given promptAsync rejects #when injecting continuation prompt #then it returns rejection without throwing", async () => {
     // given
     const ctx = {
