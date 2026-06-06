@@ -21,7 +21,11 @@ function safeUnlink(filePath: string): void {
   try {
     fs.unlinkSync(filePath)
   } catch (err) {
-    log(`[auto-update-checker] Failed to cleanup temp file: ${filePath}`, err)
+    if (err instanceof Error) {
+      log(`[auto-update-checker] Failed to cleanup temp file: ${filePath}`, err)
+    } else {
+      log(`[auto-update-checker] Failed to cleanup temp file: ${filePath}`, err)
+    }
   }
 }
 
@@ -43,7 +47,11 @@ function writeCachePackageJson(
     fs.renameSync(tmpPath, cachePackageJsonPath)
     return { synced: true, error: null }
   } catch (err) {
-    log("[auto-update-checker] Failed to write cache package.json:", err)
+    if (err instanceof Error) {
+      log("[auto-update-checker] Failed to write cache package.json:", err)
+    } else {
+      log("[auto-update-checker] Failed to write cache package.json:", err)
+    }
     safeUnlink(tmpPath)
     return { synced: false, error: "write_error", message: "Failed to write cache package.json" }
   }
@@ -67,14 +75,22 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
   try {
     content = fs.readFileSync(cachePackageJsonPath, "utf-8")
   } catch (err) {
-    log("[auto-update-checker] Failed to read cache package.json:", err)
+    if (err instanceof Error) {
+      log("[auto-update-checker] Failed to read cache package.json:", err)
+    } else {
+      log("[auto-update-checker] Failed to read cache package.json:", err)
+    }
     return { synced: false, error: "parse_error", message: "Failed to read cache package.json" }
   }
 
   try {
     pkgJson = JSON.parse(content) as CachePackageJson
   } catch (err) {
-    log("[auto-update-checker] Failed to parse cache package.json:", err)
+    if (err instanceof Error) {
+      log("[auto-update-checker] Failed to parse cache package.json:", err)
+    } else {
+      log("[auto-update-checker] Failed to parse cache package.json:", err)
+    }
     return { synced: false, error: "parse_error", message: "Failed to parse cache package.json (malformed JSON)" }
   }
 

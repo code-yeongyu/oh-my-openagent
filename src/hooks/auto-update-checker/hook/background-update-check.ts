@@ -32,7 +32,10 @@ function defaultGetModuleHostingWorkspace(): string | null {
     const nodeModulesDir = dirname(pkgDir)
     if (nodeModulesDir.split(/[\\/]/).pop() !== "node_modules") return null
     return dirname(nodeModulesDir)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
     return null
   }
 }

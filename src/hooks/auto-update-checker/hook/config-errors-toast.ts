@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../../shared/config-errors"
 import { log } from "../../../shared/logger"
+import { ignoreToastError } from "./ignore-toast-error"
 
 export async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {
   const errors = getConfigLoadErrors()
@@ -16,7 +17,7 @@ export async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {
         duration: 10000,
       },
     })
-    .catch(() => {})
+    .catch(ignoreToastError)
 
   log(`[auto-update-checker] Config load errors shown: ${errors.length} error(s)`) 
   clearConfigLoadErrors()

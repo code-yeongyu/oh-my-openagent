@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -96,5 +96,56 @@ describe("getCachedVersion (GH-3257)", () => {
         execDir: null,
       })
     ).toBe("3.17.5")
+  })
+
+  it("falls back to installed candidates when module-relative lookup throws a non-Error", () => {
+    // given
+    const legacyDir = join(cacheRoot, "node_modules", "oh-my-opencode")
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "3.18.0" }))
+    const nonError = Symbol("module lookup failed")
+
+    // when
+    const version = getCachedVersion({
+      packageJsonCandidates: mockState.candidates,
+      findPackageJson: () => {
+        throw nonError
+      },
+      currentDir: "/loaded/plugin",
+      execDir: null,
+    })
+
+    // then
+    expect(version).toBe("3.18.0")
+  })
+
+  it("tries the next candidate when reading a candidate throws a non-Error", () => {
+    // given
+    const legacyDir = join(cacheRoot, "node_modules", "oh-my-opencode")
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "3.18.0" }))
+
+    const aliasDir = join(cacheRoot, "node_modules", "oh-my-openagent")
+    mkdirSync(aliasDir, { recursive: true })
+    writeFileSync(join(aliasDir, "package.json"), JSON.stringify({ name: "oh-my-openagent", version: "3.18.1" }))
+
+    const originalParse = JSON.parse
+    const nonError = Symbol("candidate read failed")
+    const parseSpy = spyOn(JSON, "parse").mockImplementation((text: string) => {
+      if (String(text).includes("oh-my-opencode")) {
+        throw nonError
+      }
+      return originalParse(text)
+    })
+
+    try {
+      // when
+      const version = getIsolatedCachedVersion()
+
+      // then
+      expect(version).toBe("3.18.1")
+    } finally {
+      parseSpy.mockRestore()
+    }
   })
 })

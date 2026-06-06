@@ -9,6 +9,7 @@ import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-pro
 import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-status"
 import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
 import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
+import { ignoreToastError } from "./hook/ignore-toast-error"
 
 interface AutoUpdateCheckerDeps {
   getCachedVersion: typeof getCachedVersion
@@ -100,14 +101,14 @@ export function createAutoUpdateCheckerHook(
 
           if (localDevVersion) {
             if (showStartupToast) {
-              deps.showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
+              deps.showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(ignoreToastError)
             }
             deps.log("[auto-update-checker] Local development mode")
             return
           }
 
           if (showStartupToast) {
-            deps.showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
+            deps.showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(ignoreToastError)
           }
 
           deps.runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch((err) => {
