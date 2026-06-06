@@ -50,6 +50,7 @@ type CapturedModel = {
 }
 
 type CapturedLaunchInput = {
+  readonly agent?: string
   readonly model?: CapturedModel
   readonly fallbackChain?: unknown
 }
@@ -101,6 +102,13 @@ function requireResolvedCategoryConfig(result: ReturnType<typeof resolveCategory
 function requireString(value: string | undefined, context: string): string {
   if (value === undefined) {
     throw new Error(`Expected ${context}`)
+  }
+  return value
+}
+
+function requireCapturedLaunchInput(value: CapturedLaunchInput | undefined): CapturedLaunchInput {
+  if (value === undefined) {
+    throw new Error("Expected background launch input")
   }
   return value
 }
@@ -462,7 +470,6 @@ describe("sisyphus-task", () => {
       await tool.execute(args, toolContext)
 
       //#then
-      expect(args.load_skills).toEqual(["playwright", "git-master"])
       expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
     }, { timeout: 10000 })
 
@@ -525,7 +532,6 @@ describe("sisyphus-task", () => {
       await tool.execute(args, toolContext)
 
       //#then
-      expect(args.load_skills).toEqual([])
       expect(resolveSkillContentSpy).toHaveBeenCalledWith([], expect.any(Object))
     }, { timeout: 10000 })
   })
@@ -535,77 +541,85 @@ describe("sisyphus-task", () => {
       // given
       const { createDelegateTask } = require("./tools")
 
+      let launchInput: CapturedLaunchInput | undefined
       const mockManager = {
-        launch: async () => ({
-          id: "task-123",
-          status: "pending",
-          description: "Test task",
-          agent: "sisyphus-junior",
-          sessionID: "test-session",
-        }),
+        launch: async (input: CapturedLaunchInput) => {
+          launchInput = input
+          return {
+            id: "task-123",
+            status: "pending",
+            description: "Test task",
+            agent: "sisyphus-junior",
+            sessionID: "test-session",
+          }
+        },
       }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({}) },
-         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-           status: async () => ({ data: {} }),
-         },
-       }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
-         availableModelsOverride: createTestAvailableModels(),
-       })
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
 
-       const toolContext = {
-         sessionID: "parent-session",
-         messageID: "parent-message",
-         agent: "sisyphus",
-         abort: new AbortController().signal,
-       }
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
 
-       const args: {
-         description: string
-         prompt: string
-         category: string
-         run_in_background: boolean
-         load_skills: string[]
-         subagent_type?: string
-       } = {
-         description: "Quick category test",
-         prompt: "Do something",
-         category: "quick",
-         run_in_background: true,
-         load_skills: [],
-       }
+      const args: {
+        description: string
+        prompt: string
+        category: string
+        run_in_background: boolean
+        load_skills: string[]
+        subagent_type?: string
+      } = {
+        description: "Quick category test",
+        prompt: "Do something",
+        category: "quick",
+        run_in_background: true,
+        load_skills: [],
+      }
 
-       // when
-       await tool.execute(args, toolContext)
+      // when
+      await tool.execute(args, toolContext)
 
-       // then
-       expect(args.subagent_type).toBe("Sisyphus-Junior")
+      // then
+      expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("prefers category over subagent_type when both are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
+      let launchInput: CapturedLaunchInput | undefined
       const mockManager = {
-        launch: async () => ({
-          id: "task-override",
-          status: "pending",
-          description: "Override test",
-          agent: "sisyphus-junior",
-          sessionID: "test-session",
-        }),
+        launch: async (input: CapturedLaunchInput) => {
+          launchInput = input
+          return {
+            id: "task-override",
+            status: "pending",
+            description: "Override test",
+            agent: "sisyphus-junior",
+            sessionID: "test-session",
+          }
+        },
       }
 
       const mockClient = {
@@ -649,7 +663,7 @@ describe("sisyphus-task", () => {
       await tool.execute(args, toolContext)
 
       //#then - category takes precedence, subagent_type is overridden to sisyphus-junior
-      expect(args.subagent_type).toBe("Sisyphus-Junior")
+      expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
