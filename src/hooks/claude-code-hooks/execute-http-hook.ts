@@ -49,8 +49,8 @@ function resolveHeaders(
 async function readResponseTextOrEmpty(response: Response): Promise<string> {
   try {
     return await response.text()
-  } catch (error) {
-    return error instanceof Error ? "" : ""
+  } catch {
+    return ""
   }
 }
 

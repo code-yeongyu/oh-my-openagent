@@ -81,7 +81,11 @@ export function clearTranscriptCache(sessionId?: string): void {
       try {
         unlinkSync(entry.tempPath)
       } catch (error) {
-        logTranscriptError("[transcript] failed to clean up cached temp transcript", error instanceof Error ? error : error)
+        if (error instanceof Error) {
+          logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
+        } else {
+          logTranscriptError("[transcript] failed to clean up cached temp transcript", { thrown: error })
+        }
       }
     }
     transcriptCache.delete(sessionId)
@@ -91,7 +95,11 @@ export function clearTranscriptCache(sessionId?: string): void {
         try {
           unlinkSync(entry.tempPath)
         } catch (error) {
-          logTranscriptError("[transcript] failed to clean up cached temp transcript", error instanceof Error ? error : error)
+          if (error instanceof Error) {
+            logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
+          } else {
+            logTranscriptError("[transcript] failed to clean up cached temp transcript", { thrown: error })
+          }
         }
       }
     }
@@ -191,7 +199,11 @@ export async function buildTranscriptFromSession(
         try {
           unlinkSync(cached.tempPath)
         } catch (error) {
-          logTranscriptError("[transcript] failed to clean up stale temp transcript", error instanceof Error ? error : error)
+          if (error instanceof Error) {
+            logTranscriptError("[transcript] failed to clean up stale temp transcript", error)
+          } else {
+            logTranscriptError("[transcript] failed to clean up stale temp transcript", { thrown: error })
+          }
         }
       }
 
@@ -208,7 +220,11 @@ export async function buildTranscriptFromSession(
       try {
         unlinkSync(previousTempPath)
       } catch (error) {
-        logTranscriptError("[transcript] failed to clean up previous temp transcript", error instanceof Error ? error : error)
+        if (error instanceof Error) {
+          logTranscriptError("[transcript] failed to clean up previous temp transcript", error)
+        } else {
+          logTranscriptError("[transcript] failed to clean up previous temp transcript", { thrown: error })
+        }
       }
     }
 
@@ -233,7 +249,11 @@ export async function buildTranscriptFromSession(
 
     return tempPath
   } catch (error) {
-    logTranscriptError("[transcript] failed to build transcript from session", error instanceof Error ? error : error)
+    if (error instanceof Error) {
+      logTranscriptError("[transcript] failed to build transcript from session", error)
+    } else {
+      logTranscriptError("[transcript] failed to build transcript from session", { thrown: error })
+    }
     try {
       const tempPath = join(
         tmpdir(),
@@ -242,7 +262,11 @@ export async function buildTranscriptFromSession(
       writeFileSync(tempPath, buildCurrentEntry(currentToolName, currentToolInput) + "\n")
       return tempPath
     } catch (fallbackError) {
-      logTranscriptError("[transcript] failed to write fallback transcript", fallbackError instanceof Error ? fallbackError : fallbackError)
+      if (fallbackError instanceof Error) {
+        logTranscriptError("[transcript] failed to write fallback transcript", fallbackError)
+      } else {
+        logTranscriptError("[transcript] failed to write fallback transcript", { thrown: fallbackError })
+      }
       return null
     }
   }
@@ -253,6 +277,10 @@ export function deleteTempTranscript(path: string | null): void {
   try {
     unlinkSync(path)
   } catch (error) {
-    logTranscriptError("[transcript] failed to delete temp transcript", error instanceof Error ? error : error)
+    if (error instanceof Error) {
+      logTranscriptError("[transcript] failed to delete temp transcript", error)
+    } else {
+      logTranscriptError("[transcript] failed to delete temp transcript", { thrown: error })
+    }
   }
 }
