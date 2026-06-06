@@ -35,6 +35,15 @@ function createLargePngDataUrl(width: number, height: number, extraBase64Chars: 
   return `data:image/png;base64,${paddedBase64}`
 }
 
+function createTruncatedVp8WebpDataUrl(): string {
+  const buf = Buffer.alloc(26)
+  buf.write("RIFF", 0, "ascii")
+  buf.write("WEBP", 8, "ascii")
+  buf.write("VP8 ", 12, "ascii")
+  buf.set([0x9d, 0x01, 0x2a], 23)
+  return `data:image/webp;base64,${buf.toString("base64")}`
+}
+
 describe("parseImageDimensions", () => {
   it("parses PNG 1x1 dimensions", () => {
     //#given
@@ -119,6 +128,17 @@ describe("parseImageDimensions", () => {
 
     //#when
     const result = parseImageDimensions(dataUrl, "image/heic")
+
+    //#then
+    expect(result).toBeNull()
+  })
+
+  it("returns null when truncated WEBP headers cannot be read", () => {
+    //#given
+    const dataUrl = createTruncatedVp8WebpDataUrl()
+
+    //#when
+    const result = parseImageDimensions(dataUrl, "image/webp")
 
     //#then
     expect(result).toBeNull()

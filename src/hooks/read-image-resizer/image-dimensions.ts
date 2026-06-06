@@ -185,7 +185,10 @@ export function parseImageDimensions(base64DataUrl: string, mimeType: string): I
     }
 
     return null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
