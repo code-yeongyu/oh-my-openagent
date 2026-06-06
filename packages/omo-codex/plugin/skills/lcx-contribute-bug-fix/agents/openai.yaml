@@ -1,0 +1,12 @@
+interface:
+  display_name: "lcx-contribute-bug-fix (omo)"
+  short_description: "Contribute verified LazyCodex or Codex bug-fix PRs"
+  search_terms:
+    - "lcx-contribute-bug-fix"
+    - "contribute a bug fix"
+    - "contribute to fix bug"
+    - "fix bug pr"
+    - "lazycodex fix"
+    - "omo-codex bug fix"
+    - "codex bug fix pr"
+  default_prompt: "Use $lcx-contribute-bug-fix to debug this LazyCodex or Codex bug, work from a fresh /tmp clone and worktree, implement the smallest verified fix, generate the PR body, apply the lazycodex-generated label, open the PR, and clean up."

@@ -15,6 +15,7 @@ const expectedSkills = [
 	"frontend-ui-ux",
 	"git-master",
 	"init-deep",
+	"lcx-contribute-bug-fix",
 	"lcx-report-bug",
 	"lsp",
 	"programming",
@@ -191,33 +192,6 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	// then
 	assert.match(interfaceMetadata, /search_terms:/);
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
-});
-
-test("#given synced lcx-report-bug skill #when inspected #then it files LazyCodex bug issues from proven debugging evidence", async () => {
-	// given
-	const skillRoot = join(root, "skills", "lcx-report-bug");
-
-	// when
-	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
-	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
-
-	// then
-	assert.match(skill, /^---\r?\nname: lcx-report-bug\r?\n/m);
-	assert.match(skill, /code-yeongyu\/lazycodex/);
-	assert.match(skill, /openai\/codex/);
-	assert.match(skill, /\/tmp\/openai-codex-source/);
-	assert.match(skill, /\$omo:debugging/);
-	assert.match(skill, /Repository Decision/);
-	assert.match(skill, /TARGET_REPO="code-yeongyu\/lazycodex" # or openai\/codex/);
-	assert.match(skill, /gh issue create --repo "\$TARGET_REPO"/);
-	assert.match(skill, /gh pr create --repo "\$TARGET_REPO"/);
-	assert.match(skill, /🤖 This issue\/PR was debugged and created with \[LazyCodex\]/);
-	assert.match(skill, /Browser use fallback/);
-	assert.match(skill, /Computer use fallback/);
-	assert.match(skill, /## Issue Body Template/);
-	assert.match(interfaceMetadata, /display_name: "lcx-report-bug \(omo\)"/);
-	assert.match(interfaceMetadata, /- "lazycodex bug"/);
-	assert.match(interfaceMetadata, /- "openai codex bug"/);
 });
 
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {
