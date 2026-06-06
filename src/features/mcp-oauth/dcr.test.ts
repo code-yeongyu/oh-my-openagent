@@ -161,4 +161,27 @@ describe("getOrRegisterClient", () => {
     expect(result).toEqual({ clientId: "fallback-client" })
     expect(storage.getLastSet()).toBeNull()
   })
+
+  it("propagates non-Error registration failures", async () => {
+    // given
+    const storage = createStorage(null)
+    const rejection = { kind: "non-error-rejection" }
+    const fetchMock: DcrFetch = async () => Promise.reject(rejection)
+
+    // when
+    const result = getOrRegisterClient({
+      registrationEndpoint: "https://server.example.com/register",
+      serverIdentifier: "server-5",
+      clientName: "Test Client",
+      redirectUris: ["https://app.example.com/callback"],
+      tokenEndpointAuthMethod: "client_secret_post",
+      clientId: "fallback-client",
+      storage,
+      fetch: fetchMock,
+    })
+
+    // then
+    await expect(result).rejects.toBe(rejection)
+    expect(storage.getLastSet()).toBeNull()
+  })
 })
