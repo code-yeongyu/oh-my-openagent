@@ -1,0 +1,3 @@
+lsp-tools-mcp extracts the standalone LSP runtime from codex-lsp into a reusable package.
+
+The package includes adapted code originally developed for pi-lsp-client.

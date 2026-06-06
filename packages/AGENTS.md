@@ -11,7 +11,7 @@
 | Role | Count | Packages |
 |------|-------|----------|
 | **Platform binaries** | 11 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
-| **MCP packages** | 3 | `lsp-tools-mcp` (git submodule), `ast-grep-mcp`, `git-bash-mcp` |
+| **MCP packages** | 3 | `lsp-tools-mcp`, `ast-grep-mcp`, `git-bash-mcp` |
 | **Core packages** | 9 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `hashline-core`, `boulder-state` |
 | **Codex adapter** | 1 | `omo-codex` (Codex CLI Light edition; npm/bin alias `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`). See [`packages/omo-codex/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md) |
 | **Skills** | 1 | `shared-skills` (cross-harness SKILL.md bundle shared between OMO and Codex; shipped via root `files` array) |
@@ -29,7 +29,7 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 
 | Package | Layout | Purpose |
 |---------|--------|---------|
-| `lsp-tools-mcp/` | Full standalone project (own `.git` submodule, `.github/`, `CHANGELOG.md`, `LICENSE`, `src/`, `test/`, `biome.json`, `vitest.config.ts`) | Serves `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status` tools via stdio MCP. Registered as tier-1 MCP `lsp` in [`src/mcp/`](file:///Users/yeongyu/local-workspaces/omo/src/mcp/). |
+| `lsp-tools-mcp/` | Vendored standalone project (`.github/`, `CHANGELOG.md`, `LICENSE`, `src/`, `test/`, `biome.json`, `vitest.config.ts`) | Serves `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status` tools via stdio MCP. Registered as tier-1 MCP `lsp` in [`src/mcp/`](file:///Users/yeongyu/local-workspaces/omo/src/mcp/). |
 | `ast-grep-mcp/` | Internal package (`src/`, `dist/`, `tsconfig.json`) | Serves `ast_grep_search` + `ast_grep_replace` tools via stdio MCP. Registered as tier-1 MCP `ast_grep`. |
 | `git-bash-mcp/` | Internal package (`src/`, `dist/`, `tsconfig.json`) | stdio MCP serving the Windows-only `git_bash` tool for the Codex edition. Tier-1 MCP. |
 
@@ -61,7 +61,7 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 
 - **No new package without explicit need.** Adding a sibling package complicates publish + CI. Justify the boundary first.
 - **Platform binaries** are generated. Do NOT edit by hand. Modify [`script/build-binaries.ts`](file:///Users/yeongyu/local-workspaces/omo/script/build-binaries.ts).
-- **`lsp-tools-mcp` is a git submodule.** Initialize with `git submodule update --init --recursive` after fresh clone.
+- **`lsp-tools-mcp` is vendored source.** Build it with `bun run build:lsp-tools-mcp` before workflows or package tasks that need `packages/lsp-tools-mcp/dist`.
 - **`packages/web/` is excluded from root `bun test`** via `bunfig.toml`. It has its own [`web-ci.yml`](file:///Users/yeongyu/local-workspaces/omo/.github/workflows/web-ci.yml) workflow.
 - **CI builds** for non-platform packages run as part of the root `ci.yml`. Platform binaries build only via `publish-platform.yml` when triggered by `publish.yml`.
 

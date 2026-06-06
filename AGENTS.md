@@ -271,7 +271,7 @@ bun run test:codex                # Codex Light compatibility suite (ast-grep + 
 bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundle + schema generation)
 bun run build:all                 # Build + 11 platform binaries
 bun run build:binaries            # 11 platform binaries only (script/build-binaries.ts)
-bun run build:lsp-tools-mcp       # npm-install + build the bundled LSP MCP submodule
+bun run build:lsp-tools-mcp       # npm ci + build the vendored LSP MCP package
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
 bun run build:model-capabilities  # Refresh shared/model-capabilities cache from models.dev
 bun run typecheck                 # tsgo --noEmit + typecheck:packages (NOT tsc; @typescript/native-preview)

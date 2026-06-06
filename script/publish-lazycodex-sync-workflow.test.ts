@@ -46,7 +46,7 @@ describe("LazyCodex marketplace sync workflow", () => {
     expect(buildsCodexPluginBeforeMarketplaceSync, "release marketplace sync must build the Codex plugin before copying it").toBe(true)
   })
 
-  test("initializes the LSP tools submodule before the release marketplace sync builds it", () => {
+  test("uses the vendored LSP tools package directly during release marketplace sync", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const syncStep = sliceWorkflowSection(
@@ -56,16 +56,11 @@ describe("LazyCodex marketplace sync workflow", () => {
     )
 
     // #when
-    const submoduleUpdateIndex = syncStep.indexOf("git submodule update --init --recursive packages/lsp-tools-mcp")
     const lspBuildIndex = syncStep.indexOf("bun run build:lsp-tools-mcp")
-    const initializesSubmoduleBeforeBuild =
-      submoduleUpdateIndex >= 0 && lspBuildIndex > submoduleUpdateIndex
 
     // #then
-    expect(
-      initializesSubmoduleBeforeBuild,
-      "release marketplace sync must initialize packages/lsp-tools-mcp before npm ci runs inside it",
-    ).toBe(true)
+    expect(syncStep).not.toContain("git submodule")
+    expect(lspBuildIndex, "release marketplace sync must build the vendored LSP package").toBeGreaterThanOrEqual(0)
   })
 
   test("stages generated LazyCodex repository workflow changes", () => {

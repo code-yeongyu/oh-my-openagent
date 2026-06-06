@@ -44,7 +44,7 @@ The refactor splits packages into strict layers by runtime boundary:
 - 7 Core packages are now extracted under `packages/`: `utils`, `model-core`, `rules-engine`, `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `boulder-state`.
 - `omo` consumes all 7 via workspace dependencies plus per-file re-export shims at the original `src/` locations.
 - `pi-extensions` and `codex-plugins` are not yet migrated to consume these packages. That migration is the next phase.
-- The `lsp-tools-mcp` submodule is untouched. `lsp-core` extraction is `[~]` deferred pending submodule strategy.
+- The `lsp-tools-mcp` package is now vendored in-tree. `lsp-core` extraction is `[~]` deferred pending the next MCP package layering step.
 
 Layering achieved: Core (7 pure-TS packages) → Adapter (`omo` plugin) → Platform binaries. Future Pi and Codex adapters will consume the same Core layer.
 

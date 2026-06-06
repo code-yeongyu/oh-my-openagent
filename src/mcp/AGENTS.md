@@ -16,9 +16,9 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | **lsp** | local (stdio, node/bun) | `node packages/lsp-tools-mcp/dist/cli.js mcp` or `bun packages/lsp-tools-mcp/src/cli.ts mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
 | **ast_grep** | local (stdio, node/bun) | `node packages/ast-grep-mcp/dist/cli.js mcp` or `bun packages/ast-grep-mcp/src/cli.ts mcp` | `OMO_AST_GREP_WORKSPACE=<project>` | `search`, `replace` |
 
-## SUBMODULE ARCHITECTURE
+## VENDORED LSP ARCHITECTURE
 
-- The local `lsp` MCP is a git submodule at `packages/lsp-tools-mcp/`.
+- The local `lsp` MCP is vendored at `packages/lsp-tools-mcp/`.
 - Upstream project: https://github.com/code-yeongyu/lsp-tools-mcp
 - OMO resolves the CLI path dynamically in `src/mcp/lsp.ts` so both `src/` and `dist/` runtime layouts work.
 - `lsp` and `ast_grep` are registered whenever they are not listed in `disabled_mcps`, even if their CLI artifacts have not been built yet. Source checkouts fall back to the Bun source CLI; packaged builds prefer the Node dist CLI.

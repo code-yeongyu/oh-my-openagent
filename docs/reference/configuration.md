@@ -636,7 +636,7 @@ silently migrated (see `src/shared/migration/config-migration.ts`).
 To configure custom language servers, create `.opencode/lsp.json` at the project
 root. The MCP server is launched with `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json`
 and reads the server map from that file. The schema lives in the
-`packages/lsp-tools-mcp` submodule (upstream:
+`packages/lsp-tools-mcp` vendored package (upstream:
 [code-yeongyu/lsp-tools-mcp](https://github.com/code-yeongyu/lsp-tools-mcp)).
 
 To disable the LSP MCP entirely:

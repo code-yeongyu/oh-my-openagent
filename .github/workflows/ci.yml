@@ -40,14 +40,12 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 
@@ -76,14 +74,12 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 
@@ -115,14 +111,12 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 
@@ -188,9 +182,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          submodules: recursive
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 

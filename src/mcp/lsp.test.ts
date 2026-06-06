@@ -77,8 +77,14 @@ describe("createLspMcpConfig", () => {
     const nodePath = join(packageRoot, "bin", "node")
     const npmPath = join(packageRoot, "bin", "npm")
     mkdirSync(join(packageRoot, "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp"), { recursive: true })
     mkdirSync(join(workspaceRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
     writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
+    writeFileSync(
+      join(packageRoot, "packages", "lsp-tools-mcp", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/lsp-tools-mcp" }),
+      "utf-8",
+    )
     writeFileSync(workspaceCliPath, "console.log('malicious')\n", "utf-8")
 
     // when
@@ -95,11 +101,10 @@ describe("createLspMcpConfig", () => {
     expect(config.command[3]).toBe(packageRoot)
   })
 
-  it("returns a bootstrap command when no LSP cli entrypoint exists", () => {
+  it("disables the MCP config when the vendored LSP package metadata is missing", () => {
     // given
-    const packageRoot = createTemporaryDirectory("omo-lsp-missing-root-")
+    const packageRoot = createTemporaryDirectory("omo-lsp-no-package-root-")
     const moduleFilePath = join(packageRoot, "dist", "index.js")
-    const gitPath = join(packageRoot, "bin", "git")
     const bunPath = join(packageRoot, "bin", "bun")
     const nodePath = join(packageRoot, "bin", "node")
     const npmPath = join(packageRoot, "bin", "npm")
@@ -108,21 +113,47 @@ describe("createLspMcpConfig", () => {
 
     // when
     const config = createLspMcpConfig({
+      cwd: createTemporaryDirectory("omo-lsp-no-package-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath, node: nodePath, npm: npmPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(false)
+  })
+
+  it("returns a vendored package bootstrap command when no LSP cli entrypoint exists", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-lsp-missing-root-")
+    const moduleFilePath = join(packageRoot, "dist", "index.js")
+    const bunPath = join(packageRoot, "bin", "bun")
+    const nodePath = join(packageRoot, "bin", "node")
+    const npmPath = join(packageRoot, "bin", "npm")
+    mkdirSync(join(packageRoot, "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp"), { recursive: true })
+    writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
+    writeFileSync(
+      join(packageRoot, "packages", "lsp-tools-mcp", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/lsp-tools-mcp" }),
+      "utf-8",
+    )
+
+    // when
+    const config = createLspMcpConfig({
       cwd: createTemporaryDirectory("omo-lsp-missing-cwd-"),
       moduleUrl: pathToFileURL(moduleFilePath).href,
-      resolveExecutable: createResolver({ bun: bunPath, git: gitPath, node: nodePath, npm: npmPath }),
+      resolveExecutable: createResolver({ bun: bunPath, node: nodePath, npm: npmPath }),
     })
 
     // then
     expect(config.enabled).toBe(true)
     expect(config.command[0]).toBe(nodePath)
     expect(config.command[1]).toBe("-e")
-    expect(config.command[2]).toContain("submodule")
+    expect(config.command[2]).not.toContain("submodule")
     expect(config.command[2]).toContain("npm")
     expect(config.command[3]).toBe(packageRoot)
-    expect(config.command[4]).toBe(gitPath)
-    expect(config.command[5]).toBe(npmPath)
-    expect(config.command[6]).toBe(bunPath)
+    expect(config.command[4]).toBe(npmPath)
+    expect(config.command[5]).toBe(bunPath)
   })
 
   it("disables the MCP config when no runtime can launch any LSP candidate", () => {
