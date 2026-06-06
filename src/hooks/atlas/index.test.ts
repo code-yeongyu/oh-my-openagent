@@ -41,6 +41,7 @@ describe("atlas hook", () => {
     }))
     const client = createOpencodeClient({ baseUrl: "http://localhost" })
     Reflect.set(client.session, "get", sessionGetMock)
+    Reflect.set(client.session, "messages", mock(async () => ({ data: [] })))
     Reflect.set(client.session, "prompt", promptMock)
     Reflect.set(client.session, "promptAsync", promptMock)
 
@@ -48,6 +49,7 @@ describe("atlas hook", () => {
       directory: TEST_DIR,
       project: {} as Parameters<typeof createAtlasHook>[0]["project"],
       worktree: TEST_DIR,
+      experimental_workspace: { register: () => {} },
       serverUrl: new URL("http://localhost"),
       $: {} as Parameters<typeof createAtlasHook>[0]["$"],
       client,
@@ -465,7 +467,7 @@ session_id: ses_standalone_def
 
       // then - should still have only one sessionID
       const updatedState = readBoulderState(TEST_DIR)
-      const count = updatedState?.session_ids.filter((id) => id === sessionID).length
+      const count = updatedState?.session_ids.filter((id) => id === `opencode:${sessionID}`).length
       expect(count).toBe(1)
       
       cleanupMessageStorage(sessionID)
@@ -647,7 +649,7 @@ session_id: ses_auth_flow_123
 
       // then
      const updatedState = readBoulderState(TEST_DIR)
-      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("ses_auth_flow_123")
+      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("opencode:ses_auth_flow_123")
       expect(updatedState?.task_sessions?.["todo:1"]?.task_title).toBe("Implement auth flow")
       expect(updatedState?.task_sessions?.["todo:1"]?.agent).toBe("sisyphus-junior")
       expect(updatedState?.task_sessions?.["todo:1"]?.category).toBe("deep")
@@ -709,7 +711,7 @@ session_id: ses_auth_flow_123
 
       // then - the completed task session is still recorded against task 1, not task 2
      const updatedState = readBoulderState(TEST_DIR)
-      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("ses_auth_flow_123")
+      expect(updatedState?.task_sessions?.["todo:1"]?.session_id).toBe("opencode:ses_auth_flow_123")
       expect(updatedState?.task_sessions?.["todo:2"]).toBeUndefined()
 
       cleanupMessageStorage(sessionID)
@@ -2678,7 +2680,7 @@ session_id: ses_untrusted_999
 
         globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
           const timerEntry = id ? capturedTimers.get(id) : undefined
-          if (timerEntry) {
+          if (id !== undefined && timerEntry) {
             timerEntry.cleared = true
             capturedTimers.delete(id)
             return
