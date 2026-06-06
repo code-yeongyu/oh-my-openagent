@@ -60,7 +60,8 @@ export function extractErrorMessage(error: unknown): string | undefined {
 
   try {
     return JSON.stringify(error)
-  } catch {
+  } catch (stringifyError) {
+    if (stringifyError instanceof Error) return String(error)
     return String(error)
   }
 }

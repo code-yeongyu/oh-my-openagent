@@ -78,7 +78,8 @@ function isCurrentExecutable(candidate: string, currentExecutablePaths: readonly
 function realpathOrSelf(path: string): string {
   try {
     return realpathSync(path)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return path
     return path
   }
 }
