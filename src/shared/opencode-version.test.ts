@@ -180,6 +180,58 @@ describe("opencode-version", () => {
       expect(result).toBe("1.14.42")
       expect(calls).toEqual(["exec"])
     })
+
+    test("falls back to opencode binary when adjacent package JSON is invalid", () => {
+      // given adjacent package JSON cannot be parsed
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        realpath: (filePath) => filePath,
+        exists: (filePath) => filePath === "/tmp/opencode-ai/package.json",
+        readText: () => "{not json",
+        execCommand: () => "opencode 1.14.43",
+      })
+
+      // then the CLI fallback remains intact
+      expect(result).toBe("1.14.43")
+    })
+
+    test("falls back to opencode binary when resolving the adjacent package fails", () => {
+      // given the binary realpath lookup fails
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        realpath: () => {
+          throw new Error("realpath failed")
+        },
+        exists: () => true,
+        readText: () => JSON.stringify({ name: "opencode-ai", version: "1.14.44" }),
+        execCommand: () => "opencode 1.14.44",
+      })
+
+      // then the CLI fallback remains intact
+      expect(result).toBe("1.14.44")
+    })
+
+    test("returns null when opencode binary execution fails", () => {
+      // given package lookup is unavailable and the binary command fails
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => null,
+        realpath: (filePath) => filePath,
+        exists: () => false,
+        readText: () => "",
+        execCommand: () => {
+          throw new Error("opencode missing")
+        },
+      })
+
+      // then version detection remains fail-safe
+      expect(result).toBeNull()
+    })
   })
 
   describe("isOpenCodeVersionAtLeast", () => {
