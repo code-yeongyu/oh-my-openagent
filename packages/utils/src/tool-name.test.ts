@@ -1,155 +1,79 @@
-import { describe, it, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { transformToolName } from "./tool-name"
+
+type ToolNameCase = readonly [label: string, toolName: string, expected: string]
 
 describe("transformToolName", () => {
   describe("whitespace trimming", () => {
-    it("trims leading whitespace from tool name", () => {
-      // given
-      const toolName = " delegate_task"
+    const cases = [
+      ["trims leading whitespace from tool name", " delegate_task", "DelegateTask"],
+      ["trims trailing whitespace from tool name", "delegate_task ", "DelegateTask"],
+      ["trims both leading and trailing whitespace", " delegate_task ", "DelegateTask"],
+      ["applies special mapping after trimming whitespace", " webfetch", "WebFetch"],
+      ["handles simple case with leading and trailing spaces", " read ", "Read"],
+    ] as const satisfies readonly ToolNameCase[]
 
-      // when
-      const result = transformToolName(toolName)
+    for (const [label, toolName, expected] of cases) {
+      test(label, () => {
+        // when
+        const result = transformToolName(toolName)
 
-      // then
-      expect(result).toBe("DelegateTask")
-    })
-
-    it("trims trailing whitespace from tool name", () => {
-      // given
-      const toolName = "delegate_task "
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("DelegateTask")
-    })
-
-    it("trims both leading and trailing whitespace", () => {
-      // given
-      const toolName = " delegate_task "
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("DelegateTask")
-    })
-
-    it("applies special mapping after trimming whitespace", () => {
-      // given
-      const toolName = " webfetch"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("WebFetch")
-    })
-
-    it("handles simple case with leading and trailing spaces", () => {
-      // given
-      const toolName = " read "
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("Read")
-    })
+        // then
+        expect(result).toBe(expected)
+      })
+    }
   })
 
   describe("special tool mappings", () => {
-    it("maps webfetch to WebFetch", () => {
-      // given
-      const toolName = "webfetch"
+    const cases = [
+      ["maps webfetch to WebFetch", "webfetch", "WebFetch"],
+      ["maps websearch to WebSearch", "websearch", "WebSearch"],
+      ["maps todoread to TodoRead", "todoread", "TodoRead"],
+      ["maps todowrite to TodoWrite", "todowrite", "TodoWrite"],
+    ] as const satisfies readonly ToolNameCase[]
 
-      // when
-      const result = transformToolName(toolName)
+    for (const [label, toolName, expected] of cases) {
+      test(label, () => {
+        // when
+        const result = transformToolName(toolName)
 
-      // then
-      expect(result).toBe("WebFetch")
-    })
-
-    it("maps websearch to WebSearch", () => {
-      // given
-      const toolName = "websearch"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("WebSearch")
-    })
-
-    it("maps todoread to TodoRead", () => {
-      // given
-      const toolName = "todoread"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("TodoRead")
-    })
-
-    it("maps todowrite to TodoWrite", () => {
-      // given
-      const toolName = "todowrite"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("TodoWrite")
-    })
+        // then
+        expect(result).toBe(expected)
+      })
+    }
   })
 
   describe("kebab-case and snake_case conversion", () => {
-    it("converts snake_case to PascalCase", () => {
-      // given
-      const toolName = "delegate_task"
+    const cases = [
+      ["converts snake_case to PascalCase", "delegate_task", "DelegateTask"],
+      ["converts kebab-case to PascalCase", "call-omo-agent", "CallOmoAgent"],
+    ] as const satisfies readonly ToolNameCase[]
 
-      // when
-      const result = transformToolName(toolName)
+    for (const [label, toolName, expected] of cases) {
+      test(label, () => {
+        // when
+        const result = transformToolName(toolName)
 
-      // then
-      expect(result).toBe("DelegateTask")
-    })
-
-    it("converts kebab-case to PascalCase", () => {
-      // given
-      const toolName = "call-omo-agent"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("CallOmoAgent")
-    })
+        // then
+        expect(result).toBe(expected)
+      })
+    }
   })
 
   describe("simple capitalization", () => {
-    it("capitalizes simple single-word tool names", () => {
-      // given
-      const toolName = "read"
+    const cases = [
+      ["capitalizes simple single-word tool names", "read", "Read"],
+      ["preserves capitalization of already capitalized names", "Write", "Write"],
+    ] as const satisfies readonly ToolNameCase[]
 
-      // when
-      const result = transformToolName(toolName)
+    for (const [label, toolName, expected] of cases) {
+      test(label, () => {
+        // when
+        const result = transformToolName(toolName)
 
-      // then
-      expect(result).toBe("Read")
-    })
-
-    it("preserves capitalization of already capitalized names", () => {
-      // given
-      const toolName = "Write"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("Write")
-    })
+        // then
+        expect(result).toBe(expected)
+      })
+    }
   })
 })
