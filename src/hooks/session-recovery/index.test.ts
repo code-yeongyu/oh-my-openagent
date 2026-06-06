@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
