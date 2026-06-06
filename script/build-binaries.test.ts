@@ -32,6 +32,10 @@ async function writeFakeCli(tempDir: string): Promise<void> {
   await chmod(cliPath, 0o755);
 }
 
+function normalizeOutputPath(output: string): string {
+  return output.replace(/\\/g, "/");
+}
+
 describe("build-binaries", () => {
   describe("PLATFORMS array", () => {
     it("includes baseline variants for non-AVX2 CPU support", async () => {
@@ -191,7 +195,7 @@ describe("build-binaries", () => {
       // then
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("bun-cli");
-      expect(result.stdout).toContain("dist/cli/index.js --platform=both install --no-tui");
+      expect(normalizeOutputPath(result.stdout)).toContain("dist/cli/index.js --platform=both install --no-tui");
       expect(result.stdout).not.toContain("node-installer");
     });
 
@@ -219,7 +223,7 @@ describe("build-binaries", () => {
       // then
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("bun-cli");
-      expect(result.stdout).toContain("dist/cli/index.js sparkshell printf ok");
+      expect(normalizeOutputPath(result.stdout)).toContain("dist/cli/index.js sparkshell printf ok");
       expect(result.stdout).not.toContain("Unsupported lazycodex-ai command");
     });
 

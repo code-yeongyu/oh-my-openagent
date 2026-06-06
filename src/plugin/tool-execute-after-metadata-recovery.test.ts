@@ -13,6 +13,19 @@ function readLogIfPresent(filePath: string): string {
   return existsSync(filePath) ? readFileSync(filePath, "utf8") : ""
 }
 
+async function waitForLogContent(filePath: string, expected: string): Promise<string> {
+  const deadline = Date.now() + 1_000
+  while (Date.now() < deadline) {
+    const content = readLogIfPresent(filePath)
+    if (content.includes(expected)) {
+      return content
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+
+  return readLogIfPresent(filePath)
+}
+
 describe("createToolExecuteAfterHandler metadata recovery", () => {
   beforeEach(() => {
     clearPendingStore()
@@ -102,7 +115,7 @@ describe("createToolExecuteAfterHandler metadata recovery", () => {
 
       // then
       expect(hookRan).toBe(true)
-      expect(readLogIfPresent(logPath)).toContain("Unable to recover stored metadata")
+      expect(await waitForLogContent(logPath, "Unable to recover stored metadata")).toContain("Unable to recover stored metadata")
     } finally {
       _resetLoggerForTesting()
       rmSync(logDir, { force: true, recursive: true })

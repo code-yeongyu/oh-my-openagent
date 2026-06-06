@@ -73,7 +73,7 @@ describe("installModuleMockLifecycle", () => {
       }),
     }
 
-    installModuleMockLifecycle(mockApi, {
+    const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
       loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
@@ -83,7 +83,9 @@ describe("installModuleMockLifecycle", () => {
     // when
     mockApi.module("./dependency", () => ({ named: "mocked" }))
     mockApi.restore()
+    lifecycle.restoreModuleMocks()
     mockApi.restore()
+    lifecycle.restoreModuleMocks()
 
     // then
     expect(events).toEqual([

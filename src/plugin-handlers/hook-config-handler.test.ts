@@ -1,4 +1,7 @@
 const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { mkdtempSync, rmSync } = require("node:fs")
+const { tmpdir } = require("node:os")
+const { join } = require("node:path")
 
 const mockSetPluginHooksConfigs = mock(() => {})
 
@@ -10,6 +13,7 @@ const { applyHookConfig } = await import("./hook-config-handler")
 
 describe("applyHookConfig", () => {
   let originalCwd = ""
+  const tempDirs: string[] = []
 
   beforeEach(() => {
     mockSetPluginHooksConfigs.mockClear()
@@ -21,7 +25,17 @@ describe("applyHookConfig", () => {
     if (process.cwd() !== originalCwd) {
       process.chdir(originalCwd)
     }
+    while (tempDirs.length > 0) {
+      const tempDir = tempDirs.pop()
+      rmSync(tempDir, { recursive: true, force: true })
+    }
   })
+
+  function createTempCwd(): string {
+    const tempDir = mkdtempSync(join(tmpdir(), "omo-hook-config-cwd-"))
+    tempDirs.push(tempDir)
+    return tempDir
+  }
 
   test("#given hooksConfigs #when applyHookConfig called #then setPluginHooksConfigs receives process.cwd() to align with loader", () => {
     // given
@@ -99,7 +113,7 @@ describe("applyHookConfig", () => {
       plugins: [{ name: "worktree-plugin", version: "1.0.0" }],
       errors: [],
     }
-    process.chdir("/tmp")
+    process.chdir(createTempCwd())
     const expectedCwd = process.cwd()
 
     // when
