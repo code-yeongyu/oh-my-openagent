@@ -1,9 +1,20 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, mock, test } from "bun:test"
-import { installModuleMockLifecycle } from "./module-mock-lifecycle"
+import { installModuleMockLifecycle, normalizeStackPath } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
+  test("#given a Windows stack path #when normalizing caller path #then it becomes a file URL rooted at the drive", () => {
+    // given
+    const stackPath = String.raw`D:\a\oh-my-openagent\oh-my-openagent\src\hooks\example.test.ts`
+
+    // when
+    const callerUrl = normalizeStackPath(stackPath)
+
+    // then
+    expect(callerUrl).toBe("file:///D:/a/oh-my-openagent/oh-my-openagent/src/hooks/example.test.ts")
+  })
+
   test("restores the original module exports on mock.restore", () => {
     // given
     const moduleCalls: Array<{ specifier: string; value: Record<string, unknown> }> = []

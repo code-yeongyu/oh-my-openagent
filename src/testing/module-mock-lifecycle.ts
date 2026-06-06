@@ -49,9 +49,15 @@ function cloneModuleExports(moduleValue: unknown): Record<string, unknown> {
   return { default: moduleValue }
 }
 
-function normalizeStackPath(rawPath: string): string {
+const WINDOWS_DRIVE_PATH_PATTERN = /^[A-Za-z]:[\\/]/
+
+export function normalizeStackPath(rawPath: string): string {
   if (rawPath.startsWith("file://")) {
     return rawPath
+  }
+
+  if (WINDOWS_DRIVE_PATH_PATTERN.test(rawPath)) {
+    return new URL(`file:///${rawPath.replace(/\\/g, "/")}`).href
   }
 
   return pathToFileURL(rawPath).href
@@ -62,7 +68,7 @@ function defaultGetCallerUrl(): string {
   const lines = stack.split("\n")
 
   for (const line of lines) {
-    const match = line.match(/(?:\()?(file:\/\/[^\s)]+|\/[^\s):]+):(\d+):(\d+)/)
+    const match = line.match(/(?:\()?(file:\/\/[^\s)]+|[A-Za-z]:\\[^\n)]+|\/[^\s):]+):(\d+):(\d+)/)
     const candidatePath = match?.[1]
     if (!candidatePath) {
       continue
