@@ -91,7 +91,7 @@ describe("spawnTmuxWindow runner integration", () => {
 		expect(firstCall[1].slice(0, 7)).toEqual(["new-window", "-d", "-n", "omo-agents", "-P", "-F", "#{pane_id}"])
 		expect(secondCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
 		expect(harness.getNewWindowCommand()).toContain("Focus this pane to attach.")
-		expect(harness.getNewWindowCommand()).toContain("tail -f /dev/null")
+		expect(harness.getNewWindowCommand()).toContain("while :; do sleep 86400; done")
 		expect(harness.getNewWindowCommand()).not.toContain("opencode attach")
 	})
 

@@ -113,7 +113,7 @@ describe("replaceTmuxPane runner integration", () => {
 		expect(respawnCall[1].slice(0, 4)).toEqual(["respawn-pane", "-k", "-t", "%42"])
 		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
 		expect(getRespawnCommand()).toContain("Focus this pane to attach.")
-		expect(getRespawnCommand()).toContain("tail -f /dev/null")
+		expect(getRespawnCommand()).toContain("while :; do sleep 86400; done")
 		expect(getRespawnCommand()).not.toContain("opencode attach")
 	})
 
