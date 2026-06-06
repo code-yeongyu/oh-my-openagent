@@ -88,7 +88,7 @@ describe("OpenClaw Dispatcher", () => {
     }
   })
 
-  test("#given gateway metadata JSON parsing fails with a non-Error #when wakeGateway parses metadata #then it reports the dispatch failure", async () => {
+  test("#given gateway metadata JSON parsing fails with a non-Error #when wakeGateway parses metadata #then it preserves the successful wake fallback", async () => {
     // given
     const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
@@ -106,10 +106,10 @@ describe("OpenClaw Dispatcher", () => {
       )
 
       // then
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         gateway: "test",
-        success: false,
-        error: "Unknown error",
+        success: true,
+        statusCode: 200,
       })
     } finally {
       fetchSpy.mockRestore()

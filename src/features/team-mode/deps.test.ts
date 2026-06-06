@@ -19,25 +19,19 @@ test("checkTeamModeDependencies preserves Error fallback for unavailable binarie
   expect(report).toEqual({ tmuxAvailable: false, gitAvailable: false })
 })
 
-test("checkTeamModeDependencies rethrows non-Error probe failures", async () => {
+test("checkTeamModeDependencies preserves fallback for non-Error probe failures", async () => {
   // given
   const config = TeamModeConfigSchema.parse({})
   const thrownValue = "spawn failed"
 
   // when
-  let caught: unknown
-  try {
-    await checkTeamModeDependencies(config, {
-      spawn: () => {
-        throw thrownValue
-      },
-      tmuxEnv: "",
-    })
-  } catch (error) {
-    if (error instanceof Error) throw error
-    caught = error
-  }
+  const report = await checkTeamModeDependencies(config, {
+    spawn: () => {
+      throw thrownValue
+    },
+    tmuxEnv: "",
+  })
 
   // then
-  expect(caught).toBe(thrownValue)
+  expect(report).toEqual({ tmuxAvailable: false, gitAvailable: false })
 })

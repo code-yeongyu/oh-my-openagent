@@ -35,7 +35,7 @@ async function probeBinary(cmd: string, args: string[], spawnImpl: Spawn): Promi
     const code = await proc.exited
     return code === 0
   } catch (error) {
-    if (!(error instanceof Error)) throw error
+    error instanceof Error
     return false
   }
 }

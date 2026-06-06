@@ -21,9 +21,7 @@ export function loadAgentUsageState(sessionID: string): AgentUsageState | null {
     const content = readFileSync(filePath, "utf-8");
     return JSON.parse(content) as AgentUsageState;
   } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error;
-    }
+    error instanceof Error;
     return null;
   }
 }

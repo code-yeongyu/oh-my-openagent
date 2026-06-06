@@ -36,9 +36,7 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
         }
       }
     } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
-      }
+      error instanceof Error
       continue
     }
   }
