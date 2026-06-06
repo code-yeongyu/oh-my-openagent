@@ -85,7 +85,8 @@ async function exists(path: string): Promise<boolean> {
   try {
     await readFile(path, "utf8")
     return true
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return false
     return false
   }
 }

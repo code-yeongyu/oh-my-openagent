@@ -110,7 +110,9 @@ export function describeProcessCleanupError(error: unknown): Record<string, unkn
     try {
       const json = JSON.stringify(error)
       if (json !== "{}") return { raw: json }
-    } catch {
+    } catch (stringifyError) {
+      if (stringifyError instanceof Error) return { raw: String(error) }
+      return { raw: String(error) }
     }
     return { raw: String(error) }
   }
@@ -239,7 +241,12 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
           })
         )
       } catch (error) {
-        if (isHarmlessShutdownError(error)) continue
+        const harmless = isHarmlessShutdownError(error)
+        if (error instanceof Error) {
+          if (harmless) continue
+        } else if (harmless) {
+          continue
+        }
         log("[background-agent] Error during shutdown cleanup:", error)
       }
     }
