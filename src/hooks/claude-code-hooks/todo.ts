@@ -49,7 +49,10 @@ export function loadTodoFile(sessionId: string): TodoFile | null {
        }
      }
      return content
-   } catch {
+   } catch (error) {
+     if (error instanceof Error) {
+       return null
+     }
      return null
    }
 }

@@ -100,8 +100,12 @@ export async function executePreCompactHooks(
               systemMessage: normalizeHookText(output.systemMessage),
             }
           }
-        } catch {
-          appendContext(collectedContext, result.stdout)
+        } catch (error) {
+          if (error instanceof Error) {
+            appendContext(collectedContext, result.stdout)
+          } else {
+            appendContext(collectedContext, result.stdout)
+          }
         }
       }
     }

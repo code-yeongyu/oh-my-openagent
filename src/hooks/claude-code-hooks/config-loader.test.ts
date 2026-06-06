@@ -1,4 +1,4 @@
-const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -113,6 +113,43 @@ describe("loadPluginExtendedConfig", () => {
         Stop: ["profile-stop"],
       },
     })
+  })
+
+  test("#given extended config parsing throws a non-Error value #when loading config #then empty fallback config is returned", async () => {
+    //#given
+    writeConfigFile(userConfigPath, ["user-stop"])
+    const thrownValue = "parse failed"
+    const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
+      throw thrownValue
+    })
+
+    try {
+      //#when
+      const result = await loadPluginExtendedConfig()
+
+      //#then
+      expect(result).toEqual({ disabledHooks: {} })
+    } finally {
+      parseSpy.mockRestore()
+    }
+  })
+
+  test("#given disabled hook pattern is invalid regex #when command is checked #then it is treated as a literal pattern", async () => {
+    //#given
+    const { isHookCommandDisabled } = await import("./config-loader")
+    const config = {
+      disabledHooks: {
+        Stop: ["command ["],
+      },
+    }
+
+    //#when
+    const matchingResult = isHookCommandDisabled("Stop", "command [", config)
+    const nonMatchingResult = isHookCommandDisabled("Stop", "command x", config)
+
+    //#then
+    expect(matchingResult).toBe(true)
+    expect(nonMatchingResult).toBe(false)
   })
 })
 
