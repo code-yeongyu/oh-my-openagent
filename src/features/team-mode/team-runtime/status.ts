@@ -117,7 +117,10 @@ export async function aggregateStatus(
   const teamRunIdSpecific = teamBackgroundManager?.listTasksByParentSession?.(runtimeState.leadSessionId ?? teamRunId)?.length
   const baseDir = resolveBaseDir(config)
   const claimsDir = path.join(getTasksDir(baseDir, teamRunId), "claims")
-  const staleLockEntries = await readdir(claimsDir, { withFileTypes: true }).catch(() => [])
+  const staleLockEntries = await readdir(claimsDir, { withFileTypes: true }).catch((error: unknown) => {
+    if (error instanceof Error) return []
+    return []
+  })
   const staleLockPaths = await Promise.all(
     staleLockEntries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".lock"))

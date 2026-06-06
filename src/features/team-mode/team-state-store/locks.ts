@@ -116,7 +116,10 @@ export async function detectStaleLock(lockPath: string, staleAfterMs: number): P
 }
 
 export async function reapStaleLock(lockPath: string): Promise<void> {
-  await unlink(lockPath).catch(() => undefined)
+  await unlink(lockPath).catch((error: unknown) => {
+    if (error instanceof Error) return undefined
+    return undefined
+  })
 }
 
 export async function atomicWrite(
