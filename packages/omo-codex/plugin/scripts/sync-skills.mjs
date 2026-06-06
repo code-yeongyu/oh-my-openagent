@@ -7,6 +7,7 @@ import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sharedSkillsRoot = sharedSkillsRootPath();
 const skillsRoot = join(root, "skills");
+const sourceTestFilePattern = /\.test\.ts$/;
 const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
@@ -111,7 +112,10 @@ async function syncSkills() {
 		.sort();
 
 	for (const skillName of sharedSkillNames) {
-		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), { recursive: true });
+		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
+			filter: (source) => !sourceTestFilePattern.test(source),
+			recursive: true,
+		});
 		await adaptSkillForCodex(skillName);
 	}
 }
