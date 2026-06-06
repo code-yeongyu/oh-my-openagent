@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, it, mock } from "bun:test"
+import { afterAll, describe, expect, it, mock } from "bun:test"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `session-recovery-thinking-strip-${randomUUID()}`)
 const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
@@ -20,6 +20,11 @@ mock.module("../../../shared", () => ({
 const { stripThinkingParts } = await import("./thinking-strip")
 
 describe("stripThinkingParts", () => {
+  afterAll(() => {
+    mock.restore()
+    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
+  })
+
   it("#given a malformed part file #when stripping thinking #then skips the bad file and removes valid thinking", () => {
     // given
     const messageID = "msg_thinking_strip_malformed"

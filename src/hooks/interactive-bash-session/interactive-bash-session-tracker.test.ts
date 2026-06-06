@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 
 const mockLoadInteractiveBashSessionState = mock(() => null);
 const mockSaveInteractiveBashSessionState = mock(() => {});
@@ -20,6 +20,10 @@ mock.module("../../shared/spawn-with-windows-hide", () => ({
 const trackerModulePromise = import("./interactive-bash-session-tracker");
 
 describe("createInteractiveBashSessionTracker", () => {
+  afterAll(() => {
+    mock.restore();
+  });
+
   beforeEach(() => {
     mockLoadInteractiveBashSessionState.mockReset();
     mockSaveInteractiveBashSessionState.mockReset();
