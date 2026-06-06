@@ -10,7 +10,7 @@ export const PROMETHEUS_PERMISSION = {
   question: "allow" as const,
 }
 
-const QUESTION_TOOL_BLOCK_RE = /```typescript\n\s*Question\(\{[\s\S]*?\}\)\s*\n```/g
+const QUESTION_TOOL_BLOCK_RE = /```typescript\r?\n\s*Question\(\{[\s\S]*?\}\)\s*\r?\n```/g
 
 function loadPrometheusVariant(variant: PrometheusPromptSource): string {
   return loadPromptSync({
