@@ -18,7 +18,10 @@ async function importBunSqlite(): Promise<typeof import("bun:sqlite") | null> {
     // new Function() prevents Node.js ESM loader from seeing the bun: import at parse time
     const dynamicImport = new Function("return import('bun:sqlite')") as () => Promise<typeof import("bun:sqlite")>
     return await dynamicImport()
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
     return null
   }
 }
@@ -28,6 +31,14 @@ function getDbPath(): string {
 }
 
 const MAX_MICROTASK_RETRIES = 10
+
+function logCaughtDbError(
+  message: string,
+  metadata: Record<string, string | number | undefined>,
+  error: unknown,
+): void {
+  log(message, { ...metadata, error: String(error) })
+}
 
 function tryUpdateMessageModel(
   db: BunDatabase,
@@ -68,18 +79,14 @@ function retryViaMicrotask(
           log("[ultrawork-db-override] setTimeout fallback failed - message not found", { messageId })
         }
       } catch (error) {
-        log("[ultrawork-db-override] setTimeout fallback failed with error", {
-          messageId,
-          error: String(error),
-        })
+        logCaughtDbError("[ultrawork-db-override] setTimeout fallback failed with error", { messageId }, error)
+        if (error instanceof Error) return
       } finally {
         try {
           db.close()
         } catch (error) {
-          log("[ultrawork-db-override] Failed to close DB after setTimeout fallback", {
-            messageId,
-            error: String(error),
-          })
+          logCaughtDbError("[ultrawork-db-override] Failed to close DB after setTimeout fallback", { messageId }, error)
+          if (error instanceof Error) return
         }
       }
     }, 0)
@@ -98,21 +105,15 @@ function retryViaMicrotask(
       shouldCloseDb = false
       retryViaMicrotask(db, messageId, targetModel, variant, attempt + 1)
     } catch (error) {
-      log("[ultrawork-db-override] Deferred DB update failed with error", {
-        messageId,
-        attempt,
-        error: String(error),
-      })
+      logCaughtDbError("[ultrawork-db-override] Deferred DB update failed with error", { messageId, attempt }, error)
+      if (error instanceof Error) return
     } finally {
       if (shouldCloseDb) {
         try {
           db.close()
         } catch (error) {
-          log("[ultrawork-db-override] Failed to close DB after deferred DB update", {
-            messageId,
-            attempt,
-            error: String(error),
-          })
+          logCaughtDbError("[ultrawork-db-override] Failed to close DB after deferred DB update", { messageId, attempt }, error)
+          if (error instanceof Error) return
         }
       }
     }
@@ -149,20 +150,17 @@ export function scheduleDeferredModelOverride(
     try {
       db = new Database(dbPath)
     } catch (error) {
-      log("[ultrawork-db-override] Failed to open DB, skipping deferred override", {
-        messageId,
-        error: String(error),
-      })
+      logCaughtDbError("[ultrawork-db-override] Failed to open DB, skipping deferred override", { messageId }, error)
+      if (error instanceof Error) return
       return
     }
 
     try {
       retryViaMicrotask(db, messageId, targetModel, variant, 0)
     } catch (error) {
-      log("[ultrawork-db-override] Failed to apply deferred model override", {
-        error: String(error),
-      })
+      logCaughtDbError("[ultrawork-db-override] Failed to apply deferred model override", {}, error)
       db.close()
+      if (error instanceof Error) return
     }
   })
 }

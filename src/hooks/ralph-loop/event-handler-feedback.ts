@@ -6,8 +6,16 @@ export function showToastBestEffort(
 	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
 ): void {
 	try {
-		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
-	} catch {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch((error: unknown) => {
+			if (error instanceof Error) {
+				return
+			}
+			return
+		})
+	} catch (error) {
+		if (error instanceof Error) {
+			return
+		}
 		return
 	}
 }
