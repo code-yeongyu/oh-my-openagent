@@ -8,6 +8,7 @@ import { createAtlasHook } from "./atlas-hook"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, clearSessionAgent, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
 import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
+import { RETRY_DELAY_MS } from "./idle-constants"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 // Force process isolation in CI runner (globalThis.setTimeout override conflicts with other atlas tests)
@@ -80,7 +81,7 @@ describe("atlas background task retry", () => {
         return originalSetTimeout(callback, delay, ...args)
       }
 
-      if (normalizedDelay >= 5000 && normalizedDelay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS) {
+      if (normalizedDelay === RETRY_DELAY_MS && normalizedDelay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS) {
         const id = nextFakeTimerId++
         capturedTimers.set(id, {
           callback: () => (callback as LongTimerCallback)(...args),

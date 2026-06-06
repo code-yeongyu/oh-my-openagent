@@ -95,6 +95,7 @@ describe("resolveActiveBoulderSession", () => {
     expect(result).not.toBeNull()
     expect(result?.progress.isComplete).toBe(false)
     expect(result?.boulderState.session_ids).toContain("opencode:ses_appended")
+    expect(result?.appendedSession).toBe(true)
   })
 
   test("returns null for tracked session when mirror boulder is paused", async () => {

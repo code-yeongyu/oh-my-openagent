@@ -210,9 +210,9 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         expect(output.output).toContain("Background task launched.")
         expect(collectGitDiffStatsMock).not.toHaveBeenCalled()
-        expect(readBoulderState(testDirectory)?.session_ids).toContain(childSessionID)
-        expect(readBoulderState(testDirectory)?.session_origins?.[childSessionID]).toBe("appended")
-        expect(readBoulderState(testDirectory)?.task_sessions?.["todo:1"]?.session_id).toBe(childSessionID)
+        expect(readBoulderState(testDirectory)?.session_ids).toContain(`opencode:${childSessionID}`)
+        expect(readBoulderState(testDirectory)?.session_origins?.[`opencode:${childSessionID}`]).toBe("appended")
+        expect(readBoulderState(testDirectory)?.task_sessions?.["todo:1"]?.session_id).toBe(`opencode:${childSessionID}`)
       })
 
       it("#then it should not track spawned child when child lookup fails", async () => {
@@ -546,8 +546,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         )
 
         const boulderState = readBoulderState(testDirectory)
-        expect(boulderState?.works?.["work-b"]?.session_ids).toContain(childSessionID)
-        expect(boulderState?.works?.["work-a"]?.session_ids).not.toContain(childSessionID)
+        expect(boulderState?.works?.["work-b"]?.session_ids).toContain(`opencode:${childSessionID}`)
+        expect(boulderState?.works?.["work-a"]?.session_ids).not.toContain(`opencode:${childSessionID}`)
       })
     })
   })
