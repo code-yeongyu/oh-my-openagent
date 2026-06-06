@@ -190,9 +190,9 @@ describe("keyword-detector ultrawork routing", () => {
     await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
 
     // then
-    const textPart = output.parts.find((p) => p.type === "text")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).toContain("do this")
+    const textPartText = output.parts.find((p) => p.type === "text")?.text ?? ""
+    expect(textPartText).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPartText).toContain("do this")
   })
 
   test("#given partial 'ulw' substring in StatefulWidget #when chat.message fires #then ralph-loop startLoop is not invoked", async () => {
@@ -251,9 +251,9 @@ The system mentions ulw mode in passing.
     await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
 
     // then
-    const textPart = output.parts.find((p) => p.type === "text")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).toContain("refactor the codebase")
+    const textPartText = output.parts.find((p) => p.type === "text")?.text ?? ""
+    expect(textPartText).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPartText).toContain("refactor the codebase")
     expect(startLoopCalls).toHaveLength(0)
   })
 })
