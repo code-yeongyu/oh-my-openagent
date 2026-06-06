@@ -89,7 +89,11 @@ export function getPluginInfo(): PluginInfo {
       pinnedVersion,
       isLocalDev: pluginEntry.isLocalDev,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return {
       registered: false,
       configPath,
