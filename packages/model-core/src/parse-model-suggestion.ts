@@ -4,14 +4,10 @@ export interface ModelSuggestionInfo {
   suggestion: string
 }
 
-function hasProperty(value: object, key: PropertyKey): value is object & Record<PropertyKey, unknown> {
-  return key in value
-}
-
 function readProperty(value: unknown, key: PropertyKey): unknown {
   if (typeof value !== "object" || value === null) return undefined
-  if (!hasProperty(value, key)) return undefined
-  return value[key]
+  if (!(key in value)) return undefined
+  return Reflect.get(value, key)
 }
 
 function extractMessage(error: unknown): string {
@@ -22,9 +18,8 @@ function extractMessage(error: unknown): string {
     if (typeof message === "string") return message
     try {
       return JSON.stringify(error)
-    } catch (jsonError) {
-      if (jsonError instanceof TypeError) return ""
-      throw jsonError
+    } catch {
+      return ""
     }
   }
   return String(error)
