@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../../shared/logger"
+import { ignoreToastError } from "./ignore-toast-error"
 
 export async function showUpdateAvailableToast(
   ctx: PluginInput,
@@ -15,7 +16,7 @@ export async function showUpdateAvailableToast(
         duration: 8000,
       },
     })
-    .catch(() => {})
+    .catch(ignoreToastError)
   log(`[auto-update-checker] Update available toast shown: v${latestVersion}`)
 }
 
@@ -29,6 +30,6 @@ export async function showAutoUpdatedToast(ctx: PluginInput, oldVersion: string,
         duration: 8000,
       },
     })
-    .catch(() => {})
+    .catch(ignoreToastError)
   log(`[auto-update-checker] Auto-updated toast shown: v${oldVersion} → v${newVersion}`)
 }
