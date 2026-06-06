@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { ZodError } from "zod"
 import { BackgroundTaskConfigSchema } from "./background-task"
 
 describe("BackgroundTaskConfigSchema.circuitBreaker", () => {
@@ -19,38 +18,26 @@ describe("BackgroundTaskConfigSchema.circuitBreaker", () => {
   })
 
   describe("#given consecutiveThreshold below minimum", () => {
-    test("#when parsed #then throws ZodError", () => {
-      let thrownError: unknown
+    test("#when parsed #then reports schema failure", () => {
+      const result = BackgroundTaskConfigSchema.safeParse({
+        circuitBreaker: {
+          consecutiveThreshold: 4,
+        },
+      })
 
-      try {
-        BackgroundTaskConfigSchema.parse({
-          circuitBreaker: {
-            consecutiveThreshold: 4,
-          },
-        })
-      } catch (error) {
-        thrownError = error
-      }
-
-      expect(thrownError).toBeInstanceOf(ZodError)
+      expect(result.success).toBe(false)
     })
   })
 
   describe("#given consecutiveThreshold is zero", () => {
-    test("#when parsed #then throws ZodError", () => {
-      let thrownError: unknown
+    test("#when parsed #then reports schema failure", () => {
+      const result = BackgroundTaskConfigSchema.safeParse({
+        circuitBreaker: {
+          consecutiveThreshold: 0,
+        },
+      })
 
-      try {
-        BackgroundTaskConfigSchema.parse({
-          circuitBreaker: {
-            consecutiveThreshold: 0,
-          },
-        })
-      } catch (error) {
-        thrownError = error
-      }
-
-      expect(thrownError).toBeInstanceOf(ZodError)
+      expect(result.success).toBe(false)
     })
   })
 })
