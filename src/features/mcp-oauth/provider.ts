@@ -31,8 +31,8 @@ async function parseTokenResponse(tokenResponse: Response): Promise<Record<strin
           errorDetail += `: ${body.error_description}`
         }
       }
-    } catch {
-      // Response body not JSON
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
     }
     throw new Error(`Token exchange failed: ${errorDetail}`)
   }
