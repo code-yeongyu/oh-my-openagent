@@ -200,9 +200,10 @@ describe("injectBoulderContinuation", () => {
   test("#given prompt context lookup throws a non-Error #when injector catches it #then it preserves failed fallback behavior", async () => {
     // given
     registerAgentName("atlas")
+    const nonErrorFailure = { reason: "sdk unavailable" }
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => {
-      throw "sdk unavailable"
+      throw nonErrorFailure
     })
     const sessionState = { promptFailureCount: 2 }
 

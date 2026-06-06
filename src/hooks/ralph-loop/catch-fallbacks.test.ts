@@ -10,6 +10,8 @@ import type { RalphLoopState } from "./types"
 import { handleFailedVerification } from "./verification-failure-handler"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 
+const NON_ERROR_FAILURE = { reason: "non-error failure" }
+
 function createState(overrides: Partial<RalphLoopState> = {}): RalphLoopState {
 	return {
 		active: true,
@@ -29,7 +31,7 @@ describe("ralph-loop catch fallbacks", () => {
 			client: {
 				session: {
 					messages: async () => {
-						throw "messages unavailable"
+						throw NON_ERROR_FAILURE
 					},
 				},
 			},
@@ -48,13 +50,12 @@ describe("ralph-loop catch fallbacks", () => {
 
 	test("#given continuation prompt lookup throws a non-Error #when continuing iteration #then dispatch rejection is returned", async () => {
 		// given
-		const thrown = "messages unavailable"
 		const ctx = unsafeTestValue<PluginInput>({
 			directory: "/tmp",
 			client: {
 				session: {
 					messages: async () => {
-						throw thrown
+						throw NON_ERROR_FAILURE
 					},
 					promptAsync: async () => ({}),
 				},
@@ -73,7 +74,7 @@ describe("ralph-loop catch fallbacks", () => {
 		})
 
 		// then
-		expect(result).toEqual({ status: "dispatch_rejected", error: thrown })
+		expect(result).toEqual({ status: "dispatch_rejected", error: NON_ERROR_FAILURE })
 	})
 
 	test("#given reset session APIs throw non-Errors #when best-effort reset helpers run #then fallback values are returned", async () => {
@@ -82,7 +83,7 @@ describe("ralph-loop catch fallbacks", () => {
 			client: {
 				session: {
 					create: async () => {
-						throw "create unavailable"
+						throw NON_ERROR_FAILURE
 					},
 				},
 			},
@@ -90,7 +91,7 @@ describe("ralph-loop catch fallbacks", () => {
 		const selectClient = unsafeTestValue<PluginInput["client"]>({
 			tui: {
 				selectSession: async () => {
-					throw "select unavailable"
+					throw NON_ERROR_FAILURE
 				},
 			},
 		})
@@ -110,7 +111,7 @@ describe("ralph-loop catch fallbacks", () => {
 			client: {
 				session: {
 					messages: async () => {
-						throw "messages unavailable"
+						throw NON_ERROR_FAILURE
 					},
 				},
 			},
@@ -142,7 +143,7 @@ describe("ralph-loop catch fallbacks", () => {
 			client: {
 				tui: {
 					showToast: () => {
-						throw "toast unavailable"
+						throw NON_ERROR_FAILURE
 					},
 				},
 			},
@@ -173,7 +174,7 @@ describe("ralph-loop catch fallbacks", () => {
 			client: {
 				session: {
 					messages: async () => {
-						throw "messages unavailable"
+						throw NON_ERROR_FAILURE
 					},
 				},
 			},
@@ -224,7 +225,7 @@ describe("ralph-loop catch fallbacks", () => {
 				},
 				tui: {
 					showToast: () => {
-						throw "toast unavailable"
+						throw NON_ERROR_FAILURE
 					},
 				},
 			},
