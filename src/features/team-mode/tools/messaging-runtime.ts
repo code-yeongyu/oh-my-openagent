@@ -65,7 +65,8 @@ export async function resolveTeamRuntimeDetails(
         .map((entry) => entry.name)
         .filter((name) => name !== senderName),
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return {
       teamRunId,
       isLead: false,

@@ -23,7 +23,8 @@ export async function listTasks(
   let entries: Dirent[]
   try {
     entries = await readdir(tasksDirectory, { withFileTypes: true })
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return []
   }
 

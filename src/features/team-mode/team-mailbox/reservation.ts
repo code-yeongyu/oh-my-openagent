@@ -95,7 +95,8 @@ export async function reclaimStaleReservations(
     try {
       await rename(filePath, restoredPath)
       reclaimedIds.push(messageId)
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
       continue
     }
   }
