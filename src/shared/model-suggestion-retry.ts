@@ -26,7 +26,8 @@ function extractMessage(error: unknown): string {
     if (typeof obj.message === "string") return obj.message
     try {
       return JSON.stringify(error)
-    } catch {
+    } catch (stringifyError) {
+      if (!(stringifyError instanceof Error)) throw stringifyError
       return ""
     }
   }
