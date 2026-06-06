@@ -50,7 +50,10 @@ function resolveConfigPath(pathValue: string): string {
 
   try {
     return realpathSync(resolvedPath)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return resolvedPath
+    }
     return resolvedPath
   }
 }
