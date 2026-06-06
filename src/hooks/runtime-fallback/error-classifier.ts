@@ -33,7 +33,10 @@ export function getErrorMessage(error: unknown): string {
 
   try {
     return JSON.stringify(error).toLowerCase()
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return ""
   }
 }

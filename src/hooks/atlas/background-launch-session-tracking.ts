@@ -108,7 +108,10 @@ async function resolveFallbackTrackedSessionId(input: {
       return input.extractedSessionId
     }
     return undefined
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return undefined
   }
 }
