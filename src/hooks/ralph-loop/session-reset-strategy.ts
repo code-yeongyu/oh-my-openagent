@@ -26,9 +26,10 @@ export async function createIterationSession(
 
     return createResult.data.id
   } catch (error: unknown) {
+    const errorText = error instanceof Error ? String(error) : String(error)
     log("[ralph-loop] session.create threw during iteration session creation", {
       parentSessionID,
-      error: String(error),
+      error: errorText,
     })
     return null
   }
@@ -47,9 +48,10 @@ export async function selectSessionInTui(
     await selectSession({ body: { sessionID } })
     return true
   } catch (error: unknown) {
+    const errorText = error instanceof Error ? String(error) : String(error)
     log("[ralph-loop] Failed to select session in TUI", {
       sessionID,
-      error: String(error),
+      error: errorText,
     })
     return false
   }

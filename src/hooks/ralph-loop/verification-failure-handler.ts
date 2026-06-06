@@ -21,7 +21,10 @@ function showToastBestEffort(
 ): void {
 	try {
 		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
-	} catch {
+	} catch (error) {
+		if (error instanceof Error) {
+			return
+		}
 	}
 }
 
@@ -74,9 +77,10 @@ export async function handleFailedVerification(
 	try {
 		messageCountAtStart = await getSessionMessageCount(ctx, parentSessionID, directory)
 	} catch (error) {
+		const errorText = error instanceof Error ? String(error) : String(error)
 		log(`[${HOOK_NAME}] Failed to read parent session before verification retry`, {
 			parentSessionID,
-			error: String(error),
+			error: errorText,
 		})
 		return false
 	}
@@ -121,14 +125,15 @@ export async function handleFailedVerification(
 			return false
 		}
 	} catch (error) {
+		const errorText = error instanceof Error ? String(error) : String(error)
 		log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
 			parentSessionID,
-			error: String(error),
+			error: errorText,
 		})
 		loopState.clear()
 		showToastBestEffort(ctx, {
 			title: "Ralph Loop Failed",
-			message: `Verification continuation rejected: ${String(error)}`,
+			message: `Verification continuation rejected: ${errorText}`,
 			variant: "warning",
 			duration: 5000,
 		})
