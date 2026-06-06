@@ -232,6 +232,8 @@ export function installModuleMockLifecycle(
   }
 
   function restoreModuleMocksForTestFile(callerUrl: string): void {
+    let needsDelegateRestore = false
+
     for (const [restoreSpecifier, activeMockStack] of activeMocks.entries()) {
       if (!activeMockStack.some((activeMock) => activeMock.ownerUrl === callerUrl)) {
         continue
@@ -247,10 +249,17 @@ export function installModuleMockLifecycle(
       const snapshot = snapshots.get(restoreSpecifier)
       if (snapshot) {
         delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+        continue
       }
+
+      needsDelegateRestore = true
     }
 
     removeActiveMocksForTestFile(callerUrl)
+    if (needsDelegateRestore) {
+      delegateRestore()
+      replayActiveMocks()
+    }
   }
 
   function preserveModuleMocksForTestFile(callerUrl: string): void {

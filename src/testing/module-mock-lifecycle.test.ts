@@ -435,4 +435,34 @@ describe("installModuleMockLifecycle", () => {
     // then - only the original mock call, no restore call for unresolved module
     expect(moduleCalls).toEqual([{ specifier: "virtual:missing", value: { named: "mocked" } }])
   })
+
+  test("#given preserved unresolved module mock #when scoped restore runs #then Bun restore clears the active mock", () => {
+    // given
+    const events: string[] = []
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    const lifecycle = installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => "file:///repo/tests/preserved.test.ts",
+      resolveSpecifier: (specifier) => specifier,
+      loadOriginalModule: () => ({ ok: false, error: new Error("Cannot find module") }),
+    })
+
+    // when
+    mockApi.module("virtual:missing", () => ({ named: "mocked" }))
+    lifecycle.preserveModuleMocksForTestFile("file:///repo/tests/preserved.test.ts")
+    lifecycle.restoreModuleMocksForTestFile("file:///repo/tests/preserved.test.ts")
+
+    // then
+    expect(events).toEqual([
+      "module:virtual:missing:mocked",
+      "delegate:restore",
+    ])
+  })
 })
