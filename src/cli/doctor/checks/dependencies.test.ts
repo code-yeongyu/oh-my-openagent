@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import * as deps from "./dependencies"
 
+afterEach(() => mock.restore())
+
 describe("dependencies check", () => {
   describe("checkAstGrepCli", () => {
     it("returns valid dependency info", async () => {

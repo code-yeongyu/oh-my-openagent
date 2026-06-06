@@ -7,21 +7,6 @@ const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
 const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
 const MOCK_MODULE_TOKEN = "mock.module"
 const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for team mailbox inbox module mocks.
-  [
-    path.join(SOURCE_ROOT, "features", "team-mode", "team-mailbox", "inbox.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for doctor dependency module mocks.
-  [
-    path.join(SOURCE_ROOT, "cli", "doctor", "checks", "dependencies.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for session recovery module mocks.
-  [
-    path.join(SOURCE_ROOT, "hooks", "session-recovery", "index.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
   // TODO(MOCK-MODULE-AUDIT): add cleanup for auto-update checker hook module mocks.
   [
     path.join(SOURCE_ROOT, "hooks", "auto-update-checker", "hook.test.ts"),
