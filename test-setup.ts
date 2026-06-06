@@ -10,7 +10,10 @@ import { getOmoOpenCodeCacheDir } from "./src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./src/shared/prompt-async-gate"
 import { installModuleMockLifecycle } from "./src/testing/module-mock-lifecycle"
 
-const { restoreModuleMocks } = installModuleMockLifecycle(mock)
+let isGlobalMockCleanup = false
+const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
+  shouldPreserveActiveMocksOnRestore: () => isGlobalMockCleanup,
+})
 let environmentSnapshot: NodeJS.ProcessEnv = { ...process.env }
 let workingDirectorySnapshot = process.cwd()
 
@@ -63,6 +66,11 @@ afterEach(() => {
   resetTaskToastManager()
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
-  mock.restore()
-  restoreModuleMocks()
+  isGlobalMockCleanup = true
+  try {
+    mock.restore()
+    restoreModuleMocks()
+  } finally {
+    isGlobalMockCleanup = false
+  }
 })

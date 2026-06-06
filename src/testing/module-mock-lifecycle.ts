@@ -120,6 +120,7 @@ export function installModuleMockLifecycle(
   const shouldPreserveActiveMocksOnRestore = options.shouldPreserveActiveMocksOnRestore ?? (() => {
     return new Error().stack?.includes("/test-setup.ts") ?? false
   })
+  let preservedDuringLastRestore = false
 
   function replayActiveMocks(): void {
     for (const activeMock of activeMocks.values()) {
@@ -128,6 +129,16 @@ export function installModuleMockLifecycle(
   }
 
   function restoreModuleMocks(): void {
+    if (shouldPreserveActiveMocksOnRestore()) {
+      if (preservedDuringLastRestore) {
+        preservedDuringLastRestore = false
+        return
+      }
+
+      replayActiveMocks()
+      return
+    }
+
     for (const snapshot of snapshots.values()) {
       delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
     }
@@ -160,9 +171,11 @@ export function installModuleMockLifecycle(
     const result = delegateRestore()
     if (shouldPreserveActiveMocksOnRestore()) {
       replayActiveMocks()
+      preservedDuringLastRestore = true
       return result
     }
 
+    preservedDuringLastRestore = false
     restoreModuleMocks()
     return result
   }

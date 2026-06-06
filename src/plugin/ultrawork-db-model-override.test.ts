@@ -33,6 +33,29 @@ async function settleDeferredModelOverrideWork(): Promise<void> {
   await flushWithTimeout()
 }
 
+async function removeTempDirWhenReleased(directory: string): Promise<void> {
+  let lastError: Error | undefined
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      rmSync(directory, { recursive: true, force: true })
+      return
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
+
+      lastError = error
+      await flushWithTimeout()
+    }
+  }
+
+  if (lastError) {
+    throw lastError
+  }
+
+  throw new Error(`Unable to remove temp directory: ${directory}`)
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -76,7 +99,7 @@ describe("scheduleDeferredModelOverride", () => {
     await settleDeferredModelOverrideWork()
     getDataDirSpy?.mockRestore()
     logSpy?.mockRestore()
-    rmSync(tempDir, { recursive: true, force: true })
+    await removeTempDirWhenReleased(tempDir)
   })
 
   function insertMessage(id: string, model: { providerID: string; modelID: string }) {
