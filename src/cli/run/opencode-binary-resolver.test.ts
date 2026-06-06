@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { delimiter, join } from "node:path"
+import type { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import {
   buildPathWithBinaryFirst,
   collectCandidateBinaryPaths,
@@ -50,9 +51,12 @@ describe("canExecuteBinary", () => {
   it("returns false when a binary probe cannot spawn the candidate", async () => {
     // given
     const binaryPath = join("/definitely-missing", "opencode")
+    const spawn = (): ReturnType<typeof spawnWithWindowsHide> => {
+      throw new Error("spawn failed")
+    }
 
     // when
-    const canExecute = await canExecuteBinary(binaryPath)
+    const canExecute = await canExecuteBinary(binaryPath, spawn)
 
     // then
     expect(canExecute).toBe(false)

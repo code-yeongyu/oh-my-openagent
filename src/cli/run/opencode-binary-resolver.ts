@@ -40,18 +40,19 @@ export function collectCandidateBinaryPaths(
   return candidates
 }
 
-export async function canExecuteBinary(binaryPath: string): Promise<boolean> {
+export async function canExecuteBinary(
+  binaryPath: string,
+  spawn: typeof spawnWithWindowsHide = spawnWithWindowsHide,
+): Promise<boolean> {
   try {
-    const proc = spawnWithWindowsHide([binaryPath, "--version"], {
+    const proc = spawn([binaryPath, "--version"], {
       stdout: "pipe",
       stderr: "pipe",
     })
     await proc.exited
     return proc.exitCode === 0
   } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
+    if (error instanceof Error) return false
     return false
   }
 }

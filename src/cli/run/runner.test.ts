@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../../config"
 import { resolveRunAgent } from "./agent-resolver"
 
@@ -168,6 +168,7 @@ describe("run environment setup", () => {
 describe("run with invalid model", () => {
   it("given invalid --model value, when run, then returns exit code 1 with error message", async () => {
     // given
+    mock.restore()
     const originalError = console.error
     const errorMessages: string[] = []
 
@@ -177,7 +178,7 @@ describe("run with invalid model", () => {
 
     try {
       // when
-      const { run } = await import("./runner")
+      const { run } = await import(`./runner?invalid-model=${Date.now()}-${Math.random()}`)
       const exitCode = await run({
         message: "test",
         model: "invalid",
