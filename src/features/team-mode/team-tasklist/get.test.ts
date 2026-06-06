@@ -29,16 +29,10 @@ test("getTask throws when the task file is missing", async () => {
 
   try {
     // when
-    let thrownError: unknown = null
-
-    try {
-      await getTask(fixture.teamRunId, "999", fixture.config)
-    } catch (error) {
-      thrownError = error
-    }
+    const loadedTask = getTask(fixture.teamRunId, "999", fixture.config)
 
     // then
-    expect(thrownError).toBeInstanceOf(Error)
+    await expect(loadedTask).rejects.toBeInstanceOf(Error)
   } finally {
     await fixture.cleanup()
   }
