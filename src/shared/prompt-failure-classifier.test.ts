@@ -28,6 +28,34 @@ describe("prompt failure classifier", () => {
     expect(ambiguous).toBe(true)
   })
 
+  test("#given error serialization fails with an Error #when classifying ambiguity #then it uses the empty-message fallback", () => {
+    // given
+    const error = {
+      toJSON() {
+        throw new Error("cannot serialize")
+      },
+    }
+
+    // when
+    const ambiguous = isAmbiguousPromptDispatchFailure(error)
+
+    // then
+    expect(ambiguous).toBe(false)
+  })
+
+  test("#given error serialization fails with a non-Error #when classifying ambiguity #then it rethrows the thrown value", () => {
+    // given
+    const thrown = { kind: "serializer-thrown-value" } as const
+    const error = {
+      toJSON() {
+        throw thrown
+      },
+    }
+
+    // when / then
+    expect(() => isAmbiguousPromptDispatchFailure(error)).toThrow(Object)
+  })
+
   test("#given ambiguous failure before dispatch #when classifying post-dispatch acceptance #then it is not treated as accepted", () => {
     // given
     const result = {

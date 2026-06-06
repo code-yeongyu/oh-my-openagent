@@ -6,7 +6,8 @@ export function extractPromptFailureMessage(error: unknown): string {
     if (typeof record.message === "string") return record.message
     try {
       return JSON.stringify(error)
-    } catch {
+    } catch (stringifyError) {
+      if (!(stringifyError instanceof Error)) throw stringifyError
       return ""
     }
   }
