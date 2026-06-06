@@ -179,9 +179,29 @@ describe("todo-continuation-enforcer", () => {
     }
   }
 
+  interface ToastRequestOptions {
+    body: {
+      title: string
+      message: string
+    }
+  }
+
   type MockPluginInput = Parameters<typeof createTodoContinuationEnforcer>[0]
 
   let mockMessages: MockMessage[] = []
+
+  function failureCooldownAfter(failureCount: number): number {
+    return CONTINUATION_COOLDOWN_MS * 2 ** Math.min(failureCount, 5)
+  }
+
+  function recordPromptCall(opts: PromptRequestOptions): void {
+    promptCalls.push({
+      sessionID: opts.path.id,
+      agent: opts.body.agent,
+      model: opts.body.model,
+      text: opts.body.parts[0].text,
+    })
+  }
 
   function createMockPluginInput() {
     return {
@@ -192,27 +212,17 @@ describe("todo-continuation-enforcer", () => {
             { id: "2", content: "Task 2", status: "completed", priority: "medium" },
           ]}),
           messages: async () => ({ data: mockMessages }),
-          prompt: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
+          prompt: async (opts: PromptRequestOptions) => {
+            recordPromptCall(opts)
             return {}
           },
-          promptAsync: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
+          promptAsync: async (opts: PromptRequestOptions) => {
+            recordPromptCall(opts)
             return {}
           },
         },
         tui: {
-          showToast: async (opts: any) => {
+          showToast: async (opts: ToastRequestOptions) => {
             toastCalls.push({
               title: opts.body.title,
               message: opts.body.message,
@@ -831,7 +841,7 @@ describe("todo-continuation-enforcer", () => {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
       if (index < MAX_CONSECUTIVE_FAILURES - 1) {
-        await fakeTimers.advanceBy(1_000_000, true)
+        await fakeTimers.advanceBy(failureCooldownAfter(index + 1), true)
       }
     }
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -867,7 +877,7 @@ describe("todo-continuation-enforcer", () => {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
       if (index < MAX_CONSECUTIVE_FAILURES - 1) {
-        await fakeTimers.advanceBy(1_000_000, true)
+        await fakeTimers.advanceBy(failureCooldownAfter(index + 1), true)
       }
     }
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -913,7 +923,7 @@ describe("todo-continuation-enforcer", () => {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
       if (index < MAX_CONSECUTIVE_FAILURES - 1) {
-        await fakeTimers.advanceBy(1_000_000, true)
+        await fakeTimers.advanceBy(failureCooldownAfter(index + 1), true)
       }
     }
 
@@ -1034,7 +1044,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     let resolvePrompt: (() => void) | undefined
     const mockInput = createMockPluginInput()
-    mockInput.client.session.promptAsync = async (opts: any) => {
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
       promptCalls.push({
         sessionID: opts.path.id,
         agent: opts.body.agent,
@@ -1065,28 +1075,41 @@ describe("todo-continuation-enforcer", () => {
     await Promise.resolve()
   })
 
-  test("should clear cooldown state on session deleted", async () => {
+  test("should clear max failure state on session deleted", async () => {
     //#given
     const sessionID = "main-delete-state-reset"
     setMainSession(sessionID)
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
 
     //#when
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
-    await fakeTimers.advanceBy(2500, true)
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceBy(failureCooldownAfter(index + 1), true)
+      }
+    }
     await hook.handler({
       event: { type: "session.deleted", properties: { info: { id: sessionID } } },
     })
-    releaseAllPromptAsyncReservationsForTesting()
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
     await fakeTimers.advanceBy(2500, true)
 
     //#then
-    expect(promptCalls).toHaveLength(2)
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES + 1)
   }, { timeout: 15000 })
 
   test("should accept skipAgents option without error", async () => {
@@ -1626,7 +1649,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
           messages: async () => ({ data: mockMessagesWithAssistant }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1635,7 +1658,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1685,7 +1708,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesWithCompaction }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1694,7 +1717,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1737,7 +1760,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesOnlyCompaction }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1746,7 +1769,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1794,7 +1817,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
           messages: async () => ({ data: mockMessagesWithCompactionMarker }),
-          prompt: async (opts: any) => {
+          prompt: async (opts: PromptRequestOptions) => {
             promptCalls.push({
               sessionID: opts.path.id,
               agent: opts.body.agent,
@@ -1803,7 +1826,7 @@ describe("todo-continuation-enforcer", () => {
             })
             return {}
           },
-          promptAsync: async (opts: any) => {
+          promptAsync: async (opts: PromptRequestOptions) => {
             promptCalls.push({
               sessionID: opts.path.id,
               agent: opts.body.agent,
@@ -1848,7 +1871,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesPrometheusCompacted }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1857,7 +1880,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1903,7 +1926,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesNoAgent }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1912,7 +1935,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: PromptRequestOptions) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -2196,7 +2219,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     let callCount = 0
     const mockInput = createMockPluginInput()
-    mockInput.client.session.promptAsync = async (opts: any) => {
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
       callCount++
       if (callCount === 1) {
         throw new Error("simulated network error")
