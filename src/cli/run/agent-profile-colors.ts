@@ -22,7 +22,10 @@ export async function loadAgentProfileColors(
     }
 
     return colors
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return {}
   }
 }

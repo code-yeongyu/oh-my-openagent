@@ -257,6 +257,27 @@ describe("pollForCompletion", () => {
     expect(result).toBe(0)
   })
 
+  it("rethrows non-Error status API failures instead of treating them as unknown status", async () => {
+    //#given
+    const thrown = Object.freeze({ reason: "status unavailable" })
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
+      throw thrown
+    })
+
+    //#when & then
+    abortAfter(abortController, 50)
+    await expect(pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 5,
+      requiredConsecutive: 1,
+      minStabilizationMs: 10,
+    })).rejects.toBe(thrown)
+  })
+
   it("allows silent completion after stabilization when no meaningful work is received", async () => {
     //#given - session is idle and stable but no assistant message/tool event arrived
     const ctx = createMockContext()
