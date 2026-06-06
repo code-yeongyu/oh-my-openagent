@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +9,14 @@ import { fileURLToPath } from "node:url";
 import { getPlatformPackageCandidates } from "./platform.js";
 
 const testRoots: string[] = [];
+
+beforeAll(() => {
+  const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+  const build = spawnSync("bun", ["run", "build:bin"], { cwd: repoRoot, encoding: "utf8" });
+  if (build.status !== 0) {
+    throw new Error(`bun run build:bin failed (status ${build.status}): ${build.stderr ?? ""}`);
+  }
+});
 
 afterEach(async () => {
   await Promise.all(testRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -174,11 +182,11 @@ async function createLazyCodexFixture(options: { packageName?: string; wrapperFi
 
   const wrapperFileName = options.wrapperFileName ?? "lazycodex";
   const wrapperBin = join(binDir, wrapperFileName);
-  await cp(fileURLToPath(new URL("./oh-my-opencode.js", import.meta.url)), wrapperBin);
+  await cp(fileURLToPath(new URL("../bin-dist/oh-my-opencode.js", import.meta.url)), wrapperBin);
   if (wrapperFileName !== "lazycodex") {
     await symlink(wrapperFileName, join(binDir, "lazycodex"));
   }
-  await cp(fileURLToPath(new URL("./platform.js", import.meta.url)), join(binDir, "platform.js"));
+  await cp(fileURLToPath(new URL("../bin-dist/platform.js", import.meta.url)), join(binDir, "platform.js"));
   await writeFile(join(root, "package.json"), JSON.stringify({ name: options.packageName ?? "lazycodex", type: "module" }));
   await writeFile(distCli, "#!/usr/bin/env bun\n");
   await writeNodeInstallerFixture(root);

@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// bin/oh-my-opencode.js
-// Wrapper script that detects platform and spawns the correct binary
-
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -13,28 +10,21 @@ import {
   getPackageBareName,
   resolvePlatformPackageBaseName,
 } from "./platform.js";
+import { getLibcFamily } from "./shared-helpers.js";
+
+// Duplicated from src/shared/signals/signal.ts because bin/ has a separate tsconfig
+// and cannot import from src/ without cross-contaminating the build output.
+const SIGNAL_EXIT_CODES: Record<string, number> = {
+  SIGINT: 2, SIGILL: 4, SIGKILL: 9, SIGTERM: 15, SIGBREAK: 21,
+};
+
+function getSignalExitCode(signal: string): number {
+  return 128 + (SIGNAL_EXIT_CODES[signal] ?? 1);
+}
 
 const require = createRequire(import.meta.url);
 
-/**
- * Detect libc family on Linux
- * @returns {string | null} 'glibc', 'musl', or null if detection fails
- */
-function getLibcFamily() {
-  if (process.platform !== "linux") {
-    return undefined; // Not needed on non-Linux
-  }
-  
-  try {
-    const detectLibc = require("detect-libc");
-    return detectLibc.familySync();
-  } catch {
-    // detect-libc not available
-    return null;
-  }
-}
-
-function supportsAvx2() {
+function supportsAvx2(): boolean | null {
   if (process.arch !== "x64") {
     return null;
   }
@@ -67,22 +57,12 @@ function supportsAvx2() {
   return null;
 }
 
-function getSignalExitCode(signal) {
-  const signalCodeByName = {
-    SIGINT: 2,
-    SIGILL: 4,
-    SIGKILL: 9,
-    SIGTERM: 15,
-  };
-
-  return 128 + (signalCodeByName[signal] ?? 1);
+interface ResolvedBinary {
+  pkg: string;
+  binPath: string;
 }
 
-function getPackageBaseName() {
-  return resolvePlatformPackageBaseName(getWrapperPackageName());
-}
-
-function getWrapperPackageName() {
+function getWrapperPackageName(): string {
   try {
     const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     return packageJson.name || "oh-my-opencode";
@@ -91,11 +71,11 @@ function getWrapperPackageName() {
   }
 }
 
-function getWrapperPackageRoot() {
+function getWrapperPackageRoot(): string {
   return fileURLToPath(new URL("..", import.meta.url));
 }
 
-function maybeRunLazyCodexNodeInstaller(invocationName) {
+function maybeRunLazyCodexNodeInstaller(invocationName: string): boolean {
   if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false;
   const command = process.argv[2];
   if (command !== "update" && command !== "uninstall") return false;
@@ -121,9 +101,8 @@ function maybeRunLazyCodexNodeInstaller(invocationName) {
  * Determine which bin name the user invoked us with (oh-my-opencode, oh-my-openagent, omo, lazycodex).
  * Propagated to the compiled CLI binary via OMO_INVOCATION_NAME so it can route accordingly
  * (e.g. `lazycodex` defaults to the Codex install flow).
- * @returns {string}
  */
-function getInvocationName(wrapperPackageName) {
+function getInvocationName(wrapperPackageName: string): string {
   if (process.env.OMO_INVOCATION_NAME) {
     return process.env.OMO_INVOCATION_NAME;
   }
@@ -138,7 +117,7 @@ function getInvocationName(wrapperPackageName) {
   return basename(argv1, ".js").replace(/\.exe$/, "");
 }
 
-function main() {
+function main(): void {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
   const wrapperPackageName = getWrapperPackageName();
@@ -147,8 +126,8 @@ function main() {
 
   const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName);
   const avx2Supported = supportsAvx2();
-  
-  let packageCandidates;
+
+  let packageCandidates: string[];
   try {
     packageCandidates = getPlatformPackageCandidates({
       platform,
@@ -157,20 +136,21 @@ function main() {
       preferBaseline: avx2Supported === false,
       packageBaseName,
     });
-  } catch (error) {
-    console.error(`\noh-my-opencode: ${error.message}\n`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`\noh-my-opencode: ${message}\n`);
     process.exit(1);
   }
 
-  const resolvedBinaries = packageCandidates
-    .map((pkg) => {
+  const resolvedBinaries: ResolvedBinary[] = packageCandidates
+    .map((pkg): ResolvedBinary | null => {
       try {
         return { pkg, binPath: require.resolve(getBinaryPath(pkg, platform)) };
       } catch {
         return null;
       }
     })
-    .filter((entry) => entry !== null);
+    .filter((entry): entry is ResolvedBinary => entry !== null);
 
   if (resolvedBinaries.length === 0) {
     console.error(`\noh-my-opencode: Platform binary not installed.`);

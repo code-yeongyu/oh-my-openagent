@@ -1,7 +1,19 @@
-// bin/version-mismatch.js
+// bin/version-mismatch.ts
 // Detects platform binary version mismatch against the main package.
 // Background: issue #3918 - `oh-my-opencode-windows-x64@3.9.0` could stay installed
 // alongside `oh-my-opencode@4.0.0`, leaving the startup banner pinned to 3.9.0.
+
+interface PlatformBinaryMismatchInput {
+  mainVersion: string | null | undefined;
+  platformVersion: string | null | undefined;
+  platformPackage: string;
+}
+
+interface PlatformBinaryMismatch {
+  mainVersion: string;
+  platformVersion: string;
+  platformPackage: string;
+}
 
 /**
  * Strips an optional leading "v" so callers can pass either "4.5.1" or "v4.5.1".
@@ -9,11 +21,8 @@
  * workflow publishes prereleases as standalone versions on the `next` dist-tag,
  * and `oh-my-opencode@4.5.1-beta.1` paired with `oh-my-opencode-x64@4.5.1`
  * IS a real mismatch the wrapper would silently honour.
- *
- * @param {string} version
- * @returns {string} Full version with leading "v" stripped.
  */
-function normalizeVersion(version) {
+function normalizeVersion(version: string): string {
   return version.replace(/^v/, "");
 }
 
@@ -27,14 +36,12 @@ function normalizeVersion(version) {
  * including any pre-release suffix. This means `4.5.1-beta.1` and `4.5.1` are
  * treated as DIFFERENT versions, matching the publish workflow that ships
  * prerelease builds to the `next` dist-tag alongside stable releases.
- *
- * @param {object} input
- * @param {string | null | undefined} input.mainVersion
- * @param {string | null | undefined} input.platformVersion
- * @param {string} input.platformPackage
- * @returns {{ mainVersion: string, platformVersion: string, platformPackage: string } | null}
  */
-export function detectPlatformBinaryMismatch({ mainVersion, platformVersion, platformPackage }) {
+export function detectPlatformBinaryMismatch({
+  mainVersion,
+  platformVersion,
+  platformPackage,
+}: PlatformBinaryMismatchInput): PlatformBinaryMismatch | null {
   if (!mainVersion || !platformVersion) {
     return null;
   }
