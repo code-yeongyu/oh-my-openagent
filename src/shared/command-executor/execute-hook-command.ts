@@ -151,7 +151,10 @@ export async function executeHookCommand(
         if (!isWin32 && proc.pid) {
           try {
             process.kill(-proc.pid, signal);
-          } catch {
+          } catch (error) {
+            if (!(error instanceof Error)) {
+              throw error;
+            }
             proc.kill(signal);
           }
         } else {
@@ -160,7 +163,11 @@ export async function executeHookCommand(
             killWindowsProcessTree();
           }
         }
-      } catch {}
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error;
+        }
+      }
     };
 
     const appendTimeoutNotice = () => {
