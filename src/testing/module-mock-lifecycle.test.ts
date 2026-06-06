@@ -140,6 +140,76 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("#given concurrent test files have module mocks #when one calls mock.restore #then only that file's mocks are removed", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/first.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => callerUrl,
+      resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
+    callerUrl = "file:///repo/tests/second.test.ts"
+    mockApi.module("./dependency-b", () => ({ named: "mock-b" }))
+
+    // when
+    callerUrl = "file:///repo/tests/first.test.ts"
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency-a:mock-a",
+      "module:./dependency-b:mock-b",
+      "delegate:restore",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:original",
+      "module:./dependency-b:mock-b",
+    ])
+  })
+
+  test("#given restore caller has no owned module mocks #when mock.restore runs #then it falls back to full cleanup", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/owner.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => callerUrl,
+      resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
+    callerUrl = "file:///repo/tests/untracked-cleanup.test.ts"
+
+    // when
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency-a:mock-a",
+      "delegate:restore",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:original",
+    ])
+  })
+
   test("captures the original module only once per resolved specifier", () => {
     // given
     let loadCount = 0

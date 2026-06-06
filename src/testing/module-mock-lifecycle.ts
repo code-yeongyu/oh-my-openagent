@@ -161,6 +161,27 @@ export function installModuleMockLifecycle(
     activeMocks.clear()
   }
 
+  function removeActiveMocksForTestFile(callerUrl: string): void {
+    for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
+      if (activeMock.ownerUrl !== callerUrl) {
+        continue
+      }
+
+      snapshots.delete(restoreSpecifier)
+      activeMocks.delete(restoreSpecifier)
+    }
+  }
+
+  function hasActiveMocksForTestFile(callerUrl: string): boolean {
+    for (const activeMock of activeMocks.values()) {
+      if (activeMock.ownerUrl === callerUrl) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   function restoreModuleMocksForTestFile(callerUrl: string): void {
     for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
       if (activeMock.ownerUrl !== callerUrl) {
@@ -170,10 +191,10 @@ export function installModuleMockLifecycle(
       const snapshot = snapshots.get(restoreSpecifier)
       if (snapshot) {
         delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
-        snapshots.delete(restoreSpecifier)
       }
-      activeMocks.delete(restoreSpecifier)
     }
+
+    removeActiveMocksForTestFile(callerUrl)
   }
 
   mockApi.module = (specifier: string, factory: MockModuleFactory): unknown => {
@@ -205,6 +226,13 @@ export function installModuleMockLifecycle(
     }
 
     preservedDuringLastRestore = false
+    const callerUrl = getCallerUrl()
+    if (hasActiveMocksForTestFile(callerUrl)) {
+      restoreModuleMocksForTestFile(callerUrl)
+      replayActiveMocks()
+      return result
+    }
+
     restoreModuleMocks()
     return result
   }
