@@ -223,7 +223,10 @@ async function getMainSessionStatus(
       return status
     }
     return null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
