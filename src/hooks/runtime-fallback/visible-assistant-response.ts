@@ -73,7 +73,10 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
       }
 
       return false
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       return false
     }
   }
