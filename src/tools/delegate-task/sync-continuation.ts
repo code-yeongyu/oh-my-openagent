@@ -24,11 +24,6 @@ type ResumeContext = {
   anchorMessageCount?: number
 }
 
-function ignoreResumeMessagesError(error: unknown): void {
-  if (error instanceof Error) return
-  throw error
-}
-
 function shouldAttemptPollErrorRecovery(pollError: string): boolean {
   const trimmed = pollError.trim()
 
@@ -79,7 +74,7 @@ async function resolveResumeContext(
 
     return { anchorMessageCount: messages.length }
   } catch (error) {
-    ignoreResumeMessagesError(error)
+    if (!(error instanceof Error)) throw error
     const resumeMessageDir = getMessageDir(continuationID)
     const { prevMessage } = await resolveMessageContext(continuationID, client, resumeMessageDir)
     const resumeMessageModel = prevMessage?.model
