@@ -14,10 +14,14 @@ export function createSessionCacheStore(): {
   const sessionCaches = new Map<string, SessionInjectedRulesCache>();
 
   function getSessionCache(sessionID: string): SessionInjectedRulesCache {
-    if (!sessionCaches.has(sessionID)) {
-      sessionCaches.set(sessionID, loadInjectedRules(sessionID));
+    const existingCache = sessionCaches.get(sessionID);
+    if (existingCache !== undefined) {
+      return existingCache;
     }
-    return sessionCaches.get(sessionID)!;
+
+    const cache = loadInjectedRules(sessionID);
+    sessionCaches.set(sessionID, cache);
+    return cache;
   }
 
   function clearSessionCache(sessionID: string): void {
