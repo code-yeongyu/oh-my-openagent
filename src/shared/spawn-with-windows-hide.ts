@@ -62,8 +62,7 @@ export function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
 
         proc.kill(signal)
       } catch (error) {
-        if (error instanceof Error) return
-        throw error
+        if (!(error instanceof Error)) return
       }
     },
   }

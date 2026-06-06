@@ -21,4 +21,22 @@ describe("spawn-with-windows-hide", () => {
       originalKill("SIGKILL")
     }
   })
+
+  test("#given node child kill throws a non-Error #when wrapped kill is called #then legacy fallback stays silent", () => {
+    const proc = nodeSpawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    })
+    const originalKill = proc.kill.bind(proc)
+
+    try {
+      const wrapped = wrapNodeProcess(proc)
+      proc.kill = () => {
+        throw Object.create(null)
+      }
+
+      expect(() => wrapped.kill()).not.toThrow()
+    } finally {
+      originalKill("SIGKILL")
+    }
+  })
 })
