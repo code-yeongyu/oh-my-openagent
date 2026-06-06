@@ -15,6 +15,15 @@ import type { SteerUlwLoopResult, UlwLoopPlan } from "../src/types.js";
 import { UlwLoopError } from "../src/types.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
+const REVISE_CRITERION_BASE_ARGS = [
+	"--kind",
+	"revise_criterion",
+	"--goal-id",
+	"G001",
+	"--criterion-id",
+	"C002",
+] as const;
+const REQUIRED_AUDIT_ARGS = ["--evidence", "x", "--rationale", "y"] as const;
 
 function plan(): UlwLoopPlan {
 	return {
@@ -64,21 +73,23 @@ function captureStdout(action: () => void): string {
 }
 
 describe("parseSteeringKind", () => {
-	it("returns valid kind from --kind", () => {
-		expect(parseSteeringKind(["--kind", "add_subgoal"])).toBe("add_subgoal");
-	});
+	for (const testCase of [
+		{ name: "returns valid kind from --kind", args: ["--kind", "add_subgoal"], expected: "add_subgoal" },
+		{ name: "accepts revise_criterion", args: ["--kind", "revise_criterion"], expected: "revise_criterion" },
+	] as const) {
+		it(testCase.name, () => {
+			expect(parseSteeringKind(testCase.args)).toBe(testCase.expected);
+		});
+	}
 
-	it("accepts revise_criterion", () => {
-		expect(parseSteeringKind(["--kind", "revise_criterion"])).toBe("revise_criterion");
-	});
-
-	it("throws when --kind missing", () => {
-		expect(() => parseSteeringKind([])).toThrow(UlwLoopError);
-	});
-
-	it("throws when kind unknown", () => {
-		expect(() => parseSteeringKind(["--kind", "bogus"])).toThrow(UlwLoopError);
-	});
+	for (const testCase of [
+		{ name: "throws when --kind missing", args: [] },
+		{ name: "throws when kind unknown", args: ["--kind", "bogus"] },
+	] as const) {
+		it(testCase.name, () => {
+			expect(() => parseSteeringKind(testCase.args)).toThrow(UlwLoopError);
+		});
+	}
 });
 
 describe("parseSteeringSource", () => {
@@ -141,18 +152,10 @@ describe("parseSteeringProposal add_subgoal", () => {
 describe("parseSteeringProposal revise_criterion", () => {
 	it("builds proposal with goal, criterion, scenario, evidence, and rationale", async () => {
 		const p = await parseSteeringProposal([
-			"--kind",
-			"revise_criterion",
-			"--goal-id",
-			"G001",
-			"--criterion-id",
-			"C002",
+			...REVISE_CRITERION_BASE_ARGS,
 			"--scenario",
 			"new scenario",
-			"--evidence",
-			"x",
-			"--rationale",
-			"y",
+			...REQUIRED_AUDIT_ARGS,
 		]);
 
 		expect(p.kind).toBe("revise_criterion");
@@ -162,94 +165,47 @@ describe("parseSteeringProposal revise_criterion", () => {
 		expect(p.scenario).toBe("new scenario");
 	});
 
-	it("accepts --expected-evidence as an update field", async () => {
-		const p = await parseSteeringProposal([
-			"--kind",
-			"revise_criterion",
-			"--goal-id",
-			"G001",
-			"--criterion-id",
-			"C002",
-			"--expected-evidence",
-			"new evidence",
-			"--evidence",
-			"x",
-			"--rationale",
-			"y",
-		]);
+	for (const testCase of [
+		{
+			name: "accepts --expected-evidence as an update field",
+			updateArgs: ["--expected-evidence", "new evidence"],
+			expected: { expectedEvidence: "new evidence" },
+		},
+		{
+			name: "accepts --user-model as an update field",
+			updateArgs: ["--user-model", "edge"],
+			expected: { userModel: "edge" },
+		},
+	] as const) {
+		it(testCase.name, async () => {
+			const p = await parseSteeringProposal([
+				...REVISE_CRITERION_BASE_ARGS,
+				...testCase.updateArgs,
+				...REQUIRED_AUDIT_ARGS,
+			]);
 
-		expect(p.expectedEvidence).toBe("new evidence");
-	});
+			expect(p).toMatchObject(testCase.expected);
+		});
+	}
 
-	it("accepts --user-model as an update field", async () => {
-		const p = await parseSteeringProposal([
-			"--kind",
-			"revise_criterion",
-			"--goal-id",
-			"G001",
-			"--criterion-id",
-			"C002",
-			"--user-model",
-			"edge",
-			"--evidence",
-			"x",
-			"--rationale",
-			"y",
-		]);
-
-		expect(p.userModel).toBe("edge");
-	});
-
-	it("throws when none of scenario/expected-evidence/user-model provided", async () => {
-		await expect(
-			parseSteeringProposal([
-				"--kind",
-				"revise_criterion",
-				"--goal-id",
-				"G001",
-				"--criterion-id",
-				"C002",
-				"--evidence",
-				"x",
-				"--rationale",
-				"y",
-			]),
-		).rejects.toThrow(UlwLoopError);
-	});
-
-	it("throws when goal-id missing", async () => {
-		await expect(
-			parseSteeringProposal([
-				"--kind",
-				"revise_criterion",
-				"--criterion-id",
-				"C002",
-				"--scenario",
-				"s",
-				"--evidence",
-				"x",
-				"--rationale",
-				"y",
-			]),
-		).rejects.toThrow(UlwLoopError);
-	});
-
-	it("throws when criterion-id missing", async () => {
-		await expect(
-			parseSteeringProposal([
-				"--kind",
-				"revise_criterion",
-				"--goal-id",
-				"G001",
-				"--scenario",
-				"s",
-				"--evidence",
-				"x",
-				"--rationale",
-				"y",
-			]),
-		).rejects.toThrow(UlwLoopError);
-	});
+	for (const testCase of [
+		{
+			name: "throws when none of scenario/expected-evidence/user-model provided",
+			args: [...REVISE_CRITERION_BASE_ARGS, ...REQUIRED_AUDIT_ARGS],
+		},
+		{
+			name: "throws when goal-id missing",
+			args: ["--kind", "revise_criterion", "--criterion-id", "C002", "--scenario", "s", ...REQUIRED_AUDIT_ARGS],
+		},
+		{
+			name: "throws when criterion-id missing",
+			args: ["--kind", "revise_criterion", "--goal-id", "G001", "--scenario", "s", ...REQUIRED_AUDIT_ARGS],
+		},
+	] as const) {
+		it(testCase.name, async () => {
+			await expect(parseSteeringProposal(testCase.args)).rejects.toThrow(UlwLoopError);
+		});
+	}
 });
 
 describe("parseSteeringProposal split_subgoal", () => {
