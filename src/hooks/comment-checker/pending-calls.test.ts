@@ -1,4 +1,5 @@
 import { describe, test, expect } from "bun:test"
+import { fileURLToPath } from "node:url"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("pending-calls cleanup interval", () => {
@@ -22,7 +23,7 @@ describe("pending-calls cleanup interval", () => {
     }))
 
     try {
-      const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname
+      const modulePath = fileURLToPath(new URL("./pending-calls.ts", import.meta.url))
       const pendingCallsModule = await import(`${modulePath}?pending-calls-test-once`)
 
       //#when
@@ -60,7 +61,7 @@ describe("pending-calls cleanup interval", () => {
     }))
 
     try {
-      const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname
+      const modulePath = fileURLToPath(new URL("./pending-calls.ts", import.meta.url))
       const pendingCallsModule = await import(`${modulePath}?pending-calls-test-stop`)
       pendingCallsModule.startPendingCallCleanup()
 

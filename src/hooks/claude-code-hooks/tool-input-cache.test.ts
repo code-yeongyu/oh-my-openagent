@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { fileURLToPath } from "node:url"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("tool-input-cache", () => {
@@ -11,14 +12,14 @@ describe("tool-input-cache", () => {
   })
 
   afterEach(async () => {
-    const modulePath = new URL("./tool-input-cache.ts", import.meta.url).pathname
+    const modulePath = fileURLToPath(new URL("./tool-input-cache.ts", import.meta.url))
     const cacheModule = await import(`${modulePath}?cleanup=${Date.now()}`)
     cacheModule.stopToolInputCacheCleanup()
   })
 
   test("#given cached entries from multiple sessions #when clearing one session #then only matching entries are removed", async () => {
     //#given
-    const modulePath = new URL("./tool-input-cache.ts", import.meta.url).pathname
+    const modulePath = fileURLToPath(new URL("./tool-input-cache.ts", import.meta.url))
     const cacheModule = await import(`${modulePath}?session-clear`)
 
     cacheModule.cacheToolInput("ses_a", "Read", "call-1", { path: "a" })
@@ -40,7 +41,7 @@ describe("tool-input-cache", () => {
     globalThis.setInterval = unsafeTestValue<typeof setInterval>(setIntervalMock)
     globalThis.clearInterval = unsafeTestValue<typeof clearInterval>(clearIntervalMock)
 
-    const modulePath = new URL("./tool-input-cache.ts", import.meta.url).pathname
+    const modulePath = fileURLToPath(new URL("./tool-input-cache.ts", import.meta.url))
     const cacheModule = await import(`${modulePath}?stop-clear`)
     cacheModule.cacheToolInput("ses_stop", "Read", "call-stop", { path: "stop" })
 
