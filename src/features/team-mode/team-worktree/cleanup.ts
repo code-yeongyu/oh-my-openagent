@@ -58,7 +58,10 @@ export async function findOrphanWorktrees(baseDir: string, _config: TeamModeConf
 
   for (const teamRunId of teamRunDirectories) {
     const teamRunPath = path.join(worktreesDir, teamRunId)
-    const memberNames = await fs.readdir(teamRunPath).catch(() => [])
+    const memberNames = await fs.readdir(teamRunPath).catch((error: unknown) => {
+      if (error instanceof Error) return []
+      return []
+    })
 
     for (const memberName of memberNames) {
       const worktreePath = path.join(teamRunPath, memberName)

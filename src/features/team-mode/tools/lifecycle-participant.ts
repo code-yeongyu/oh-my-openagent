@@ -20,6 +20,11 @@ export type TeamRuntimeStoreDeps = {
   loadRuntimeState: typeof loadRuntimeState
 }
 
+function resolveRuntimeStateLoadFailure(error: unknown): undefined {
+  if (error instanceof Error) return undefined
+  return undefined
+}
+
 function resolveRegisteredParticipant(
   runtimeState: RuntimeState,
   registryEntry: TeamSessionEntry,
@@ -43,14 +48,14 @@ export function sanitizeRuntimeState(runtimeState: RuntimeState): Omit<RuntimeSt
 export async function findParticipantRuntime(sessionID: string, config: TeamModeConfig, deps: TeamRuntimeStoreDeps): Promise<RuntimeState | undefined> {
   const registryEntry = lookupTeamSession(sessionID)
   if (registryEntry) {
-    const runtimeState = await deps.loadRuntimeState(registryEntry.teamRunId, config).catch(() => undefined)
+    const runtimeState = await deps.loadRuntimeState(registryEntry.teamRunId, config).catch(resolveRuntimeStateLoadFailure)
     if (runtimeState && ACTIVE_RUNTIME_STATUSES.has(runtimeState.status) && resolveRegisteredParticipant(runtimeState, registryEntry)) {
       return runtimeState
     }
   }
 
   for (const activeTeam of await deps.listActiveTeams(config)) {
-    const runtimeState = await deps.loadRuntimeState(activeTeam.teamRunId, config).catch(() => undefined)
+    const runtimeState = await deps.loadRuntimeState(activeTeam.teamRunId, config).catch(resolveRuntimeStateLoadFailure)
     if (!runtimeState || !ACTIVE_RUNTIME_STATUSES.has(runtimeState.status)) continue
     if (runtimeState.leadSessionId === sessionID) return runtimeState
     if (runtimeState.members.some((member) => member.sessionId === sessionID)) return runtimeState

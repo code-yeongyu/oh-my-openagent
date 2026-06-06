@@ -168,7 +168,8 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
       ownedSession: false,
     }
   } catch (error) {
-    log("tmux visualization unavailable, skipping", { error: String(error) })
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    log("tmux visualization unavailable, skipping", { error: errorMessage })
     return null
   }
 }
@@ -198,7 +199,11 @@ export async function removeTeamLayout(
       for (const paneId of cleanupTarget.paneIds) {
         try {
           await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-pane", "-t", paneId])
-        } catch {
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            log("tmux team pane cleanup failed", { teamRunId, paneId })
+            continue
+          }
           log("tmux team pane cleanup failed", { teamRunId, paneId })
         }
       }
@@ -210,11 +215,13 @@ export async function removeTeamLayout(
       try {
         await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
       } catch (windowError) {
-        log("tmux team layout window cleanup failed", { teamRunId, windowId, error: String(windowError) })
+        const errorMessage = windowError instanceof Error ? String(windowError) : String(windowError)
+        log("tmux team layout window cleanup failed", { teamRunId, windowId, error: errorMessage })
       }
     }
   } catch (error) {
-    log("tmux team layout cleanup failed", { teamRunId, error: String(error) })
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    log("tmux team layout cleanup failed", { teamRunId, error: errorMessage })
   }
 }
 

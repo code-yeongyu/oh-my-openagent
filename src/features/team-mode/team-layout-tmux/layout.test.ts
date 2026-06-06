@@ -171,6 +171,24 @@ describe("team-layout-tmux", () => {
     expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
+  test("#given tmux path lookup throws a non-Error value #when createTeamLayout runs #then it falls back to null", async () => {
+    // given
+    const deps: TeamLayoutDeps = {
+      runTmuxCommand: runTmuxCommandMock,
+      isServerRunning: isServerRunningMock,
+      getTmuxPath: async () => Promise.reject("tmux path unavailable"),
+      resolveCallerTmuxSession: async () => ({ sessionId: "$7", paneId: "%42", windowTarget: "test-session:0" }),
+    }
+    const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+    // when
+    const result = await createTeamLayout("run-non-error", members, tmuxMgr as never, deps)
+
+    // then
+    expect(result).toBeNull()
+    expect(sharedModule.log).toHaveBeenCalledWith("tmux visualization unavailable, skipping", { error: "tmux path unavailable" })
+  })
+
   test("creates teammate panes in the caller window and sends attach via send-keys", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
@@ -214,13 +232,14 @@ describe("team-layout-tmux", () => {
       const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
+      if (attach === undefined) throw new Error("expected attach command")
       // both auth vars are forwarded
       expect(attach).toContain("OPENCODE_SERVER_PASSWORD=")
       expect(attach).toContain("OPENCODE_SERVER_USERNAME=")
       // embedded single quote is POSIX-escaped as '\'' (verified independently of the impl helper)
       expect(attach).toContain("'a'\\''b'")
       // env-prefix precedes the binary
-      expect(attach!.indexOf("OPENCODE_SERVER_PASSWORD=")).toBeLessThan(attach!.indexOf("opencode attach"))
+      expect(attach.indexOf("OPENCODE_SERVER_PASSWORD=")).toBeLessThan(attach.indexOf("opencode attach"))
     } finally {
       if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
       if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
@@ -411,6 +430,33 @@ describe("team-layout-tmux", () => {
       ["kill-window", "-t", "@10"],
       ["kill-window", "-t", "@11"],
     ])
+  })
+
+  test("#given pane cleanup throws a non-Error value #when removeTeamLayout runs #then cleanup continues", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+    runTmuxCommandMock.mockImplementation((_tmuxPath: string, args: Array<string>, _options?: unknown) => {
+      if (args[0] === "kill-pane") {
+        return Promise.reject("pane already gone")
+      }
+
+      return Promise.resolve(createTmuxCommandResult(""))
+    })
+
+    // when
+    await removeTeamLayout("run-pane-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      paneIds: ["%11", "%12"],
+    }, tmuxMgr as never)
+
+    // then
+    expect(getCommands().filter((args) => args[0] === "kill-pane")).toEqual([
+      ["kill-pane", "-t", "%11"],
+      ["kill-pane", "-t", "%12"],
+    ])
+    expect(sharedModule.log).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
+    expect(sharedModule.log).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
   })
 
   test("skips all panes when lead member missing", async () => {

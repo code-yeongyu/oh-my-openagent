@@ -249,11 +249,32 @@ describe("createTeamRun", () => {
       await result
       throw new Error("expected createTeamRun to reject")
     } catch (error) {
+      if (!(error instanceof TeamRunCreateError)) throw error
       expect(error).toBeInstanceOf(TeamRunCreateError)
     }
     expect((cancelTaskMock.mock.calls as Array<[string]>).map(([taskId]) => taskId)).toEqual(["task-3", "task-2", "task-1"])
     expect((await loadSingleRuntimeState(baseDir)).status).toBe("failed")
     expect(getSessionCreatedTeamRunIds()).toEqual([])
+  })
+
+  test("#given member launch throws a non-Error value #when createTeamRun rolls back #then it preserves the fallback error message", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-non-error-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async () => Promise.reject("launch failed as string"))
+
+    // when
+    const result = createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    try {
+      await result
+      throw new Error("expected createTeamRun to reject")
+    } catch (error) {
+      if (!(error instanceof TeamRunCreateError)) throw error
+      expect(error).toBeInstanceOf(TeamRunCreateError)
+      expect(error).toHaveProperty("message", "Failed to create team run 'alpha-team': launch failed as string")
+    }
   })
 
   test("removes all created worktrees when spawn fails after worktree creation", async () => {
@@ -273,6 +294,7 @@ describe("createTeamRun", () => {
       await createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
       throw new Error("expected createTeamRun to reject")
     } catch (error) {
+      if (!(error instanceof TeamRunCreateError)) throw error
       expect(error).toBeInstanceOf(TeamRunCreateError)
     }
 
