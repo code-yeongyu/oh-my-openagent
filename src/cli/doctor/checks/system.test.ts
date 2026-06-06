@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PLUGIN_NAME } from "../../../shared"
@@ -32,6 +32,9 @@ const mockGetLoadedPluginVersion = mock(() => ({
 }))
 const mockGetLatestPluginVersion = mock(async (_currentVersion: string | null) => null as string | null)
 const mockGetSuggestedInstallTag = mock(() => "latest")
+const mockConfigExists = mock((_path: string) => true)
+const mockReadConfigFile = mock((_path: string) => "{}")
+const mockParseConfigContent = mock((_content: string) => ({}))
 
 const temporaryDirectories: string[] = []
 
@@ -44,6 +47,9 @@ function createSystemDeps() {
     getLoadedPluginVersion: mockGetLoadedPluginVersion,
     getLatestPluginVersion: mockGetLatestPluginVersion,
     getSuggestedInstallTag: mockGetSuggestedInstallTag,
+    configExists: mockConfigExists,
+    readConfigFile: mockReadConfigFile,
+    parseConfigContent: mockParseConfigContent,
   }
 }
 
@@ -56,6 +62,9 @@ describe("system check", () => {
     mockGetLoadedPluginVersion.mockReset()
     mockGetLatestPluginVersion.mockReset()
     mockGetSuggestedInstallTag.mockReset()
+    mockConfigExists.mockReset()
+    mockReadConfigFile.mockReset()
+    mockParseConfigContent.mockReset()
 
     mockFindOpenCodeBinary.mockResolvedValue({
       binary: "opencode",
@@ -80,6 +89,9 @@ describe("system check", () => {
     })
     mockGetLatestPluginVersion.mockResolvedValue(null)
     mockGetSuggestedInstallTag.mockReturnValue("latest")
+    mockConfigExists.mockReturnValue(true)
+    mockReadConfigFile.mockReturnValue("{}")
+    mockParseConfigContent.mockReturnValue({})
   })
 
   afterEach(() => {
@@ -91,21 +103,41 @@ describe("system check", () => {
   describe("#given malformed config JSONC", () => {
     it("marks the config invalid without throwing", async () => {
       //#given
-      const directory = mkdtempSync(join(tmpdir(), "omo-system-config-"))
-      temporaryDirectories.push(directory)
-      const configPath = join(directory, "opencode.json")
-      writeFileSync(configPath, "{", "utf-8")
-      mockGetPluginInfo.mockReturnValue({
-        registered: false,
-        entry: null,
-        isPinned: false,
-        pinnedVersion: null,
-        configPath,
-        isLocalDev: false,
-      })
+      const configPath = join(tmpdir(), "omo-system-config-malformed.jsonc")
+      const deps = {
+        findOpenCodeBinary: async () => ({
+          binary: "opencode",
+          path: "/usr/local/bin/opencode",
+        }),
+        getOpenCodeVersion: async () => "1.0.200",
+        compareVersions: () => true,
+        getPluginInfo: () => ({
+          registered: false,
+          entry: null,
+          isPinned: false,
+          pinnedVersion: null,
+          configPath,
+          isLocalDev: false,
+        }),
+        getLoadedPluginVersion: () => ({
+          cacheDir: "/Users/test/Library/Caches/opencode with spaces",
+          cachePackagePath: "/tmp/package.json",
+          installedPackagePath: "/tmp/node_modules/oh-my-opencode/package.json",
+          expectedVersion: "3.0.0",
+          loadedVersion: "3.1.0",
+        }),
+        getLatestPluginVersion: async () => null,
+        getSuggestedInstallTag: () => "latest",
+        configExists: () => true,
+        readConfigFile: () => "{",
+        parseConfigContent: () => {
+          throw new Error("Invalid JSONC")
+        },
+      }
 
       //#when
-      const result = await gatherSystemInfo(createSystemDeps())
+      const { gatherSystemInfo: freshGatherSystemInfo } = await import(`./system?malformed=${Date.now()}`)
+      const result = await freshGatherSystemInfo(deps)
 
       //#then
       expect(result.configValid).toBe(false)
