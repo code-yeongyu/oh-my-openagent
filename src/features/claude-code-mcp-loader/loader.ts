@@ -41,6 +41,10 @@ async function loadMcpConfigFile(
     const content = await bunFile(filePath).text()
     return JSON.parse(content) as ClaudeCodeMcpConfig
   } catch (error) {
+    if (error instanceof Error) {
+      log(`Failed to load MCP config from ${filePath}`, error)
+      return null
+    }
     log(`Failed to load MCP config from ${filePath}`, error)
     return null
   }
@@ -67,7 +71,8 @@ export function getSystemMcpServerNames(): Set<string> {
         if (!shouldLoadMcpServer(serverConfig, cwd)) continue
         names.add(name)
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) continue
       continue
     }
   }
@@ -127,6 +132,10 @@ export async function loadMcpConfigs(
 
         log(`Loaded MCP server "${name}" from ${scope}`, { path })
       } catch (error) {
+        if (error instanceof Error) {
+          log(`Failed to transform MCP server "${name}"`, error)
+          continue
+        }
         log(`Failed to transform MCP server "${name}"`, error)
       }
     }

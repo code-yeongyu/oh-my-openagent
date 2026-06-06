@@ -16,7 +16,8 @@ export function derivePluginNameFromKey(pluginKey: string): string {
   if (keyWithoutVersion.startsWith("file://")) {
     try {
       return basename(fileURLToPath(keyWithoutVersion))
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) return basename(keyWithoutVersion)
       return basename(keyWithoutVersion)
     }
   }

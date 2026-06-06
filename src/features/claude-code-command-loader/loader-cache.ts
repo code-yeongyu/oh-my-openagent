@@ -10,7 +10,8 @@ export async function getCommandLoaderCacheKey(directory?: string): Promise<stri
 
   try {
     return await fs.realpath(resolvedDirectory)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return resolvedDirectory
     return resolvedDirectory
   }
 }
