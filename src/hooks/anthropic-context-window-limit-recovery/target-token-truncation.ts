@@ -78,7 +78,10 @@ export async function truncateUntilTargetTokens(
 					toolPartsByKey.set(`${messageID}:${part.id}`, part)
 				}
 			}
-		} catch {
+		} catch (error) {
+			if (!(error instanceof Error)) {
+				throw error
+			}
 			toolPartsByKey = new Map<string, SDKToolPart>()
 		}
 
