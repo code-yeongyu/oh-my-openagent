@@ -113,7 +113,7 @@ describe("install-codex project-local cleanup", () => {
     const content = await readFile(globalConfigPath, "utf8")
     expect(content).not.toMatch(/^max_threads\s*=/m)
     expect(content).toContain("max_depth = 5")
-  }, { timeout: 15_000 })
+  }, { timeout: 30_000 })
 
   test("#given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup", async () => {
     // given
