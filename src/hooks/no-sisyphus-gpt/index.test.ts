@@ -29,8 +29,8 @@ function createHookContext(showToast: (input: unknown) => Promise<unknown>): Plu
 }
 
 describe("no-sisyphus-gpt hook", () => {
-  test("shows toast on every chat.message when sisyphus uses gpt model", async () => {
-    // given - sisyphus (display name) with gpt model
+  test("shows toast on every chat.message when sisyphus uses unsupported gpt model", async () => {
+    // given - sisyphus (display name) with a GPT model that lacks native support
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
 
@@ -41,12 +41,12 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: "openai", modelID: "gpt-4.1" },
     }, output1)
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: "openai", modelID: "gpt-4.1" },
     }, output2)
 
     // then - toast is shown for every message

@@ -208,11 +208,11 @@ describe("resolveSkillContentAsync", () => {
 
 	it("returns null for ambiguous short name async", async () => {
 		// given: two skills with same short name in different namespaces
-		createNestedSkill(testConfigDir, "superpowers", "debugging", "superpowers content")
-		createNestedSkill(testConfigDir, "utils", "debugging", "utils content")
+		createNestedSkill(testConfigDir, "superpowers", "nested-debug", "superpowers content")
+		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving by ambiguous short name
-		const result = await resolveSkillContentAsync("debugging")
+		const result = await resolveSkillContentAsync("nested-debug")
 
 		// then: ambiguous => null
 		expect(result).toBeNull()
@@ -454,16 +454,16 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("does not resolve ambiguous short name in batch", async () => {
 		// given: two skills with same short name
-		createNestedSkill(testConfigDir, "superpowers", "debugging", "sp content")
-		createNestedSkill(testConfigDir, "utils", "debugging", "utils content")
+		createNestedSkill(testConfigDir, "superpowers", "nested-debug", "sp content")
+		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving ambiguous short name with builtin
-		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
+		const result = await resolveMultipleSkillsAsync(["nested-debug", "playwright"])
 
-		// then: debugging not found, playwright resolved
+		// then: ambiguous short name not found, playwright resolved
 		expect(result.resolved.size).toBe(1)
 		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.notFound).toContain("debugging")
+		expect(result.notFound).toContain("nested-debug")
 	})
 
 	it("prefers exact match over short name in batch", async () => {
