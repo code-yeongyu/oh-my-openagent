@@ -1,3 +1,4 @@
+import { Signal } from "../../shared/signals"
 import type { ManagedClient, SkillMcpManagerState } from "./types"
 
 async function closeIgnoringErrors(close: () => Promise<void>): Promise<void> {
@@ -42,10 +43,10 @@ export function registerProcessCleanup(state: SkillMcpManagerState): void {
     process.on(signal, listener)
   }
 
-  register("SIGINT")
-  register("SIGTERM")
+  register(Signal.SIGINT.name)
+  register(Signal.SIGTERM.name)
   if (process.platform === "win32") {
-    register("SIGBREAK")
+    register(Signal.SIGBREAK.name)
   }
 }
 

@@ -3,6 +3,7 @@ import type { RunContext } from "./types"
 import type { EventState } from "./events"
 import { checkCompletionConditions } from "./completion"
 import { isRecord, normalizeSDKResponse } from "../../shared"
+import { Signal } from "../../shared/signals"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
@@ -60,7 +61,7 @@ export async function pollForCompletion(
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
 
     if (abortController.signal.aborted) {
-      return 130
+      return Signal.SIGINT.exitCode
     }
 
     if (eventState.mainSessionError) {
@@ -174,7 +175,7 @@ export async function pollForCompletion(
     const shouldExit = await checkCompletionConditions(ctx)
     if (shouldExit) {
       if (abortController.signal.aborted) {
-        return 130
+        return Signal.SIGINT.exitCode
       }
 
       consecutiveCompleteChecks++
@@ -187,7 +188,7 @@ export async function pollForCompletion(
     }
   }
 
-  return 130
+  return Signal.SIGINT.exitCode
 }
 
 async function hasActiveSessionWork(ctx: RunContext): Promise<boolean> {

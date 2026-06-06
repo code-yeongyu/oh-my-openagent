@@ -38,10 +38,7 @@ export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.CODEX]: "Codex",
 } as const
 
-export const EXIT_CODES = {
-  SUCCESS: 0,
-  FAILURE: 1,
-} as const
+export { EXIT_CODES } from "../../shared/signals"
 
 export const MIN_OPENCODE_VERSION = "1.4.0"
 

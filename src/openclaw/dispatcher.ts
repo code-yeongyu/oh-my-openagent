@@ -1,5 +1,6 @@
 import { spawn } from "../shared/bun-spawn-shim"
 import { validateGatewayUrl } from "./gateway-url-validation"
+import { Signal, killProcessGroup } from "../shared/signals"
 import type { OpenClawGateway, WakeResult } from "./types"
 
 const DEFAULT_HTTP_TIMEOUT_MS = 10_000
@@ -192,7 +193,7 @@ export async function wakeCommandGateway(
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        terminateCommandProcess(proc, "SIGKILL")
+        terminateCommandProcess(proc, Signal.SIGKILL)
         reject(new Error("Command timed out"))
       }, timeout)
     })
@@ -226,27 +227,10 @@ type KillableProcess = {
   kill: (signal?: NodeJS.Signals) => void
 }
 
-export function terminateCommandProcess(proc: KillableProcess, signal: NodeJS.Signals): void {
+export function terminateCommandProcess(proc: KillableProcess, signal: Signal): void {
   try {
-    if (process.platform !== "win32" && proc.pid) {
-      try {
-        process.kill(-proc.pid, signal)
-        return
-      } catch (groupKillError) {
-        if (groupKillError instanceof Error) {
-          proc.kill(signal)
-          return
-        }
-        proc.kill(signal)
-        return
-      }
-    }
-
-    proc.kill(signal)
-  } catch (directKillError) {
-    if (directKillError instanceof Error) {
-      return
-    }
-    return
+    killProcessGroup(proc, signal)
+  } catch {
+    // Best-effort termination; the process may have already exited.
   }
 }

@@ -16,6 +16,7 @@ import {
 } from "./reply-listener-state"
 import { pollTelegramReplies } from "./reply-listener-telegram"
 import { pruneStale } from "./session-registry"
+import { Signal } from "../shared/signals"
 
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000
 
@@ -56,8 +57,8 @@ export async function pollLoop(): Promise<void> {
     process.exit(0)
   }
 
-  process.on("SIGTERM", shutdown)
-  process.on("SIGINT", shutdown)
+  process.on(Signal.SIGTERM.name, shutdown)
+  process.on(Signal.SIGINT.name, shutdown)
 
   try {
     pruneStale()

@@ -1,3 +1,5 @@
+import { Signal } from "../../shared/signals"
+
 type StdinLike = {
   isTTY?: boolean
   isRaw?: boolean
@@ -17,7 +19,7 @@ function includesCtrlC(chunk: string | Uint8Array): boolean {
 export function suppressRunInput(
   stdin: StdinLike = process.stdin,
   onInterrupt: () => void = () => {
-    process.kill(process.pid, "SIGINT")
+    process.kill(process.pid, Signal.SIGINT.name)
   }
 ): () => void {
   if (!stdin.isTTY) {

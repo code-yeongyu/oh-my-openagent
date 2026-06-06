@@ -1,5 +1,6 @@
 import { extractSemverFromOutput } from "../../shared/extract-semver"
 import type { OpenCodeBinaryType } from "../../shared/opencode-config-dir-types"
+import { gracefulTerminate } from "../../shared/signals"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { initConfigContext } from "./config-context"
 
@@ -23,15 +24,11 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
 
       const outputPromise = new Response(proc.stdout).text()
       let killTimer: ReturnType<typeof setTimeout> | null = null
-      let killGraceTimer: ReturnType<typeof setTimeout> | null = null
       const timedExitResult = await Promise.race([
         proc.exited.then((exitCode) => ({ type: "exit" as const, exitCode })),
         new Promise<{ type: "timeout" }>((resolve) => {
           killTimer = setTimeout(() => {
-            proc.kill("SIGTERM")
-            killGraceTimer = setTimeout(() => {
-              proc.kill("SIGKILL")
-            }, OPENCODE_VERSION_KILL_GRACE_MS)
+            gracefulTerminate(proc, { gracePeriodMs: OPENCODE_VERSION_KILL_GRACE_MS })
             resolve({ type: "timeout" })
           }, OPENCODE_VERSION_CHECK_TIMEOUT_MS)
         }),
@@ -44,10 +41,6 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
       if (timedExitResult.type === "timeout") {
         void outputPromise.catch(() => {})
         continue
-      }
-
-      if (killGraceTimer) {
-        clearTimeout(killGraceTimer)
       }
 
       let outputTimer: ReturnType<typeof setTimeout> | null = null

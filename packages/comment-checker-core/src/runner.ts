@@ -1,26 +1,15 @@
 import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 
+import { gracefulTerminate } from "./graceful-terminate"
 import type {
   CheckResult,
   ResolveCommentCheckerBinaryInput,
   RunCommentCheckerInput,
   RunCommentCheckerOptions,
-  SpawnProcess,
-  SpawnSignal,
 } from "./types"
 
 const EMPTY_RESULT: CheckResult = { hasComments: false, message: "" }
-
-function killProcessSafely(process: SpawnProcess, signal: SpawnSignal): void {
-  try {
-    process.kill(signal)
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-  }
-}
 
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null {
   const packageName = input.packageName ?? "@code-yeongyu/comment-checker"
@@ -69,16 +58,14 @@ export async function runCommentChecker(
   process.stdin.end()
 
   let timeoutId: ReturnType<typeof setTimeout> | null = null
-  let graceId: ReturnType<typeof setTimeout> | null = null
 
   const timeoutPromise = new Promise<"timeout">((resolve) => {
     timeoutId = setTimer(() => {
-      killProcessSafely(process, "SIGTERM")
-
-      graceId = setTimer(() => {
-        killProcessSafely(process, "SIGKILL")
-      }, killGraceMs)
-
+      gracefulTerminate(process, {
+        gracePeriodMs: killGraceMs,
+        setTimer,
+        clearTimer,
+      })
       resolve("timeout")
     }, timeoutMs)
   })
@@ -111,9 +98,6 @@ export async function runCommentChecker(
   } finally {
     if (timeoutId !== null) {
       clearTimer(timeoutId)
-    }
-    if (graceId !== null) {
-      clearTimer(graceId)
     }
   }
 }

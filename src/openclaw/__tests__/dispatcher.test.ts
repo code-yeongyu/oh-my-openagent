@@ -7,6 +7,7 @@ import {
   wakeGateway,
   wakeCommandGateway,
 } from "../dispatcher"
+import { Signal } from "../../shared/signals"
 
 describe("OpenClaw Dispatcher", () => {
   test("interpolateInstruction replaces variables", () => {
@@ -179,7 +180,7 @@ describe("OpenClaw Dispatcher", () => {
     }
 
     try {
-      terminateCommandProcess(proc, "SIGKILL")
+      terminateCommandProcess(proc, Signal.SIGKILL)
 
       expect(killSpy).toHaveBeenCalledWith(-4321, "SIGKILL")
       expect(proc.kill).not.toHaveBeenCalled()
@@ -198,7 +199,7 @@ describe("OpenClaw Dispatcher", () => {
     }
 
     try {
-      terminateCommandProcess(proc, "SIGKILL")
+      terminateCommandProcess(proc, Signal.SIGKILL)
 
       expect(killSpy).toHaveBeenCalledWith(-9876, "SIGKILL")
       expect(proc.kill).toHaveBeenCalledWith("SIGKILL")
@@ -214,7 +215,7 @@ describe("OpenClaw Dispatcher", () => {
       }),
     }
 
-    expect(() => terminateCommandProcess(proc, "SIGKILL")).not.toThrow()
+    expect(() => terminateCommandProcess(proc, Signal.SIGKILL)).not.toThrow()
     expect(proc.kill).toHaveBeenCalledWith("SIGKILL")
   })
 

@@ -2,6 +2,7 @@ import pc from "picocolors"
 import type { RunOptions, RunContext } from "./types"
 import { createEventState, processEvents, serializeError } from "./events"
 import { loadPluginConfig } from "../../plugin-config"
+import { Signal } from "../../shared/signals"
 import { createServerConnection } from "./server-connection"
 import { resolveSession } from "./session-resolver"
 import { createJsonOutputManager } from "./json-output"
@@ -82,10 +83,10 @@ export async function run(options: RunOptions): Promise<number> {
       console.log(pc.yellow("\nInterrupted. Shutting down..."))
       restoreInput()
       cleanup()
-      process.exit(130)
+      process.exit(Signal.SIGINT.exitCode)
     }
 
-    process.on("SIGINT", handleSigint)
+    process.on(Signal.SIGINT.name, handleSigint)
 
     try {
       const sessionID = await resolveSession({
@@ -185,14 +186,14 @@ export async function run(options: RunOptions): Promise<number> {
       cleanup()
       throw err
     } finally {
-      process.removeListener("SIGINT", handleSigint)
+      process.removeListener(Signal.SIGINT.name, handleSigint)
       restoreInput()
     }
   } catch (err) {
     if (jsonManager) jsonManager.restore()
     timestampOutput?.restore()
     if (err instanceof Error && err.name === "AbortError") {
-      return 130
+      return Signal.SIGINT.exitCode
     }
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1

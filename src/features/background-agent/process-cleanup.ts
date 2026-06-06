@@ -1,6 +1,7 @@
 import { log } from "../../shared"
+import { Signal, EXIT_CODES } from "../../shared/signals"
+import type { ProcessCleanupEvent } from "../../shared/signals"
 
-type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"
 
 /**
@@ -82,7 +83,7 @@ export function __setShutdownInProgressForTesting(value: boolean): void {
 }
 
 function registerProcessSignal(
-  signal: ProcessCleanupSignal,
+  signal: ProcessCleanupEvent,
   handler: () => void | Promise<void>,
   exitAfter: boolean
 ): () => void {
@@ -90,7 +91,7 @@ function registerProcessSignal(
     markShutdownStarted()
     const cleanupResult = handler()
     if (exitAfter) {
-      scheduleForcedExit(cleanupResult, 0, true)
+      scheduleForcedExit(cleanupResult, EXIT_CODES.SUCCESS, true)
     }
   }
   process.on(signal, listener)
@@ -217,7 +218,7 @@ interface CleanupTarget {
 
 const cleanupManagers = new Set<CleanupTarget>()
 let cleanupRegistered = false
-const cleanupSignalHandlers = new Map<ProcessCleanupSignal, () => void>()
+const cleanupSignalHandlers = new Map<ProcessCleanupEvent, () => void>()
 const cleanupErrorHandlers = new Map<ProcessCleanupErrorEvent, (error: unknown) => void>()
 
 export function registerManagerForCleanup(manager: CleanupTarget): void {
@@ -258,15 +259,15 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
     return cleanupPromise
   }
 
-  const registerSignal = (signal: ProcessCleanupSignal, exitAfter: boolean): void => {
+  const registerSignal = (signal: ProcessCleanupEvent, exitAfter: boolean): void => {
     const listener = registerProcessSignal(signal, cleanupAll, exitAfter)
     cleanupSignalHandlers.set(signal, listener)
   }
 
-  registerSignal("SIGINT", true)
-  registerSignal("SIGTERM", true)
+  registerSignal(Signal.SIGINT.name, true)
+  registerSignal(Signal.SIGTERM.name, true)
   if (process.platform === "win32") {
-    registerSignal("SIGBREAK", true)
+    registerSignal(Signal.SIGBREAK.name, true)
   }
   registerSignal("beforeExit", false)
   registerSignal("exit", false)

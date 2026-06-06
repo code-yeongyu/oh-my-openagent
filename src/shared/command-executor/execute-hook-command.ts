@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { getHomeDirectory } from "./home-directory";
 import { findBashPath, findZshPath } from "./shell-path";
+import { Signal, killProcessGroup } from "../signals";
 
 export interface CommandResult {
   exitCode: number;
@@ -146,30 +147,6 @@ export async function executeHookCommand(
       killer.on("close", finish);
     };
 
-    const killProcessGroup = (signal: NodeJS.Signals) => {
-      try {
-        if (!isWin32 && proc.pid) {
-          try {
-            process.kill(-proc.pid, signal);
-          } catch (error) {
-            if (!(error instanceof Error)) {
-              throw error;
-            }
-            proc.kill(signal);
-          }
-        } else {
-          proc.kill(signal);
-          if (signal === "SIGKILL") {
-            killWindowsProcessTree();
-          }
-        }
-      } catch (error) {
-        if (!(error instanceof Error)) {
-          throw error;
-        }
-      }
-    };
-
     const appendTimeoutNotice = () => {
       if (!stderr.includes("Hook command timed out after")) {
         stderr += `\nHook command timed out after ${timeoutMs}ms`;
@@ -191,7 +168,7 @@ export async function executeHookCommand(
         return;
       }
       // Kill entire process group to avoid orphaned children
-      killProcessGroup("SIGTERM");
+      killProcessGroup(proc, Signal.SIGTERM);
       killTimer = setTimeout(() => {
         if (settled) return;
         if (isWin32) {
@@ -204,7 +181,7 @@ export async function executeHookCommand(
           });
           return;
         }
-        killProcessGroup("SIGKILL");
+        killProcessGroup(proc, Signal.SIGKILL);
         settle({
           exitCode: 124,
           stdout: stdout.trim(),

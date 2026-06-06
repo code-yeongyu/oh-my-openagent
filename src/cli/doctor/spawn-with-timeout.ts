@@ -1,5 +1,6 @@
 import type { SpawnOptions } from "../../shared/spawn-with-windows-hide"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
+import { gracefulTerminate } from "../../shared/signals"
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 10_000
 
@@ -39,7 +40,7 @@ export async function spawnWithTimeout(
   const race = await Promise.race([processPromise, timeoutPromise])
 
   if (race === "timeout") {
-    proc.kill("SIGTERM")
+    gracefulTerminate(proc)
     await proc.exited.catch(() => {})
     return { stdout: "", stderr: "", exitCode: 1, timedOut: true }
   }

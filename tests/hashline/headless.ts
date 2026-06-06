@@ -8,6 +8,7 @@ import { z } from "zod"
 import { formatHashLines } from "../../src/tools/hashline-edit/hash-computation"
 import { normalizeHashlineEdits } from "../../src/tools/hashline-edit/normalize-edits"
 import { applyHashlineEditsWithReport } from "../../src/tools/hashline-edit/edit-operations"
+import { Signal } from "../../src/shared/signals"
 import { canonicalizeFileText, restoreFileText } from "../../src/tools/hashline-edit/file-text-canonicalization"
 import { HASHLINE_EDIT_DESCRIPTION } from "../../src/tools/hashline-edit/tool-description"
 
@@ -185,8 +186,8 @@ async function run() {
 }
 
 // ── Signal + Startup ─────────────────────────────────────────
-process.once("SIGINT", () => process.exit(0))
-process.once("SIGTERM", () => process.exit(143))
+process.once(Signal.SIGINT.name, () => process.exit(0))
+process.once(Signal.SIGTERM.name, () => process.exit(Signal.SIGTERM.exitCode))
 
 const startTime = Date.now()
 run()

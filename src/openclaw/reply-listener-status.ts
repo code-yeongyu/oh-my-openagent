@@ -7,13 +7,14 @@ import {
   removeReplyListenerPid,
 } from "./reply-listener-state"
 import { sleep } from "./reply-listener-sleep"
+import { Signal } from "../shared/signals"
 
 export async function terminateReplyListenerProcess(pid: number): Promise<void> {
   if (!isReplyListenerProcessRunning(pid)) return
   if (!(await isReplyListenerDaemonProcess(pid))) return
 
   try {
-    process.kill(pid, "SIGTERM")
+    process.kill(pid, Signal.SIGTERM.name)
   } catch (error) {
     if (error instanceof Error) return
     throw error

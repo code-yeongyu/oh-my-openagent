@@ -11,6 +11,7 @@ import {
   type ReplyListenerDaemonState,
   writeReplyListenerDaemonState,
 } from "./reply-listener-state"
+import { Signal } from "../shared/signals"
 
 export async function stopReplyListener(): Promise<{
   success: boolean
@@ -43,7 +44,7 @@ export async function stopReplyListener(): Promise<{
   }
 
   try {
-    process.kill(pid, "SIGTERM")
+    process.kill(pid, Signal.SIGTERM.name)
     removeReplyListenerPid()
     const state = markReplyListenerStopped(readReplyListenerDaemonState())
     writeReplyListenerDaemonState(state)
