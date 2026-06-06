@@ -9,27 +9,26 @@ export function createSgResultFromStdout(stdout: string): SgResult {
 	const outputTruncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
 	const outputToProcess = outputTruncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
 
-	let matches: CliMatch[] = []
-	try {
-		matches = JSON.parse(outputToProcess) as CliMatch[]
-	} catch {
+	const parsedMatches = parseCliMatches(outputToProcess)
+	let matches: CliMatch[] = parsedMatches ?? []
+	if (!parsedMatches) {
 		if (outputTruncated) {
-			try {
-				const lastValidIndex = outputToProcess.lastIndexOf("}")
-				if (lastValidIndex > 0) {
-					const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
-					if (bracketIndex > 0) {
-						const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
-						matches = JSON.parse(truncatedJson) as CliMatch[]
+			const lastValidIndex = outputToProcess.lastIndexOf("}")
+			if (lastValidIndex > 0) {
+				const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
+				if (bracketIndex > 0) {
+					const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
+					const recoveredMatches = parseCliMatches(truncatedJson)
+					if (!recoveredMatches) {
+						return {
+							matches: [],
+							totalMatches: 0,
+							truncated: true,
+							truncatedReason: "max_output_bytes",
+							error: "Output too large and could not be parsed",
+						}
 					}
-				}
-			} catch {
-				return {
-					matches: [],
-					totalMatches: 0,
-					truncated: true,
-					truncatedReason: "max_output_bytes",
-					error: "Output too large and could not be parsed",
+					matches = recoveredMatches
 				}
 			}
 		} else {
@@ -50,5 +49,16 @@ export function createSgResultFromStdout(stdout: string): SgResult {
 			: matchesTruncated
 				? "max_matches"
 				: undefined,
+	}
+}
+
+function parseCliMatches(json: string): CliMatch[] | undefined {
+	try {
+		return JSON.parse(json) as CliMatch[]
+	} catch (error) {
+		if (error instanceof Error) {
+			return undefined
+		}
+		return undefined
 	}
 }
