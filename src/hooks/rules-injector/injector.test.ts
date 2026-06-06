@@ -449,6 +449,43 @@ describe("createRuleInjectionProcessor", () => {
 		expect(trackedShouldApplyRuleCount).toBe(2);
 	});
 
+	it("#given rule processing throws a non-error value #when injecting #then rethrows it", async () => {
+		// given
+		const thrown = "stat failed";
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: () => ({
+				contentHashes: new Set<string>(),
+				realPaths: new Set<string>(),
+			}),
+			readFileSync: originalReadFileSync,
+			statSync: (filePath: string) => {
+				if (filePath === ruleFile) {
+					throw thrown;
+				}
+				return originalStatSync(filePath);
+			},
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+		});
+
+		// when
+		const process = processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+
+		// then
+		await expect(process).rejects.toBe(thrown);
+	});
+
 	it("#given transcript hydration reports prior rule banner #when same rule matches #then rule is skipped and cache absorbs the realPath", async () => {
 		// given
 		const hydratedRelativePath =
