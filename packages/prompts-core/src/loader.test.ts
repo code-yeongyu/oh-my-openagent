@@ -53,7 +53,7 @@ describe("loadPrompt", () => {
     )
 
     expect(error).toBeInstanceOf(PromptFileNotFoundError)
-    expect(expectError(error).message).toContain("test-prompt/missing")
+    expect(error.message).toContain("test-prompt/missing")
   })
 
   test("#given prompt name escapes source directory #then rejects path traversal", async () => {
@@ -147,16 +147,17 @@ describe("loadPrompt", () => {
   })
 })
 
-async function captureError(operation: () => Promise<unknown>): Promise<unknown> {
+async function captureError(operation: () => Promise<unknown>): Promise<Error> {
+  let capturedError: unknown
   try {
     await operation()
-    return undefined
   } catch (error) {
-    return error
+    if (!(error instanceof Error)) {
+      throw new ExpectedErrorMissingError("Expected operation to throw an Error instance")
+    }
+    capturedError = error
   }
-}
 
-function expectError(error: unknown): Error {
-  if (error instanceof Error) return error
+  if (capturedError instanceof Error) return capturedError
   throw new ExpectedErrorMissingError("Expected operation to throw an Error instance")
 }
