@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
-import { restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 import type { AutoCompactState } from "./types"
 
 type PromptAsyncCall = {
@@ -35,6 +35,7 @@ mock.module("../../features/hook-message-injector", () => ({
   findNearestMessageWithFieldsFromSDK: findNearestMessageWithFieldsFromSDKMock,
   findNearestMessageWithFields: findNearestMessageWithFieldsMock,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 import { _resetForTesting as resetSessionState, updateSessionAgent } from "../../features/claude-code-session-state/state"
 import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strategy"

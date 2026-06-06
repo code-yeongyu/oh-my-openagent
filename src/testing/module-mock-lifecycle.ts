@@ -32,6 +32,7 @@ type ModuleMockLifecycleOptions = {
 }
 
 type InstalledModuleMockLifecycle = {
+  preserveModuleMocksForTestFile: (callerUrl: string) => void
   restoreModuleMocksForTestFile: (callerUrl: string) => void
 }
 
@@ -123,7 +124,11 @@ function defaultLoadOriginalModule(specifier: string, callerUrl: string): Module
 export function installModuleMockLifecycle(
   mockApi: MockApi,
   options: ModuleMockLifecycleOptions = {},
-): { restoreModuleMocks: () => void; restoreModuleMocksForTestFile: (callerUrl: string) => void } {
+): {
+  preserveModuleMocksForTestFile: (callerUrl: string) => void
+  restoreModuleMocks: () => void
+  restoreModuleMocksForTestFile: (callerUrl: string) => void
+} {
   const snapshots = new Map<string, ModuleSnapshot>()
   const activeMocks = new Map<string, ActiveModuleMock>()
   const delegateModule = mockApi.module.bind(mockApi)
@@ -134,10 +139,15 @@ export function installModuleMockLifecycle(
   const shouldPreserveActiveMocksOnRestore = options.shouldPreserveActiveMocksOnRestore ?? (() => {
     return new Error().stack?.includes("/test-setup.ts") ?? false
   })
+  const preserveOwners = new Set<string>()
   let preservedDuringLastRestore = false
 
-  function replayActiveMocks(): void {
+  function replayActiveMocks(ownerFilter?: (ownerUrl: string) => boolean): void {
     for (const activeMock of activeMocks.values()) {
+      if (ownerFilter && !ownerFilter(activeMock.ownerUrl)) {
+        continue
+      }
+
       delegateModule(activeMock.specifier, activeMock.factory)
     }
   }
@@ -170,6 +180,24 @@ export function installModuleMockLifecycle(
       snapshots.delete(restoreSpecifier)
       activeMocks.delete(restoreSpecifier)
     }
+
+    preserveOwners.delete(callerUrl)
+  }
+
+  function restoreAndRemoveUnpreservedActiveMocks(): void {
+    for (const [restoreSpecifier, activeMock] of activeMocks.entries()) {
+      if (preserveOwners.has(activeMock.ownerUrl)) {
+        continue
+      }
+
+      const snapshot = snapshots.get(restoreSpecifier)
+      if (snapshot) {
+        delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+      }
+
+      snapshots.delete(restoreSpecifier)
+      activeMocks.delete(restoreSpecifier)
+    }
   }
 
   function hasActiveMocksForTestFile(callerUrl: string): boolean {
@@ -195,6 +223,10 @@ export function installModuleMockLifecycle(
     }
 
     removeActiveMocksForTestFile(callerUrl)
+  }
+
+  function preserveModuleMocksForTestFile(callerUrl: string): void {
+    preserveOwners.add(callerUrl)
   }
 
   mockApi.module = (specifier: string, factory: MockModuleFactory): unknown => {
@@ -233,15 +265,25 @@ export function installModuleMockLifecycle(
       return result
     }
 
+    restoreAndRemoveUnpreservedActiveMocks()
+    replayActiveMocks((ownerUrl) => preserveOwners.has(ownerUrl))
+    if (activeMocks.size > 0) {
+      return result
+    }
+
     restoreModuleMocks()
     return result
   }
 
   if (options.registerGlobalRestore) {
-    installedLifecycle = { restoreModuleMocksForTestFile }
+    installedLifecycle = { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile }
   }
 
-  return { restoreModuleMocks, restoreModuleMocksForTestFile }
+  return { preserveModuleMocksForTestFile, restoreModuleMocks, restoreModuleMocksForTestFile }
+}
+
+export function preserveModuleMocksForTestFile(callerUrl: string): void {
+  installedLifecycle?.preserveModuleMocksForTestFile(callerUrl)
 }
 
 export function restoreModuleMocksForTestFile(callerUrl: string): void {

@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
-import { restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const TEST_STORAGE_ROOT = mkdtempSync(join(tmpdir(), "omo-injector-storage-"))
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -22,6 +22,7 @@ mock.module("../../shared/opencode-storage-paths", () => ({
   PART_STORAGE: TEST_PART_STORAGE,
   SESSION_STORAGE: join(TEST_STORAGE_ROOT, "session"),
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const {
   findFirstMessageWithAgent,

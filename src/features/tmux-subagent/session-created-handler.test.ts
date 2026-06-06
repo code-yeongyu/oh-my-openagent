@@ -1,5 +1,5 @@
 import { describe, test, expect, mock, afterEach, afterAll } from "bun:test"
-import { restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — must be registered BEFORE importing the handler so the
@@ -23,6 +23,7 @@ const mockExecuteActions = mock(async (_actions: unknown[], _ctx: unknown) => ({
 
 mock.module("./pane-state-querier", () => ({ queryWindowState: mockQueryWindowState }))
 mock.module("./action-executor", () => ({ executeActions: mockExecuteActions }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 import type { SessionCreatedHandlerDeps } from "./session-created-handler"
 import { handleSessionCreated } from "./session-created-handler"
