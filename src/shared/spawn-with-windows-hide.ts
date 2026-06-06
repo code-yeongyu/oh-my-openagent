@@ -26,7 +26,7 @@ function toReadableStream(stream: NodeJS.ReadableStream | null): ReadableStream<
   return Readable.toWeb(stream as Readable) as ReadableStream<Uint8Array>
 }
 
-function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
+export function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
   let resolveExited: (exitCode: number) => void
   let exitCode: number | null = null
 
@@ -61,7 +61,9 @@ function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
         }
 
         proc.kill(signal)
-      } catch {}
+      } catch (error) {
+        if (!(error instanceof Error)) return
+      }
     },
   }
 }
