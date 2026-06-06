@@ -20,8 +20,10 @@ function showToastBestEffort(
 	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
 ): void {
 	try {
-		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
-	} catch (error) {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch((error: unknown) => {
+			if (error instanceof Error) return
+		})
+	} catch (error: unknown) {
 		if (error instanceof Error) {
 			return
 		}
@@ -141,7 +143,9 @@ export async function handleFailedVerification(
 	}
 
 	if (state.verification_session_id) {
-		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch((error: unknown) => {
+			if (error instanceof Error) return
+		})
 	}
 
 	const clearedState = loopState.clearVerificationState(
@@ -178,7 +182,9 @@ export async function handleFailedVerification(
 			variant: "warning",
 			duration: 5000,
 		},
-	}).catch(() => {})
+	}).catch((error: unknown) => {
+		if (error instanceof Error) return
+	})
 
 	return true
 }

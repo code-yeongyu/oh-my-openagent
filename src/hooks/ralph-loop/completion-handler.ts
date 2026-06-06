@@ -16,8 +16,10 @@ function showToastBestEffort(
 	body: { title: string; message: string; variant: "error" | "info" | "success"; duration: number },
 ): void {
 	try {
-		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
-	} catch (error) {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch((error: unknown) => {
+			if (error instanceof Error) return
+		})
+	} catch (error: unknown) {
 		if (error instanceof Error) {
 			return
 		}
@@ -38,7 +40,9 @@ export async function handleDetectedCompletion(
 
 	if (state.ultrawork && !state.verification_pending) {
 		if (state.verification_session_id) {
-			ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+			ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch((error: unknown) => {
+				if (error instanceof Error) return
+			})
 		}
 
 		const verificationState = loopState.markVerificationPending(sessionID)
