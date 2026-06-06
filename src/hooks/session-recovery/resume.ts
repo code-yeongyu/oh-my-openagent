@@ -60,7 +60,10 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
       return true
     }
     return isInternalPromptDispatchAccepted(promptResult)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
