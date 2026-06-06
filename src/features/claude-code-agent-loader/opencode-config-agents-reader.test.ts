@@ -101,6 +101,28 @@ describe("readOpencodeConfigAgents", () => {
     fs.rmSync(tempDir, { recursive: true })
   })
 
+  it("#given config reading throws a non-Error value #when reading opencode agents #then it returns the empty fallback", () => {
+    // given
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-test-"))
+    const opencodeDir = path.join(tempDir, ".opencode")
+    fs.mkdirSync(opencodeDir, { recursive: true })
+    fs.writeFileSync(path.join(opencodeDir, "opencode.json"), "{}")
+    const readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw "read failed"
+    })
+
+    try {
+      // when
+      const result = readOpencodeConfigAgents(tempDir)
+
+      // then
+      expect(result).toEqual({})
+    } finally {
+      readFileSyncSpy.mockRestore()
+      fs.rmSync(tempDir, { recursive: true })
+    }
+  })
+
   it("maps Claude model names correctly", () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-test-"))
     const opencodeDir = path.join(tempDir, ".opencode")

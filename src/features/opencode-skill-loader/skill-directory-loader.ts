@@ -1,8 +1,32 @@
+import type { Dirent } from "node:fs"
 import * as fs from "node:fs/promises"
 import { join } from "path"
 import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
 import type { LoadedSkill, SkillScope } from "./types"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
+
+async function readDirectoryEntries(skillsDir: string): Promise<Dirent[]> {
+  try {
+    return await fs.readdir(skillsDir, { withFileTypes: true })
+  } catch (error) {
+    if (error instanceof Error) {
+      return []
+    }
+    return []
+  }
+}
+
+async function canAccessFile(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath)
+    return true
+  } catch (error) {
+    if (error instanceof Error) {
+      return false
+    }
+    return false
+  }
+}
 
 export async function loadSkillsFromDir(options: {
   skillsDir: string
@@ -15,7 +39,7 @@ export async function loadSkillsFromDir(options: {
   const depth = options.depth ?? 0
   const maxDepth = options.maxDepth ?? 2
 
-  const entries = await fs.readdir(options.skillsDir, { withFileTypes: true }).catch(() => [])
+  const entries = await readDirectoryEntries(options.skillsDir)
   const skillMap = new Map<string, LoadedSkill>()
 
   const directories = entries.filter(
@@ -35,8 +59,7 @@ export async function loadSkillsFromDir(options: {
     const dirName = entry.name
 
     const skillMdPath = join(resolvedPath, "SKILL.md")
-    try {
-      await fs.access(skillMdPath)
+    if (await canAccessFile(skillMdPath)) {
       const skill = await loadSkillFromPath({
         skillPath: skillMdPath,
         resolvedPath,
@@ -48,13 +71,10 @@ export async function loadSkillsFromDir(options: {
         skillMap.set(skill.name, skill)
       }
       continue
-    } catch {
-      // no SKILL.md
     }
 
     const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
-    try {
-      await fs.access(namedSkillMdPath)
+    if (await canAccessFile(namedSkillMdPath)) {
       const skill = await loadSkillFromPath({
         skillPath: namedSkillMdPath,
         resolvedPath,
@@ -66,8 +86,6 @@ export async function loadSkillsFromDir(options: {
         skillMap.set(skill.name, skill)
       }
       continue
-    } catch {
-      // no named md
     }
 
     if (depth < maxDepth) {

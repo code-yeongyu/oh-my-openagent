@@ -71,7 +71,20 @@ function detectProvidersFromOmoConfig(): {
       hasMinimaxCodingPlan,
       hasVercelAiGateway,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return {
+        hasOpenAI: true,
+        hasOpencodeZen: true,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+      }
+    }
     return {
       hasOpenAI: true,
       hasOpencodeZen: true,

@@ -191,4 +191,21 @@ describe("claude-code command loader", () => {
     // then
     expect(cacheKey).toBe(missingDirectory)
   })
+
+  it("#given command directory access throws a non-Error value #when loading project commands #then it returns the empty fallback", async () => {
+    // given
+    const accessSpy = spyOn(fs, "access").mockImplementation(() => {
+      throw "access failed"
+    })
+
+    try {
+      // when
+      const commands = await loader.loadProjectCommands(TEST_DIR)
+
+      // then
+      expect(commands).toEqual({})
+    } finally {
+      accessSpy.mockRestore()
+    }
+  })
 })

@@ -63,7 +63,10 @@ export async function loadSkillFromPath(options: {
       mcpConfig,
       lazyContent: eagerLoader,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return null
+    }
     return null
   }
 }
