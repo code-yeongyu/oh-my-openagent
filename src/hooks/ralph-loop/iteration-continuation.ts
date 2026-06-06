@@ -56,7 +56,9 @@ export async function continueIteration(
         return { status: "dispatch_rejected", error: promptResult.error }
       }
     } catch (error: unknown) {
-      if (!(error instanceof Error)) throw error
+      if (error instanceof Error) {
+        return { status: "dispatch_rejected", error }
+      }
       return { status: "dispatch_rejected", error }
     }
 
@@ -89,7 +91,9 @@ export async function continueIteration(
       return { status: "dispatch_rejected", error: promptResult.error }
     }
   } catch (error: unknown) {
-    if (!(error instanceof Error)) throw error
+    if (error instanceof Error) {
+      return { status: "dispatch_rejected", error }
+    }
     return { status: "dispatch_rejected", error }
   }
 
