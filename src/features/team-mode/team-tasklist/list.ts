@@ -24,7 +24,7 @@ export async function listTasks(
   try {
     entries = await readdir(tasksDirectory, { withFileTypes: true })
   } catch (error) {
-    if (!(error instanceof Error)) throw error
+    error instanceof Error
     return []
   }
 

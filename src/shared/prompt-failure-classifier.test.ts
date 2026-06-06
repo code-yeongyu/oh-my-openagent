@@ -43,7 +43,7 @@ describe("prompt failure classifier", () => {
     expect(ambiguous).toBe(false)
   })
 
-  test("#given error serialization fails with a non-Error #when classifying ambiguity #then it rethrows the thrown value", () => {
+  test("#given error serialization fails with a non-Error #when classifying ambiguity #then it uses the empty-message fallback", () => {
     // given
     const thrown = { kind: "serializer-thrown-value" } as const
     const error = {
@@ -52,8 +52,11 @@ describe("prompt failure classifier", () => {
       },
     }
 
-    // when / then
-    expect(() => isAmbiguousPromptDispatchFailure(error)).toThrow(Object)
+    // when
+    const ambiguous = isAmbiguousPromptDispatchFailure(error)
+
+    // then
+    expect(ambiguous).toBe(false)
   })
 
   test("#given ambiguous failure before dispatch #when classifying post-dispatch acceptance #then it is not treated as accepted", () => {

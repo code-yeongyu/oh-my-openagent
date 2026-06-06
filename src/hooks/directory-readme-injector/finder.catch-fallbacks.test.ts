@@ -21,7 +21,7 @@ describe("directory README finder catch fallbacks", () => {
     expect(found).toEqual([])
   })
 
-  it("rethrows non-Error access rejections", async () => {
+  it("skips missing README files when access rejects with a non-Error", async () => {
     // given
     const nonError = Symbol("missing")
     mock.module("node:fs/promises", () => ({
@@ -32,17 +32,9 @@ describe("directory README finder catch fallbacks", () => {
     const { findReadmeMdUp } = await import(`./finder?non-error=${crypto.randomUUID()}`)
 
     // when
-    let thrown: unknown = null
-    try {
-      await findReadmeMdUp({ startDir: "/workspace/src", rootDir: "/workspace" })
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-      thrown = error
-    }
+    const found = await findReadmeMdUp({ startDir: "/workspace/src", rootDir: "/workspace" })
 
     // then
-    expect(thrown).toBe(nonError)
+    expect(found).toEqual([])
   })
 })

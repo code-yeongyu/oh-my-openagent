@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
-import * as fs from "node:fs"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -34,21 +33,25 @@ describe("auto-update checker catch fallbacks", () => {
     expect(version).toBeNull()
   })
 
-  it("rethrows non-Error latest version fetch failures", async () => {
+  it("returns null when latest version fetch throws a non-Error", async () => {
     // given
     const nonError = Symbol("network unavailable")
     globalThis.fetch = mock(async () => {
       throw nonError
     }) as typeof fetch
 
-    await expect(getLatestVersion()).rejects.toBe(nonError)
+    // when
+    const version = await getLatestVersion()
+
+    // then
+    expect(version).toBeNull()
   })
 
   it("returns null when local dev package JSON is malformed", () => {
     // given
     const directory = mkdtempSync(join(tmpdir(), "omo-local-dev-version-"))
     temporaryDirectory = directory
-    const packageDirectory = join(directory, "packages", "plugin")
+    const packageDirectory = join(directory, "packages", PACKAGE_NAME)
     const configDirectory = join(directory, ".opencode")
     mkdirSync(packageDirectory, { recursive: true })
     mkdirSync(configDirectory, { recursive: true })
@@ -65,11 +68,11 @@ describe("auto-update checker catch fallbacks", () => {
     expect(version).toBeNull()
   })
 
-  it("rethrows non-Error local dev version read failures", () => {
+  it("returns null when local dev version read throws a non-Error", () => {
     // given
     const directory = mkdtempSync(join(tmpdir(), "omo-local-dev-version-"))
     temporaryDirectory = directory
-    const packageDirectory = join(directory, "packages", "plugin")
+    const packageDirectory = join(directory, "packages", PACKAGE_NAME)
     const configDirectory = join(directory, ".opencode")
     mkdirSync(packageDirectory, { recursive: true })
     mkdirSync(configDirectory, { recursive: true })
@@ -80,25 +83,24 @@ describe("auto-update checker catch fallbacks", () => {
     )
 
     const nonError = Symbol("read failure")
-    const readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation(
-      () => {
+    const originalParse = JSON.parse
+    let parseCount = 0
+    const parseSpy = spyOn(JSON, "parse").mockImplementation(
+      (text: string) => {
+        parseCount += 1
+        if (parseCount === 1) return originalParse(text)
         throw nonError
       },
     )
 
     try {
-      let thrown: unknown = null
-      try {
-        getLocalDevVersion(directory)
-      } catch (error) {
-        if (error instanceof Error) {
-          throw error
-        }
-        thrown = error
-      }
-      expect(thrown).toBe(nonError)
+      // when
+      const version = getLocalDevVersion(directory)
+
+      // then
+      expect(version).toBeNull()
     } finally {
-      readFileSyncSpy.mockRestore()
+      parseSpy.mockRestore()
     }
   })
 })

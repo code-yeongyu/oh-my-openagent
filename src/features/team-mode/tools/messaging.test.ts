@@ -180,26 +180,25 @@ describe("createTeamSendMessageTool", () => {
     })
   })
 
-  test("resolveTeamRuntimeDetails rethrows non-Error runtime load failures", async () => {
+  test("resolveTeamRuntimeDetails preserves fallback for non-Error runtime load failures", async () => {
     // given
     const config = createConfig(await createFixtureBaseDir())
     const thrownValue = "missing runtime state"
 
     // when
-    let caught: unknown
-    try {
-      await resolveTeamRuntimeDetails("team-run-missing", "session-missing", config, {
-        loadRuntimeState: async () => {
-          throw thrownValue
-        },
-      })
-    } catch (error) {
-      if (error instanceof Error) throw error
-      caught = error
-    }
+    const runtimeDetails = await resolveTeamRuntimeDetails("team-run-missing", "session-missing", config, {
+      loadRuntimeState: async () => {
+        throw thrownValue
+      },
+    })
 
     // then
-    expect(caught).toBe(thrownValue)
+    expect(runtimeDetails).toEqual({
+      teamRunId: "team-run-missing",
+      isLead: false,
+      senderName: "unknown",
+      activeMembers: [],
+    })
   })
 
   test("routes a member message to one recipient", async () => {
