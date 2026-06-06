@@ -1,4 +1,5 @@
 import type { SpawnOptions } from "../../shared/spawn-with-windows-hide"
+import { log } from "../../shared/logger"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 10_000
@@ -18,8 +19,10 @@ export async function spawnWithTimeout(
   let proc: ReturnType<typeof spawnWithWindowsHide>
   try {
     proc = spawnWithWindowsHide(command, options)
-  } catch {
-    return { stdout: "", stderr: "", exitCode: 1, timedOut: false }
+  } catch (error) {
+    const stderr = error instanceof Error ? error.message : String(error)
+    log("doctor spawn failed before process start", { command, error: stderr })
+    return { stdout: "", stderr, exitCode: 1, timedOut: false }
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined

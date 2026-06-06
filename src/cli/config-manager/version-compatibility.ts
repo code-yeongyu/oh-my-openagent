@@ -1,3 +1,5 @@
+import { log } from "../../shared/logger"
+
 export interface VersionCompatibility {
   canUpgrade: boolean
   reason?: string
@@ -86,7 +88,12 @@ export function checkVersionCompatibility(
       isMajorBump: false,
       requiresMigration: false,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      log("version compatibility comparison failed", { currentVersion, newVersion, error: error.message })
+    } else {
+      log("version compatibility comparison failed", { currentVersion, newVersion, error: String(error) })
+    }
     return {
       canUpgrade: true,
       reason: `Unable to compare versions ${currentVersion} and ${newVersion} - proceeding with caution`,

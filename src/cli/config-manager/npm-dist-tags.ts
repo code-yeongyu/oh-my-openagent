@@ -1,3 +1,5 @@
+import { log } from "../../shared/logger"
+
 export interface NpmDistTags {
   latest?: string
   beta?: string
@@ -15,7 +17,12 @@ export async function fetchNpmDistTags(packageName: string): Promise<NpmDistTags
     if (!res.ok) return null
     const data = (await res.json()) as NpmDistTags
     return data
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      log("npm dist-tags fetch failed", { packageName, error: error.message })
+    } else {
+      log("npm dist-tags fetch failed", { packageName, error: String(error) })
+    }
     return null
   }
 }

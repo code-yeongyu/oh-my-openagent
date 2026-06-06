@@ -1,5 +1,7 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, spyOn } from "bun:test"
 import { spawnWithTimeout } from "./spawn-with-timeout"
+import * as logger from "../../shared/logger"
+import * as spawnHelpers from "../../shared/spawn-with-windows-hide"
 
 describe("spawnWithTimeout", () => {
   describe("#given a command that completes quickly", () => {
@@ -56,18 +58,33 @@ describe("spawnWithTimeout", () => {
     })
   })
 
-  describe("#given a nonexistent command", () => {
-    it("handles gracefully without hanging", async () => {
-      // when
-      const result = await spawnWithTimeout(
-        ["nonexistent-binary-that-does-not-exist-12345"],
-        { stdout: "pipe", stderr: "pipe" },
-        2000
-      )
+  describe("#given process start throws", () => {
+    it("returns stderr and logs the failure", async () => {
+      // given
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      const spawnSpy = spyOn(spawnHelpers, "spawnWithWindowsHide").mockImplementation(() => {
+        throw new Error("spawn failed")
+      })
 
-      // then
-      expect(result.timedOut).toBe(false)
-      expect(result.exitCode).toBe(1)
+      try {
+        // when
+        const result = await spawnWithTimeout(["not-started"], { stdout: "pipe", stderr: "pipe" }, 2000)
+
+        // then
+        expect(result).toEqual({
+          stdout: "",
+          stderr: "spawn failed",
+          exitCode: 1,
+          timedOut: false,
+        })
+        expect(logSpy).toHaveBeenCalledWith("doctor spawn failed before process start", {
+          command: ["not-started"],
+          error: "spawn failed",
+        })
+      } finally {
+        spawnSpy.mockRestore()
+        logSpy.mockRestore()
+      }
     })
   })
 })

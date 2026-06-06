@@ -1,4 +1,5 @@
 import { extractSemverFromOutput } from "../../shared/extract-semver"
+import { log } from "../../shared/logger"
 import type { OpenCodeBinaryType } from "../../shared/opencode-config-dir-types"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { initConfigContext } from "./config-context"
@@ -78,7 +79,12 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
         initConfigContext(binary, version)
         return { binary, version }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        log("opencode binary version check failed", { binary, error: error.message })
+      } else {
+        log("opencode binary version check failed", { binary, error: String(error) })
+      }
       continue
     }
   }

@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 
 import * as configContext from "./config-context"
+import * as logger from "../../shared/logger"
 import * as spawnHelpers from "../../shared/spawn-with-windows-hide"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
@@ -158,13 +159,22 @@ describe("getOpenCodeVersion (installer)", () => {
 
   describe("#given no opencode binary on PATH #when getOpenCodeVersion #then returns null", () => {
     it("all candidate spawns throw", async () => {
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
       spawnSpy.mockImplementation(() => {
         throw new Error("ENOENT")
       })
 
-      const result = await getOpenCodeVersion()
+      try {
+        const result = await getOpenCodeVersion()
 
-      expect(result).toBe(null)
+        expect(result).toBe(null)
+        expect(logSpy).toHaveBeenCalledWith("opencode binary version check failed", {
+          binary: "opencode",
+          error: "ENOENT",
+        })
+      } finally {
+        logSpy.mockRestore()
+      }
     })
   })
 })

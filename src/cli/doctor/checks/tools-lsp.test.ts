@@ -1,10 +1,11 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearPluginConfigFileDetectionCache } from "../../../shared/jsonc-parser"
+import * as logger from "../../../shared/logger"
 
 const temporaryDirectories: string[] = []
 
@@ -83,4 +84,27 @@ describe("getInstalledLspServers", () => {
     expect(servers).toEqual([{ id: "lsp-tools-mcp", extensions: ["*"] }])
   })
 
+  it("falls back to enabled when project config cannot be parsed", async () => {
+    // given
+    const userConfigDirectory = createTemporaryDirectory("omo-tools-lsp-user-")
+    const workspaceDirectory = createTemporaryDirectory("omo-tools-lsp-malformed-")
+    const projectConfigDirectory = join(workspaceDirectory, ".opencode")
+    mkdirSync(projectConfigDirectory, { recursive: true })
+    writeFileSync(join(projectConfigDirectory, "oh-my-openagent.json"), "{", "utf-8")
+    clearPluginConfigFileDetectionCache()
+    const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+
+    const { getInstalledLspServers } = await import(`./tools-lsp?t=${Date.now()}-malformed`)
+
+    try {
+      // when
+      const servers = getInstalledLspServers({ configDirectory: userConfigDirectory, cwd: workspaceDirectory })
+
+      // then
+      expect(servers).toEqual([{ id: "lsp-tools-mcp", extensions: ["*"] }])
+      expect(logSpy).toHaveBeenCalled()
+    } finally {
+      logSpy.mockRestore()
+    }
+  })
 })

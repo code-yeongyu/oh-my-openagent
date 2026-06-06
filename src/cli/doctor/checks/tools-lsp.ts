@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createLspMcpConfig } from "../../../mcp/lsp"
 import { detectPluginConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
+import { log } from "../../../shared/logger"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../../shared/plugin-identity"
 
 type OmoConfigForDoctor = {
@@ -25,7 +26,12 @@ function readOmoConfig(configDirectory: string): OmoConfigForDoctor | null {
   try {
     const content = readFileSync(detected.path, "utf-8")
     return parseJsonc<OmoConfigForDoctor>(content)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      log("doctor lsp config parse failed", { configPath: detected.path, error: error.message })
+    } else {
+      log("doctor lsp config parse failed", { configPath: detected.path, error: String(error) })
+    }
     return null
   }
 }

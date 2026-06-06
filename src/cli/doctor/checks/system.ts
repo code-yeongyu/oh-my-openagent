@@ -6,6 +6,7 @@ import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./syste
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared"
+import { log } from "../../../shared/logger"
 import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
 
 interface SystemCheckDeps {
@@ -35,7 +36,12 @@ function isConfigValid(configPath: string | null): boolean {
   try {
     parseJsonc<Record<string, unknown>>(readFileSync(configPath, "utf-8"))
     return true
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      log("doctor system config parse failed", { configPath, error: error.message })
+    } else {
+      log("doctor system config parse failed", { configPath, error: String(error) })
+    }
     return false
   }
 }

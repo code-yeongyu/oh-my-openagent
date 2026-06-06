@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import type { McpServerInfo } from "../types"
 import { parseJsonc } from "../../../shared"
+import { log } from "../../../shared/logger"
 
 const BUILTIN_MCP_SERVERS = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]
 
@@ -31,7 +32,12 @@ function loadUserMcpConfig(): Record<string, unknown> {
       if (config.mcpServers) {
         Object.assign(servers, config.mcpServers)
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        log("doctor mcp config parse failed", { configPath, error: error.message })
+      } else {
+        log("doctor mcp config parse failed", { configPath, error: String(error) })
+      }
       continue
     }
   }

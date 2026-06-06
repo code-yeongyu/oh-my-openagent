@@ -1,8 +1,9 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 
 import { fetchNpmDistTags } from "../config-manager"
+import * as logger from "../../shared/logger"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("fetchNpmDistTags", () => {
@@ -31,12 +32,21 @@ describe("fetchNpmDistTags", () => {
   test("returns null on network failure", async () => {
     //#given
     globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() => Promise.reject(new Error("Network error"))))
+    const logSpy = spyOn(logger, "log").mockImplementation(() => {})
 
-    //#when
-    const result = await fetchNpmDistTags("oh-my-openagent")
+    try {
+      //#when
+      const result = await fetchNpmDistTags("oh-my-openagent")
 
-    //#then
-    expect(result).toBeNull()
+      //#then
+      expect(result).toBeNull()
+      expect(logSpy).toHaveBeenCalledWith("npm dist-tags fetch failed", {
+        packageName: "oh-my-openagent",
+        error: "Network error",
+      })
+    } finally {
+      logSpy.mockRestore()
+    }
   })
 
   test("returns null on non-ok response", async () => {

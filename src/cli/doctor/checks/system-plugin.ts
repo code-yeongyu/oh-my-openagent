@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import { log } from "../../../shared/logger"
 
 export interface PluginInfo {
   registered: boolean
@@ -89,7 +90,12 @@ export function getPluginInfo(): PluginInfo {
       pinnedVersion,
       isLocalDev: pluginEntry.isLocalDev,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      log("doctor plugin config parse failed", { configPath, error: error.message })
+    } else {
+      log("doctor plugin config parse failed", { configPath, error: String(error) })
+    }
     return {
       registered: false,
       configPath,
