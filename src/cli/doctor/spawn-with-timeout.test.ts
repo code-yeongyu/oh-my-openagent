@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test"
+import { afterEach, describe, expect, it, mock } from "bun:test"
 import { spawnWithTimeout } from "./spawn-with-timeout"
 
 describe("spawnWithTimeout", () => {
@@ -68,6 +68,31 @@ describe("spawnWithTimeout", () => {
       // then
       expect(result.timedOut).toBe(false)
       expect(result.exitCode).toBe(1)
+    })
+  })
+
+  describe("#given spawn throws a non-Error value", () => {
+    afterEach(() => {
+      mock.restore()
+    })
+
+    it("rethrows the unknown value", async () => {
+      // given
+      const unknownFailure = { reason: "spawn failed" } as const
+      mock.module("../../shared/spawn-with-windows-hide", () => ({
+        spawnWithWindowsHide: () => {
+          throw unknownFailure
+        },
+      }))
+      const { spawnWithTimeout: spawnWithMockedSpawn } = await import(
+        `./spawn-with-timeout?non-error=${Date.now()}`
+      )
+
+      // when
+      const promise = spawnWithMockedSpawn(["test-command"], { stdout: "pipe", stderr: "pipe" })
+
+      // then
+      await expect(promise).rejects.toBe(unknownFailure)
     })
   })
 })

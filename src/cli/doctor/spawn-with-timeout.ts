@@ -18,7 +18,11 @@ export async function spawnWithTimeout(
   let proc: ReturnType<typeof spawnWithWindowsHide>
   try {
     proc = spawnWithWindowsHide(command, options)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return { stdout: "", stderr: "", exitCode: 1, timedOut: false }
   }
 

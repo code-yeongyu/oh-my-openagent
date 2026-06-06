@@ -167,4 +167,17 @@ describe("getOpenCodeVersion (installer)", () => {
       expect(result).toBe(null)
     })
   })
+
+  describe("#given spawn throws a non-Error value #when getOpenCodeVersion #then the value is rethrown", () => {
+    it("does not swallow unknown throw values", async () => {
+      const unknownFailure = { reason: "ENOENT" } as const
+      spawnSpy.mockImplementation(() => {
+        throw unknownFailure
+      })
+
+      const promise = getOpenCodeVersion()
+
+      await expect(promise).rejects.toBe(unknownFailure)
+    })
+  })
 })
