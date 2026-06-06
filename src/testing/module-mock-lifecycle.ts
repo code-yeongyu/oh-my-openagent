@@ -17,10 +17,16 @@ type ModuleSnapshot = {
   restoreFactory: MockModuleFactory
 }
 
+type ActiveModuleMock = {
+  specifier: string
+  factory: MockModuleFactory
+}
+
 type ModuleMockLifecycleOptions = {
   getCallerUrl?: () => string
   resolveSpecifier?: (specifier: string, callerUrl: string) => string
   loadOriginalModule?: (specifier: string, callerUrl: string) => ModuleLoadResult
+  shouldPreserveActiveMocksOnRestore?: () => boolean
 }
 
 function toError(error: unknown): Error {
@@ -105,11 +111,21 @@ export function installModuleMockLifecycle(
   options: ModuleMockLifecycleOptions = {},
 ): { restoreModuleMocks: () => void } {
   const snapshots = new Map<string, ModuleSnapshot>()
+  const activeMocks = new Map<string, ActiveModuleMock>()
   const delegateModule = mockApi.module.bind(mockApi)
   const delegateRestore = mockApi.restore.bind(mockApi)
   const getCallerUrl = options.getCallerUrl ?? defaultGetCallerUrl
   const resolveSpecifier = options.resolveSpecifier ?? defaultResolveSpecifier
   const loadOriginalModule = options.loadOriginalModule ?? defaultLoadOriginalModule
+  const shouldPreserveActiveMocksOnRestore = options.shouldPreserveActiveMocksOnRestore ?? (() => {
+    return new Error().stack?.includes("/test-setup.ts") ?? false
+  })
+
+  function replayActiveMocks(): void {
+    for (const activeMock of activeMocks.values()) {
+      delegateModule(activeMock.specifier, activeMock.factory)
+    }
+  }
 
   function restoreModuleMocks(): void {
     for (const snapshot of snapshots.values()) {
@@ -117,6 +133,7 @@ export function installModuleMockLifecycle(
     }
 
     snapshots.clear()
+    activeMocks.clear()
   }
 
   mockApi.module = (specifier: string, factory: MockModuleFactory): unknown => {
@@ -135,11 +152,17 @@ export function installModuleMockLifecycle(
       }
     }
 
+    activeMocks.set(restoreSpecifier, { specifier, factory })
     return delegateModule(specifier, factory)
   }
 
   mockApi.restore = (): unknown => {
     const result = delegateRestore()
+    if (shouldPreserveActiveMocksOnRestore()) {
+      replayActiveMocks()
+      return result
+    }
+
     restoreModuleMocks()
     return result
   }

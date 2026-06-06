@@ -61,11 +61,45 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("preserves active module mocks during global test setup cleanup", () => {
+    // given
+    const events: string[] = []
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => "file:///repo/tests/example.test.ts",
+      resolveSpecifier: (specifier) => `resolved:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      shouldPreserveActiveMocksOnRestore: () => true,
+    })
+
+    // when
+    mockApi.module("./dependency", () => ({ named: "mocked" }))
+    mockApi.restore()
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency:mocked",
+      "delegate:restore",
+      "module:./dependency:mocked",
+      "delegate:restore",
+      "module:./dependency:mocked",
+    ])
+  })
+
   test("captures the original module only once per resolved specifier", () => {
     // given
     let loadCount = 0
     const mockApi = {
-      module: mock(() => {}),
+      module: mock((_specifier: string, _factory: () => Record<string, unknown>) => {}),
       restore: mock(() => {}),
     }
 
