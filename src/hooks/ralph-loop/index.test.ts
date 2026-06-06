@@ -167,6 +167,36 @@ describe("ralph-loop", () => {
       expect(result).toBeNull()
     })
 
+    test("#given state path is a directory #when reading state #then returns null", () => {
+      // given
+      mkdirSync(join(TEST_DIR, ".ralph-loop-state.md"), { recursive: true })
+
+      // when
+      const result = readState(TEST_DIR)
+
+      // then
+      expect(result).toBeNull()
+    })
+
+    test("#given state parent path is a file #when writing state #then returns false", () => {
+      // given
+      writeFileSync(join(TEST_DIR, "blocked"), "")
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Test prompt",
+      }
+
+      // when
+      const result = writeState(TEST_DIR, state, "blocked/state.md")
+
+      // then
+      expect(result).toBe(false)
+    })
+
     test("should clear state correctly", () => {
       // given - existing state
       const state: RalphLoopState = {
