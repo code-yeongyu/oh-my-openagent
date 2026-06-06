@@ -147,7 +147,10 @@ export function createRuleInjectionProcessor(
 				cache.realPaths.add(candidate.realPath);
 				cache.contentHashes.add(contentHash);
 				dirty = true;
-			} catch {
+			} catch (error) {
+				if (!(error instanceof Error)) {
+					throw error;
+				}
 				continue;
 			}
 		}
