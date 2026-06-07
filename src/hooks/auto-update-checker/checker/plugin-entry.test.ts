@@ -13,6 +13,10 @@ type PluginEntryResult = {
   configPath: string
 } | null
 
+function normalizePathForAssertion(filePath: string): string {
+  return filePath.replaceAll("\\", "/").replaceAll("/private/var/", "/var/")
+}
+
 function runFindPluginEntry(
   directory: string,
   envOverrides: Record<string, string | undefined> = {},
@@ -201,7 +205,9 @@ describe("findPluginEntry", () => {
     expect(execution.status).toBe(0)
     const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
     expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.configPath).toEndWith("/profiles/today/opencode.json")
+    expect(normalizePathForAssertion(pluginInfo?.configPath ?? "")).toBe(
+      normalizePathForAssertion(path.join(profileConfigDir, "opencode.json")),
+    )
     expect(pluginInfo?.pinnedVersion).toBe("beta")
   })
 })

@@ -130,7 +130,7 @@ describe("createRuleInjectionProcessor", () => {
 		writeFileSync(targetFile, "export const value = 1;\n");
 		writeFileSync(ruleFile, "rule-content\n");
 
-		ruleRealPath = fs.realpathSync(ruleFile);
+		ruleRealPath = fs.realpathSync.native(ruleFile);
 		trackedRulePath = ruleFile;
 		statSnapshots = [];
 		trackedReadFileCount = 0;

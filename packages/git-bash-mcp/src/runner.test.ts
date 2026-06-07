@@ -26,8 +26,8 @@ describe("Git Bash runner", () => {
     const fakeBashScript = process.platform === "win32"
       ? [
         "@echo off",
-        "> \"%FAKE_BASH_ARGV_PATH%\" echo %1",
-        ">> \"%FAKE_BASH_ARGV_PATH%\" echo %2",
+        "> \"%FAKE_BASH_ARGV_PATH%\" echo %~1",
+        ">> \"%FAKE_BASH_ARGV_PATH%\" echo %~2",
         "echo fake stdout",
         "echo fake stderr 1>&2",
         "exit /b 7",

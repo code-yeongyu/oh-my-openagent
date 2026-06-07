@@ -18,11 +18,13 @@ function createMockInput() {
   }
 }
 
-function createScriptBinary(scriptContent: string): string {
+function createScriptBinary(scriptContent: string, windowsScriptContent?: string): string {
   const directory = mkdtempSync(join(tmpdir(), "comment-checker-cli-test-"))
-  const binaryPath = join(directory, "comment-checker")
-  writeFileSync(binaryPath, scriptContent)
-  chmodSync(binaryPath, 0o755)
+  const binaryPath = join(directory, process.platform === "win32" ? "comment-checker.cmd" : "comment-checker")
+  writeFileSync(binaryPath, process.platform === "win32" ? windowsScriptContent ?? scriptContent : scriptContent)
+  if (process.platform !== "win32") {
+    chmodSync(binaryPath, 0o755)
+  }
   return binaryPath
 }
 
@@ -100,6 +102,10 @@ trap '' TERM
 while :; do
   :
 done
+`, `@echo off
+if "%~1" neq "check" exit /b 1
+:loop
+goto loop
 `)
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
@@ -128,6 +134,10 @@ trap '' TERM
 while :; do
   :
 done
+`, `@echo off
+if "%~1" neq "check" exit /b 1
+:loop
+goto loop
 `)
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
@@ -155,6 +165,11 @@ fi
 cat >/dev/null
 echo "found comments" 1>&2
 exit 2
+`, `@echo off
+if "%~1" neq "check" exit /b 1
+more > nul
+echo found comments 1>&2
+exit /b 2
 `)
       // when
       const result = await runCommentChecker(createMockInput(), binaryPath)

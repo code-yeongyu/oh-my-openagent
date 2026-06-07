@@ -24,6 +24,10 @@ async function readInvocationCount(counterFilePath: string): Promise<number> {
 	return Number.parseInt(count, 10)
 }
 
+function normalizeLineEndings(value: string): string {
+	return value.replaceAll("\r\n", "\n")
+}
+
 async function createFakeCmux(directoryPath: string, argsFilePath: string): Promise<string> {
 	const cmuxPath = path.join(directoryPath, process.platform === "win32" ? "cmux.cmd" : "cmux")
 	if (process.platform === "win32") {
@@ -216,6 +220,7 @@ describe("runTmuxCommand", () => {
 			stderr: "",
 			exitCode: 0,
 		})
-		await expect(fs.readFile(argsFilePath, "utf8")).resolves.toBe("__tmux-compat\ndisplay-message\n-p\n#{pane_id}\n")
+		const argsFileContent = await fs.readFile(argsFilePath, "utf8")
+		expect(normalizeLineEndings(argsFileContent)).toBe("__tmux-compat\ndisplay-message\n-p\n#{pane_id}\n")
 	})
 })
