@@ -2,13 +2,13 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cleanupCodexLight } from "./codex-cleanup"
 
 describe("codex cleanup", () => {
-  test("#given managed Codex Light state and project-local omx leftovers #when cleanup runs #then removes only managed global state and repairs local config", async () => {
+  test("#given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-home-"))
     const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-project-"))
@@ -28,7 +28,6 @@ describe("codex cleanup", () => {
     await mkdir(projectDirectory, { recursive: true })
     await mkdir(join(projectRoot, ".git"), { recursive: true })
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
-    await mkdir(join(projectRoot, ".omx"), { recursive: true })
     await writeFile(join(projectRoot, ".codex", "hooks.json"), "{}\n")
     await writeFile(managedAgentPath, "managed explorer\n")
     await writeFile(userAgentPath, "user custom\n")
@@ -116,10 +115,9 @@ describe("codex cleanup", () => {
 
     const projectConfig = await readFile(projectConfigPath, "utf8")
     expect(result.projectCleanup.changed).toBe(true)
-    expect(result.projectCleanup.artifacts.map((artifact) => artifact.relativePath).sort()).toEqual([".codex/hooks.json", ".omx"])
+    expect(result.projectCleanup.artifacts.map((artifact) => artifact.relativePath).sort()).toEqual([".codex/hooks.json"])
     expect(projectConfig).not.toMatch(/^max_threads\s*=/m)
     expect(projectConfig).toContain("max_depth = 3")
-    expect(await pathExists(join(projectRoot, ".omx"))).toBe(true)
     expect(await pathExists(join(projectRoot, ".codex", "hooks.json"))).toBe(true)
   })
 
@@ -154,6 +152,42 @@ describe("codex cleanup", () => {
     const config = await readFile(configPath, "utf8")
     expect(config).not.toContain("[marketplaces.sisyphuslabs]")
     expect(config).not.toContain('omo@sisyphuslabs')
+  })
+
+  test("#given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-orphan-agent-"))
+    const configPath = join(codexHome, "config.toml")
+    const managedAgentPath = join(codexHome, "agents", "explorer.toml")
+    await mkdir(join(codexHome, "agents"), { recursive: true })
+    await symlink(join(codexHome, ".tmp", "marketplaces", "missing", "explorer.toml"), managedAgentPath)
+    await writeFile(
+      configPath,
+      [
+        "[marketplaces.sisyphuslabs]",
+        'source = "/old/cache"',
+        "",
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = true",
+        "",
+        "[agents.explorer]",
+        'config_file = "./agents/explorer.toml"',
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    const result = await cleanupCodexLight({
+      codexHome,
+      projectDirectory: codexHome,
+      now: () => new Date("2026-06-01T00:00:00Z"),
+    })
+
+    // then
+    expect(result.removedAgentLinks).toEqual([managedAgentPath])
+    expect(await pathExists(managedAgentPath)).toBe(false)
+    const config = await readFile(configPath, "utf8")
+    expect(config).not.toContain("[agents.explorer]")
   })
 
   test("#given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped", async () => {

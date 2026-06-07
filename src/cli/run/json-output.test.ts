@@ -19,6 +19,15 @@ function createMockWriteStream(): MockWriteStream {
   return stream
 }
 
+function requireWrite(stream: MockWriteStream, index: number): string {
+  const value = stream.writes[index]
+  expect(value).toBeDefined()
+  if (value === undefined) {
+    throw new Error(`Expected write at index ${index}`)
+  }
+  return value
+}
+
 describe("createJsonOutputManager", () => {
   let mockStdout: MockWriteStream
   let mockStderr: MockWriteStream
@@ -85,7 +94,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      const emitted = mockStdout.writes[0]!
+      const emitted = requireWrite(mockStdout, 0)
       expect(() => JSON.parse(emitted)).not.toThrow()
     })
 
@@ -107,7 +116,7 @@ describe("createJsonOutputManager", () => {
       manager.emitResult(result)
 
       // then
-      const emitted = mockStdout.writes[0]!
+      const emitted = requireWrite(mockStdout, 0)
       const parsed = JSON.parse(emitted) as RunResult
       expect(parsed).toEqual(result)
       expect(parsed.sessionId).toBe("test-session")
@@ -137,7 +146,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      expect(mockStdout.writes[0]!).toBe(JSON.stringify(result) + "\n")
+      expect(requireWrite(mockStdout, 0)).toBe(JSON.stringify(result) + "\n")
 
       mockStdout.write("after emit")
       expect(mockStdout.writes).toHaveLength(2)

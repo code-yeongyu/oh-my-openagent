@@ -5,6 +5,7 @@ import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
 type LinkPlatform = NodeJS.Platform
 
 const LEGACY_CODEX_COMPONENT_BINS = [
+  { name: "omo", component: "ulw-loop" },
   { name: "codex-comment-checker", component: "comment-checker" },
   { name: "codex-lsp", component: "lsp" },
   { name: "codex-rules", component: "rules" },
@@ -49,13 +50,20 @@ function isManagedLegacyComponentTarget(target: string, component: LegacyCodexCo
     suffix[1] === component &&
     suffix[2] === "dist" &&
     suffix[3] === "cli.js" &&
-    hasPluginCachePrefix(parts, suffixStart)
+    (hasPluginCachePrefix(parts, suffixStart) || hasOmoCodexPluginPrefix(parts, suffixStart))
   )
 }
 
 function hasPluginCachePrefix(parts: readonly string[], endExclusive: number): boolean {
   for (let index = 0; index < endExclusive - 1; index += 1) {
     if (parts[index] === "plugins" && parts[index + 1] === "cache") return true
+  }
+  return false
+}
+
+function hasOmoCodexPluginPrefix(parts: readonly string[], endExclusive: number): boolean {
+  for (let index = 0; index <= endExclusive - 3; index += 1) {
+    if (parts[index] === "packages" && parts[index + 1] === "omo-codex" && parts[index + 2] === "plugin") return true
   }
   return false
 }

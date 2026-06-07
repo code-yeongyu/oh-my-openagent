@@ -158,6 +158,23 @@ describe("getErrorText", () => {
   })
 })
 
+describe("extractErrorMessage", () => {
+  test("#given JSON serialization throws a non-Error #when extracting the message #then it returns the String fallback", () => {
+    // given
+    const error = {
+      toJSON() {
+        throw { reason: "cannot serialize" }
+      },
+    }
+
+    // when
+    const message = extractErrorMessage(error)
+
+    // then
+    expect(message).toBe("[object Object]")
+  })
+})
+
 describe("extractErrorName", () => {
   describe("#given Error instance", () => {
     test("returns Error for generic Error", () => {

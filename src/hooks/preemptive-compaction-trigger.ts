@@ -106,25 +106,29 @@ export async function runPreemptiveCompactionIfNeeded(args: {
 
     compactedSessions.add(sessionID)
   } catch (error) {
+    const errorMessage = String(error)
     log("[preemptive-compaction] Compaction failed", {
       sessionID,
       providerID: cached.providerID,
       modelID: cached.modelID,
-      error: String(error),
+      error: errorMessage,
     })
     ctx.client.tui.showToast({
       body: {
         title: "Preemptive compaction failed",
-        message: `Context window is above ${Math.round(PREEMPTIVE_COMPACTION_THRESHOLD * 100)}% and auto-compaction could not run. The session may grow large. Error: ${String(error)}`,
+        message: `Context window is above ${Math.round(PREEMPTIVE_COMPACTION_THRESHOLD * 100)}% and auto-compaction could not run. The session may grow large. Error: ${errorMessage}`,
         variant: "warning",
         duration: 10000,
       },
     }).catch((toastError: unknown) => {
+      const toastErrorMessage = String(toastError)
       log("[preemptive-compaction] Failed to show toast", {
         sessionID,
-        toastError: String(toastError),
+        toastError: toastErrorMessage,
       })
+      if (toastError instanceof Error) return
     })
+    if (error instanceof Error) return
   } finally {
     compactionInProgress.delete(sessionID)
   }

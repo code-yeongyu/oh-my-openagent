@@ -229,8 +229,37 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 				permissionDecision: "deny",
 			},
 		});
-		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("Do not set token_budget on create_goal");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("token_budget");
 		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("unlimited");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
+	});
+
+	it("#given create_goal sets status #when PreToolUse runs #then it blocks with objective-only warning", () => {
+		// given
+		const input = preToolPayload("create_goal", { objective: "Ship the feature", status: "active" });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		const parsed = JSON.parse(output);
+		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("update_goal");
+	});
+
+	it("#given create_goal sets an unknown field #when PreToolUse runs #then it blocks with objective-only warning", () => {
+		// given
+		const input = preToolPayload("create_goal", { objective: "Ship the feature", statusText: "active" });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		const parsed = JSON.parse(output);
+		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("objective only");
 	});
 
 	it("#given create_goal omits token_budget #when PreToolUse runs #then it stays silent", () => {
@@ -246,7 +275,7 @@ describe("applyPreToolUseGoalBudgetGuard", () => {
 
 	it("#given a neighboring tool includes token_budget text #when PreToolUse runs #then it stays silent", () => {
 		// given
-		const input = preToolPayload("update_goal", { status: "complete", token_budget: 5000 });
+		const input = preToolPayload("update_goal", { status: "complete", token_budget: 5000, statusText: "done" });
 
 		// when
 		const output = applyPreToolUseGoalBudgetGuard(input);

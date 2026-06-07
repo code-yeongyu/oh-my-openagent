@@ -39,7 +39,6 @@ describe("discoverInstalledPlugins", () => {
     } else {
       process.env.CLAUDE_PLUGINS_HOME = originalClaudePluginsHome
     }
-
     if (process.cwd() !== originalCwd) {
       process.chdir(originalCwd)
     }

@@ -1,10 +1,13 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { PLUGIN_NAME } from "../../../shared"
 import type { PluginInfo } from "./system-plugin"
 import type { OpenCodeBinaryInfo } from "./system-binary"
-import { checkSystem } from "./system"
+import { checkSystem, gatherSystemInfo } from "./system"
 
 const mockFindOpenCodeBinary = mock<() => Promise<OpenCodeBinaryInfo | null>>(async () => ({
   binary: "opencode",
@@ -30,6 +33,7 @@ const mockGetLoadedPluginVersion = mock(() => ({
 const mockGetLatestPluginVersion = mock(async (_currentVersion: string | null) => null as string | null)
 const mockGetSuggestedInstallTag = mock(() => "latest")
 
+const temporaryDirectories: string[] = []
 
 function createSystemDeps() {
   return {
@@ -76,6 +80,36 @@ describe("system check", () => {
     })
     mockGetLatestPluginVersion.mockResolvedValue(null)
     mockGetSuggestedInstallTag.mockReturnValue("latest")
+  })
+
+  afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  describe("#given malformed config JSONC", () => {
+    it("marks the config invalid without throwing", async () => {
+      //#given
+      const directory = mkdtempSync(join(tmpdir(), "omo-system-config-"))
+      temporaryDirectories.push(directory)
+      const configPath = join(directory, "opencode.json")
+      writeFileSync(configPath, "{", "utf-8")
+      mockGetPluginInfo.mockReturnValue({
+        registered: false,
+        entry: null,
+        isPinned: false,
+        pinnedVersion: null,
+        configPath,
+        isLocalDev: false,
+      })
+
+      //#when
+      const result = await gatherSystemInfo(createSystemDeps())
+
+      //#then
+      expect(result.configValid).toBe(false)
+    })
   })
 
   describe("#given cache directory contains spaces", () => {

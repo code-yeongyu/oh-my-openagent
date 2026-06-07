@@ -195,6 +195,50 @@ describe("createToolPairValidatorHook", () => {
     ])
   })
 
+  it("continues validating later assistant turns after inserting a synthetic repair message", async () => {
+    //#given
+    const messages = [
+      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
+      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_2" }] },
+      { info: { role: "user" }, parts: [{ type: "text", text: "continue" }] },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runTransform(messages)
+
+    //#then
+    expect(messages).toEqual([
+      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_1" }] },
+      {
+        info: { role: "user" },
+        parts: [{
+          type: "tool_result",
+          toolUseId: "toolu_1",
+          tool_use_id: "toolu_1",
+          isError: true,
+          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+        }, {
+          type: "text",
+          text: TOOL_RESULT_RECOVERY_CONTINUATION,
+          synthetic: true,
+        }],
+      },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },
+      { info: { role: "assistant" }, parts: [{ type: "tool_use", id: "toolu_2" }] },
+      {
+        info: { role: "user" },
+        parts: [{
+          type: "tool_result",
+          toolUseId: "toolu_2",
+          tool_use_id: "toolu_2",
+          isError: true,
+          content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+        }, { type: "text", text: "continue" }],
+      },
+    ])
+  })
+
   it("injects only the missing tool_results for partial matches", async () => {
     //#given
     const messages = [
@@ -271,6 +315,33 @@ describe("createToolPairValidatorHook", () => {
         },
         { type: "text", text: "continue main session" },
       ])
+    } finally {
+      _resetForTesting()
+    }
+  })
+
+  it("leaves tracked subagent user turns unchanged when tool_result is missing", async () => {
+    //#given
+    _resetForTesting()
+    subagentSessions.add("ses_background_2")
+    const backgroundMessages = [
+      {
+        info: { role: "assistant", sessionID: "ses_background_2" },
+        parts: [{ type: "tool_use", id: "toolu_background_2" }],
+      },
+      {
+        info: { role: "user", sessionID: "ses_background_2" },
+        parts: [{ type: "text", text: "continue background session" }],
+      },
+    ] satisfies TestMessage[]
+    const originalBackgroundMessages = JSON.parse(JSON.stringify(backgroundMessages))
+
+    try {
+      //#when
+      await runTransform(backgroundMessages)
+
+      //#then
+      expect(backgroundMessages).toEqual(originalBackgroundMessages)
     } finally {
       _resetForTesting()
     }

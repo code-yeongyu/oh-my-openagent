@@ -94,6 +94,14 @@ function createSpecWithTwoWorkers(name = `team-${randomUUID().slice(0, 8)}`): Te
   }
 }
 
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined
+  }
+
+  return typeof error.code === "string" ? error.code : undefined
+}
+
 type SessionGetMock = (input: { path: { id: string } }) => Promise<unknown>
 type SessionMessagesMock = (input: { path: { id: string } }) => Promise<unknown>
 
@@ -160,6 +168,28 @@ describe("resumeAllTeams", () => {
       statError = error as NodeJS.ErrnoException
     }
     expect(statError?.code).toBe("ENOENT")
+  })
+
+  test("leaves fresh creating teams pending during reload recovery", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+
+    // when
+    const report = await resumeAllTeams(createExecutorContext(baseDir), config)
+    const persistedState = await loadRuntimeState(runtimeState.teamRunId, config)
+
+    // then
+    expect(persistedState.status).toBe("creating")
+    expect(report).toEqual({
+      resumed: 0,
+      marked_failed: 0,
+      marked_orphaned: 0,
+      cleaned: 0,
+      errors: [],
+    })
   })
 
   test("marks active teams orphaned when lead session no longer exists", async () => {
@@ -502,5 +532,56 @@ describe("resumeAllTeams", () => {
     expect(workerB?.sessionId).toBeUndefined()
     expect(report.resumed).toBe(0)
     expect(report.marked_orphaned).toBe(1)
+  })
+
+  test("finishes deleting teams and removes the runtime directory", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "active",
+    }), config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "deleting",
+    }), config)
+    const worktreePath = path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker")
+    await mkdir(worktreePath, { recursive: true })
+    await saveRuntimeState({
+      ...await loadRuntimeState(runtimeState.teamRunId, config),
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, worktreePath }
+        : member),
+    }, config)
+
+    // when
+    const report = await resumeAllTeams(createExecutorContext(baseDir), config)
+
+    // then
+    expect(report).toEqual({
+      resumed: 0,
+      marked_failed: 0,
+      marked_orphaned: 0,
+      cleaned: 1,
+      errors: [],
+    })
+    let runtimeStatErrorCode: string | undefined
+    try {
+      await loadRuntimeState(runtimeState.teamRunId, config)
+    } catch (error) {
+      runtimeStatErrorCode = getErrorCode(error)
+    }
+    expect(runtimeStatErrorCode).toBe("ENOENT")
+
+    let worktreeStatErrorCode: string | undefined
+    try {
+      await stat(worktreePath)
+    } catch (error) {
+      worktreeStatErrorCode = getErrorCode(error)
+    }
+    expect(worktreeStatErrorCode).toBe("ENOENT")
   })
 })

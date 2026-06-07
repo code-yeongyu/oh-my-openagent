@@ -2,15 +2,22 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+	DEFAULT_LOCK_STALE_MS,
+	acquireLock,
+	appendUpdateLog,
+	readState,
+	resolveLockPath,
+	resolveStatePath,
+	writeState,
+} from "./auto-update-state.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
+import { resolveSpawnInvocation } from "./spawn-command.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
-const DEFAULT_LOCK_STALE_MS = 10 * 60 * 1_000;
 const DEFAULT_UPDATE_COMMAND = "npx";
 const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
 const INSTALLED_VERSION_FILE = "lazycodex-install.json";
@@ -100,7 +107,8 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		return { started: false, reason: plan.reason };
 	}
 
-	const lock = await acquireLock(resolveLockPath(env, statePath), now, env);
+	const lockStaleMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS, DEFAULT_LOCK_STALE_MS);
+	const lock = await acquireLock(resolveLockPath(env, statePath), now, lockStaleMs);
 	if (lock === null) {
 		await appendUpdateLog(env, now, "locked");
 		return { started: false, reason: "locked" };
@@ -108,7 +116,8 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 	try {
 		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
-			const result = spawnSync(plan.command, plan.args, {
+			const invocation = resolveSpawnInvocation(plan.command, plan.args);
+			const result = spawnSync(invocation.command, invocation.args, {
 				env: plan.env,
 				stdio: "ignore",
 			});
@@ -120,7 +129,8 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			return { started: true, status };
 		}
 
-		const child = spawn(plan.command, plan.args, {
+		const invocation = resolveSpawnInvocation(plan.command, plan.args);
+		const child = spawn(invocation.command, invocation.args, {
 			env: plan.env,
 			stdio: "ignore",
 			detached: true,
@@ -170,7 +180,8 @@ function resolveCurrentVersion(env) {
 
 function resolveLatestVersion(env) {
 	if (env.LAZYCODEX_LATEST_VERSION?.trim()) return env.LAZYCODEX_LATEST_VERSION.trim();
-	const result = spawnSync("npm", ["view", "lazycodex-ai", "version", "--silent"], {
+	const invocation = resolveSpawnInvocation("npm", ["view", "lazycodex-ai", "version", "--silent"]);
+	const result = spawnSync(invocation.command, invocation.args, {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "ignore"],
 	});
@@ -181,7 +192,8 @@ function resolveLatestVersion(env) {
 
 function defaultRunCommandForManualUpdate(command, args, options) {
 	return new Promise((resolve, reject) => {
-		const child = spawn(command, args, {
+		const invocation = resolveSpawnInvocation(command, args);
+		const child = spawn(invocation.command, invocation.args, {
 			cwd: options.cwd,
 			env: options.env,
 			stdio: "inherit",
@@ -225,23 +237,6 @@ function compareVersions(left, right) {
 	return 0;
 }
 
-function resolveStatePath(env) {
-	if (env.LAZYCODEX_AUTO_UPDATE_STATE_PATH?.trim()) return env.LAZYCODEX_AUTO_UPDATE_STATE_PATH;
-	const dataRoot = env.PLUGIN_DATA?.trim() || join(homedir(), ".local", "share", "lazycodex");
-	return join(dataRoot, "auto-update.json");
-}
-
-function resolveLogPath(env) {
-	if (env.LAZYCODEX_AUTO_UPDATE_LOG_PATH?.trim()) return env.LAZYCODEX_AUTO_UPDATE_LOG_PATH;
-	const dataRoot = env.PLUGIN_DATA?.trim() || join(homedir(), ".local", "share", "lazycodex");
-	return join(dataRoot, "auto-update.log");
-}
-
-function resolveLockPath(env, statePath) {
-	if (env.LAZYCODEX_AUTO_UPDATE_LOCK_PATH?.trim()) return env.LAZYCODEX_AUTO_UPDATE_LOCK_PATH;
-	return `${statePath}.lock`;
-}
-
 function resolveInstalledVersionPath(env, pluginRoot) {
 	if (env.LAZYCODEX_INSTALLED_VERSION_PATH?.trim()) return env.LAZYCODEX_INSTALLED_VERSION_PATH;
 	return join(pluginRoot, INSTALLED_VERSION_FILE);
@@ -257,63 +252,6 @@ function readVersionManifest(path) {
 		if (error instanceof Error) return undefined;
 		throw error;
 	}
-}
-
-async function acquireLock(lockPath, now, env) {
-	await mkdir(dirname(lockPath), { recursive: true });
-	const staleMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS, DEFAULT_LOCK_STALE_MS);
-	try {
-		const handle = await open(lockPath, "wx");
-		await handle.writeFile(`${now}\n`);
-		await handle.close();
-		return {
-			release: () => rm(lockPath, { force: true }),
-		};
-	} catch (error) {
-		if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
-		if (!(await removeStaleLock(lockPath, now, staleMs))) return null;
-		return acquireLock(lockPath, now, { ...env, LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS: "0" });
-	}
-}
-
-async function removeStaleLock(lockPath, now, staleMs) {
-	if (staleMs <= 0) return false;
-	try {
-		const lockStat = await stat(lockPath);
-		if (now - lockStat.mtimeMs < staleMs) return false;
-		await rm(lockPath, { force: true });
-		return true;
-	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "ENOENT") return true;
-		throw error;
-	}
-}
-
-async function readState(statePath) {
-	try {
-		const raw = await readFile(statePath, "utf8");
-		const parsed = JSON.parse(raw);
-		return typeof parsed === "object" && parsed !== null ? parsed : {};
-	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "ENOENT") return {};
-		return {};
-	}
-}
-
-async function writeState(statePath, state) {
-	await mkdir(dirname(statePath), { recursive: true });
-	await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
-}
-
-async function appendUpdateLog(env, now, event, details = {}) {
-	const logPath = resolveLogPath(env);
-	await mkdir(dirname(logPath), { recursive: true });
-	const entry = {
-		timestamp: new Date(now).toISOString(),
-		event,
-		...details,
-	};
-	await appendFile(logPath, `${JSON.stringify(entry)}\n`);
 }
 
 function parsePositiveInteger(value, fallback) {

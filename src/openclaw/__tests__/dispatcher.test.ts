@@ -88,6 +88,35 @@ describe("OpenClaw Dispatcher", () => {
     }
   })
 
+  test("#given gateway metadata JSON parsing fails with a non-Error #when wakeGateway parses metadata #then it preserves the successful wake fallback", async () => {
+    // given
+    const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    )
+    const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
+      throw { kind: "json-parse-thrown-value" } as const
+    })
+
+    try {
+      // when
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
+
+      // then
+      expect(result).toMatchObject({
+        gateway: "test",
+        success: true,
+        statusCode: 200,
+      })
+    } finally {
+      fetchSpy.mockRestore()
+      parseSpy.mockRestore()
+    }
+  })
+
   test("wakeGateway prefers nested message metadata over wrapper ids", async () => {
     const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
       new Response(
@@ -176,6 +205,17 @@ describe("OpenClaw Dispatcher", () => {
     } finally {
       killSpy.mockRestore()
     }
+  })
+
+  test("terminateCommandProcess suppresses direct kill failures", () => {
+    const proc = {
+      kill: mock(() => {
+        throw new Error("process already exited")
+      }),
+    }
+
+    expect(() => terminateCommandProcess(proc, "SIGKILL")).not.toThrow()
+    expect(proc.kill).toHaveBeenCalledWith("SIGKILL")
   })
 
   test("wakeCommandGateway returns correlation metadata from stdout JSON", async () => {

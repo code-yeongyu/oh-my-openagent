@@ -1,11 +1,11 @@
 > [!NOTE]
-> **🚀 첫 Codex 버전 출시: omo 이제 Codex CLI에서 사용 가능합니다**
+> **OmO for Codex 출시: LazyCodex를 써보세요**
 >
-> 더 이상 복잡한 JSON 설정은 필요 없습니다. 그냥 실행하세요:
+> Anthropic 모델을 너무 사랑했던 이유로 차단까지 겪었던 저희는 이제 Codex의 손을 들기로 했습니다.
+> OmO 팬이지만 설정이 번거로웠다면 LazyCodex를 사용해보세요. OmO for Codex가 출시되었습니다:
 > ```bash
 > npx lazycodex-ai install
 > ```
-> 당신의 Codex가 명확하게 코딩하고, 내장 computer-use QA로 작업을 완수합니다.
 > 자세한 내용은 [lazycodex.ai](https://lazycodex.ai)에서 확인하세요.
 
 > [!NOTE]
@@ -440,6 +440,8 @@ OpenCode가 Debian/Arch라면, oh-my-openagent는 Ubuntu/[Omarchy](https://omarc
 오만하게 들리나요? 더 나은 방법이 있으신가요? 기여해주세요. 환영합니다.
 
 언급된 어떤 프로젝트나 모델과도 제휴 관계는 없습니다. 그저 개인적인 실험의 결과입니다.
+
+Credit: LazyCodex 이름 아이디어는 [LazyVim](https://github.com/LazyVim/LazyVim)에서 영감을 받았습니다. Ultragoal과 UltraQA 아이디어는 [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex)에서 영감을 받아 OmO용으로 콘셉트만 재구현했습니다.
 
 이 프로젝트의 99%는 OpenCode로 만들어졌습니다. 저는 TypeScript를 사실 잘 모릅니다. **다만 이 문서만큼은 제가 직접 검토하고 대부분 다시 썼습니다.**
 

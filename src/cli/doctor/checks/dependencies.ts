@@ -16,8 +16,8 @@ async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
     if (path) {
       return { exists: true, path }
     }
-  } catch {
-    // intentionally empty - binary not found
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
   }
   return { exists: false, path: null }
 }
@@ -27,7 +27,8 @@ async function getBinaryVersion(binary: string): Promise<string | null> {
     const result = await spawnWithTimeout([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
     if (result.timedOut || result.exitCode !== 0) return null
     return result.stdout.trim().split("\n")[0] ?? null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
@@ -70,7 +71,8 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
       version: null,
       path: null,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     // Fallback: check common installation paths
     const { existsSync } = await import("fs")
     const { join } = await import("path")
@@ -104,15 +106,22 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
   }
 }
 
-function findCommentCheckerPackageBinary(): string | null {
+export function findCommentCheckerPackageBinary(baseDirOverride?: string): string | null {
   const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+  const platformKey = `${process.platform}-${process.arch === "x64" ? "x64" : process.arch}`
   try {
-    const require = createRequire(import.meta.url)
-    const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
-    const binaryPath = join(dirname(pkgPath), "bin", binaryName)
-    if (existsSync(binaryPath)) return binaryPath
-  } catch {
-    // intentionally empty - package not installed
+    let packageDir = baseDirOverride
+    if (!packageDir) {
+      const require = createRequire(import.meta.url)
+      const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
+      packageDir = dirname(pkgPath)
+    }
+    const vendorPath = join(packageDir, "vendor", platformKey, binaryName)
+    if (existsSync(vendorPath)) return vendorPath
+    const binPath = join(packageDir, "bin", binaryName)
+    if (existsSync(binPath)) return binPath
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
   }
   return null
 }

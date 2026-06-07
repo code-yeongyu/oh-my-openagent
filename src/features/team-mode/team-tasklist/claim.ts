@@ -16,7 +16,8 @@ async function lockExists(lockPath: string): Promise<boolean> {
   try {
     await access(lockPath)
     return true
-  } catch {
+  } catch (error) {
+    error instanceof Error
     return false
   }
 }

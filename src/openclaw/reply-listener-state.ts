@@ -25,6 +25,11 @@ export interface ReplyListenerDaemonState {
   lastError?: string
 }
 
+function ignoreReplyListenerStateReadError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 function createDefaultReplyListenerState(): ReplyListenerDaemonState {
   return {
     isRunning: false,
@@ -96,7 +101,8 @@ export function readReplyListenerDaemonState(): ReplyListenerDaemonState | null 
     const stateFilePath = getReplyListenerStateFilePath()
     if (!existsSync(stateFilePath)) return null
     return normalizeReplyListenerState(JSON.parse(readFileSync(stateFilePath, "utf-8")))
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerStateReadError(error)
     return null
   }
 }
@@ -121,7 +127,8 @@ export function readReplyListenerDaemonConfig(): OpenClawConfig | null {
     const configFilePath = getReplyListenerConfigFilePath()
     if (!existsSync(configFilePath)) return null
     return JSON.parse(readFileSync(configFilePath, "utf-8")) as OpenClawConfig
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerStateReadError(error)
     return null
   }
 }
@@ -136,7 +143,8 @@ export function readReplyListenerPid(): number | null {
     if (!existsSync(pidFilePath)) return null
     const pid = Number.parseInt(readFileSync(pidFilePath, "utf-8").trim(), 10)
     return Number.isNaN(pid) ? null : pid
-  } catch {
+  } catch (error) {
+    ignoreReplyListenerStateReadError(error)
     return null
   }
 }

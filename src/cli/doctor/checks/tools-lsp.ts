@@ -25,7 +25,11 @@ function readOmoConfig(configDirectory: string): OmoConfigForDoctor | null {
   try {
     const content = readFileSync(detected.path, "utf-8")
     return parseJsonc<OmoConfigForDoctor>(content)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return null
   }
 }

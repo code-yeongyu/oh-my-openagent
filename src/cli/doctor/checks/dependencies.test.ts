@@ -1,5 +1,12 @@
-import { describe, it, expect, mock } from "bun:test"
+/// <reference types="bun-types" />
+
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import * as deps from "./dependencies"
+
+afterEach(() => mock.restore())
 
 describe("dependencies check", () => {
   describe("checkAstGrepCli", () => {
@@ -45,7 +52,7 @@ describe("dependencies check", () => {
     it("returns installed=true when cached binary exists", async () => {
       //#given cached binary exists
       const mockCachedPath = "/mock/path/to/comment-checker"
-      
+
       mock.module("../../../hooks/comment-checker/downloader", () => ({
         getCachedBinaryPath: () => mockCachedPath,
         getCacheDir: () => "/mock/cache/dir",
@@ -60,6 +67,48 @@ describe("dependencies check", () => {
       //#then reports installed=true with cached path
       expect(info.installed).toBe(true)
       expect(info.path).toBe(mockCachedPath)
+    })
+  })
+
+  describe("findCommentCheckerPackageBinary", () => {
+    let testDir: string
+    const platformKey = `${process.platform}-${process.arch === "x64" ? "x64" : process.arch}`
+    const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+
+    beforeEach(() => {
+      testDir = mkdtempSync(join(tmpdir(), "cc-pkg-test-"))
+    })
+
+    afterEach(() => {
+      rmSync(testDir, { recursive: true, force: true })
+    })
+
+    it("#given the package vendor binary exists #when resolving package binary #then returns vendor path", () => {
+      //#given a package dir with binary at vendor/{platformKey}/
+      const vendorDir = join(testDir, "vendor", platformKey)
+      mkdirSync(vendorDir, { recursive: true })
+      const expected = join(vendorDir, binaryName)
+      writeFileSync(expected, "")
+
+      //#when resolving with the package dir override
+      const result = deps.findCommentCheckerPackageBinary(testDir)
+
+      //#then returns the vendor path
+      expect(result).toBe(expected)
+    })
+
+    it("#given only the legacy bin binary exists #when resolving package binary #then returns bin path", () => {
+      //#given a package dir with binary only at bin/
+      const binDir = join(testDir, "bin")
+      mkdirSync(binDir, { recursive: true })
+      const expected = join(binDir, binaryName)
+      writeFileSync(expected, "")
+
+      //#when resolving with the package dir override
+      const result = deps.findCommentCheckerPackageBinary(testDir)
+
+      //#then returns the bin path
+      expect(result).toBe(expected)
     })
   })
 })

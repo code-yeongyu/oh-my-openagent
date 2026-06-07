@@ -76,7 +76,17 @@ containing `{ "lastActiveDayUTC": "YYYY-MM-DD" }`. If the stored day matches tod
 
 ## Failure Behavior
 
-Every telemetry path is wrapped in `try`/`catch`. The hook always exits 0 with no stdout output, even when PostHog construction, capture, or shutdown fails. Codex session startup is never blocked or slowed by telemetry failures.
+Every telemetry path is wrapped in `try`/`catch`. The hook always exits 0 with no stdout or stderr output, even when PostHog construction, capture, or shutdown fails. Codex session startup is never blocked or slowed by telemetry failures.
+
+Handled telemetry failures are written only to a local diagnostics file:
+
+```
+$XDG_DATA_HOME/omo-codex/telemetry-diagnostics.jsonl
+# or, when XDG_DATA_HOME is unset:
+~/.local/share/omo-codex/telemetry-diagnostics.jsonl
+```
+
+The diagnostics file keeps JSONL rows for recent telemetry failures, prunes stale rows during writes, and caps itself at 256 KiB by dropping the oldest complete rows. Diagnostics are never sent to PostHog and do not include prompt contents, transcript contents, raw hostnames, API keys, tokens, or full hook payloads.
 
 ## Endpoint Overrides
 

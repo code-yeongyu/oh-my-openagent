@@ -86,4 +86,24 @@ describe("readOpencodeConfigSkills", () => {
 
     expect(readOpencodeConfigSkills(tmpDir)).toBeUndefined()
   })
+
+  it("#given a config read throws a non-Error value #when reading opencode skills #then it keeps the fallback result", () => {
+    // given
+    const opencodeDir = path.join(tmpDir, ".opencode")
+    fs.mkdirSync(opencodeDir, { recursive: true })
+    fs.writeFileSync(path.join(opencodeDir, "opencode.json"), "{}")
+    const readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw "read failed"
+    })
+
+    try {
+      // when
+      const result = readOpencodeConfigSkills(tmpDir)
+
+      // then
+      expect(result).toBeUndefined()
+    } finally {
+      readFileSyncSpy.mockRestore()
+    }
+  })
 })

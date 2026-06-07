@@ -110,7 +110,10 @@ async function readPartsFromSDKFallback(
     if (!target?.parts) return []
 
     return target.parts.map((part) => normalizeMessagePart(part)).filter((part): part is MessagePart => part !== null)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -183,7 +186,10 @@ export async function recoverToolResultMissing(
       return true
     }
     return isInternalPromptDispatchAccepted(promptResult)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }

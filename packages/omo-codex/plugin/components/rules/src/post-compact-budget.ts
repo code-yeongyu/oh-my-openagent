@@ -22,7 +22,6 @@ const POST_COMPACT_MIN_GUIDE_CHARS = 500;
 const FALLBACK_CONTEXT_WINDOW_TOKENS = 200_000;
 const MODEL_CONTEXT_BUDGETS: readonly ModelContextBudget[] = [
 	{ slug: "gpt-5.5", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
-	{ slug: "gpt-5.4", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
 	{ slug: "gpt-5.4-mini", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
 	{
 		slug: "codex-auto-review",

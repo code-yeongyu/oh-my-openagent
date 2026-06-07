@@ -1,18 +1,15 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { PluginInput } from "@opencode-ai/plugin";
 import { createTranscriptHydrationStore } from "./transcript-hydration";
-
-type SessionClient = PluginInput["client"]["session"];
 
 function makeClient(
 	messages: (sessionID: string) => Promise<{ data: unknown }>,
-): PluginInput["client"] {
+): Parameters<typeof createTranscriptHydrationStore>[0]["client"] {
 	const session = {
 		messages: mock(async (args: { path: { id: string } }) =>
 			messages(args.path.id),
 		),
-	} as unknown as SessionClient;
-	return { session } as unknown as PluginInput["client"];
+	};
+	return { session };
 }
 
 function ruleMarker(relativePath: string, body = "Rule body."): string {
@@ -131,6 +128,22 @@ describe("createTranscriptHydrationStore", () => {
 
 		// then
 		expect(result.size).toBe(0);
+	});
+
+	it("#given fetch throws a non-error value #when hydrateSession runs #then rethrows it", async () => {
+		// given
+		const thrown = "network down";
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => {
+				throw thrown;
+			}),
+		});
+
+		// when
+		const hydrate = store.hydrateSession("session-1");
+
+		// then
+		await expect(hydrate).rejects.toBe(thrown);
 	});
 
 	it("#given hydrated session #when clearSession then re-hydrate #then transcript is rescanned", async () => {

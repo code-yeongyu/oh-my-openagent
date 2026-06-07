@@ -564,6 +564,16 @@ describe("#given process cleanup registration", () => {
       expect(describe).toEqual({ raw: "[object Object]" })
     })
 
+    test("#given JSON serialization throws a non-Error #when serialized #then String fallback is captured", () => {
+      const describe = describeProcessCleanupError({
+        toJSON() {
+          throw { reason: "cannot serialize" }
+        },
+      })
+
+      expect(describe).toEqual({ raw: "[object Object]" })
+    })
+
     test("#given a primitive error value #when serialized #then String form is captured", () => {
       expect(describeProcessCleanupError("oops")).toEqual({ raw: "oops" })
       expect(describeProcessCleanupError(undefined)).toEqual({ raw: "undefined" })

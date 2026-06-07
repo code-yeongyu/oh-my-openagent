@@ -3,7 +3,6 @@ import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCrit
 
 export interface CodexCreateGoalPayload {
 	readonly objective: string;
-	readonly status: "active";
 }
 
 export interface UlwLoopGoalInstruction {
@@ -23,7 +22,7 @@ export function buildCodexGoalInstruction(args: {
 }
 
 function buildCreateGoalPayload(plan: UlwLoopPlan, goal: UlwLoopItem): CodexCreateGoalPayload {
-	return { objective: expectedCodexObjective(plan, goal), status: "active" };
+	return { objective: expectedCodexObjective(plan, goal) };
 }
 
 function buildText(
@@ -45,7 +44,7 @@ function buildText(
 		...successCriteriaLines(goal.successCriteria),
 		"",
 		"Codex goal integration constraints:",
-		"- Use the create_goal payload exactly as rendered: objective and status only.",
+		"- Use the create_goal payload exactly as rendered: objective only.",
 		"- Goals are unlimited. Do not add numeric limits.",
 		...modeConstraintLines(mode, isFinal),
 		finalSection(plan, goal, isFinal, mode === "aggregate"),

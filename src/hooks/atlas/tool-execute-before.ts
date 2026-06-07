@@ -104,7 +104,10 @@ export function createToolExecuteBeforeHandler(input: {
           if (existsSync(planPath)) {
             pendingPlanSnapshots.set(toolInput.callID, readFileSync(planPath, "utf-8"))
           }
-        } catch {
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            throw error
+          }
           pendingPlanSnapshots.delete(toolInput.callID)
         }
       }

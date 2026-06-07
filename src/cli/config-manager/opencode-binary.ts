@@ -78,7 +78,11 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
         initConfigContext(binary, version)
         return { binary, version }
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
+
       continue
     }
   }

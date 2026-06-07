@@ -7,6 +7,20 @@ export function formatStatus(result: DoctorResult): string {
 
   lines.push(formatHeader())
 
+  if (result.target === "codex" && result.codex) {
+    const codex = result.codex.codexPath ?? result.codex.codexAppId ?? "unknown"
+    const pluginVersion = result.codex.pluginVersion ?? "unknown"
+    const packageName = result.codex.packageName ?? "lazycodex-ai"
+    const packageVersion = result.codex.packageVersion ?? "unknown"
+    lines.push(`  Codex      ${codex}`)
+    lines.push(`  Plugin     ${result.codex.pluginName}@${pluginVersion}`)
+    lines.push(`  Package    ${packageName}@${packageVersion}`)
+    lines.push(`  Config     ${result.codex.configPath} ${result.codex.config.pluginEnabled ? color.green("(enabled)") : color.red("(disabled)")}`)
+    lines.push(`  Bins       ${result.codex.linkedBins.length > 0 ? result.codex.linkedBins.join(" · ") : "none"}`)
+    lines.push(`  Agents     ${result.codex.agents.length > 0 ? result.codex.agents.join(" · ") : "none"}`)
+    return lines.join("\n")
+  }
+
   const { systemInfo, tools } = result
   const padding = " "
 

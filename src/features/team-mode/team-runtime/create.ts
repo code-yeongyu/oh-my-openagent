@@ -18,6 +18,7 @@ import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
+import { assertNoUnresolvedTeamMembers, hasUnresolvedTeamMembers } from "./unresolved-team-members"
 
 const SESSION_ID_POLL_MS = 25
 
@@ -48,17 +49,23 @@ export class TeamRunCreateError extends Error {
   }
 }
 
-function normalizeError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error))
-}
-
 async function pathExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath)
     return true
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return false
     return false
   }
+}
+
+function ignoreTeamSessionSweepFailure(error: unknown): void {
+  if (error instanceof Error) return
+}
+
+function resolveRuntimeStateLoadFailure(error: unknown): undefined {
+  if (error instanceof Error) return undefined
+  return undefined
 }
 
 async function resolveSpecSource(spec: TeamSpec, ctx: ExecutorContext, config: TeamModeConfig): Promise<"project" | "user"> {
@@ -71,8 +78,8 @@ async function resolveSpecSource(spec: TeamSpec, ctx: ExecutorContext, config: T
 async function findExistingRuntime(spec: TeamSpec, leadSessionId: string, config: TeamModeConfig): Promise<RuntimeState | undefined> {
   for (const candidate of await listActiveTeams(config)) {
     if (candidate.teamName !== spec.name || (candidate.status !== "creating" && candidate.status !== "active")) continue
-    const runtimeState = await loadRuntimeState(candidate.teamRunId, config).catch(() => undefined)
-    if (runtimeState?.leadSessionId === leadSessionId) return runtimeState
+    const runtimeState = await loadRuntimeState(candidate.teamRunId, config).catch(resolveRuntimeStateLoadFailure)
+    if (runtimeState?.leadSessionId === leadSessionId && !hasUnresolvedTeamMembers(runtimeState.members)) return runtimeState
   }
 }
 
@@ -124,7 +131,7 @@ export async function createTeamRun(
 
   const activeTeams = await listActiveTeams(config)
   const activeRunIds = new Set(activeTeams.map((t) => t.teamRunId))
-  sweepStaleTeamSessions(activeRunIds).catch(() => {})
+  sweepStaleTeamSessions(activeRunIds).catch(ignoreTeamSessionSweepFailure)
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)
@@ -180,7 +187,7 @@ export async function createTeamRun(
             if (resource.worktreePath) {
               await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
                 ...currentState,
-                members: currentState.members.map((currentMember, currentIndex) => currentIndex === memberIndex
+                members: currentState.members.map((currentMember) => currentMember.name === member.name
                   ? { ...currentMember, worktreePath: resource.worktreePath }
                   : currentMember),
               }), config)
@@ -209,7 +216,7 @@ export async function createTeamRun(
               })
               runtimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
                 ...currentState,
-                members: currentState.members.map((currentMember, currentIndex) => currentIndex === memberIndex
+                members: currentState.members.map((currentMember) => currentMember.name === member.name
                   ? { ...currentMember, sessionId, status: "running" }
                   : currentMember),
               }), config)
@@ -236,7 +243,7 @@ export async function createTeamRun(
             : undefined
           await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
             ...currentState,
-            members: currentState.members.map((currentMember, currentIndex) => currentIndex === memberIndex
+            members: currentState.members.map((currentMember) => currentMember.name === member.name
               ? {
                   ...currentMember,
                   sessionId,
@@ -249,7 +256,7 @@ export async function createTeamRun(
               : currentMember),
           }), config)
         } catch (error) {
-          failure = normalizeError(error)
+          failure = error instanceof Error ? error : new Error(String(error))
           return
         }
       }
@@ -258,6 +265,7 @@ export async function createTeamRun(
     if (failure) throw failure
 
     const launchedRuntimeState = await loadRuntimeState(runtimeState.teamRunId, config)
+    assertNoUnresolvedTeamMembers(launchedRuntimeState.members)
     createdLayout = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
 
     return await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
@@ -270,6 +278,7 @@ export async function createTeamRun(
       tmuxMgr,
       createdLayout,
     })
-    throw new TeamRunCreateError(`Failed to create team run '${spec.name}'`, cleanupReport, normalizeError(error))
+    const cause = error instanceof Error ? error : new Error(String(error))
+    throw new TeamRunCreateError(`Failed to create team run '${spec.name}'`, cleanupReport, cause)
   }
 }

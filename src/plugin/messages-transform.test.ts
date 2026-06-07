@@ -46,11 +46,15 @@ function makeHook(handler: TransformHook): NonNullable<CreatedHooks["toolPairVal
 
 function makeHooks(overrides: {
   contextInjector?: TransformHook
+  teamModeStatus?: TransformHook
+  teamMailbox?: TransformHook
   thinkingBlock?: TransformHook
   toolPair?: TransformHook
 }): CreatedHooks {
   return {
     contextInjectorMessagesTransform: overrides.contextInjector ? makeHook(overrides.contextInjector) : undefined,
+    teamModeStatusInjector: overrides.teamModeStatus ? makeHook(overrides.teamModeStatus) : undefined,
+    teamMailboxInjector: overrides.teamMailbox ? makeHook(overrides.teamMailbox) : undefined,
     thinkingBlockValidator: overrides.thinkingBlock ? makeHook(overrides.thinkingBlock) : undefined,
     toolPairValidator: overrides.toolPair ? makeHook(overrides.toolPair) : undefined,
   } as CreatedHooks
@@ -72,6 +76,12 @@ describe("createMessagesTransformHandler", () => {
       contextInjector: async () => {
         callOrder.push("context-injector")
       },
+      teamModeStatus: async () => {
+        callOrder.push("team-mode-status-injector")
+      },
+      teamMailbox: async () => {
+        callOrder.push("team-mailbox-injector")
+      },
       thinkingBlock: async () => {
         callOrder.push("thinking-block-validator")
       },
@@ -86,6 +96,8 @@ describe("createMessagesTransformHandler", () => {
     //#then
     expect(callOrder).toEqual([
       "context-injector",
+      "team-mode-status-injector",
+      "team-mailbox-injector",
       "thinking-block-validator",
       "tool-pair-validator",
     ])
@@ -328,6 +340,131 @@ describe("createMessagesTransformHandler", () => {
       system: "system-prompt",
       tools: { bash: true },
     })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given multiple user turns and a rejecting assistant tail #when messages transform runs #then recovery copies the last user turn metadata", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_first_user",
+          role: "user",
+          sessionID: "ses_first_user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+          system: "old-system",
+          tools: { read: true },
+        },
+        parts: [{ type: "text", text: "first" }],
+      },
+      {
+        info: {
+          id: "msg_last_user",
+          role: "user",
+          sessionID: "ses_last_user",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+          system: "new-system",
+          tools: { bash: true },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_tail_without_session",
+          role: "assistant",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(4)
+    expect(messages.at(-1)?.info).toMatchObject({
+      id: "msg_tail_without_session_prefill_recovery",
+      role: "user",
+      sessionID: "ses_last_user",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+      system: "new-system",
+      tools: { bash: true },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      sessionID: "ses_last_user",
+      messageID: "msg_tail_without_session_prefill_recovery",
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given an earlier compaction continuation but the last user turn is ordinary #when messages transform runs #then it does not recover the assistant tail", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: { role: "user" },
+        parts: [{
+          type: "text",
+          text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          synthetic: true,
+          metadata: { compaction_continue: true },
+        }],
+      },
+      { info: { role: "user" }, parts: [{ type: "text", text: "ordinary follow-up" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "completed assistant answer" }] },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info.role).toBe("assistant")
+  })
+
+  it("#given hooks leave an unsupported assistant tail #when messages transform runs #then recovery happens after hook validation", async () => {
+    //#given
+    const observedTailRoles: Array<TestMessage["info"]["role"] | undefined> = []
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_recovery_timing",
+          role: "user",
+          sessionID: "ses_recovery_timing",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_recovery_timing",
+          role: "assistant",
+          sessionID: "ses_recovery_timing",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+    const hooks = makeHooks({
+      toolPair: async (_input, output) => {
+        observedTailRoles.push(output.messages.at(-1)?.info.role)
+      },
+    })
+
+    //#when
+    await runHandler(hooks, messages)
+
+    //#then
+    expect(observedTailRoles).toEqual(["assistant"])
+    expect(messages.at(-1)?.info.role).toBe("user")
     expect(messages.at(-1)?.parts[0]).toMatchObject({
       type: "text",
       text: "[internal] Continue from the previous assistant state.",

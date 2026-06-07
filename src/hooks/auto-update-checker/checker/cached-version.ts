@@ -38,7 +38,11 @@ export function getCachedVersion(options: CachedVersionOptions = {}): string | n
       }
     }
   } catch (err) {
-    log("[auto-update-checker] Failed to resolve version from current directory:", err)
+    if (err instanceof Error) {
+      log("[auto-update-checker] Failed to resolve version from current directory:", err)
+    } else {
+      log("[auto-update-checker] Failed to resolve version from current directory:", err)
+    }
   }
 
   for (const candidate of packageJsonCandidates) {
@@ -46,8 +50,12 @@ export function getCachedVersion(options: CachedVersionOptions = {}): string | n
       if (fs.existsSync(candidate)) {
         return readPackageVersion(candidate)
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error) {
+        continue
+      }
       // ignore; try next candidate
+      continue
     }
   }
 
@@ -60,7 +68,11 @@ export function getCachedVersion(options: CachedVersionOptions = {}): string | n
       }
     }
   } catch (err) {
-    log("[auto-update-checker] Failed to resolve version from execPath:", err)
+    if (err instanceof Error) {
+      log("[auto-update-checker] Failed to resolve version from execPath:", err)
+    } else {
+      log("[auto-update-checker] Failed to resolve version from execPath:", err)
+    }
   }
 
   return null

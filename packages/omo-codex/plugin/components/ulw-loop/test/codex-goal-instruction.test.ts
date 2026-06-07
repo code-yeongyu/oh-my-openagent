@@ -59,9 +59,9 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		});
 		expect(json).toEqual({
 			objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE,
-			status: "active",
 		});
-		expect(text).toContain("objective and status only");
+		expect(text).toContain("objective only");
+		expect(text).not.toContain('"status"');
 		expect(text).toContain("Goals are unlimited");
 		expect(text).not.toMatch(/token[_-]?budget/i);
 	});

@@ -59,7 +59,10 @@ function readPackageJson(filePath: string): PackageJsonShape | null {
   try {
     const content = readFileSync(filePath, "utf-8")
     return parseJsonc<PackageJsonShape>(content)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
@@ -96,11 +99,17 @@ function resolveInstalledPackageJsonPath(): { packageName: string; packageJsonPa
         if (existsSync(packageJsonPath)) {
           return { packageName, packageJsonPath }
         }
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
         continue
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
   return null

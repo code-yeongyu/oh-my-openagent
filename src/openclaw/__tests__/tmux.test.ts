@@ -107,6 +107,19 @@ describe("openclaw tmux helpers", () => {
     expect(runTmuxCommandMock).toHaveBeenCalledWith("/mock/tmux", ["display-message", "-p", "#S"])
   })
 
+  test("getTmuxSessionName returns null when tmux command lookup throws Error", async () => {
+    // given
+    runTmuxCommandMock.mockImplementation(async () => {
+      throw new Error("tmux unavailable")
+    })
+
+    // when
+    const result = await tmuxModule.getTmuxSessionName()
+
+    // then
+    expect(result).toBeNull()
+  })
+
   test("captureTmuxPane delegates pane capture through runTmuxCommand", async () => {
     // given
     runTmuxCommandMock.mockResolvedValue({
@@ -123,6 +136,27 @@ describe("openclaw tmux helpers", () => {
     // then
     expect(result).toBe("pane output")
     expect(runTmuxCommandMock).toHaveBeenCalledWith("/mock/tmux", ["capture-pane", "-p", "-t", "%42", "-S", "-30"])
+  })
+
+  test("captureTmuxPane rethrows non-Error command failures", async () => {
+    // given
+    const thrownValue = { reason: "unexpected throw shape" }
+    runTmuxCommandMock.mockImplementation(async () => {
+      throw thrownValue
+    })
+
+    // when
+    const result = tmuxModule.captureTmuxPane("%42", 30)
+
+    // then
+    await result.then(
+      () => {
+        throw new Error("Expected captureTmuxPane to reject")
+      },
+      (error: unknown) => {
+        expect(error).toBe(thrownValue)
+      },
+    )
   })
 
   test("sendToPane delegates literal text and Enter through runTmuxCommand", async () => {

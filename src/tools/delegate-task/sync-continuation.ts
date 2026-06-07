@@ -73,7 +73,8 @@ async function resolveResumeContext(
     }
 
     return { anchorMessageCount: messages.length }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     const resumeMessageDir = getMessageDir(continuationID)
     const { prevMessage } = await resolveMessageContext(continuationID, client, resumeMessageDir)
     const resumeMessageModel = prevMessage?.model

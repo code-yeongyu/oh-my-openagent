@@ -11,6 +11,7 @@ import {
 } from "../scripts/hook-status-message.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const repoRoot = join(root, "..", "..", "..");
 
 const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:SessionStart:0:0", "Loading Project Rules"],
@@ -49,6 +50,18 @@ async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
 }
 
+async function readRepoJson(relativePath) {
+	return JSON.parse(await readFile(join(repoRoot, relativePath), "utf8"));
+}
+
+async function readPluginVersion() {
+	return (await readJson(".codex-plugin/plugin.json")).version;
+}
+
+async function readComponentVersion(componentName) {
+	return (await readJson(join("components", componentName, "package.json"))).version;
+}
+
 async function exists(relativePath) {
 	try {
 		await access(join(root, relativePath));
@@ -66,8 +79,8 @@ async function readComponentHookManifests() {
 		if (!entry.isDirectory()) continue;
 		const source = join("components", entry.name, "hooks", "hooks.json");
 		if (!(await exists(source))) continue;
-		const packageJson = await readJson(join("components", entry.name, "package.json"));
-		manifests.push({ source, version: packageJson.version, hooks: await readJson(source) });
+		const version = await readComponentVersion(entry.name);
+		manifests.push({ source, version, hooks: await readJson(source) });
 	}
 	return manifests.sort((left, right) => left.source.localeCompare(right.source));
 }
@@ -91,16 +104,16 @@ function collectCommandHooks(hooks, source, version) {
 	return commandHooks;
 }
 
-test("#given hook status label #when formatting #then prefixes LazyCodex with version", () => {
+test("#given hook status label #when formatting #then prefixes LazyCodex with current version", async () => {
 	// given
-	const version = "0.1.0";
+	const version = (await readRepoJson("package.json")).version;
 	const label = "Checking Comments";
 
 	// when
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-	assert.equal(message, "LazyCodex(0.1.0): Checking Comments");
+	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
 test("#given hook status label with blank version #when formatting #then prefixes LazyCodex with local version", () => {
@@ -115,9 +128,9 @@ test("#given hook status label with blank version #when formatting #then prefixe
 	assert.equal(message, "LazyCodex(local): Checking Comments");
 });
 
-test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", () => {
+test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", async () => {
 	// given
-	const version = "0.1.0";
+	const version = (await readRepoJson("package.json")).version;
 	const label = "  checking   OMO comments  ";
 
 	// when
@@ -126,12 +139,12 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 
 	// then
 	assert.equal(normalized, "Checking Comments");
-	assert.equal(message, "LazyCodex(0.1.0): Checking Comments");
+	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
-	const aggregateVersion = (await readJson(".codex-plugin/plugin.json")).version;
+	const aggregateVersion = await readPluginVersion();
 	const aggregateHooks = await readJson("hooks/hooks.json");
 
 	// when
@@ -145,7 +158,7 @@ test("#given aggregate comment-checker hook #when status is inspected #then it u
 
 test("#given aggregate and component hooks #when status messages are inspected #then all use the LazyCodex formatter", async () => {
 	// given
-	const aggregateVersion = (await readJson(".codex-plugin/plugin.json")).version;
+	const aggregateVersion = await readPluginVersion();
 	const aggregateHooks = await readJson("hooks/hooks.json");
 	const componentManifests = await readComponentHookManifests();
 

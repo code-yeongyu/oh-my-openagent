@@ -72,7 +72,6 @@ test("#given root and nested project-local Codex configs #when script cleanup ru
 	await mkdir(join(projectRoot, ".git"), { recursive: true });
 	await mkdir(join(projectRoot, ".codex"), { recursive: true });
 	await mkdir(join(projectDirectory, ".codex"), { recursive: true });
-	await mkdir(join(projectDirectory, ".omx"), { recursive: true });
 	await writeFile(join(projectDirectory, ".codex", "hooks.json"), "{}\n");
 	await writeFile(
 		rootConfigPath,
@@ -122,7 +121,7 @@ test("#given root and nested project-local Codex configs #when script cleanup ru
 	assert.match(nestedContent, /job_max_runtime_seconds = 7200/);
 	assert.deepEqual(
 		result.artifacts.map((artifact) => artifact.path).sort(),
-		[join(projectDirectory, ".codex", "hooks.json"), join(projectDirectory, ".omx")],
+		[join(projectDirectory, ".codex", "hooks.json")],
 	);
 });
 

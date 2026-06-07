@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
+import { resolveSpawnInvocation } from "../../plugin/scripts/spawn-command.mjs";
 
 export async function defaultRunCommand(command, args, options) {
 	await new Promise((resolvePromise, reject) => {
-		const child = spawn(command, args, {
+		const invocation = resolveSpawnInvocation(command, args);
+		const child = spawn(invocation.command, invocation.args, {
 			cwd: options.cwd,
 			stdio: "inherit",
 		});

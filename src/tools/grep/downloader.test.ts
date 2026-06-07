@@ -86,7 +86,10 @@ describe("findFileRecursive", () => {
 
     // then
     expect(result).not.toBeNull()
-    expect(result!.endsWith("rg")).toBe(true)
+    if (result === null) {
+      throw new Error("Expected recursive file lookup result")
+    }
+    expect(result.endsWith("rg")).toBe(true)
   })
 
   test("should match exact filename, not partial", () => {

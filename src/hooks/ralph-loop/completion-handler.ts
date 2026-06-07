@@ -11,13 +11,16 @@ type LoopStateController = {
 	markVerificationPending: (sessionID: string) => RalphLoopState | null
 }
 
+const ignoreBestEffortFailure = (): void => undefined
+
 function showToastBestEffort(
 	ctx: PluginInput,
 	body: { title: string; message: string; variant: "error" | "info" | "success"; duration: number },
 ): void {
 	try {
-		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(ignoreBestEffortFailure)
 	} catch {
+		ignoreBestEffortFailure()
 	}
 }
 
@@ -35,7 +38,7 @@ export async function handleDetectedCompletion(
 
 	if (state.ultrawork && !state.verification_pending) {
 		if (state.verification_session_id) {
-			ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+			ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(ignoreBestEffortFailure)
 		}
 
 		const verificationState = loopState.markVerificationPending(sessionID)

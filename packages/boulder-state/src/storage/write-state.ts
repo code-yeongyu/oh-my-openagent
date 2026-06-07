@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 
 import type { BoulderState, BoulderWorkState } from "../types"
 import { getBoulderFilePath } from "./path"
@@ -13,6 +13,8 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
     const dir = dirname(filePath)
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })
+      // Self-ignoring .gitignore - excludes rules/ which is tracked in git
+      writeFileSync(join(dir, ".gitignore"), ["*", "!/rules/", "!/rules/**", ""].join("\n"), "utf-8")
     }
 
     const stateToWrite: BoulderState = { ...state }

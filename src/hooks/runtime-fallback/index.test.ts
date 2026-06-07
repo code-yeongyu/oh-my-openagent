@@ -2535,6 +2535,34 @@ describe("runtime-fallback", () => {
       expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     })
 
+    test("should restore configured primary when reopened on a configured fallback model", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryModel(
+          "test",
+          "anthropic/claude-opus-4-5",
+          ["openai/gpt-5.4"],
+        ),
+      })
+      const sessionID = "test-session-reopen-fallback"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "openai/gpt-5.4" } },
+        },
+      })
+
+      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+        message: {},
+        parts: [],
+      }
+      await hook["chat.message"]?.({ sessionID, model: { providerID: "openai", modelID: "gpt-5.4" } }, output)
+
+      expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+    })
+
     test("should notify when fallback occurs", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: true }),

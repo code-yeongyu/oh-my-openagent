@@ -45,7 +45,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       try {
         const nativeAll = await options.nativeSkills.all()
         mergeNativeSkills(allSkills, nativeAll)
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) throw error
       }
     }
 
@@ -90,7 +91,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         } else {
           mergeNativeSkillInfos(skillInfos, nativeAll)
         }
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) throw error
       }
     }
 

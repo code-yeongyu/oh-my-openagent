@@ -197,6 +197,43 @@ describe("injectBoulderContinuation", () => {
     expect(sessionState.promptFailureCount).toBe(0)
   })
 
+  test("#given prompt context lookup throws a non-Error #when injector catches it #then it preserves failed fallback behavior", async () => {
+    // given
+    registerAgentName("atlas")
+    const nonErrorFailure = { reason: "sdk unavailable" }
+    const promptAsyncMock = mock(async (_request: unknown) => undefined)
+    const messagesMock = mock(async () => {
+      throw nonErrorFailure
+    })
+    const sessionState = { promptFailureCount: 2 }
+
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    })
+
+    // when
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_non_error",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "atlas",
+      sessionState,
+    })
+
+    // then
+    expect(result).toBe("failed")
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+    expect(sessionState.promptFailureCount).toBe(3)
+  })
+
   test("#given recent prompt context includes variant #when injecting boulder continuation #then promptAsync receives variant as a top-level field", async () => {
     // given
     registerAgentName("atlas")

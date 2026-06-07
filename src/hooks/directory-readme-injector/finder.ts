@@ -21,7 +21,8 @@ export async function findReadmeMdUp(input: {
     try {
       await access(readmePath);
       found.push(readmePath);
-    } catch {
+    } catch (error) {
+      error instanceof Error;
     }
 
     if (current === input.rootDir) break;

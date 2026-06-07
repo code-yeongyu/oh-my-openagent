@@ -3,6 +3,22 @@ import { describe, expect, it } from "bun:test"
 import { detectErrorType, extractMessageIndex, extractUnavailableToolName } from "./detect-error-type"
 
 describe("detectErrorType", () => {
+  it("#given an error object throws a non-Error while reading data #when detecting #then rethrows", () => {
+    //#given
+    const thrownValue = { reason: "unexpected throw shape" }
+    class MalformedError {
+      get data(): string {
+        throw thrownValue
+      }
+    }
+
+    //#when
+    const run = () => detectErrorType(new MalformedError())
+
+    //#then
+    expect(run).toThrow()
+  })
+
   it("#given a tool_use/tool_result error #when detecting #then returns tool_result_missing", () => {
     //#given
     const error = { message: "tool_use block must be followed by tool_result" }

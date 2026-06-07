@@ -31,7 +31,11 @@ function loadUserMcpConfig(): Record<string, unknown> {
       if (config.mcpServers) {
         Object.assign(servers, config.mcpServers)
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
+
       continue
     }
   }

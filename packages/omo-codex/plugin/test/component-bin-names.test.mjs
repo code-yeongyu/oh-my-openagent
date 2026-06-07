@@ -13,7 +13,7 @@ const EXPECTED_COMPONENT_BINS = new Map([
 	["start-work-continuation", "omo-start-work-continuation"],
 	["telemetry", "omo-telemetry"],
 	["ultrawork", "omo-ultrawork"],
-	["ulw-loop", "omo"],
+	["ulw-loop", "omo-ulw-loop"],
 ]);
 
 const EXPECTED_USAGE_PREFIXES = new Map([

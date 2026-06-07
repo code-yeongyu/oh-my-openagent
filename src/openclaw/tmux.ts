@@ -22,7 +22,8 @@ export async function getTmuxSessionName(): Promise<string | null> {
     const result = await runOpenClawTmuxCommand(["display-message", "-p", "#S"])
     if (!result?.success) return null
     return result.output.trim() || null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
@@ -32,7 +33,8 @@ export async function captureTmuxPane(paneId: string, lines = 15): Promise<strin
     const result = await runOpenClawTmuxCommand(["capture-pane", "-p", "-t", paneId, "-S", `-${lines}`])
     if (!result?.success) return null
     return result.output.trim() || null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
@@ -46,7 +48,8 @@ export async function sendToPane(paneId: string, text: string, confirm = true): 
 
     const enterResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "Enter"])
     return enterResult?.success ?? false
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return false
   }
 }
@@ -55,7 +58,8 @@ export async function isTmuxAvailable(): Promise<boolean> {
   try {
     const result = await runOpenClawTmuxCommand(["-V"])
     return result?.success ?? false
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return false
   }
 }

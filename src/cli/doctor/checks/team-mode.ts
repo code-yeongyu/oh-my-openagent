@@ -46,8 +46,12 @@ function loadTeamModeConfig() {
   if (!configPath) return { team_mode: undefined }
   try {
     return parseJsonc<{ team_mode?: { enabled?: boolean } }>(readFileSync(configPath, "utf-8"))
-  } catch {
-    return { team_mode: undefined }
+  } catch (error) {
+    if (error instanceof Error) {
+      return { team_mode: undefined }
+    }
+
+    throw error
   }
 }
 
@@ -55,8 +59,12 @@ async function safeCount(dir: string): Promise<number> {
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true })
     return entries.filter((entry) => entry.isDirectory()).length
-  } catch {
-    return 0
+  } catch (error) {
+    if (error instanceof Error) {
+      return 0
+    }
+
+    throw error
   }
 }
 
@@ -64,7 +72,11 @@ async function pathExists(dir: string): Promise<boolean> {
   try {
     const stats = await fs.stat(dir)
     return stats.isDirectory()
-  } catch {
-    return false
+  } catch (error) {
+    if (error instanceof Error) {
+      return false
+    }
+
+    throw error
   }
 }

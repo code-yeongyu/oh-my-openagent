@@ -25,6 +25,7 @@ import type { Message } from "../types"
 import { MessageSchema } from "../types"
 import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
 import { createTeamSendMessageTool } from "./messaging"
+import { resolveTeamRuntimeDetails } from "./messaging-runtime"
 
 type PromptAsyncCall = {
   sessionId: string
@@ -159,6 +160,47 @@ async function createTeamFixture() {
 }
 
 describe("createTeamSendMessageTool", () => {
+  test("resolveTeamRuntimeDetails preserves Error fallback for missing runtime state", async () => {
+    // given
+    const config = createConfig(await createFixtureBaseDir())
+
+    // when
+    const runtimeDetails = await resolveTeamRuntimeDetails("team-run-missing", "session-missing", config, {
+      loadRuntimeState: async () => {
+        throw new Error("missing runtime state")
+      },
+    })
+
+    // then
+    expect(runtimeDetails).toEqual({
+      teamRunId: "team-run-missing",
+      isLead: false,
+      senderName: "unknown",
+      activeMembers: [],
+    })
+  })
+
+  test("resolveTeamRuntimeDetails preserves fallback for non-Error runtime load failures", async () => {
+    // given
+    const config = createConfig(await createFixtureBaseDir())
+    const thrownValue = "missing runtime state"
+
+    // when
+    const runtimeDetails = await resolveTeamRuntimeDetails("team-run-missing", "session-missing", config, {
+      loadRuntimeState: async () => {
+        throw thrownValue
+      },
+    })
+
+    // then
+    expect(runtimeDetails).toEqual({
+      teamRunId: "team-run-missing",
+      isLead: false,
+      senderName: "unknown",
+      activeMembers: [],
+    })
+  })
+
   test("routes a member message to one recipient", async () => {
     // given
     const fixture = await createTeamFixture()
@@ -177,6 +219,35 @@ describe("createTeamSendMessageTool", () => {
     const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
     expect(message.from).toBe("m1")
+  })
+
+  test("persists optional message metadata from tool arguments", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const correlationId = randomUUID()
+
+    // when
+    const result = await fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "hello with metadata",
+      correlationId,
+      summary: "metadata summary",
+      references: [{ path: "src/features/team-mode/tools/messaging.ts", description: "send tool" }],
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const parsedResult = JSON.parse(result)
+
+    // then
+    expect(parsedResult.deliveredTo).toEqual(["m2"])
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
+    const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
+    expect(message.kind).toBe("message")
+    expect(message.correlationId).toBe(correlationId)
+    expect(message.summary).toBe("metadata summary")
+    expect(message.references).toEqual([
+      { path: "src/features/team-mode/tools/messaging.ts", description: "send tool" },
+    ])
   })
 
   test("gates broadcast to the lead and fans out to active members", async () => {

@@ -79,7 +79,10 @@ async function findMessagesWithOrphanThinkingFromSDK(
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 
@@ -113,7 +116,10 @@ async function findMessageByIndexNeedingThinkingFromSDK(
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 

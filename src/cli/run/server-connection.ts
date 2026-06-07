@@ -45,7 +45,10 @@ function isLoopbackAttachUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
     return LOOPBACK_HOSTS.has(parsed.hostname)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof TypeError)) {
+      throw error
+    }
     return false
   }
 }

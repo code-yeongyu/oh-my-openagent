@@ -252,4 +252,6 @@ export interface PluginLoaderOptions {
    * This takes precedence over ~/.claude/settings.json enabledPlugins
    */
   enabledPluginsOverride?: Record<string, boolean>
+
+  anthropicProvider?: string
 }

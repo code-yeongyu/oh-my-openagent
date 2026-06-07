@@ -1,7 +1,7 @@
 import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { createFallbackState } from "./fallback-state"
+import { createFallbackState, isModelInCooldown } from "./fallback-state"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -40,9 +40,32 @@ export function createChatMessageHandler(deps: HookDeps) {
       return
     }
 
-    if (state.currentModel === state.originalModel) return
+    if (
+      state.currentModel !== state.originalModel &&
+      !state.pendingFallbackModel &&
+      !isModelInCooldown(state.originalModel, state, config.cooldown_seconds)
+    ) {
+      const activeModel = state.originalModel
+      log(`[${HOOK_NAME}] Restoring preferred primary model`, {
+        sessionID,
+        from: state.currentModel,
+        to: activeModel,
+      })
+      sessionStates.set(sessionID, createFallbackState(activeModel))
+
+      const parts = activeModel.split("/")
+      if (parts.length >= 2) {
+        output.message.model = {
+          providerID: parts[0],
+          modelID: parts.slice(1).join("/"),
+        }
+      }
+      return
+    }
 
     const activeModel = state.currentModel
+
+    if (activeModel === state.originalModel) return
 
     log(`[${HOOK_NAME}] Applying fallback model override`, {
       sessionID,

@@ -1,5 +1,5 @@
 import { basename, join } from "node:path";
-import { copyFile, lstat, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 
 import { exists } from "./utils.mjs";
 
@@ -22,7 +22,7 @@ export async function capturePreservedAgentReasoning({ codexHome }) {
 	return preserved;
 }
 
-export async function linkCachedPluginAgents({ codexHome, pluginRoot, platform = process.platform, preservedReasoning = new Map() }) {
+export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning = new Map() }) {
 	const bundledAgents = await discoverBundledAgents(pluginRoot);
 	if (bundledAgents.length === 0) {
 		await writeManifest(pluginRoot, []);
@@ -36,11 +36,7 @@ export async function linkCachedPluginAgents({ codexHome, pluginRoot, platform =
 		const agentFileName = basename(agentPath);
 		const agentName = agentNameFromToml(agentFileName);
 		const linkPath = join(agentsDir, agentFileName);
-		if (platform === "win32") {
-			await replaceWithCopy(linkPath, agentPath);
-		} else {
-			await replaceWithSymlink(linkPath, agentPath);
-		}
+		await replaceWithCopy(linkPath, agentPath);
 		await restorePreservedReasoning({ linkPath, target: agentPath, value: preservedReasoning.get(agentName) });
 		linked.push({ name: agentFileName, path: linkPath, target: agentPath });
 	}
@@ -66,11 +62,6 @@ async function discoverBundledAgents(pluginRoot) {
 	}
 	agents.sort();
 	return agents;
-}
-
-async function replaceWithSymlink(linkPath, target) {
-	await prepareReplacement(linkPath);
-	await symlink(target, linkPath);
 }
 
 async function replaceWithCopy(linkPath, target) {

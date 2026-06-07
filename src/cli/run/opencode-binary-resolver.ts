@@ -48,7 +48,10 @@ export async function canExecuteBinary(binaryPath: string): Promise<boolean> {
     })
     await proc.exited
     return proc.exitCode === 0
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }

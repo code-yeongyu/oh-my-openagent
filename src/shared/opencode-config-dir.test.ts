@@ -1,4 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
+import * as fs from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve, win32 } from "node:path"
 import {
@@ -98,6 +99,27 @@ describe("opencode-config-dir", () => {
 
       // then returns resolved absolute path
       expect(result).toBe(resolve("./my-opencode-config"))
+    })
+
+    test("falls back to the resolved path when realpath throws a non-Error value", () => {
+      // given an existing OPENCODE_CONFIG_DIR whose realpath lookup fails
+      const existsSyncSpy = spyOn(fs, "existsSync").mockReturnValue(true)
+      const realpathSyncSpy = spyOn(fs, "realpathSync").mockImplementation(() => {
+        throw "realpath failed"
+      })
+      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      try {
+        // when getOpenCodeConfigDir is called with binary="opencode"
+        const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
+
+        // then returns the resolved path fallback
+        expect(result).toBe(resolve("/custom/opencode/path"))
+      } finally {
+        realpathSyncSpy.mockRestore()
+        existsSyncSpy.mockRestore()
+      }
     })
 
     test("OPENCODE_CONFIG_DIR takes priority over XDG_CONFIG_HOME", () => {

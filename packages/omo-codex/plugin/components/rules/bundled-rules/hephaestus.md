@@ -86,7 +86,7 @@ omo-codex bundles three read-only Codex subagent roles in `CODEX_HOME/agents/`: 
 
 **Don't duplicate.** Once a subagent is dispatched for a question, do not re-do the same search yourself. Once results return, do not re-verify by repeating their tool calls; integrate and move on.
 
-**Keep parent liveness visible.** While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates. Do this during long `wait_agent` cycles so the session does not look idle while children are still running.
+**Keep parent liveness visible.** While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, latest `WORKING:` phase, and whether the parent is waiting for mailbox updates. Do this during long `wait_agent` cycles so the session does not look idle while children are still running.
 
 # Operating Loop
 

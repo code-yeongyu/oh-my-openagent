@@ -1,8 +1,10 @@
 export type DoctorMode = "default" | "status" | "verbose"
+export type DoctorTarget = "opencode" | "codex"
 
 export interface DoctorOptions {
   mode: DoctorMode
   json?: boolean
+  target?: DoctorTarget
 }
 
 export interface DoctorIssue {
@@ -69,6 +71,32 @@ export interface DoctorResult {
   tools: ToolsSummary
   summary: DoctorSummary
   exitCode: number
+  target?: DoctorTarget
+  codex?: CodexDoctorSummary
+}
+
+export interface CodexConfigSummary {
+  readonly exists: boolean
+  readonly marketplaceConfigured: boolean
+  readonly pluginEnabled: boolean
+  readonly pluginsFeatureEnabled: boolean
+  readonly pluginHooksFeatureEnabled: boolean
+}
+
+export interface CodexDoctorSummary {
+  readonly codexPath: string | null
+  readonly codexSource: string | null
+  readonly codexAppId: string | null
+  readonly marketplaceName: string
+  readonly pluginName: string
+  readonly pluginVersion: string | null
+  readonly packageName: string | null
+  readonly packageVersion: string | null
+  readonly pluginRoot: string | null
+  readonly configPath: string
+  readonly config: CodexConfigSummary
+  readonly linkedBins: readonly string[]
+  readonly agents: readonly string[]
 }
 
 export type CheckCategory =

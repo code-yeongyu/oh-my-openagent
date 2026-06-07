@@ -1,8 +1,10 @@
-import { existsSync, readFileSync, rmSync } from "node:fs"
+/// <reference types="bun-types" />
+
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, describe, expect, it, mock } from "bun:test"
 import { detectErrorType } from "./index"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `session-recovery-thinking-prepend-${randomUUID()}`)
@@ -15,10 +17,23 @@ mock.module("../../shared", () => ({
   log: () => {},
   isSqliteBackend: () => false,
   patchPart: async () => true,
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData) => response.data ?? fallback,
+  normalizeSDKResponse: <TData>(response: unknown, fallback: TData) => {
+    if (Array.isArray(response)) {
+      return response as TData
+    }
+    if (response != null && typeof response === "object" && "data" in response) {
+      return (response as { data?: TData }).data ?? fallback
+    }
+    return fallback
+  },
 }))
 
+afterEach(() => mock.restore())
+
+afterAll(() => rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true }))
+
 const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")
+const { injectTextPart } = await import("./storage/text-part-injector")
 
 describe("detectErrorType", () => {
   describe("thinking_block_order errors", () => {
@@ -410,7 +425,7 @@ describe("thinking-prepend", () => {
     )
     const sessionID = "ses_thinking_prepend_async"
     const targetMessageID = "msg_target_async"
-    const patchPartMock = mock(async () => true)
+    const patchPartMock = mock(async (..._args: readonly unknown[]) => true)
     const originalPart = {
       id: "prt_prev_async",
       type: "thinking",
@@ -541,5 +556,22 @@ describe("thinking-prepend", () => {
 
     expect(result).toBe(false)
     expect(patchPartMock).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe("text-part-injector", () => {
+  it("returns false when part storage cannot accept a new injected part", () => {
+    // given
+    const messageID = "msg_text_injector_blocked"
+    mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    writeFileSync(join(TEST_PART_STORAGE, messageID), "not a directory")
+
+    // when
+    const result = injectTextPart("ses_text_injector", messageID, "visible answer")
+
+    // then
+    expect(result).toBe(false)
+
+    rmSync(join(TEST_PART_STORAGE, messageID), { force: true })
   })
 })

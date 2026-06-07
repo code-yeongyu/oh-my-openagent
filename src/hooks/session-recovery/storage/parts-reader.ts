@@ -20,7 +20,10 @@ export function readParts(messageID: string): StoredPart[] {
     try {
       const content = readFileSync(join(partDir, file), "utf-8")
       parts.push(JSON.parse(content))
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
@@ -50,7 +53,10 @@ export async function readPartsFromSDK(
         return { ...part, sessionID, messageID } as StoredPart
       })
       .filter((part): part is StoredPart => part !== null)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }

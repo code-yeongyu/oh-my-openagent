@@ -5,6 +5,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as loader from "./loader"
+import { getCommandLoaderCacheKey } from "./loader-cache"
 
 const TEST_DIR = join(tmpdir(), `claude-code-command-loader-${Date.now()}`)
 
@@ -178,5 +179,33 @@ describe("claude-code command loader", () => {
     expect(secondCommands).toEqual(firstCommands)
     expect(firstReaddirCount).toBeGreaterThan(0)
     expect(readdirSpy.mock.calls.length).toBe(firstReaddirCount)
+  })
+
+  it("#given a missing command directory #when building the cache key #then it falls back to the resolved path", async () => {
+    // given
+    const missingDirectory = join(TEST_DIR, "missing-commands")
+
+    // when
+    const cacheKey = await getCommandLoaderCacheKey(missingDirectory)
+
+    // then
+    expect(cacheKey).toBe(missingDirectory)
+  })
+
+  it("#given command directory access throws a non-Error value #when loading project commands #then it returns the empty fallback", async () => {
+    // given
+    const accessSpy = spyOn(fs, "access").mockImplementation(() => {
+      throw "access failed"
+    })
+
+    try {
+      // when
+      const commands = await loader.loadProjectCommands(TEST_DIR)
+
+      // then
+      expect(commands).toEqual({})
+    } finally {
+      accessSpy.mockRestore()
+    }
   })
 })

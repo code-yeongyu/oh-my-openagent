@@ -92,7 +92,10 @@ function parsePackageVersion(content: string): string | null {
     if (typeof version !== "string" || version.length === 0) return null
 
     return version
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
@@ -103,7 +106,10 @@ function getPackageVersionFromBinary(binaryPath: string, deps: OpenCodeVersionDe
     const packagePath = join(dirname(dirname(realBinaryPath)), "package.json")
     if (!deps.exists(packagePath)) return null
     return parsePackageVersion(deps.readText(packagePath))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
@@ -133,7 +139,10 @@ export function getOpenCodeVersion(deps: Partial<OpenCodeVersionDeps> = {}): str
     const versionMatch = result.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/)
     cachedVersion = versionMatch?.[1] ?? null
     return cachedVersion
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     cachedVersion = null
     return null
   }

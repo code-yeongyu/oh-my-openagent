@@ -175,6 +175,55 @@ describe("#given task_system configuration", () => {
   })
 })
 
+describe("#given the OMO skill tool overrides OpenCode native skill discovery", () => {
+  test("#when the registry creates the skill tool #then plugin skills are advertised in the description", () => {
+    const createSkillToolCallsBefore = toolFactories.createSkillTool.mock.calls.length
+
+    createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [
+          {
+            name: "security-review",
+            path: "<builtin>/security-review/SKILL.md",
+            definition: {
+              name: "security-review",
+              description: "Security review instructions",
+              template: "review",
+            },
+            scope: "builtin",
+          },
+        ],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories,
+    })
+
+    const skillToolOptions = toolFactories.createSkillTool.mock.calls[createSkillToolCallsBefore]?.[0]
+
+    expect(skillToolOptions).toMatchObject({
+      includeSkillsInDescription: true,
+      skills: [
+        {
+          name: "security-review",
+          definition: {
+            name: "security-review",
+          },
+        },
+      ],
+    })
+  })
+})
+
 describe("#given team_mode configuration", () => {
   test("#when team_mode is enabled #then all 12 team tools are registered", () => {
     syncSessionCreatedCallbacks.length = 0

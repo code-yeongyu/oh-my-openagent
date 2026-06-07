@@ -147,12 +147,23 @@ export function getWorkForSession(directory: string, sessionId: string): Boulder
   }
 
   const normalizedSessionId = normalizeSessionId(sessionId)
-  const works = getBoulderWorks(state)
-    .filter((work) => work.session_ids.includes(normalizedSessionId))
-    .sort((left, right) => (parseIsoToMs(right.updated_at ?? right.started_at) ?? 0) - (parseIsoToMs(left.updated_at ?? left.started_at) ?? 0))
+  let newestWork: BoulderWorkState | null = null
+  let newestWorkMs = 0
 
-  if (works.length > 0) {
-    return works[0] ?? null
+  for (const work of getBoulderWorks(state)) {
+    if (!work.session_ids.includes(normalizedSessionId)) {
+      continue
+    }
+
+    const workMs = parseIsoToMs(work.updated_at ?? work.started_at) ?? 0
+    if (!newestWork || workMs > newestWorkMs) {
+      newestWork = work
+      newestWorkMs = workMs
+    }
+  }
+
+  if (newestWork) {
+    return newestWork
   }
 
   return state.session_ids.includes(normalizedSessionId) ? buildWorkFromMirror(state) : null

@@ -47,7 +47,8 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     try {
       const parsed = JSON.parse(loadSkills)
       loadSkills = Array.isArray(parsed) ? parsed : []
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
       loadSkills = []
     }
   }
@@ -81,15 +82,6 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
 
-  args.category = category
-  args.subagent_type = subagentType
-  args.requested_subagent_type = originalSubagentType
-  args.description = description
-  args.prompt = prompt
-  args.run_in_background = runInBackground
-  args.task_id = taskID
-  args.command = command
-  args.load_skills = normalizedLoadSkills
 
   return {
     category,

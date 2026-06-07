@@ -4,6 +4,7 @@ import { createKeywordDetectorHook } from "./index"
 import { setMainSession, _resetForTesting } from "../../features/claude-code-session-state"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("keyword-detector hyperplan keyword", () => {
   let logSpy: ReturnType<typeof spyOn>
@@ -22,7 +23,7 @@ describe("keyword-detector hyperplan keyword", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return {
+    return unsafeTestValue<PluginInput>({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string } }) => {
@@ -30,7 +31,16 @@ describe("keyword-detector hyperplan keyword", () => {
           },
         },
       },
-    } as PluginInput
+    })
+  }
+
+  function textOf(output: { readonly parts: readonly { readonly type: string; readonly text?: string }[] }): string {
+    const textPart = output.parts.find((part) => part.type === "text")
+    expect(textPart).toBeDefined()
+    if (!textPart || typeof textPart.text !== "string") {
+      throw new Error("expected text part")
+    }
+    return textPart.text
   }
 
   test("should inject hyperplan message when user types 'hyperplan'", async () => {
@@ -47,20 +57,19 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan-mode wrapper and skill-loading instruction should be present
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-mode>")
-    expect(textPart!.text).toContain('skill(name="hyperplan")')
-    expect(textPart!.text).toContain("HYPERPLAN MODE ENABLED")
-    expect(textPart!.text).toContain("unspecified-low")
-    expect(textPart!.text).toContain("unspecified-high")
-    expect(textPart!.text).toContain("artistry")
-    expect(textPart!.text).toContain("ultrabrain")
-    expect(textPart!.text).toContain("deep")
-    expect(textPart!.text).toContain("only if")
-    expect(textPart!.text).toContain("enabled")
-    expect(textPart!.text).toContain("refactor the auth module")
-    expect(textPart!.text).toContain("---")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-mode>")
+    expect(text).toContain('skill(name="hyperplan")')
+    expect(text).toContain("HYPERPLAN MODE ENABLED")
+    expect(text).toContain("unspecified-low")
+    expect(text).toContain("unspecified-high")
+    expect(text).toContain("artistry")
+    expect(text).toContain("ultrabrain")
+    expect(text).toContain("deep")
+    expect(text).toContain("only if")
+    expect(text).toContain("enabled")
+    expect(text).toContain("refactor the auth module")
+    expect(text).toContain("---")
   })
 
   test("should inject hyperplan message when user types 'hpp' shorthand", async () => {
@@ -77,10 +86,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan injection should fire
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-mode>")
-    expect(textPart!.text).toContain('skill(name="hyperplan")')
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-mode>")
+    expect(text).toContain('skill(name="hyperplan")')
   })
 
   test("should inject hyperplan message case-insensitively", async () => {
@@ -97,9 +105,8 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan should still fire
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-mode>")
   })
 
   test("should NOT trigger hyperplan when 'hpp' is a substring of another word", async () => {
@@ -116,10 +123,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan should NOT trigger because 'hpp' lacks word boundaries
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("myhppvar = 1")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("myhppvar = 1")
+    expect(text).not.toContain("<hyperplan-mode>")
   })
 
   test("should NOT trigger hyperplan when 'hpp' is the extension of a C++ header path", async () => {
@@ -136,10 +142,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan must NOT fire just because '.hpp' appears as a file extension
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("please help to check interface.hpp")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("please help to check interface.hpp")
+    expect(text).not.toContain("<hyperplan-mode>")
   })
 
   test("should NOT trigger hyperplan when path-like '.hpp' appears in a deeper file path", async () => {
@@ -156,10 +161,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan must not fire (the trailing '.hpp' is a header extension, not the trigger)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
-    expect(textPart!.text).not.toContain('skill(name="hyperplan")')
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-mode>")
+    expect(text).not.toContain('skill(name="hyperplan")')
   })
 
   test("should fire 'Hyperplan Mode Activated' toast when keyword detected", async () => {
@@ -200,10 +204,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - neither injection nor toast should occur
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("hyperplan refactor this")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("hyperplan refactor this")
+    expect(text).not.toContain("<hyperplan-mode>")
     expect(toastCalls).not.toContain("Hyperplan Mode Activated")
   })
 
@@ -222,10 +225,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID: subagentSessionID }, output)
 
     // then - hyperplan injection should be skipped in non-main session
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("hyperplan please")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("hyperplan please")
+    expect(text).not.toContain("<hyperplan-mode>")
   })
 
   test("should skip hyperplan injection when agent is prometheus (planner)", async () => {
@@ -241,11 +243,10 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
     // then - hyperplan should be filtered out for planner agents
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
-    expect(textPart!.text).not.toContain('skill(name="hyperplan")')
-    expect(textPart!.text).toContain("hyperplan refactor stuff")
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-mode>")
+    expect(text).not.toContain('skill(name="hyperplan")')
+    expect(text).toContain("hyperplan refactor stuff")
   })
 
   test("should NOT inject hyperplan when user invokes /hyperplan slash command", async () => {
@@ -263,10 +264,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - the slash command path owns the message; keyword detector must not double-inject
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("/hyperplan refactor the auth module")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("/hyperplan refactor the auth module")
+    expect(text).not.toContain("<hyperplan-mode>")
     expect(toastCalls).not.toContain("Hyperplan Mode Activated")
   })
 
@@ -284,10 +284,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - keyword detector should yield to the slash command system
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("/hpp investigate the build pipeline")
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toBe("/hpp investigate the build pipeline")
+    expect(text).not.toContain("<hyperplan-mode>")
   })
 
   test("should still inject hyperplan when slash appears mid-message (not a slash command)", async () => {
@@ -304,9 +303,8 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID }, output)
 
     // then - hyperplan should still fire (this is a real keyword invocation, not a slash command)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("<hyperplan-mode>")
+    const text = textOf(output)
+    expect(text).toContain("<hyperplan-mode>")
   })
 
   test("should skip hyperplan injection when agent name contains 'planner' token", async () => {
@@ -322,10 +320,9 @@ describe("keyword-detector hyperplan keyword", () => {
     await hook["chat.message"]({ sessionID, agent: "Plan Agent" }, output)
 
     // then - hyperplan should be filtered out
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("<hyperplan-mode>")
-    expect(textPart!.text).not.toContain('skill(name="hyperplan")')
-    expect(textPart!.text).toContain("hpp build the feature")
+    const text = textOf(output)
+    expect(text).not.toContain("<hyperplan-mode>")
+    expect(text).not.toContain('skill(name="hyperplan")')
+    expect(text).toContain("hpp build the feature")
   })
 })

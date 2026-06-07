@@ -60,6 +60,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
         hasVercelAiGateway: false,
       }
   const isUpdate = hasOpenCode && detected.isInstalled
@@ -130,6 +133,11 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasGemini &&
     !config.hasCopilot &&
     !config.hasOpencodeZen &&
+    !config.hasZaiCodingPlan &&
+    !config.hasKimiForCoding &&
+    !config.hasOpencodeGo &&
+    !config.hasMinimaxCnCodingPlan &&
+    !config.hasMinimaxCodingPlan &&
     !config.hasVercelAiGateway
   ) {
     printWarning("No model providers configured. Using opencode/big-pickle as fallback.")

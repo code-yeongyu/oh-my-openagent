@@ -240,6 +240,20 @@ describe("mergeConfigs", () => {
         "anthropic",
       ]);
     });
+
+    it("should replace mcp_env_allowlist instead of merging it", () => {
+      const base = createConfig({
+        mcp_env_allowlist: ["USER_ONLY_TOKEN"],
+      });
+
+      const override = createConfig({
+        mcp_env_allowlist: ["PROJECT_TOKEN"],
+      });
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.mcp_env_allowlist).toEqual(["PROJECT_TOKEN"]);
+    });
   });
 });
 
@@ -353,6 +367,23 @@ describe("parseConfigPartially", () => {
       expect(result).not.toBeNull();
       expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
       expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
+    });
+
+    it("should skip invalid string-array sections without discarding other salvaged sections", () => {
+      const rawConfig = {
+        agents: {
+          oracle: { temperature: "not-a-number" },
+        },
+        disabled_hooks: ["comment-checker"],
+        mcp_env_allowlist: ["USER_TOKEN", 42],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result?.agents).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.mcp_env_allowlist).toBeUndefined();
     });
   });
 
@@ -589,6 +620,37 @@ describe("loadPluginConfig", () => {
     expect(existsSync(legacyConfigPath)).toBe(false)
     expect(existsSync(canonicalConfigPath)).toBe(true)
     expect(config.agents?.oracle?.model).toBe("openai/gpt-5.5")
+  })
+
+  it("does not rewrite explicit user-selected openai/gpt-5.4 models during config load", async () => {
+    // given
+    const { userConfigDir, projectDir } =
+      createLoadPluginConfigTestContext("omo-plugin-config-preserve-user-model-")
+    const userConfigPath = join(userConfigDir, "oh-my-openagent.json")
+    writeJsonFile(userConfigPath, {
+      agents: {
+        sisyphus: {
+          model: "openai/gpt-5.4",
+          variant: "xhigh",
+        },
+        hephaestus: {
+          model: "openai/gpt-5.4",
+          variant: "medium",
+        },
+      },
+    })
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.sisyphus?.model).toBe("openai/gpt-5.4")
+    expect(config.agents?.hephaestus?.model).toBe("openai/gpt-5.4")
+    expect(readFileSync(userConfigPath, "utf-8")).toContain('"openai/gpt-5.4"')
+    expect(existsSync(`${userConfigPath}.migrations.json`)).toBe(false)
   })
 
   it("should preserve explicit user git_master settings when project config omits git_master", async () => {

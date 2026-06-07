@@ -83,4 +83,20 @@ describe("getInstalledLspServers", () => {
     expect(servers).toEqual([{ id: "lsp-tools-mcp", extensions: ["*"] }])
   })
 
+  it("ignores malformed OMO config files when detecting disabled MCPs", async () => {
+    // given
+    const userConfigDirectory = createTemporaryDirectory("omo-tools-lsp-user-")
+    const workspaceDirectory = createTemporaryDirectory("omo-tools-lsp-malformed-")
+    mkdirSync(userConfigDirectory, { recursive: true })
+    writeFileSync(join(userConfigDirectory, "oh-my-openagent.json"), "{", "utf-8")
+    clearPluginConfigFileDetectionCache()
+
+    const { getInstalledLspServers } = await import(`./tools-lsp?t=${Date.now()}-malformed`)
+
+    // when
+    const servers = getInstalledLspServers({ configDirectory: userConfigDirectory, cwd: workspaceDirectory })
+
+    // then
+    expect(servers).toEqual([{ id: "lsp-tools-mcp", extensions: ["*"] }])
+  })
 })

@@ -3,6 +3,7 @@ import { delimiter, join } from "node:path"
 import {
   buildPathWithBinaryFirst,
   collectCandidateBinaryPaths,
+  canExecuteBinary,
   findWorkingOpencodeBinary,
   withWorkingOpencodePath,
 } from "./opencode-binary-resolver"
@@ -42,6 +43,19 @@ describe("findWorkingOpencodeBinary", () => {
 
     // then
     expect(resolved).toBe("/good/opencode")
+  })
+})
+
+describe("canExecuteBinary", () => {
+  it("returns false when a binary probe cannot spawn the candidate", async () => {
+    // given
+    const binaryPath = join("/definitely-missing", "opencode")
+
+    // when
+    const canExecute = await canExecuteBinary(binaryPath)
+
+    // then
+    expect(canExecute).toBe(false)
   })
 })
 

@@ -22,6 +22,21 @@ describe("start-work Stop hook", () => {
 		expect(output).toBe("");
 	});
 
+	it("#given no boulder state and start work prompt #when stop hook runs #then it stays quiet", () => {
+		// given
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(),
+			last_assistant_message: "I'll start work on this plan now.",
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given active codex work with remaining top-level tasks #when hook runs #then returns block JSON", () => {
 		// given
 		const fs = createMemoryFs({
@@ -66,9 +81,11 @@ describe("start-work Stop hook", () => {
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toMatch(/TASK:/);
 		expect(parsed.reason).toMatch(/fork_turns:\s*"none"/);
-		expect(parsed.reason).toMatch(/wait_agent.*signal, not proof/);
-		expect(parsed.reason).toMatch(/one targeted followup/);
+		expect(parsed.reason).toMatch(/wait_agent.*mailbox signals/);
+		expect(parsed.reason).toMatch(/TASK STILL ACTIVE/);
 		expect(parsed.reason).toMatch(/respawn.*smaller/);
+		expect(parsed.reason).toMatch(/WORKING:/);
+		expect(parsed.reason).toMatch(/single `list_agents`/);
 	});
 
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {
@@ -104,6 +121,19 @@ describe("start-work Stop hook", () => {
 		const fs = createMemoryFs({
 			[BOULDER_PATH]: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "completed" }),
 			[PLAN_PATH]: "- [ ] First",
+		});
+
+		// when
+		const output = runStopHook(createStopInput(), fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given malformed boulder JSON #when hook runs #then returns empty output", () => {
+		// given
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: "{",
 		});
 
 		// when

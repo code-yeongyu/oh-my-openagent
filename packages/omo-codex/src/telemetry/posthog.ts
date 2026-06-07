@@ -4,6 +4,12 @@ import os from "node:os"
 import { PostHog } from "posthog-node"
 import packageJson from "../../package.json" with { type: "json" }
 
+import {
+  type TelemetryDiagnosticErrorKind,
+  type TelemetryDiagnosticEvent,
+  type TelemetryDiagnosticSource,
+  writeTelemetryDiagnostic,
+} from "./diagnostics"
 import { getPostHogApiKey, getPostHogHost, hasPostHogApiKey, shouldDisablePostHog } from "./env-flags"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
 import {
@@ -45,6 +51,15 @@ function resolveActivityStateProvider(): ActivityStateProvider {
   return activityStateProviderOverride ?? getPostHogActivityCaptureState
 }
 
+function writePostHogDiagnostic(
+  event: TelemetryDiagnosticEvent,
+  source: TelemetryDiagnosticSource,
+  error: unknown,
+  errorKind: TelemetryDiagnosticErrorKind,
+): void {
+  writeTelemetryDiagnostic({ event, source, error, errorKind })
+}
+
 function getSafeCpuInfo(): { readonly count: number; readonly model: string | undefined } {
   try {
     const cpuInfo = resolveOsProvider().cpus()
@@ -52,7 +67,8 @@ function getSafeCpuInfo(): { readonly count: number; readonly model: string | un
       count: cpuInfo.length,
       model: cpuInfo[0]?.model,
     }
-  } catch {
+  } catch (error) {
+    writePostHogDiagnostic("telemetry_cpu_info_unavailable", "shared", error, error instanceof Error ? "error" : "non_error")
     return {
       count: 0,
       model: undefined,
@@ -102,7 +118,8 @@ function createPostHogClient(
       host: getPostHogHost(),
       disableGeoip: false,
     })
-  } catch {
+  } catch (error) {
+    writePostHogDiagnostic("telemetry_posthog_init_failed", source, error, error instanceof Error ? "error" : "non_error")
     return NO_OP_POSTHOG
   }
 
@@ -115,18 +132,28 @@ function createPostHogClient(
         return
       }
 
-      client.capture({
-        distinctId,
-        event: EVENT_NAME,
-        properties: {
-          ...sharedProperties,
-          $process_person_profile: false,
-          day_utc: activityState.dayUTC,
-          reason,
-        },
-      })
+      try {
+        client.capture({
+          distinctId,
+          event: EVENT_NAME,
+          properties: {
+            ...sharedProperties,
+            $process_person_profile: false,
+            day_utc: activityState.dayUTC,
+            reason,
+          },
+        })
+      } catch (error) {
+        writePostHogDiagnostic("telemetry_capture_failed", source, error, error instanceof Error ? "error" : "non_error")
+      }
     },
-    shutdown: async () => client.shutdown(),
+    shutdown: async () => {
+      try {
+        await client.shutdown()
+      } catch (error) {
+        writePostHogDiagnostic("telemetry_shutdown_failed", source, error, error instanceof Error ? "error" : "non_error")
+      }
+    },
   }
 }
 

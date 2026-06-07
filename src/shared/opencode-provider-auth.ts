@@ -39,7 +39,12 @@ function loadAuthMap(): Map<string, string> {
   let mtimeMs: number
   try {
     mtimeMs = statSync(filePath).mtimeMs
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      cached = null
+      return new Map()
+    }
+
     cached = null
     return new Map()
   }

@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, resolve, sep } from "node:path"
 import { validateLazycodexPluginBundle } from "./lazycodex-marketplace-validation"
 
@@ -7,8 +7,17 @@ const PLUGIN_SOURCE_PATH = join("packages", "omo-codex", "plugin")
 const AST_GREP_MCP_DIST_SOURCE_PATH = join("packages", "ast-grep-mcp", "dist")
 const GIT_BASH_MCP_DIST_SOURCE_PATH = join("packages", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_SOURCE_PATH = join("packages", "lsp-tools-mcp", "dist")
+const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
+  "packages",
+  "omo-codex",
+  "lazycodex-repository",
+  ".github",
+  "workflows",
+  "pr-source-guidance.yml",
+)
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
+const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
 const AST_GREP_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "ast-grep-mcp", "dist")
 const GIT_BASH_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "lsp-tools-mcp", "dist")
@@ -46,6 +55,7 @@ const MCP_ARG_REWRITES = [
 export interface SyncLazycodexMarketplaceInput {
   readonly sourceRoot: string
   readonly lazycodexRoot: string
+  readonly releaseVersion?: string
 }
 
 interface MarketplaceManifest {
@@ -85,8 +95,10 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     recursive: true,
     filter: (path) => shouldCopyPluginPath(path, pluginRoot),
   })
+  await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
   await copyBundledMcpDists(sourceRoot, lazycodexRoot)
   await rewritePluginMcpManifest(destinationPluginRoot)
+  await stampReleaseVersion(destinationPluginRoot, input.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION)
   await validateLazycodexPluginBundle(destinationPluginRoot)
 }
 
@@ -136,6 +148,14 @@ async function copyBundledMcpDists(sourceRoot: string, lazycodexRoot: string): P
   }
 }
 
+async function copyLazycodexRepositoryWorkflow(sourceRoot: string, lazycodexRoot: string): Promise<void> {
+  const sourcePath = join(sourceRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH)
+  if (!(await isFile(sourcePath))) return
+  const destinationPath = join(lazycodexRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH)
+  await mkdir(dirname(destinationPath), { recursive: true })
+  await writeFile(destinationPath, await readFile(sourcePath, "utf8"))
+}
+
 async function copyBundledMcpDist(
   sourceRoot: string,
   lazycodexRoot: string,
@@ -167,6 +187,72 @@ async function rewritePluginMcpManifest(pluginRoot: string): Promise<void> {
     }
   }
   if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
+async function stampReleaseVersion(pluginRoot: string, releaseVersion: string | undefined): Promise<void> {
+  const version = releaseVersion?.trim()
+  if (version === undefined || version.length === 0) return
+  await stampJsonVersion(join(pluginRoot, ".codex-plugin", "plugin.json"), version)
+  await stampJsonVersion(join(pluginRoot, "package.json"), version)
+  for (const hooksPath of await collectHookManifestPaths(pluginRoot)) {
+    await stampHookStatusMessages(hooksPath, version)
+  }
+}
+
+async function collectHookManifestPaths(root: string): Promise<string[]> {
+  const paths: string[] = []
+  await collectHookManifestPathsInto(root, paths)
+  return paths
+}
+
+async function collectHookManifestPathsInto(root: string, paths: string[]): Promise<void> {
+  let entries
+  try {
+    entries = await readdir(root, { withFileTypes: true })
+  } catch (error) {
+    if (error instanceof Error) return
+    return
+  }
+  for (const entry of entries) {
+    const path = join(root, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === ".git" || entry.name === "node_modules") continue
+      await collectHookManifestPathsInto(path, paths)
+      continue
+    }
+    if (entry.isFile() && entry.name === "hooks.json" && path.endsWith(`${sep}hooks${sep}hooks.json`)) {
+      paths.push(path)
+    }
+  }
+}
+
+async function stampJsonVersion(path: string, version: string): Promise<void> {
+  if (!(await isFile(path))) return
+  const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
+  if (!isRecord(parsed)) return
+  parsed.version = version
+  await writeFile(path, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
+async function stampHookStatusMessages(path: string, version: string): Promise<void> {
+  if (!(await isFile(path))) return
+  const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
+  if (!isRecord(parsed) || !isRecord(parsed.hooks)) return
+  for (const groups of Object.values(parsed.hooks)) {
+    if (!Array.isArray(groups)) continue
+    for (const group of groups) {
+      if (!isRecord(group) || !Array.isArray(group.hooks)) continue
+      for (const hook of group.hooks) {
+        stampHookStatusMessage(hook, version)
+      }
+    }
+  }
+  await writeFile(path, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
+function stampHookStatusMessage(hook: unknown, version: string): void {
+  if (!isRecord(hook) || typeof hook.statusMessage !== "string") return
+  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):/, `LazyCodex(${version}):`)
 }
 
 function rewriteMcpArg(arg: unknown): unknown {

@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { afterEach, describe, expect, test } = require("bun:test")
+import { afterEach, describe, expect, test } from "bun:test"
 
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
@@ -150,5 +149,52 @@ describe("session-recovery resume", () => {
     // then
     expect(ok).toBe(true)
     expect(promptCalls).toBe(1)
+  })
+
+  test("#given resume setup throws an error #when resuming #then returns false", async () => {
+    // given
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+      },
+    }
+    const tools: Record<string, boolean> = new Proxy({}, {
+      ownKeys: () => {
+        throw new Error("tools unavailable")
+      },
+    })
+
+    // when
+    const ok = await resumeSession(client as never, {
+      sessionID: "ses_resume_error",
+      tools,
+    })
+
+    // then
+    expect(ok).toBe(false)
+  })
+
+  test("#given resume setup throws a non-error value #when resuming #then rethrows it", async () => {
+    // given
+    const thrown = "tools unavailable"
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+      },
+    }
+    const tools: Record<string, boolean> = new Proxy({}, {
+      ownKeys: () => {
+        throw thrown
+      },
+    })
+
+    // when
+    const resume = resumeSession(client as never, {
+      sessionID: "ses_resume_non_error",
+      tools,
+    })
+
+    // then
+    await expect(resume).rejects.toBe(thrown)
   })
 })

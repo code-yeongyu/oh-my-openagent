@@ -148,22 +148,21 @@ describe("paths", () => {
     logCalls.splice(0)
 
     // when
-    let thrown: unknown = null
-    try {
-      await ensureBaseDirsWithMockedChmod(baseDir)
-    } catch (error) {
-      thrown = error
-    }
+    const ensuredBaseDirectories = ensureBaseDirsWithMockedChmod(baseDir)
 
     // then: function does not throw, EPERM was reached, and one warning was logged.
-    expect(thrown).toBeNull()
+    await expect(ensuredBaseDirectories).resolves.toBeUndefined()
     expect(chmodCalls).toBeGreaterThan(0)
     const warnings = logCalls.filter(([message]) =>
       message === "team-mode: chmod refused on base directory; continuing with existing permissions"
     )
     expect(warnings.length).toBeGreaterThan(0)
-    const firstWarning = warnings[0]?.[1] as { code?: string; path?: string } | undefined
-    expect(firstWarning?.code).toBe("EPERM")
-    expect(firstWarning?.path).toContain(baseDir)
+    const firstWarning = warnings[0]?.[1]
+    expect(firstWarning).toBeObject()
+    if (typeof firstWarning !== "object" || firstWarning === null) {
+      throw new Error("expected warning metadata")
+    }
+    expect("code" in firstWarning ? firstWarning.code : undefined).toBe("EPERM")
+    expect("path" in firstWarning ? firstWarning.path : undefined).toContain(baseDir)
   })
 })

@@ -3,6 +3,12 @@ import os from "node:os";
 
 import type { PostHog } from "posthog-node";
 
+import {
+	type TelemetryDiagnosticErrorKind,
+	type TelemetryDiagnosticEvent,
+	type TelemetryDiagnosticSource,
+	writeTelemetryDiagnostic,
+} from "./diagnostics.js";
 import { getPostHogApiKey, getPostHogHost, hasPostHogApiKey, shouldDisablePostHog } from "./env-flags.js";
 import { getPostHogActivityCaptureState } from "./posthog-activity-state.js";
 import {
@@ -44,6 +50,15 @@ function resolveActivityStateProvider(): ActivityStateProvider {
 	return activityStateProviderOverride ?? getPostHogActivityCaptureState;
 }
 
+function writePostHogDiagnostic(
+	event: TelemetryDiagnosticEvent,
+	source: TelemetryDiagnosticSource,
+	error: unknown,
+	errorKind: TelemetryDiagnosticErrorKind,
+): void {
+	writeTelemetryDiagnostic({ event, source, error, errorKind });
+}
+
 function getSafeCpuInfo(): { readonly count: number; readonly model: string | undefined } {
 	try {
 		const cpuInfo = resolveOsProvider().cpus();
@@ -51,7 +66,13 @@ function getSafeCpuInfo(): { readonly count: number; readonly model: string | un
 			count: cpuInfo.length,
 			model: cpuInfo[0]?.model,
 		};
-	} catch {
+	} catch (error) {
+		writePostHogDiagnostic(
+			"telemetry_cpu_info_unavailable",
+			"plugin",
+			error,
+			error instanceof Error ? "error" : "non_error",
+		);
 		return {
 			count: 0,
 			model: undefined,
@@ -96,8 +117,13 @@ export async function createPluginPostHog(): Promise<PostHogClient> {
 		const module = await import("posthog-node");
 		PostHogClientConstructor = module.PostHog;
 	} catch (error) {
-		if (error instanceof Error) return NO_OP_POSTHOG;
-		throw error;
+		writePostHogDiagnostic(
+			"telemetry_posthog_import_failed",
+			"plugin",
+			error,
+			error instanceof Error ? "error" : "non_error",
+		);
+		return NO_OP_POSTHOG;
 	}
 
 	let client: PostHog;
@@ -112,7 +138,13 @@ export async function createPluginPostHog(): Promise<PostHogClient> {
 			host: getPostHogHost(),
 			disableGeoip: false,
 		});
-	} catch {
+	} catch (error) {
+		writePostHogDiagnostic(
+			"telemetry_posthog_init_failed",
+			"plugin",
+			error,
+			error instanceof Error ? "error" : "non_error",
+		);
 		return NO_OP_POSTHOG;
 	}
 

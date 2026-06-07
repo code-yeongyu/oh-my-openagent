@@ -1,5 +1,5 @@
 const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs.";
-const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run", "ulw-loop"]);
+export const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run", "ulw-loop"]);
 
 export function parseLazyCodexInstallCliArgs(argv) {
 	const args = [...argv];
@@ -132,11 +132,18 @@ function readOptionValue(args, index, option) {
 }
 
 export function formatLazyCodexInstallHelp() {
+	const passthrough = [...PASSTHROUGH_COMMANDS].sort().join(", ");
 	return [
 		"Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
 		"       lazycodex-ai uninstall [--project <path>]",
+		"       lazycodex-ai update [--dry-run] [--repo-root <path>]",
+		"       lazycodex-ai version",
+		"       lazycodex-ai <command> [args...]",
 		"",
 		"Installs or removes the Codex Light edition in ~/.codex using Node/npm.",
-		"`cleanup` remains available as a backward-compatible uninstall alias.",
+		"`uninstall` removes managed Codex Light state; `cleanup` is a backward-compatible alias.",
+		"`update` refreshes the installed Codex Light edition in place.",
+		"",
+		`Pass-through commands delegated to the omo CLI: ${passthrough}.`,
 	].join("\n");
 }

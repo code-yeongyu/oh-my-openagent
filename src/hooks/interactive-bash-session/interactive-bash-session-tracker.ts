@@ -25,8 +25,10 @@ async function killAllTrackedSessions(
         stderr: "ignore",
       })
       await proc.exited
-    } catch {
-      // best-effort cleanup
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
     }
   }
 

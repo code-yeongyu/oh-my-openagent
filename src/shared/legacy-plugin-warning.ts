@@ -62,7 +62,11 @@ export function checkForLegacyPluginEntry(overrideConfigDir?: string): LegacyPlu
       legacyEntries,
       configPath,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return { hasLegacyEntry: false, hasCanonicalEntry: false, legacyEntries: [], configPath: null }
   }
 }

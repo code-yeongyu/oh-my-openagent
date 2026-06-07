@@ -46,7 +46,11 @@ function replacePluginEntry(configPath: string, oldEntry: string, newEntry: stri
     log(`[auto-update-checker] Updated ${configPath}: ${oldEntry} → ${newEntry}`)
     return true
   } catch (err) {
-    log(`[auto-update-checker] Failed to update config file ${configPath}:`, err)
+    if (err instanceof Error) {
+      log(`[auto-update-checker] Failed to update config file ${configPath}:`, err)
+    } else {
+      log(`[auto-update-checker] Failed to update config file ${configPath}:`, err)
+    }
     return false
   }
 }

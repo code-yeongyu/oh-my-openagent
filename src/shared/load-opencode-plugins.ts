@@ -65,7 +65,11 @@ export function loadOpencodePlugins(directory: string): string[] {
         seenPluginEntries.add(entry)
         pluginEntries.push(entry)
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        continue
+      }
+
       continue
     }
   }

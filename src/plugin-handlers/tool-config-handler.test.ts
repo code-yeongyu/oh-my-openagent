@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { applyToolConfig } from "./tool-config-handler"
 import type { OhMyOpenCodeConfig } from "../config"
 import { getAgentDisplayName } from "../shared/agent-display-names"
@@ -149,6 +149,31 @@ describe("applyToolConfig", () => {
           expect(agent.permission.question).toBe("allow")
         },
       )
+    })
+
+    describe("#when OPENCODE_CONFIG_CONTENT parsing throws a non-Error value", () => {
+      it("#then should fall back to interactive question permission", () => {
+        // given
+        const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
+          throw "parse failed"
+        })
+        process.env.OPENCODE_CONFIG_CONTENT = "{"
+        delete process.env.OPENCODE_CLI_RUN_MODE
+        const params = createParams({ agents: ["sisyphus"] })
+
+        try {
+          // when
+          applyToolConfig(params)
+
+          // then
+          const agent = params.agentResult.sisyphus as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.question).toBe("allow")
+        } finally {
+          parseSpy.mockRestore()
+        }
+      })
     })
 
     describe("#when CLI_RUN_MODE is true and config does not deny", () => {

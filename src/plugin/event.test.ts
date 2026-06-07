@@ -1889,4 +1889,83 @@ describe("createEventHandler - session recovery compaction", () => {
 		expect(runtimeFallbackCalls).toHaveLength(1)
 		expect(runtimeFallbackCalls[0]?.event.type).toBe("session.error")
 	})
+
+	it("preserves hook fan-out order while isolating individual hook failures", async () => {
+		const calls: string[] = []
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({
+				directory: "/tmp",
+				client: {
+					session: {
+						abort: async () => ({}),
+						prompt: async () => ({}),
+					},
+				},
+			}),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
+				autoUpdateChecker: {
+					event: async () => {
+						calls.push("autoUpdateChecker")
+					},
+				},
+				legacyPluginToast: {
+					event: async () => {
+						calls.push("legacyPluginToast")
+						throw new Error("toast failed")
+					},
+				},
+				claudeCodeHooks: {
+					event: async () => {
+						calls.push("claudeCodeHooks")
+					},
+				},
+				backgroundNotificationHook: {
+					event: async () => {
+						calls.push("backgroundNotificationHook")
+					},
+				},
+				sessionNotification: async () => {
+					calls.push("sessionNotification")
+				},
+				runtimeFallback: {
+					event: async () => {
+						calls.push("runtimeFallback")
+					},
+				},
+				writeExistingFileGuard: {
+					event: async () => {
+						calls.push("writeExistingFileGuard")
+					},
+				},
+				stopContinuationGuard: { isStopped: () => false },
+			}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "ses_hook_order",
+					error: { name: "Error", message: "retry me" },
+				},
+			},
+		}))
+
+		expect(calls).toEqual([
+			"autoUpdateChecker",
+			"legacyPluginToast",
+			"claudeCodeHooks",
+			"backgroundNotificationHook",
+			"sessionNotification",
+			"runtimeFallback",
+			"writeExistingFileGuard",
+		])
+	})
 })

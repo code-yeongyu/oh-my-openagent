@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import { writeFileAtomically } from "./atomic-write.js"
 import { getActivityStateDir } from "./data-path.js"
+import { type TelemetryDiagnosticErrorKind, type TelemetryDiagnosticEvent, writeTelemetryDiagnostic } from "./diagnostics.js"
 
 export type PostHogActivityState = {
   readonly lastActiveDayUTC?: string
@@ -27,6 +28,19 @@ function isPostHogActivityState(value: unknown): value is PostHogActivityState {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
+function writeActivityStateDiagnostic(
+  event: TelemetryDiagnosticEvent,
+  error: unknown,
+  errorKind: TelemetryDiagnosticErrorKind,
+): void {
+  writeTelemetryDiagnostic({
+    event,
+    source: "shared",
+    error,
+    errorKind,
+  })
+}
+
 function readPostHogActivityState(): PostHogActivityState {
   const stateFilePath = getPostHogActivityStateFilePath()
 
@@ -43,7 +57,8 @@ function readPostHogActivityState(): PostHogActivityState {
     }
 
     return stateJson
-  } catch {
+  } catch (error) {
+    writeActivityStateDiagnostic("telemetry_activity_state_read_failed", error, error instanceof Error ? "error" : "non_error")
     return {}
   }
 }
@@ -55,7 +70,8 @@ function writePostHogActivityState(nextState: PostHogActivityState): void {
   try {
     mkdirSync(stateDir, { recursive: true })
     writeFileAtomically(stateFilePath, `${JSON.stringify(nextState, null, 2)}\n`)
-  } catch {
+  } catch (error) {
+    writeActivityStateDiagnostic("telemetry_activity_state_write_failed", error, error instanceof Error ? "error" : "non_error")
     return
   }
 }

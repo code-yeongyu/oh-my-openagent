@@ -69,7 +69,10 @@ export async function resolveRecentPromptContextForSession(
         return { model: { providerID: info.providerID, modelID: info.modelID }, tools }
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     // ignore - fallback to message storage
   }
 

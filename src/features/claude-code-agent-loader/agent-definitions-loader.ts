@@ -7,7 +7,11 @@ import { parseJsonAgentFile } from "./json-agent-loader"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
 import type { AgentScope, AgentFrontmatter, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
 
-export function parseMarkdownAgentFile(filePath: string, scope: AgentScope): LoadedAgent | null {
+export function parseMarkdownAgentFile(
+  filePath: string,
+  scope: AgentScope,
+  anthropicProvider?: string,
+): LoadedAgent | null {
   try {
     if (!existsSync(filePath)) {
       return null
@@ -23,7 +27,7 @@ export function parseMarkdownAgentFile(filePath: string, scope: AgentScope): Loa
 
     const formattedDescription = `(${scope}) ${originalDescription}`
 
-    const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
+    const mappedModelOverride = mapClaudeModelToOpenCode(data.model, anthropicProvider)
     const modelString = mappedModelOverride
       ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
       : undefined
@@ -46,14 +50,16 @@ export function parseMarkdownAgentFile(filePath: string, scope: AgentScope): Loa
       config,
       scope,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return null
     return null
   }
 }
 
 export function loadAgentDefinitions(
   paths: string[],
-  scope: AgentScope
+  scope: AgentScope,
+  anthropicProvider?: string,
 ): Record<string, ClaudeCodeAgentConfig> {
   const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
 
@@ -67,7 +73,7 @@ export function loadAgentDefinitions(
     let agent: LoadedAgent | null = null
 
     if (ext === ".md") {
-      agent = parseMarkdownAgentFile(filePath, scope)
+      agent = parseMarkdownAgentFile(filePath, scope, anthropicProvider)
     } else if (ext === ".json" || ext === ".jsonc") {
       agent = parseJsonAgentFile(filePath, scope)
     } else {

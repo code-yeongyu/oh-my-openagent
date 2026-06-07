@@ -31,17 +31,17 @@ async function readPackageVersion(path) {
 	return packageJson.version;
 }
 
-async function readComponentVersions(root) {
+async function readComponentNames(root) {
 	const componentsRoot = join(root, "components");
 	const entries = await readdir(componentsRoot, { withFileTypes: true });
-	const versions = new Map();
+	const names = [];
 	for (const entry of entries) {
 		if (!entry.isDirectory()) continue;
 		const packageJsonPath = join(componentsRoot, entry.name, "package.json");
 		if (!(await exists(packageJsonPath))) continue;
-		versions.set(entry.name, await readPackageVersion(packageJsonPath));
+		names.push(entry.name);
 	}
-	return versions;
+	return names;
 }
 
 function syncHooksJson(hooksJson, versionForCommand) {
@@ -64,16 +64,30 @@ async function syncComponentHooks(root, componentName, version) {
 	await writeJson(hooksPath, hooksJson);
 }
 
-export async function syncHookStatusMessages(root = defaultRoot) {
-	const aggregateVersion = await readPackageVersion(join(root, ".codex-plugin", "plugin.json"));
-	const componentVersions = await readComponentVersions(root);
+function normalizeReleaseVersion(version) {
+	if (typeof version !== "string") return "";
+	return version.trim();
+}
+
+function readReleaseVersion(options) {
+	const releaseVersion = normalizeReleaseVersion(options.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION);
+	if (releaseVersion.length > 0) return releaseVersion;
+	return undefined;
+}
+
+export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
+	const releaseVersion = readReleaseVersion(options);
+	const aggregateVersion = releaseVersion ?? (await readPackageVersion(join(root, ".codex-plugin", "plugin.json")));
+	const componentNames = await readComponentNames(root);
 	const aggregateHooksPath = join(root, "hooks", "hooks.json");
 	const aggregateHooks = await readJson(aggregateHooksPath);
 	syncHooksJson(aggregateHooks, () => aggregateVersion);
 	await writeJson(aggregateHooksPath, aggregateHooks);
 
-	for (const [componentName, version] of componentVersions.entries()) {
-		await syncComponentHooks(root, componentName, version);
+	for (const componentName of componentNames) {
+		const componentVersion =
+			releaseVersion ?? (await readPackageVersion(join(root, "components", componentName, "package.json")));
+		await syncComponentHooks(root, componentName, componentVersion);
 	}
 }
 

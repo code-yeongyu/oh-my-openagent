@@ -1,11 +1,11 @@
 > [!NOTE]
-> **🚀 首个 Codex 版本发布：omo 现已支持 Codex CLI**
+> **OmO for Codex 已发布。试试 LazyCodex**
 >
-> 无需再配置复杂的 JSON。直接运行：
+> 因为太爱 Anthropic 模型而被封禁之后，我们决定站到 Codex 这一边。
+> 如果你是 OmO 粉丝，但觉得配置太麻烦，请使用 LazyCodex。OmO for Codex 已经发布:
 > ```bash
 > npx lazycodex-ai install
 > ```
-> 您的 Codex 将清晰编码，并通过内置 computer-use QA 完成任务。
 > 了解更多请访问 [lazycodex.ai](https://lazycodex.ai)。
 
 > [!NOTE]

@@ -36,7 +36,8 @@ function loadSkillFromFile(filePath: string): { template: string; metadata: Skil
     const content = readFileSync(filePath, "utf-8")
     const { data, body } = parseFrontmatter<SkillMetadata>(content)
     return { template: body, metadata: data }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return null
     return null
   }
 }

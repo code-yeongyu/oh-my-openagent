@@ -53,7 +53,10 @@ function describePromptAsyncError(error: unknown): string {
 
 	try {
 		return JSON.stringify(error)
-	} catch {
+	} catch (jsonError) {
+		if (!(jsonError instanceof Error)) {
+			throw jsonError
+		}
 		return String(error)
 	}
 }
@@ -106,7 +109,10 @@ export async function injectContinuationPrompt(
 				break
 			}
 		}
-	} catch {
+	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error
+		}
 		const messageDir = getMessageDir(sourceSessionID)
 		const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 		agent = currentMessage?.agent

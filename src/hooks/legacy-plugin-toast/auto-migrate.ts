@@ -58,7 +58,10 @@ export function autoMigrateLegacyPluginEntry(overrideConfigDir?: string): Migrat
       to: hasCanonical ? PLUGIN_NAME : to,
       configPath,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return { migrated: false, from: null, to: null, configPath }
   }
 }

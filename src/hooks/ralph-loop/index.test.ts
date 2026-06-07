@@ -167,6 +167,36 @@ describe("ralph-loop", () => {
       expect(result).toBeNull()
     })
 
+    test("#given state path is a directory #when reading state #then returns null", () => {
+      // given
+      mkdirSync(join(TEST_DIR, ".ralph-loop-state.md"), { recursive: true })
+
+      // when
+      const result = readState(TEST_DIR)
+
+      // then
+      expect(result).toBeNull()
+    })
+
+    test("#given state parent path is a file #when writing state #then returns false", () => {
+      // given
+      writeFileSync(join(TEST_DIR, "blocked"), "")
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Test prompt",
+      }
+
+      // when
+      const result = writeState(TEST_DIR, state, "blocked/state.md")
+
+      // then
+      expect(result).toBe(false)
+    })
+
     test("should clear state correctly", () => {
       // given - existing state
       const state: RalphLoopState = {
@@ -266,6 +296,27 @@ describe("ralph-loop", () => {
       // then - state should have ultrawork=true
       const state = hook.getState()
       expect(state?.ultrawork).toBe(true)
+    })
+
+    test("#given active ultrawork loop #when resumeLoop binds a new session #then prompt is preserved", () => {
+      // given
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-old", "Build feature\nwith long prompt", {
+        ultrawork: true,
+        messageCountAtStart: 8,
+      })
+
+      // when
+      const resumed = hook.resumeLoop("session-new")
+
+      // then
+      expect(resumed).toBe(true)
+      const state = hook.getState()
+      expect(state?.session_id).toBe("session-new")
+      expect(state?.prompt).toBe("Build feature\nwith long prompt")
+      expect(state?.ultrawork).toBe(true)
+      expect(state?.message_count_at_start).toBeUndefined()
+      expect(messagesCalls).toEqual([])
     })
 
     test("should handle missing ultrawork option in startLoop", () => {
@@ -468,7 +519,10 @@ describe("ralph-loop", () => {
       const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build something", { maxIterations: 2 })
 
-      const state = hook.getState()!
+      const state = hook.getState()
+      if (!state) {
+        throw new Error("expected active Ralph loop state")
+      }
       state.iteration = 2
       writeState(TEST_DIR, state)
 
@@ -898,7 +952,7 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(1)
     })
 
-    test("#given assistant activity follows an idle continuation #when stale idle arrives before dispatch hold expires #then no duplicate prompt is sent", async () => {
+    test("#given assistant activity follows an idle continuation #when real idle arrives immediately #then next iteration can continue", async () => {
       // given - active loop with deterministic dispatch hold time
       const originalDateNow = Date.now
       let currentNow = originalDateNow()
@@ -911,7 +965,7 @@ describe("ralph-loop", () => {
           event: { type: "session.idle", properties: { sessionID: "session-123" } },
         })
 
-        // when - assistant activity arrives, followed by an immediate stale idle
+        // when - assistant activity arrives, followed by an immediate real idle
         await hook.event({
           event: { type: "message.part.updated", properties: { sessionID: "session-123" } },
         })
@@ -919,9 +973,9 @@ describe("ralph-loop", () => {
           event: { type: "session.idle", properties: { sessionID: "session-123" } },
         })
 
-        // then - activity did not release the prompt gate reservation
-        expect(hook.getState()?.iteration).toBe(2)
-        expect(promptCalls.length).toBe(1)
+        // then - real activity clears stale-idle suppression and allows the next iteration
+        expect(hook.getState()?.iteration).toBe(3)
+        expect(promptCalls.length).toBe(2)
       } finally {
         Date.now = originalDateNow
       }
@@ -1366,7 +1420,10 @@ Original task: Build something`
 
       const verificationToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP")
       expect(verificationToast).toBeDefined()
-      expect(verificationToast!.message).toMatch(/Oracle verification is now required/)
+      if (!verificationToast) {
+        throw new Error("expected ultrawork verification toast")
+      }
+      expect(verificationToast.message).toMatch(/Oracle verification is now required/)
     })
 
     test("#given loop-start message count resolves late after progress #when ulw DONE appears #then oracle verification still starts", async () => {

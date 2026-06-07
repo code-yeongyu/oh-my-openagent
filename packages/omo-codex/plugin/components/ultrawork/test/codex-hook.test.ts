@@ -31,6 +31,28 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/First user-visible line this turn MUST be exactly:/);
 	});
 
+	it("#given Windows cwd #when hook sees ultrawork prompt #then emits directive as Codex hook JSON", () => {
+		// given
+		const payload = {
+			cwd: "C:\\Users\\codex\\project",
+			hook_event_name: "UserPromptSubmit",
+			model: "gpt-5.5",
+			permission_mode: "default",
+			prompt: "please ulw this change",
+			session_id: "s",
+			transcript_path: null,
+			turn_id: "t",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+	});
+
 	it("#given transcript already contains ultrawork directive #when hook sees ultrawork prompt #then it does not repeat directive", () => {
 		// given
 		const payload = {
@@ -187,6 +209,9 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/3\. Browser use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/4\. Computer use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/CLEANUP \(PAIRED/);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/refresh current branch\/PR\/issue state/);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/preserve existing ordering\/policy/);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/separate compatibility detection from policy changes/);
 	});
 
 	it("#given directive #when inspected #then avoids context-expensive agent polling", () => {
@@ -203,15 +228,13 @@ describe("codex ultrawork hook", () => {
 		// then
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/list_agents/);
-		expect(directive).toMatch(/polling or status tool/);
-		expect(directive).toMatch(/replay large agent status and latest-message\s+payloads/);
+		expect(directive).toMatch(/polling loop/);
+		expect(directive).toMatch(/replay large payloads/);
 		expect(directive).toMatch(/Track spawned agent names locally/);
-		expect(directive).toMatch(/wait_agent[\s\S]*completion/);
-		expect(directive).toMatch(/targeted\s+followups only when needed/);
-		expect(directive).toMatch(/close_agent[\s\S]*after integrating each\s+result/);
-		expect(directive).toMatch(/Plan and reviewer agents\s+may run for a long time/);
-		expect(directive).toMatch(/short wait_agent cycles/);
-		expect(directive).toMatch(/single long blocking wait/);
+		expect(directive).toMatch(/wait_agent[\s\S]*mailbox/);
+		expect(directive).toMatch(/WORKING:/);
+		expect(directive).toMatch(/TASK STILL ACTIVE/);
+		expect(directive).toMatch(/Treat child status as a progress signal/);
 	});
 
 	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {
@@ -229,9 +252,12 @@ describe("codex ultrawork hook", () => {
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/TASK:/);
 		expect(directive).toMatch(/fork_turns:\s*"none"/);
-		expect(directive).toMatch(/wait_agent[\s\S]*signal, not\s+proof/);
-		expect(directive).toMatch(/one targeted followup/);
+		expect(directive).toMatch(/wait_agent[\s\S]*mailbox/);
+		expect(directive).toMatch(/TASK STILL ACTIVE/);
 		expect(directive).toMatch(/respawn.*smaller/);
+		expect(directive).toMatch(/timeout only means no new mailbox update arrived/i);
+		expect(directive).toMatch(/WORKING:/);
+		expect(directive).toMatch(/single `list_agents`/);
 	});
 });
 

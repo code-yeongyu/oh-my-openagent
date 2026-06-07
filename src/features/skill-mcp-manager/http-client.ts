@@ -1,6 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { log } from "../../shared/logger"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
+import { redactSensitiveData } from "./error-redaction"
 import { buildHttpRequestInit } from "./oauth-handler"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
 
@@ -50,8 +52,42 @@ function redactUrl(urlStr: string): string {
       }
     }
     return u.toString()
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return urlStr
+  }
+}
+
+function redactCleanupErrorMessage(message: string): string {
+  const sensitiveHeaderKey = "(?:authorization|x-api-key|api-key|x-auth-token|auth-token|x-access-token|access-token)"
+  const messageWithRedactedAuthorization = message
+    .replace(new RegExp(`("${sensitiveHeaderKey}"\\s*:\\s*")([^"]*)(")`, "gi"), "$1[REDACTED]$3")
+    .replace(new RegExp(`('${sensitiveHeaderKey}'\\s*:\\s*')([^']*)(')`, "gi"), "$1[REDACTED]$3")
+    .replace(
+      new RegExp(`(\\b${sensitiveHeaderKey}\\s*[:=]\\s*\\\\?")((?:\\\\.|[^"\\\\])*)(\\\\?")`, "gi"),
+      "$1[REDACTED]$3",
+    )
+    .replace(new RegExp(`(\\b${sensitiveHeaderKey}\\s*[:=]\\s*')([^']*)(')`, "gi"), "$1[REDACTED]$3")
+    .replace(new RegExp(`(\\b${sensitiveHeaderKey}\\s*:\\s*)([^\\s'"\\n,;}][^\\n,;}'"]*)`, "gi"), "$1[REDACTED]")
+    .replace(new RegExp(`(\\b${sensitiveHeaderKey}\\s*=\\s*)([^\\s'"\\n,;}][^\\n,;}'"]*)`, "gi"), "$1[REDACTED]")
+  const messageWithRedactedSecrets = redactSensitiveData(messageWithRedactedAuthorization)
+  return messageWithRedactedSecrets.replace(/https?:\/\/[^\s"'<>)}\]]+/g, (url) => redactUrl(url))
+}
+
+async function closeHttpResourceIgnoringFailure(
+  close: () => Promise<void>,
+  context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" },
+): Promise<void> {
+  try {
+    await close()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    log("[skill-mcp-http-client] ignored cleanup failure", {
+      ...context,
+      error: redactCleanupErrorMessage(message),
+    })
   }
 }
 
@@ -66,7 +102,10 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   let url: URL
   try {
     url = new URL(config.url)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     throw new Error(
       `MCP server "${info.serverName}" has invalid URL: ${redactUrl(config.url)}\n\n` +
       `Expected a valid URL like: https://mcp.example.com/mcp`
@@ -88,13 +127,13 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   try {
     await client.connect(transport)
   } catch (error) {
-    try {
-      await transport.close()
-    } catch {
-      // Transport may already be closed
-    }
+    await closeHttpResourceIgnoringFailure(() => transport.close(), {
+      resource: "transport",
+      serverName: info.serverName,
+      phase: "connect-failure",
+    })
 
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorMessage = redactCleanupErrorMessage(error instanceof Error ? error.message : String(error))
     throw new Error(
       `Failed to connect to MCP server "${info.serverName}".\n\n` +
       `URL: ${redactUrl(config.url)}\n` +
@@ -107,8 +146,16 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   }
 
   if (state.shutdownGeneration !== shutdownGenAtStart) {
-    try { await client.close() } catch {}
-    try { await transport.close() } catch {}
+    await closeHttpResourceIgnoringFailure(() => client.close(), {
+      resource: "client",
+      serverName: info.serverName,
+      phase: "post-shutdown",
+    })
+    await closeHttpResourceIgnoringFailure(() => transport.close(), {
+      resource: "transport",
+      serverName: info.serverName,
+      phase: "post-shutdown",
+    })
     throw new Error(`MCP server "${info.serverName}" connection completed after shutdown`)
   }
 

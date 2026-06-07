@@ -18,6 +18,7 @@ import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
+const CONTEXT_INFO_MARKER = "<!-- omo-start-work-context -->"
 
 interface StartWorkHookInput {
   sessionID: string
@@ -109,13 +110,29 @@ export function createStartWorkHook(ctx: PluginInput) {
       preferredPlanPath,
     })
 
-    const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
-    if (idx >= 0 && output.parts[idx].text) {
-      output.parts[idx].text = output.parts[idx].text
+    // Substitute placeholders across every text part: on an error-retry path
+    // OpenCode may re-issue the original template alongside the already-
+    // processed text, leaving a second <session-context> block with un-
+    // substituted $SESSION_ID / $TIMESTAMP literals (#4480).
+    let firstTextIdx = -1
+    let contextAlreadyInjected = false
+    for (let i = 0; i < output.parts.length; i++) {
+      const part = output.parts[i]
+      if (part.type !== "text" || !part.text) continue
+      part.text = part.text
         .replace(/\$SESSION_ID/g, sessionId)
         .replace(/\$TIMESTAMP/g, timestamp)
+      if (part.text.includes(CONTEXT_INFO_MARKER)) {
+        contextAlreadyInjected = true
+      }
+      if (firstTextIdx < 0) firstTextIdx = i
+    }
 
-      output.parts[idx].text += `\n\n---\n${contextInfo}`
+    // Marker-guarded append: keeps the hook idempotent when it fires more than
+    // once for the same session (e.g. command.execute.before + chat.message,
+    // or retry-driven re-firings).
+    if (!contextAlreadyInjected && firstTextIdx >= 0) {
+      output.parts[firstTextIdx].text += `\n\n---\n${CONTEXT_INFO_MARKER}\n${contextInfo}`
     }
 
     log(`[${HOOK_NAME}] Context injected`, {

@@ -89,7 +89,10 @@ async function getFileMtime(filePath: string): Promise<number> {
   try {
     const stats = await stat(filePath)
     return stats.mtime.getTime()
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return 0
   }
 }

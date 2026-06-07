@@ -40,6 +40,7 @@ import { join } from "node:path";
 
 const wrapperPackageRoot = process.env.OMO_WRAPPER_PACKAGE_ROOT;
 const lazyCodexInvocationNames = new Set(["lazycodex", "lazycodex-ai"]);
+const lazyCodexInstallerCommands = new Set(["install", "setup", "update", "uninstall", "cleanup"]);
 
 if (!wrapperPackageRoot) {
   console.error("oh-my-opencode: OMO_WRAPPER_PACKAGE_ROOT is required to launch the packaged CLI.");
@@ -60,7 +61,52 @@ function exitFromResult(result, failureLabel) {
   process.exit(result.status ?? 1);
 }
 
-if (lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+function shouldRunLazyCodexInstaller() {
+  const args = process.argv.slice(2);
+  const command = readInstallerCommand(args);
+  const platformArg = readPlatformArg(args);
+  if (lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+    if ((command === "install" || command === "setup") && platformArg !== undefined && platformArg !== "codex") {
+      return false;
+    }
+    return command === undefined ||
+    command === "--help" ||
+    command === "-h" ||
+    command === "--version" ||
+    command === "-v" ||
+    lazyCodexInstallerCommands.has(command);
+  }
+
+  return (command === "install" || command === "setup") && platformArg === "codex";
+}
+
+function readInstallerCommand(args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--platform" || arg === "--repo-root") {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    return arg;
+  }
+  return undefined;
+}
+
+function readPlatformArg(args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--platform") {
+      return args[index + 1];
+    }
+    if (arg.startsWith("--platform=")) {
+      return arg.slice("--platform=".length);
+    }
+  }
+  return undefined;
+}
+
+if (shouldRunLazyCodexInstaller()) {
   const lazyCodexInstallerPath = join(wrapperPackageRoot, "packages", "omo-codex", "scripts", "install-local.mjs");
 
   if (!existsSync(lazyCodexInstallerPath)) {

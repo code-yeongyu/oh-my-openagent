@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
@@ -13,6 +13,8 @@ mock.module("../../../shared/logger", () => ({
     logCalls.push([message, data])
   },
 }))
+
+afterEach(() => mock.restore())
 
 const { listUnreadMessages } = await import("./inbox")
 const { TeamModeConfigSchema } = await import("../../../config/schema/team-mode")

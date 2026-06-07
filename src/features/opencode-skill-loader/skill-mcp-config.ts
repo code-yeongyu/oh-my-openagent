@@ -12,7 +12,10 @@ export function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpCon
     if (parsed && typeof parsed === "object" && "mcp" in parsed && parsed.mcp) {
       return parsed.mcp as SkillMcpConfig
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return undefined
   }
   return undefined
@@ -37,7 +40,10 @@ export async function loadMcpJsonFromDir(skillDir: string): Promise<SkillMcpConf
         return parsed as SkillMcpConfig
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return undefined
   }
 

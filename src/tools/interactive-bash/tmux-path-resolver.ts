@@ -33,7 +33,8 @@ async function findCommandPath(command: string): Promise<string | null> {
     }
 
     return path
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
@@ -57,7 +58,8 @@ async function findVerifiedTmuxPath(): Promise<string | null> {
     }
 
     return path
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 }
@@ -109,6 +111,8 @@ export function resetTmuxPathCacheForTesting(): void {
 export function startBackgroundCheck(): void {
   if (!initPromise) {
     initPromise = getTmuxPath()
-    initPromise.catch(() => {})
+    initPromise.catch((error) => {
+      if (!(error instanceof Error)) throw error
+    })
   }
 }

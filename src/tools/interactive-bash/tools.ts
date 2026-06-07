@@ -11,6 +11,11 @@ import { getCachedTmuxPath } from "./tmux-path-resolver"
 
 const GLOBAL_TMUX_OPTIONS_WITH_ARGS = new Set(["-L", "-S", "-f", "-c", "-T"])
 
+function ignoreInteractiveBashKillError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 function resolveTmuxExecutable(tmuxPath: string): string[] {
   if (!isCmuxCompatEnvironment()) {
     return [tmuxPath]
@@ -181,8 +186,11 @@ export async function executeInteractiveBash(args: InteractiveBashArgs): Promise
         try {
           proc.kill()
           // Fire-and-forget: wait for process exit in background to avoid zombies
-          void proc.exited.catch(() => {})
-        } catch {
+          void proc.exited.catch((error) => {
+            ignoreInteractiveBashKillError(error)
+          })
+        } catch (error) {
+          if (!(error instanceof Error)) throw error
           // Ignore kill errors; we'll still reject with timeoutError below
         }
         reject(timeoutError)
@@ -209,8 +217,9 @@ export async function executeInteractiveBash(args: InteractiveBashArgs): Promise
     }
 
     return stdout || "(no output)"
-  } catch (e) {
-    return `Error: ${e instanceof Error ? e.message : String(e)}`
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return `Error: ${message}`
   }
 }
 

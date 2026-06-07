@@ -1,4 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { execFileSync } from "node:child_process"
 import { existsSync, readdirSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -121,6 +122,23 @@ async function packDryRunPaths(): Promise<Set<string>> {
 }
 
 describe("published package layout", () => {
+  test("#given vendored LSP MCP package #when inspecting tracked package files #then it is not a git submodule", () => {
+    // given
+    const gitmodulesPath = join(repositoryRoot, ".gitmodules")
+
+    // when
+    const trackedEntries = execFileSync("git", ["ls-files", "--stage", "packages/lsp-tools-mcp"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    })
+    const gitmodules = existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
+
+    // then
+    expect(trackedEntries).not.toContain("160000")
+    expect(trackedEntries).toContain("packages/lsp-tools-mcp/package.json")
+    return expect(gitmodules).resolves.not.toContain("packages/lsp-tools-mcp")
+  })
+
   test("#given Codex LSP file dependency #when packing package #then lsp-tools-mcp package metadata ships", async () => {
     // given
     const expectedPackageRootManifest = "packages/lsp-tools-mcp/package.json"

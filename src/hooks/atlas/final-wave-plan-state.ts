@@ -54,7 +54,10 @@ export function readFinalWavePlanState(planPath: string): FinalWavePlanState | n
       pendingImplementationTaskCount,
       pendingFinalWaveTaskCount,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }

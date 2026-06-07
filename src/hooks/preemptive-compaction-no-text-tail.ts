@@ -69,7 +69,8 @@ export async function resolveNoTextTailFromSession(args: {
     if (target.info?.role !== "assistant") return false
 
     return isStepOnlyNoTextParts(target.parts)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return false
     return false
   }
 }

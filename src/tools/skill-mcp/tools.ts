@@ -90,7 +90,8 @@ export function applyGrepFilter(output: string, pattern: string | undefined): st
     const lines = output.split("\n")
     const filtered = lines.filter((line) => regex.test(line))
     return filtered.length > 0 ? filtered.join("\n") : `[grep] No lines matched pattern: ${pattern}`
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return output
   }
 }

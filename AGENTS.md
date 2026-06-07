@@ -2,7 +2,7 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-06-01 | **Commit:** 5555d66d3 | **Branch:** dev | **Release:** v4.5.12
+**Generated:** 2026-06-06 | **Commit:** cfee52e84 | **Branch:** dev | **Release:** v4.7.5
 
 ## OVERVIEW
 
@@ -161,7 +161,7 @@ oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCo
 - **Alias mechanics:** root `package.json` maps `lazycodex-ai` to `bin/oh-my-opencode.js` (1 of 5 bin aliases: `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex`, `lazycodex-ai`, all the same compiled CLI). `bunx lazycodex-ai install` is exactly `bunx oh-my-openagent install --platform=codex`. Routing: `src/cli/cli-program.ts` (`lazycodex`/`lazycodex-ai` default platform to codex), `bin/platform.js` (both resolve the `oh-my-openagent` platform family). `src/cli/star-request.ts` stars both repos. The bare `lazycodex` npm name was unpublished 2026-05-30; the live npm package is `lazycodex-ai`.
 - **Disambiguation:** `publish.yml` republishes this repo's CLI under the npm name `lazycodex-ai` (name/version rewrite). The bare `lazycodex` npm name was unpublished 2026-05-30 and is no longer installable. `lazycodex` (without `-ai`) now refers only to the `code-yeongyu/lazycodex` GitHub repository that hosts the marketplace bundle, not an npm package. Both this repo's publish target and the `code-yeongyu/lazycodex` repo's package resolve to `lazycodex-ai` on npm, so their release versions must stay coordinated.
 - **Components (8):** `comment-checker`, `git-bash`, `lsp`, `rules`, `start-work-continuation`, `telemetry`, `ultrawork`, `ulw-loop`, wired to Codex events `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PostToolUse`/`PostCompact`/`Stop`/`SubagentStop`. No agent orchestration, no `team_*`, no built-in MCPs beyond LSP, no hashline.
-- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, links agent TOMLs via `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer: [`src/cli/install-codex/`](file:///Users/yeongyu/local-workspaces/omo/src/cli/install-codex/) + `packages/omo-codex/scripts/install*.mjs`.
+- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer: [`src/cli/install-codex/`](file:///Users/yeongyu/local-workspaces/omo/src/cli/install-codex/) + `packages/omo-codex/scripts/install*.mjs`.
 - **Deploy / publish** ([`.github/workflows/publish.yml`](file:///Users/yeongyu/local-workspaces/omo/.github/workflows/publish.yml), manual dispatch):
   - `publish_lazycodex` (default **true**) publishes the npm alias `lazycodex-ai`: rewrites root `package.json` name to `lazycodex-ai` + version to the release + optionalDeps `oh-my-opencode-*` to `oh-my-openagent-*`, skips when `registry.npmjs.org/lazycodex-ai/${VERSION}` exists, publishes `--access public --provenance --tag latest`, then restores `package.json`. (The bare `lazycodex` npm name was unpublished 2026-05-30; `lazycodex-ai` is the live package.)
   - `sync_lazycodex_marketplace` (default **false**, needs secret `LAZYCODEX_SYNC_TOKEN`) checks out `code-yeongyu/lazycodex`, builds the plugin + ast-grep-mcp + lsp-tools-mcp, runs [`script/sync-lazycodex-marketplace.ts`](file:///Users/yeongyu/local-workspaces/omo/script/sync-lazycodex-marketplace.ts) `<source-root> <lazycodex-root>`, then `git push origin HEAD:main`.
@@ -271,7 +271,7 @@ bun run test:codex                # Codex Light compatibility suite (ast-grep + 
 bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundle + schema generation)
 bun run build:all                 # Build + 11 platform binaries
 bun run build:binaries            # 11 platform binaries only (script/build-binaries.ts)
-bun run build:lsp-tools-mcp       # npm-install + build the bundled LSP MCP submodule
+bun run build:lsp-tools-mcp       # npm ci + build the vendored LSP MCP package
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
 bun run build:model-capabilities  # Refresh shared/model-capabilities cache from models.dev
 bun run typecheck                 # tsgo --noEmit + typecheck:packages (NOT tsc; @typescript/native-preview)

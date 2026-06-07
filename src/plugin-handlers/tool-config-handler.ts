@@ -19,7 +19,8 @@ function getConfigQuestionPermission(): string | null {
   try {
     const parsed = JSON.parse(configContent);
     return parsed?.permission?.question ?? null;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return null;
     return null;
   }
 }

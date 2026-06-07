@@ -28,7 +28,8 @@ export async function refreshModelCapabilitiesOnStartup(
       }),
     ])
   } catch (error) {
-    log("[auto-update-checker] Model capabilities refresh failed", { error: String(error) })
+    const message = error instanceof Error ? String(error) : String(error)
+    log("[auto-update-checker] Model capabilities refresh failed", { error: message })
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId)

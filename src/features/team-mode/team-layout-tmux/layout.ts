@@ -46,7 +46,15 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+  const password = process.env.OPENCODE_SERVER_PASSWORD
+  let envPrefix = ""
+  if (password) {
+    const parts = [`OPENCODE_SERVER_PASSWORD=${shellSingleQuote(password)}`]
+    const username = process.env.OPENCODE_SERVER_USERNAME
+    if (username !== undefined) parts.push(`OPENCODE_SERVER_USERNAME=${shellSingleQuote(username)}`)
+    envPrefix = `${parts.join(" ")} `
+  }
+  return `${envPrefix}opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -160,7 +168,8 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
       ownedSession: false,
     }
   } catch (error) {
-    log("tmux visualization unavailable, skipping", { error: String(error) })
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    log("tmux visualization unavailable, skipping", { error: errorMessage })
     return null
   }
 }
@@ -190,7 +199,11 @@ export async function removeTeamLayout(
       for (const paneId of cleanupTarget.paneIds) {
         try {
           await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-pane", "-t", paneId])
-        } catch {
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            log("tmux team pane cleanup failed", { teamRunId, paneId })
+            continue
+          }
           log("tmux team pane cleanup failed", { teamRunId, paneId })
         }
       }
@@ -202,11 +215,13 @@ export async function removeTeamLayout(
       try {
         await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-window", "-t", windowId])
       } catch (windowError) {
-        log("tmux team layout window cleanup failed", { teamRunId, windowId, error: String(windowError) })
+        const errorMessage = windowError instanceof Error ? String(windowError) : String(windowError)
+        log("tmux team layout window cleanup failed", { teamRunId, windowId, error: errorMessage })
       }
     }
   } catch (error) {
-    log("tmux team layout cleanup failed", { teamRunId, error: String(error) })
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    log("tmux team layout cleanup failed", { teamRunId, error: errorMessage })
   }
 }
 

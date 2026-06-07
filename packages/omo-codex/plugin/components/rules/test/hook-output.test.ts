@@ -26,6 +26,22 @@ describe("formatAdditionalContextOutput", () => {
 		// then
 		expect(output).toBe("");
 	});
+
+	it("#given oversized context #when serializing hook JSON #then it keeps additional context under the safety cap", () => {
+		// given
+		const context = `first\n${"x".repeat(50_000)}\nlast`;
+
+		// when
+		const output = formatAdditionalContextOutput("SessionStart", context);
+		const parsed: unknown = JSON.parse(output);
+		const additionalContext = readAdditionalContext(parsed);
+
+		// then
+		expect(additionalContext.length).toBeLessThanOrEqual(32_000);
+		expect(additionalContext).toContain("first");
+		expect(additionalContext).not.toContain("last");
+		expect(additionalContext).toContain("[Truncated hook additional context to 32000 chars");
+	});
 });
 
 function readAdditionalContext(value: unknown): string {

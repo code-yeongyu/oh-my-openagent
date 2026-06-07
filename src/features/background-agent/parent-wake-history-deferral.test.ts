@@ -8,7 +8,7 @@ import { ParentWakeNotifier } from "./parent-wake-notifier"
 type ParentWakeClient = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
 
 describe("ParentWakeNotifier — assistant history deferral", () => {
-  test("#given stale unfinished assistant text has no pending tool call #when checking parent wake history #then parent wake dispatches after defer max without second gate check", async () => {
+  test("#given stale unfinished assistant text has no pending tool call #when checking parent wake history #then parent wake keeps deferring", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -66,7 +66,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
       const decision = await notifier["shouldDeferParentWakeForSessionHistory"]("parent-stale-text", pendingWake)
 
       // then
-      expect(decision).toEqual({ defer: false, skipPromptGateToolStateCheck: true })
+      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -140,7 +140,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
     }
   })
 
-  test("#given stale deferral but fresh unfinished assistant text #when flushing parent wake #then parent wake stays queued without dispatch", async () => {
+  test("#given stale deferral but fresh unfinished assistant text #when flushing parent wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -200,8 +200,8 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
       await notifier.flushPendingParentWake("parent-fresh-text-flush")
 
       // then
-      expect(promptAsyncCallCount).toBe(0)
-      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(true)
+      expect(promptAsyncCallCount).toBe(1)
+      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -325,6 +325,81 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
     try {
       // when
       const decision = await notifier["shouldDeferParentWakeForSessionHistory"]("parent-fresh-tool-activity", pendingWake)
+
+      // then
+      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given old assistant turn has recent state-level tool activity #when checking parent wake history #then stale tool escape stays deferred", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "assistant",
+                finish: "tool-calls",
+                time: { created: 80_000 },
+              },
+              parts: [
+                {
+                  type: "tool",
+                  tool: "bash",
+                  state: { status: "running", time: { updated: 99_500 } },
+                },
+              ],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-fresh-tool-state-activity": { type: "idle" } } }),
+        promptAsync: async () => {
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-fresh-tool-state-activity",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-tool-state-activity")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 90_000
+
+    try {
+      // when
+      const decision = await notifier["shouldDeferParentWakeForSessionHistory"](
+        "parent-fresh-tool-state-activity",
+        pendingWake,
+      )
 
       // then
       expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })

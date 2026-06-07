@@ -10,6 +10,7 @@ const SKILLS = [
 	"review-work",
 	"start-work",
 	"ulw-loop",
+	"ulw-plan",
 ];
 
 const AGENT_FILES = [
@@ -28,13 +29,16 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 		if (
 			!/TASK:/.test(text) ||
 			!/fork_turns:\s*"none"/.test(text) ||
-			!/wait_agent.*signal, not proof/s.test(text) ||
-			!/one targeted followup/.test(text) ||
+			!/wait_agent.*mailbox signals/s.test(text) ||
+			!/Fallback only when/.test(text) ||
 			!/respawn.*smaller/s.test(text) ||
 			!/model.*reasoning_effort.*default agent/s.test(text) ||
 			!/Plan and reviewer agents may run for a long time/.test(text) ||
 			!/short wait_agent cycles/.test(text) ||
-			!/single long blocking wait/.test(text)
+			!/single long blocking wait/.test(text) ||
+			!/A timeout only means no new mailbox update arrived/i.test(text) ||
+			!/WORKING:/.test(text) ||
+			!/single `list_agents`/.test(text)
 		) {
 			missing.push(skillPath);
 		}
@@ -56,6 +60,33 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /codex-ultrawork-reviewer/);
 	assert.match(text, /agent_type.*worker/s);
 	assert.match(text, /model.*reasoning_effort.*default agent/s);
+	assert.match(text, /timeout only means no new mailbox update arrived/i);
+	assert.match(text, /WORKING:/);
+	assert.match(text, /single `list_agents`/);
+});
+
+test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {
+	// given
+	const workflowPaths = [
+		"components/ulw-loop/skills/ulw-loop/references/full-workflow.md",
+		"skills/ulw-loop/references/full-workflow.md",
+	];
+
+	// when
+	const missing = [];
+	for (const workflowPath of workflowPaths) {
+		const text = await readFile(join(root, workflowPath), "utf8");
+		if (
+			!/refresh current branch\/PR\/issue state/.test(text) ||
+			!/preserve existing ordering\/policy/.test(text) ||
+			!/separate compatibility detection from policy changes/.test(text)
+		) {
+			missing.push(workflowPath);
+		}
+	}
+
+	// then
+	assert.deepEqual(missing, []);
 });
 
 test("#given ultrawork agents #when inspected #then inter-agent commentary is treated as assignments", async () => {
@@ -73,4 +104,17 @@ test("#given ultrawork agents #when inspected #then inter-agent commentary is tr
 
 	// then
 	assert.deepEqual(missing, []);
+});
+
+test("#given reviewer receives a targeted still-active followup #when prompt is inspected #then it must fail loud", async () => {
+	// given
+	const reviewerPath = "components/ultrawork/agents/codex-ultrawork-reviewer.toml";
+
+	// when
+	const text = await readFile(join(root, reviewerPath), "utf8");
+
+	// then
+	assert.match(text, /TASK STILL ACTIVE:/);
+	assert.match(text, /BLOCKED: <reason>/);
+	assert.match(text, /instead of continuing silently/);
 });

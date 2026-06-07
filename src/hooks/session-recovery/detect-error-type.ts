@@ -30,7 +30,8 @@ function getErrorMessage(error: unknown): string {
 
   try {
     return JSON.stringify(error).toLowerCase()
-  } catch {
+  } catch (stringifyError) {
+    if (!(stringifyError instanceof Error)) throw stringifyError
     return ""
   }
 }
@@ -40,7 +41,8 @@ export function extractMessageIndex(error: unknown): number | null {
     const message = getErrorMessage(error)
     const match = message.match(/messages\.(\d+)/)
     return match ? parseInt(match[1], 10) : null
-  } catch {
+  } catch (extractionError) {
+    if (!(extractionError instanceof Error)) throw extractionError
     return null
   }
 }
@@ -50,7 +52,8 @@ export function extractUnavailableToolName(error: unknown): string | null {
     const message = getErrorMessage(error)
     const match = message.match(/(?:unavailable tool|no such tool)[:\s'"]+([^'".\s]+)/)
     return match ? match[1] : null
-  } catch {
+  } catch (extractionError) {
+    if (!(extractionError instanceof Error)) throw extractionError
     return null
   }
 }
@@ -101,7 +104,8 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
     }
 
     return null
-  } catch {
+  } catch (detectionError) {
+    if (!(detectionError instanceof Error)) throw detectionError
     return null
   }
 }

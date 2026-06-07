@@ -2,6 +2,7 @@
 
 import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
+import { agentBrowserSkill, playwrightSkill } from "./skills/playwright"
 
 describe("createBuiltinSkills", () => {
 	test("returns playwright skill by default", () => {
@@ -15,6 +16,22 @@ describe("createBuiltinSkills", () => {
 		expect(browserSkill).toBeDefined()
 		expect(browserSkill?.description).toContain("browser")
 		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
+	})
+
+	test("exports browser skill contracts with stable tool surfaces", () => {
+		// #given - direct browser skill exports
+
+		// #when
+		const playwrightMcp = playwrightSkill.mcpConfig?.playwright
+
+		// #then
+		expect(playwrightSkill.name).toBe("playwright")
+		expect(playwrightMcp?.command).toBe("npx")
+		expect(playwrightMcp?.args).toEqual(["@playwright/mcp@latest"])
+		expect(agentBrowserSkill.name).toBe("agent-browser")
+		expect(agentBrowserSkill.allowedTools).toEqual(["Bash(agent-browser:*)"])
+		expect(agentBrowserSkill.template).toContain("agent-browser snapshot -i")
+		expect(agentBrowserSkill.template).toContain("AGENT_BROWSER_SESSION")
 	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
@@ -70,7 +87,7 @@ describe("createBuiltinSkills", () => {
 		expect(playwrightSkill).toBeUndefined()
 	})
 
-	test("agent-browser skill template is inlined (not loaded from file)", () => {
+	test("agent-browser skill template exposes bundled command documentation", () => {
 		// given
 		const options = { browserProvider: "agent-browser" as const }
 
@@ -78,7 +95,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 
-		// then - template should contain substantial content (inlined, not fallback)
+		// then
 		expect(agentBrowserSkill?.template).toContain("## Quick start")
 		expect(agentBrowserSkill?.template).toContain("## Commands")
 		expect(agentBrowserSkill?.template).toContain("agent-browser open")
@@ -103,10 +120,37 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "debugging")).toBeDefined()
 			expect(skills.find((s) => s.name === "security-research")).toBeDefined()
 			expect(skills.find((s) => s.name === "security-review")).toBeDefined()
+			expect(skills.find((s) => s.name === "visual-qa")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 9 skills regardless of provider", () => {
+	test("git-master skill keeps commit workflow phases in order", () => {
+		// #given
+		const skills = createBuiltinSkills()
+
+		// #when
+		const gitMaster = skills.find((skill) => skill.name === "git-master")
+		const template = gitMaster?.template ?? ""
+		const phaseHeadings = [
+			"## PHASE 0: Parallel Context Gathering",
+			"## PHASE 1: Style Detection",
+			"## PHASE 2: Branch Context Analysis",
+			"## PHASE 3: Atomic Unit Planning",
+			"## PHASE 4: Commit Strategy Decision",
+			"## PHASE 5: Commit Execution",
+			"## PHASE 6: Verification & Cleanup",
+		]
+		const phaseIndexes = phaseHeadings.map((heading) => template.indexOf(heading))
+
+		// #then
+		expect(gitMaster).toBeDefined()
+		expect(phaseIndexes.every((index) => index >= 0)).toBe(true)
+		expect(phaseIndexes).toEqual([...phaseIndexes].sort((left, right) => left - right))
+		expect(template).toContain("COMMIT PLAN\n===========")
+		expect(template).toContain("COMMIT SUMMARY:")
+	})
+
+	test("returns exactly 10 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -115,9 +159,9 @@ describe("createBuiltinSkills", () => {
 		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(9)
-		expect(agentBrowserSkills).toHaveLength(9)
-		expect(devBrowserSkills).toHaveLength(9)
+		expect(defaultSkills).toHaveLength(10)
+		expect(agentBrowserSkills).toHaveLength(10)
+		expect(devBrowserSkills).toHaveLength(10)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -138,7 +182,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("debugging")
 		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
-		expect(skills.length).toBe(8)
+		expect(skills.map((s) => s.name)).toContain("visual-qa")
+		expect(skills.length).toBe(9)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -159,7 +204,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("debugging")
 		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
-		expect(skills.length).toBe(7)
+		expect(skills.map((s) => s.name)).toContain("visual-qa")
+		expect(skills.length).toBe(8)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
@@ -175,6 +221,7 @@ describe("createBuiltinSkills", () => {
 				"debugging",
 				"security-research",
 				"security-review",
+				"visual-qa",
 			]),
 		}
 
@@ -185,7 +232,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.length).toBe(0)
 	})
 
-	test("should return all 9 skills when disabledSkills set is empty", () => {
+	test("should return all 10 skills when disabledSkills set is empty", () => {
 		// #given
 		const options = { disabledSkills: new Set<string>() }
 
@@ -193,7 +240,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(9)
+		expect(skills.length).toBe(10)
 	})
 
 	test("init-deep skill has correct structure", () => {
@@ -205,10 +252,10 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(initDeep).toBeDefined()
-		expect(initDeep!.description).toContain("hierarchical AGENTS.md")
-		expect(initDeep!.argumentHint).toBe("[--create-new] [--max-depth=N]")
-		expect(initDeep!.template).toContain("Generate hierarchical AGENTS.md files")
-		expect(initDeep!.template).toContain("Discovery + Analysis")
+		expect(initDeep?.description).toContain("hierarchical AGENTS.md")
+		expect(initDeep?.argumentHint).toBe("[--create-new] [--max-depth=N]")
+		expect(initDeep?.template).toContain("Generate hierarchical AGENTS.md files")
+		expect(initDeep?.template).toContain("Discovery + Analysis")
 	})
 
 	test("debugging skill is available from shared template", () => {
@@ -268,9 +315,9 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(removeAiSlops).toBeDefined()
-		expect(removeAiSlops!.description).toContain("AI-generated code smells")
-		expect(removeAiSlops!.template).toContain("Remove AI Slops Skill")
-		expect(removeAiSlops!.template).toContain("$omo:remove-ai-slops")
+		expect(removeAiSlops?.description).toContain("AI-generated code smells")
+		expect(removeAiSlops?.template).toContain("Remove AI Slops Skill")
+		expect(removeAiSlops?.template).toContain("$omo:remove-ai-slops")
 	})
 
 	test("security-research skill has correct structure", () => {

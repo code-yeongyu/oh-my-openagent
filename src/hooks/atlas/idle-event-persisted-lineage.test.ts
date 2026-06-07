@@ -208,6 +208,76 @@ describe("atlas hook idle-event persisted lineage", () => {
     expect(promptCalls.length).toBe(0)
   })
 
+  test("#given appended descendant lineage and matching agent #when descendant idles #then atlas injects continuation", async () => {
+    // given
+    const descendantSessionID = "ses_appended_descendant_match"
+    writeIncompleteBoulder({
+      agent: "atlas",
+      session_ids: [MAIN_SESSION_ID, descendantSessionID],
+      session_origins: {
+        [MAIN_SESSION_ID]: "direct",
+        [descendantSessionID]: "appended",
+      },
+    })
+
+    const hook = createHook(
+      {
+        [descendantSessionID]: MAIN_SESSION_ID,
+      },
+      {
+        [descendantSessionID]: [
+          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
+        ],
+      },
+    )
+
+    // when
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: descendantSessionID },
+      },
+    })
+
+    // then
+    expect(promptCalls.length).toBe(1)
+  })
+
+  test("#given appended descendant lineage with sisyphus agent #when atlas owns boulder #then atlas still injects continuation", async () => {
+    // given
+    const descendantSessionID = "ses_appended_descendant_sisyphus"
+    writeIncompleteBoulder({
+      agent: "atlas",
+      session_ids: [MAIN_SESSION_ID, descendantSessionID],
+      session_origins: {
+        [MAIN_SESSION_ID]: "direct",
+        [descendantSessionID]: "appended",
+      },
+    })
+
+    const hook = createHook(
+      {
+        [descendantSessionID]: MAIN_SESSION_ID,
+      },
+      {
+        [descendantSessionID]: [
+          { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.4" } },
+        ],
+      },
+    )
+
+    // when
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: descendantSessionID },
+      },
+    })
+
+    // then
+    expect(promptCalls.length).toBe(1)
+  })
+
   test("injects continuation for directly tracked child session even when ancestor is also tracked and child agent mismatches", async () => {
     // given
     const descendantSessionID = "ses_direct_child_tracked"

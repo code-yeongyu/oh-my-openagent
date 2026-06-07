@@ -235,6 +235,14 @@ ${taskMetadataBlock}`
     if (!cleanupReason) {
       cleanupReason = "exception"
     }
+    if (error instanceof Error) {
+      return formatDetailedError(error, {
+        operation: "Launch monitored background task",
+        args,
+        agent: agentToUse,
+        category: args.category,
+      })
+    }
     return formatDetailedError(error, {
       operation: "Launch monitored background task",
       args,

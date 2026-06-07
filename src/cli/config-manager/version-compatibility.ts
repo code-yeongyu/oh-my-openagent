@@ -8,7 +8,12 @@ export interface VersionCompatibility {
 
 function parseVersion(version: string): number[] {
   const clean = version.replace(/^v/, "").split("-")[0]
-  return clean.split(".").map(Number)
+  const parts = clean.split(".").map(Number)
+  if (parts.some((part) => !Number.isFinite(part))) {
+    throw new RangeError(`Invalid semver: ${version}`)
+  }
+
+  return parts
 }
 
 function compareVersions(a: string, b: string): number {
@@ -86,7 +91,11 @@ export function checkVersionCompatibility(
       isMajorBump: false,
       requiresMigration: false,
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return {
       canUpgrade: true,
       reason: `Unable to compare versions ${currentVersion} and ${newVersion} - proceeding with caution`,

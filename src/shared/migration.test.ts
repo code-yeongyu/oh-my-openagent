@@ -580,21 +580,20 @@ describe("MODEL_VERSION_MAP", () => {
 
   test("does not migrate openai/gpt-5.5 (still a supported codex variant, #3777)", () => {
     // given/when: Check MODEL_VERSION_MAP
-    // then: gpt-5.5 must remain user-selectable — it is the codex
-    //       powerhouse documented in agent-model-matching.md, not a
-    //       deprecated alias for gpt-5.4
+    // then: gpt-5.5 must remain user-selectable as the codex powerhouse
+    // documented in agent-model-matching.md, not a deprecated alias.
     expect(MODEL_VERSION_MAP["openai/gpt-5.5"]).toBeUndefined()
   })
 
-  test("maps openai/gpt-5.4 to openai/gpt-5.5", () => {
+  test("does not migrate openai/gpt-5.4 while it remains a user-selectable primary model", () => {
     // given/when: Check MODEL_VERSION_MAP
-    // then: gpt-5.4 should migrate to gpt-5.5
-    expect(MODEL_VERSION_MAP["openai/gpt-5.4"]).toBe("openai/gpt-5.5")
+    // then: explicit user config for gpt-5.4 must be preserved
+    expect(MODEL_VERSION_MAP["openai/gpt-5.4"]).toBeUndefined()
   })
 })
 
 describe("migrateModelVersions", () => {
-  test("#given a config with gpt-5.4-codex model #when migrating model versions #then does not overwrite with non-existent gpt-5.5", () => {
+  test("#given a config with gpt-5.4-codex model #when migrating model versions #then does not overwrite with gpt-5.5", () => {
     // given: Agent config with gpt-5.4-codex model
     const agents = {
       sisyphus: { model: "openai/gpt-5.4-codex", temperature: 0.1 },
@@ -623,7 +622,7 @@ describe("migrateModelVersions", () => {
     // when: Migrate model versions
     const { migrated, changed, newMigrations } = migrateModelVersions(agents)
 
-    // then: gpt-5.5 must remain — auto-rewriting silently broke configs
+    // then: gpt-5.5 must remain because auto-rewriting silently broke configs
     expect(changed).toBe(false)
     expect(newMigrations).toEqual([])
     expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.5")

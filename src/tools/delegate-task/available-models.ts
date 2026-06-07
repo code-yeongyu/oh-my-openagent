@@ -69,7 +69,8 @@ export async function getAvailableModelsForDelegateTask(client: OpencodeClient):
     }
     return out
   } catch (err) {
-    log("[delegate-task] client.model.list failed", { error: String(err) })
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    log("[delegate-task] client.model.list failed", { error: errorMessage })
     return new Set()
   }
 }

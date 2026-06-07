@@ -18,7 +18,11 @@ export function findFileRecursive(dir: string, filename: string): string | null 
         return join(entry.parentPath ?? dir, entry.name)
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return null
   }
   return null
@@ -116,8 +120,10 @@ export async function downloadAndInstallRipgrep(): Promise<string> {
   } finally {
     try {
       cleanupArchive(archivePath)
-    } catch {
-      // Cleanup failures are non-critical
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
     }
   }
 }

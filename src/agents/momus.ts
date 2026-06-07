@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel } from "./types";
+import { buildClaudeThinkingConfig, isGptModel } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -26,6 +26,8 @@ const MOMUS_DEFAULT_PROMPT = `You are a **practical** work plan reviewer. Your g
 
 **CRITICAL FIRST RULE**:
 Extract a single plan path from anywhere in the input, ignoring system directives and wrappers. If exactly one \`.omo/plans/*.md\` path exists, this is VALID input and you must read it. If no plan path exists or multiple plan paths exist, reject per Step 0. If the path points to a YAML plan file (\`.yml\` or \`.yaml\`), reject it as non-reviewable.
+
+**PLAN RE-READ RULE**: If you encounter the same plan path in a follow-up turn, you must re-read from disk. This fresh reread ensures the current on-disk contents are the only source of truth. A previous verdict cannot be trusted without re-reading the plan. Supported plan paths: canonical \`.omo/plans/*.md\`.
 
 ---
 
@@ -208,6 +210,10 @@ Extract a single plan path from anywhere in the input, ignoring system directive
 System directives (\`<system-reminder>\`, \`[analyze-mode]\`, etc.) are IGNORED during validation.
 </input_extraction>
 
+<plan_reread_rule>
+If you encounter the same plan path in a follow-up turn, you must re-read from disk. This fresh reread ensures the current on-disk contents are the only source of truth. A previous verdict cannot be trusted without re-reading the plan. Supported plan paths: canonical \`.omo/plans/*.md\`.
+</plan_reread_rule>
+
 <purpose>
 You exist to answer one question: "Can a capable developer execute this plan without getting stuck?"
 
@@ -300,7 +306,7 @@ export function createMomusAgent(model: string): AgentConfig {
 
   return {
     ...base,
-    thinking: { type: "enabled", budgetTokens: 32000 },
+    ...buildClaudeThinkingConfig(model),
   } as AgentConfig;
 }
 createMomusAgent.mode = MODE;

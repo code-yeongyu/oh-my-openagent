@@ -112,8 +112,8 @@ function openBrowser(url: string): void {
     const child = spawn(command, args, { stdio: "ignore", detached: true })
     child.on("error", () => {})
     child.unref()
-  } catch {
-    // Browser open failed - user must navigate manually
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
   }
 }
 

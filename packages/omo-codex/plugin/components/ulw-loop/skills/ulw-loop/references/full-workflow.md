@@ -33,31 +33,32 @@ Size each worker to the task — never spend `xhigh` on a one-liner, never send 
 | Task shape | agent_type | model | reasoning_effort |
 |---|---|---|---|
 | Trivial / mechanical (rename, move, obvious one-liner, config edit) | `worker` | `gpt-5.4-mini` | `low` |
-| Pure implementation against a clear spec (new function, endpoint, test from a named pattern) | `worker` | `gpt-5.4` | `high` |
+| Pure implementation against a clear spec (new function, endpoint, test from a named pattern) | `worker` | `gpt-5.5` | `high` |
 | Deep debugging / race / perf / subtle cross-module reasoning | `worker` | `gpt-5.5` | `xhigh` |
-| QA execution (drive a channel, capture evidence) | `worker` | `gpt-5.4` | `high` |
+| QA execution (drive a channel, capture evidence) | `worker` | `gpt-5.5` | `high` |
 | Read-only codebase search | `explorer` | role default | role default |
 | External library / docs research | `librarian` | role default | role default |
 | Final verification audit | `codex-ultrawork-reviewer` | role default | role default |
 
 If `codex-ultrawork-reviewer` is unavailable, use `agent_type="worker"` with a self-contained reviewer assignment, tight scope, and explicit verification. Never spawn a model-only default agent for review.
 
-Every worker message MUST carry: goal + exact files in scope; the baseline characterization test pinning current behavior when the task touches existing code, then the failing test / reproduction required before production code; constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker.
+Every worker message MUST carry: goal + exact files in scope; the baseline characterization test pinning current behavior when the task touches existing code, then the failing test / reproduction required before production code; constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture; for git-tracked edits, require `git-master` plus repository-wide and touched-path commit history inspection before commit. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker.
 
 Codex subagent reliability:
 - Start every `spawn_agent` message with `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and `VERIFY`. State that it is an executable assignment, not a context handoff.
 - Prefer `fork_turns: "none"` unless full history is truly required; paste only the context the child needs. Full-history forks can make the child continue old parent context instead of the delegated task.
 - Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
-- While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
-- Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads. Track spawned agent names locally, use `wait_agent` for completion signals, targeted followups only when needed, and `close_agent` after integrating each result.
-- Treat `wait_agent` as a mailbox signal, not proof of completion, content, or errors. After two waits with no substantive result, send one targeted followup: `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If still silent or ack-only, record inconclusive, do not count it as pass/review approval, close if safe, and respawn a smaller `fork_turns: "none"` task with the missing deliverable.
-- A `wait_agent` timeout is not unresponsive evidence by itself. Check the child's latest heartbeat, session log activity, or tool output before labeling it silent; timeout plus active logs means "still running", not "dead". If the targeted followup still produces no substantive result, record inconclusive rather than converting the timeout into approval, failure, or proof of no work.
+- For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
+- While any child is active, keep the parent visibly alive with active subagent count, agent names, latest `WORKING:` phase, and whether the parent is waiting for mailbox updates.
+- Track spawned agent names locally. Use `wait_agent` for mailbox signals, not proof of completion. A timeout only means no new mailbox update arrived; after a timeout, run a single `list_agents` check for the named child when you need reassurance. If it is running or its latest message is `WORKING:`, treat it as alive. Do not use `list_agents` as a polling loop or status feed; it can replay large payloads.
+- Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running. Then send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>` when a targeted followup can still recover the lane; otherwise record inconclusive, do not count it as pass/review approval, close if safe, and respawn a smaller `fork_turns: "none"` task with the missing deliverable.
 
 ## Artifacts
 - `.omo/ulw-loop/brief.md`: original brief and durable constraints.
 - `.omo/ulw-loop/goals.json`: goals with embedded `successCriteria` per goal.
 - `.omo/ulw-loop/ledger.jsonl`: append-only audit trail.
 - Read artifacts before resuming, steering, or checkpointing.
+- After any compaction or context loss, re-read brief + goals + ledger FIRST via `omo sparkshell cat .omo/ulw-loop/ledger.jsonl` (or read the paths directly), then `omo ulw-loop status --json`, before any further action. Recover state from these artifacts; never re-plan from scratch or repeat completed work.
 - Never invent state outside `.omo/ulw-loop` artifacts or `omo ulw-loop status --json`.
 
 ## Bootstrap
@@ -108,6 +109,10 @@ omo ulw-loop create-goals --brief "<brief>" --json
 omo ulw-loop create-goals --brief-file <path> --json
 cat <brief> | omo ulw-loop create-goals --from-stdin --json
 ```
+If the existing aggregate is already complete, do not steer or force the
+completed default state for unrelated new work. Start a fresh run with
+`omo ulw-loop create-goals --session-id <new-id> ...`; use `--force`
+only when deliberately overwriting completed evidence.
 Write state through the CLI path. Do not hand-edit state files.
 
 ### 2. Refine success criteria + a Prometheus-grade QA and parallelism plan per goal
@@ -138,7 +143,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 
 | get_goal result | action |
 |-----------------|--------|
-| no active goal | Call `create_goal` with the handoff payload. |
+| no active goal | Call `create_goal` with objective only from `instruction.json.objective`; do not copy lifecycle fields such as `status`. |
 | same aggregate objective active | Continue the current ulw-loop story. |
 | different goal active | STOP. Checkpoint blocked and surface the conflict. |
 4. If retrying failed work, run `omo ulw-loop complete-goals --retry-failed --json`.
@@ -146,10 +151,10 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 
 ### Per-Criterion Cycle
 1. PLAN: read `criterion.scenario`, `criterion.expectedEvidence`, prior ledger entries, and safety bounds. Identify which tasks in the current wave are independent.
-2. Register atomic todos: `path: <action> for <criterion> - verify by <check>`.
-3. DELEGATE-IN-PARALLEL: dispatch every independent task in the wave at once via right-sized `spawn_agent` workers (Delegation table). Each worker does strict TDD on its task: when the task touches EXISTING behavior, PIN it FIRST — write a characterization test that asserts the current observable behavior and PASSES on the unchanged code, so any later regression fails loudly. Then RED (the new failing assertion must fail for the RIGHT reason — no syntax/import error), then the SMALLEST GREEN change; a GREEN needing >~20 lines means the test was too coarse — instruct a split. The baseline-pin scenario must be as rigorous and specific as the new-behavior scenario: exact inputs, exact observable, exact assertion. Serialize only on a NAMED dependency.
-4. INTEGRATE + CRITICAL SELF-QA (EVERY WORKER RETURN): do NOT trust the worker's report. Read the diff yourself, re-run its tests, and run LSP diagnostics on the changed files. Treat "done" as a claim to disprove. If the diff drifts, the test is hollow, or evidence is missing, RESPAWN the worker with the specific failure context. Forward every finding/learning to subsequent workers.
-5. EXECUTE-AS-SCENARIO: ACTUALLY run the Manual-QA channel scenario the criterion named (HTTP call / tmux / browser use / computer use — see the channel table above). Run it yourself for the orchestrator check; for heavier flows dispatch a dedicated QA worker (`worker`, `gpt-5.4`, `high`) whose ONLY job is to drive the channel and write the artifact to the named evidence path. The unit suite being green is NEVER substitute. If the scenario FAILS, respawn the implementing worker with the captured failure — do not hand-patch around it.
+2. Register atomic todos via `update_plan` — one ultra-granular step per action, `path: <action> for <criterion> - verify by <check>`. Call `update_plan` on every transition (start → `in_progress`, finish → `completed`); exactly one `in_progress`, mark completed immediately, never batch, never let the rendered plan lag behind reality.
+3. DELEGATE-IN-PARALLEL: dispatch every independent task in the wave at once via right-sized `spawn_agent` workers (Delegation table). Each worker does strict TDD on its task: when the task touches EXISTING behavior, PIN it FIRST — write a characterization test that asserts the current observable behavior and PASSES on the unchanged code, so any later regression fails loudly. Then RED (the new failing assertion must fail for the RIGHT reason — no syntax/import error), then the SMALLEST GREEN change; before GREEN work that depends on external review, PR, issue, or branch state, refresh current branch/PR/issue state, preserve existing ordering/policy, and separate compatibility detection from policy changes unless the goal explicitly asks to change policy. A GREEN needing >~20 lines means the test was too coarse — instruct a split. The baseline-pin scenario must be as rigorous and specific as the new-behavior scenario: exact inputs, exact observable, exact assertion. Serialize only on a NAMED dependency.
+4. INTEGRATE + CRITICAL SELF-QA + GIT CHECKPOINT (EVERY WORKER RETURN): do NOT trust the worker's report. Read the diff yourself, re-run its tests, and run LSP diagnostics on the changed files. Treat "done" as a claim to disprove. If the diff drifts, the test is hollow, or evidence is missing, RESPAWN the worker with the specific failure context. Once the work unit is verified, use `git-master` before staging: inspect recent repository commits and touched-path history to infer commit language, Conventional Commit scope, message shape, and unit size. Stage only that unit's files and commit in the observed style; do not carry verified work forward into a later omnibus commit. If no git-tracked files changed or committing is unsafe, record the no-commit reason as evidence. Forward every finding/learning to subsequent workers.
+5. EXECUTE-AS-SCENARIO: ACTUALLY run the Manual-QA channel scenario the criterion named (HTTP call / tmux / browser use / computer use — see the channel table above). Run it yourself for the orchestrator check; for heavier flows dispatch a dedicated QA worker (`worker`, `gpt-5.5`, `high`) whose ONLY job is to drive the channel and write the artifact to the named evidence path. The unit suite being green is NEVER substitute. If the scenario FAILS, respawn the implementing worker with the captured failure — do not hand-patch around it.
 6. CAPTURE: collect the observable artifact path: transcript, stdout, screenshot, assertion, status+body, diff, or parsed dump. No artifact written at the evidence path — not done; record BLOCKED and respawn QA.
 7. CLEAN (PAIRED, NEVER SKIP): tear down every runtime artifact step 5 spawned BEFORE recording — server PIDs (`kill`, verify `kill -0` fails), `tmux` sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`), browser / Playwright contexts (`.close()`), containers (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env vars, AND `close_agent` on every finished worker. Register each teardown as its own todo the moment the QA spawns the resource (scripts, tmux assets, browsers / agent-browser sessions, PIDs, ports) so none is forgotten. Embed a one-line cleanup receipt in the evidence string, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo; rm -rf /tmp/ulw.aB12cD; close_agent w-3`. Missing receipt → record BLOCKED, not PASS.
 8. RECORD exactly one result:
@@ -221,6 +226,7 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 12. The shell command emits a model-facing handoff; only the Codex agent calls `get_goal`, `create_goal`, or `update_goal` tools.
 13. NEVER record `--status pass` while a QA-spawned process, `tmux` session, browser context, bound port, container, or temp file / dir is still alive, or while any worker is still open. The evidence string MUST include the cleanup receipt. Leftover runtime state = BLOCKED, not PASS.
 14. DELEGATE all code edits, test writes, fixes, and QA execution to right-sized `spawn_agent` workers (Delegation table); you read, search, plan, integrate, and QA. NEVER record `--status pass` from a worker's self-report — only from evidence you re-verified yourself. Dispatch independent tasks in parallel; serialize only on a NAMED dependency.
+15. Every verified work unit that touched git-tracked files must leave either an atomic `git-master`-style commit hash or explicit no-commit blocker evidence before the next unit starts.
 
 ## Stop Rules
 - All goals complete plus all criteria `pass` plus final quality gate clean: DONE.

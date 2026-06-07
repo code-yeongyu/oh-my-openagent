@@ -39,6 +39,20 @@ describe("fetchNpmDistTags", () => {
     expect(result).toBeNull()
   })
 
+  test("rethrows non-Error fetch failures", async () => {
+    //#given
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() => Promise.reject("Network error")))
+
+    //#when
+    const result = await fetchNpmDistTags("oh-my-openagent").then(
+      () => "resolved",
+      (error: unknown) => error,
+    )
+
+    //#then
+    expect(result).toBe("Network error")
+  })
+
   test("returns null on non-ok response", async () => {
     //#given
     globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>

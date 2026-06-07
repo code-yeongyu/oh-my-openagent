@@ -48,7 +48,10 @@ export function readOpencodeConfigSkills(directory: string): HostSkillConfigShap
       for (const u of toStringArray(parseResult.data.skills.urls)) {
         if (!urls.includes(u)) urls.push(u)
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        continue
+      }
       continue
     }
   }

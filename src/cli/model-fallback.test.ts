@@ -20,6 +20,9 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
+    hasMinimaxCnCodingPlan: false,
+    hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
     ...overrides,
   }
@@ -207,6 +210,19 @@ describe("generateModelConfig", () => {
       // #then librarian should not use a stale ZAI special case
       expect(result.agents?.librarian).toBeUndefined()
       expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
+    })
+
+    test("uses Bailian Qwen for utility agents when only Bailian is available", () => {
+      // #given only Bailian Coding Plan is available
+      const config = createConfig({ hasBailianCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Bailian is limited to compatible utility routes
+      expect(result.agents?.librarian?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.explore?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.hephaestus).toBeUndefined()
     })
   })
 
@@ -727,6 +743,50 @@ describe("generateModelConfig", () => {
 
       // #then should prefer native anthropic over gateway
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+    })
+  })
+
+  describe("MiniMax Coding Plan providers", () => {
+    test("uses minimax.io MiniMax-M3 when only MiniMax Coding Plan is available", () => {
+      // #given only MiniMax Coding Plan is available
+      const config = createConfig({ hasMinimaxCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then utility agents should use MiniMax-M3 through minimax.io
+      expect(result.agents?.librarian?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.explore?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.categories?.writing?.model).toBe("minimax-coding-plan/MiniMax-M3")
+    })
+
+    test("keeps opencode-go MiniMax M3 ahead of Coding Plan fallback when both are available", () => {
+      // #given OpenCode Go and MiniMax Coding Plan are both available
+      const config = createConfig({ hasOpencodeGo: true, hasMinimaxCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then OpenCode Go stays primary and MiniMax M3 ordering is preserved in fallbacks
+      expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
+      expect(result.agents?.atlas?.fallback_models?.[0]?.model).toBe("opencode-go/minimax-m3")
+      expect(result.agents?.atlas?.fallback_models?.[1]?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.atlas?.fallback_models?.[2]?.model).toBe("opencode-go/minimax-m2.7")
+    })
+
+    test("uses minimaxi.com MiniMax-M3 when only MiniMax CN Coding Plan is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then utility agents should use MiniMax-M3 through minimaxi.com
+      expect(result.agents?.librarian?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      expect(result.agents?.explore?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      expect(result.categories?.quick?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
     })
   })
 

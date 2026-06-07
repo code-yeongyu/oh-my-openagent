@@ -86,7 +86,10 @@ export async function truncateToolOutputsByCallId(
         if (result.success) {
           truncatedCount++
         }
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
         continue
       }
     }
@@ -136,7 +139,10 @@ async function truncateToolOutputsByCallIdFromSDK(
     }
 
     return { truncatedCount }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return { truncatedCount: 0 }
   }
 }

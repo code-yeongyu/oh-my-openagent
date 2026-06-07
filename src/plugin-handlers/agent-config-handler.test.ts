@@ -66,6 +66,8 @@ describe("applyAgentConfig builtin override protection", () => {
   let discoverGlobalAgentsSkillsSpy: ReturnType<typeof spyOn>
   let loadUserAgentsSpy: ReturnType<typeof spyOn>
   let loadProjectAgentsSpy: ReturnType<typeof spyOn>
+  let loadOpencodeGlobalAgentsSpy: ReturnType<typeof spyOn>
+  let loadOpencodeProjectAgentsSpy: ReturnType<typeof spyOn>
   let loadAgentDefinitionsSpy: ReturnType<typeof spyOn>
   let readOpencodeConfigAgentsSpy: ReturnType<typeof spyOn>
   let migrateAgentConfigSpy: ReturnType<typeof spyOn>
@@ -149,6 +151,8 @@ describe("applyAgentConfig builtin override protection", () => {
 
     loadUserAgentsSpy = spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
     loadProjectAgentsSpy = spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
+    loadOpencodeGlobalAgentsSpy = spyOn(agentLoader, "loadOpencodeGlobalAgents").mockReturnValue({})
+    loadOpencodeProjectAgentsSpy = spyOn(agentLoader, "loadOpencodeProjectAgents").mockReturnValue({})
     loadAgentDefinitionsSpy = spyOn(agentLoader, "loadAgentDefinitions").mockReturnValue({})
     readOpencodeConfigAgentsSpy = spyOn(
       agentLoader,
@@ -175,6 +179,8 @@ describe("applyAgentConfig builtin override protection", () => {
     discoverGlobalAgentsSkillsSpy.mockRestore()
     loadUserAgentsSpy.mockRestore()
     loadProjectAgentsSpy.mockRestore()
+    loadOpencodeGlobalAgentsSpy.mockRestore()
+    loadOpencodeProjectAgentsSpy.mockRestore()
     loadAgentDefinitionsSpy.mockRestore()
     readOpencodeConfigAgentsSpy.mockRestore()
     migrateAgentConfigSpy.mockRestore()
@@ -734,6 +740,81 @@ describe("applyAgentConfig builtin override protection", () => {
 
       // then
       expect(result["shared-name"]).toBeDefined()
+      expect(result["shared-name"]?.prompt).toBe("from-config")
+    })
+
+    test("precedence: custom agent sources resolve from lowest to highest priority", async () => {
+      // given
+      const pluginComponents = createPluginComponents()
+      pluginComponents.agents = {
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-plugin",
+          mode: "subagent",
+        },
+      }
+      loadUserAgentsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-user",
+          mode: "subagent",
+        },
+      })
+      loadOpencodeGlobalAgentsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-opencode-global",
+          mode: "subagent",
+        },
+      })
+      loadProjectAgentsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-project",
+          mode: "subagent",
+        },
+      })
+      loadOpencodeProjectAgentsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-opencode-project",
+          mode: "subagent",
+        },
+      })
+      loadAgentDefinitionsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-definitions",
+          mode: "subagent",
+        },
+      })
+      readOpencodeConfigAgentsSpy.mockReturnValue({
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-opencode-config",
+          mode: "subagent",
+        },
+      })
+      const config = createBaseConfig()
+      ;(config as Record<string, unknown>).agent = {
+        "shared-name": {
+          name: "shared-name",
+          prompt: "from-config",
+          mode: "subagent",
+        },
+      }
+      const pluginConfig = createPluginConfig()
+      pluginConfig.agent_definitions = ["/fake/path/agent.md"]
+
+      // when
+      const result = await applyAgentConfig({
+        config,
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents,
+      })
+
+      // then
       expect(result["shared-name"]?.prompt).toBe("from-config")
     })
 

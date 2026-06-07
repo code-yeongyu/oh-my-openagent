@@ -44,6 +44,10 @@ const FORCE_COMPLETABLE_MEMBER_STATUSES = new Set<RuntimeState["members"][number
 
 const FORCE_BYPASS_DELETING_STATUSES = new Set<RuntimeState["status"]>(["creating", "orphaned"])
 
+function ignoreStaleTeamSessionSweepFailure(error: unknown): void {
+  if (error instanceof Error) return
+}
+
 export async function deleteTeam(
   teamRunId: string,
   config: TeamModeConfig,
@@ -146,7 +150,7 @@ export async function deleteTeam(
   unregisterTeamRunForSessionCleanup(teamRunId)
 
   const activeTeams = await listActiveTeams(config)
-  sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch(() => {})
+  sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch(ignoreStaleTeamSessionSweepFailure)
 
   return { removedWorktrees, removedLayout }
 }

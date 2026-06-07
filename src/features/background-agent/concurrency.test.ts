@@ -393,9 +393,68 @@ describe("ConcurrencyManager.acquire/release", () => {
     manager.release("anthropic/claude-sonnet-4-6")
     await waitPromise
   })
+
 })
 
 describe("ConcurrencyManager.cleanup", () => {
+  test("cancelWaiter should cancel a raw model waiter stored under a normalized provider key", async () => {
+    // given
+    const rawKey = "anthropic/claude-sonnet-4-6"
+    const config: BackgroundTaskConfig = {
+      providerConcurrency: { anthropic: 1 },
+    }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire(rawKey, "running-task")
+
+    const errors: Error[] = []
+    const waiter = manager.acquire(rawKey, "queued-task").catch((error: Error) => {
+      errors.push(error)
+    })
+    await Promise.resolve()
+
+    // when
+    const cancelled = manager.cancelWaiter(rawKey, "queued-task")
+    await waiter
+
+    // then
+    expect(cancelled).toBe(true)
+    expect(errors).toHaveLength(1)
+    expect(errors[0].message).toContain("queued-task")
+    expect(manager.getQueueLength(rawKey)).toBe(0)
+
+    manager.release(rawKey)
+  })
+
+  test("cancelWaiters should cancel all raw model waiters stored under a normalized provider key", async () => {
+    // given
+    const rawKey = "anthropic/claude-sonnet-4-6"
+    const config: BackgroundTaskConfig = {
+      providerConcurrency: { anthropic: 1 },
+    }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire(rawKey, "running-task")
+
+    const errors: Error[] = []
+    const firstWaiter = manager.acquire(rawKey, "queued-task-1").catch((error: Error) => {
+      errors.push(error)
+    })
+    const secondWaiter = manager.acquire(rawKey, "queued-task-2").catch((error: Error) => {
+      errors.push(error)
+    })
+    await Promise.resolve()
+
+    // when
+    manager.cancelWaiters(rawKey)
+    await Promise.all([firstWaiter, secondWaiter])
+
+    // then
+    expect(errors).toHaveLength(2)
+    expect(errors.every((error) => error.message.includes(rawKey))).toBe(true)
+    expect(manager.getQueueLength(rawKey)).toBe(0)
+
+    manager.release(rawKey)
+  })
+
   test("cancelWaiters should reject all pending acquires", async () => {
     // given
     const config: BackgroundTaskConfig = { defaultConcurrency: 1 }

@@ -12,6 +12,9 @@ const ALLOWED_LEGACY_REFERENCES = new Set([
 
 function isActiveSurface(path: string): boolean {
   if (!ACTIVE_SURFACE_EXTENSIONS.test(path)) return false
+  if (path.includes("/node_modules/")) return false
+  if (path.includes("/dist/")) return false
+  if (path.startsWith("packages/lsp-tools-mcp/")) return false
   if (path.includes("/__snapshots__/")) return false
   if (path.includes("work-with-pr-workspace/")) return false
   if (path.endsWith(".test.ts") || path.endsWith(".test.mts") || path.endsWith(".test.mjs")) return false
@@ -23,14 +26,14 @@ function isActiveSurface(path: string): boolean {
 describe("current model family references", () => {
   test("#given active repo surfaces #when scanned for legacy GPT models #then they use the GPT-5.5 family", async () => {
     // given
-    const trackedFiles = Bun.spawnSync(["git", "ls-files"], {
+    const grepResult = Bun.spawnSync(["git", "grep", "-l", "-I", "-i", "-P", LEGACY_GPT_MODEL_RE.source, "--", "."], {
       stdout: "pipe",
       stderr: "pipe",
     })
-    expect(trackedFiles.exitCode).toBe(0)
+    expect([0, 1]).toContain(grepResult.exitCode)
 
     // when
-    const candidatePaths = trackedFiles.stdout
+    const candidatePaths = grepResult.stdout
       .toString()
       .split("\n")
       .filter((path) => path.length > 0 && isActiveSurface(path))

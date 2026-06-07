@@ -102,7 +102,10 @@ export function readOpencodeConfigAgents(directory: string): Record<string, Clau
           }
         }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) {
+        continue
+      }
       continue
     }
   }

@@ -48,29 +48,25 @@ describe("test workflows", () => {
     }
   })
 
-  test("prepares lsp-tools-mcp before publish workflow tests and typecheck", () => {
+  test("prepares vendored lsp-tools-mcp before publish workflow tests and typecheck", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const testJob = sliceWorkflowSection(workflow, "  test:", "  typecheck:")
     const typecheckJob = sliceWorkflowSection(workflow, "  typecheck:", "  preflight-trust:")
 
     // #when
-    const testHasRecursiveCheckout = testJob.includes("submodules: recursive")
     const testHasNodeSetup = testJob.includes('node-version: "24"')
-    const testBuildsLspToolsMcp = testJob.includes("name: Build lsp-tools-mcp submodule") &&
+    const testBuildsLspToolsMcp = testJob.includes("name: Build vendored lsp-tools-mcp package") &&
       testJob.includes("working-directory: packages/lsp-tools-mcp")
 
-    const typecheckHasRecursiveCheckout = typecheckJob.includes("submodules: recursive")
     const typecheckHasNodeSetup = typecheckJob.includes('node-version: "24"')
-    const typecheckBuildsLspToolsMcp = typecheckJob.includes("name: Build lsp-tools-mcp submodule") &&
+    const typecheckBuildsLspToolsMcp = typecheckJob.includes("name: Build vendored lsp-tools-mcp package") &&
       typecheckJob.includes("working-directory: packages/lsp-tools-mcp")
 
     // #then
-    expect(testHasRecursiveCheckout, "publish test job must checkout submodules recursively").toBe(true)
-    expect(testHasNodeSetup, "publish test job must setup Node for MCP submodule builds").toBe(true)
+    expect(testHasNodeSetup, "publish test job must setup Node for MCP package builds").toBe(true)
     expect(testBuildsLspToolsMcp, "publish test job must build lsp-tools-mcp before bun test").toBe(true)
-    expect(typecheckHasRecursiveCheckout, "publish typecheck job must checkout submodules recursively").toBe(true)
-    expect(typecheckHasNodeSetup, "publish typecheck job must setup Node for MCP submodule builds").toBe(true)
+    expect(typecheckHasNodeSetup, "publish typecheck job must setup Node for MCP package builds").toBe(true)
     expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
   })
 
@@ -100,6 +96,21 @@ describe("test workflows", () => {
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
     expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
+  })
+
+  test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
+
+    const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
+    const buildsLspToolsMcp =
+      codexCompatibilityJob.includes("name: Build vendored lsp-tools-mcp package") &&
+      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
+      codexCompatibilityJob.indexOf("name: Build vendored lsp-tools-mcp package") <
+        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
+
+    expect(hasNodeSetup, "Codex compatibility must setup Node for MCP package builds").toBe(true)
+    expect(buildsLspToolsMcp, "Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
   })
 
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {

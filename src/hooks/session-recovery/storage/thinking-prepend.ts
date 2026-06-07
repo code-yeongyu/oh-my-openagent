@@ -66,7 +66,12 @@ async function readTargetPartIDsFromSDK(
     return targetMessage.parts
       .map((part) => part.id)
       .filter((id): id is string => typeof id === "string")
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    log("[session-recovery] readTargetPartIDsFromSDK failed", { error: error.message })
     return []
   }
 }
@@ -170,7 +175,12 @@ export function prependThinkingPart(
       JSON.stringify(previousThinkingPart, null, 2)
     )
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    deps.log("[session-recovery] prependThinkingPart failed", { error: error.message })
     return false
   }
 }
@@ -198,7 +208,12 @@ async function findLastThinkingPartFromSDK(
         }
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    log("[session-recovery] findLastThinkingPartFromSDK failed", { error: error.message })
     return null
   }
   return null
@@ -240,7 +255,11 @@ export async function prependThinkingPartAsync(
       toPatchBody(previousThinkingPart)
     )
   } catch (error) {
-    deps.log("[session-recovery] prependThinkingPartAsync failed", { error: String(error) })
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    deps.log("[session-recovery] prependThinkingPartAsync failed", { error: error.message })
     return false
   }
 }

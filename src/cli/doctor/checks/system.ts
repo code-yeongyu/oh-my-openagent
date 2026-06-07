@@ -35,7 +35,11 @@ function isConfigValid(configPath: string | null): boolean {
   try {
     parseJsonc<Record<string, unknown>>(readFileSync(configPath, "utf-8"))
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return false
   }
 }

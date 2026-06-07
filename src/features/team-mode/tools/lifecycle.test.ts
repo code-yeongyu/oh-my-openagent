@@ -2,6 +2,9 @@
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
+import type { ToolResult } from "@opencode-ai/plugin/tool"
+
+import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-registry"
 import type { RuntimeState } from "../types"
 import {
   approveShutdownMock,
@@ -17,7 +20,6 @@ import {
   loadRuntimeStateMock,
   loadTeamSpecMock,
   mockClient,
-  parseToolResult,
   rejectShutdownMock,
   requestShutdownOfMemberMock,
   requireRuntime,
@@ -47,6 +49,10 @@ function createTeamCreateToolForTest() {
   return createTeamCreateTool(config, mockClient, backgroundManager, undefined, undefined, lifecycleDeps)
 }
 
+function parseToolResult<TValue>(value: ToolResult): TValue {
+  return JSON.parse(typeof value === "string" ? value : value.output) as TValue
+}
+
 describe("team lifecycle tools", () => {
   afterAll(() => {
     mock.restore()
@@ -54,6 +60,7 @@ describe("team lifecycle tools", () => {
 
   beforeEach(() => {
     resetLifecycleTestState()
+    clearTeamSessionRegistry()
   })
 
   test("team_create works without toolContext.client field", async () => {
@@ -156,6 +163,19 @@ describe("team lifecycle tools", () => {
     expect(errorMessage).toContain("leadSessionId")
   })
 
+  test("team_create checks participant conflicts against the effective leadSessionId override", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+    await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "effective-lead-session" }, createToolContext("caller-session-a"))
+    const betaSpec = { ...createSpec(), name: "beta-team" }
+
+    // when
+    const result = teamCreateTool.execute({ inline_spec: betaSpec, leadSessionId: "effective-lead-session" }, createToolContext("caller-session-b"))
+
+    // then
+    expect(result).rejects.toThrow("team_create denied: session is already a participant")
+  })
+
   test("team_delete propagates active-member errors", async () => {
     // given
     const createTool = createTeamCreateToolForTest()
@@ -250,6 +270,24 @@ describe("team lifecycle tools", () => {
     expect(result).rejects.toThrow("team_delete is lead-only")
   })
 
+  test("team_delete resolves member participants from the session registry before persisted member session IDs", async () => {
+    // given
+    const createTool = createTeamCreateToolForTest()
+    const deleteTool = createTeamDeleteTool(config, mockClient, backgroundManager, undefined, lifecycleDeps)
+    const created = parseToolResult<{ teamRunId: string }>(await createTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session")))
+    const runtimeState = requireRuntime(created.teamRunId)
+    runtimeState.status = "orphaned"
+    runtimeState.members = runtimeState.members.map((member) => member.name === "member-a" ? { ...member, sessionId: undefined } : member)
+    registerTeamSession("spawn-race-member-session", { teamRunId: created.teamRunId, memberName: "member-a", role: "member" })
+
+    // when
+    const result = parseToolResult<{ deleted: boolean }>(await deleteTool.execute({ teamRunId: created.teamRunId, force: true }, createToolContext("spawn-race-member-session")))
+
+    // then
+    expect(result.deleted).toBe(true)
+    expect(hasRuntime(created.teamRunId)).toBe(false)
+  })
+
   test("team_create is idempotent for the same spec and lead session", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
@@ -326,6 +364,23 @@ describe("team lifecycle tools", () => {
 
     // then
     expect(result).toEqual({ teamRunId: created.teamRunId, memberName: "member-a", rejectedBy: "member-a", reason: "still working", status: "shutdown_rejected" })
+    expect(rejectShutdownMock).toHaveBeenCalledWith(created.teamRunId, "member-a", "member-a", "still working", config)
     expect(getLatestShutdownRequest(requireRuntime(created.teamRunId), "member-a")).toEqual(expect.objectContaining({ rejectedReason: "still working", rejectedAt: expect.any(Number) }))
+  })
+
+  test("team_reject_shutdown records lead rejections as the lead participant", async () => {
+    // given
+    const createTool = createTeamCreateToolForTest()
+    const requestTool = createTeamShutdownRequestTool(config, mockClient, lifecycleDeps)
+    const rejectTool = createTeamRejectShutdownTool(config, mockClient, lifecycleDeps)
+    const created = parseToolResult<{ teamRunId: string }>(await createTool.execute({ teamName: "alpha-team" }, createToolContext("lead-session")))
+    await requestTool.execute({ teamRunId: created.teamRunId, targetMemberName: "member-a" }, createToolContext("lead-session"))
+
+    // when
+    const result = parseToolResult<{ rejectedBy: string }>(await rejectTool.execute({ teamRunId: created.teamRunId, memberName: "member-a", reason: "still working" }, createToolContext("lead-session")))
+
+    // then
+    expect(result.rejectedBy).toBe("lead")
+    expect(rejectShutdownMock).toHaveBeenCalledWith(created.teamRunId, "member-a", "lead", "still working", config)
   })
 })

@@ -132,6 +132,29 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("YOUR_API_KEY")
   })
 
+  test("#given sisyphuslabs omo install #when updating config #then enables Context7 plugin mcp policy", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-plugin-policy-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.context7]')
+    expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/)
+    expect(content).not.toContain("[mcp_servers.context7]")
+    expect(content).not.toContain("@upstash/context7-mcp")
+    expect(content).not.toContain("YOUR_API_KEY")
+  })
+
   test("#given existing Context7 MCP server #when updating config #then leaves user server settings untouched", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-existing-"))
@@ -394,6 +417,54 @@ describe("codex-config-toml", () => {
     expect(content).toContain('config_file = "./agents/explorer.toml"')
     expect(content).not.toContain("stale-explorer")
     expect(content).not.toContain("ref = undefined")
+  })
+
+  test("#given git marketplace source #when updating config #then writes second-precision timestamp and ref", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-marketplace-git-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: {
+        sourceType: "git",
+        source: "https://github.com/code-yeongyu/lazycodex.git",
+        ref: "main",
+      },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    const lastUpdatedLine = content.split("\n").find((line) => line.startsWith("last_updated = "))
+    expect(lastUpdatedLine ?? "").toMatch(/^last_updated = "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"$/)
+    expect(content).toContain('source_type = "git"')
+    expect(content).toContain('source = "https://github.com/code-yeongyu/lazycodex.git"')
+    expect(content).toContain('ref = "main"')
+  })
+
+  test("#given agent name needs quoting #when updating config #then writes quoted agent key", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-quoted-agent-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      agentConfigs: [{ name: "review.agent", configFile: "./agents/review.agent.toml" }],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('[agents."review.agent"]')
+    expect(content).toContain('config_file = "./agents/review.agent.toml"')
   })
 
   test("#given windows platform #when updating sisyphuslabs plugin config #then enables git_bash plugin mcp policy", async () => {

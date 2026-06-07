@@ -12,6 +12,18 @@ export function isClaudeOpus47Model(model: string): boolean {
   return modelName.includes("claude-opus-4-7")
 }
 
+const CLAUDE_OPUS_VERSION_RE = /claude-opus-(\d+)-(\d+)/
+
+export function isClaudeOpus47OrLaterModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  const match = CLAUDE_OPUS_VERSION_RE.exec(modelName)
+  if (!match) return false
+  const major = Number(match[1])
+  const minor = Number(match[2])
+  if (Number.isNaN(major) || Number.isNaN(minor)) return false
+  return major > 4 || (major === 4 && minor >= 7)
+}
+
 export function isKimiK2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   if (modelName.includes("kimi")) return true

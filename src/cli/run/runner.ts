@@ -58,8 +58,10 @@ export async function run(options: RunOptions): Promise<number> {
   const distinctId = getPostHogDistinctId()
   try {
     posthog.trackActive(distinctId, "run_started")
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      void error
+    }
   }
 
   try {
@@ -197,8 +199,10 @@ export async function run(options: RunOptions): Promise<number> {
   } finally {
     try {
       await posthog.shutdown()
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        void error
+      }
     }
     timestampOutput?.restore()
   }

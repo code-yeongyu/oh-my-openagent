@@ -26,44 +26,6 @@ type SessionMessagesClient = {
   }
 }
 
-function getLastAgentFromMessageDir(messageDir: string): string | null {
-  try {
-    const messages = readdirSync(messageDir)
-      .filter((fileName) => fileName.endsWith(".json"))
-      .map((fileName) => {
-        try {
-          const content = readFileSync(join(messageDir, fileName), "utf-8")
-          const parsed = JSON.parse(content) as { id?: string; agent?: unknown; time?: { created?: unknown } }
-          return {
-            fileName,
-            id: parsed.id,
-            agent: parsed.agent,
-            createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
-          }
-        } catch {
-          return null
-        }
-      })
-      .filter((message): message is { fileName: string; id: string | undefined; agent: unknown; createdAt: number } => message !== null)
-      .sort((left, right) => (right?.createdAt ?? 0) - (left?.createdAt ?? 0) || (right?.fileName ?? "").localeCompare(left?.fileName ?? ""))
-
-    for (const message of messages) {
-      if (!message) continue
-      if (isCompactionMessage({ agent: message.agent }) || hasCompactionPartInStorage(message?.id)) {
-        continue
-      }
-
-      if (typeof message.agent === "string") {
-        return message.agent.toLowerCase()
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
-
 async function getLastAgentFromSessionMessages(
   sessionID: string,
   client: SessionMessagesClient,
@@ -99,7 +61,8 @@ async function getLastAgentFromSessionMessages(
         return agent.toLowerCase()
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 
@@ -139,7 +102,8 @@ export async function getLastAgentFromSession(
             agent: parsed.agent,
             createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
           }
-        } catch {
+        } catch (error) {
+          if (!(error instanceof Error)) throw error
           return null
         }
       })
@@ -156,7 +120,8 @@ export async function getLastAgentFromSession(
         return message.agent.toLowerCase()
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
   }
 

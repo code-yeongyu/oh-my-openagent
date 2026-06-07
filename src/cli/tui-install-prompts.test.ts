@@ -19,6 +19,9 @@ function createDetectedConfig(): DetectedConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+    hasBailianCodingPlan: false,
+    hasMinimaxCnCodingPlan: false,
+    hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
   }
 }
@@ -130,7 +133,7 @@ describe("promptInstallConfig platform branching", () => {
 
       // then
       expect(config).toMatchObject({ platform, hasOpenCode: true, hasCodex } satisfies Partial<InstallConfig>)
-      expect(selectSpy).toHaveBeenCalledTimes(9)
+      expect(selectSpy).toHaveBeenCalledTimes(12)
     },
   )
 

@@ -63,7 +63,7 @@ describe("plugin bundled rule priority", () => {
 		expect(SOURCE_PRIORITY.get("plugin-bundled")).toBe(200);
 	});
 
-	it("#given user-home and bundled rules share a description #when formatting static rules #then user-home wins", () => {
+	it("#given user-home and bundled rules share a description #when formatting static rules #then user-home file wins", () => {
 		// given
 		const bundledCandidate = globalCandidate("plugin-bundled", bundledPath);
 		const homeCandidate = globalCandidate("~/.opencode/rules", homePath);
@@ -85,6 +85,7 @@ describe("plugin bundled rule priority", () => {
 		// then
 		expect(formatted).toContain(homePath);
 		expect(formatted).toContain(homeBody);
+		expect(formatted).not.toContain(`- [hephaestus.md]{${homePath}}`);
 		expect(formatted).not.toContain(bundledPath);
 		expect(formatted).not.toContain(bundledBody);
 	});

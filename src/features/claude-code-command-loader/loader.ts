@@ -29,7 +29,10 @@ async function loadCommandsFromDir(
 ): Promise<LoadedCommand[]> {
   try {
     await fs.access(commandsDir)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return []
+    }
     return []
   }
 
@@ -37,7 +40,11 @@ async function loadCommandsFromDir(
   try {
     realPath = await fs.realpath(commandsDir)
   } catch (error) {
-    log(`Failed to resolve command directory: ${commandsDir}`, error)
+    if (error instanceof Error) {
+      log(`Failed to resolve command directory: ${commandsDir}`, error)
+    } else {
+      log(`Failed to resolve command directory: ${commandsDir}`, error)
+    }
     return []
   }
 
@@ -50,7 +57,11 @@ async function loadCommandsFromDir(
   try {
     entries = await fs.readdir(commandsDir, { withFileTypes: true })
   } catch (error) {
-    log(`Failed to read command directory: ${commandsDir}`, error)
+    if (error instanceof Error) {
+      log(`Failed to read command directory: ${commandsDir}`, error)
+    } else {
+      log(`Failed to read command directory: ${commandsDir}`, error)
+    }
     return []
   }
 
@@ -106,7 +117,11 @@ $ARGUMENTS
         scope,
       })
     } catch (error) {
-      log(`Failed to parse command: ${commandPath}`, error)
+      if (error instanceof Error) {
+        log(`Failed to parse command: ${commandPath}`, error)
+      } else {
+        log(`Failed to parse command: ${commandPath}`, error)
+      }
       continue
     }
   }
@@ -187,6 +202,9 @@ export async function loadAllCommands(directory?: string): Promise<Record<string
     })
     .catch((error) => {
       deleteCachedCommands(cacheKey)
+      if (error instanceof Error) {
+        throw error
+      }
       throw error
     })
 

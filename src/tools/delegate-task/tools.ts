@@ -25,7 +25,8 @@ async function loadNativeSkillEntries(
     const list = await nativeSkills.all()
     return Array.isArray(list) ? list : []
   } catch (err) {
-    log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: String(err) })
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: errorMessage })
     return []
   }
 }
@@ -107,7 +108,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       try {
         const openCodeConfig = await options.client.config.get()
         systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) throw error
         systemDefaultModel = undefined
       }
 

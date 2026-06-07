@@ -1,7 +1,8 @@
 import { describe, test, expect } from "bun:test"
-import { PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
-import { PROMETHEUS_GPT_SYSTEM_PROMPT } from "./prometheus/gpt"
-import { PROMETHEUS_GEMINI_SYSTEM_PROMPT } from "./prometheus/gemini"
+import { getPrometheusPrompt, PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
+
+const PROMETHEUS_GPT_SYSTEM_PROMPT = getPrometheusPrompt("gpt-5.5")
+const PROMETHEUS_GEMINI_SYSTEM_PROMPT = getPrometheusPrompt("gemini-3.1-pro")
 
 describe("PROMETHEUS_SYSTEM_PROMPT Momus invocation policy", () => {
   test("should direct providing ONLY the file path string when invoking Momus", () => {
@@ -218,6 +219,45 @@ describe("PROMETHEUS_SYSTEM_PROMPT OpenSpec expanded commands", () => {
 
     //#when / #then
     expect(prompt).toContain("/opsx:explore")
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    // Must use fresh task() call with subagent_type="momus"
+    expect(prompt).toContain('subagent_type="momus"')
+    // Must pass exact on-disk plan path as prompt
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    // Must explicitly forbid continuation/task_id reuse for Momus (not yet present)
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
+describe("PROMETHEUS_GPT_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_GPT_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain('subagent_type="momus"')
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
+describe("PROMETHEUS_GEMINI_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_GEMINI_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain('subagent_type="momus"')
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
   })
 })
 

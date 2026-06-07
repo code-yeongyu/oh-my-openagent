@@ -4,6 +4,7 @@ export {
   findFirstMessageWithAgent,
   findNearestMessageWithFieldsFromSDK,
   findFirstMessageWithAgentFromSDK,
+  findMessageContextFromSDK,
   resolveMessageContext,
 } from "./injector"
 export type { StoredMessage } from "./injector"
