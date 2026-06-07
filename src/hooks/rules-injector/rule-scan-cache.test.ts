@@ -108,7 +108,7 @@ describe("findRuleFiles with scan cache", () => {
     writeFileSync(ruleFileA, "alpha rules\n");
     writeFileSync(ruleFileB, "beta rules\n");
     symlinkSync(actualGithubA, symlinkGithub, "dir");
-    const canonicalRuleFileA = realpathSync(ruleFileA);
+    const canonicalRuleFileA = realpathSync.native(ruleFileA);
     const cache = createRuleScanCache();
 
     // when

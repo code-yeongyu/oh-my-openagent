@@ -4,7 +4,8 @@ import { EXCLUDED_DIRS, GITHUB_INSTRUCTIONS_PATTERN, RULE_EXTENSIONS } from "./c
 import type { DirectoryScanEntry } from "./types";
 
 function isGitHubInstructionsDir(dir: string): boolean {
-  return dir.includes(".github/instructions") || dir.endsWith(".github/instructions");
+  const normalizedDir = dir.replaceAll("\\", "/");
+  return normalizedDir.includes(".github/instructions") || normalizedDir.endsWith(".github/instructions");
 }
 
 function isRuleFile(fileName: string, dir: string): boolean {
