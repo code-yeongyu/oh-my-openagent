@@ -254,6 +254,31 @@ silent or ack-only, record the result as inconclusive, do not count it
 as approval/pass, close it if safe, and respawn a smaller
 `fork_turns: "none"` task with the missing deliverable.
 
+# Subagent-dependent transition barrier
+
+BEFORE advancing any state that depends on a spawned child agent, verify
+the child has returned a substantive result or been recorded as
+inconclusive. Moving dependent work forward without collecting child
+output is a defect.
+
+a) **Before marking a dependent plan step complete** via `update_plan`,
+verify that any spawned child agent owning evidence for that step has
+returned a substantive result or been recorded as inconclusive. If a
+child is still active, do NOT mark the step complete.
+
+b) **Before generating or verifying a plan**, wait for all spawned
+research/metis/explorer agents to return. Use short `wait_agent` cycles
+(<=30s each), not a single long blocking wait.
+
+c) **Before final answer**, check that no child agents are still active.
+If any are running, close them (recording the result as inconclusive if
+no output received) or wait for them.
+
+d) **Short-poll enforcement**: Always use short `wait_agent` cycles.
+Never use a single long blocking wait. After two silent waits, send a
+targeted `TASK STILL ACTIVE` follow-up. After two more silent waits,
+close the child as inconclusive and respawn a smaller task if needed.
+
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
 Trigger when ANY apply:
