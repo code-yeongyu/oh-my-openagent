@@ -26,8 +26,8 @@ describe("Git Bash runner", () => {
     const fakeBashScript = process.platform === "win32"
       ? [
         "@echo off",
-        "> \"%FAKE_BASH_ARGV_PATH%\" echo %~1",
-        ">> \"%FAKE_BASH_ARGV_PATH%\" echo %~2",
+        ">\"%FAKE_BASH_ARGV_PATH%\" echo(%~1",
+        ">>\"%FAKE_BASH_ARGV_PATH%\" echo(%~2",
         "echo fake stdout",
         "echo fake stderr 1>&2",
         "exit /b 7",
@@ -54,7 +54,7 @@ describe("Git Bash runner", () => {
       env: { ...process.env, FAKE_BASH_ARGV_PATH: argvPath },
     });
 
-    expect(readFileSync(argvPath, "utf8")).toBe("-lc\nprintf ok\n");
+    expect(readFileSync(argvPath, "utf8").replace(/\r\n/g, "\n")).toBe("-lc\nprintf ok\n");
     expect(result).toEqual({ exitCode: 7, stdout: "fake stdout\n", stderr: "fake stderr\n", timedOut: false });
   });
 });
