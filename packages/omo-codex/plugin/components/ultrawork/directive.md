@@ -74,7 +74,7 @@ may skip the plan agent — justify that skip in the notepad.
 
 ## 1. Create the goal with binding success criteria
 Call `create_goal` (or open your reply with a `# Goal` block treated as
-binding) using exactly `objective` and `status` fields. Goals are
+binding) using exactly `objective`. Do not include `status`. Goals are
 unlimited; never invent a numeric budget or limit.
 The criteria MUST list, upfront:
 - The user-visible deliverable in one line.

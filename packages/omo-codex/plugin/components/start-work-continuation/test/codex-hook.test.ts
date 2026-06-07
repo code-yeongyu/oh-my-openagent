@@ -64,6 +64,38 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
 	});
 
+	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {
+		// given
+		const transcriptPath = "/repo/transcript.jsonl";
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+			}),
+			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+			[transcriptPath]: [
+				JSON.stringify({
+					type: "message",
+					payload: {
+						content: {
+							error: {
+								code: "context_too_large",
+							},
+						},
+					},
+				}),
+				"Your input exceeds the context window of this model.",
+				"",
+			].join("\n"),
+		});
+
+		// when
+		const output = runStopHook({ ...createStopInput(), transcript_path: transcriptPath }, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given active codex work #when continuation directive is emitted #then subagent guidance is reliable", () => {
 		// given
 		const fs = createMemoryFs({
