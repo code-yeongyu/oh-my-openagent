@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -225,4 +225,44 @@ test("#given user-owned legacy Codex symlink with component-like target #when li
 
 	assert.equal(await readlink(join(binDir, "codex-rules")), userTarget);
 	assert.equal(await readlink(join(binDir, "omo-rules")), join(pluginRoot, "dist", "cli.js"));
+});
+
+test("#given package bin name escapes bin directory #when linking bins #then rejects without writing outside link", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const binDir = join(root, "bin");
+	const escapedLink = join(root, "escaped");
+
+	await mkdir(join(pluginRoot, "dist"), { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/omo",
+		bin: { "../escaped": "./dist/cli.js" },
+	});
+	await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+
+	await assert.rejects(
+		linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" }),
+		/invalid package bin name/,
+	);
+	await assert.rejects(lstat(escapedLink));
+});
+
+test("#given package bin target escapes plugin root #when linking bins #then rejects without linking outside target", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const binDir = join(root, "bin");
+	const outsideTarget = join(root, "outside.js");
+
+	await mkdir(pluginRoot, { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/omo",
+		bin: { omo: "../outside.js" },
+	});
+	await writeFile(outsideTarget, "#!/usr/bin/env node\n");
+
+	await assert.rejects(
+		linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" }),
+		/escapes package root/,
+	);
+	await assert.rejects(readlink(join(binDir, "omo")));
 });
