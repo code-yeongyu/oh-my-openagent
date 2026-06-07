@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test"
-import { mkdirSync, writeFileSync, symlinkSync, rmSync } from "fs"
+import { mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { resolveSymlink, resolveSymlinkAsync, isSymbolicLink } from "./file-utils"
@@ -24,6 +24,11 @@ const realSkillDir = join(testDir, "repo", "skills", "category", "my-skill")
 const repoOpencodeSkills = join(testDir, "repo", ".opencode", "skills")
 const configSkills = join(testDir, "config", "skills")
 
+function expectedRealpath(filePath: string): string {
+	const realPath = realpathSync(filePath)
+	return realPath.startsWith("/private/var/") ? realPath.slice("/private".length) : realPath
+}
+
 beforeAll(() => {
 	// Create real skill directory with a file
 	mkdirSync(realSkillDir, { recursive: true })
@@ -45,19 +50,19 @@ afterAll(() => {
 describe("resolveSymlink", () => {
 	it("resolves a regular file path to itself", () => {
 		const filePath = join(realSkillDir, "SKILL.md")
-		expect(resolveSymlink(filePath)).toBe(filePath)
+		expect(resolveSymlink(filePath)).toBe(expectedRealpath(filePath))
 	})
 
 	it("resolves a relative symlink to its real path", () => {
 		const symlinkPath = join(repoOpencodeSkills, "my-skill")
-		expect(resolveSymlink(symlinkPath)).toBe(realSkillDir)
+		expect(resolveSymlink(symlinkPath)).toBe(expectedRealpath(realSkillDir))
 	})
 
 	it("resolves a chained symlink (symlink-to-dir-containing-symlinks) to the real path", () => {
 		// This is the real-world scenario:
 		// config/skills/my-skill -> (follows config/skills) -> repo/.opencode/skills/my-skill -> repo/skills/category/my-skill
 		const chainedPath = join(configSkills, "my-skill")
-		expect(resolveSymlink(chainedPath)).toBe(realSkillDir)
+		expect(resolveSymlink(chainedPath)).toBe(expectedRealpath(realSkillDir))
 	})
 
 	it("returns the original path for non-existent paths", () => {
@@ -69,17 +74,17 @@ describe("resolveSymlink", () => {
 describe("resolveSymlinkAsync", () => {
 	it("resolves a regular file path to itself", async () => {
 		const filePath = join(realSkillDir, "SKILL.md")
-		expect(await resolveSymlinkAsync(filePath)).toBe(filePath)
+		expect(await resolveSymlinkAsync(filePath)).toBe(expectedRealpath(filePath))
 	})
 
 	it("resolves a relative symlink to its real path", async () => {
 		const symlinkPath = join(repoOpencodeSkills, "my-skill")
-		expect(await resolveSymlinkAsync(symlinkPath)).toBe(realSkillDir)
+		expect(await resolveSymlinkAsync(symlinkPath)).toBe(expectedRealpath(realSkillDir))
 	})
 
 	it("resolves a chained symlink (symlink-to-dir-containing-symlinks) to the real path", async () => {
 		const chainedPath = join(configSkills, "my-skill")
-		expect(await resolveSymlinkAsync(chainedPath)).toBe(realSkillDir)
+		expect(await resolveSymlinkAsync(chainedPath)).toBe(expectedRealpath(realSkillDir))
 	})
 
 	it("returns the original path for non-existent paths", async () => {

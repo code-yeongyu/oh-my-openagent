@@ -51,7 +51,7 @@ describe("resolveAgentDefinitionPaths", () => {
         null,
       )
 
-      expect(result).toEqual([join(homedir(), "agents/test.md")])
+      expect(result).toEqual([join(homedir(), "agents", "test.md")])
     })
   })
 
