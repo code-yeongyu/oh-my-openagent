@@ -119,6 +119,32 @@ describe("createJsonErrorRecoveryHook", () => {
       expect(output.output).toBe("JSON parse error: unexpected end of JSON input")
     })
 
+    it("does not append reminder for subagent and session-content tools", async () => {
+      // given
+      const subagentTools = [
+        "task",
+        "call_omo_agent",
+        "background_output",
+        "session_read",
+        "session_search",
+        "session_info",
+        "session_list",
+        "skill",
+        "skill_mcp",
+      ]
+      const proseMentioningJson = "The oracle re-reviewed. Note: the JSON parse error: unexpected EOF text is spurious content embedded in the returned text, not a real system error."
+
+      for (const tool of subagentTools) {
+        const output = createOutput(proseMentioningJson)
+
+        // when
+        await hook["tool.execute.after"](createInput(tool), output)
+
+        // then
+        expect(output.output).toBe(proseMentioningJson)
+      }
+    })
+
     it("does not append reminder when reminder already exists", async () => {
       // given
       const input = createInput()
@@ -182,6 +208,11 @@ describe("createJsonErrorRecoveryHook", () => {
         "read",
         "bash",
         "webfetch",
+        "task",
+        "call_omo_agent",
+        "background_output",
+        "session_read",
+        "skill",
       ]
 
       // when
