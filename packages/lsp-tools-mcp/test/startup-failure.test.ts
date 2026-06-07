@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { LspProcessExitedError } from "../src/lsp/errors.js";
-import { formatKnownLspStartupFailure, handleMissingDependencyError } from "../src/lsp/utils.js";
+import { formatKnownLspStartupFailure, handleMissingDependencyError } from "../src/lsp/startup-failure.js";
 
 describe("formatKnownLspStartupFailure", () => {
 	it("#given rust-src component conflict #when formatting startup failure #then returns repair guidance", () => {

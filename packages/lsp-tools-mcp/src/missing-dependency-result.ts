@@ -1,4 +1,4 @@
-import { handleMissingDependencyError } from "./lsp/utils.js";
+import { handleMissingDependencyError } from "./lsp/startup-failure.js";
 import type { ToolExecutionResult } from "./tools.js";
 
 export function missingDependencyResult<TDetails extends object>(
