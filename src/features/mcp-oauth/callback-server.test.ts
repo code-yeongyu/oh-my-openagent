@@ -2,57 +2,10 @@
 
 import { describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
-import { type ClientRequest, type IncomingMessage, request as httpRequest, type RequestOptions } from "node:http"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { type IncomingMessage, request as httpRequest } from "node:http"
 import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
-
-type DeferredProbe = { readonly complete: () => void }
-type ReadinessRequest = (options: RequestOptions, callback: (response: IncomingMessage) => void) => ClientRequest
-
-function delay(ms: number): Promise<"timeout"> {
-  return new Promise((resolve) => setTimeout(() => resolve("timeout"), ms))
-}
-
-function createDeferredReadinessRequest(): {
-  readonly probeStarted: Promise<DeferredProbe>
-  readonly readinessRequest: ReadinessRequest
-} {
-  let resolveProbe: (probe: DeferredProbe) => void = () => {
-    throw new Error("Readiness probe promise was not initialized")
-  }
-  const probeStarted = new Promise<DeferredProbe>((resolve) => {
-    resolveProbe = resolve
-  })
-
-  const readinessRequest: ReadinessRequest = (_options, callback) => {
-    let requestClient: ClientRequest
-    requestClient = unsafeTestValue<ClientRequest>({
-      destroy: () => {
-        return requestClient
-      },
-      end: () => {
-        let response: IncomingMessage
-        response = unsafeTestValue<IncomingMessage>({
-          resume: () => response,
-        })
-        resolveProbe({
-          complete: () => {
-            callback(response)
-          },
-        })
-        return requestClient
-      },
-      once: () => requestClient,
-      setTimeout: (_timeoutMs: number, _callback?: () => void) => requestClient,
-    })
-
-    return requestClient
-  }
-
-  return { probeStarted, readinessRequest }
-}
 
 function request(url: string): Promise<Response> {
   return new Promise((resolve, reject) => {
@@ -104,32 +57,6 @@ describe("startCallbackServer", () => {
     await server.close()
   }
 
-  it("#given callback listener starts #when the readiness probe has not received a response #then startup remains pending", async () => {
-    const { probeStarted, readinessRequest } = createDeferredReadinessRequest()
-    let resolved = false
-
-    const startup = startCallbackServer(0, { readinessRequest }).then((server) => {
-      resolved = true
-      return server
-    })
-    const probe = await Promise.race([probeStarted, delay(500)])
-
-    expect(probe).not.toBe("timeout")
-    expect(resolved).toBe(false)
-    if (probe === "timeout") {
-      throw new Error("Expected startup readiness probe to begin")
-    }
-
-    probe.complete()
-    const server = await startup
-
-    try {
-      expect(resolved).toBe(true)
-    } finally {
-      await close(server)
-    }
-  })
-
   it("starts server and returns port", async () => {
     const server = await startCallbackServer(0)
 
@@ -173,7 +100,7 @@ describe("startCallbackServer", () => {
     }
   })
 
-  it("keeps startup probes on the non-callback route contract", async () => {
+  it("keeps non-callback routes separate from OAuth callbacks", async () => {
     const server = await startCallbackServer(0)
 
     try {
