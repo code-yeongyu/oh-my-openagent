@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -7,7 +9,7 @@ const TEST_DIR = join(tmpdir(), `project-discovery-dirs-${Date.now()}`)
 let worktreeSpawnCount = 0
 
 function canonicalPath(path: string): string {
-  return realpathSync(path)
+  return realpathSync.native(path)
 }
 
 describe("project-discovery-dirs", () => {

@@ -15,7 +15,7 @@ function normalizePath(path: string): string {
   }
 
   try {
-    return realpathSync(resolvedPath)
+    return realpathSync.native(resolvedPath)
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error

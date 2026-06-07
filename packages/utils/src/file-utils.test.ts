@@ -25,7 +25,7 @@ const repoOpencodeSkills = join(testDir, "repo", ".opencode", "skills")
 const configSkills = join(testDir, "config", "skills")
 
 function expectedRealpath(filePath: string): string {
-	const realPath = realpathSync(filePath)
+	const realPath = realpathSync.native(filePath)
 	return realPath.startsWith("/private/var/") ? realPath.slice("/private".length) : realPath
 }
 

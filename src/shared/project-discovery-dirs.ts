@@ -14,13 +14,18 @@ function normalizePath(path: string): string {
   }
 
   try {
-    return realpathSync(resolvedPath)
+    return realpathSync.native(resolvedPath)
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error
     }
     return resolvedPath
   }
+}
+
+function pathKey(path: string): string {
+  const normalized = path.replace(/\\/g, "/")
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized
 }
 
 function findAncestorDirectories(
@@ -32,19 +37,26 @@ function findAncestorDirectories(
   const seen = new Set<string>()
   let currentDirectory = normalizePath(startDirectory)
   const resolvedStopDirectory = stopDirectory ? normalizePath(stopDirectory) : undefined
+  const stopDirectoryKey = resolvedStopDirectory ? pathKey(resolvedStopDirectory) : undefined
 
   while (true) {
     for (const targetPath of targetPaths) {
       const candidateDirectory = join(currentDirectory, ...targetPath)
-      if (!existsSync(candidateDirectory) || seen.has(candidateDirectory)) {
+      if (!existsSync(candidateDirectory)) {
         continue
       }
 
-      seen.add(candidateDirectory)
-      directories.push(candidateDirectory)
+      const normalizedCandidateDirectory = normalizePath(candidateDirectory)
+      const candidateDirectoryKey = pathKey(normalizedCandidateDirectory)
+      if (seen.has(candidateDirectoryKey)) {
+        continue
+      }
+
+      seen.add(candidateDirectoryKey)
+      directories.push(normalizedCandidateDirectory)
     }
 
-    if (resolvedStopDirectory === currentDirectory) {
+    if (stopDirectoryKey === pathKey(currentDirectory)) {
       return directories
     }
 
@@ -63,8 +75,9 @@ export function clearWorktreeCache(): void {
 
 export function detectWorktreePath(directory: string): string | undefined {
   const resolvedDirectory = resolve(directory)
-  if (worktreePathCache.has(resolvedDirectory)) {
-    return worktreePathCache.get(resolvedDirectory)
+  const cacheKey = pathKey(normalizePath(resolvedDirectory))
+  if (worktreePathCache.has(cacheKey)) {
+    return worktreePathCache.get(cacheKey)
   }
 
   try {
@@ -76,13 +89,13 @@ export function detectWorktreePath(directory: string): string | undefined {
     }).trim()
     const normalizedWorktreePath = normalizePath(worktreePath)
 
-    worktreePathCache.set(resolvedDirectory, normalizedWorktreePath)
+    worktreePathCache.set(cacheKey, normalizedWorktreePath)
     return normalizedWorktreePath
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error
     }
-    worktreePathCache.set(resolvedDirectory, undefined)
+    worktreePathCache.set(cacheKey, undefined)
     return undefined
   }
 }
@@ -133,6 +146,7 @@ export function findProjectOpencodePluginConfigFiles(
   const seen = new Set<string>()
   let currentDirectory = normalizePath(startDirectory)
   const resolvedStopDirectory = stopDirectory ? normalizePath(stopDirectory) : undefined
+  const stopDirectoryKey = resolvedStopDirectory ? pathKey(resolvedStopDirectory) : undefined
 
   while (true) {
     const opencodeDirectory = join(currentDirectory, ".opencode")
@@ -141,13 +155,16 @@ export function findProjectOpencodePluginConfigFiles(
         basenames: [CONFIG_BASENAME],
         legacyBasenames: [LEGACY_CONFIG_BASENAME],
       })
-      if (detected.format !== "none" && !seen.has(detected.path)) {
-        seen.add(detected.path)
-        paths.push(detected.path)
+      if (detected.format !== "none") {
+        const detectedPathKey = pathKey(detected.path)
+        if (!seen.has(detectedPathKey)) {
+          seen.add(detectedPathKey)
+          paths.push(detected.path)
+        }
       }
     }
 
-    if (resolvedStopDirectory === currentDirectory) {
+    if (stopDirectoryKey === pathKey(currentDirectory)) {
       return paths
     }
 
