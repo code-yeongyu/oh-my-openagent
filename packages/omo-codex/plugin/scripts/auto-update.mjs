@@ -104,6 +104,9 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 	});
 	if (!plan.shouldRun) {
 		await appendUpdateLog(env, now, "skipped", { reason: plan.reason });
+		if (plan.reason === "up-to-date") {
+			await writeState(statePath, { ...state, lastCheckedAt: now, lastStatus: "success" });
+		}
 		return { started: false, reason: plan.reason };
 	}
 
