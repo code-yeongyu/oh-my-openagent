@@ -74,12 +74,16 @@ export function spawnWithWindowsHide(command: string[], options: SpawnOptions): 
   }
 
   const [cmd, ...args] = command
+  if (!cmd) {
+    throw new Error("Cannot spawn an empty command")
+  }
+  const needsShell = /\.(?:bat|cmd)$/i.test(cmd)
   const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
     env: options.env,
     stdio: [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"],
     windowsHide: true,
-    shell: true,
+    shell: needsShell,
   })
 
   return wrapNodeProcess(proc)

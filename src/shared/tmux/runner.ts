@@ -36,7 +36,7 @@ function resolveTmuxExecutable(tmuxPath: string): string[] {
 	}
 
 	const executableName = tmuxPath.split(/[\\/]/).pop()
-	const cmuxExecutable = executableName === "cmux" ? tmuxPath : "cmux"
+	const cmuxExecutable = executableName && /^cmux(?:\.(?:bat|cmd|exe|ps1))?$/i.test(executableName) ? tmuxPath : "cmux"
 	return [cmuxExecutable, "__tmux-compat"]
 }
 

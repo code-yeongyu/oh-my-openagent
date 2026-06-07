@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import * as fs from "node:fs"
+import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 
@@ -32,6 +33,8 @@ function createProc(options: CreateProcOptions = {}): ReturnType<typeof spawnHel
     kill: options.kill ?? (() => {}),
   } satisfies ReturnType<typeof spawnHelpers.spawnWithWindowsHide>
 }
+
+const EXPECTED_WORKSPACE_DIR = join("/tmp/opencode-cache", "packages")
 
 describe("runBunInstallWithDetails", () => {
   let getOpenCodeCacheDirSpy: ReturnType<typeof spyOn>
@@ -69,7 +72,7 @@ describe("runBunInstallWithDetails", () => {
         expect(result).toEqual({ success: true })
         expect(getOpenCodeCacheDirSpy).toHaveBeenCalledTimes(1)
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
-          cwd: "/tmp/opencode-cache/packages",
+          cwd: EXPECTED_WORKSPACE_DIR,
           env: process.env,
           stdout: "pipe",
           stderr: "pipe",
@@ -114,7 +117,7 @@ describe("runBunInstallWithDetails", () => {
         // then
         expect(result).toEqual({ success: true })
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
-          cwd: "/tmp/opencode-cache/packages",
+          cwd: EXPECTED_WORKSPACE_DIR,
           env: process.env,
           stdout: "pipe",
           stderr: "pipe",
@@ -132,7 +135,7 @@ describe("runBunInstallWithDetails", () => {
         // then
         expect(result).toEqual({ success: true })
         expect(spawnWithWindowsHideSpy).toHaveBeenCalledWith(["bun", "install"], {
-          cwd: "/tmp/opencode-cache/packages",
+          cwd: EXPECTED_WORKSPACE_DIR,
           env: process.env,
           stdout: "inherit",
           stderr: "inherit",
@@ -214,7 +217,7 @@ describe("runBunInstallWithDetails", () => {
           expect(outcome).toEqual({
             success: false,
             timedOut: true,
-            error: 'bun install timed out after 60 seconds. Try running manually: cd "/tmp/opencode-cache/packages" && bun i',
+            error: `bun install timed out after 60 seconds. Try running manually: cd "${EXPECTED_WORKSPACE_DIR}" && bun i`,
           } satisfies BunInstallResult)
           expect(killCallCount).toBe(1)
         } finally {

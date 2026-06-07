@@ -25,7 +25,17 @@ async function readInvocationCount(counterFilePath: string): Promise<number> {
 }
 
 async function createFakeCmux(directoryPath: string, argsFilePath: string): Promise<string> {
-	const cmuxPath = path.join(directoryPath, "cmux")
+	const cmuxPath = path.join(directoryPath, process.platform === "win32" ? "cmux.cmd" : "cmux")
+	if (process.platform === "win32") {
+		const script = [
+			"@echo off",
+			`(for %%A in (%*) do @echo %%~A) > "${argsFilePath}"`,
+			"echo %%42",
+		].join("\r\n")
+		await fs.writeFile(cmuxPath, script, "utf8")
+		return cmuxPath
+	}
+
 	const script = [
 		"#!/bin/sh",
 		"printf '%s\\n' \"$@\" > \"$1.args\"",
