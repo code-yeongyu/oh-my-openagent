@@ -356,7 +356,40 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
-  test("#given restore caller has no owned module mocks #when mock.restore runs #then active module mocks from other owners are replayed", () => {
+  test("#given restore caller has no owned module mocks #when mock.restore runs #then unpreserved module mocks from other owners are restored", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/owner.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => callerUrl,
+      resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
+    callerUrl = "file:///repo/tests/untracked-cleanup.test.ts"
+
+    // when
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency-a:mock-a",
+      "delegate:restore",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:original",
+    ])
+  })
+
+  test("#given restore caller has no owned module mocks #when mock.restore runs #then preserved module mocks from other owners are replayed", () => {
     // given
     const events: string[] = []
     let callerUrl = "file:///repo/tests/owner.test.ts"
@@ -376,6 +409,7 @@ describe("installModuleMockLifecycle", () => {
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
+    lifecycle.preserveModuleMocksForTestFile(callerUrl)
     callerUrl = "file:///repo/tests/untracked-cleanup.test.ts"
 
     // when

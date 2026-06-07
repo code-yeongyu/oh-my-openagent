@@ -18,6 +18,11 @@ const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
 let environmentSnapshot: NodeJS.ProcessEnv = { ...process.env }
 let workingDirectorySnapshot = process.cwd()
 const fetchSnapshot = globalThis.fetch
+const dateNowSnapshot = Date.now
+const setTimeoutSnapshot = globalThis.setTimeout
+const clearTimeoutSnapshot = globalThis.clearTimeout
+const setIntervalSnapshot = globalThis.setInterval
+const clearIntervalSnapshot = globalThis.clearInterval
 
 function cleanupOmoCacheDir(cacheDir: string): void {
   rmSync(cacheDir, { recursive: true, force: true })
@@ -62,6 +67,11 @@ afterEach(() => {
     process.chdir(workingDirectorySnapshot)
   }
   globalThis.fetch = fetchSnapshot
+  Date.now = dateNowSnapshot
+  globalThis.setTimeout = setTimeoutSnapshot
+  globalThis.clearTimeout = clearTimeoutSnapshot
+  globalThis.setInterval = setIntervalSnapshot
+  globalThis.clearInterval = clearIntervalSnapshot
 
   cleanupOmoCacheDir(currentCacheDir)
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
