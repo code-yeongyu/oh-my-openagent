@@ -91,6 +91,26 @@ describe("startCallbackServer", () => {
     }
   })
 
+  it("keeps readiness probes separate from OAuth callbacks", async () => {
+    const server = await startCallbackServer(0)
+
+    try {
+      const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_ready__`)
+      expect(readyResponse.status).toBe(204)
+
+      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=after-ready&state=still-waiting`
+      const [result, response] = await Promise.all([
+        server.waitForCallback(),
+        request(callbackUrl),
+      ])
+
+      expect(result).toEqual({ code: "after-ready", state: "still-waiting" })
+      expect(response.status).toBe(200)
+    } finally {
+      await close(server)
+    }
+  })
+
   it("uses native timers for server lifetime when global timers are patched", async () => {
     const originalSetTimeout = globalThis.setTimeout
     const originalClearTimeout = globalThis.clearTimeout

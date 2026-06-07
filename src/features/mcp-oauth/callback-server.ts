@@ -7,7 +7,9 @@ import { findAvailablePort as findAvailablePortShared } from "../../shared/port-
 const DEFAULT_PORT = 19877
 const TIMEOUT_MS = 5 * 60 * 1000
 const STARTUP_TIMEOUT_MS = 2_000
+const STARTUP_PROBE_TIMEOUT_MS = 250
 const STARTUP_RETRY_MS = 25
+const READINESS_PATH = "/__omo_oauth_ready__"
 
 export type OAuthCallbackResult = {
   code: string
@@ -70,23 +72,24 @@ function probeServerReady(port: number): Promise<boolean> {
       {
         hostname: "127.0.0.1",
         method: "GET",
-        path: "/__omo_oauth_ready__",
+        path: READINESS_PATH,
         port,
       },
       (response) => {
-        response.resume()
+        const statusCode = response.statusCode ?? 0
         response.once("end", () => {
-          finish(true)
+          finish(statusCode >= 200 && statusCode < 300)
         })
         response.once("error", () => {
           finish(false)
         })
+        response.resume()
       },
     )
 
-    req.setTimeout(STARTUP_RETRY_MS, () => {
-      req.destroy()
+    req.setTimeout(STARTUP_PROBE_TIMEOUT_MS, () => {
       finish(false)
+      req.destroy()
     })
     req.once("error", () => {
       finish(false)
@@ -126,6 +129,12 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1")
+
+    if (url.pathname === READINESS_PATH) {
+      response.statusCode = 204
+      response.end()
+      return
+    }
 
     if (url.pathname !== "/oauth/callback") {
       response.statusCode = 404
