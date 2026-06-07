@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { createConnection } from "node:net"
+import { clearTimeout as clearNativeTimeout, setTimeout as setNativeTimeout } from "node:timers"
 
 import { log } from "../../shared/logger"
 import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
@@ -22,18 +23,15 @@ export type CallbackServer = {
   close: () => Promise<void>
 }
 
-const capturedSetTimeout = globalThis.setTimeout
-const capturedClearTimeout = globalThis.clearTimeout
-
-export type CallbackServerTimerHandle = ReturnType<typeof capturedSetTimeout>
+export type CallbackServerTimerHandle = ReturnType<typeof setNativeTimeout>
 export type CallbackServerTimer = {
   readonly setTimeout: (callback: () => void, delayMs: number) => CallbackServerTimerHandle
   readonly clearTimeout: (handle: CallbackServerTimerHandle) => void
 }
 
 const CALLBACK_SERVER_TIMER: CallbackServerTimer = {
-  setTimeout: (callback, delayMs) => capturedSetTimeout(callback, delayMs),
-  clearTimeout: (handle) => capturedClearTimeout(handle),
+  setTimeout: (callback, delayMs) => setNativeTimeout(callback, delayMs),
+  clearTimeout: (handle) => clearNativeTimeout(handle),
 }
 
 const SUCCESS_HTML = `<!DOCTYPE html>
@@ -66,20 +64,25 @@ export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promi
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
-    capturedSetTimeout(() => resolve(), ms)
+    setNativeTimeout(() => resolve(), ms)
   })
 }
 
 function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false
+    let receivedResponse = false
 
     const finish = (ready: boolean): void => {
       if (settled) {
         return
       }
       settled = true
-      socket.destroy()
+      if (ready) {
+        socket.end()
+      } else {
+        socket.destroy()
+      }
       resolve(ready)
     }
 
@@ -88,14 +91,14 @@ function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
         `GET ${READINESS_PROBE_PATH} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`,
       )
     })
-    socket.once("data", () => {
-      finish(true)
+    socket.on("data", () => {
+      receivedResponse = true
     })
     socket.once("end", () => {
-      finish(false)
+      finish(receivedResponse)
     })
     socket.once("close", () => {
-      finish(false)
+      finish(receivedResponse)
     })
 
     socket.setTimeout(STARTUP_PROBE_TIMEOUT_MS, () => {
