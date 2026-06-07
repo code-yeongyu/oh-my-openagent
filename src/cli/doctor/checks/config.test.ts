@@ -4,6 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as config from "./config"
 
+function normalizePathForAssertion(filePath: string): string {
+  return filePath.replaceAll("\\", "/").replaceAll("/private/var/", "/var/")
+}
+
 describe("config check", () => {
   describe("checkConfig", () => {
     it("returns a valid CheckResult", async () => {
@@ -45,7 +49,9 @@ describe("config check", () => {
 
         const result = await config.checkConfig()
 
-        expect(result.details?.[0]).toContain(join(testConfigDir, "oh-my-openagent.json"))
+        expect(normalizePathForAssertion(result.details?.[0] ?? "")).toContain(
+          normalizePathForAssertion(join(testConfigDir, "oh-my-openagent.json")),
+        )
       } finally {
         rmSync(testConfigDir, { recursive: true, force: true })
         if (originalConfigDir === undefined) {

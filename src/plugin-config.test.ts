@@ -294,9 +294,9 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
-      expect(result!.agents?.momus).toMatchObject({ model: "openai/gpt-5.4" });
-      expect(result!.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
+      expect(result?.agents?.momus).toMatchObject({ model: "openai/gpt-5.4" });
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
     });
   });
 
@@ -322,8 +322,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.disabled_hooks).toEqual(["comment-checker"]);
-      expect(result!.agents).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.agents).toBeUndefined();
     });
 
     it("should preserve valid agent_order when another section is invalid", () => {
@@ -366,8 +366,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
-      expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
+      expect(result?.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
+      expect(result?.disabled_hooks).toEqual(["not-a-real-hook"]);
     });
 
     it("should skip invalid string-array sections without discarding other salvaged sections", () => {
@@ -402,8 +402,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents).toBeUndefined();
-      expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
+      expect(result?.agents).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["not-a-real-hook"]);
     });
   });
 
@@ -442,7 +442,7 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
+      expect(result?.agents?.oracle).toMatchObject({ model: "openai/gpt-5.5" });
       expect((result as Record<string, unknown>)["some_future_key"]).toBeUndefined();
     });
   });
