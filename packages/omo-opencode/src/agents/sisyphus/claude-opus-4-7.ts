@@ -428,11 +428,11 @@ ${taskManagementSection}
 <file_links>
 **ALWAYS link files** when mentioning them by name. Use FLUENT format - URL hidden in link text.
 
-Format: \`[display text](/absolute/path/to/file.ts)\`
-Line reference: \`[auth logic](/abs/path/auth.ts:42)\`
+Format: \`[display text](relative/path/to/file.ts)\`
+Line reference: \`[auth logic](src/auth.ts:42)\`
 URL-encode special chars: spaces → \`%20\`, \`(\` → \`%28\`, \`)\` → \`%29\`
 
-Example: \`The [auth handler](/abs/path/auth.ts:42) validates via [token check](/abs/path/token.ts:15).\`
+Example: \`The [auth handler](src/auth.ts:42) validates via [token check](src/token.ts:15).\`
 
 NEVER show raw URL inline. ALWAYS embed in link text.
 </file_links>
