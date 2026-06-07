@@ -1,12 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
-import { createConnection } from "node:net"
 
 import { log } from "../../shared/logger"
 import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
 
 const DEFAULT_PORT = 19877
 const TIMEOUT_MS = 5 * 60 * 1000
-const STARTUP_TIMEOUT_MS = 2_000
 
 export type OAuthCallbackResult = {
   code: string
@@ -45,37 +43,6 @@ function isServerNotRunningError(error: Error): boolean {
 
 export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promise<number> {
   return findAvailablePortShared(startPort)
-}
-
-function waitForServerReady(port: number): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const socket = createConnection({ host: "127.0.0.1", port })
-    let settled = false
-
-    const finish = (error?: Error): void => {
-      if (settled) {
-        return
-      }
-      settled = true
-      socket.removeAllListeners()
-      socket.destroy()
-      if (error) {
-        reject(error)
-        return
-      }
-      resolve()
-    }
-
-    socket.setTimeout(STARTUP_TIMEOUT_MS, () => {
-      finish(new Error(`OAuth callback server did not accept connections on port ${port}`))
-    })
-    socket.once("connect", () => {
-      finish()
-    })
-    socket.once("error", (error) => {
-      finish(error)
-    })
-  })
 }
 
 export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
@@ -187,12 +154,6 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
 
   const address = server.address()
   const activePort = typeof address === "object" && address !== null ? address.port : requestedPort
-  try {
-    await waitForServerReady(activePort)
-  } catch (error) {
-    await closeServer()
-    throw error
-  }
 
   return {
     port: activePort,
