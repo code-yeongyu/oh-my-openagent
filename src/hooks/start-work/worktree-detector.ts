@@ -1,9 +1,27 @@
 import { execFileSync } from "node:child_process"
+import { existsSync, realpathSync } from "node:fs"
+import { resolve } from "node:path"
 
 export type WorktreeEntry = {
   path: string
   branch: string | undefined
   bare: boolean
+}
+
+function normalizePath(path: string): string {
+  const resolvedPath = resolve(path)
+  if (!existsSync(resolvedPath)) {
+    return resolvedPath
+  }
+
+  try {
+    return realpathSync(resolvedPath)
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+    return resolvedPath
+  }
 }
 
 export function parseWorktreeListPorcelain(output: string): WorktreeEntry[] {
@@ -68,12 +86,13 @@ export function listWorktrees(directory: string): WorktreeEntry[] {
 
 export function detectWorktreePath(directory: string): string | null {
   try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
+    return normalizePath(worktreePath)
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error

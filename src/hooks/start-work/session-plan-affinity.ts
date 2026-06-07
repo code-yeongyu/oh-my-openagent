@@ -1,9 +1,9 @@
-import { isAbsolute, resolve } from "node:path"
+import { posix, win32 } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 
-const PLAN_PATH_PATTERN = /[A-Za-z0-9_./\\:-]*\.(?:sisyphus|omo)[\\/]plans[\\/][A-Za-z0-9._/\\-]+\.md/gi
+const PLAN_PATH_PATTERN = /[A-Za-z0-9_./\\:~-]*\.(?:sisyphus|omo)[\\/]plans[\\/][A-Za-z0-9._/\\~-]+\.md/gi
 
 interface SessionMessagePart {
   text?: string
@@ -17,11 +17,28 @@ interface SessionMessage {
 
 function normalizePlanPath(directory: string, candidate: string): string {
   const trimmedCandidate = candidate.trim().replace(/^["'`]+|["'`]+$/g, "")
-  if (isAbsolute(trimmedCandidate) || /^[A-Za-z]:[\\/]/.test(trimmedCandidate)) {
-    return resolve(trimmedCandidate)
+  if (looksLikeWindowsAbsolutePath(trimmedCandidate)) {
+    return win32.resolve(trimmedCandidate)
+  }
+  if (looksLikeWindowsAbsolutePath(directory)) {
+    return win32.resolve(directory, trimmedCandidate)
+  }
+  if (posix.isAbsolute(trimmedCandidate)) {
+    return posix.resolve(trimmedCandidate)
   }
 
-  return resolve(directory, trimmedCandidate)
+  return posix.resolve(directory, trimmedCandidate)
+}
+
+function normalizePlanPathKey(planPath: string): string {
+  const resolvedPath = looksLikeWindowsAbsolutePath(planPath)
+    ? win32.resolve(planPath)
+    : posix.resolve(planPath)
+  return resolvedPath.replaceAll("\\", "/")
+}
+
+function looksLikeWindowsAbsolutePath(path: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(path) || /^[/\\]{2}[^/\\]/.test(path)
 }
 
 function extractPlanPathsFromText(directory: string, text: string): string[] {
@@ -71,8 +88,10 @@ export async function findRecentSessionPlanPath(input: {
     return null
   }
 
-  const availablePlans = new Set(input.availablePlans.map((planPath) => resolve(planPath)))
-  if (availablePlans.size === 0) {
+  const availablePlansByKey = new Map(
+    input.availablePlans.map((planPath) => [normalizePlanPathKey(planPath), planPath]),
+  )
+  if (availablePlansByKey.size === 0) {
     return null
   }
 
@@ -91,9 +110,11 @@ export async function findRecentSessionPlanPath(input: {
           ...extractPlanPathsFromInput(input.directory, part.input),
         ]
 
-        const matchedPlan = planCandidates.find((planPath) => availablePlans.has(resolve(planPath)))
+        const matchedPlan = planCandidates
+          .map((planPath) => availablePlansByKey.get(normalizePlanPathKey(planPath)))
+          .find((planPath): planPath is string => planPath !== undefined)
         if (matchedPlan) {
-          return resolve(matchedPlan)
+          return matchedPlan
         }
       }
     }

@@ -74,9 +74,10 @@ export function detectWorktreePath(directory: string): string | undefined {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
+    const normalizedWorktreePath = normalizePath(worktreePath)
 
-    worktreePathCache.set(resolvedDirectory, worktreePath)
-    return worktreePath
+    worktreePathCache.set(resolvedDirectory, normalizedWorktreePath)
+    return normalizedWorktreePath
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error

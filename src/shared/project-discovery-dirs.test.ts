@@ -42,9 +42,9 @@ describe("project-discovery-dirs", () => {
     const thirdPath = detectWorktreePath("/some/dir")
 
     // then
-    expect(firstPath).toBe(TEST_DIR)
-    expect(secondPath).toBe(TEST_DIR)
-    expect(thirdPath).toBe(TEST_DIR)
+    expect(firstPath).toBe(canonicalPath(TEST_DIR))
+    expect(secondPath).toBe(canonicalPath(TEST_DIR))
+    expect(thirdPath).toBe(canonicalPath(TEST_DIR))
     expect(worktreeSpawnCount).toBe(2)
   })
 
