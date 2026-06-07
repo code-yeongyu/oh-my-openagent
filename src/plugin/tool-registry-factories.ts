@@ -16,7 +16,6 @@ import {
 import {
   createBackgroundTools,
   createCallOmoAgent,
-  createConsensusTool,
   createDelegateTask,
   createGlobTools,
   createGrepTools,
@@ -50,7 +49,6 @@ export type ToolRegistryFactories = {
   createTaskList: typeof createTaskList
   createTaskUpdateTool: typeof createTaskUpdateTool
   createHashlineEditTool: typeof createHashlineEditTool
-  createConsensusTool: typeof createConsensusTool
   createTeamApproveShutdownTool: typeof createTeamApproveShutdownTool
   createTeamCreateTool: typeof createTeamCreateTool
   createTeamDeleteTool: typeof createTeamDeleteTool
@@ -82,7 +80,6 @@ export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createTaskList,
   createTaskUpdateTool,
   createHashlineEditTool,
-  createConsensusTool,
   createTeamApproveShutdownTool,
   createTeamCreateTool,
   createTeamDeleteTool,
