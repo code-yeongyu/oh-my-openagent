@@ -42,7 +42,6 @@ function createToolFactories(): ToolFactories {
     createTaskList: mock(() => fakeTool),
     createTaskUpdateTool: mock(() => fakeTool),
     createHashlineEditTool: mock(() => fakeTool),
-    createConsensusTool: mock(() => fakeTool),
     createTeamApproveShutdownTool: mock(() => fakeTool),
     createTeamCreateTool: mock(() => fakeTool),
     createTeamDeleteTool: mock(() => fakeTool),
@@ -110,7 +109,6 @@ describe("#given the default tool registry", () => {
       "task",
       "skill_mcp",
       "skill",
-      "consensus",
     ])
   })
 
@@ -156,7 +154,6 @@ describe("#given the default tool registry", () => {
       "task_list",
       "task_update",
       "edit",
-      "consensus",
     ])
   })
 })
