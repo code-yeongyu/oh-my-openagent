@@ -2,7 +2,6 @@ import {
   buildAgentIdentitySection,
   buildAntiPatternsSection,
   buildCategorySkillsDelegationGuide,
-  buildConsensusSection,
   buildDelegationTable,
   buildExploreSection,
   buildHardBlocksSection,
@@ -25,7 +24,6 @@ export interface SisyphusDynamicPromptSections {
   readonly agentIdentity: string;
   readonly antiPatterns: string;
   readonly categorySkillsGuide: string;
-  readonly consensusSection: string;
   readonly delegationTable: string;
   readonly exploreSection: string;
   readonly hardBlocks: string;
@@ -57,7 +55,6 @@ export function buildSisyphusDynamicPromptSections(
       availableCategories,
       availableSkills,
     ),
-    consensusSection: buildConsensusSection(availableTools),
     delegationTable: buildDelegationTable(availableAgents),
     exploreSection: buildExploreSection(availableAgents),
     hardBlocks: buildHardBlocksSection(),

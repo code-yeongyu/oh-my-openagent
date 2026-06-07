@@ -12,7 +12,6 @@ import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 import { createCoreTools } from "./tool-registry-core-tools"
 import { defaultToolRegistryFactories } from "./tool-registry-factories"
 import {
-  createConsensusToolsRecord,
   createHashlineToolsRecord,
   createTaskToolsRecord,
   getTaskSystemEnabled,
@@ -62,7 +61,6 @@ export function createToolRegistry(args: {
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createTaskToolsRecord({ taskSystemEnabled, pluginConfig, ctx, factories }),
     ...createHashlineToolsRecord({ pluginConfig, ctx, factories }),
-    ...createConsensusToolsRecord({ pluginConfig, ctx, factories }),
   }
 
   const allToolNames = Object.keys(allTools)
