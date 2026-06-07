@@ -7,7 +7,7 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
-import { discoverTeamSpecs, ensureBaseDirs, getInboxDir, getRuntimeStateDir, getWorktreeDir, resolveBaseDir } from "./paths"
+import { discoverTeamSpecs, ensureBaseDirs, getInboxDir, getRuntimeStateDir, getTasksDir, getWorktreeDir, resolveBaseDir } from "./paths"
 
 const logCalls: Array<[string, unknown?]> = []
 
@@ -58,11 +58,13 @@ describe("paths", () => {
     // when
     const runtimeStatePath = () => getRuntimeStateDir(baseDir, "../../escape")
     const inboxPath = () => getInboxDir(baseDir, "run-1", "../../escape")
+    const tasksPath = () => getTasksDir(baseDir, "../../escape")
     const worktreePath = () => getWorktreeDir(baseDir, "run-1", "../../escape")
 
     // then
     expect(runtimeStatePath).toThrow("team path escapes base directory")
     expect(inboxPath).toThrow("team path escapes base directory")
+    expect(tasksPath).toThrow("team path escapes base directory")
     expect(worktreePath).toThrow("team path escapes base directory")
   })
 

@@ -346,7 +346,7 @@ jobs:
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
-        run: bun run build
+        run: bun run build:lsp-tools-mcp && bun run build
 
       - name: Strip token auth from .npmrc to force OIDC
         if: >-

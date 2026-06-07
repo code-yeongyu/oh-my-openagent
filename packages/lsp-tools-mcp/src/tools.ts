@@ -493,12 +493,15 @@ async function executeLspRename(params: Record<string, unknown>, signal?: AbortS
 	try {
 		const edit = await withLspClient(
 			filePath,
-			async (client) => client.rename(filePath, line, character, newName),
+			async (client, workspaceRoot) => ({
+				edit: await client.rename(filePath, line, character, newName),
+				workspaceRoot,
+			}),
 			"rename",
 			clientOptions(signal),
 		);
-		const apply = applyWorkspaceEdit(edit);
-		const details: LspRenameDetails = { filePath, line, character, newName, apply, edit };
+		const apply = applyWorkspaceEdit(edit.edit, { workspaceRoot: edit.workspaceRoot });
+		const details: LspRenameDetails = { filePath, line, character, newName, apply, edit: edit.edit };
 		return text(formatApplyResult(apply), details, !apply.success);
 	} catch (error) {
 		const missingDependency = missingDependencyResult(error, {

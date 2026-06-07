@@ -37,3 +37,18 @@ test("getTask throws when the task file is missing", async () => {
     await fixture.cleanup()
   }
 })
+
+test("#given traversal task id #when loading a task #then it rejects before reading outside the task directory", async () => {
+  // given
+  const fixture = await createTasklistFixture()
+
+  try {
+    // when
+    const loadedTask = getTask(fixture.teamRunId, "../escape", fixture.config)
+
+    // then
+    await expect(loadedTask).rejects.toThrow("team path escapes base directory")
+  } finally {
+    await fixture.cleanup()
+  }
+})

@@ -33,4 +33,20 @@ describe("Codex compatibility test script", () => {
     // #then
     expect(testsLspAfterBuild, "test:codex must run the vendored LSP package test suite after building it").toBe(true)
   })
+
+  test("builds git-bash MCP before installer tests copy packaged runtimes", () => {
+    // #given
+    const packageManifest = readFileSync(packageManifestPath, "utf8")
+
+    // #when
+    const gitBashBuildIndex = packageManifest.indexOf("bun run build:git-bash-mcp")
+    const installerTestIndex = packageManifest.indexOf("src/cli/install-codex/install-codex.test.ts")
+    const buildsGitBashBeforeInstallerTests = gitBashBuildIndex >= 0 && installerTestIndex > gitBashBuildIndex
+
+    // #then
+    expect(
+      buildsGitBashBeforeInstallerTests,
+      "test:codex must build git-bash-mcp before installer tests assert packaged runtime files",
+    ).toBe(true)
+  })
 })

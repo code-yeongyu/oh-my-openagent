@@ -42,7 +42,14 @@ export class TeamPathTraversalError extends Error {
 
 function resolveContainedPath(baseDir: string, pathSegments: readonly string[]): string {
   for (const pathSegment of pathSegments) {
-    if (pathSegment === "." || pathSegment === ".." || pathSegment.includes("/") || pathSegment.includes("\\")) {
+    if (
+      pathSegment.length === 0 ||
+      pathSegment === "." ||
+      pathSegment === ".." ||
+      pathSegment.includes("/") ||
+      pathSegment.includes("\\") ||
+      pathSegment.includes("\0")
+    ) {
       throw new TeamPathTraversalError()
     }
   }
@@ -80,7 +87,27 @@ export function getInboxDir(baseDir: string, teamRunId: string, memberName: stri
 }
 
 export function getTasksDir(baseDir: string, teamRunId: string): string {
-  return path.join(baseDir, "runtime", teamRunId, "tasks")
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks"])
+}
+
+function assertSafeTaskId(taskId: string): void {
+  if (!/^\d+$/.test(taskId)) {
+    throw new TeamPathTraversalError()
+  }
+}
+
+export function getTaskFilePath(baseDir: string, teamRunId: string, taskId: string): string {
+  assertSafeTaskId(taskId)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks", `${taskId}.json`])
+}
+
+export function getTaskClaimsDir(baseDir: string, teamRunId: string): string {
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks", "claims"])
+}
+
+export function getTaskClaimLockPath(baseDir: string, teamRunId: string, taskId: string): string {
+  assertSafeTaskId(taskId)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks", "claims", `${taskId}.lock`])
 }
 
 export function getWorktreeDir(baseDir: string, teamRunId: string, memberName: string): string {

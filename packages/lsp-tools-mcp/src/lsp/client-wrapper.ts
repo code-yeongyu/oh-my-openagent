@@ -97,7 +97,7 @@ const READ_ONLY_RETRY_TOOLS = new Set([
 
 export async function withLspClient<T>(
 	filePath: string,
-	fn: (client: LspClient) => Promise<T>,
+	fn: (client: LspClient, workspaceRoot: string) => Promise<T>,
 	toolName: string,
 	options: WithLspClientOptions = {},
 ): Promise<T> {
@@ -124,7 +124,7 @@ export async function withLspClient<T>(
 		const client = await manager.getClient(root, server, options.signal);
 
 		try {
-			return await fn(client);
+			return await fn(client, root);
 		} catch (err) {
 			if (allowRetry && READ_ONLY_RETRY_TOOLS.has(toolName) && isLspDeadConnectionError(err)) {
 				manager.invalidateClient(root, server.id, client);
