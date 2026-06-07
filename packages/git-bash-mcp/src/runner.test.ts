@@ -55,6 +55,12 @@ describe("Git Bash runner", () => {
     });
 
     expect(readFileSync(argvPath, "utf8").replace(/\r\n/g, "\n")).toBe("-lc\nprintf ok\n");
-    expect(result).toEqual({ exitCode: 7, stdout: "fake stdout\n", stderr: "fake stderr\n", timedOut: false });
+    const expectedLineEnding = process.platform === "win32" ? "\r\n" : "\n";
+    expect(result).toEqual({
+      exitCode: 7,
+      stdout: `fake stdout${expectedLineEnding}`,
+      stderr: `fake stderr${expectedLineEnding}`,
+      timedOut: false,
+    });
   });
 });
