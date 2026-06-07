@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
-import { type IncomingMessage, request as httpRequest } from "node:http"
+import { createConnection } from "node:net"
 import { startCallbackServer, type CallbackServer, type CallbackServerTimer, type CallbackServerTimerHandle } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
@@ -46,45 +46,83 @@ function createControllableTimer(): {
 function request(url: string): Promise<Response> {
   return new Promise((resolve, reject) => {
     const target = new URL(url)
-    const req = httpRequest(
-      {
-        hostname: target.hostname,
-        port: Number.parseInt(target.port, 10),
-        path: `${target.pathname}${target.search}`,
-        method: "GET",
-      },
-      (res: IncomingMessage) => {
-        const chunks: Buffer[] = []
-        const headers = new Headers()
+    const port = Number.parseInt(target.port, 10)
+    const chunks: Buffer[] = []
+    let settled = false
 
-        res.on("data", (chunk: Buffer) => {
-          chunks.push(chunk)
-        })
-        res.on("end", () => {
-          for (const [name, value] of Object.entries(res.headers)) {
-            if (typeof value === "string") {
-              headers.set(name, value)
-              continue
-            }
-            if (Array.isArray(value)) {
-              for (const item of value) {
-                headers.append(name, item)
-              }
-            }
-          }
+    const finishWithError = (error: Error): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      socket.destroy()
+      reject(error)
+    }
 
-          resolve(
-            new Response(Buffer.concat(chunks), {
-              status: res.statusCode ?? 0,
-              headers,
-            }),
-          )
-        })
-      },
-    )
+    const finishWithResponse = (): void => {
+      if (settled) {
+        return
+      }
+      settled = true
 
-    req.on("error", reject)
-    req.end()
+      const rawResponse = Buffer.concat(chunks)
+      const headerEnd = rawResponse.indexOf("\r\n\r\n")
+      if (headerEnd < 0) {
+        reject(new Error("HTTP response did not include headers"))
+        return
+      }
+
+      const headerText = rawResponse.subarray(0, headerEnd).toString("utf8")
+      const [statusLine, ...headerLines] = headerText.split("\r\n")
+      const status = Number.parseInt(statusLine?.split(" ")[1] ?? "", 10)
+      if (!Number.isFinite(status)) {
+        reject(new Error(`HTTP response had invalid status line: ${statusLine ?? ""}`))
+        return
+      }
+
+      const headers = new Headers()
+      for (const headerLine of headerLines) {
+        const separatorIndex = headerLine.indexOf(":")
+        if (separatorIndex < 0) {
+          continue
+        }
+        const name = headerLine.slice(0, separatorIndex).trim()
+        const value = headerLine.slice(separatorIndex + 1).trim()
+        headers.append(name, value)
+      }
+
+      resolve(
+        new Response(rawResponse.subarray(headerEnd + 4), {
+          status,
+          headers,
+        }),
+      )
+    }
+
+    const socket = createConnection({ host: target.hostname, port }, () => {
+      socket.write(
+        `GET ${target.pathname}${target.search} HTTP/1.1\r\nHost: ${target.host}\r\nConnection: close\r\n\r\n`,
+      )
+    })
+
+    socket.on("data", (chunk: Buffer) => {
+      chunks.push(chunk)
+    })
+    socket.once("end", finishWithResponse)
+    socket.once("close", () => {
+      if (settled) {
+        return
+      }
+      if (chunks.length > 0) {
+        finishWithResponse()
+        return
+      }
+      finishWithError(new Error(`HTTP connection closed before response for ${url}`))
+    })
+    socket.once("error", finishWithError)
+    socket.setTimeout(1_000, () => {
+      finishWithError(new Error(`HTTP request timed out for ${url}`))
+    })
   })
 }
 

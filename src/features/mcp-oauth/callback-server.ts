@@ -73,14 +73,12 @@ function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
     let settled = false
     let receivedResponse = false
 
-    const finish = (ready: boolean): void => {
+    const finish = (ready: boolean, destroySocket: boolean): void => {
       if (settled) {
         return
       }
       settled = true
-      if (ready) {
-        socket.end()
-      } else {
+      if (destroySocket) {
         socket.destroy()
       }
       resolve(ready)
@@ -91,21 +89,21 @@ function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
         `GET ${READINESS_PROBE_PATH} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`,
       )
     })
-    socket.on("data", () => {
+    socket.once("data", () => {
       receivedResponse = true
     })
     socket.once("end", () => {
-      finish(receivedResponse)
+      finish(receivedResponse, false)
     })
     socket.once("close", () => {
-      finish(receivedResponse)
+      finish(receivedResponse, false)
     })
 
     socket.setTimeout(STARTUP_PROBE_TIMEOUT_MS, () => {
-      finish(false)
+      finish(false, true)
     })
     socket.once("error", () => {
-      finish(false)
+      finish(false, true)
     })
   })
 }
