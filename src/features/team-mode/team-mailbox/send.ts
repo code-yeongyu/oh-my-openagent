@@ -42,6 +42,13 @@ export class DuplicateMessageIdError extends Error {
   }
 }
 
+export class InvalidRecipientError extends Error {
+  constructor(recipient: string) {
+    super(`unknown or inactive team recipient: ${recipient}`)
+    this.name = "InvalidRecipientError"
+  }
+}
+
 export class TeamDeletingError extends Error {
   constructor(message = "team is deleting") {
     super(message)
@@ -73,6 +80,11 @@ async function assertTeamAcceptsMessages(teamRunId: string, config: TeamModeConf
 
 function resolveRecipients(message: Message, context: SendContext): string[] {
   if (message.to !== "*") {
+    const allowedRecipients = new Set([...context.activeMembers, ...(context.reservedRecipients ?? [])])
+    if (!allowedRecipients.has(message.to)) {
+      throw new InvalidRecipientError(message.to)
+    }
+
     return [message.to]
   }
 

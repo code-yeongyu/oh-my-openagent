@@ -33,6 +33,31 @@ function getTeamDirectory(baseDir: string, teamName: string, scope: "user" | "pr
   return path.join(baseDir, "teams", teamName)
 }
 
+export class TeamPathTraversalError extends Error {
+  constructor() {
+    super("team path escapes base directory")
+    this.name = "TeamPathTraversalError"
+  }
+}
+
+function resolveContainedPath(baseDir: string, pathSegments: readonly string[]): string {
+  for (const pathSegment of pathSegments) {
+    if (pathSegment === "." || pathSegment === ".." || pathSegment.includes("/") || pathSegment.includes("\\")) {
+      throw new TeamPathTraversalError()
+    }
+  }
+
+  const resolvedBaseDir = path.resolve(baseDir)
+  const resolvedPath = path.resolve(resolvedBaseDir, ...pathSegments)
+  const relativePath = path.relative(resolvedBaseDir, resolvedPath)
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new TeamPathTraversalError()
+  }
+
+  return resolvedPath
+}
+
 export function resolveBaseDir(config: TeamModeConfig): string {
   return config.base_dir ?? path.join(homedir(), ".omo")
 }
@@ -47,11 +72,11 @@ export function getTeamSpecPath(
 }
 
 export function getRuntimeStateDir(baseDir: string, teamRunId: string): string {
-  return path.join(baseDir, "runtime", teamRunId)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId])
 }
 
 export function getInboxDir(baseDir: string, teamRunId: string, memberName: string): string {
-  return path.join(baseDir, "runtime", teamRunId, "inboxes", memberName)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "inboxes", memberName])
 }
 
 export function getTasksDir(baseDir: string, teamRunId: string): string {
@@ -59,7 +84,7 @@ export function getTasksDir(baseDir: string, teamRunId: string): string {
 }
 
 export function getWorktreeDir(baseDir: string, teamRunId: string, memberName: string): string {
-  return path.join(baseDir, "worktrees", teamRunId, memberName)
+  return resolveContainedPath(baseDir, ["worktrees", teamRunId, memberName])
 }
 
 async function readTeamSpecDirectories(directoryPath: string, scope: "project" | "user"): Promise<TeamSpecEntry[]> {
