@@ -13,7 +13,7 @@ function request(url: string): Promise<Response> {
     const req = httpRequest(
       {
         hostname: target.hostname,
-        port: target.port,
+        port: Number.parseInt(target.port, 10),
         path: `${target.pathname}${target.search}`,
         method: "GET",
       },
@@ -95,6 +95,26 @@ describe("startCallbackServer", () => {
       const response = await request(`http://${HOSTNAME}:${server.port}/other`)
 
       expect(response.status).toBe(404)
+    } finally {
+      await close(server)
+    }
+  })
+
+  it("keeps startup probes on the non-callback route contract", async () => {
+    const server = await startCallbackServer(0)
+
+    try {
+      const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_ready__`)
+      expect(readyResponse.status).toBe(404)
+
+      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=after-ready&state=still-waiting`
+      const [result, response] = await Promise.all([
+        server.waitForCallback(),
+        request(callbackUrl),
+      ])
+
+      expect(result).toEqual({ code: "after-ready", state: "still-waiting" })
+      expect(response.status).toBe(200)
     } finally {
       await close(server)
     }
