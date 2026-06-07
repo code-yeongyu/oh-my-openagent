@@ -20,4 +20,5 @@ export type StopHookOutput = {
 
 export type ReadonlyFileSystem = {
 	readFileSync(path: string, encoding: "utf8"): string;
+	realpathSync(path: string): string;
 };

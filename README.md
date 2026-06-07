@@ -352,6 +352,10 @@ Complex task? Don't prompt and pray.
 
 `/start-work` calls Prometheus. He **interviews you like a real engineer**, identifies scope and ambiguities, and builds a verified plan before touching code. The agent knows what it's building before it starts.
 
+For significant implementation work and PR handoff, completion is gated by
+global `review-work` plus a debugging-oriented runtime audit, with redacted
+evidence recorded before handoff.
+
 ### Skills
 
 Skills aren't just prompts. Each brings:

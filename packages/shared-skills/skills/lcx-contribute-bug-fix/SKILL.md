@@ -11,7 +11,8 @@ Use this skill to debug a concrete LazyCodex or Codex defect, implement the smal
 
 Route ownership the same way as `$lcx-report-bug`:
 
-- `code-yeongyu/lazycodex` for LazyCodex, lazycodex-ai, omo-codex, bundled skills, hooks, MCP wiring, installer behavior, marketplace sync, docs, or packaging.
+- `code-yeongyu/oh-my-openagent` for LazyCodex, lazycodex-ai, omo-codex, bundled skills, hooks, MCP wiring, installer behavior, marketplace sync, docs, packaging, or sync-source implementation fixes. Work in canonical paths such as `packages/omo-codex`, `packages/shared-skills`, and `script/sync-lazycodex-marketplace.ts`.
+- `code-yeongyu/lazycodex` only for downstream marketplace repository metadata, releases, issue comments, or generated artifacts that cannot be corrected in the canonical source.
 - `openai/codex` for upstream Codex CLI bugs that reproduce without LazyCodex or come from Codex core behavior.
 
 ## Required Outcome
@@ -22,6 +23,7 @@ Create a PR that includes:
 - reproduction logs from before the fix
 - the smallest implementation that fixes the defect
 - verification logs from after the fix
+- Global Review and Debugging Gate evidence before any PR push or creation
 - apply `lazycodex-generated` when label management is available
 - the required LazyCodex footer tag `Tag: lazycodex-generated`
 - cleanup of temporary worktrees and clones
@@ -34,7 +36,7 @@ Create a PR that includes:
 4. Create a fresh temporary clone and branch. Do not modify the user's current repository for the target fix unless the current repository is itself the requested target and the user explicitly asked for local edits.
 
 ```bash
-TARGET_REPO="code-yeongyu/lazycodex" # or openai/codex
+TARGET_REPO="code-yeongyu/oh-my-openagent" # or openai/codex; use code-yeongyu/lazycodex only for downstream marketplace-only artifacts
 WORK_ROOT="$(mktemp -d /tmp/lazycodex-fix-XXXXXX)"
 gh repo clone "$TARGET_REPO" "$WORK_ROOT/repo" -- --depth=1
 cd "$WORK_ROOT/repo"
@@ -61,7 +63,14 @@ git log --oneline "origin/$BASE_BRANCH..HEAD"
 ```
 
 10. Generate the PR body with `scripts/create-pr-body.mjs`.
-11. Ensure the generated label exists when the target repo allows label management. Keep the footer tag even when label creation is unavailable:
+11. Before any push, branch handoff, PR creation, or PR handoff, complete the **Global Review and Debugging Gate**:
+   - Invoke `review-work` with the final diff, changed files, user goal, constraints, run command, reproduction evidence, and verification evidence.
+   - All review lanes must PASS. Failed, timed-out, missing-deliverable, ack-only, `BLOCKED:`, or inconclusive lanes block the PR.
+   - Run a debugging-oriented runtime audit against the changed surface: name at least three plausible failure hypotheses, run distinguishing checks, and record whether each was ruled out or confirmed.
+   - If review or debugging finds an issue, use the `debugging` skill to confirm root cause, add the minimal failing test or reproduction, fix it, rerun verification, and rerun this gate.
+   - Redact or mask secrets and sensitive user data before writing subagent prompts, repro artifacts, logs, PR bodies, comments, or handoffs. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use summaries, lengths, hashes, or short non-sensitive prefixes instead.
+   - Add the redacted gate verdict and evidence summary to the PR body before creation.
+12. Ensure the generated label exists when the target repo allows label management. Keep the footer tag even when label creation is unavailable:
 
 ```bash
 LABEL_ARGS=()
@@ -72,7 +81,7 @@ else
 fi
 ```
 
-12. Push to a writable remote, then create the PR. For upstream `openai/codex`, fork first and use the fork as the head repository:
+13. Push to a writable remote, then create the PR. For upstream `openai/codex`, fork first and use the fork as the head repository:
 
 ```bash
 PUSH_REMOTE="origin"
@@ -85,10 +94,14 @@ if [ "$TARGET_REPO" = "openai/codex" ]; then
 fi
 
 git push -u "$PUSH_REMOTE" "$BRANCH_NAME"
-gh pr create --repo "$TARGET_REPO" --base "$BASE_BRANCH" --head "$PR_HEAD" --title "<short fix title>" "${LABEL_ARGS[@]}" --body-file "$PR_BODY"
+PR_URL="$(gh pr create --repo "$TARGET_REPO" --base "$BASE_BRANCH" --head "$PR_HEAD" --title "<short fix title>" "${LABEL_ARGS[@]}" --body-file "$PR_BODY")"
 ```
 
-13. Clean up:
+If this canonical PR supersedes or corrects a downstream `code-yeongyu/lazycodex`
+marketplace PR, comment on the downstream PR with the canonical PR URL before
+handoff.
+
+14. Clean up:
 
 ```bash
 cd /
@@ -106,14 +119,15 @@ Use the bundled script to generate the PR body. Create a JSON file with this sha
 ```json
 {
   "title": "Fix short user-visible failure",
-  "targetRepository": "code-yeongyu/lazycodex",
+  "targetRepository": "code-yeongyu/oh-my-openagent",
   "problem": "What is broken for the user.",
   "reproductionLogs": "Exact failing command, log excerpt, or trace.",
   "approach": "What changed and why this is the smallest correct fix.",
   "confidence": "Why the diagnosis and fix are strongly supported.",
   "risks": "Risk level and what could regress.",
   "userVisibleBehaviorChanges": "What changes for the user after the PR.",
-  "verification": ["failing test before fix", "passing test after fix", "manual QA command"]
+  "verification": ["failing test before fix", "passing test after fix", "manual QA command"],
+  "globalReviewDebugGate": "PASS. review-work all lanes passed; debugging audit covered three hypotheses with redacted evidence."
 }
 ```
 
@@ -153,6 +167,9 @@ The generated body must follow this structure:
 - [GREEN test output after the fix]
 - [Manual QA command and result]
 
+## Global Review and Debugging Gate
+[PASS verdict with redacted review-work and debugging evidence.]
+
 ---
 This PR was debugged, implemented, and created with [LazyCodex](https://github.com/code-yeongyu/lazycodex).
 Tag: lazycodex-generated
@@ -171,6 +188,7 @@ Do not open:
 
 - a PR without a failing-before and passing-after test
 - a PR without a real-surface QA command
+- a PR without Global Review and Debugging Gate PASS evidence
 - a PR without the `Tag: lazycodex-generated` footer
 - a vague fix that does not identify the root cause
 - a broad refactor disguised as a bug fix

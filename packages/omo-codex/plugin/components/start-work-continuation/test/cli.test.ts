@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execPath } from "node:process";
@@ -57,6 +57,32 @@ describe("start-work continuation CLI", () => {
 	it("#given unrelated session stdin #when CLI runs #then stdout is empty and exit is zero", () => {
 		// given
 		const cwd = createWorkspace(["codex:other"]);
+		const payload = JSON.stringify(makePayload(cwd, false, "Stop"));
+
+		// when
+		const result = runCli("stop", payload);
+
+		// then
+		if (result.error !== undefined) throw result.error;
+		expect(result.status).toBe(0);
+		expect(result.stdout).toBe("");
+	});
+
+	it("#given active plan path is symlinked outside workspace #when CLI runs #then stdout is empty and exit is zero", () => {
+		// given
+		const cwd = createWorkspace(["codex:s1"]);
+		const outsideRoot = mkdtempSync(join(tmpdir(), "codex-continuation-outside-"));
+		cleanupRoots.push(outsideRoot);
+		const outsidePlan = join(outsideRoot, "plan.md");
+		writeFileSync(outsidePlan, "## TODOs\n\n- [ ] External task label\n");
+		const planPath = join(cwd, ".omo", "plans", "plan.md");
+		rmSync(planPath);
+		try {
+			symlinkSync(outsidePlan, planPath);
+		} catch (error) {
+			if (error instanceof Error) return;
+			throw error;
+		}
 		const payload = JSON.stringify(makePayload(cwd, false, "Stop"));
 
 		// when

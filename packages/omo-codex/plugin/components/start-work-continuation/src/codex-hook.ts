@@ -21,15 +21,19 @@ function renderDirective(state: ContinuationState, sessionId: string): string {
 			? ""
 			: `${lineBreak}- Worktree: \`${state.worktreePath}\` (all edits, tests, and commands run inside this directory)`;
 	const replacements = {
+		WORK_ID: state.workId,
 		PLAN_NAME: state.planName,
 		PLAN_PATH: state.planPath,
 		BOULDER_PATH: state.boulderPath,
 		REMAINING_COUNT: String(state.checklist.remaining),
 		TOTAL_COUNT: String(state.checklist.total),
-		NEXT_TASK_LABEL: state.checklist.nextTaskLabel ?? "",
+		NEXT_TASK_LABEL: state.checklist.nextTaskLabel ?? "Global Review and Debugging Gate",
 		WORKTREE_BLOCK: worktreeBlock,
 		LEDGER_PATH: state.ledgerPath,
 		SESSION_ID: sessionId,
+		FINAL_GATE_BLOCK: state.finalGateOnly
+			? "All top-level checkboxes are complete. Do not search for another checkbox; run the Final gate below now, record the gate marker in the ledger, then complete the Boulder work."
+			: "",
 	} as const;
 	let rendered = START_WORK_CONTINUATION_DIRECTIVE;
 	for (const [placeholder, value] of Object.entries(replacements)) {

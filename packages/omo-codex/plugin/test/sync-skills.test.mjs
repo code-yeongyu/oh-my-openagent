@@ -275,7 +275,66 @@ test("#given packaged start-work skill #when inspected #then no-plan bootstrap a
 		["requires stale-state probes", /stale state/i],
 		["rejects misleading success output", /misleading success output/i],
 		["does not accept worker done claims without independent verification", /done claim[\s\S]*independent(?:ly)? verified|independent(?:ly)? verify[\s\S]*done claim/i],
+		["requires global review and debugging gate before completion", /Global Review and Debugging Gate[\s\S]*review-work[\s\S]*debugging/i],
+		["blocks inconclusive review lanes", /inconclusive lane[\s\S]*gate failure|inconclusive lanes?[\s\S]*block/i],
+		["redacts evidence before PR handoff", /redact|mask/i],
+		["forbids raw sensitive evidence", /raw tokens|credentials|auth headers|cookies|API keys/i],
+		["records scoped final gate marker", /global-review-debug-gate-passed[\s\S]*verdict: "PASS"[\s\S]*work_id[\s\S]*plan_path[\s\S]*session_id/i],
 	]);
+});
+
+test("#given packaged review-work skill #when inspected #then blocking review evidence contract is shipped", async () => {
+	// given
+	const skillFile = await readPackagedSkillFile("review-work", "SKILL.md");
+
+	// when / then
+	assertPackagedContentMatches(skillFile, [
+		["blocks final implementation and PR gates", /final implementation[\s\S]*PR[\s\S]*blocking/i],
+		["does not treat inconclusive lanes as pass", /inconclusive lane[\s\S]*not a pass/i],
+		["routes uncertainty through debugging", /debugging[\s\S]*skill[\s\S]*runtime behavior/i],
+		["redacts shareable evidence", /Redact|mask/i],
+		["forbids raw secrets and private data", /raw tokens|credentials|auth headers|cookies|API keys|PII/i],
+		["redacts subagent prompts and repro artifacts", /subagent prompts[\s\S]*repro artifacts/i],
+	]);
+});
+
+test("#given packaged LazyCodex PR skills #when inspected #then global review and debugging gates PR creation", async () => {
+	// given
+	const contributeSkill = await readPackagedSkillFile("lcx-contribute-bug-fix", "SKILL.md");
+	const reportSkill = await readPackagedSkillFile("lcx-report-bug", "SKILL.md");
+
+	// when / then
+	assertPackagedContentMatches(contributeSkill, [
+		["routes implementation PRs to canonical source", /code-yeongyu\/oh-my-openagent[\s\S]*packages\/omo-codex/i],
+		["limits lazycodex repo to downstream artifacts", /code-yeongyu\/lazycodex` only for downstream marketplace/i],
+		[
+			"blocks before push, branch handoff, and PR creation",
+			/Before any push, branch handoff, PR creation, or PR handoff[\s\S]*Global Review and Debugging Gate/i,
+		],
+		["requires all review lanes to pass", /All review lanes must PASS[\s\S]*inconclusive lanes block the PR/i],
+		["requires debugging runtime audit", /debugging-oriented runtime audit[\s\S]*three plausible failure hypotheses/i],
+		["redacts prompts artifacts and PR bodies", /subagent prompts[\s\S]*repro artifacts[\s\S]*PR bodies/i],
+		["adds gate evidence before PR creation", /gate verdict[\s\S]*PR body[\s\S]*before creation/i],
+		["forbids PR without gate evidence", /PR without Global Review and Debugging Gate PASS evidence/i],
+	]);
+	assertPackagedContentMatches(reportSkill, [
+		["routes implementation PRs to canonical source", /code-yeongyu\/oh-my-openagent[\s\S]*packages\/omo-codex/i],
+		["limits lazycodex repo to downstream artifacts", /code-yeongyu\/lazycodex` only for downstream marketplace/i],
+		[
+			"blocks before branch handoff and PR creation",
+			/Before any branch handoff, PR creation, or PR handoff[\s\S]*Global Review and Debugging Gate/i,
+		],
+		["requires all review lanes to pass", /All review lanes must PASS[\s\S]*inconclusive lanes block the PR/i],
+		["requires debugging runtime audit", /debugging-oriented runtime audit[\s\S]*three plausible failure hypotheses/i],
+		["redacts prompts artifacts and PR bodies", /subagent prompts[\s\S]*repro artifacts[\s\S]*PR bodies/i],
+		["limits PR body to redacted evidence", /Include only the redacted gate verdict[\s\S]*PR body/i],
+		["forbids PR without gate evidence", /PR without Global Review and Debugging Gate PASS evidence/i],
+	]);
+	assert.ok(
+		reportSkill.content.indexOf("Before any branch handoff, PR creation, or PR handoff") <
+			reportSkill.content.indexOf("Create a PR only when"),
+		`${reportSkill.path} must gate before PR creation`,
+	);
 });
 
 test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent planning contracts are shipped", async () => {

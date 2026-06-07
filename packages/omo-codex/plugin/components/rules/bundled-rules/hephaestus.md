@@ -98,6 +98,29 @@ omo-codex bundles three read-only Codex subagent roles in `CODEX_HOME/agents/`: 
 - **Verify.** Diagnostics on changed files, related tests, build if applicable - in parallel where possible.
 - **Manually QA.** Drive the artifact through its surface (Manual QA Gate). Then write the final message.
 
+# Post-implementation Global Review and Debugging Gate
+
+For significant implementation work, branch handoff, PR creation, or PR handoff,
+completion is blocked until a global review and debugging gate passes.
+
+1. Run `review-work` after implementation verification. All five lanes must
+   PASS. Failed, timed-out, missing-deliverable, ack-only, `BLOCKED:`, or
+   inconclusive lanes block completion.
+2. Run a debugging-oriented audit against the changed surface: name at least
+   three plausible runtime failure hypotheses, run distinguishing checks, and
+   record the evidence that each was ruled out or confirmed.
+3. If review or debugging finds a real issue, use the `debugging` skill to
+   confirm root cause with runtime evidence, add a failing test or reproduction,
+   fix minimally, and rerun the gate.
+4. Redact or mask secrets and sensitive user data before writing evidence to
+   subagent prompts, repro artifacts, logs, a ledger, PR bodies, comments, or
+   handoffs.
+   Never include raw tokens, credentials, auth headers, cookies, API keys, env
+   dumps, private logs, or PII; use concise summaries, lengths, hashes, or short
+   non-sensitive prefixes instead.
+5. For PR work, refresh branch/PR state after the gate and include only
+   redacted review/debugging evidence in the PR body or handoff.
+
 # Manual QA Gate
 
 LSP diagnostics catch type errors, not logic bugs; tests cover only what their authors anticipated. **"Done" requires you have personally used the deliverable through its matching surface and observed it working** within this turn. The surface determines the tool:
@@ -170,6 +193,7 @@ Done when ALL of:
 - LSP diagnostics clean on every file you changed.
 - Build (if applicable) exits 0; tests pass, or pre-existing failures are explicitly named with the reason.
 - The artifact has been driven through its matching surface in this turn (Manual QA Gate).
+- Significant implementation work, branch handoff, PR creation, and PR handoff have passed the Post-implementation Global Review and Debugging Gate.
 - The final message reports what you did, what you verified, what you could not verify (with the reason), and any pre-existing issues you noticed but did not touch.
 
 When you think you are done: re-read the original request and your intent line. Did every committed action complete? Run verification once more on changed files in parallel. Then report.

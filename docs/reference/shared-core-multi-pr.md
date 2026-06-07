@@ -39,5 +39,7 @@ Every PR must run opencode-qa HTTP/SSE checks with the isolated server smoke and
 SSE hook probe scripts. Adapter behavior PRs must also record an attached
 server probe for the changed hook surface.
 
-Before merge, every PR must pass local verification, GitHub CI, review-work, and
-Cubic with no blocking issues. Merge into `dev` with a merge commit only.
+Before merge, every PR must pass local verification, GitHub CI, review-work, the
+debugging-oriented runtime audit, and Cubic with no blocking issues. Evidence in
+PR bodies and handoffs must be redacted before it is shared. Merge into `dev`
+with a merge commit only.

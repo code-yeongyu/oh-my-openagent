@@ -2,15 +2,15 @@
 
 Codex Stop-hook continuation injector for the omo-codex `start-work` skill.
 
-It reads `.omo/boulder.json` in the hook payload `cwd`, resolves the active work, inspects the active plan for incomplete top-level checkboxes, and emits Codex Stop-hook JSON when the plan still has work:
+It reads `.omo/boulder.json` in the hook payload `cwd`, resolves the active work, inspects the active plan for incomplete top-level checkboxes, and emits Codex Stop-hook JSON when the plan still has work or the final review/debugging gate has not been recorded:
 
 ```json
 {"decision":"block","reason":"<directive>"}
 ```
 
-The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when all top-level plan checkboxes are complete.
+The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when all top-level plan checkboxes are complete and `.omo/start-work/ledger.jsonl` contains a fresh `global-review-debug-gate-passed` PASS marker scoped to the current `work_id`, plan name, resolved plan path, Boulder `started_at`, and `codex:<session_id>` with no later relevant ledger event. That marker must include structured redacted `verification`, `review`, `debugging`, `artifact`, and `cleanup` evidence: `verification.verdict` is `PASS`, `review` records all five lanes passed, `debugging.verdict` is `PASS` with at least three hypotheses, `artifact.redacted` is `true`, and `cleanup.status` is `complete`.
 
-This pairs with the `start-work` skill at `plugin/skills/start-work/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session.
+This pairs with the `start-work` skill at `plugin/skills/start-work/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session. Plan paths must resolve inside the hook payload `cwd`; symlinked plans that resolve outside the workspace are ignored.
 
 ## Counted plan checkboxes
 
@@ -52,4 +52,4 @@ MIT. See `LICENSE`.
 
 ## Privacy
 
-This plugin only reads local hook payloads, `.omo/boulder.json`, the active plan, and the bundled directive. It makes no network calls and stores no telemetry.
+This plugin only reads local hook payloads, `.omo/boulder.json`, `.omo/start-work/ledger.jsonl`, the active plan, and the bundled directive. It makes no network calls and stores no telemetry.
