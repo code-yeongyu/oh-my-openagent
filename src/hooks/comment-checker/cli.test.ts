@@ -168,7 +168,7 @@ exit 2
 `, `@echo off
 if "%~1" neq "check" exit /b 1
 more > nul
-echo found comments 1>&2
+1>&2 echo(found comments
 exit /b 2
 `)
       // when
