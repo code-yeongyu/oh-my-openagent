@@ -77,19 +77,27 @@ describe("scheduleDeferredModelOverride", () => {
 
   function insertMessage(id: string, model: { providerID: string; modelID: string }) {
     const db = new Database(dbPath)
-    db.run(
+    const stmt = db.prepare(
       `INSERT INTO message (id, session_id, data) VALUES (?, ?, ?)`,
-      [id, "ses_test", JSON.stringify({ model })],
     )
-    db.close()
+    try {
+      stmt.run(id, "ses_test", JSON.stringify({ model }))
+    } finally {
+      stmt.finalize()
+      db.close()
+    }
   }
 
   function readMessageModel(id: string): { providerID: string; modelID: string } | null {
     const db = new Database(dbPath)
-    const row = db.query(`SELECT data FROM message WHERE id = ?`).get(id) as
-      | { data: string }
-      | null
-    db.close()
+    const stmt = db.query(`SELECT data FROM message WHERE id = ?`)
+    let row: { data: string } | null
+    try {
+      row = stmt.get(id) as { data: string } | null
+    } finally {
+      stmt.finalize()
+      db.close()
+    }
     if (!row) return null
     const parsed = JSON.parse(row.data)
     return parsed.model ?? null
@@ -97,10 +105,14 @@ describe("scheduleDeferredModelOverride", () => {
 
   function readMessageField(id: string, field: string): unknown {
     const db = new Database(dbPath)
-    const row = db.query(`SELECT data FROM message WHERE id = ?`).get(id) as
-      | { data: string }
-      | null
-    db.close()
+    const stmt = db.query(`SELECT data FROM message WHERE id = ?`)
+    let row: { data: string } | null
+    try {
+      row = stmt.get(id) as { data: string } | null
+    } finally {
+      stmt.finalize()
+      db.close()
+    }
     if (!row) return null
     return JSON.parse(row.data)[field] ?? null
   }
