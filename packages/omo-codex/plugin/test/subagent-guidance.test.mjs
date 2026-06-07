@@ -63,6 +63,9 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /timeout only means no new mailbox update arrived/i);
 	assert.match(text, /WORKING:/);
 	assert.match(text, /single `list_agents`/);
+	assert.match(text, /TOML-backed/);
+	assert.match(text, /routing-unverified/);
+	assert.match(text, /service_tier/);
 });
 
 test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {

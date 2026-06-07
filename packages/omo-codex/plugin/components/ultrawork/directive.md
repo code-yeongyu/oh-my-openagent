@@ -254,6 +254,38 @@ silent or ack-only, record the result as inconclusive, do not count it
 as approval/pass, close it if safe, and respawn a smaller
 `fork_turns: "none"` task with the missing deliverable.
 
+# TOML-backed subagent routing compatibility
+
+Native Codex `spawn_agent` accepts `task_name`, `fork_turns`, and
+`message` but does NOT expose `agent_type`, `model`, or
+`reasoning_effort`. The TOML agent files in `agents/*.toml` define
+role-specific model and reasoning settings, but those settings are NOT
+applied through the `spawn_agent` surface. Observe these rules:
+
+a) **Routing unverified by default**: When spawning subagents via native
+`spawn_agent`, the task name alone does NOT guarantee the TOML-backed
+agent role (model, reasoning effort, service tier) was selected. Treat
+all subagent spawns as using the default model/config unless runtime
+evidence confirms otherwise.
+
+b) **Compatibility warning**: If the orchestrator cannot confirm
+TOML-backed routing (because `spawn_agent` does not expose
+`agent_type`/`model`/`reasoning_effort`), mark the subagent
+result as `routing-unverified` and proceed with appropriate caution.
+Do not assume role-specific model or reasoning was applied.
+
+c) **Service tier validation**: If agent TOMLs reference `service_tier`
+values unsupported by the target model (e.g. `fast` for `gpt-5.5`),
+the orchestrator should not attempt to enforce that tier. Prefer
+omitting unsupported service tiers or mapping to the runtime-supported
+tier.
+
+d) **Fallback behavior**: While TOML-backed routing is not guaranteed
+through native `spawn_agent`, the task assignment pattern
+(TASK/DELIVERABLE/SCOPE/VERIFY) still provides sufficient structure for
+reliable subagent work. The TOML files serve as documentation of
+intent, not runtime configuration for `spawn_agent`.
+
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
 Trigger when ANY apply:
