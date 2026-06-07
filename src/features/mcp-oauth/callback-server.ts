@@ -1,5 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
-import { createConnection } from "node:net"
+import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http"
 import { clearTimeout, setTimeout } from "node:timers"
 
 import { log } from "../../shared/logger"
@@ -57,7 +56,6 @@ function delay(ms: number): Promise<void> {
 
 function probeServerReady(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = createConnection({ host: "127.0.0.1", port })
     let settled = false
 
     const finish = (ready: boolean): void => {
@@ -65,20 +63,35 @@ function probeServerReady(port: number): Promise<boolean> {
         return
       }
       settled = true
-      socket.removeAllListeners()
-      socket.destroy()
       resolve(ready)
     }
 
-    socket.setTimeout(STARTUP_RETRY_MS, () => {
+    const req = httpRequest(
+      {
+        hostname: "127.0.0.1",
+        method: "GET",
+        path: "/__omo_oauth_ready__",
+        port,
+      },
+      (response) => {
+        response.resume()
+        response.once("end", () => {
+          finish(true)
+        })
+        response.once("error", () => {
+          finish(false)
+        })
+      },
+    )
+
+    req.setTimeout(STARTUP_RETRY_MS, () => {
+      req.destroy()
       finish(false)
     })
-    socket.once("connect", () => {
-      finish(true)
-    })
-    socket.once("error", () => {
+    req.once("error", () => {
       finish(false)
     })
+    req.end()
   })
 }
 
@@ -92,7 +105,7 @@ async function waitForServerReady(port: number): Promise<void> {
     await delay(STARTUP_RETRY_MS)
   }
 
-  throw new Error(`OAuth callback server did not accept TCP connections on port ${port}`)
+  throw new Error(`OAuth callback server did not accept HTTP requests on port ${port}`)
 }
 
 export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
