@@ -1,27 +1,26 @@
 /**
- * Agent sort shim.
+ * Agent sort scoped helper.
  *
  * OpenCode 1.4.x ignores the agent `order` field (sst/opencode#19127) and
  * sorts the agent list by `agent.name` via Remeda `sortBy(x => x.name, "asc")`
- * at packages/opencode/src/agent/agent.ts. Without intervention, core agents
- * collapse into name order, which can invert the default sisyphus -> hephaestus
- * -> prometheus -> atlas order or a user's configured `agent_order`.
+ * at packages/opencode/src/agent/agent.ts. Earlier OMO versions (v4.1.0+)
+ * attempted to override that ordering with a global `Array.prototype.sort`
+ * and `Array.prototype.toSorted` monkey-patch. That global patch caused TUI
+ * rendering anomalies (issue #3998): any third-party array whose elements
+ * happened to expose a `.name` matching a core agent display name was
+ * silently re-ordered, producing first-character truncation and similar
+ * visual regressions reminiscent of the original ZWSP bug.
  *
- * Earlier attempts to bias the sort key with invisible characters (ZWSP,
- * U+2060 WORD JOINER, U+00AD SOFT HYPHEN, ANSI escape) caused visible-gap
- * and column-truncation regressions in the TUI status bar (#3259, #3238).
+ * This module no longer mutates `Array.prototype`. The exported
+ * `installAgentSortShim` is kept as a no-op so call sites and mocked tests
+ * remain stable, and `sortAgentList` is provided as an OPT-IN scoped helper
+ * for callers that own the array they want sorted. Without prototype
+ * interception OpenCode's internal `Agent.list()` falls back to its native
+ * alphabetical ordering for the TUI tab bar; the plugin's
+ * `reorderAgentsByPriority` continues to control the order of agent config
+ * keys emitted to OpenCode.
  *
- * This shim is the narrowly-scoped alternative from PR #3267 with the Cubic
- * P1 mitigations applied:
- *   1. `isAgentArray` rejects any array element that is null, non-object, or
- *      lacks a string `name`, eliminating the throw-on-mixed-array failure
- *      mode that closed the original PR.
- *   2. The activation predicate requires >= 2 elements whose `.name` is ranked
- *      by the active agent order, so unrelated `.sort()` and `.toSorted()` calls
- *      (string arrays, number arrays, generic objects) execute native behavior
- *      unchanged.
- *
- * Remove this shim once OpenCode honors the agent `order` field
+ * Remove the remaining helpers once OpenCode honors the agent `order` field
  * (sst/opencode#19127).
  */
 
@@ -68,8 +67,6 @@ function agentComparator(
   return 0
 }
 
-let installed = false
-
 function createAgentRank(agentOrder: readonly string[] | undefined): ReadonlyMap<string, number> {
   return new Map(
     resolveAgentOrderDisplayNames(agentOrder).map(
@@ -93,45 +90,31 @@ export function setDefaultAgentForSort(agentName: string | undefined): void {
   agentRank = updated
 }
 
+/**
+ * Sort an agent list array using the active agent rank in a scoped, opt-in
+ * way. Returns a new array; the input is not mutated.
+ *
+ * Callers MUST own the array they pass in. This helper never touches
+ * `Array.prototype` and has no global side effects.
+ */
+export function sortAgentList<T>(
+  arr: ReadonlyArray<T>,
+  compareFn?: (a: T, b: T) => number,
+): T[] {
+  if (!isAgentArray(arr)) {
+    return compareFn ? [...arr].sort(compareFn) : [...arr].sort()
+  }
+  const fallback = compareFn
+    ? (a: unknown, b: unknown): number => compareFn(a as T, b as T)
+    : undefined
+  return [...arr].sort((a, b) => agentComparator(a, b, fallback))
+}
+
+/**
+ * Backwards-compatible no-op kept so existing call sites and mocked tests
+ * keep compiling. The plugin no longer mutates `Array.prototype`; see the
+ * module header and issue #3998 for the rationale.
+ */
 export function installAgentSortShim(): void {
-  if (installed) return
-
-  const originalToSorted = Array.prototype.toSorted
-  const originalSort = Array.prototype.sort
-
-  function patchedToSorted(
-    this: unknown[],
-    compareFn?: (a: unknown, b: unknown) => number,
-  ): unknown[] {
-    if (isAgentArray(this)) {
-      return originalToSorted.call(this, (a, b) => agentComparator(a, b, compareFn))
-    }
-    return originalToSorted.call(this, compareFn)
-  }
-
-  function patchedSort(
-    this: unknown[],
-    compareFn?: (a: unknown, b: unknown) => number,
-  ): unknown[] {
-    if (isAgentArray(this)) {
-      return originalSort.call(this, (a, b) => agentComparator(a, b, compareFn))
-    }
-    return originalSort.call(this, compareFn)
-  }
-
-  Object.defineProperty(Array.prototype, "toSorted", {
-    value: patchedToSorted,
-    configurable: true,
-    writable: true,
-    enumerable: false,
-  })
-
-  Object.defineProperty(Array.prototype, "sort", {
-    value: patchedSort,
-    configurable: true,
-    writable: true,
-    enumerable: false,
-  })
-
-  installed = true
+  // intentionally empty — prototype interception was removed in fix for #3998
 }

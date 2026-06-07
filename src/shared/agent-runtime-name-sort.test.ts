@@ -7,7 +7,7 @@ import {
   getAgentListDisplayName,
   normalizeAgentForPromptKey,
 } from "./agent-display-names"
-import { installAgentSortShim } from "./agent-sort-shim"
+import { installAgentSortShim, sortAgentList } from "./agent-sort-shim"
 
 type AgentListItem = {
   name: string
@@ -29,7 +29,10 @@ function simulateOpencodeSort(agentNames: string[], defaultName: string): string
     default_agent: name === defaultName,
   }))
 
-  return [...agents].sort(compareOpenCodeAgentListItems).map((agent) => agent.name)
+  // Simulate the plugin's scoped sort over the agent list rather than the
+  // legacy global prototype interception. Callers of sortAgentList own the
+  // array they pass in; nothing else in the runtime is affected.
+  return sortAgentList(agents, compareOpenCodeAgentListItems).map((agent) => agent.name)
 }
 
 describe("OpenCode Agent.list() sort with runtime display names", () => {
@@ -70,7 +73,7 @@ describe("OpenCode Agent.list() sort with runtime display names", () => {
       ])
     })
 
-    test("#when default_agent is unset #then canonical core order still holds via the sort shim", () => {
+    test("#when default_agent is unset #then canonical core order still holds via the scoped helper", () => {
       const sisyphus = getAgentListDisplayName("sisyphus")
       const hephaestus = getAgentListDisplayName("hephaestus")
       const prometheus = getAgentListDisplayName("prometheus")
