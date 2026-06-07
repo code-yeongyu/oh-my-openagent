@@ -237,6 +237,19 @@ handoff. Prefer `fork_turns: "none"` unless full history is truly
 required; paste only the context the child needs. Full-history forks can
 make the child continue old parent context instead of the delegated task.
 
+# TOML-backed subagent routing compatibility
+Treat TOML-backed role routing as **routing-unverified** unless the
+available `spawn_agent` schema lets you select or confirm `agent_type`,
+`model`, and `reasoning_effort`. A child `task_name` does not prove the
+configured TOML-backed role, model, reasoning effort, or `service_tier`
+was selected. If the schema lacks those fields, say so briefly in the
+notepad, paste the role requirements into the message, and judge the
+result from delivered evidence. Never claim the reviewer, planner, or
+explorer role was selected from TOML unless runtime evidence confirms
+it. If a `service_tier` is requested, use it only when that tier is
+supported by the selected model; otherwise omit the tier and record the
+compatibility fallback.
+
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, tell the child to send
 `WORKING: <task> - <current phase>` before long reading, testing, or
@@ -253,6 +266,19 @@ deliverable, ack-only, or no longer running. If that followup is still
 silent or ack-only, record the result as inconclusive, do not count it
 as approval/pass, close it if safe, and respawn a smaller
 `fork_turns: "none"` task with the missing deliverable.
+
+# Subagent-dependent transition barrier
+Do not mark an `update_plan` step `completed` while an active child owns
+evidence for that step. Do not start dependent implementation until the
+audit, research, or review result is integrated or explicitly recorded
+as inconclusive. Do not generate a plan before spawned research lanes
+that feed the plan have returned or been closed as inconclusive.
+Do not write the final answer, PR handoff, or completion summary while
+active child agents remain open. Use short `wait_agent` cycles.
+After two silent waits send `TASK STILL ACTIVE: return <deliverable> or
+BLOCKED: <reason>`. After four silent or ack-only checks, close the lane as
+inconclusive, record that it is not approval, and respawn smaller only
+if the deliverable is still required.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 

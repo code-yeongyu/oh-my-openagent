@@ -192,9 +192,15 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. If worktree mode was used, sync `.omo/` state back to the main repo, merge or hand off exactly as requested, and remove the worktree only after successful merge or explicit handoff.
-3. Remove or mark the Boulder work as completed.
-4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
+2. Complete the **Global Review and Debugging Gate** before any completion claim, PR handoff, or branch handoff:
+   - Invoke the `review-work` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, `BLOCKED:`, or inconclusive lane is a gate failure, not approval.
+   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to `.omo/start-work/ledger.jsonl`.
+   - If any review lane or debugging hypothesis fails, invoke the `debugging` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
+   - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing `.omo/start-work/ledger.jsonl`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
+   - If the work includes creating, updating, or handing off a PR, refresh `git status` and the PR/branch state after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
+3. If worktree mode was used, sync `.omo/` state back to the main repo, merge or hand off exactly as requested, and remove the worktree only after successful merge or explicit handoff.
+4. Remove or mark the Boulder work as completed.
+5. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, Global Review and Debugging Gate verdict, artifacts, and cleanup receipts.
 
 ## Hard rules
 
@@ -202,5 +208,6 @@ When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are
 - No `--dry-run` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
+- No `ORCHESTRATION COMPLETE`, final response, PR creation, or PR handoff before the Global Review and Debugging Gate passes with recorded evidence.
 - No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.
 - No stale-memory execution. The plan and ledger are the durable source of truth.

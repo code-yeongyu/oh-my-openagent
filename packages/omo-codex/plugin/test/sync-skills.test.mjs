@@ -55,6 +55,45 @@ function removeCodexCompatibilityGuidance(content) {
 	return `${content.slice(0, start)}${content.slice(end + endMarker.length)}`;
 }
 
+const startWorkOriginalCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
+
+1. Run the plan's final verification commands.
+2. If worktree mode was used, sync \`.omo/\` state back to the main repo, merge or hand off exactly as requested, and remove the worktree only after successful merge or explicit handoff.
+3. Remove or mark the Boulder work as completed.
+4. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`;
+
+const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
+
+1. Run the plan's final verification commands.
+2. Complete the **Global Review and Debugging Gate** before any completion claim, PR handoff, or branch handoff:
+   - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
+   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to \`.omo/start-work/ledger.jsonl\`.
+   - If any review lane or debugging hypothesis fails, invoke the \`debugging\` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
+   - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/start-work/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
+   - If the work includes creating, updating, or handing off a PR, refresh \`git status\` and the PR/branch state after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
+3. If worktree mode was used, sync \`.omo/\` state back to the main repo, merge or hand off exactly as requested, and remove the worktree only after successful merge or explicit handoff.
+4. Remove or mark the Boulder work as completed.
+5. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, Global Review and Debugging Gate verdict, artifacts, and cleanup receipts.`;
+
+const startWorkOriginalHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
+
+const startWorkCodexHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No `ORCHESTRATION COMPLETE`, final response, PR creation, or PR handoff before the Global Review and Debugging Gate passes with recorded evidence.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
+
+const reviewWorkCodexGatePattern =
+	/\nWhen `review-work` is used as a final implementation, PR, or `\$start-work`\ngate, it is blocking\. A timeout, missing deliverable, ack-only response,\nexplicit `BLOCKED:`, or inconclusive lane is not a pass\. Treat that lane as\nfailed, investigate the underlying uncertainty with the `debugging` skill when\nruntime behavior may be wrong, fix with evidence, and rerun the affected lane\nbefore claiming completion or handing off a PR\.\n\nReview evidence must be safe to share\. Redact or mask secrets and sensitive\nuser data before including evidence in logs, PR bodies, or handoffs\. Never\ninclude raw tokens, credentials, auth headers, cookies, API keys, env dumps,\nprivate logs, or PII; summarize with lengths, hashes, and short non-sensitive\nprefixes when identity is needed\.\n/;
+
+function removeCodexSkillOverlays(skillName, content) {
+	if (skillName === "start-work") {
+		return content
+			.replace(startWorkCodexCompletion, startWorkOriginalCompletion)
+			.replace(startWorkCodexHardRule, startWorkOriginalHardRule);
+	}
+	if (skillName === "review-work") {
+		return content.replace(reviewWorkCodexGatePattern, "");
+	}
+	return content;
+}
+
 async function listSkillFiles(dir) {
 	const entries = await readdir(dir, { withFileTypes: true });
 	const files = [];
@@ -135,7 +174,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
-			removeCodexCompatibilityGuidance(aggregateContent),
+			removeCodexSkillOverlays(skillName, removeCodexCompatibilityGuidance(aggregateContent)),
 			removeCodexCompatibilityGuidance(sharedContent),
 			`${skillName} drifted from shared-skills`,
 		);
