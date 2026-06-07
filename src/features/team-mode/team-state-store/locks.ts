@@ -15,7 +15,7 @@ type AtomicWriteDeps = {
 }
 
 const LOCK_RETRY_MS = 50
-const LOCK_WAIT_TIMEOUT_MS = 4_000
+const LOCK_WAIT_TIMEOUT_MS = 15_000
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
