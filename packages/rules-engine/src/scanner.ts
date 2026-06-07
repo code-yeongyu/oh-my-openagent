@@ -3,6 +3,11 @@ import { isAbsolute, join, relative } from "node:path";
 import { EXCLUDED_DIRS, GITHUB_INSTRUCTIONS_PATTERN, RULE_EXTENSIONS } from "./constants";
 import type { DirectoryScanEntry } from "./types";
 
+type RealpathResult = {
+  readonly path: string;
+  readonly resolved: boolean;
+};
+
 function isGitHubInstructionsDir(dir: string): boolean {
   const normalizedDir = dir.replaceAll("\\", "/");
   return normalizedDir.includes(".github/instructions") || normalizedDir.endsWith(".github/instructions");
@@ -14,10 +19,14 @@ function isRuleFile(fileName: string, dir: string): boolean {
 }
 
 export function safeRealpathSync(filePath: string): string {
+  return tryRealpathSync(filePath).path;
+}
+
+function tryRealpathSync(filePath: string): RealpathResult {
   try {
-    return realpathSync.native(filePath);
+    return { path: realpathSync.native(filePath), resolved: true };
   } catch {
-    return filePath;
+    return { path: filePath, resolved: false };
   }
 }
 
@@ -33,11 +42,11 @@ export function findRuleFilesRecursive(
   boundaryRoot?: string,
 ): void {
   if (!existsSync(dir)) return;
-  const realDir = safeRealpathSync(dir);
-  const effectiveBoundary = boundaryRoot ?? realDir;
-  if (!isPathWithinRoot(realDir, effectiveBoundary)) return;
-  if (visited.has(realDir)) return;
-  visited.add(realDir);
+  const realDir = tryRealpathSync(dir);
+  const effectiveBoundary = boundaryRoot === undefined ? realDir.path : realDir.resolved ? safeRealpathSync(boundaryRoot) : boundaryRoot;
+  if (!isPathWithinRoot(realDir.path, effectiveBoundary)) return;
+  if (visited.has(realDir.path)) return;
+  visited.add(realDir.path);
   let entries: Dirent<string>[] = [];
   try {
     entries = readdirSync(dir, { withFileTypes: true, encoding: "utf8" }).sort((left, right) => left.name.localeCompare(right.name));

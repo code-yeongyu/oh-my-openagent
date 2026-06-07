@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
@@ -81,6 +81,25 @@ describe("rules-core", () => {
 
     // when
     findRuleFilesRecursive(githubInstructionsDir, results, new Set<string>(), root);
+
+    // then
+    expect(results.map((rule) => rule.path)).toEqual([instructionFile]);
+  });
+
+  it("#given an alias boundary root #when scanning github instructions #then boundary comparison uses canonical paths", () => {
+    // given
+    const root = createTestRoot("rules-core-alias-boundary");
+    const realProjectRoot = join(root, "repo-real");
+    const aliasProjectRoot = join(root, "repo-link");
+    const githubInstructionsDir = join(aliasProjectRoot, ".github", "instructions");
+    const instructionFile = join(githubInstructionsDir, "typescript.instructions.md");
+    const results: DirectoryScanEntry[] = [];
+    mkdirSync(join(realProjectRoot, ".github", "instructions"), { recursive: true });
+    symlinkSync(realProjectRoot, aliasProjectRoot, "dir");
+    writeFileSync(instructionFile, "typescript");
+
+    // when
+    findRuleFilesRecursive(githubInstructionsDir, results, new Set<string>(), aliasProjectRoot);
 
     // then
     expect(results.map((rule) => rule.path)).toEqual([instructionFile]);
