@@ -2,6 +2,7 @@
 
 import { describe, expect, test, spyOn, beforeEach, afterEach } from "bun:test"
 import * as childProcess from "node:child_process"
+import { resolve } from "node:path"
 import { detectWorktreePath, parseWorktreeListPorcelain, listWorktrees } from "./worktree-detector"
 
 describe("detectWorktreePath", () => {
@@ -27,7 +28,7 @@ describe("detectWorktreePath", () => {
       const result = detectWorktreePath("/home/user/my-repo/src")
 
       // then
-      expect(result).toBe("/home/user/my-repo")
+      expect(result).toBe(resolve("/home/user/my-repo"))
     })
 
     test("#given git output with trailing newline #when detecting #then trims output", () => {
@@ -37,7 +38,7 @@ describe("detectWorktreePath", () => {
 
       const result = detectWorktreePath("/projects/worktree-a")
 
-      expect(result).toBe("/projects/worktree-a")
+      expect(result).toBe(resolve("/projects/worktree-a"))
     })
 
     test("#given git emits a non-host absolute path #when detecting #then preserves the git path", () => {

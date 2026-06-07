@@ -73,9 +73,10 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.cacheDir).toBe(configDir)
-      expect(loadedVersion.cachePackagePath).toBe(join(configDir, "package.json"))
-      expect(loadedVersion.installedPackagePath).toBe(join(configDir, "node_modules", PACKAGE_NAME, "package.json"))
+      const resolvedConfigDir = resolveSymlink(configDir)
+      expect(loadedVersion.cacheDir).toBe(resolvedConfigDir)
+      expect(loadedVersion.cachePackagePath).toBe(join(resolvedConfigDir, "package.json"))
+      expect(loadedVersion.installedPackagePath).toBe(join(resolvedConfigDir, "node_modules", PACKAGE_NAME, "package.json"))
       expect(loadedVersion.expectedVersion).toBe("1.2.3")
       expect(loadedVersion.loadedVersion).toBe("1.2.3")
     })
@@ -100,9 +101,10 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.cacheDir).toBe(cacheDir)
-      expect(loadedVersion.cachePackagePath).toBe(join(cacheDir, "package.json"))
-      expect(loadedVersion.installedPackagePath).toBe(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"))
+      const resolvedCacheDir = resolveSymlink(cacheDir)
+      expect(loadedVersion.cacheDir).toBe(resolvedCacheDir)
+      expect(loadedVersion.cachePackagePath).toBe(join(resolvedCacheDir, "package.json"))
+      expect(loadedVersion.installedPackagePath).toBe(join(resolvedCacheDir, "node_modules", PACKAGE_NAME, "package.json"))
       expect(loadedVersion.expectedVersion).toBe("2.3.4")
       expect(loadedVersion.loadedVersion).toBe("2.3.4")
     })
@@ -124,7 +126,7 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(join(configDir, "node_modules", PLUGIN_NAME, "package.json"))
+      expect(loadedVersion.installedPackagePath).toBe(join(resolveSymlink(configDir), "node_modules", PLUGIN_NAME, "package.json"))
       expect(loadedVersion.expectedVersion).toBe("5.6.7")
       expect(loadedVersion.loadedVersion).toBe("5.6.7")
     })
@@ -165,7 +167,7 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(join(configDir, "node_modules", PACKAGE_NAME, "package.json"))
+      expect(loadedVersion.installedPackagePath).toBe(join(resolveSymlink(configDir), "node_modules", PACKAGE_NAME, "package.json"))
       expect(loadedVersion.loadedVersion).toBe("7.7.7")
     })
 
@@ -184,7 +186,7 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(installedPackagePath)
+      expect(loadedVersion.installedPackagePath).toBe(resolveSymlink(installedPackagePath))
       expect(loadedVersion.expectedVersion).toBeNull()
       expect(loadedVersion.loadedVersion).toBeNull()
     })

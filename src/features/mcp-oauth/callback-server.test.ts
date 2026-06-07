@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
 import { type IncomingMessage, request as httpRequest } from "node:http"
@@ -89,6 +91,44 @@ describe("startCallbackServer", () => {
     }
   })
 
+  it("uses native timers for server lifetime when global timers are patched", async () => {
+    const originalSetTimeout = globalThis.setTimeout
+    const originalClearTimeout = globalThis.clearTimeout
+    globalThis.setTimeout = ((handler, timeout, ...args) => {
+      const timer = originalSetTimeout(handler, timeout, ...args)
+      if (typeof timeout === "number" && timeout >= 60_000 && typeof handler === "function") {
+        queueMicrotask(() => handler(...args))
+      }
+      return timer
+    }) as typeof globalThis.setTimeout
+    globalThis.clearTimeout = ((timer) => {
+      originalClearTimeout(timer)
+    }) as typeof globalThis.clearTimeout
+
+    let server: CallbackServer | undefined
+
+    try {
+      server = await startCallbackServer(0)
+      globalThis.setTimeout = originalSetTimeout
+      globalThis.clearTimeout = originalClearTimeout
+
+      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=native-code&state=native-state`
+      const [result, response] = await Promise.all([
+        server.waitForCallback(),
+        request(callbackUrl),
+      ])
+
+      expect(result).toEqual({ code: "native-code", state: "native-state" })
+      expect(response.status).toBe(200)
+    } finally {
+      if (server) {
+        await close(server)
+      }
+      globalThis.setTimeout = originalSetTimeout
+      globalThis.clearTimeout = originalClearTimeout
+    }
+  })
+
   it("returns 400 and rejects when code is missing", async () => {
     const server = await startCallbackServer(0)
 
@@ -137,7 +177,10 @@ describe("startCallbackServer", () => {
       await request(`http://${HOSTNAME}:${port}/oauth/callback?code=c&state=s`)
       expect.unreachable("request should fail after close")
     } catch (error) {
-      expect(error).toBeDefined()
+      expect(error).toBeInstanceOf(Error)
+      if (!(error instanceof Error)) {
+        throw new Error("Expected request after close to fail with an Error")
+      }
     }
   })
 

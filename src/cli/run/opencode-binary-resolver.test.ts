@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
 import { delimiter, join, posix, win32 } from "node:path"
 import type { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"

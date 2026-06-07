@@ -2,6 +2,7 @@ import type { SpawnOptions } from "../../shared/spawn-with-windows-hide"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 10_000
+const MISSING_EXECUTABLE_ERROR_CODE = "ENOENT"
 
 export interface SpawnWithTimeoutResult {
   stdout: string
@@ -10,7 +11,7 @@ export interface SpawnWithTimeoutResult {
   timedOut: boolean
 }
 
-async function readPipe(stream: ReadableStream<Uint8Array> | undefined): Promise<string> {
+async function readSpawnStream(stream: ReadableStream<Uint8Array> | undefined): Promise<string> {
   if (!stream) {
     return ""
   }
@@ -23,6 +24,11 @@ async function readPipe(stream: ReadableStream<Uint8Array> | undefined): Promise
     }
     throw error
   }
+}
+
+function isMissingExecutableError(error: Error): boolean {
+  const code = "code" in error ? error.code : undefined
+  return code === MISSING_EXECUTABLE_ERROR_CODE
 }
 
 export async function spawnWithTimeout(
@@ -38,11 +44,15 @@ export async function spawnWithTimeout(
       throw error
     }
 
+    if (!isMissingExecutableError(error)) {
+      throw error
+    }
+
     return { stdout: "", stderr: "", exitCode: 1, timedOut: false }
   }
 
-  const stdoutPromise = readPipe(proc.stdout)
-  const stderrPromise = readPipe(proc.stderr)
+  const stdoutPromise = readSpawnStream(proc.stdout)
+  const stderrPromise = readSpawnStream(proc.stderr)
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<"timeout">((resolve) => {
     timer = setTimeout(() => resolve("timeout"), timeoutMs)
@@ -53,11 +63,26 @@ export async function spawnWithTimeout(
     return "done"
   })()
 
-  const race = await Promise.race([processPromise, timeoutPromise])
+  let race: "done" | "timeout"
+  try {
+    race = await Promise.race([processPromise, timeoutPromise])
+  } catch (error) {
+    clearTimeout(timer)
+    await Promise.allSettled([stdoutPromise, stderrPromise])
+    if (error instanceof Error && isMissingExecutableError(error)) {
+      return { stdout: "", stderr: "", exitCode: 1, timedOut: false }
+    }
+    throw error
+  }
 
   if (race === "timeout") {
     proc.kill("SIGTERM")
-    await proc.exited.catch(() => {})
+    await proc.exited.catch((error: unknown) => {
+      if (error instanceof Error) {
+        return
+      }
+      throw error
+    })
     await Promise.allSettled([stdoutPromise, stderrPromise])
     return { stdout: "", stderr: "", exitCode: 1, timedOut: true }
   }

@@ -1,4 +1,6 @@
-import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http"
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { createConnection } from "node:net"
+import { clearTimeout, setTimeout } from "node:timers"
 
 import { log } from "../../shared/logger"
 import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
@@ -6,7 +8,6 @@ import { findAvailablePort as findAvailablePortShared } from "../../shared/port-
 const DEFAULT_PORT = 19877
 const TIMEOUT_MS = 5 * 60 * 1000
 const STARTUP_TIMEOUT_MS = 2_000
-const STARTUP_RETRY_MS = 10
 
 export type OAuthCallbackResult = {
   code: string
@@ -47,58 +48,37 @@ export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promi
   return findAvailablePortShared(startPort)
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
-
-function probeServerReady(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
+function waitForServerReady(port: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const socket = createConnection({ host: "127.0.0.1", port })
     let settled = false
-    const finish = (ready: boolean): void => {
+
+    const finish = (error?: Error): void => {
       if (settled) {
         return
       }
       settled = true
-      resolve(ready)
+      socket.removeAllListeners()
+      socket.destroy()
+      if (error) {
+        reject(error)
+        return
+      }
+      resolve()
     }
 
-    const req = httpRequest(
-      {
-        hostname: "127.0.0.1",
-        method: "GET",
-        path: "/__omo_oauth_ready__",
-        port,
-      },
-      (response) => {
-        response.resume()
-        finish(true)
-      },
-    )
+    socket.setTimeout(STARTUP_TIMEOUT_MS, () => {
+      finish(new Error(`OAuth callback server did not accept connections on port ${port}`))
+    })
 
-    req.setTimeout(STARTUP_RETRY_MS, () => {
-      req.destroy()
-      finish(false)
+    socket.once("connect", () => {
+      finish()
     })
-    req.once("error", () => {
-      finish(false)
+
+    socket.once("error", (error) => {
+      finish(error)
     })
-    req.end()
   })
-}
-
-async function waitForServerReady(port: number): Promise<void> {
-  const startedAt = Date.now()
-
-  while (Date.now() - startedAt <= STARTUP_TIMEOUT_MS) {
-    if (await probeServerReady(port)) {
-      return
-    }
-    await delay(STARTUP_RETRY_MS)
-  }
-
-  throw new Error(`OAuth callback server did not accept HTTP requests on port ${port}`)
 }
 
 export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
