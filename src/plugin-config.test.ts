@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { loadConfigFromPath, mergeConfigs, parseConfigPartially } from "./plugin-config";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type TeamModeConfig } from "./config";
 import { clearConfigLoadErrors, getConfigLoadErrors } from "./shared/config-errors";
+import { resolveSymlink } from "./shared/file-utils"
 
 const tempDirs: string[] = []
 type ConfigInput = Omit<Partial<OhMyOpenCodeConfig>, "team_mode"> & {
@@ -1128,10 +1129,12 @@ describe("loadPluginConfig", () => {
       join(workDir, ".opencode", "oh-my-openagent.jsonc"),
       JSON.stringify({ agent_definitions: [workDefRelativePath] })
     )
+    writeFileSync(join(workDir, ".opencode", "work-agent.md"), "# Work Agent")
     writeFileSync(
       join(projectDir, ".opencode", "oh-my-openagent.jsonc"),
       JSON.stringify({ agent_definitions: [projectDefRelativePath] })
     )
+    writeFileSync(join(projectDir, ".opencode", "project-agent.md"), "# Project Agent")
 
     process.env.OPENCODE_CONFIG_DIR = userConfigDir
     process.env.HOME = homeDir
@@ -1139,10 +1142,11 @@ describe("loadPluginConfig", () => {
     // when
     const { loadPluginConfig } = await importFreshPluginConfigModule()
     const config = loadPluginConfig(projectDir, {})
+    const resolvedAgentDefinitions = config.agent_definitions.map(resolveSymlink)
 
     // then each ancestor's relative path resolves against its own .opencode/
-    expect(config.agent_definitions).toContain(join(realpathSync(workDir), ".opencode", "work-agent.md"))
-    expect(config.agent_definitions).toContain(join(realpathSync(projectDir), ".opencode", "project-agent.md"))
+    expect(resolvedAgentDefinitions).toContain(join(resolveSymlink(workDir), ".opencode", "work-agent.md"))
+    expect(resolvedAgentDefinitions).toContain(join(resolveSymlink(projectDir), ".opencode", "project-agent.md"))
   })
 
   it("should migrate legacy basenames found in ancestor directories", async () => {
