@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, realpathSync, type Dirent } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { EXCLUDED_DIRS, GITHUB_INSTRUCTIONS_PATTERN, RULE_EXTENSIONS } from "./constants";
 import type { DirectoryScanEntry } from "./types";
 
@@ -16,8 +16,11 @@ function isRuleFile(fileName: string, dir: string): boolean {
 export function safeRealpathSync(filePath: string): string {
   try {
     return realpathSync.native(filePath);
-  } catch {
-    return filePath;
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    const parentPath = dirname(filePath);
+    if (parentPath === filePath) return filePath;
+    return join(safeRealpathSync(parentPath), basename(filePath));
   }
 }
 
@@ -34,7 +37,7 @@ export function findRuleFilesRecursive(
 ): void {
   if (!existsSync(dir)) return;
   const realDir = safeRealpathSync(dir);
-  const effectiveBoundary = boundaryRoot ?? realDir;
+  const effectiveBoundary = boundaryRoot === undefined ? realDir : safeRealpathSync(boundaryRoot);
   if (!isPathWithinRoot(realDir, effectiveBoundary)) return;
   if (visited.has(realDir)) return;
   visited.add(realDir);
