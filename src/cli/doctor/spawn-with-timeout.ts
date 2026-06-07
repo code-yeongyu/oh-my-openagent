@@ -26,6 +26,8 @@ export async function spawnWithTimeout(
     return { stdout: "", stderr: "", exitCode: 1, timedOut: false }
   }
 
+  const stdoutPromise = proc.stdout ? new Response(proc.stdout).text() : Promise.resolve("")
+  const stderrPromise = proc.stderr ? new Response(proc.stderr).text() : Promise.resolve("")
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<"timeout">((resolve) => {
     timer = setTimeout(() => resolve("timeout"), timeoutMs)
@@ -41,11 +43,11 @@ export async function spawnWithTimeout(
   if (race === "timeout") {
     proc.kill("SIGTERM")
     await proc.exited.catch(() => {})
+    await Promise.allSettled([stdoutPromise, stderrPromise])
     return { stdout: "", stderr: "", exitCode: 1, timedOut: true }
   }
 
   clearTimeout(timer)
-  const stdout = proc.stdout ? await new Response(proc.stdout).text() : ""
-  const stderr = proc.stderr ? await new Response(proc.stderr).text() : ""
+  const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise])
   return { stdout, stderr, exitCode: proc.exitCode ?? 1, timedOut: false }
 }

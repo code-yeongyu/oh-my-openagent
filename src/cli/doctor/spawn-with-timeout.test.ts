@@ -71,6 +71,20 @@ describe("spawnWithTimeout", () => {
       expect(result.timedOut).toBe(false)
       expect(result.exitCode).toBe(1)
     })
+
+    it("does not consume process streams more than once", async () => {
+      // given
+      const unreadableCommand = process.platform === "win32" ? ["cmd", "/c", "exit", "9009"] : ["false"]
+
+      // when
+      const result = await spawnWithTimeout(unreadableCommand, { stdout: "pipe", stderr: "pipe" }, 2000)
+
+      // then
+      expect(result.timedOut).toBe(false)
+      expect(result.exitCode).not.toBe(0)
+      expect(typeof result.stdout).toBe("string")
+      expect(typeof result.stderr).toBe("string")
+    })
   })
 
   describe("#given spawn throws a non-Error value", () => {
