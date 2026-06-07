@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { fileURLToPath } from "node:url"
 import type { HookHttp } from "./types"
 import * as sharedModule from "../../shared"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
@@ -12,7 +13,7 @@ const originalFetch = globalThis.fetch
 const originalEnv = process.env
 
 async function importFreshExecuteHttpHook() {
-  const modulePath = `${new URL("./execute-http-hook.ts", import.meta.url).pathname}?t=${Date.now()}-${Math.random()}`
+  const modulePath = `${fileURLToPath(new URL("./execute-http-hook.ts", import.meta.url))}?t=${Date.now()}-${Math.random()}`
   return import(modulePath)
 }
 

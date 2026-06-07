@@ -36,7 +36,7 @@ describe("replace-tool-args audit", () => {
 
 		// when
 		for (const file of files) {
-			const relPath = relative(SRC_DIR, file)
+			const relPath = relative(SRC_DIR, file).split("\\").join("/")
 			if (relPath === HELPER_FILE) continue
 
 			const content = await readFile(file, "utf-8")

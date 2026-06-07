@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { join, resolve, win32 } from "node:path"
+import { join, posix, resolve, win32 } from "node:path"
 
 import { CONFIG_BASENAME } from "./plugin-identity"
 
@@ -45,6 +45,10 @@ function getTauriConfigDir(identifier: string): string {
 }
 
 function resolveConfigPath(pathValue: string): string {
+  if (isWslEnvironment() && pathValue.startsWith("/")) {
+    return posix.normalize(pathValue)
+  }
+
   const resolvedPath = resolve(pathValue)
   if (!existsSync(resolvedPath)) return resolvedPath
 
@@ -83,7 +87,7 @@ function getWslLinuxHomeDir(windowsConfigRoot?: string): string | null {
   const user = process.env.USER?.trim() || process.env.LOGNAME?.trim() ||
     process.env.SUDO_USER?.trim() ||
     (windowsConfigRoot ? getWindowsUserFromConfigRoot(windowsConfigRoot) : undefined)
-  return user ? join("/home", user) : null
+  return user ? posix.join("/home", user) : null
 }
 
 function getCliDefaultConfigDir(): string {
@@ -91,9 +95,10 @@ function getCliDefaultConfigDir(): string {
   const shouldIgnoreWindowsXdg = envXdgConfig !== undefined && envXdgConfig.length > 0 &&
     isWslEnvironment() && isWindowsUserConfigRoot(envXdgConfig)
   const xdgConfig = shouldIgnoreWindowsXdg
-    ? join(getWslLinuxHomeDir(envXdgConfig) ?? "/home", ".config")
+    ? posix.join(getWslLinuxHomeDir(envXdgConfig) ?? "/home", ".config")
     : envXdgConfig || join(homedir(), ".config")
-  return resolveConfigPath(join(xdgConfig, "opencode"))
+  const configDir = isWslEnvironment() ? posix.join(xdgConfig, "opencode") : join(xdgConfig, "opencode")
+  return resolveConfigPath(configDir)
 }
 
 function getCliCustomConfigDir(): string | null {

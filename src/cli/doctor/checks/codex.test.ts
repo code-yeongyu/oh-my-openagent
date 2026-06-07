@@ -4,6 +4,15 @@ import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { checkCodex, gatherCodexSummary } from "./codex"
 
+async function createPlatformBin(binDir: string, name: string, target: string): Promise<void> {
+  if (process.platform === "win32") {
+    await writeFile(join(binDir, `${name}.cmd`), `@echo off\r\nnode "${target}" %*\r\n`)
+    return
+  }
+
+  await symlink(target, join(binDir, name))
+}
+
 async function createInstalledCodexHome(): Promise<{ readonly codexHome: string; readonly binDir: string; readonly pluginRoot: string }> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-doctor-"))
   const codexHome = join(root, ".codex")
@@ -34,8 +43,8 @@ async function createInstalledCodexHome(): Promise<{ readonly codexHome: string;
     ].join("\n"),
   )
   await writeFile(join(codexHome, "agents", "plan.toml"), 'name = "plan"\n')
-  await symlink(join(pluginRoot, "dist", "cli.js"), join(binDir, "omo"))
-  await symlink(join(pluginRoot, "components", "rules", "dist", "cli.js"), join(binDir, "omo-rules"))
+  await createPlatformBin(binDir, "omo", join(pluginRoot, "dist", "cli.js"))
+  await createPlatformBin(binDir, "omo-rules", join(pluginRoot, "components", "rules", "dist", "cli.js"))
   return { codexHome, binDir, pluginRoot }
 }
 

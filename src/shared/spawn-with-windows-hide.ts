@@ -1,6 +1,6 @@
-import { spawn as bunSpawn } from "./bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { Readable } from "node:stream"
+import { spawn as bunSpawn } from "./bun-spawn-shim"
 
 export interface SpawnOptions {
   cwd?: string
@@ -23,27 +23,31 @@ function toReadableStream(stream: NodeJS.ReadableStream | null): ReadableStream<
     return undefined
   }
 
-  return Readable.toWeb(stream as Readable) as ReadableStream<Uint8Array>
+  const readable = stream as Readable
+  if (readable.destroyed || !readable.readable || Readable.isDisturbed(readable)) {
+    return undefined
+  }
+
+  return Readable.toWeb(readable) as ReadableStream<Uint8Array>
 }
 
 export function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
   let resolveExited: (exitCode: number) => void
   let exitCode: number | null = null
 
-  const exited = new Promise<number>((resolve) => {
+  const exited = new Promise<number>((resolve, reject) => {
     resolveExited = resolve
+    proc.on("error", (error) => {
+      if (exitCode === null) {
+        exitCode = 1
+        reject(error)
+      }
+    })
   })
 
   proc.on("exit", (code) => {
     exitCode = code ?? 1
     resolveExited(exitCode)
-  })
-
-  proc.on("error", () => {
-    if (exitCode === null) {
-      exitCode = 1
-      resolveExited(1)
-    }
   })
 
   return {
@@ -74,12 +78,16 @@ export function spawnWithWindowsHide(command: string[], options: SpawnOptions): 
   }
 
   const [cmd, ...args] = command
+  if (!cmd) {
+    throw new Error("Cannot spawn an empty command")
+  }
+  const needsShell = /\.(?:bat|cmd)$/i.test(cmd)
   const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
     env: options.env,
     stdio: [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"],
     windowsHide: true,
-    shell: true,
+    shell: needsShell,
   })
 
   return wrapNodeProcess(proc)

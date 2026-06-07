@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import * as fs from "node:fs"
@@ -12,6 +14,10 @@ type PluginEntryResult = {
   pinnedVersion: string | null
   configPath: string
 } | null
+
+function normalizePathForAssertion(filePath: string): string {
+  return filePath.replaceAll("\\", "/").replaceAll("/private/var/", "/var/")
+}
 
 function runFindPluginEntry(
   directory: string,
@@ -47,6 +53,10 @@ describe("findPluginEntry", () => {
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "omo-plugin-entry-test-"))
+    const emptyConfigDirectory = path.join(temporaryDirectory, "empty-config")
+    fs.mkdirSync(emptyConfigDirectory, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = emptyConfigDirectory
+
     const opencodeDirectory = path.join(temporaryDirectory, ".opencode")
     fs.mkdirSync(opencodeDirectory, { recursive: true })
     configPath = path.join(opencodeDirectory, "opencode.json")
@@ -197,7 +207,9 @@ describe("findPluginEntry", () => {
     expect(execution.status).toBe(0)
     const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
     expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.configPath).toEndWith("/profiles/today/opencode.json")
+    expect(normalizePathForAssertion(pluginInfo?.configPath ?? "")).toBe(
+      normalizePathForAssertion(path.join(profileConfigDir, "opencode.json")),
+    )
     expect(pluginInfo?.pinnedVersion).toBe("beta")
   })
 })

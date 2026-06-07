@@ -7,6 +7,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Import PLATFORMS from build-binaries.ts
 // We need to export it first, but for now we'll test the expected structure
@@ -16,6 +17,24 @@ const EXPECTED_BASELINE_TARGETS = [
   "bun-darwin-x64-baseline",
   "bun-windows-x64-baseline",
 ];
+
+async function writeFakeCli(tempDir: string): Promise<void> {
+  const cliPath = join(tempDir, "dist", "cli", "index.js");
+  await mkdir(join(tempDir, "dist", "cli"), { recursive: true });
+  await writeFile(
+    cliPath,
+    [
+      "#!/usr/bin/env node",
+      "console.log(`bun-cli ${process.argv.slice(1).join(\" \")}`);",
+      "",
+    ].join("\n"),
+  );
+  await chmod(cliPath, 0o755);
+}
+
+function normalizeOutputPath(output: string): string {
+  return output.replace(/\\/g, "/");
+}
 
 describe("build-binaries", () => {
   describe("PLATFORMS array", () => {
@@ -88,7 +107,7 @@ describe("build-binaries", () => {
       // given
       const module = await import("./build-binaries.ts");
       const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
-      const root = new URL("..", import.meta.url);
+      const root = fileURLToPath(new URL("..", import.meta.url));
       const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
       await writeFile(launcherPath, createPlatformLauncherSource());
@@ -101,7 +120,7 @@ describe("build-binaries", () => {
           ...process.env,
           BUN_BINARY: join(tempDir, "missing-bun"),
           OMO_INVOCATION_NAME: "lazycodex-ai",
-          OMO_WRAPPER_PACKAGE_ROOT: root.pathname,
+          OMO_WRAPPER_PACKAGE_ROOT: root,
         },
       });
 
@@ -154,15 +173,11 @@ describe("build-binaries", () => {
       const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
       const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-both-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
-      const bunPath = join(tempDir, "fake-bun");
       const installerPath = join(tempDir, "packages", "omo-codex", "scripts", "install-local.mjs");
-      await mkdir(join(tempDir, "dist", "cli"), { recursive: true });
       await mkdir(join(tempDir, "packages", "omo-codex", "scripts"), { recursive: true });
       await writeFile(launcherPath, createPlatformLauncherSource());
       await chmod(launcherPath, 0o755);
-      await writeFile(join(tempDir, "dist", "cli", "index.js"), "#!/usr/bin/env bun\n");
-      await writeFile(bunPath, "#!/bin/sh\necho bun-cli \"$@\"\n");
-      await chmod(bunPath, 0o755);
+      await writeFakeCli(tempDir);
       await writeFile(installerPath, "#!/usr/bin/env node\nconsole.log('node-installer');\n");
       await chmod(installerPath, 0o755);
 
@@ -171,7 +186,7 @@ describe("build-binaries", () => {
         encoding: "utf8",
         env: {
           ...process.env,
-          BUN_BINARY: bunPath,
+          BUN_BINARY: process.execPath,
           OMO_INVOCATION_NAME: "lazycodex-ai",
           OMO_WRAPPER_PACKAGE_ROOT: tempDir,
         },
@@ -180,7 +195,7 @@ describe("build-binaries", () => {
       // then
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("bun-cli");
-      expect(result.stdout).toContain("dist/cli/index.js --platform=both install --no-tui");
+      expect(normalizeOutputPath(result.stdout)).toContain("dist/cli/index.js --platform=both install --no-tui");
       expect(result.stdout).not.toContain("node-installer");
     });
 
@@ -188,30 +203,27 @@ describe("build-binaries", () => {
       // given
       const module = await import("./build-binaries.ts");
       const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
-      const root = new URL("..", import.meta.url);
       const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-sparkshell-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
-      const bunPath = join(tempDir, "fake-bun");
       await writeFile(launcherPath, createPlatformLauncherSource());
       await chmod(launcherPath, 0o755);
-      await writeFile(bunPath, "#!/bin/sh\necho bun-cli \"$@\"\n");
-      await chmod(bunPath, 0o755);
+      await writeFakeCli(tempDir);
 
       // when
       const result = spawnSync(process.execPath, [launcherPath, "sparkshell", "printf", "ok"], {
         encoding: "utf8",
         env: {
           ...process.env,
-          BUN_BINARY: bunPath,
+          BUN_BINARY: process.execPath,
           OMO_INVOCATION_NAME: "lazycodex-ai",
-          OMO_WRAPPER_PACKAGE_ROOT: root.pathname,
+          OMO_WRAPPER_PACKAGE_ROOT: tempDir,
         },
       });
 
       // then
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("bun-cli");
-      expect(result.stdout).toContain("dist/cli/index.js sparkshell printf ok");
+      expect(normalizeOutputPath(result.stdout)).toContain("dist/cli/index.js sparkshell printf ok");
       expect(result.stdout).not.toContain("Unsupported lazycodex-ai command");
     });
 

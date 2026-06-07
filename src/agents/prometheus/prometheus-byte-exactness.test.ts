@@ -17,14 +17,14 @@ const PROMETHEUS_PROMPT_BASELINES: readonly PrometheusPromptBaseline[] = [
     name: "default-enabled",
     model: undefined,
     disabledTools: [],
-    sha256: "13d5c2daed9fe7892a9a6010c3b625c903a2e44b161545b012900e77994288e2",
+    sha256: "c1c68ab2121e1e77aca291657aafca0bc88cad006abe64c3c5ef0a8c3595ee07",
     shouldContainQuestionTool: true,
   },
   {
     name: "default-question-disabled",
     model: undefined,
     disabledTools: ["question"],
-    sha256: "693ccabde8d145c10b9f47f680b5894d20bf2bca25e12536aaff7880124398dc",
+    sha256: "72e95540669b48007e39973b99843fb8630ae701b68ac98b6d56ab0b14e3884a",
     shouldContainQuestionTool: false,
   },
   {

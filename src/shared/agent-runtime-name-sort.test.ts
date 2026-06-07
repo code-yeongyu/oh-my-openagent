@@ -1,13 +1,13 @@
 /// <reference types="bun-types" />
 
-import { beforeAll, describe, expect, test } from "bun:test"
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 
 import {
   AGENT_DISPLAY_NAMES,
   getAgentListDisplayName,
   normalizeAgentForPromptKey,
 } from "./agent-display-names"
-import { installAgentSortShim } from "./agent-sort-shim"
+import { installAgentSortShim, setAgentSortOrder } from "./agent-sort-shim"
 
 type AgentListItem = {
   name: string
@@ -35,6 +35,14 @@ function simulateOpencodeSort(agentNames: string[], defaultName: string): string
 describe("OpenCode Agent.list() sort with runtime display names", () => {
   beforeAll(() => {
     installAgentSortShim()
+  })
+
+  beforeEach(() => {
+    setAgentSortOrder(undefined)
+  })
+
+  afterEach(() => {
+    setAgentSortOrder(undefined)
   })
 
   describe("#given the four core agents and a mix of non-core agents", () => {

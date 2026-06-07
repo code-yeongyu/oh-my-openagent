@@ -2,12 +2,21 @@ import { describe, expect, test } from "bun:test"
 import { selectCiTestTargets } from "./run-ci-tests"
 
 describe("plain test script policy", () => {
-  test("#given mock.module tests in the suite #then bun run test remains the package test script", async () => {
+  test("#given global mock tests in the suite #then bun run test remains the package test script", async () => {
     //#given
     const packageJson = await Bun.file("package.json").json()
 
     //#then
     expect(packageJson.scripts.test).toBe("bun test")
+  })
+
+  test("#given CI root tests #then GitHub Actions uses the plain Bun test gate", async () => {
+    // given
+    const workflow = await Bun.file(".github/workflows/ci.yml").text()
+
+    // then
+    expect(workflow).toMatch(/- name: Run tests\s+run: bun test/)
+    expect(workflow).not.toContain("run: bun test --max-concurrency")
   })
 
   test("#given isolated test shards #when selecting targets #then shards are deterministic and complete", () => {

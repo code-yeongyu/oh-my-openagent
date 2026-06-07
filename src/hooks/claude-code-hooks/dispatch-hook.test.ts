@@ -1,4 +1,8 @@
-const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const {
+  preserveModuleMocksForTestFile,
+  restoreModuleMocksForTestFile,
+} = await import("../../testing/module-mock-lifecycle")
 
 const capturedOptions: Array<Record<string, unknown>> = []
 
@@ -16,8 +20,13 @@ mock.module("../../shared/command-executor/execute-hook-command", () => ({
 mock.module("./execute-http-hook", () => ({
   executeHttpHook: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })),
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const { dispatchHook } = await import("./dispatch-hook")
+
+afterAll(() => {
+  restoreModuleMocksForTestFile(import.meta.url)
+})
 
 describe("dispatchHook", () => {
   beforeEach(() => {

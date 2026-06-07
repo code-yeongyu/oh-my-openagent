@@ -73,6 +73,7 @@ function defaultRunTmuxCommand(_tmuxPath: string, args: Array<string>, _options?
 }
 
 const runTmuxCommandMock = mock(defaultRunTmuxCommand)
+const logMock = mock(() => undefined)
 
 const isServerRunningMock = mock(async (_serverUrl: string) => true)
 
@@ -81,6 +82,7 @@ async function loadLayoutModule() {
     runTmuxCommand: runTmuxCommandMock,
     isServerRunning: isServerRunningMock,
     getTmuxPath: async () => "tmux",
+    log: logMock,
     resolveCallerTmuxSession: async () => {
       if (!process.env.TMUX_PANE || !displaySuccess || !/^\$[0-9]+$/.test(displaySessionId)) {
         return null
@@ -117,6 +119,7 @@ describe("team-layout-tmux", () => {
 
   beforeEach(() => {
     runTmuxCommandMock.mockClear()
+    logMock.mockClear()
     isServerRunningMock.mockClear()
     isServerRunningMock.mockImplementation(async () => true)
     nextWindowNumber = 1
@@ -177,6 +180,7 @@ describe("team-layout-tmux", () => {
       runTmuxCommand: runTmuxCommandMock,
       isServerRunning: isServerRunningMock,
       getTmuxPath: async () => Promise.reject("tmux path unavailable"),
+      log: logMock,
       resolveCallerTmuxSession: async () => ({ sessionId: "$7", paneId: "%42", windowTarget: "test-session:0" }),
     }
     const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
@@ -186,7 +190,7 @@ describe("team-layout-tmux", () => {
 
     // then
     expect(result).toBeNull()
-    expect(sharedModule.log).toHaveBeenCalledWith("tmux visualization unavailable, skipping", { error: "tmux path unavailable" })
+    expect(logMock).toHaveBeenCalledWith("tmux visualization unavailable, skipping", { error: "tmux path unavailable" })
   })
 
   test("creates teammate panes in the caller window and sends attach via send-keys", async () => {
@@ -455,8 +459,8 @@ describe("team-layout-tmux", () => {
       ["kill-pane", "-t", "%11"],
       ["kill-pane", "-t", "%12"],
     ])
-    expect(sharedModule.log).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
-    expect(sharedModule.log).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
   })
 
   test("skips all panes when lead member missing", async () => {

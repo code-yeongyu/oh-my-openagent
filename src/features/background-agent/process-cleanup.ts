@@ -220,6 +220,12 @@ let cleanupRegistered = false
 const cleanupSignalHandlers = new Map<ProcessCleanupSignal, () => void>()
 const cleanupErrorHandlers = new Map<ProcessCleanupErrorEvent, (error: unknown) => void>()
 
+export function __getProcessCleanupSignalListenerForTesting(
+  signal: ProcessCleanupSignal,
+): (() => void) | undefined {
+  return cleanupSignalHandlers.get(signal)
+}
+
 export function registerManagerForCleanup(manager: CleanupTarget): void {
   cleanupManagers.add(manager)
 

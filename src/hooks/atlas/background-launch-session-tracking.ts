@@ -3,6 +3,7 @@ import {
   appendSessionId,
   appendSessionIdForWork,
   getWorkForSession,
+  normalizeSessionId,
   type BoulderState,
   resolveBoulderPlanPath,
   resolveBoulderPlanPathForWork,
@@ -104,7 +105,11 @@ async function resolveFallbackTrackedSessionId(input: {
   try {
     const session = await input.ctx.client.session.get({ path: { id: input.extractedSessionId } })
     const parentSessionId = session.data?.parentID
-    if (typeof parentSessionId === "string" && input.lineageSessionIDs.includes(parentSessionId)) {
+    const normalizedLineageSessionIDs = input.lineageSessionIDs.map((sessionID) => normalizeSessionId(sessionID))
+    if (
+      typeof parentSessionId === "string"
+      && normalizedLineageSessionIDs.includes(normalizeSessionId(parentSessionId))
+    ) {
       return input.extractedSessionId
     }
     return undefined

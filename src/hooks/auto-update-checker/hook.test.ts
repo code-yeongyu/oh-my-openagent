@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { describe, expect, mock, test } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
 type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
@@ -33,6 +34,11 @@ mock.module("./checker/latest-version", () => ({
 mock.module("./hook/deferred-startup-check", () => ({
   scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
+
+afterAll(() => {
+  restoreModuleMocksForTestFile(import.meta.url)
+})
 
 const createPluginInput = (): PluginInput => ({
   client: {} as PluginInput["client"],

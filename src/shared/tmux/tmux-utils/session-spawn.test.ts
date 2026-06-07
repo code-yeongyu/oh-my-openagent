@@ -103,7 +103,7 @@ describe("spawnTmuxSession runner integration", () => {
 		expect(String(newSessionCall[1][3]).startsWith("omo-agents-")).toBe(true)
 		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
 		expect(harness.getSpawnCommand()).toContain("Focus this pane to attach.")
-		expect(harness.getSpawnCommand()).toContain("tail -f /dev/null")
+		expect(harness.getSpawnCommand()).toContain("while :; do sleep 86400; done")
 		expect(harness.getSpawnCommand()).not.toContain("opencode attach")
 	})
 

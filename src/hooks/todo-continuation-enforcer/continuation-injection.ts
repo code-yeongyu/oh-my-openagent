@@ -27,6 +27,7 @@ import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../sha
 
 import {
   CONTINUATION_PROMPT,
+  CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
 } from "./constants"
@@ -95,7 +96,8 @@ export async function injectContinuation(args: {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
     todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
-    log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? error : String(error)
+    log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: loggedError })
     return
   }
 
@@ -198,6 +200,7 @@ ${todoList}`
       source: HOOK_NAME,
       settleMs: 0,
       queueBehavior: "defer",
+      semanticDedupeHoldMs: CONTINUATION_COOLDOWN_MS,
       input: {
         path: { id: sessionID },
         body: {

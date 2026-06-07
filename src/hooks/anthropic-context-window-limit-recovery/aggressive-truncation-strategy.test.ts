@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 import type { AutoCompactState } from "./types"
 
 type PromptAsyncCall = {
@@ -27,13 +28,7 @@ mock.module("./storage", () => ({
   truncateUntilTargetTokens: truncateUntilTargetTokensMock,
 }))
 
-const findNearestMessageWithFieldsFromSDKMock = mock(async () => null)
-const findNearestMessageWithFieldsMock = mock(() => null)
-
-mock.module("../../features/hook-message-injector", () => ({
-  findNearestMessageWithFieldsFromSDK: findNearestMessageWithFieldsFromSDKMock,
-  findNearestMessageWithFields: findNearestMessageWithFieldsMock,
-}))
+preserveModuleMocksForTestFile(import.meta.url)
 
 import { _resetForTesting as resetSessionState, updateSessionAgent } from "../../features/claude-code-session-state/state"
 import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strategy"
@@ -41,20 +36,34 @@ import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strateg
 type FakeClient = {
   session: {
     promptAsync: (input: PromptAsyncCall) => Promise<unknown>
+    messages: () => Promise<{ data: readonly FakeSDKMessage[] }>
     status?: () => Promise<unknown>
   }
   tui: { showToast: (input: unknown) => Promise<unknown> }
 }
 
-function createRecordingClient(status?: () => Promise<unknown>): { client: FakeClient; calls: PromptAsyncCall[] } {
+type FakeSDKMessage = {
+  readonly id: string
+  readonly info: {
+    readonly agent?: string
+    readonly model?: { readonly providerID?: string; readonly modelID?: string; readonly variant?: string }
+    readonly time: { readonly created: number }
+  }
+}
+
+function createRecordingClient(params: {
+  readonly messages?: readonly FakeSDKMessage[]
+  readonly status?: () => Promise<unknown>
+} = {}): { client: FakeClient; calls: PromptAsyncCall[] } {
   const calls: PromptAsyncCall[] = []
   const client: FakeClient = {
     session: {
+      messages: async () => ({ data: params.messages ?? [] }),
       promptAsync: async (input: PromptAsyncCall) => {
         calls.push(input)
         return undefined
       },
-      ...(status ? { status } : {}),
+      ...(params.status ? { status: params.status } : {}),
     },
     tui: {
       showToast: async () => undefined,
@@ -83,14 +92,14 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
   beforeEach(() => {
     resetSessionState()
     truncateUntilTargetTokensMock.mockClear()
-    findNearestMessageWithFieldsFromSDKMock.mockClear()
-    findNearestMessageWithFieldsMock.mockClear()
-    findNearestMessageWithFieldsFromSDKMock.mockResolvedValue(null)
-    findNearestMessageWithFieldsMock.mockReturnValue(null)
   })
 
   afterEach(() => {
     resetSessionState()
+  })
+
+  afterAll(() => {
+    restoreModuleMocksForTestFile(import.meta.url)
   })
 
   test("includes the session's resolved agent on promptAsync when agent is known", async () => {
@@ -120,18 +129,17 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
 
   test("pins provider/model/variant resolved from the nearest prior assistant message", async () => {
     // given
-    const { client, calls } = createRecordingClient()
+    const { client, calls } = createRecordingClient({
+      messages: [{
+        id: "msg_1",
+        info: {
+          agent: "atlas",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" },
+          time: { created: 1 },
+        },
+      }],
+    })
     const sessionID = "session-truncation-model"
-    findNearestMessageWithFieldsFromSDKMock.mockResolvedValue({
-      agent: "atlas",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" },
-      tools: undefined,
-    } as never)
-    findNearestMessageWithFieldsMock.mockReturnValue({
-      agent: "atlas",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" },
-      tools: undefined,
-    } as never)
 
     // when
     await runAggressiveTruncationStrategy({
@@ -181,9 +189,11 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
   test("does not send the delayed auto prompt when the session becomes active before recovery fires", async () => {
     // given
     const sessionID = "session-truncation-active"
-    const { client, calls } = createRecordingClient(async () => ({
-      [sessionID]: { type: "busy" },
-    }))
+    const { client, calls } = createRecordingClient({
+      status: async () => ({
+        [sessionID]: { type: "busy" },
+      }),
+    })
 
     // when
     await runAggressiveTruncationStrategy({

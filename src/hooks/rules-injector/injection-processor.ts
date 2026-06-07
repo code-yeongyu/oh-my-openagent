@@ -1,5 +1,4 @@
 import { homedir } from "node:os";
-import { relative } from "node:path";
 import { findProjectRoot, findRuleFiles } from "./finder";
 import { appendInjectedRulesToOutput } from "./injection-output";
 import type {
@@ -25,6 +24,10 @@ import type { RuleScanCache } from "./rule-scan-cache";
 import { saveInjectedRules } from "./storage";
 
 const EMPTY_TRANSCRIPT_SET: ReadonlySet<string> = new Set();
+
+function normalizeRuleRelativePath(relativePath: string): string {
+	return relativePath.split("\\").join("/");
+}
 
 export type CreateRuleInjectionProcessorDeps = RuleInjectionProcessorDeps & {
 	getSessionRuleScanCache?: (sessionID: string) => RuleScanCache;
@@ -90,6 +93,9 @@ export function createRuleInjectionProcessor(
 		const transcriptRelativePaths = transcriptHydration
 			? await transcriptHydration.hydrateSession(sessionID)
 			: EMPTY_TRANSCRIPT_SET;
+		const normalizedTranscriptRelativePaths = new Set(
+			[...transcriptRelativePaths].map(normalizeRuleRelativePath),
+		);
 
 		const ruleFileCandidates = findRuleFiles(
 			projectRoot,
@@ -126,11 +132,9 @@ export function createRuleInjectionProcessor(
 				if (isDuplicateByContentHashImpl(contentHash, cache.contentHashes))
 					continue;
 
-				const relativePath = projectRoot
-					? relative(projectRoot, candidate.path)
-					: candidate.path;
+				const relativePath = normalizeRuleRelativePath(candidate.relativePath);
 
-				if (transcriptRelativePaths.has(relativePath)) {
+				if (normalizedTranscriptRelativePaths.has(relativePath)) {
 					cache.realPaths.add(candidate.realPath);
 					cache.contentHashes.add(contentHash);
 					dirty = true;

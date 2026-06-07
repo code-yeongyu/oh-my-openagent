@@ -2,9 +2,20 @@ import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { detectShellType } from "../../shared"
 import { log } from "../../shared/logger"
 
+type OnCompleteHookDeps = {
+  spawnWithWindowsHide: typeof spawnWithWindowsHide
+  log: typeof log
+}
+
+const defaultDeps: OnCompleteHookDeps = {
+  spawnWithWindowsHide,
+  log,
+}
+
 async function readOutput(
   stream: ReadableStream<Uint8Array> | undefined,
-  streamName: "stdout" | "stderr"
+  streamName: "stdout" | "stderr",
+  deps: Pick<OnCompleteHookDeps, "log"> = defaultDeps,
 ): Promise<string> {
   if (!stream) {
     return ""
@@ -13,7 +24,7 @@ async function readOutput(
   try {
     return await new Response(stream).text()
   } catch (error) {
-    log("Failed to read on-complete hook output", {
+    deps.log("Failed to read on-complete hook output", {
       stream: streamName,
       error: error instanceof Error ? error.message : String(error),
     })
@@ -45,7 +56,7 @@ export async function executeOnCompleteHook(options: {
   exitCode: number
   durationMs: number
   messageCount: number
-}): Promise<void> {
+}, deps: OnCompleteHookDeps = defaultDeps): Promise<void> {
   const { command, sessionId, exitCode, durationMs, messageCount } = options
 
   const trimmedCommand = command.trim()
@@ -53,11 +64,11 @@ export async function executeOnCompleteHook(options: {
     return
   }
 
-  log("Running on-complete hook", { command: trimmedCommand })
+  deps.log("Running on-complete hook", { command: trimmedCommand })
 
   try {
     const shellCommand = resolveHookShellCommand(trimmedCommand)
-    const proc = spawnWithWindowsHide(shellCommand, {
+    const proc = deps.spawnWithWindowsHide(shellCommand, {
       env: {
         ...process.env,
         SESSION_ID: sessionId,
@@ -71,26 +82,26 @@ export async function executeOnCompleteHook(options: {
 
     const [hookExitCode, stdout, stderr] = await Promise.all([
       proc.exited,
-      readOutput(proc.stdout, "stdout"),
-      readOutput(proc.stderr, "stderr"),
+      readOutput(proc.stdout, "stdout", deps),
+      readOutput(proc.stderr, "stderr", deps),
     ])
 
     if (stdout.trim()) {
-      log("On-complete hook stdout", { command: trimmedCommand, stdout: stdout.trim() })
+      deps.log("On-complete hook stdout", { command: trimmedCommand, stdout: stdout.trim() })
     }
 
     if (stderr.trim()) {
-      log("On-complete hook stderr", { command: trimmedCommand, stderr: stderr.trim() })
+      deps.log("On-complete hook stderr", { command: trimmedCommand, stderr: stderr.trim() })
     }
 
     if (hookExitCode !== 0) {
-      log("On-complete hook exited with non-zero code", {
+      deps.log("On-complete hook exited with non-zero code", {
         command: trimmedCommand,
         exitCode: hookExitCode,
       })
     }
   } catch (error) {
-    log("Failed to execute on-complete hook", {
+    deps.log("Failed to execute on-complete hook", {
       command: trimmedCommand,
       error: error instanceof Error ? error.message : String(error),
     })

@@ -12,15 +12,21 @@ export function isMarkdownFile(entry: { name: string; isFile: () => boolean }): 
 export function isSymbolicLink(filePath: string): boolean {
   try {
     return lstatSync(filePath, { throwIfNoEntry: false })?.isSymbolicLink() ?? false
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
 
 export function resolveSymlink(filePath: string): string {
   try {
-    return normalizeDarwinRealpath(realpathSync(filePath))
-  } catch {
+    return normalizeDarwinRealpath(realpathSync.native(filePath))
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return filePath
   }
 }
@@ -28,7 +34,10 @@ export function resolveSymlink(filePath: string): string {
 export async function resolveSymlinkAsync(filePath: string): Promise<string> {
   try {
     return normalizeDarwinRealpath(await fs.realpath(filePath))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return filePath
   }
 }

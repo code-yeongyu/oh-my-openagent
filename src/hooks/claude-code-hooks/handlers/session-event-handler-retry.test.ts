@@ -1,4 +1,5 @@
-const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
 const executeStopHooks = mock(async (context: { parentSessionId?: string }) => ({
   block: false,
@@ -19,7 +20,10 @@ mock.module("../stop", () => ({
   executeStopHooks,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+  restoreModuleMocksForTestFile(import.meta.url)
+})
 
 const { createSessionEventHandler } = await import("./session-event-handler")
 
@@ -103,5 +107,3 @@ describe("createSessionEventHandler retry behavior", () => {
     )
   })
 })
-
-export {}

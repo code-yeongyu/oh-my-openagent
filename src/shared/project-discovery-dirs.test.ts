@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -7,7 +9,7 @@ const TEST_DIR = join(tmpdir(), `project-discovery-dirs-${Date.now()}`)
 let worktreeSpawnCount = 0
 
 function canonicalPath(path: string): string {
-  return realpathSync(path)
+  return realpathSync.native(path)
 }
 
 describe("project-discovery-dirs", () => {
@@ -16,6 +18,7 @@ describe("project-discovery-dirs", () => {
   })
 
   afterEach(() => {
+    mock.restore()
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
@@ -41,9 +44,9 @@ describe("project-discovery-dirs", () => {
     const thirdPath = detectWorktreePath("/some/dir")
 
     // then
-    expect(firstPath).toBe(TEST_DIR)
-    expect(secondPath).toBe(TEST_DIR)
-    expect(thirdPath).toBe(TEST_DIR)
+    expect(firstPath).toBe(canonicalPath(TEST_DIR))
+    expect(secondPath).toBe(canonicalPath(TEST_DIR))
+    expect(thirdPath).toBe(canonicalPath(TEST_DIR))
     expect(worktreeSpawnCount).toBe(2)
   })
 

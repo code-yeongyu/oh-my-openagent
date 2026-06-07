@@ -17,7 +17,7 @@ import {
   __isShutdownInProgressForTesting,
   __setShutdownInProgressForTesting,
 } from "./process-cleanup"
-import { flushMicrotasks, getNewListener } from "./process-cleanup.test-helpers"
+import { flushMicrotasks, getRegisteredProcessCleanupSignalListener } from "./process-cleanup.test-helpers"
 
 type CleanupManager = {
   shutdown: () => void | Promise<void>
@@ -75,23 +75,22 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#when the exit listener runs #then the registered manager shuts down", () => {
-      const exitListenersBefore = process.listeners("exit")
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
 
-      const exitListener = getNewListener("exit", exitListenersBefore)
+      const exitListener = getRegisteredProcessCleanupSignalListener("exit")
       exitListener()
 
       expect(shutdown).toHaveBeenCalledTimes(1)
     })
 
     test("#when cleanup finishes after SIGINT #then the fallback exit timer is cleared", async () => {
-      const sigintListenersBefore = process.listeners("SIGINT")
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       // Re-enable forced exit so we can verify setTimeout/clearTimeout are called
       __enableScheduledForcedExitForTesting()
 
@@ -105,16 +104,18 @@ describe("#given process cleanup registration", () => {
 
         registerManagerForCleanup(manager)
 
-        const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+        const sigintListener = getRegisteredProcessCleanupSignalListener("SIGINT")
 
         sigintListener()
         await flushMicrotasks()
 
         expect(setTimeoutSpy).toHaveBeenCalledTimes(1)
         expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenCalledWith(0)
       } finally {
         setTimeoutSpy.mockRestore()
         clearTimeoutSpy.mockRestore()
+        exitSpy.mockRestore()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
@@ -123,7 +124,6 @@ describe("#given process cleanup registration", () => {
 
   describe("#given multiple cleanup managers", () => {
     test("#when the exit listener runs #then every registered manager shuts down", () => {
-      const exitListenersBefore = process.listeners("exit")
       const shutdownOne = mock(() => {})
       const shutdownTwo = mock(() => {})
       const shutdownThree = mock(() => {})
@@ -138,7 +138,7 @@ describe("#given process cleanup registration", () => {
         registerManagerForCleanup(manager)
       }
 
-      const exitListener = getNewListener("exit", exitListenersBefore)
+      const exitListener = getRegisteredProcessCleanupSignalListener("exit")
       exitListener()
 
       expect(shutdownOne).toHaveBeenCalledTimes(1)
@@ -205,7 +205,6 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#when one manager remains registered #then cleanup handlers stay active for it", () => {
-      const exitListenersBefore = process.listeners("exit")
       const remainingManagerShutdown = mock(() => {})
       const removedManagerShutdown = mock(() => {})
       const remainingManager = { shutdown: remainingManagerShutdown }
@@ -216,7 +215,7 @@ describe("#given process cleanup registration", () => {
       registerManagerForCleanup(removedManager)
       unregisterManagerForCleanup(removedManager)
 
-      const exitListener = getNewListener("exit", exitListenersBefore)
+      const exitListener = getRegisteredProcessCleanupSignalListener("exit")
       exitListener()
 
       expect(remainingManagerShutdown).toHaveBeenCalledTimes(1)
@@ -308,14 +307,13 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#given env var is set #when signals fire #then SIGINT/SIGTERM/beforeExit/exit handlers still run cleanup", () => {
-      const exitListenersBefore = process.listeners("exit")
       process.env.OMO_DISABLE_PROCESS_CLEANUP = "yes"
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
-      const exitListener = getNewListener("exit", exitListenersBefore)
+      const exitListener = getRegisteredProcessCleanupSignalListener("exit")
       exitListener()
 
       expect(shutdown).toHaveBeenCalledTimes(1)
@@ -467,13 +465,12 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#given a manager registered AND process emits 'exit' #then cleanup still runs (signal path remains the real shutdown gate)", () => {
-      const exitListenersBefore = process.listeners("exit")
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
-      const exitListener = getNewListener("exit", exitListenersBefore)
+      const exitListener = getRegisteredProcessCleanupSignalListener("exit")
       exitListener()
 
       expect(shutdown).toHaveBeenCalledTimes(1)
@@ -683,42 +680,39 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#given SIGINT fires #then the shutdown flag is set", () => {
-      const sigintListenersBefore = process.listeners("SIGINT")
       const manager = { shutdown: mock(() => {}) }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
       expect(__isShutdownInProgressForTesting()).toBe(false)
 
-      const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+      const sigintListener = getRegisteredProcessCleanupSignalListener("SIGINT")
       sigintListener()
 
       expect(__isShutdownInProgressForTesting()).toBe(true)
     })
 
     test("#given beforeExit fires #then the shutdown flag is set", () => {
-      const beforeExitListenersBefore = process.listeners("beforeExit")
       const manager = { shutdown: mock(() => {}) }
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
       expect(__isShutdownInProgressForTesting()).toBe(false)
 
-      const beforeExitListener = getNewListener("beforeExit", beforeExitListenersBefore)
+      const beforeExitListener = getRegisteredProcessCleanupSignalListener("beforeExit")
       beforeExitListener()
 
       expect(__isShutdownInProgressForTesting()).toBe(true)
     })
 
     test("#given SIGINT has fired AND a non-stdio ECONNRESET arrives via uncaughtException #then it is dropped silently", async () => {
-      const sigintListenersBefore = process.listeners("SIGINT")
       const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const manager = { shutdown: mock(() => {}) }
       registeredManagers.push(manager)
 
       try {
         registerManagerForCleanup(manager)
-        const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+        const sigintListener = getRegisteredProcessCleanupSignalListener("SIGINT")
         sigintListener()
 
         const burst = Object.assign(new Error("connection reset"), { code: "ECONNRESET" })

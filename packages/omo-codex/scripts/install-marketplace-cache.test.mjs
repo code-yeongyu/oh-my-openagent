@@ -88,11 +88,14 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.equal(alphaPackageJson.dependencies["@example/shared-lsp"], `file:${join(codexPackageRoot, "shared-lsp")}`);
 	await assert.rejects(stat(join(alphaCacheRoot, "node_modules")), /code: 'ENOENT'|ENOENT/);
 	await assert.rejects(stat(join(codexHome, "plugins", "cache", "debug-marketplace", "stale")), /code: 'ENOENT'|ENOENT/);
-	assert.deepEqual(commands.map(([command, args, cwd]) => [command, args.join(" "), cwd]), [
+	const commandLog = commands.map(([command, args, cwd]) => [command, args.join(" "), cwd]);
+	assert.deepEqual(commandLog.slice(0, 2), [
 		["npm", "install", pluginRoot],
 		["npm", "run build", pluginRoot],
-		["npm", "install --omit=dev", alphaCacheRoot],
 	]);
+	assert.equal(commandLog[2][0], "npm");
+	assert.equal(commandLog[2][1], "install --omit=dev");
+	assert.equal(commandLog[2][2].startsWith(join(codexHome, "plugins", "cache", "debug-marketplace", "alpha", ".tmp-1.2.3-")), true);
 
 	const config = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.match(config, /\[marketplaces\.debug-marketplace\]/);

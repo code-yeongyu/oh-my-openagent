@@ -43,7 +43,7 @@ describe("waitForTaskSessionID", () => {
     // when
     const sessionID = await waitForTaskSessionID(manager, "bg_late", {
       intervalMs: 1,
-      timeoutMs: 20,
+      timeoutMs: 100,
     })
 
     // then

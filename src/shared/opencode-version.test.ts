@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { join } from "node:path"
 import {
   parseVersion,
   compareVersions,
@@ -136,12 +137,15 @@ describe("opencode-version", () => {
     test("reads adjacent package version before executing opencode binary", () => {
       // given an opencode package next to the resolved binary
       const calls: string[] = []
+      const packageRoot = join("/tmp", "opencode-ai")
+      const binaryPath = join(packageRoot, "bin", "opencode")
+      const packagePath = join(packageRoot, "package.json")
 
       // when getting version
       const result = getOpenCodeVersion({
-        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        getBinaryPath: () => binaryPath,
         realpath: (filePath) => filePath,
-        exists: (filePath) => filePath === "/tmp/opencode-ai/package.json",
+        exists: (filePath) => filePath === packagePath,
         readText: (filePath) => {
           calls.push(`read:${filePath}`)
           return JSON.stringify({ name: "opencode-ai", version: "1.14.41" })
@@ -154,7 +158,7 @@ describe("opencode-version", () => {
 
       // then the version is resolved without spawning the CLI
       expect(result).toBe("1.14.41")
-      expect(calls).toEqual(["read:/tmp/opencode-ai/package.json"])
+      expect(calls).toEqual([`read:${packagePath}`])
     })
 
     test("falls back to opencode binary when package version is unavailable", () => {

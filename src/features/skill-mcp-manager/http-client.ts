@@ -19,11 +19,13 @@ type HttpTransportFactory = (
 interface HttpClientDependencies {
   createClient: HttpClientFactory
   createTransport: HttpTransportFactory
+  log: typeof log
 }
 
 const defaultHttpClientDependencies: HttpClientDependencies = {
   createClient: (clientInfo, options) => new Client(clientInfo, options),
   createTransport: (url, options) => new StreamableHTTPClientTransport(url, options),
+  log,
 }
 
 let httpClientDependencies: HttpClientDependencies = defaultHttpClientDependencies
@@ -84,7 +86,7 @@ async function closeHttpResourceIgnoringFailure(
     await close()
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    log("[skill-mcp-http-client] ignored cleanup failure", {
+    httpClientDependencies.log("[skill-mcp-http-client] ignored cleanup failure", {
       ...context,
       error: redactCleanupErrorMessage(message),
     })
