@@ -120,7 +120,7 @@ describe("test workflows", () => {
     // #when
     const codexTestScriptBuildsMcpRuntimes =
       packageManifest.includes(
-        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
+        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
       )
 
     // #then

@@ -643,6 +643,7 @@ jobs:
           mv tmp.json packages/omo-codex/plugin/package.json
           npm --prefix packages/omo-codex/plugin ci
           bun run build:ast-grep-mcp
+          bun run build:git-bash-mcp
           bun run build:lsp-tools-mcp
           bun run --cwd packages/omo-codex/plugin build
           bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
