@@ -66,8 +66,6 @@ Codex may still start Windows shell calls through its own defaults. The Light ed
 > To remove the Light edition after migration, run `npx lazycodex-ai uninstall`. It removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` with a backup, and removes managed agent TOML files from `~/.codex/agents/`. `cleanup` remains available as a backward-compatible alias.
 > If Codex still fails only inside one project with `agents.max_threads cannot be set when multi_agent_v2 is enabled`, run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers from the project root to the current directory, removes conflicting legacy `[agents] max_threads` only when MultiAgentV2 is enabled, and writes timestamped backups next to changed files.
 
-> **oh-my-codex (OMX) coexistence:** LazyCodex runs inside Codex as `omo@sisyphuslabs`; OMX wraps Codex from outside. The installer preserves unrelated `[features]`, `[tui]`, and `[shell_environment_policy]` blocks in `~/.codex/config.toml` while managing only LazyCodex marketplace/plugin/hook-state/MCP-policy/agent entries. Codex does not define hook precedence between independent lifecycle handlers, so LazyCodex does not define hook precedence for OMX keywords versus LazyCodex keywords. If `omx setup` refreshes shared config, rerun `npx lazycodex-ai install` after `omx setup`.
-
 ### A note on direct install
 
 If you insist on running the Ultimate installer yourself:
