@@ -1,6 +1,6 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-06-01
+**Generated:** 2026-06-08
 
 ## OVERVIEW
 
@@ -55,20 +55,22 @@ Counts verified from each composer's return object. Numbers in brackets show cou
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 23: preemptiveCompaction, sessionRecovery,
+  │   ├─ createSessionHooks()     # 24: preemptiveCompaction, sessionRecovery,
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
   │   │                             ralphLoop, editErrorRecovery, delegateTaskRetry, startWork,
   │   │                             prometheusMdOnly, sisyphusJuniorNotepad, noSisyphusGpt,
-  │   │                             noHephaestusNonGpt, questionLabelTruncator, taskResumeInfo,
+  │   │                             noHephaestusNonGpt, hephaestusAgentsMdInjector,
+  │   │                             questionLabelTruncator, taskResumeInfo,
   │   │                             anthropicEffort, runtimeFallback, legacyPluginToast
-  │   ├─ createToolGuardHooks()   # 16 [+1 with team-mode]: commentChecker, toolOutputTruncator,
+  │   ├─ createToolGuardHooks()   # 17 [+1 with team-mode]: commentChecker, toolOutputTruncator,
   │   │                             directoryAgentsInjector, directoryReadmeInjector,
   │   │                             emptyTaskResponseDetector, rulesInjector, tasksTodowriteDisabler,
   │   │                             writeExistingFileGuard, bashFileReadGuard, hashlineReadEnhancer,
   │   │                             jsonErrorRecovery, readImageResizer, todoDescriptionOverride,
-  │   │                             webfetchRedirectGuard, fsyncSkipWarning [+ teamToolGating]
+  │   │                             webfetchRedirectGuard, fsyncSkipWarning,
+  │   │                             notepadWriteGuard, planFormatValidator [+ teamToolGating]
   │   └─ createTransformHooks()   # 5 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
   │                                  contextInjectorMessagesTransform, thinkingBlockValidator,
   │                                  toolPairValidator [+ teamModeStatusInjector, teamMailboxInjector]
@@ -82,20 +84,20 @@ createHooks()
     team-member-error-handler, team-member-status-handler
 ```
 
-Total: 54 base, 61 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
+Total: 55 base, 62 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 
 | Subdir | Files (.ts) | LOC | Purpose | Has AGENTS.md |
 |--------|-------------|-----|---------|---------------|
 | `agents/` | 104 | ~20k | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
-| `hooks/` | 596 | ~78k | ~52 lifecycle hooks across 57 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
+| `hooks/` | 596 | ~78k | ~55 lifecycle hooks across 61 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
 | `tools/` | 317 | ~45k | 13 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
-| `features/` | 404 | ~71k | 20 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
+| `features/` | 404 | ~71k | 21 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
 | `shared/` | 297 | ~33k | Cross-cutting utilities (179 non-test), barrel-exported | yes |
 | `cli/` | 158 | ~18k | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
 | `plugin/` | 58 | ~12k | 12 OpenCode hook handlers + hook composition | yes |
-| `config/` | 41 | ~2k | 30 Zod v4 schema files | yes |
+| `config/` | 41 | ~2k | 32 Zod v4 schema files | yes |
 | `plugin-handlers/` | 27 | ~6k | 6-phase config loading pipeline | yes |
 | `openclaw/` | 26 | ~3k | Bidirectional Discord/Telegram/HTTP integration | yes |
 | `__tests__/` | 22 | ~300 | Plugin-level integration tests + perf fixtures | — |

@@ -2,11 +2,11 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-06-06 | **Commit:** cfee52e84 | **Branch:** dev | **Release:** v4.7.5
+**Generated:** 2026-06-08 | **Commit:** f3b8110ed | **Branch:** dev | **Release:** v4.7.5
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54-61 lifecycle hooks (base / +team-mode) across 57 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 55-62 lifecycle hooks (base / +team-mode) across 61 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
 
 ## STRUCTURE
 
@@ -20,12 +20,12 @@ oh-my-opencode/
 │   ├── create-tools.ts       # ToolRegistry composition
 │   ├── create-hooks.ts       # 5-tier hook composition
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/                # ~52 lifecycle hooks across 57 dirs (incl. 5 zauc-mocks + 1 shared + 1 `.sisyphus/` legacy state + 1 `team-session-events/`; 2 unwired WIP: `task-reminder/`, `hashline-edit-diff-enhancer/`)
+│   ├── hooks/                # ~55 lifecycle hooks across 61 dirs (incl. 5 zauc-mocks + 1 shared + 1 `team-session-events/`; 2 unwired WIP: `task-reminder/`, `hashline-edit-diff-enhancer/`)
 │   ├── tools/                # 13 native tool dirs; LSP + AST-grep now served via built-in MCPs
-│   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, tmux-subagent, mcp-oauth, claude-code-plugin-loader, boulder-state, etc.)
+│   ├── features/             # 21 feature modules (incl. team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, tmux-subagent, mcp-oauth, claude-code-plugin-loader, boulder-state, etc.)
 │   ├── shared/               # 297 utility files (179 non-test); logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
-│   ├── config/               # Zod v4 schema system (30 schema files)
-│   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
+│   ├── config/               # Zod v4 schema system (32 schema files)
+│   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, version, boulder, cleanup, sparkshell, ulw-loop
 │   ├── help/                 # CLI help-text schemas (acp, doctor, sandbox, status)
 │   ├── locales/              # i18n strings (en, zh) for toasts + model-fallback labels
 │   ├── mcp/                  # 5 built-in MCPs (3 remote + local stdio lsp + ast_grep)
@@ -219,7 +219,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 - **Canonical agent order:** Sisyphus → Hephaestus → Prometheus → Atlas. Enforced by `installAgentSortShim()` (patches `Array.prototype.toSorted`/`.sort` narrowly when the array contains ≥2 canonical core agents). See [`src/plugin-handlers/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-handlers/AGENTS.md) for the full history of why this exists.
 - **Hashline edit + read pairing:** Every `Read` tool output is tagged with `LINE#ID` content hashes; `hashline_edit` validates the hash before applying. Stale hash → reject.
-- **5-tier hook composition:** Session (24) + ToolGuard (16) + Transform (5) + Continuation (7) + Skill (2) = 54 base. With `team_mode.enabled`: +1 ToolGuard (`team-tool-gating`), +2 Transform (`team-mode-status-injector`, `team-mailbox-injector`), +4 direct event handlers in `src/plugin/event.ts` (`team-session-events/*`) = 61 total. Composed by `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`.
+- **5-tier hook composition:** Session (24) + ToolGuard (17) + Transform (5) + Continuation (7) + Skill (2) = 55 base. With `team_mode.enabled`: +1 ToolGuard (`team-tool-gating`), +2 Transform (`team-mode-status-injector`, `team-mailbox-injector`), +4 direct event handlers in `src/plugin/event.ts` (`team-session-events/*`) = 62 total. Composed by `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`.
 - **Per-session MCP isolation:** Tier-3 MCP clients keyed by `${sessionID}:${skillName}:${serverName}` so the same skill in two sessions does not share state.
 - **Two fallback systems:** `model-fallback` (proactive, chat.params) vs `runtime-fallback` (reactive, session.error). They operate independently — no direct integration.
 - **OpenClaw bidirectional:** Outbound dispatchers fire on session events; inbound daemon polls Discord/Telegram and `send-keys` replies into the tracked tmux pane.
@@ -325,7 +325,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Docs:** see [`docs/guide/`](file:///Users/yeongyu/local-workspaces/omo/docs/guide/) for user-facing guides (overview, installation, orchestration, agent-model-matching, team-mode), [`docs/reference/`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/) for CLI/configuration/features reference. v4.2.0+ adds [`CHANGELOG.md`](file:///Users/yeongyu/local-workspaces/omo/CHANGELOG.md), [`docs/reference/known-issues.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/known-issues.md), [`docs/reference/prompt-async-gate-rfc.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/prompt-async-gate-rfc.md), and [`docs/reference/release-process.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/release-process.md).
 - **Rules files** (auto-injected by `rules-injector` hook): [`.omo/rules/modular-code-enforcement.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/modular-code-enforcement.md) + [`.omo/rules/test-discipline.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/test-discipline.md) (forbids `setTimeout(resolve, N)` / `await sleep(N)` in tests unless time IS the SUT). Scans `.omo/rules/`, `.claude/rules/`, `.cursor/rules/`, `.github/instructions/`, plus `.github/copilot-instructions.md` and `.mdc` files.
 - **Process cleanup:** Background-agent error handlers are now log-only — no force-exit on transient errors. Opt out entirely via `OMO_DISABLE_PROCESS_CLEANUP=1` env var.
-- **First-prompt watchdog:** `src/hooks/runtime-fallback/first-prompt-watchdog.ts` (206 LOC) detects subagent sessions producing no progress within 90s and triggers fallback / abort.
+- **First-prompt watchdog:** `src/hooks/runtime-fallback/first-prompt-watchdog.ts` (228 LOC) detects subagent sessions producing no progress within 90s and triggers fallback / abort.
 - **ParentWakeNotifier:** Background-agent parent-wake state extracted to `src/features/background-agent/parent-wake-notifier.ts` (587 LOC) with dependency-injected client and enqueue callback.
 - **Workspace migration:** Runtime state migrated from `.sisyphus/` → `.omo/`. Legacy `.sisyphus/` still exists during transition; `src/shared/legacy-workspace-migration.ts` copies it forward on first load.
 - **CI nuance:** PRs targeting `master` are hard-blocked — they MUST target `dev`. CI auto-commits schema changes on master push and creates a draft "next" release on dev push.
