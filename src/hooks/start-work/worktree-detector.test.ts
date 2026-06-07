@@ -40,6 +40,16 @@ describe("detectWorktreePath", () => {
       expect(result).toBe("/projects/worktree-a")
     })
 
+    test("#given git emits a non-host absolute path #when detecting #then preserves the git path", () => {
+      execFileSyncSpy.mockImplementation(
+        ((_file: string, _args: string[]) => "D:\\agent\\repo\n") as typeof childProcess.execFileSync,
+      )
+
+      const result = detectWorktreePath("D:\\agent\\repo\\src")
+
+      expect(result).toBe("D:\\agent\\repo")
+    })
+
     test("#given valid dir #when detecting #then calls git rev-parse with cwd", () => {
       execFileSyncSpy.mockImplementation(
         ((_file: string, _args: string[]) => "/repo\n") as typeof childProcess.execFileSync,
