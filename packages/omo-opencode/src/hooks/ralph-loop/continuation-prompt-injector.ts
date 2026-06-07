@@ -10,8 +10,7 @@ import {
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
 } from "../../shared"
-import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
-import { normalizeAgentForPromptKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 type MessageInfo = {
@@ -66,7 +65,7 @@ function createPromptAsyncError(prefix: string, error: unknown): Error {
 }
 
 function normalizeInheritedAgentForPrompt(agent: string | undefined): string | undefined {
-	const resolvedAgent = resolveRegisteredAgentName(agent) ?? normalizeAgentForPromptKey(agent)
+	const resolvedAgent = normalizeAgentForPrompt(agent)
 	if (typeof resolvedAgent !== "string") return undefined
 	const cleanAgent = stripAgentListSortPrefix(resolvedAgent).trim()
 	return cleanAgent || undefined
