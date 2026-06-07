@@ -32,7 +32,7 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 			!/wait_agent.*mailbox signals/s.test(text) ||
 			!/Fallback only when/.test(text) ||
 			!/respawn.*smaller/s.test(text) ||
-			!/model.*reasoning_effort.*default agent/s.test(text) ||
+			!/schema only accepts `task_name`, `message`, and `fork_turns`/s.test(text) ||
 			!/Plan and reviewer agents may run for a long time/.test(text) ||
 			!/short wait_agent cycles/.test(text) ||
 			!/single long blocking wait/.test(text) ||
@@ -57,9 +57,9 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 
 	// then
 	assert.doesNotMatch(text, /any `gpt-5\.2`\s+xhigh reviewer/);
-	assert.match(text, /codex-ultrawork-reviewer/);
-	assert.match(text, /agent_type.*worker/s);
-	assert.match(text, /model.*reasoning_effort.*default agent/s);
+	assert.match(text, /self-contained reviewer/);
+	assert.match(text, /schema cannot select.*TOML-backed reviewer role/s);
+	assert.match(text, /paste the reviewer requirements into\s+the message/s);
 	assert.match(text, /timeout only means no new mailbox update arrived/i);
 	assert.match(text, /WORKING:/);
 	assert.match(text, /single `list_agents`/);
@@ -91,10 +91,9 @@ test("#given ultrawork directive #when inspected #then TOML-backed routing is tr
 	// then
 	assert.match(text, /TOML-backed subagent routing compatibility/);
 	assert.match(text, /routing-unverified/);
-	assert.match(text, /task_name.*does not prove.*TOML-backed role/s);
-	assert.match(text, /spawn_agent.*schema.*agent_type.*model.*reasoning_effort/s);
-	assert.match(text, /paste the role requirements into the message/s);
-	assert.match(text, /service_tier.*supported/s);
+	assert.match(text, /schema accepts only `task_name`, `message`, and\s+`fork_turns`/s);
+	assert.match(text, /cannot select a TOML-backed role, model, reasoning\s+effort, or `service_tier`/s);
+	assert.match(text, /paste the\s+role requirements into the message/s);
 });
 
 test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {

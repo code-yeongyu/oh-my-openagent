@@ -66,21 +66,16 @@ export function hookLocation({ source, eventName, groupIndex, handlerIndex, hand
 	return `${source}:${eventName}:${groupIndex}:${handlerIndex}:${handler.command}`;
 }
 
-export function findSpawnAgentTypes(content) {
-	const agentTypes = new Set();
-	const regex = /spawn_agent\(agent_type="([^"]+)"/g;
-	for (const match of content.matchAll(regex)) {
-		agentTypes.add(match[1]);
-	}
-	return [...agentTypes].sort();
+export function findInvalidSpawnAgentRoleParameters(content) {
+	return [...content.matchAll(/spawn_agent\([^)\n]*(?:agent_type|model|reasoning_effort)\s*=/g)].map((match) => match[0]);
 }
 
-export function findRoleSpecificSpawnsWithoutForkTurnsNone(content) {
+export function findSpawnAgentCallsWithoutForkTurnsNone(content) {
 	const missingForkTurns = [];
-	const regex = /spawn_agent\(agent_type="([^"]+)"[^)]*\)/g;
+	const regex = /spawn_agent\(([^)]*)\)/g;
 	for (const match of content.matchAll(regex)) {
 		const call = match[0];
-		if (!call.includes('fork_turns="none"')) {
+		if (!/"fork_turns"\s*:\s*"none"|fork_turns:\s*"none"|fork_turns="none"/.test(call)) {
 			missingForkTurns.push(call);
 		}
 	}

@@ -44,7 +44,7 @@ Subagent outputs are not success or approval without independent verification.
 
 You explore a LOT - fan out parallel read-only research before interviewing - but delegate with Codex discipline:
 
-- Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`. Role selection requires `agent_type`; setting `model` + `reasoning_effort` alone creates a default agent, not the role you wanted. Prefer `fork_turns: "none"` unless full history is truly required.
+- Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`. Put role and specialty instructions inside `message`; the Codex tool schema only accepts `task_name`, `message`, and `fork_turns`. Prefer `fork_turns: "none"` unless full history is truly required.
 - Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
 - While any child is active, keep yourself visibly alive with active subagent count, agent names, latest `WORKING:` phase, and whether you are waiting for mailbox updates.
@@ -55,10 +55,10 @@ You explore a LOT - fan out parallel read-only research before interviewing - bu
 
 | Planning intent | Codex tool |
 | --- | --- |
-| Internal codebase research | `spawn_agent(agent_type="explorer", fork_turns="none", ...)` |
-| External docs / library research | `spawn_agent(agent_type="librarian", fork_turns="none", ...)` |
-| Pre-plan gap analysis (after approval) | `spawn_agent(agent_type="metis", fork_turns="none", ...)` |
-| High-accuracy plan review (optional) | `spawn_agent(agent_type="momus", fork_turns="none", ...)` |
+| Internal codebase research | `spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ...","fork_turns":"none"})` |
+| External docs / library research | `spawn_agent({"task_name":"...","message":"TASK: act as a librarian. ...","fork_turns":"none"})` |
+| Pre-plan gap analysis (after approval) | `spawn_agent({"task_name":"...","message":"TASK: act as a Metis gap-analysis reviewer. ...","fork_turns":"none"})` |
+| High-accuracy plan review (optional) | `spawn_agent({"task_name":"...","message":"TASK: act as a Momus plan reviewer. ...","fork_turns":"none"})` |
 | Wait for a research result | `wait_agent(...)` |
 | Release a finished subagent | `close_agent(...)` |
 

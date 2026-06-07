@@ -25,7 +25,7 @@ This Codex skill is intentionally compact to avoid adding a large operating manu
 - Every success criterion needs observable evidence from a real channel: tmux, HTTP, browser, or computer-use.
 - Record evidence through the CLI only after cleanup receipts are available.
 - Delegate code edits, test writes, fixes, and QA execution to right-sized Codex subagents when the workflow requires it.
-- Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`; role selection requires `agent_type`, while `model` + `reasoning_effort` alone creates a default agent, not a reviewer or worker; prefer `fork_turns: "none"` unless full history is truly required.
+- Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`; put role and specialty instructions inside `message` because the Codex tool schema only accepts `task_name`, `message`, and `fork_turns`; prefer `fork_turns: "none"` unless full history is truly required.
 - Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
 - While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, latest `WORKING:` phase, and whether the parent is waiting for mailbox updates.
@@ -39,10 +39,10 @@ The full workflow may mention OpenCode-style orchestration examples. In Codex, t
 
 | Workflow intent | Codex tool |
 | --- | --- |
-| Plan agent | `spawn_agent(agent_type="plan", fork_turns="none", ...)` |
-| Search/read-only worker | `spawn_agent(agent_type="explorer", fork_turns="none", ...)` |
-| Implementation or QA worker | `spawn_agent(agent_type="worker", fork_turns="none", ...)` |
-| Final verification reviewer | `spawn_agent(agent_type="codex-ultrawork-reviewer", fork_turns="none", ...)` |
+| Plan agent | `spawn_agent({"task_name":"...","message":"TASK: act as a planning agent. ...","fork_turns":"none"})` |
+| Search/read-only worker | `spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ...","fork_turns":"none"})` |
+| Implementation or QA worker | `spawn_agent({"task_name":"...","message":"TASK: act as an implementation or QA worker. ...","fork_turns":"none"})` |
+| Final verification reviewer | `spawn_agent({"task_name":"...","message":"TASK: act as a rigorous reviewer. ...","fork_turns":"none"})` |
 | Wait for background result | `wait_agent(...)` |
 | Clean up finished worker | `close_agent(...)` |
 
