@@ -215,4 +215,75 @@ describe("createToolExecuteAfterHandler", () => {
     // then
     expect(output.output).toBe("warning from hook")
   })
+
+  it("#given apply_patch with files in metadata #when virtual PostToolUse returns warnings #then output includes virtual sections", async () => {
+    // given
+    postToolUseResult = {
+      warnings: ["virtual warning from edit hook"],
+      hookName: "my-guard",
+      toolName: "edit",
+    }
+    const handler = createToolExecuteAfterHandler(
+      {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+        directory: "/repo",
+      } as never,
+      { disabledHooks: [] }
+    )
+    const output = {
+      title: "apply_patch",
+      output: "applied patch",
+      metadata: {
+        files: [
+          { filePath: "src/a.ts", before: "old", after: "new" },
+        ],
+      },
+    }
+
+    // when
+    await handler({ tool: "apply_patch", sessionID: "ses_test", callID: "call_test" }, output)
+
+    // then — virtual warning appended after original output
+    expect(output.output).toContain("applied patch")
+    expect(output.output).toContain("virtual warning from edit hook")
+  })
+
+  it("#given apply_patch with new file #when virtual PostToolUse runs #then fires Write-type virtual hook", async () => {
+    // given
+    postToolUseResult = {
+      warnings: ["write hook warning"],
+      hookName: "write-guard",
+      toolName: "write",
+    }
+    const handler = createToolExecuteAfterHandler(
+      {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+        directory: "/repo",
+      } as never,
+      { disabledHooks: [] }
+    )
+    const output = {
+      title: "apply_patch",
+      output: "",
+      metadata: {
+        files: [
+          { filePath: "src/brand_new.ts", before: "", after: "new content\n" },
+        ],
+      },
+    }
+
+    // when
+    await handler({ tool: "apply_patch", sessionID: "ses_test", callID: "call_test" }, output)
+
+    // then
+    expect(output.output).toContain("write hook warning")
+  })
 })

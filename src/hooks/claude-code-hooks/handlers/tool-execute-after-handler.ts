@@ -11,6 +11,13 @@ import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
 import { isHookDisabled, log } from "../../../shared"
 import { normalizeHookText, normalizeHookTextList } from "../hook-text"
+import {
+	isApplyPatchTool,
+	extractVirtualEdits,
+	hasDirectApplyPatchMatcher,
+	buildVirtualToolInput,
+	deduplicateByFilePath,
+} from "../apply-patch-adapter"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -189,6 +196,98 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 						})
 					}
 				})
+		}
+
+		// Virtual hook expansion: apply_patch → Edit/Write for CC hook compatibility
+		if (
+			isApplyPatchTool(input.tool) &&
+			!hasDirectApplyPatchMatcher(claudeConfig, "PostToolUse")
+		) {
+			const virtualEdits = extractVirtualEdits(output.metadata, cachedInput)
+			const virtualSections: string[] = []
+
+			for (const edit of deduplicateByFilePath(virtualEdits)) {
+				const virtualPostCtx: PostToolUseContext = {
+					sessionId: input.sessionID,
+					toolName: edit.ccToolName === "Write" ? "write" : "edit",
+					toolInput: buildVirtualToolInput(edit),
+					toolOutput: {
+						title: edit.ccToolName,
+						output: output.output,
+						metadata: output.metadata as Record<string, unknown>,
+					},
+					cwd: ctx.directory,
+					transcriptPath: getTranscriptPath(input.sessionID),
+					toolUseId: input.callID,
+					client: postClient,
+					permissionMode: "bypassPermissions",
+				}
+
+				const virtualResult = await executePostToolUseHooks(virtualPostCtx, claudeConfig, extendedConfig)
+
+				if (virtualResult.block) {
+					ctx.client.tui
+						.showToast({
+							body: {
+								title: "PostToolUse Hook Warning",
+								message: `[apply_patch→${edit.ccToolName}] ${virtualResult.reason ?? "Hook returned warning"}`,
+								variant: "warning",
+								duration: 4000,
+							},
+						})
+						.catch((error: unknown) => {
+							if (error instanceof Error) {
+								log("apply_patch virtual PostToolUse hook toast failed", {
+									sessionID: input.sessionID,
+									error: error.message,
+								})
+							} else {
+								log("apply_patch virtual PostToolUse hook toast failed", {
+									sessionID: input.sessionID,
+									error: String(error),
+								})
+							}
+						})
+				}
+
+				virtualSections.push(
+					...(virtualResult.warnings ?? []),
+					...(() => {
+						const normalized = normalizeHookText(virtualResult.additionalContext)
+						return normalized === undefined ? [] : [normalized]
+					})(),
+					...(virtualResult.message === undefined ? [] : [virtualResult.message]),
+				)
+
+				if (virtualResult.hookName) {
+					ctx.client.tui
+						.showToast({
+							body: {
+								title: "PostToolUse Hook Executed",
+								message: `▶ ${virtualResult.toolName ?? edit.ccToolName} ${
+									virtualResult.hookName
+								} (apply_patch→${edit.ccToolName}): ${virtualResult.elapsedMs ?? 0}ms`,
+								variant: "success",
+								duration: 2000,
+							},
+						})
+						.catch((error: unknown) => {
+							if (error instanceof Error) {
+								log("apply_patch virtual PostToolUse hook toast failed", {
+									sessionID: input.sessionID,
+									error: error.message,
+								})
+							} else {
+								log("apply_patch virtual PostToolUse hook toast failed", {
+									sessionID: input.sessionID,
+									error: String(error),
+								})
+							}
+						})
+				}
+			}
+
+			output.output = appendHookSections(output.output, virtualSections)
 		}
 	}
 }
