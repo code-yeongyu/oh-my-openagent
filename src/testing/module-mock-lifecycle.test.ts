@@ -178,6 +178,46 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("#given preserved active module mocks from two owners #when global test setup cleans up #then both owner mocks are replayed", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/first.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    const lifecycle = installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => callerUrl,
+      resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      shouldPreserveActiveMocksOnRestore: () => true,
+    })
+
+    mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
+    lifecycle.preserveModuleMocksForTestFile(callerUrl)
+    callerUrl = "file:///repo/tests/second.test.ts"
+    mockApi.module("./dependency-b", () => ({ named: "mock-b" }))
+    lifecycle.preserveModuleMocksForTestFile(callerUrl)
+
+    // when
+    mockApi.restore()
+    lifecycle.restoreModuleMocks()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency-a:mock-a",
+      "module:./dependency-b:mock-b",
+      "delegate:restore",
+      "module:./dependency-a:mock-a",
+      "module:./dependency-b:mock-b",
+    ])
+  })
+
   test("#given preserved active module mock #when global test setup cleans up #then preserved mock stays active", () => {
     // given
     const events: string[] = []

@@ -166,11 +166,8 @@ export function installModuleMockLifecycle(
     }
   }
 
-  function restoreAllModuleMocks(options: RestoreOptions = {}): void {
-    if (!options.bunRestoreAlreadyRan) {
-      delegateRestore()
-    }
-
+  function restoreAllModuleMocks(): void {
+    delegateRestore()
     snapshots.clear()
     activeMocks.clear()
   }
