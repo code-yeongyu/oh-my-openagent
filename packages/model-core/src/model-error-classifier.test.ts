@@ -150,6 +150,17 @@ describe("model-error-classifier", () => {
     expect(result).toBe(false)
   })
 
+  test("treats ModelNotSupportedError name without message as retryable", () => {
+    //#given
+    const error = { name: "ModelNotSupportedError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
   test("treats quota reset message as non-retryable STOP error (no error name)", () => {
     //#given
     const error = { message: "quota will reset after 1 hour" }
