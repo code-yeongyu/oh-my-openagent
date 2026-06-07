@@ -10,6 +10,21 @@ export interface SpawnWithTimeoutResult {
   timedOut: boolean
 }
 
+async function readPipe(stream: ReadableStream<Uint8Array> | undefined): Promise<string> {
+  if (!stream) {
+    return ""
+  }
+
+  try {
+    return await new Response(stream).text()
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("already been used")) {
+      return ""
+    }
+    throw error
+  }
+}
+
 export async function spawnWithTimeout(
   command: string[],
   options: SpawnOptions,
@@ -26,8 +41,8 @@ export async function spawnWithTimeout(
     return { stdout: "", stderr: "", exitCode: 1, timedOut: false }
   }
 
-  const stdoutPromise = proc.stdout ? new Response(proc.stdout).text() : Promise.resolve("")
-  const stderrPromise = proc.stderr ? new Response(proc.stderr).text() : Promise.resolve("")
+  const stdoutPromise = readPipe(proc.stdout)
+  const stderrPromise = readPipe(proc.stderr)
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<"timeout">((resolve) => {
     timer = setTimeout(() => resolve("timeout"), timeoutMs)
