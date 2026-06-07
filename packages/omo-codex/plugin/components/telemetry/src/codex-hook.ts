@@ -47,7 +47,14 @@ export async function runSessionStartHook(
 	const createClient = options.createClient ?? createPluginPostHog;
 	const getDistinctId = options.getDistinctId ?? getPostHogDistinctId;
 
-	const client = await createClient();
+	let client: PostHogClient;
+	try {
+		client = await createClient();
+	} catch (error) {
+		writeHookDiagnostic("telemetry_posthog_init_failed", error, error instanceof Error ? "error" : "non_error");
+		return "";
+	}
+
 	try {
 		client.trackActive(getDistinctId(), SESSION_START_REASON);
 	} catch (error) {

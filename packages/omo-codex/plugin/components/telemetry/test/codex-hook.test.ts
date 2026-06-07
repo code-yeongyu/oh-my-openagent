@@ -122,6 +122,30 @@ describe("runSessionStartHook", () => {
 			expect(recorder.shutdownCalls).toBe(1);
 		});
 	});
+
+	describe("#given PostHog client creation fails", () => {
+		it("#when createClient throws #then hook resolves with empty output", async () => {
+			const output = await runSessionStartHook(makeSessionStartInput(), {
+				createClient: () => {
+					throw new Error("posthog unavailable");
+				},
+				getDistinctId: () => "distinct-id-abc",
+			});
+
+			expect(output).toBe("");
+		});
+
+		it("#when createClient rejects #then hook resolves with empty output", async () => {
+			const output = await runSessionStartHook(makeSessionStartInput(), {
+				createClient: async () => {
+					throw new Error("posthog unavailable");
+				},
+				getDistinctId: () => "distinct-id-abc",
+			});
+
+			expect(output).toBe("");
+		});
+	});
 });
 
 describe("telemetry CLI session-start hook (subprocess)", () => {
