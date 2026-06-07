@@ -1,13 +1,13 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
-import { discoverTeamSpecs, ensureBaseDirs, resolveBaseDir } from "./paths"
+import { discoverTeamSpecs, ensureBaseDirs, getInboxDir, getRuntimeStateDir, getTasksDir, getWorktreeDir, resolveBaseDir } from "./paths"
 
 const logCalls: Array<[string, unknown?]> = []
 
@@ -49,6 +49,23 @@ describe("paths", () => {
 
     // then
     expect(resolvedBaseDir).toBe("/tmp/test-abc")
+  })
+
+  test("#given team runtime ids contain traversal #when runtime paths are built #then they are rejected before escaping base dir", () => {
+    // given
+    const baseDir = "/tmp/omo-contained"
+
+    // when
+    const runtimeStatePath = () => getRuntimeStateDir(baseDir, "../../escape")
+    const inboxPath = () => getInboxDir(baseDir, "run-1", "../../escape")
+    const tasksPath = () => getTasksDir(baseDir, "../../escape")
+    const worktreePath = () => getWorktreeDir(baseDir, "run-1", "../../escape")
+
+    // then
+    expect(runtimeStatePath).toThrow("team path escapes base directory")
+    expect(inboxPath).toThrow("team path escapes base directory")
+    expect(tasksPath).toThrow("team path escapes base directory")
+    expect(worktreePath).toThrow("team path escapes base directory")
   })
 
   test("discoverTeamSpecs prefers project scope", async () => {
@@ -130,7 +147,7 @@ describe("paths", () => {
     await mkdir(path.join(baseDir, "worktrees"), { recursive: true })
 
     let chmodCalls = 0
-    const chmodWithEperm = async (target: string): Promise<void> => {
+    const chmodWithEperm: typeof chmod = async (target, _mode): Promise<void> => {
       chmodCalls += 1
       const eperm = Object.assign(new Error(`EPERM: operation not permitted, chmod '${target}'`), {
         code: "EPERM",

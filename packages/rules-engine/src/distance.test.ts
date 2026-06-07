@@ -80,4 +80,43 @@ describe("calculateDistance", () => {
     // then
     expect(distance).toBe(1);
   });
+
+  it("#given a Windows rule path on another drive #when calculating rule distance #then returns the global distance", () => {
+    // given
+    const projectRoot = "C:\\repo";
+    const rulePath = "D:\\rules\\rule.md";
+    const currentFile = "C:\\repo\\src\\index.ts";
+
+    // when
+    const distance = calculateDistance(rulePath, currentFile, projectRoot);
+
+    // then
+    expect(distance).toBe(GLOBAL_DISTANCE);
+  });
+
+  it("#given a Windows current file on another drive #when calculating rule distance #then returns the global distance", () => {
+    // given
+    const projectRoot = "C:\\repo";
+    const rulePath = "C:\\repo\\.omo\\rules\\rule.md";
+    const currentFile = "D:\\repo\\src\\index.ts";
+
+    // when
+    const distance = calculateDistance(rulePath, currentFile, projectRoot);
+
+    // then
+    expect(distance).toBe(GLOBAL_DISTANCE);
+  });
+
+  it("#given a UNC current file on another server and share #when calculating rule distance #then returns the global distance", () => {
+    // given
+    const projectRoot = "\\\\server-a\\share-a\\repo";
+    const rulePath = "\\\\server-a\\share-a\\repo\\.omo\\rules\\rule.md";
+    const currentFile = "\\\\server-b\\share-b\\repo\\src\\index.ts";
+
+    // when
+    const distance = calculateDistance(rulePath, currentFile, projectRoot);
+
+    // then
+    expect(distance).toBe(GLOBAL_DISTANCE);
+  });
 });

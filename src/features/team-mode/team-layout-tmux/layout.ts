@@ -48,15 +48,22 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
+  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+}
+
+function buildPaneEnvironmentArgs(): string[] {
   const password = process.env.OPENCODE_SERVER_PASSWORD
-  let envPrefix = ""
-  if (password) {
-    const parts = [`OPENCODE_SERVER_PASSWORD=${shellSingleQuote(password)}`]
-    const username = process.env.OPENCODE_SERVER_USERNAME
-    if (username !== undefined) parts.push(`OPENCODE_SERVER_USERNAME=${shellSingleQuote(username)}`)
-    envPrefix = `${parts.join(" ")} `
+  if (!password) {
+    return []
   }
-  return `${envPrefix}opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+
+  const environmentArgs = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
+  const username = process.env.OPENCODE_SERVER_USERNAME
+  if (username !== undefined) {
+    environmentArgs.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
+  }
+
+  return environmentArgs
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -70,12 +77,14 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 }
 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
+  const environmentArgs = buildPaneEnvironmentArgs()
   if (teammatePanes.length === 0) {
-    return ["split-window", "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
+    return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
   }
 
   return [
     "split-window",
+    ...environmentArgs,
     "-t",
     selectExistingTeammatePane(teammatePanes, callerPaneId),
     teammatePanes.length % 2 === 1 ? "-v" : "-h",

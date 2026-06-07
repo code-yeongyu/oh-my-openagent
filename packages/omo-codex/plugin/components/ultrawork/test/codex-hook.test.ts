@@ -211,7 +211,9 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/CLEANUP \(PAIRED/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/refresh current branch\/PR\/issue state/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/preserve existing ordering\/policy/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/separate compatibility detection from policy changes/);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(
+			/separate compatibility detection from policy changes/,
+		);
 	});
 
 	it("#given directive #when inspected #then avoids context-expensive agent polling", () => {

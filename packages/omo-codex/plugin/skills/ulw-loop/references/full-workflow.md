@@ -28,19 +28,19 @@ Auxiliary surfaces (pure CLI stdout / DB state diff / parsed config dump) satisf
 ## Delegation model (ATLAS-STYLE — YOU CONDUCT, WORKERS PLAY)
 You read, search, plan, integrate, and QA. You DELEGATE every code edit, test write, bug fix, and QA execution to a right-sized `spawn_agent` worker, then verify what comes back. Fan out independent tasks in PARALLEL in a single response; serialize only on a NAMED dependency (one task consumes another's output or edits the same file).
 
-Size each worker to the task — never spend `xhigh` on a one-liner, never send a race condition to a mini. Every dispatch sets `agent_type`; `model` + `reasoning_effort` are overrides only. Setting them alone creates a default agent, not a reviewer or worker.
+Size each worker to the task. Put the intended role, rigor level, and specialty inside the worker `message`; the Codex `spawn_agent` schema only accepts `task_name`, `message`, and `fork_turns`.
 
-| Task shape | agent_type | model | reasoning_effort |
-|---|---|---|---|
-| Trivial / mechanical (rename, move, obvious one-liner, config edit) | `worker` | `gpt-5.4-mini` | `low` |
-| Pure implementation against a clear spec (new function, endpoint, test from a named pattern) | `worker` | `gpt-5.5` | `high` |
-| Deep debugging / race / perf / subtle cross-module reasoning | `worker` | `gpt-5.5` | `xhigh` |
-| QA execution (drive a channel, capture evidence) | `worker` | `gpt-5.5` | `high` |
-| Read-only codebase search | `explorer` | role default | role default |
-| External library / docs research | `librarian` | role default | role default |
-| Final verification audit | `codex-ultrawork-reviewer` | role default | role default |
+| Task shape | Message instruction |
+|---|---|
+| Trivial / mechanical (rename, move, obvious one-liner, config edit) | `TASK: act as a focused worker for a trivial mechanical edit. ...` |
+| Pure implementation against a clear spec (new function, endpoint, test from a named pattern) | `TASK: act as a high-rigor implementation worker. ...` |
+| Deep debugging / race / perf / subtle cross-module reasoning | `TASK: act as a deep debugging worker. ...` |
+| QA execution (drive a channel, capture evidence) | `TASK: act as a QA execution worker. ...` |
+| Read-only codebase search | `TASK: act as an explorer. ...` |
+| External library / docs research | `TASK: act as a librarian. ...` |
+| Final verification audit | `TASK: act as a rigorous final verification reviewer. ...` |
 
-If `codex-ultrawork-reviewer` is unavailable, use `agent_type="worker"` with a self-contained reviewer assignment, tight scope, and explicit verification. Never spawn a model-only default agent for review.
+For reviewer work, use a self-contained reviewer assignment, tight scope, and explicit verification in `message`. Never spawn a context-only child for review.
 
 Every worker message MUST carry: goal + exact files in scope; the baseline characterization test pinning current behavior when the task touches existing code, then the failing test / reproduction required before production code; constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture; for git-tracked edits, require `git-master` plus repository-wide and touched-path commit history inspection before commit. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker.
 
@@ -178,7 +178,7 @@ Trigger only when one goal remains and all its criteria are passing.
 1. Run targeted verification for changed behavior.
 2. Run `ai-slop-cleaner` on changed files. If no relevant edits exist, record a passed no-op cleaner report.
 3. Rerun verification after cleanup.
-4. Judge the change size. Spawn the `codex-ultrawork-reviewer` agent (`spawn_agent(agent_type="codex-ultrawork-reviewer", fork_turns="none", ...)`; fall back to `agent_type="worker"` with a scoped reviewer assignment if unavailable) only when the work is large or risky (multi-file, cross-cutting, new architecture, security/data surfaces, or you are unsure it is sound); for a small, local, low-risk change, do the review yourself and record `codeReview` with `evidence` starting `UNCONDITIONAL APPROVAL` plus a one-line justification of why the change was small enough to self-review.
+4. Judge the change size. Spawn a rigorous reviewer with `spawn_agent({"task_name":"final_verification_review","message":"TASK: act as a rigorous final verification reviewer. DELIVERABLE: approve or cite blockers. SCOPE: <changed files and goal>. VERIFY: inspect diff and verification evidence.","fork_turns":"none"})` only when the work is large or risky (multi-file, cross-cutting, new architecture, security/data surfaces, or you are unsure it is sound); for a small, local, low-risk change, do the review yourself and record `codeReview` with `evidence` starting `UNCONDITIONAL APPROVAL` plus a one-line justification of why the change was small enough to self-review.
 5. Clean review means `codeReview.recommendation == "APPROVE"` and `codeReview.architectStatus == "CLEAR"`.
 6. If review is non-clean, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 7. If clean, checkpoint final completion:

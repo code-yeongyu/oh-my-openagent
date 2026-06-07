@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { delimiter, isAbsolute, join } from "node:path";
 
 import { BUILTIN_SERVERS } from "./server-definitions.js";
 import type { ResolvedServer } from "./types.js";
@@ -25,21 +25,29 @@ export interface ServerWithSource extends ResolvedServer {
 }
 
 export function getConfigPaths(): { project: string; user: string } {
-	const cwd = process.cwd();
-	const projectOverride = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
-	const userOverride = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
 	return {
-		project: projectOverride
-			? isAbsolute(projectOverride)
-				? projectOverride
-				: join(cwd, projectOverride)
-			: join(cwd, ".codex", "lsp-client.json"),
-		user: userOverride
-			? isAbsolute(userOverride)
-				? userOverride
-				: join(homedir(), userOverride)
-			: join(homedir(), ".codex", "lsp-client.json"),
+		project: getProjectConfigPaths()[0] ?? join(process.cwd(), ".codex", "lsp-client.json"),
+		user: getUserConfigPath(),
 	};
+}
+
+function resolveProjectConfigPath(path: string): string {
+	const cwd = process.cwd();
+	return isAbsolute(path) ? path : join(cwd, path);
+}
+
+function getProjectConfigPaths(): string[] {
+	const projectOverride = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
+	if (projectOverride) {
+		return projectOverride.split(delimiter).filter(Boolean).map(resolveProjectConfigPath);
+	}
+	return [join(process.cwd(), ".codex", "lsp-client.json")];
+}
+
+function getUserConfigPath(): string {
+	const userOverride = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
+	if (!userOverride) return join(homedir(), ".codex", "lsp-client.json");
+	return isAbsolute(userOverride) ? userOverride : join(homedir(), userOverride);
 }
 
 function loadJsonFile(path: string): ConfigJson | null {
@@ -53,16 +61,23 @@ function loadJsonFile(path: string): ConfigJson | null {
 }
 
 export function loadAllConfigs(): Map<ConfigSource, ConfigJson> {
-	const paths = getConfigPaths();
 	const configs = new Map<ConfigSource, ConfigJson>();
 
-	const project = loadJsonFile(paths.project);
+	const project = loadFirstJsonFile(getProjectConfigPaths());
 	if (project) configs.set("project", project);
 
-	const user = loadJsonFile(paths.user);
+	const user = loadJsonFile(getUserConfigPath());
 	if (user) configs.set("user", user);
 
 	return configs;
+}
+
+function loadFirstJsonFile(paths: readonly string[]): ConfigJson | null {
+	for (const path of paths) {
+		const config = loadJsonFile(path);
+		if (config) return config;
+	}
+	return null;
 }
 
 export function getMergedServers(): ServerWithSource[] {
@@ -86,21 +101,9 @@ export function getMergedServers(): ServerWithSource[] {
 			}
 
 			if (seen.has(id)) continue;
-			if (!entry.command || !entry.extensions) continue;
+			const server = createServerFromEntry(id, entry, source);
+			if (!server) continue;
 
-			const server: ServerWithSource = {
-				id,
-				command: entry.command,
-				extensions: entry.extensions,
-				priority: entry.priority ?? 0,
-				source,
-			};
-			if (entry.env !== undefined) {
-				server.env = entry.env;
-			}
-			if (entry.initialization !== undefined) {
-				server.initialization = entry.initialization;
-			}
 			servers.push(server);
 			seen.add(id);
 		}
@@ -129,6 +132,81 @@ export function getMergedServers(): ServerWithSource[] {
 		}
 		return b.priority - a.priority;
 	});
+}
+
+function createServerFromEntry(id: string, entry: LspEntry, source: ConfigSource): ServerWithSource | null {
+	const builtin = BUILTIN_SERVERS[id];
+	if (source === "project") {
+		if (!builtin) return null;
+		const server = createServer({
+			id,
+			command: builtin.command,
+			extensions: entry.extensions ?? builtin.extensions,
+			priority: entry.priority ?? 0,
+			source,
+		});
+		if (entry.initialization !== undefined) {
+			server.initialization = entry.initialization;
+		}
+		return server;
+	}
+
+	if (entry.command && entry.extensions) {
+		const server = createServer({
+			id,
+			command: entry.command,
+			extensions: entry.extensions,
+			priority: entry.priority ?? 0,
+			source,
+		});
+		applyOptionalServerFields(server, entry);
+		return server;
+	}
+
+	if (!builtin) return null;
+	const server = createServer({
+		id,
+		command: entry.command ?? builtin.command,
+		extensions: entry.extensions ?? builtin.extensions,
+		priority: entry.priority ?? 0,
+		source,
+	});
+	applyOptionalServerFields(server, entry);
+	return server;
+}
+
+function createServer(input: {
+	readonly id: string;
+	readonly command: string[];
+	readonly extensions: string[];
+	readonly priority: number;
+	readonly source: ConfigSource;
+	readonly env?: Record<string, string>;
+	readonly initialization?: Record<string, unknown>;
+}): ServerWithSource {
+	const server: ServerWithSource = {
+		id: input.id,
+		command: input.command,
+		extensions: input.extensions,
+		priority: input.priority,
+		source: input.source,
+	};
+	if (input.env !== undefined) {
+		server.env = input.env;
+	}
+	if (input.initialization !== undefined) {
+		server.initialization = input.initialization;
+	}
+	return server;
+}
+
+function applyOptionalServerFields(server: ServerWithSource, entry: LspEntry): void {
+	if (entry.env !== undefined) {
+		server.env = entry.env;
+	}
+	if (entry.initialization !== undefined) {
+		server.initialization = entry.initialization;
+	}
 }
 
 function isConfigJson(value: unknown): value is ConfigJson {

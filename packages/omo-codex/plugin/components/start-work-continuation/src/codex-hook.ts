@@ -6,6 +6,7 @@ import type { ReadonlyFileSystem, StopHookEventName, StopHookOutput, StopInput }
 export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
 	if (!isStopInput(input)) return "";
 	if (input.stop_hook_active) return "";
+	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
 	const state = readContinuationState(input.cwd, input.session_id, fs);
 	if (state === null) return "";
 	return JSON.stringify({
@@ -36,6 +37,26 @@ function renderDirective(state: ContinuationState, sessionId: string): string {
 		rendered = rendered.replaceAll(`{{${placeholder}}}`, value);
 	}
 	return rendered;
+}
+
+const CONTEXT_PRESSURE_MARKERS = [
+	"context compacted",
+	"context_length_exceeded",
+	"skill descriptions were shortened",
+	"context_too_large",
+	"codex ran out of room in the model's context window",
+	"your input exceeds the context window",
+	"long threads and multiple compactions",
+] as const;
+
+function transcriptHasContextPressureMarker(transcriptPath: string, fs: ReadonlyFileSystem): boolean {
+	try {
+		const transcript = fs.readFileSync(transcriptPath, "utf8").toLowerCase();
+		return CONTEXT_PRESSURE_MARKERS.some((marker) => transcript.includes(marker));
+	} catch (error) {
+		if (error instanceof Error) return false;
+		throw error;
+	}
 }
 
 function isStopInput(value: unknown): value is StopInput {

@@ -416,7 +416,7 @@ To remove oh-my-openagent:
    omo cleanup --platform=codex
    ```
 
-   The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old `oh-my-codex` state, run the command from that project or pass `--project <path>`; it repairs the known project-local `.codex/config.toml` conflict and reports project-local `.codex` artifacts without deleting project-owned files.
+   The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old project-local Codex plugin state, run the command from that project or pass `--project <path>`; it repairs known project-local `.codex/config.toml` conflicts and reports project-local `.codex` artifacts without deleting project-owned files.
 
 ## Features
 

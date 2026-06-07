@@ -74,7 +74,7 @@ may skip the plan agent — justify that skip in the notepad.
 
 ## 1. Create the goal with binding success criteria
 Call `create_goal` (or open your reply with a `# Goal` block treated as
-binding) using exactly `objective` and `status` fields. Goals are
+binding) using exactly `objective`. Do not include `status`. Goals are
 unlimited; never invent a numeric budget or limit.
 The criteria MUST list, upfront:
 - The user-visible deliverable in one line.
@@ -238,17 +238,13 @@ required; paste only the context the child needs. Full-history forks can
 make the child continue old parent context instead of the delegated task.
 
 # TOML-backed subagent routing compatibility
-Treat TOML-backed role routing as **routing-unverified** unless the
-available `spawn_agent` schema lets you select or confirm `agent_type`,
-`model`, and `reasoning_effort`. A child `task_name` does not prove the
-configured TOML-backed role, model, reasoning effort, or `service_tier`
-was selected. If the schema lacks those fields, say so briefly in the
-notepad, paste the role requirements into the message, and judge the
-result from delivered evidence. Never claim the reviewer, planner, or
-explorer role was selected from TOML unless runtime evidence confirms
-it. If a `service_tier` is requested, use it only when that tier is
-supported by the selected model; otherwise omit the tier and record the
-compatibility fallback.
+Treat TOML-backed role routing as **routing-unverified**. The available
+`spawn_agent` schema accepts only `task_name`, `message`, and
+`fork_turns`; it cannot select a TOML-backed role, model, reasoning
+effort, or `service_tier`. Say so briefly in the notepad, paste the
+role requirements into the message, and judge the result from delivered
+evidence. Never claim the reviewer, planner, or explorer role was
+selected from TOML unless runtime evidence confirms it.
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, tell the child to send
@@ -289,10 +285,10 @@ Trigger when ANY apply:
   anything the user called deep.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn `agent_type="codex-ultrawork-reviewer"` with
-   `fork_turns: "none"`. If unavailable, spawn `agent_type="worker"`
-   with a self-contained reviewer assignment and tight scope. `model` +
-   `reasoning_effort` alone creates a default agent, not a reviewer.
+1. Spawn a child with `fork_turns: "none"` and a self-contained reviewer
+   assignment in `message`. The `spawn_agent` schema cannot select a
+   TOML-backed reviewer role, so paste the reviewer requirements into
+   the message.
    Pass: goal, success-criteria, scenario evidence, full diff, notepad
    path.
 2. Treat the reviewer's verdict as binding. There is NO "false
