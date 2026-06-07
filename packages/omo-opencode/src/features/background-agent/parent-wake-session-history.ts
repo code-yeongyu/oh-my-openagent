@@ -118,7 +118,7 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs
     && latestAssistantTurnHasStaleUnknownSubstantiveOutput(messages, now, input.toolCallDeferMaxMs)
   ) {
-    log("[background-agent] Retrying parent wake after stale unknown-finish assistant output:", {
+    log("[background-agent] Retrying parent wake after stale unknown-finish assistant turn:", {
       sessionID: input.sessionID,
     })
     return { defer: false, skipPromptGateToolStateCheck: true }

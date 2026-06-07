@@ -20,7 +20,7 @@ export function latestAssistantTurnIsCompletedEmptyNoProgress(messages: readonly
       const info = isRecord(message) && isRecord(message.info) ? message.info : message
       return messageCompleted(message) && isEmptyNoProgressAssistantTurnInfo(info)
     }
-    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
+    if (role === "user") {
       return false
     }
   }
@@ -83,7 +83,7 @@ export function latestAssistantTurnHasStaleUnknownSubstantiveOutput(
         && messageHasSubstantiveAssistantOutput(message)
         && !messageHasFreshActivity(message, now, maxAgeMs)
     }
-    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
+    if (role === "user") {
       return false
     }
   }
