@@ -19,7 +19,12 @@ async function createTemporaryDirectory(): Promise<string> {
 }
 
 async function createExecutable(directoryPath: string, name: string, script: string): Promise<string> {
-	const executablePath = path.join(directoryPath, name)
+	const executablePath = path.join(directoryPath, process.platform === "win32" ? `${name}.cmd` : name)
+	if (process.platform === "win32") {
+		await fs.writeFile(executablePath, "@echo off\r\nexit /b 0\r\n", "utf8")
+		return executablePath
+	}
+
 	await fs.writeFile(executablePath, script, "utf8")
 	await fs.chmod(executablePath, 0o755)
 	return executablePath

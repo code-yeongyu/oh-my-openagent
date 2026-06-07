@@ -249,8 +249,8 @@ describe("hook message injection boundaries", () => {
 
   it("does not leave message metadata when part write fails", () => {
     // given
-    mkdirSync(TEST_PART_STORAGE, { recursive: true })
-    chmodSync(TEST_PART_STORAGE, 0)
+    rmSync(TEST_PART_STORAGE, { recursive: true, force: true })
+    writeFileSync(TEST_PART_STORAGE, "not a directory")
 
     try {
       // when
@@ -263,7 +263,7 @@ describe("hook message injection boundaries", () => {
       expect(result).toBe(false)
       expect(listJsonFiles(join(TEST_MESSAGE_STORAGE, "ses_part_failure"))).toHaveLength(0)
     } finally {
-      chmodSync(TEST_PART_STORAGE, 0o700)
+      rmSync(TEST_PART_STORAGE, { force: true })
     }
   })
 })

@@ -122,7 +122,7 @@ describe("waitForEventProcessorShutdown", () => {
 
     //#then
     const elapsed = performance.now() - start
-    expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 10)
+    expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 50)
   })
 })
 

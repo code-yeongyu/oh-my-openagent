@@ -9,6 +9,16 @@ import {
 } from "../dispatcher"
 
 describe("OpenClaw Dispatcher", () => {
+  function withPlatform<T>(platform: NodeJS.Platform, callback: () => T): T {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, "platform", { value: platform })
+    try {
+      return callback()
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform })
+    }
+  }
+
   test("interpolateInstruction replaces variables", () => {
     const template = "Hello {{name}}, welcome to {{place}}!"
     const variables = { name: "World", place: "Bun" }
@@ -179,7 +189,7 @@ describe("OpenClaw Dispatcher", () => {
     }
 
     try {
-      terminateCommandProcess(proc, "SIGKILL")
+      withPlatform("linux", () => terminateCommandProcess(proc, "SIGKILL"))
 
       expect(killSpy).toHaveBeenCalledWith(-4321, "SIGKILL")
       expect(proc.kill).not.toHaveBeenCalled()
@@ -198,7 +208,7 @@ describe("OpenClaw Dispatcher", () => {
     }
 
     try {
-      terminateCommandProcess(proc, "SIGKILL")
+      withPlatform("linux", () => terminateCommandProcess(proc, "SIGKILL"))
 
       expect(killSpy).toHaveBeenCalledWith(-9876, "SIGKILL")
       expect(proc.kill).toHaveBeenCalledWith("SIGKILL")

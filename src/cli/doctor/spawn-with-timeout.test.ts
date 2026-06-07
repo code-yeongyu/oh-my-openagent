@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { afterEach, describe, expect, it, mock } from "bun:test"
 import { spawnWithTimeout } from "./spawn-with-timeout"
 
@@ -19,7 +21,7 @@ describe("spawnWithTimeout", () => {
     it("captures stderr output", async () => {
       // when
       const result = await spawnWithTimeout(
-        ["bash", "-c", "echo err >&2"],
+        [process.execPath, "-e", "console.error('err')"],
         { stdout: "pipe", stderr: "pipe" }
       )
 
@@ -44,7 +46,7 @@ describe("spawnWithTimeout", () => {
     it("returns timedOut true and kills the process", async () => {
       // when
       const result = await spawnWithTimeout(
-        ["bash", "-c", "while true; do :; done"],
+        [process.execPath, "-e", "setInterval(() => {}, 1000)"],
         { stdout: "pipe", stderr: "pipe" },
         200
       )

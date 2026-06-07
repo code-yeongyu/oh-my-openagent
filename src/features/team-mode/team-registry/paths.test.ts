@@ -1,22 +1,19 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
+import { discoverTeamSpecs, ensureBaseDirs, resolveBaseDir } from "./paths"
 
 const logCalls: Array<[string, unknown?]> = []
 
-mock.module("../../../shared/logger", () => ({
-  log: (message: string, data?: unknown) => {
-    logCalls.push([message, data])
-  },
-}))
-
-const { discoverTeamSpecs, ensureBaseDirs, resolveBaseDir } = await import("./paths")
+function captureLog(message: string, data?: unknown): void {
+  logCalls.push([message, data])
+}
 
 async function createTemporaryRoot(): Promise<string> {
   return await mkdtemp(path.join(tmpdir(), "team-mode-paths-"))
@@ -72,7 +69,9 @@ describe("paths", () => {
     logCalls.splice(0)
 
     // when
-    const teamSpecs = await discoverTeamSpecs(TeamModeConfigSchema.parse({ base_dir: userBaseDir }), projectRoot)
+    const teamSpecs = await discoverTeamSpecs(TeamModeConfigSchema.parse({ base_dir: userBaseDir }), projectRoot, {
+      log: captureLog,
+    })
 
     // then
     expect(teamSpecs).toEqual([
@@ -114,7 +113,9 @@ describe("paths", () => {
     for (const directoryPath of directoryPaths) {
       const directoryStat = await stat(directoryPath)
       expect(directoryStat.isDirectory()).toBe(true)
-      expect(directoryStat.mode & 0o777).toBe(0o700)
+      if (process.platform !== "win32") {
+        expect(directoryStat.mode & 0o777).toBe(0o700)
+      }
     }
   })
 
@@ -128,27 +129,26 @@ describe("paths", () => {
     await mkdir(path.join(baseDir, "runtime"), { recursive: true })
     await mkdir(path.join(baseDir, "worktrees"), { recursive: true })
 
-    const realFs = await import("node:fs/promises")
     let chmodCalls = 0
-    mock.module("node:fs/promises", () => ({
-      ...realFs,
-      chmod: async (target: string) => {
-        chmodCalls += 1
-        const eperm = Object.assign(new Error(`EPERM: operation not permitted, chmod '${target}'`), {
-          code: "EPERM",
-          syscall: "chmod",
-          path: target,
-          errno: -1,
-        })
-        throw eperm
-      },
-    }))
-
-    const { ensureBaseDirs: ensureBaseDirsWithMockedChmod } = await import("./paths")
+    const chmodWithEperm = async (target: string): Promise<void> => {
+      chmodCalls += 1
+      const eperm = Object.assign(new Error(`EPERM: operation not permitted, chmod '${target}'`), {
+        code: "EPERM",
+        syscall: "chmod",
+        path: target,
+        errno: -1,
+      })
+      throw eperm
+    }
     logCalls.splice(0)
 
     // when
-    const ensuredBaseDirectories = ensureBaseDirsWithMockedChmod(baseDir)
+    const ensuredBaseDirectories = ensureBaseDirs(baseDir, {
+      chmod: chmodWithEperm,
+      log: captureLog,
+      mkdir,
+      stat,
+    })
 
     // then: function does not throw, EPERM was reached, and one warning was logged.
     await expect(ensuredBaseDirectories).resolves.toBeUndefined()
