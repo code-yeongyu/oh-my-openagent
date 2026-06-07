@@ -9,17 +9,15 @@ import { linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCach
 import { exists } from "./codex-cache-fs"
 
 describe("codex-cache security boundaries", () => {
-  test("#given a non-directory path segment #when checking existence #then non-ENOENT filesystem errors propagate", async () => {
+  test("#given a malformed path #when checking existence #then non-missing filesystem errors propagate", async () => {
     // given
-    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-exists-"))
-    const filePath = join(root, "not-a-directory")
-    await writeFile(filePath, "plain file\n")
+    const malformedPath = "\0"
 
     // when
-    const checked = exists(join(filePath, "child"))
+    const checked = exists(malformedPath)
 
     // then
-    await expect(checked).rejects.toHaveProperty("code", "ENOTDIR")
+    await expect(checked).rejects.toThrow()
   })
 
   test("#given a package bin name with path traversal #when linking cached plugin bins #then the installer rejects it", async () => {

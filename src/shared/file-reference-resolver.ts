@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from "fs"
+import { homedir } from "os"
 import { isAbsolute, posix, resolve, win32 } from "path"
 import { isWithinProject } from "./contains-path"
 import { log } from "./logger"
@@ -18,6 +19,23 @@ function isPosixAbsolutePath(filePath: string): boolean {
 
 function isWindowsAbsolutePath(filePath: string): boolean {
   return /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith("\\\\")
+}
+
+function expandEnvironmentVariable(match: string, variableName: string | undefined): string {
+  if (!variableName) {
+    return match
+  }
+
+  const value = process.env[variableName]
+  if (value !== undefined) {
+    return value
+  }
+
+  if (variableName === "HOME") {
+    return homedir()
+  }
+
+  return match
 }
 
 function resolvePathForInput(filePath: string, cwd: string): string {
@@ -56,11 +74,7 @@ function findFileReferences(text: string): FileMatch[] {
 
 export function resolveFilePath(filePath: string, cwd: string): string {
   const expanded = filePath.replace(/\$\{(\w+)\}|\$(\w+)/g, (match, braced: string | undefined, bare: string | undefined) => {
-    const variableName = braced ?? bare
-    if (!variableName) {
-      return match
-    }
-    return process.env[variableName] ?? match
+    return expandEnvironmentVariable(match, braced ?? bare)
   })
 
   if (isAbsolute(expanded) || isPosixAbsolutePath(expanded) || isWindowsAbsolutePath(expanded)) {

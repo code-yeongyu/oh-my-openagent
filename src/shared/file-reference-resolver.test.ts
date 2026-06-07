@@ -3,35 +3,44 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
-import { join, resolve, win32 } from "node:path"
+import { join, posix, resolve, win32 } from "node:path"
 import { resolveFilePath, resolveFileReferencesInText } from "./file-reference-resolver"
 
 describe("resolveFilePath", () => {
   const cwd = "/skills/gsd"
 
-  test("expands bare environment variables before resolving absolute paths", () => {
-    //#given
+  function expectedHomePath(fileName: string): string {
     const homeDir = process.env.HOME ?? homedir()
+    if (/^[A-Za-z]:[\\/]/.test(homeDir) || homeDir.startsWith("\\\\")) {
+      return win32.resolve(homeDir, fileName)
+    }
+
+    return posix.resolve(homeDir, fileName)
+  }
+
+  test("expands bare environment variables before resolving absolute paths", () => {
+    //#given: HOME may be absent on Windows, where resolveFilePath falls back to the OS home directory.
+    const expected = expectedHomePath("foo.md")
 
     //#when
     const resolved = resolveFilePath("$HOME/foo.md", cwd)
 
     //#then
-    expect(resolved).toBe(resolve(homeDir, "foo.md"))
+    expect(resolved).toBe(expected)
   })
 
   test("expands braced environment variables before resolving absolute paths", () => {
-    //#given
-    const homeDir = process.env.HOME ?? homedir()
+    //#given: HOME may be absent on Windows, where resolveFilePath falls back to the OS home directory.
+    const expected = expectedHomePath("foo.md")
 
     //#when
     const resolved = resolveFilePath("${HOME}/foo.md", cwd)
 
     //#then
-    expect(resolved).toBe(resolve(homeDir, "foo.md"))
+    expect(resolved).toBe(expected)
   })
 
-  test("keeps absolute paths absolute", () => {
+  test("keeps POSIX absolute paths absolute when cwd is POSIX-shaped", () => {
     //#given
     const absolutePath = "/abs/path.md"
 
@@ -39,7 +48,7 @@ describe("resolveFilePath", () => {
     const resolved = resolveFilePath(absolutePath, cwd)
 
     //#then
-    expect(resolved).toBe(resolve(absolutePath))
+    expect(resolved).toBe(posix.resolve(absolutePath))
   })
 
   test("keeps Windows absolute paths absolute when cwd is POSIX-shaped", () => {
@@ -53,7 +62,7 @@ describe("resolveFilePath", () => {
     expect(resolved).toBe(win32.resolve(absolutePath))
   })
 
-  test("resolves relative paths from cwd", () => {
+  test("resolves relative paths from POSIX-shaped cwd", () => {
     //#given
     const relativePath = "relative/path.md"
 
@@ -61,7 +70,7 @@ describe("resolveFilePath", () => {
     const resolved = resolveFilePath(relativePath, cwd)
 
     //#then
-    expect(resolved).toBe(resolve(cwd, relativePath))
+    expect(resolved).toBe(posix.resolve(cwd, relativePath))
   })
 })
 

@@ -1500,7 +1500,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
   })
 
   test("preserves _migrations in config when sidecar write fails", () => {
-    // given: Config with _migrations field and a read-only directory that will cause sidecar write to fail
+    // given: Config with _migrations field and a sidecar path collision that will cause sidecar write to fail
     const testConfigPath = tempConfigPath("sidecar-fail")
     const rawConfig: Record<string, unknown> = {
       agents: {
@@ -1509,10 +1509,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       _migrations: ["model-version:openai/gpt-5.4->openai/gpt-5.5"],
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
-
-    // Make the directory read-only to cause sidecar write to fail
-    const workdir = path.dirname(testConfigPath)
-    fs.chmodSync(workdir, 0o555)
+    fs.mkdirSync(sidecarPath(testConfigPath))
 
     // when: Migrate config file (sidecar write will fail)
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
@@ -1525,15 +1522,12 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     expect(migrations.length).toBeGreaterThanOrEqual(1)
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
 
-    // Sidecar should not exist because write failed
-    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
-
-    // cleanup: restore permissions for cleanup
-    fs.chmodSync(workdir, 0o755)
+    // Sidecar should still be the blocking directory because write failed
+    expect(fs.statSync(sidecarPath(testConfigPath)).isDirectory()).toBe(true)
   })
 
   test("writes _migrations into config as fallback when sidecar write fails and no prior _migrations existed", () => {
-    // given: config WITHOUT _migrations field and a read-only dir
+    // given: config WITHOUT _migrations field and a sidecar path collision
     const testConfigPath = tempConfigPath("sidecar-fail-no-prior")
     const rawConfig: Record<string, unknown> = {
       agents: {
@@ -1541,8 +1535,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       },
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
-    const workdir = path.dirname(testConfigPath)
-    fs.chmodSync(workdir, 0o555)
+    fs.mkdirSync(sidecarPath(testConfigPath))
 
     // when: migrate runs (sidecar write will fail)
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
@@ -1552,9 +1545,6 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     expect(rawConfig._migrations).toBeDefined()
     expect(Array.isArray(rawConfig._migrations)).toBe(true)
     expect((rawConfig._migrations as string[]).length).toBeGreaterThan(0)
-    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
-
-    // cleanup
-    fs.chmodSync(workdir, 0o755)
+    expect(fs.statSync(sidecarPath(testConfigPath)).isDirectory()).toBe(true)
   })
 })

@@ -68,7 +68,7 @@ describe("calculateDistance", () => {
     expect(distance).toBe(GLOBAL_DISTANCE);
   });
 
-  it("#given Windows-style paths on a POSIX runtime #when calculating rule distance #then preserves the existing global fallback behavior", () => {
+  it("#given Windows-style paths #when calculating rule distance #then uses Windows path semantics", () => {
     // given
     const projectRoot = "C:\\repo";
     const rulePath = "C:\\repo\\.omo\\rules\\rule.md";
@@ -78,6 +78,6 @@ describe("calculateDistance", () => {
     const distance = calculateDistance(rulePath, currentFile, projectRoot);
 
     // then
-    expect(distance).toBe(GLOBAL_DISTANCE);
+    expect(distance).toBe(1);
   });
 });

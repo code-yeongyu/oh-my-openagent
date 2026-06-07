@@ -1,8 +1,45 @@
 import { describe, expect, it } from "bun:test"
+import { Buffer } from "node:buffer"
+import { type IncomingMessage, request as httpRequest } from "node:http"
 import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
-const request = Bun.fetch.bind(Bun)
+
+function request(url: string): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(url, (res: IncomingMessage) => {
+      const chunks: Buffer[] = []
+      const headers = new Headers()
+
+      res.on("data", (chunk: Buffer) => {
+        chunks.push(chunk)
+      })
+      res.on("end", () => {
+        for (const [name, value] of Object.entries(res.headers)) {
+          if (typeof value === "string") {
+            headers.set(name, value)
+            continue
+          }
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              headers.append(name, item)
+            }
+          }
+        }
+
+        resolve(
+          new Response(Buffer.concat(chunks), {
+            status: res.statusCode ?? 0,
+            headers,
+          }),
+        )
+      })
+    })
+
+    req.on("error", reject)
+    req.end()
+  })
+}
 
 describe("startCallbackServer", () => {
   function close(server: CallbackServer): void {
