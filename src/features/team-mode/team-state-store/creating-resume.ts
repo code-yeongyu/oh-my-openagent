@@ -15,9 +15,9 @@ export async function markStuckCreatingTeamFailed(
   runtimeState: RuntimeState,
   config: TeamModeConfig,
 ): Promise<void> {
-  await cleanupMemberWorktrees(runtimeState)
   await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
     ...currentRuntimeState,
     status: "failed",
   }), config)
+  await cleanupMemberWorktrees(runtimeState)
 }
