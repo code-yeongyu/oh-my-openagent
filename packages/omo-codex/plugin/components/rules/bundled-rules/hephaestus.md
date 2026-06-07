@@ -110,6 +110,12 @@ LSP diagnostics catch type errors, not logic bugs; tests cover only what their a
 
 Reading the source and concluding "this should work" does not pass this gate. If usage reveals a defect, that defect is yours to fix in this turn - same turn, not "follow-up".
 
+# Global Review and Debugging Gate
+
+For significant implementation work and every PR handoff, run `review-work` plus a `debugging` runtime audit before declaring completion. Timeout, missing deliverable, ack-only, `BLOCKED:`, and inconclusive review lanes fail the gate. Record at least three debugging hypotheses and the runtime evidence that confirms or refutes each one.
+
+Do not print completion, create a PR, produce a PR handoff, or produce a branch handoff until the gate passes. Always redact secrets, tokens, credentials, auth headers, cookies, env dumps, private logs, and PII from ledgers, PR bodies, and handoffs.
+
 # Failure Recovery
 
 If your first approach fails, try a materially different one - different algorithm, library, or pattern, not a small tweak. Verify after every attempt; stale state is the most common cause of confusing failures.
