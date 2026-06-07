@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 
+import { log } from "../../shared/logger"
 import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
 
 const DEFAULT_PORT = 19877
@@ -57,7 +58,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
 
   const timeoutId = setTimeout(() => {
     rejectCallback?.(new Error("OAuth callback timed out after 5 minutes"))
-    void closeServer()
+    scheduleClose()
   }, TIMEOUT_MS)
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
@@ -76,9 +77,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
       rejectCallback?.(new Error(`OAuth authorization failed: ${description}`))
       response.statusCode = 400
       response.end(`Authorization failed: ${description}`)
-      setTimeout(() => {
-        void closeServer()
-      }, 100)
+      setTimeout(scheduleClose, 100)
       return
     }
 
@@ -90,9 +89,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
       rejectCallback?.(new Error("OAuth callback missing code or state parameter"))
       response.statusCode = 400
       response.end("Missing code or state parameter")
-      setTimeout(() => {
-        void closeServer()
-      }, 100)
+      setTimeout(scheduleClose, 100)
       return
     }
 
@@ -102,12 +99,16 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
     response.statusCode = 200
     response.setHeader("content-type", "text/html; charset=utf-8")
     response.end(SUCCESS_HTML)
-    setTimeout(() => {
-      void closeServer()
-    }, 100)
+    setTimeout(scheduleClose, 100)
   })
 
   let closePromise: Promise<void> | null = null
+
+  function scheduleClose(): void {
+    void closeServer().catch((error) => {
+      log("Failed to close OAuth callback server", error)
+    })
+  }
 
   function closeServer(): Promise<void> {
     clearTimeout(timeoutId)
