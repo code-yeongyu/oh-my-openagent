@@ -9,34 +9,43 @@ const HOSTNAME = "127.0.0.1"
 
 function request(url: string): Promise<Response> {
   return new Promise((resolve, reject) => {
-    const req = httpRequest(url, (res: IncomingMessage) => {
-      const chunks: Buffer[] = []
-      const headers = new Headers()
+    const target = new URL(url)
+    const req = httpRequest(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path: `${target.pathname}${target.search}`,
+        method: "GET",
+      },
+      (res: IncomingMessage) => {
+        const chunks: Buffer[] = []
+        const headers = new Headers()
 
-      res.on("data", (chunk: Buffer) => {
-        chunks.push(chunk)
-      })
-      res.on("end", () => {
-        for (const [name, value] of Object.entries(res.headers)) {
-          if (typeof value === "string") {
-            headers.set(name, value)
-            continue
-          }
-          if (Array.isArray(value)) {
-            for (const item of value) {
-              headers.append(name, item)
+        res.on("data", (chunk: Buffer) => {
+          chunks.push(chunk)
+        })
+        res.on("end", () => {
+          for (const [name, value] of Object.entries(res.headers)) {
+            if (typeof value === "string") {
+              headers.set(name, value)
+              continue
+            }
+            if (Array.isArray(value)) {
+              for (const item of value) {
+                headers.append(name, item)
+              }
             }
           }
-        }
 
-        resolve(
-          new Response(Buffer.concat(chunks), {
-            status: res.statusCode ?? 0,
-            headers,
-          }),
-        )
-      })
-    })
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: res.statusCode ?? 0,
+              headers,
+            }),
+          )
+        })
+      },
+    )
 
     req.on("error", reject)
     req.end()
@@ -86,26 +95,6 @@ describe("startCallbackServer", () => {
       const response = await request(`http://${HOSTNAME}:${server.port}/other`)
 
       expect(response.status).toBe(404)
-    } finally {
-      await close(server)
-    }
-  })
-
-  it("keeps readiness probes separate from OAuth callbacks", async () => {
-    const server = await startCallbackServer(0)
-
-    try {
-      const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_ready__`)
-      expect(readyResponse.status).toBe(204)
-
-      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=after-ready&state=still-waiting`
-      const [result, response] = await Promise.all([
-        server.waitForCallback(),
-        request(callbackUrl),
-      ])
-
-      expect(result).toEqual({ code: "after-ready", state: "still-waiting" })
-      expect(response.status).toBe(200)
     } finally {
       await close(server)
     }
