@@ -16,7 +16,7 @@ test("#given ulw-plan skill #when inspected #then it is a Codex-native planner t
 	// then
 	assert.match(skill, /^---\r?\nname: ulw-plan\r?\n/m);
 	assert.match(skill, /references\/full-workflow\.md/);
-	assert.match(skill, /spawn_agent\([^)]*fork_turns="none"/);
+	assert.match(skill, /spawn_agent\(\{[^)]*"fork_turns":"none"/);
 	assert.doesNotMatch(skill, opencodeOnlyToolPattern);
 });
 
@@ -37,7 +37,7 @@ test("#given ulw-plan full workflow reference #when inspected #then it documents
 	// then
 	assert.match(workflow, /\.omo\/plans\/<slug>\.md/);
 	assert.match(workflow, /[Aa]pproval gate/);
-	assert.match(workflow, /spawn_agent\([^)]*fork_turns="none"/);
+	assert.match(workflow, /spawn_agent\(\{[^)]*"fork_turns":"none"/);
 	assert.doesNotMatch(workflow, opencodeOnlyToolPattern);
 	assert.doesNotMatch(workflow, /Proceeding to plan generation/);
 });
