@@ -29,7 +29,7 @@ describe("Git Bash runner", () => {
         ">\"%FAKE_BASH_ARGV_PATH%\" echo(%~1",
         ">>\"%FAKE_BASH_ARGV_PATH%\" echo(%~2",
         "echo fake stdout",
-        "echo fake stderr 1>&2",
+        ">&2 echo(fake stderr",
         "exit /b 7",
         "",
       ].join("\r\n")

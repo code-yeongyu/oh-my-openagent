@@ -11,6 +11,7 @@ const temporaryDirectories: string[] = []
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
 const originalTmux = process.env.TMUX
 const originalPath = process.env.PATH
+const originalWindowsPath = process.env.Path
 
 async function createTemporaryDirectory(): Promise<string> {
 	const directoryPath = await fs.mkdtemp(path.join(os.tmpdir(), "tmux-path-resolver-"))
@@ -35,6 +36,9 @@ beforeEach(() => {
 	delete process.env.CMUX_SOCKET_PATH
 	delete process.env.TMUX
 	process.env.PATH = originalPath
+	if (process.platform === "win32") {
+		process.env.Path = originalWindowsPath
+	}
 })
 
 afterAll(async () => {
@@ -53,6 +57,9 @@ afterAll(async () => {
 	}
 
 	process.env.PATH = originalPath
+	if (process.platform === "win32") {
+		process.env.Path = originalWindowsPath
+	}
 
 	for (const directoryPath of temporaryDirectories) {
 		await fs.rm(directoryPath, { recursive: true, force: true })
@@ -66,7 +73,11 @@ describe("getTmuxPath", () => {
 		const cmuxPath = await createExecutable(temporaryDirectory, "cmux", "#!/bin/sh\nexit 0\n")
 		await createExecutable(temporaryDirectory, "tmux", "#!/bin/sh\nexit 1\n")
 		process.env.CMUX_SOCKET_PATH = path.join(temporaryDirectory, "cmux.sock")
-		process.env.PATH = `${temporaryDirectory}${path.delimiter}${originalPath ?? ""}`
+		const fixturePath = `${temporaryDirectory}${path.delimiter}${originalPath ?? ""}`
+		process.env.PATH = fixturePath
+		if (process.platform === "win32") {
+			process.env.Path = fixturePath
+		}
 
 		// when
 		const resolvedPath = await getTmuxPath()

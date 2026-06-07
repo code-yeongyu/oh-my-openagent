@@ -16,7 +16,7 @@ function isUnsafeCommandName(commandName: string): boolean {
 
 function isExecutable(filePath: string): boolean {
   try {
-    accessSync(filePath, constants.X_OK)
+    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK)
     return true
   } catch (error) {
     if (!(error instanceof Error) && Object.prototype.toString.call(error) !== "[object Error]") {
