@@ -73,13 +73,16 @@ function delay(ms: number): Promise<void> {
 function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false
+    let receivedResponse = false
 
-    const finish = (ready: boolean): void => {
+    const finish = (ready: boolean, destroySocket: boolean): void => {
       if (settled) {
         return
       }
       settled = true
-      socket.destroy()
+      if (destroySocket) {
+        socket.destroy()
+      }
       resolve(ready)
     }
 
@@ -89,20 +92,20 @@ function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
       )
     })
     socket.once("data", () => {
-      finish(true)
+      receivedResponse = true
     })
     socket.once("end", () => {
-      finish(false)
+      finish(receivedResponse, false)
     })
     socket.once("close", () => {
-      finish(false)
+      finish(receivedResponse, false)
     })
 
     socket.setTimeout(STARTUP_PROBE_TIMEOUT_MS, () => {
-      finish(false)
+      finish(false, true)
     })
     socket.once("error", () => {
-      finish(false)
+      finish(false, true)
     })
   })
 }
