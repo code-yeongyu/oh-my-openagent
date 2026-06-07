@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { posix, resolve, win32 } from "node:path"
+import { resolve, win32 } from "node:path"
 
 export type WorktreeEntry = {
   path: string
@@ -9,7 +9,7 @@ export type WorktreeEntry = {
 }
 
 function normalizePath(path: string): string {
-  const resolvedPath = posix.isAbsolute(path) || win32.isAbsolute(path) ? path : resolve(path)
+  const resolvedPath = process.platform !== "win32" && win32.isAbsolute(path) ? path : resolve(path)
   if (!existsSync(resolvedPath)) {
     return resolvedPath
   }

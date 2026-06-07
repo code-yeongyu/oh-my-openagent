@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { dirname, join, posix, resolve, win32 } from "node:path"
+import { dirname, join, resolve, win32 } from "node:path"
 
 import { detectPluginConfigFile } from "./jsonc-parser"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
@@ -8,7 +8,7 @@ import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
 const worktreePathCache = new Map<string, string | undefined>()
 
 function normalizePath(path: string): string {
-  const resolvedPath = posix.isAbsolute(path) || win32.isAbsolute(path) ? path : resolve(path)
+  const resolvedPath = process.platform !== "win32" && win32.isAbsolute(path) ? path : resolve(path)
   if (!existsSync(resolvedPath)) {
     return resolvedPath
   }
