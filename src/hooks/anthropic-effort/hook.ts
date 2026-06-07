@@ -1,6 +1,8 @@
 import { isProviderUsingOAuth, log, normalizeModelID } from "../../shared"
 
-const OPUS_PATTERN = /claude-.*opus/i
+// Only claude-opus-4-7 (and future versions) support "max" effort
+// claude-opus-4.6 and earlier versions only support low | medium | high
+const OPUS_PATTERN = /claude-opus-4-[7-9]|claude-opus-4-\d{2,}/i
 const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
@@ -54,7 +56,7 @@ interface ChatParamsOutput {
 
 /**
  * Valid thinking budget levels per model tier.
- * Opus supports "max"; all other Claude models cap at "high".
+ * Only claude-opus-4-7+ supports "max"; all other Claude models cap at "high".
  */
 const MAX_VARIANT_BY_TIER: Record<string, string> = {
   opus: "max",
