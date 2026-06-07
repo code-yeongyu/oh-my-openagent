@@ -1,4 +1,4 @@
-import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http"
+import { createServer, request as httpRequest, type ClientRequest, type IncomingMessage, type RequestOptions, type ServerResponse } from "node:http"
 import { clearTimeout, setTimeout } from "node:timers"
 
 import { log } from "../../shared/logger"
@@ -21,6 +21,8 @@ export type CallbackServer = {
   waitForCallback: () => Promise<OAuthCallbackResult>
   close: () => Promise<void>
 }
+
+type ReadinessRequest = (options: RequestOptions, callback: (response: IncomingMessage) => void) => ClientRequest
 
 const SUCCESS_HTML = `<!DOCTYPE html>
 <html>
@@ -56,7 +58,7 @@ function delay(ms: number): Promise<void> {
   })
 }
 
-function probeServerAcceptingRequests(port: number): Promise<boolean> {
+function probeServerAcceptingRequests(port: number, readinessRequest: ReadinessRequest): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false
 
@@ -68,7 +70,7 @@ function probeServerAcceptingRequests(port: number): Promise<boolean> {
       resolve(ready)
     }
 
-    const req = httpRequest(
+    const req = readinessRequest(
       {
         hostname: "127.0.0.1",
         method: "GET",
@@ -92,11 +94,11 @@ function probeServerAcceptingRequests(port: number): Promise<boolean> {
   })
 }
 
-async function waitForServerAcceptingRequests(port: number): Promise<void> {
+async function waitForServerAcceptingRequests(port: number, readinessRequest: ReadinessRequest): Promise<void> {
   const startedAt = Date.now()
 
   while (Date.now() - startedAt <= STARTUP_TIMEOUT_MS) {
-    if (await probeServerAcceptingRequests(port)) {
+    if (await probeServerAcceptingRequests(port, readinessRequest)) {
       return
     }
     await delay(STARTUP_RETRY_MS)
@@ -105,7 +107,10 @@ async function waitForServerAcceptingRequests(port: number): Promise<void> {
   throw new Error(`OAuth callback server did not accept HTTP requests on port ${port}`)
 }
 
-export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
+export async function startCallbackServer(
+  startPort: number = DEFAULT_PORT,
+  options: { readonly readinessRequest?: ReadinessRequest } = {},
+): Promise<CallbackServer> {
   const requestedPort = startPort === 0 ? 0 : await findAvailablePort(startPort).catch(() => 0)
 
   let resolveCallback: ((result: OAuthCallbackResult) => void) | null = null
@@ -215,7 +220,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
   const address = server.address()
   const activePort = typeof address === "object" && address !== null ? address.port : requestedPort
   try {
-    await waitForServerAcceptingRequests(activePort)
+    await waitForServerAcceptingRequests(activePort, options.readinessRequest ?? httpRequest)
   } catch (error) {
     await closeServer()
     throw error
