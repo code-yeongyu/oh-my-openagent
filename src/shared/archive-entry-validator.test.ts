@@ -18,8 +18,8 @@ function createTestDir(): string {
 	return dir
 }
 
-function runCommand(command: string, cwd?: string): void {
-	const result = spawnSync(["bash", "-lc", command], { cwd, stderr: "pipe", stdout: "pipe" })
+function runPythonScript(scriptPath: string, args: readonly string[], cwd?: string): void {
+	const result = spawnSync(["python3", scriptPath, ...args], { cwd, stderr: "pipe", stdout: "pipe" })
 	if (result.exitCode !== 0) {
 		throw new Error(result.stderr.toString())
 	}
@@ -121,7 +121,7 @@ describe("archive extraction preflight", () => {
 				"    archive.addfile(info, io.BytesIO(data))",
 			].join("\n")
 		)
-		runCommand(`python3 "${scriptPath}" "${archivePath}"`)
+		runPythonScript(scriptPath, [archivePath])
 
 		//#when
 		let errorMessage = ""
@@ -154,7 +154,7 @@ describe("archive extraction preflight", () => {
 				"    archive.addfile(info)",
 			].join("\n")
 		)
-		runCommand(`python3 "${scriptPath}" "${archivePath}"`)
+		runPythonScript(scriptPath, [archivePath])
 
 		//#when
 		let errorMessage = ""
@@ -189,7 +189,7 @@ describe("archive extraction preflight", () => {
 				"archive.close()",
 			].join("\n")
 		)
-		runCommand(`python3 "${scriptPath}" "${archivePath}"`)
+		runPythonScript(scriptPath, [archivePath])
 
 		//#when
 		let errorMessage = ""
@@ -242,8 +242,8 @@ describe("archive extraction preflight", () => {
 				"    archive.writestr(info, 'tool.txt')",
 			].join("\n")
 		)
-		runCommand(`python3 "${tarScriptPath}" "${tarArchivePath}" "${sourceDir}"`)
-		runCommand(`python3 "${zipScriptPath}" "${zipArchivePath}" "${sourceDir}"`)
+		runPythonScript(tarScriptPath, [tarArchivePath, sourceDir])
+		runPythonScript(zipScriptPath, [zipArchivePath, sourceDir])
 
 		//#when
 		await extractTarGz(tarArchivePath, tarDestDir)
