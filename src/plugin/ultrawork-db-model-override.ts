@@ -4,6 +4,7 @@ import { getDataDir } from "../shared/data-path"
 import { log } from "../shared"
 
 type BunDatabase = import("bun:sqlite").Database
+type BunStatement = ReturnType<BunDatabase["prepare"]>
 
 /**
  * Safely import bun:sqlite only when running in Bun runtime.
@@ -61,6 +62,15 @@ function closeDbWithLog(db: BunDatabase, message: string, metadata: Record<strin
   }
 }
 
+function finalizeStatementWithLog(stmt: BunStatement, message: string, metadata: Record<string, string | number | undefined>): void {
+  try {
+    stmt.finalize()
+  } catch (error) {
+    logCaughtDbError(message, metadata, error)
+    if (error instanceof Error) return
+  }
+}
+
 function tryUpdateMessageModel(
   db: BunDatabase,
   messageId: string,
@@ -70,12 +80,22 @@ function tryUpdateMessageModel(
   const stmt = db.prepare(
     `UPDATE message SET data = json_set(data, '$.model.providerID', ?, '$.model.modelID', ?) WHERE id = ?`,
   )
-  const result = stmt.run(targetModel.providerID, targetModel.modelID, messageId)
-  if (result.changes === 0) return false
+  try {
+    const result = stmt.run(targetModel.providerID, targetModel.modelID, messageId)
+    if (result.changes === 0) return false
+  } finally {
+    finalizeStatementWithLog(stmt, "[ultrawork-db-override] Failed to finalize model update statement", { messageId })
+  }
+
   if (variant) {
-    db.prepare(
+    const variantStmt = db.prepare(
       `UPDATE message SET data = json_set(data, '$.variant', ?, '$.thinking', ?) WHERE id = ?`,
-    ).run(variant, variant, messageId)
+    )
+    try {
+      variantStmt.run(variant, variant, messageId)
+    } finally {
+      finalizeStatementWithLog(variantStmt, "[ultrawork-db-override] Failed to finalize variant update statement", { messageId })
+    }
   }
   return true
 }
