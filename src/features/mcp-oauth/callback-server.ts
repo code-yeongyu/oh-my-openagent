@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http"
 import { clearTimeout, setTimeout } from "node:timers"
 
 import { log } from "../../shared/logger"
@@ -6,6 +6,10 @@ import { findAvailablePort as findAvailablePortShared } from "../../shared/port-
 
 const DEFAULT_PORT = 19877
 const TIMEOUT_MS = 5 * 60 * 1000
+const STARTUP_TIMEOUT_MS = 2_000
+const STARTUP_PROBE_TIMEOUT_MS = 250
+const STARTUP_RETRY_MS = 25
+const READINESS_PROBE_PATH = "/__omo_oauth_startup_probe__"
 
 export type OAuthCallbackResult = {
   code: string
@@ -44,6 +48,61 @@ function isServerNotRunningError(error: Error): boolean {
 
 export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promise<number> {
   return findAvailablePortShared(startPort)
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function probeServerAcceptingRequests(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false
+
+    const finish = (ready: boolean): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      resolve(ready)
+    }
+
+    const req = httpRequest(
+      {
+        hostname: "127.0.0.1",
+        method: "GET",
+        path: READINESS_PROBE_PATH,
+        port,
+      },
+      (response) => {
+        response.resume()
+        finish(true)
+      },
+    )
+
+    req.setTimeout(STARTUP_PROBE_TIMEOUT_MS, () => {
+      finish(false)
+      req.destroy()
+    })
+    req.once("error", () => {
+      finish(false)
+    })
+    req.end()
+  })
+}
+
+async function waitForServerAcceptingRequests(port: number): Promise<void> {
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt <= STARTUP_TIMEOUT_MS) {
+    if (await probeServerAcceptingRequests(port)) {
+      return
+    }
+    await delay(STARTUP_RETRY_MS)
+  }
+
+  throw new Error(`OAuth callback server did not accept HTTP requests on port ${port}`)
 }
 
 export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
@@ -155,6 +214,12 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
 
   const address = server.address()
   const activePort = typeof address === "object" && address !== null ? address.port : requestedPort
+  try {
+    await waitForServerAcceptingRequests(activePort)
+  } catch (error) {
+    await closeServer()
+    throw error
+  }
 
   return {
     port: activePort,
