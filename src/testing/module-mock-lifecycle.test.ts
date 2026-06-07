@@ -389,7 +389,7 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
-  test("#given owner is preserved #when owner calls mock.restore #then delegate runs and module mock stays active", () => {
+  test("#given owner is preserved #when owner calls mock.restore #then the owner mock is cleared", () => {
     // given
     const events: string[] = []
     let callerUrl = "file:///repo/tests/owner.test.ts"
@@ -418,7 +418,7 @@ describe("installModuleMockLifecycle", () => {
     expect(events).toEqual([
       "module:./dependency-a:mock-a",
       "delegate:restore",
-      "module:./dependency-a:mock-a",
+      "module:resolved:./dependency-a:original",
     ])
   })
 

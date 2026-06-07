@@ -1,6 +1,6 @@
 import { recoverToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
-import { log } from "../shared/logger"
+import { log as defaultLog } from "../shared/logger"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import type { PluginContext } from "./types"
 
@@ -53,11 +53,13 @@ function expectsRecoverableMetadata(tool: string): boolean {
 export function createToolExecuteAfterHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
+  log?: typeof defaultLog
 }): (
   input: ToolExecuteAfterInput,
   output: ToolExecuteAfterOutput | undefined,
 ) => Promise<void> {
   const { ctx, hooks } = args
+  const log = args.log ?? defaultLog
 
   // OpenCode injects tool call ids into execute() context and after-hook input via undocumented runtime fields.
   // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.

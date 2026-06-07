@@ -319,12 +319,6 @@ export function installModuleMockLifecycle(
     handledPreserveCleanup = false
     const callerUrl = getCallerUrl()
     if (hasActiveMocksForTestFile(callerUrl)) {
-      if (preserveOwners.has(callerUrl)) {
-        const result = delegateRestore()
-        replayActiveMocks()
-        return result
-      }
-
       const result = delegateRestore()
       restoreModuleMocksForTestFile(callerUrl)
       replayActiveMocks()

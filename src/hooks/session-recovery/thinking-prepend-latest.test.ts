@@ -3,22 +3,10 @@ import { existsSync, rmSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterAll, describe, expect, it, mock } from "bun:test"
+import { describe, expect, it, mock } from "bun:test"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `session-recovery-latest-thinking-prepend-${randomUUID()}`)
 const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
-
-mock.module("../../shared", () => ({
-  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
-  MESSAGE_STORAGE: join(TEST_STORAGE_ROOT, "message"),
-  PART_STORAGE: TEST_PART_STORAGE,
-  log: () => {},
-  isSqliteBackend: () => false,
-  patchPart: async () => true,
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData) => response.data ?? fallback,
-}))
-
-afterAll(() => { mock.restore() })
 
 const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")
 

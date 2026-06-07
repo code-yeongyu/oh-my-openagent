@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
 
@@ -66,12 +65,6 @@ function createExecutorContext(
 
 describe("resolveSubagentExecution", () => {
   let resolveSubagentExecution: SubagentResolverModule["resolveSubagentExecution"]
-
-  preserveModuleMocksForTestFile(import.meta.url)
-
-  afterAll(() => {
-    restoreModuleMocksForTestFile(import.meta.url)
-  })
 
   beforeEach(async () => {
     mock.restore()

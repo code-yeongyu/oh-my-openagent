@@ -7,14 +7,28 @@ import { log, isSqliteBackend, deletePart } from "../../../shared"
 import { normalizeSDKResponse } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
+type StripThinkingPartsDeps = {
+  readonly isSqliteBackend: typeof isSqliteBackend
+  readonly log: typeof log
+  readonly partStorage: string
+}
 
-export function stripThinkingParts(messageID: string): boolean {
-  if (isSqliteBackend()) {
-    log("[session-recovery] Disabled on SQLite backend: stripThinkingParts (use async variant)")
+const stripThinkingPartsDeps: StripThinkingPartsDeps = {
+  isSqliteBackend,
+  log,
+  partStorage: PART_STORAGE,
+}
+
+export function stripThinkingParts(
+  messageID: string,
+  deps: StripThinkingPartsDeps = stripThinkingPartsDeps
+): boolean {
+  if (deps.isSqliteBackend()) {
+    deps.log("[session-recovery] Disabled on SQLite backend: stripThinkingParts (use async variant)")
     return false
   }
 
-  const partDir = join(PART_STORAGE, messageID)
+  const partDir = join(deps.partStorage, messageID)
   if (!existsSync(partDir)) return false
 
   let anyRemoved = false
