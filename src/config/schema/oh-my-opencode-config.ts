@@ -15,6 +15,7 @@ import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
 import { I18nConfigSchema } from "./i18n"
 import { KeywordDetectorConfigSchema } from "./keyword-detector"
+import { LspConfigSchema } from "./lsp-config"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
@@ -90,6 +91,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
     include_co_authored_by: true,
     git_env_prefix: "GIT_MASTER=1",
   }),
+  lsp: LspConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
