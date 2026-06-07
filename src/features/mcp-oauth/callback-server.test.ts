@@ -42,8 +42,8 @@ function request(url: string): Promise<Response> {
 }
 
 describe("startCallbackServer", () => {
-  function close(server: CallbackServer): void {
-    server.close()
+  async function close(server: CallbackServer): Promise<void> {
+    await server.close()
   }
 
   it("starts server and returns port", async () => {
@@ -54,7 +54,7 @@ describe("startCallbackServer", () => {
       expect(typeof server.waitForCallback).toBe("function")
       expect(typeof server.close).toBe("function")
     } finally {
-      close(server)
+      await close(server)
     }
   })
 
@@ -73,7 +73,7 @@ describe("startCallbackServer", () => {
       const html = await response.text()
       expect(html).toContain("Authorization successful")
     } finally {
-      close(server)
+      await close(server)
     }
   })
 
@@ -85,7 +85,7 @@ describe("startCallbackServer", () => {
 
       expect(response.status).toBe(404)
     } finally {
-      close(server)
+      await close(server)
     }
   })
 
@@ -104,7 +104,7 @@ describe("startCallbackServer", () => {
       }
       expect(error.message).toContain("missing code or state")
     } finally {
-      close(server)
+      await close(server)
     }
   })
 
@@ -123,7 +123,7 @@ describe("startCallbackServer", () => {
       }
       expect(error.message).toContain("missing code or state")
     } finally {
-      close(server)
+      await close(server)
     }
   })
 
@@ -131,13 +131,31 @@ describe("startCallbackServer", () => {
     const server = await startCallbackServer(0)
     const port = server.port
 
-    server.close()
+    await server.close()
 
     try {
       await request(`http://${HOSTNAME}:${port}/oauth/callback?code=c&state=s`)
       expect.unreachable("request should fail after close")
     } catch (error) {
       expect(error).toBeDefined()
+    }
+  })
+
+  it("close resolves after the underlying server releases its port", async () => {
+    const firstServer = await startCallbackServer(0)
+    const port = firstServer.port
+
+    const closeResult = firstServer.close()
+    expect(closeResult).toBeInstanceOf(Promise)
+    await closeResult
+
+    const secondServer = await startCallbackServer(port)
+    try {
+      expect(secondServer.port).toBe(port)
+      const response = await request(`http://${HOSTNAME}:${port}/other`)
+      expect(response.status).toBe(404)
+    } finally {
+      await close(secondServer)
     }
   })
 })
