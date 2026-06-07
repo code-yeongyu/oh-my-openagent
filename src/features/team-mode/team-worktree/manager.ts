@@ -1,4 +1,5 @@
 import path from "node:path"
+import fs from "node:fs/promises"
 import { spawn as bunSpawn } from "../../../shared/bun-spawn-shim"
 
 export type TeamModeConfig = {
@@ -34,9 +35,34 @@ export async function isGitAvailable(): Promise<boolean> {
 }
 
 export function validateWorktreeSpec(spec: string): void {
-  if (!/^(\.\.?\/|\/).+/.test(spec) || countParentSegments(spec) > 2) {
-    throw new Error("worktreePath must be a filesystem path (relative './...', '../...' or absolute '/...')")
+  if (!/^(\.\.\/|\/|\.\/).+/.test(spec) || countParentSegments(spec) > 2) {
+    throw new Error("worktreePath must be a filesystem path (relative './...', '../...' or absolute '/...')") 
   }
+}
+const GITIGNORE_CONTENT = `# Temporary files
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.iml
+coverage/
+.nyc_output/
+tmp/
+temp/
+`
+
+async function writeGitignore(worktreePath: string): Promise<void> {
+  const gitignorePath = path.join(worktreePath, ".gitignore")
+  await fs.writeFile(gitignorePath, GITIGNORE_CONTENT, "utf-8")
 }
 
 export async function createWorktree(
@@ -58,6 +84,8 @@ export async function createWorktree(
   if (result.code !== 0) {
     throw new Error(result.stderr.trim() || "git worktree add failed")
   }
+
+  await writeGitignore(absolutePath)
 
   return absolutePath
 }
