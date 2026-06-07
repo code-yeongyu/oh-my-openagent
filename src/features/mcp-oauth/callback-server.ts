@@ -9,7 +9,7 @@ const TIMEOUT_MS = 5 * 60 * 1000
 const STARTUP_TIMEOUT_MS = 2_000
 const STARTUP_PROBE_TIMEOUT_MS = 250
 const STARTUP_RETRY_MS = 25
-const STARTUP_PROBE_PATH = "/__omo_oauth_ready__"
+const READINESS_PROBE_PATH = "/__omo_oauth_startup_probe__"
 
 export type OAuthCallbackResult = {
   code: string
@@ -56,7 +56,7 @@ function delay(ms: number): Promise<void> {
   })
 }
 
-function probeServerReady(port: number): Promise<boolean> {
+function probeServerAcceptingRequests(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false
 
@@ -72,17 +72,12 @@ function probeServerReady(port: number): Promise<boolean> {
       {
         hostname: "127.0.0.1",
         method: "GET",
-        path: STARTUP_PROBE_PATH,
+        path: READINESS_PROBE_PATH,
         port,
       },
       (response) => {
-        response.once("end", () => {
-          finish(true)
-        })
-        response.once("error", () => {
-          finish(false)
-        })
         response.resume()
+        finish(true)
       },
     )
 
@@ -97,11 +92,11 @@ function probeServerReady(port: number): Promise<boolean> {
   })
 }
 
-async function waitForServerReady(port: number): Promise<void> {
+async function waitForServerAcceptingRequests(port: number): Promise<void> {
   const startedAt = Date.now()
 
   while (Date.now() - startedAt <= STARTUP_TIMEOUT_MS) {
-    if (await probeServerReady(port)) {
+    if (await probeServerAcceptingRequests(port)) {
       return
     }
     await delay(STARTUP_RETRY_MS)
@@ -220,7 +215,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
   const address = server.address()
   const activePort = typeof address === "object" && address !== null ? address.port : requestedPort
   try {
-    await waitForServerReady(activePort)
+    await waitForServerAcceptingRequests(activePort)
   } catch (error) {
     await closeServer()
     throw error

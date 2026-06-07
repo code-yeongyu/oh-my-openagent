@@ -1,11 +1,62 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, mock } from "bun:test"
 import { Buffer } from "node:buffer"
-import { type IncomingMessage, request as httpRequest } from "node:http"
+import * as http from "node:http"
+import { type ClientRequest, type IncomingMessage, request as httpRequest, type RequestOptions } from "node:http"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
+
+type DeferredProbe = { readonly complete: () => void }
+
+function delay(ms: number): Promise<"timeout"> {
+  return new Promise((resolve) => setTimeout(() => resolve("timeout"), ms))
+}
+
+function importFreshCallbackServer() {
+  return import(new URL(`./callback-server.ts?readiness=${Date.now()}-${Math.random()}`, import.meta.url).href)
+}
+
+function installDeferredReadinessProbe(): Promise<DeferredProbe> {
+  let resolveProbe: (probe: DeferredProbe) => void
+  const probeStarted = new Promise<DeferredProbe>((resolve) => {
+    resolveProbe = resolve
+  })
+
+  const requestMock = mock((_options: string | URL | RequestOptions, callback?: (response: IncomingMessage) => void): ClientRequest => {
+    let requestClient: ClientRequest
+    requestClient = unsafeTestValue<ClientRequest>({
+      destroy: () => {
+        return requestClient
+      },
+      end: () => {
+        let response: IncomingMessage
+        response = unsafeTestValue<IncomingMessage>({
+          resume: () => response,
+        })
+        resolveProbe({
+          complete: () => {
+            callback?.(response)
+          },
+        })
+        return requestClient
+      },
+      once: () => requestClient,
+      setTimeout: (_timeoutMs: number, _callback?: () => void) => requestClient,
+    })
+
+    return requestClient
+  })
+
+  mock.module("node:http", () => ({
+    ...http,
+    request: requestMock,
+  }))
+
+  return probeStarted
+}
 
 function request(url: string): Promise<Response> {
   return new Promise((resolve, reject) => {
@@ -53,9 +104,40 @@ function request(url: string): Promise<Response> {
 }
 
 describe("startCallbackServer", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
   async function close(server: CallbackServer): Promise<void> {
     await server.close()
   }
+
+  it("#given callback listener starts #when the readiness probe has not received a response #then startup remains pending", async () => {
+    const probeStarted = installDeferredReadinessProbe()
+    const { startCallbackServer: startFreshCallbackServer } = await importFreshCallbackServer()
+    let resolved = false
+
+    const startup = startFreshCallbackServer(0).then((server) => {
+      resolved = true
+      return server
+    })
+    const probe = await Promise.race([probeStarted, delay(500)])
+
+    expect(probe).not.toBe("timeout")
+    expect(resolved).toBe(false)
+    if (probe === "timeout") {
+      throw new Error("Expected startup readiness probe to begin")
+    }
+
+    probe.complete()
+    const server = await startup
+
+    try {
+      expect(resolved).toBe(true)
+    } finally {
+      await close(server)
+    }
+  })
 
   it("starts server and returns port", async () => {
     const server = await startCallbackServer(0)
@@ -104,7 +186,7 @@ describe("startCallbackServer", () => {
     const server = await startCallbackServer(0)
 
     try {
-      const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_ready__`)
+      const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_startup_probe__`)
       expect(readyResponse.status).toBe(404)
 
       const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=after-ready&state=still-waiting`
