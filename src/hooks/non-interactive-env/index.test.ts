@@ -20,6 +20,7 @@ describe("non-interactive-env hook", () => {
     // given clean Unix-like environment for all tests
     // This prevents CI environments (which may have PSModulePath set) from
     // triggering PowerShell detection in tests that expect Unix behavior
+    Object.defineProperty(process, "platform", { value: "linux" })
     delete process.env.PSModulePath
     process.env.SHELL = "/bin/bash"
     process.env.OPENCODE_NON_INTERACTIVE = "true"

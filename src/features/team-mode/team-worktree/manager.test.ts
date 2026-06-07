@@ -11,6 +11,10 @@ import { removeWorktree } from "./cleanup"
 
 const temporaryDirectories: string[] = []
 
+function normalizeGitPathText(value: string): string {
+  return value.replaceAll("\\", "/").replaceAll("/private/var/", "/var/").toLowerCase()
+}
+
 async function initGitRepo(): Promise<string> {
   const repositoryRoot = await fs.mkdtemp(path.join(tmpdir(), "team-worktree-"))
   temporaryDirectories.push(repositoryRoot)
@@ -48,7 +52,10 @@ describe("team-worktree manager", () => {
     expect(resultPath).toBe(worktreeDirectory)
     await expect(fs.stat(worktreeDirectory)).resolves.toBeDefined()
     const listResult = Bun.spawnSync(["git", "worktree", "list"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
-    expect(new TextDecoder().decode(listResult.stdout)).toContain(worktreeDirectory)
+    const canonicalWorktreeDirectory = await fs.realpath(worktreeDirectory)
+    expect(normalizeGitPathText(new TextDecoder().decode(listResult.stdout))).toContain(
+      normalizeGitPathText(canonicalWorktreeDirectory),
+    )
     const headResult = Bun.spawnSync(["git", "-C", worktreeDirectory, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
     const repoHeadResult = Bun.spawnSync(["git", "-C", repositoryRoot, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
     expect(new TextDecoder().decode(headResult.stdout).trim()).toBe(new TextDecoder().decode(repoHeadResult.stdout).trim())

@@ -110,6 +110,10 @@ export function createTranscriptHydrationStore(
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
+function normalizeRuleRelativePath(relativePath: string): string {
+	return relativePath.split("\\").join("/");
+}
+
 async function fetchTranscriptRelativePaths(
 	client: TranscriptHydrationClient,
 	sessionID: string,
@@ -127,7 +131,7 @@ async function fetchTranscriptRelativePaths(
 		for (const match of text.matchAll(RULE_MARKER_PATTERN)) {
 			const relativePath = match[1];
 			if (relativePath !== undefined) {
-				relativePaths.add(relativePath);
+				relativePaths.add(normalizeRuleRelativePath(relativePath));
 			}
 		}
 		if (scannedChars > HYDRATION_MAX_CHARS) {

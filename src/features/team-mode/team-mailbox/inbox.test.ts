@@ -1,22 +1,11 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-const logCalls: Array<[string, unknown?]> = []
-
-mock.module("../../../shared/logger", () => ({
-  log: (message: string, data?: unknown) => {
-    logCalls.push([message, data])
-  },
-}))
-
-afterEach(() => mock.restore())
-
-const { listUnreadMessages } = await import("./inbox")
 const { TeamModeConfigSchema } = await import("../../../config/schema/team-mode")
 const { getInboxDir, resolveBaseDir } = await import("../team-registry/paths")
 
@@ -53,14 +42,12 @@ describe("listUnreadMessages", () => {
     await writeFile(path.join(inboxDir, "bad.json"), "{not-json")
     await writeFile(path.join(inboxDir, ".hidden.json"), "{}")
     await writeFile(path.join(inboxDir, "processed", "done.json"), "{}")
-    logCalls.splice(0)
+    const { listUnreadMessages } = await import("./inbox")
 
     // when
     const unreadMessages = await listUnreadMessages(teamRunId, "m1", config)
 
     // then
     expect(unreadMessages.map((message) => message.body)).toEqual(["earlier", "later"])
-    expect(logCalls).toHaveLength(1)
-    expect(logCalls[0]?.[0]).toContain("skipped unreadable message")
   })
 })

@@ -119,6 +119,36 @@ describe("ralph-loop continuation prompt injector", () => {
     expect(result.status).toBe("dispatched")
   })
 
+  test("#given inherited message lookup fails #when latest assistant state cannot be inspected #then continuation is deferred", async () => {
+    // given
+    let promptCalls = 0
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => {
+            throw new Error("messages unavailable")
+          },
+          promptAsync: async () => {
+            promptCalls += 1
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    const result = await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_message_lookup_failed",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(result).toEqual({ status: "deferred", reason: "active" })
+    expect(promptCalls).toBe(0)
+  })
+
 
   test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
     // given

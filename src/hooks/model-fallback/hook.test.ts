@@ -1,66 +1,16 @@
+/// <reference types="bun-types" />
+
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
-declare const require: (name: string) => any
-const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
+import { beforeEach, describe, expect, test } from "bun:test"
+import { _resetMemCacheForTesting, updateConnectedProvidersCache } from "../../shared/connected-providers-cache"
 
-const readConnectedProvidersCacheMock = mock(() => null)
-const readProviderModelsCacheMock = mock(() => null)
-const selectFallbackProviderMock = mock((providers: string[], preferredProviderID?: string) => {
-  const connectedProviders = readConnectedProvidersCacheMock()
-  if (connectedProviders) {
-    const connectedSet = new Set(connectedProviders.map((provider: string) => provider.toLowerCase()))
-
-    for (const provider of providers) {
-      if (connectedSet.has(provider.toLowerCase())) {
-        return provider
-      }
-    }
-
-    if (preferredProviderID && connectedSet.has(preferredProviderID.toLowerCase())) {
-      return preferredProviderID
-    }
-  }
-
-  return providers[0] || preferredProviderID || "opencode"
-})
-const transformModelForProviderMock = mock((provider: string, model: string) => {
-  if (provider === "github-copilot") {
-    return model
-      .replace("claude-opus-4-7", "claude-opus-4.7")
-      .replace("claude-sonnet-4-6", "claude-sonnet-4.6")
-      .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
-      .replace("claude-haiku-4-5", "claude-haiku-4.5")
-      .replace("claude-sonnet-4", "claude-sonnet-4")
-      .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
-      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
-  }
-  if (provider === "google") {
-    return model
-      .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
-      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
-  }
-  return model
-})
-
-afterAll(() => {
-  mock.restore()
-})
+type ChatMessageOutput = {
+  message: Record<string, unknown>
+  parts: Array<{ type: string; text?: string }>
+}
 
 async function importFreshModelFallbackHookModule() {
-  mock.module("../../shared/connected-providers-cache", () => ({
-    readConnectedProvidersCache: readConnectedProvidersCacheMock,
-    readProviderModelsCache: readProviderModelsCacheMock,
-  }))
-
-  mock.module("../../shared/provider-model-id-transform", () => ({
-    transformModelForProvider: transformModelForProviderMock,
-  }))
-
-  mock.module("../../shared/model-error-classifier", () => ({
-    selectFallbackProvider: selectFallbackProviderMock,
-  }))
-
   const module = await import(`./hook?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
   return module
 }
 
@@ -79,11 +29,7 @@ describe("model fallback hook", () => {
 
   beforeEach(() => {
     modelFallback = createModelFallbackHook()
-    readConnectedProvidersCacheMock.mockReturnValue(null)
-    readProviderModelsCacheMock.mockReturnValue(null)
-    readConnectedProvidersCacheMock.mockClear()
-    readProviderModelsCacheMock.mockClear()
-    selectFallbackProviderMock.mockClear()
+    _resetMemCacheForTesting()
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
@@ -154,7 +100,7 @@ describe("model fallback hook", () => {
       setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
     ).toBe(true)
 
-    const secondOutput = {
+    const secondOutput: ChatMessageOutput = {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
@@ -298,7 +244,16 @@ describe("model fallback hook", () => {
   test("uses connected preferred provider when fallback entry providers are disconnected", async () => {
     const sessionID = "ses_model_fallback_preferred_provider"
     clearPendingModelFallback(modelFallback, sessionID)
-    readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
+    await updateConnectedProvidersCache({
+      provider: {
+        list: async () => ({
+          data: {
+            connected: ["provider-x"],
+            all: [{ id: "provider-x", models: {} }],
+          },
+        }),
+      },
+    })
 
     const hook = unsafeTestValue<{
       "chat.message"?: (
@@ -362,7 +317,7 @@ describe("model fallback hook", () => {
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
     }>(createModelFallbackHook({
-      toast: async ({ title, message }) => {
+      toast: async ({ title, message }: { title: string; message: string }) => {
         toastCalls.push({ title, message })
       },
     }))

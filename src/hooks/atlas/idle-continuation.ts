@@ -120,6 +120,16 @@ export async function injectContinuation(input: {
       return
     }
 
+    if (result === "skipped_active_session") {
+      scheduleRetry({
+        ctx: input.ctx,
+        sessionID: input.sessionID,
+        sessionState: input.sessionState,
+        options: input.options,
+      })
+      return
+    }
+
     if (result === "failed") {
       scheduleRetry({
         ctx: input.ctx,

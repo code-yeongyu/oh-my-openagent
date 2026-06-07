@@ -12,6 +12,10 @@ import type {
 
 const EMPTY_RESULT: CheckResult = { hasComments: false, message: "" }
 
+function normalizeMessage(message: string): string {
+  return message.replace(/\r\n/g, "\n")
+}
+
 function killProcessSafely(process: SpawnProcess, signal: SpawnSignal): void {
   try {
     process.kill(signal)
@@ -99,7 +103,7 @@ export async function runCommentChecker(
       return EMPTY_RESULT
     }
     if (exitCode === 2) {
-      return { hasComments: true, message: stderr }
+      return { hasComments: true, message: normalizeMessage(stderr) }
     }
 
     return EMPTY_RESULT

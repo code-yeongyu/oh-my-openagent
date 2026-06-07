@@ -65,6 +65,38 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /single `list_agents`/);
 });
 
+test("#given ultrawork directive #when inspected #then dependent subagent transitions are blocked", async () => {
+	// given
+	const directivePath = "components/ultrawork/directive.md";
+
+	// when
+	const text = await readFile(join(root, directivePath), "utf8");
+
+	// then
+	assert.match(text, /Subagent-dependent transition barrier/);
+	assert.match(text, /Do not mark.*update_plan.*completed.*active child/s);
+	assert.match(text, /Do not start dependent implementation.*audit.*research.*review.*integrated/s);
+	assert.match(text, /Do not write the final answer.*active child agents/s);
+	assert.match(text, /two silent waits.*TASK STILL ACTIVE/s);
+	assert.match(text, /four silent or ack-only checks.*inconclusive/s);
+});
+
+test("#given ultrawork directive #when inspected #then TOML-backed routing is treated as unverified when native spawn cannot select it", async () => {
+	// given
+	const directivePath = "components/ultrawork/directive.md";
+
+	// when
+	const text = await readFile(join(root, directivePath), "utf8");
+
+	// then
+	assert.match(text, /TOML-backed subagent routing compatibility/);
+	assert.match(text, /routing-unverified/);
+	assert.match(text, /task_name.*does not prove.*TOML-backed role/s);
+	assert.match(text, /spawn_agent.*schema.*agent_type.*model.*reasoning_effort/s);
+	assert.match(text, /paste the role requirements into the message/s);
+	assert.match(text, /service_tier.*supported/s);
+});
+
 test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {
 	// given
 	const workflowPaths = [

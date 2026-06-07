@@ -37,6 +37,12 @@ To install **both** the Ultimate edition (OpenCode plugin) and the Light edition
 
 The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
+### oh-my-codex (OMX) coexistence
+
+LazyCodex can be installed beside oh-my-codex (OMX) because OMX runs outside Codex while LazyCodex runs as `omo@sisyphuslabs` inside Codex. The installer preserves unrelated `[features]`, `[tui]`, and `[shell_environment_policy]` blocks in `~/.codex/config.toml`, then adds only the LazyCodex marketplace, plugin, hook-state, MCP-policy, and managed-agent entries it owns.
+
+Codex does not define hook precedence for separate tools that listen to the same lifecycle event, so LazyCodex does not define hook precedence between OMX keywords and LazyCodex keywords. If `omx setup` rewrites shared Codex config, rerun `npx lazycodex-ai install` after `omx setup` to repair the managed `omo@sisyphuslabs` blocks.
+
 To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.

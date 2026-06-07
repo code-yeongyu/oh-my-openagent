@@ -14,7 +14,7 @@ mock.module("./resolve-member-dependencies", () => ({
   buildSystemContent: buildSystemContentMock,
 }))
 
-const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member")
+const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member?resolve-member-test")
 
 function createExecutorContext(): ExecutorContext {
   return {

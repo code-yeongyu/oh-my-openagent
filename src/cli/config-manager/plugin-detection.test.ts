@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import * as fs from "node:fs"
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -259,7 +259,7 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
     // then
     expect(result.success).toBe(true)
-    expect(result.configPath.endsWith("/profiles/today/opencode.json")).toBe(true)
+    expect(result.configPath).toBe(join(realpathSync(profileDir), "opencode.json"))
     const savedProfileConfig = JSON.parse(readFileSync(profileConfigPath, "utf-8"))
     expect(savedProfileConfig.plugin).toEqual([sourcePlugin])
   })

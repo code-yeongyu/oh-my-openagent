@@ -1,9 +1,5 @@
-import * as fs from "fs"
-import * as os from "os"
-import * as path from "path"
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
-import { _flushForTesting, _resetLoggerForTesting, _setLoggerForTesting } from "../../shared/logger"
 import { disconnectAll } from "./cleanup"
 import { createHttpClient, setHttpClientDependenciesForTesting } from "./http-client"
 import type { McpTransport, SkillMcpClientInfo, SkillMcpManagerState } from "./types"
@@ -13,7 +9,7 @@ const createdClients: MockHttpClient[] = []
 const createdTransports: MockHttpTransport[] = []
 let configureNextClient: ((client: MockHttpClient) => void) | undefined
 let configureNextTransport: ((transport: MockHttpTransport) => void) | undefined
-let testLogDir: string | undefined
+let logEntries: string[] = []
 
 class MockHttpClient {
   readonly close = mock(async () => {})
@@ -97,15 +93,28 @@ function createConfig(): ClaudeCodeMcpServer {
   }
 }
 
+async function captureCreateHttpClientError(params: Parameters<typeof createHttpClient>[0]): Promise<Error> {
+  try {
+    await createHttpClient(params)
+  } catch (error) {
+    if (error instanceof Error) return error
+    throw error
+  }
+  throw new Error("createHttpClient unexpectedly resolved")
+}
+
 beforeEach(() => {
   createdClients.length = 0
   createdTransports.length = 0
   configureNextClient = undefined
   configureNextTransport = undefined
-  testLogDir = undefined
+  logEntries = []
   setHttpClientDependenciesForTesting({
     createClient: (clientInfo, options) => new MockHttpClient(clientInfo, options),
     createTransport: (url, options) => new MockHttpTransport(url, options),
+    log: (message, data) => {
+      logEntries.push(`${message} ${JSON.stringify(data)}`)
+    },
   })
 })
 
@@ -119,11 +128,7 @@ afterEach(async () => {
   createdTransports.length = 0
   configureNextClient = undefined
   configureNextTransport = undefined
-  _resetLoggerForTesting()
-  if (testLogDir) {
-    fs.rmSync(testLogDir, { recursive: true, force: true })
-    testLogDir = undefined
-  }
+  logEntries = []
   setHttpClientDependenciesForTesting()
 })
 
@@ -166,15 +171,7 @@ describe("createHttpClient cleanup failures", () => {
       })
     }
 
-    let thrown: unknown
-    try {
-      await createHttpClient({ state, clientKey, info, config })
-    } catch (error) {
-      thrown = error
-    }
-
-    expect(thrown).toBeInstanceOf(Error)
-    const message = thrown instanceof Error ? thrown.message : ""
+    const { message } = await captureCreateHttpClientError({ state, clientKey, info, config })
     expect(message).toMatch(
       /Reason: connect failed for https:\/\/example\.com\/mcp\?api_key=\*\*\*REDACTED\*\*\* with Authorization: \[REDACTED\]/,
     )
@@ -195,15 +192,7 @@ describe("createHttpClient cleanup failures", () => {
       })
     }
 
-    let thrown: unknown
-    try {
-      await createHttpClient({ state, clientKey, info, config })
-    } catch (error) {
-      thrown = error
-    }
-
-    expect(thrown).toBeInstanceOf(Error)
-    const message = thrown instanceof Error ? thrown.message : ""
+    const { message } = await captureCreateHttpClientError({ state, clientKey, info, config })
     expect(message).toContain('"url":"https://example.com/mcp?api_key=***REDACTED***"')
     expect(message).toContain('"Authorization":"[REDACTED]"')
     expect(message).not.toMatch(/secret-value|abcdefghijklmnopqrstuvwxyz/)
@@ -223,15 +212,7 @@ describe("createHttpClient cleanup failures", () => {
       })
     }
 
-    let thrown: unknown
-    try {
-      await createHttpClient({ state, clientKey, info, config })
-    } catch (error) {
-      thrown = error
-    }
-
-    expect(thrown).toBeInstanceOf(Error)
-    const message = thrown instanceof Error ? thrown.message : ""
+    const { message } = await captureCreateHttpClientError({ state, clientKey, info, config })
     expect(message).toContain('"url":"https://example.com/mcp?api_key=***REDACTED***"')
     expect(message).toContain('"Authorization":"[REDACTED]"')
     expect(message).toContain('"authorization":"[REDACTED]"')
@@ -250,15 +231,7 @@ describe("createHttpClient cleanup failures", () => {
       })
     }
 
-    let thrown: unknown
-    try {
-      await createHttpClient({ state, clientKey, info, config })
-    } catch (error) {
-      thrown = error
-    }
-
-    expect(thrown).toBeInstanceOf(Error)
-    const message = thrown instanceof Error ? thrown.message : ""
+    const { message } = await captureCreateHttpClientError({ state, clientKey, info, config })
     expect(message).toContain("authorization=[REDACTED]; authorization=[REDACTED]")
     expect(message).not.toMatch(/short-secret|Bearer short/)
   })
@@ -277,15 +250,7 @@ describe("createHttpClient cleanup failures", () => {
       })
     }
 
-    let thrown: unknown
-    try {
-      await createHttpClient({ state, clientKey, info, config })
-    } catch (error) {
-      thrown = error
-    }
-
-    expect(thrown).toBeInstanceOf(Error)
-    const message = thrown instanceof Error ? thrown.message : ""
+    const { message } = await captureCreateHttpClientError({ state, clientKey, info, config })
     expect(message).toContain('"X-API-Key":"[REDACTED]"')
     expect(message).toContain('"x-auth-token":"[REDACTED]"')
     expect(message).toContain('"detail":"api-key=[REDACTED]"')
@@ -328,10 +293,7 @@ describe("createHttpClient cleanup failures", () => {
     const info = createInfo()
     const clientKey = createClientKey(info)
     const config = createConfig()
-    testLogDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-http-client-cleanup-"))
-    const logFilePath = path.join(testLogDir, "cleanup.log")
 
-    _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024 * 1024, maxBackups: 2 })
     configureNextClient = (client) => {
       client.connect.mockImplementation(async () => {
         throw new Error("connect boom")
@@ -346,9 +308,8 @@ describe("createHttpClient cleanup failures", () => {
     }
 
     await expect(createHttpClient({ state, clientKey, info, config })).rejects.toThrow(/connect boom/)
-    _flushForTesting()
 
-    const logContent = fs.readFileSync(logFilePath, "utf8")
+    const logContent = logEntries.join("\n")
     expect(logContent).toContain("ignored cleanup failure")
     expect(logContent).toContain("api_key=***REDACTED***")
     expect(logContent).toContain("Authorization: [REDACTED]")

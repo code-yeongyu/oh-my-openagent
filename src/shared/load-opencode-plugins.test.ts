@@ -1,42 +1,46 @@
-/// <reference path="../../bun-test.d.ts" />
+/// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import * as fs from "node:fs"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import * as os from "node:os"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 type LoadOpencodePluginsModule = {
   loadOpencodePlugins: (directory: string) => string[]
   clearOpencodePluginsCache?: () => void
 }
 
-const existsSyncMock = mock((_path: string) => true)
-const readFileSyncMock = mock((_path: string, _encoding?: string) => `{
-  "plugin": ["plugin-a", "plugin-b"]
-}`)
-
 async function importFreshLoadOpencodePluginsModule(): Promise<LoadOpencodePluginsModule> {
-  const modulePath = `${new URL("./load-opencode-plugins.ts", import.meta.url).pathname}?test=${Date.now()}-${Math.random()}`
+  const modulePath = `${fileURLToPath(new URL("./load-opencode-plugins.ts", import.meta.url))}?test=${Date.now()}-${Math.random()}`
   return import(modulePath)
 }
 
+function writeOpencodeConfig(directory: string, pluginEntries: readonly string[]): void {
+  const configDirectory = join(directory, ".opencode")
+  mkdirSync(configDirectory, { recursive: true })
+  writeFileSync(join(configDirectory, "opencode.json"), JSON.stringify({ plugin: pluginEntries }))
+}
+
+function writeProfileConfig(directory: string, pluginEntries: readonly string[]): void {
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, "opencode.json"), JSON.stringify({ plugin: pluginEntries }))
+}
+
 describe("loadOpencodePlugins", () => {
+  const tempDirs: string[] = []
   let originalOpencodeConfigDir: string | undefined
+
+  function createTempDir(prefix: string): string {
+    const directory = mkdtempSync(join(os.tmpdir(), prefix))
+    tempDirs.push(directory)
+    return directory
+  }
 
   beforeEach(() => {
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+
     delete process.env.OPENCODE_CONFIG_DIR
-
-    existsSyncMock.mockReset()
-    existsSyncMock.mockImplementation((_path: string) => true)
-    readFileSyncMock.mockReset()
-    readFileSyncMock.mockImplementation((_path: string, _encoding?: string) => `{
-  "plugin": ["plugin-a", "plugin-b"]
-}`)
-
-    mock.module("node:fs", () => ({
-      ...fs,
-      existsSync: existsSyncMock,
-      readFileSync: readFileSyncMock,
-    }))
   })
 
   afterEach(() => {
@@ -45,26 +49,39 @@ describe("loadOpencodePlugins", () => {
     } else {
       process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
     }
-    mock.restore()
+    while (tempDirs.length > 0) {
+      const directory = tempDirs.pop()
+      if (directory) {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
   })
 
   describe("#given the same directory is loaded twice", () => {
     describe("#when loading plugins repeatedly", () => {
-      it("#then does not call readFileSync on the second load", async () => {
+      it("#then returns the cached plugin entries on the second load", async () => {
         // given
+        const projectDirectory = createTempDir("omo-load-opencode-project-")
+        const initialPlugins = [
+          `file://${join(projectDirectory, "plugin-a.ts")}`,
+          `file://${join(projectDirectory, "plugin-b.ts")}`,
+        ]
+        const updatedPlugin = `file://${join(projectDirectory, "plugin-c.ts")}`
+        writeOpencodeConfig(projectDirectory, initialPlugins)
         const { loadOpencodePlugins } = await importFreshLoadOpencodePluginsModule()
 
         // when
-        const firstResult = loadOpencodePlugins("/some/fake/dir")
-        const readCountAfterFirstLoad = readFileSyncMock.mock.calls.length
-        const secondResult = loadOpencodePlugins("/some/fake/dir")
-        const readCountAfterSecondLoad = readFileSyncMock.mock.calls.length
+        const firstResult = loadOpencodePlugins(projectDirectory)
+        writeOpencodeConfig(projectDirectory, [updatedPlugin])
+        const secondResult = loadOpencodePlugins(projectDirectory)
 
         // then
-        expect(firstResult).toEqual(["plugin-a", "plugin-b"])
-        expect(secondResult).toEqual(["plugin-a", "plugin-b"])
-        expect(readCountAfterFirstLoad).toBeGreaterThan(0)
-        expect(readCountAfterSecondLoad - readCountAfterFirstLoad).toBe(0)
+        expect(firstResult).toContain(initialPlugins[0])
+        expect(firstResult).toContain(initialPlugins[1])
+        expect(firstResult).not.toContain(updatedPlugin)
+        expect(secondResult).toContain(initialPlugins[0])
+        expect(secondResult).toContain(initialPlugins[1])
+        expect(secondResult).not.toContain(updatedPlugin)
       })
     })
   })
@@ -73,6 +90,13 @@ describe("loadOpencodePlugins", () => {
     describe("#when loading the same directory again", () => {
       it("#then re-reads plugin config files from disk", async () => {
         // given
+        const projectDirectory = createTempDir("omo-load-opencode-project-")
+        const initialPlugins = [
+          `file://${join(projectDirectory, "plugin-a.ts")}`,
+          `file://${join(projectDirectory, "plugin-b.ts")}`,
+        ]
+        const updatedPlugin = `file://${join(projectDirectory, "plugin-c.ts")}`
+        writeOpencodeConfig(projectDirectory, initialPlugins)
         const { loadOpencodePlugins, clearOpencodePluginsCache } = await importFreshLoadOpencodePluginsModule()
 
         if (typeof clearOpencodePluginsCache !== "function") {
@@ -80,19 +104,22 @@ describe("loadOpencodePlugins", () => {
         }
 
         // when
-        const firstResult = loadOpencodePlugins("/some/fake/dir")
-        const readCountAfterFirstLoad = readFileSyncMock.mock.calls.length
-        loadOpencodePlugins("/some/fake/dir")
-        const readCountAfterSecondLoad = readFileSyncMock.mock.calls.length
+        const firstResult = loadOpencodePlugins(projectDirectory)
+        writeOpencodeConfig(projectDirectory, [updatedPlugin])
+        const secondResult = loadOpencodePlugins(projectDirectory)
         clearOpencodePluginsCache()
-        const thirdResult = loadOpencodePlugins("/some/fake/dir")
-        const readCountAfterThirdLoad = readFileSyncMock.mock.calls.length
+        const thirdResult = loadOpencodePlugins(projectDirectory)
 
         // then
-        expect(firstResult).toEqual(["plugin-a", "plugin-b"])
-        expect(thirdResult).toEqual(["plugin-a", "plugin-b"])
-        expect(readCountAfterSecondLoad - readCountAfterFirstLoad).toBe(0)
-        expect(readCountAfterThirdLoad - readCountAfterSecondLoad).toBeGreaterThan(0)
+        expect(firstResult).toContain(initialPlugins[0])
+        expect(firstResult).toContain(initialPlugins[1])
+        expect(firstResult).not.toContain(updatedPlugin)
+        expect(secondResult).toContain(initialPlugins[0])
+        expect(secondResult).toContain(initialPlugins[1])
+        expect(secondResult).not.toContain(updatedPlugin)
+        expect(thirdResult).toContain(updatedPlugin)
+        expect(thirdResult).not.toContain(initialPlugins[0])
+        expect(thirdResult).not.toContain(initialPlugins[1])
       })
     })
   })
@@ -101,30 +128,22 @@ describe("loadOpencodePlugins", () => {
     describe("#when loading plugins for the project", () => {
       it("#then includes plugin entries from the profile config directory", async () => {
         // given
-        process.env.OPENCODE_CONFIG_DIR = "/tmp/opencode-profile"
-        existsSyncMock.mockImplementation((filePath: string) => (
-          filePath === "/project/.opencode/opencode.json"
-          || filePath === "/tmp/opencode-profile/opencode.json"
-        ))
-        readFileSyncMock.mockImplementation((filePath: string, _encoding?: string) => {
-          if (filePath === "/project/.opencode/opencode.json") {
-            return JSON.stringify({ plugin: ["file:///repo/omo/src/index.ts"] })
-          }
-          if (filePath === "/tmp/opencode-profile/opencode.json") {
-            return JSON.stringify({ plugin: ["oh-my-openagent@latest"] })
-          }
-          return JSON.stringify({})
-        })
+        const projectDirectory = createTempDir("omo-load-opencode-project-")
+        const profileDirectory = createTempDir("omo-load-opencode-profile-")
+        process.env.OPENCODE_CONFIG_DIR = profileDirectory
+        const projectPlugin = `file://${join(projectDirectory, "src", "index.ts")}`
+        const profilePlugin = `file://${join(profileDirectory, "profile-plugin.ts")}`
+        writeOpencodeConfig(projectDirectory, [projectPlugin])
+        writeProfileConfig(profileDirectory, [profilePlugin])
         const { loadOpencodePlugins } = await importFreshLoadOpencodePluginsModule()
 
         // when
-        const result = loadOpencodePlugins("/project")
+        const result = loadOpencodePlugins(projectDirectory)
 
         // then
-        expect(result).toEqual([
-          "file:///repo/omo/src/index.ts",
-          "oh-my-openagent@latest",
-        ])
+        expect(result).toContain(projectPlugin)
+        expect(result).toContain(profilePlugin)
+        expect(result.indexOf(projectPlugin)).toBeLessThan(result.indexOf(profilePlugin))
       })
     })
   })

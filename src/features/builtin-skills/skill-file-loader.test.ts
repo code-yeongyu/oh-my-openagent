@@ -1,6 +1,7 @@
 /// <reference path="../../../bun-test.d.ts" />
 
 import { describe, expect, test } from "bun:test"
+import { normalize } from "node:path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { createBuiltinSkills } from "./skills"
 import { createSharedSkillTemplateLoader, loadSharedSkillTemplate } from "./skill-file-loader"
@@ -55,7 +56,7 @@ describe("shared builtin skill file loader", () => {
       return error
     }
     const readFile = (path: string): string => {
-      if (path.endsWith("/packages/shared-skills/skills/layout/SKILL.md")) {
+      if (normalize(path).endsWith(normalize("/packages/shared-skills/skills/layout/SKILL.md"))) {
         return expectedContent
       }
       throw createMissingFileError()

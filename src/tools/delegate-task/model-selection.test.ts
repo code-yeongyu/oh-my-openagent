@@ -125,6 +125,29 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toEqual({ model: "openai/gpt-5.4", matchedFallback: true })
 				readConnectedProvidersSpy.mockRestore()
 			})
+
+			test("#then trusts readable connected providers even when cache presence flags are false", () => {
+				hasConnectedProvidersSpy?.mockReturnValue(false)
+				hasProviderModelsSpy?.mockReturnValue(false)
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+				const result = resolveModelForDelegateTask({
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
+					fallbackChain: [
+						{ providers: ["openai"], model: "gpt-5.4", variant: "high" },
+					],
+					availableModels: new Set(),
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
+				})
+
+				expect(result).toEqual({
+					model: "openai/gpt-5.4",
+					variant: "high",
+					fallbackEntry: { providers: ["openai"], model: "gpt-5.4", variant: "high" },
+					matchedFallback: true,
+				})
+				readConnectedProvidersSpy.mockRestore()
+			})
 		})
 
 		describe("#when availableModels has entries and category default matches", () => {

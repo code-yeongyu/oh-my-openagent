@@ -1,5 +1,5 @@
 import type { Dirent } from "node:fs"
-import { readdir, rm } from "node:fs/promises"
+import { lstat, readdir, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { exists, isNodeErrorWithCode } from "./codex-cache-fs"
 
@@ -36,19 +36,38 @@ export async function pruneMarketplacePluginCaches(input: {
 
 async function readCacheEntries(path: string): Promise<readonly Dirent<string>[]> {
   const emptyEntries: readonly Dirent<string>[] = []
-  return readCacheRoot(() => readdir(path, { withFileTypes: true }), emptyEntries)
+  return readCacheRoot(path, () => readdir(path, { withFileTypes: true }), emptyEntries)
 }
 
 async function readCacheEntryNames(path: string): Promise<readonly string[]> {
   const emptyNames: readonly string[] = []
-  return readCacheRoot(() => readdir(path), emptyNames)
+  return readCacheRoot(path, () => readdir(path), emptyNames)
 }
 
-async function readCacheRoot<T>(readEntries: () => Promise<T>, fallback: T): Promise<T> {
+async function readCacheRoot<T>(path: string, readEntries: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await readEntries()
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT") return fallback
+    if (await isBrokenCacheSymlink(path)) return fallback
+    throw error
+  }
+}
+
+async function isBrokenCacheSymlink(path: string): Promise<boolean> {
+  try {
+    const entry = await lstat(path)
+    if (!entry.isSymbolicLink()) return false
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return true
+    throw error
+  }
+
+  try {
+    await stat(path)
+    return false
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return true
     throw error
   }
 }

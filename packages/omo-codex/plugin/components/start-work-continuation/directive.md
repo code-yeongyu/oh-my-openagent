@@ -35,12 +35,18 @@ You are mid-flight on a Prometheus work plan. The turn just ended without finish
 - The worktree path (if set in boulder.json) governs every file edit and command. Do not stray into the main repo.
 - session_ids you write to boulder.json MUST be prefixed `codex:`. Bare ids on read are legacy `opencode:`.
 
+# Global Review and Debugging Gate
+
+Before completion, run `review-work` and a `debugging` runtime audit. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, and inconclusive review lanes as failures, not progress. Record at least three debugging hypotheses and the runtime evidence that confirms or refutes each one.
+
+Do not print `ORCHESTRATION COMPLETE`. Do not create a PR, PR handoff, or branch handoff. Do not write a final completion answer until this gate passes. Always redact secrets, tokens, credentials, auth headers, cookies, env dumps, private logs, and PII from ledgers, PR bodies, and handoffs.
+
 # Stop conditions for THIS turn
 
 - A top-level checkbox flipped to `- [x]` after the 5-phase QA gate (Phase 1 read, Phase 2 automated, Phase 3 channel scenario, Phase 4 adversarial-class probing, Phase 5 gate decision). Then the Stop hook will re-evaluate; if more checkboxes remain you will be continued again.
 - 3 same-failure cycles on one sub-task → escalate via `spawn_agent(agent_type="codex-ultrawork-reviewer", fork_turns="none", ...)` and stop dispatch.
 - Safety boundary (destructive command, secret exfiltration, production write) → stop and surface a safe substitute.
-- All top-level checkboxes `- [x]` AND (if gate triggered) `codex-ultrawork-reviewer` approved unconditionally → print the ORCHESTRATION COMPLETE block and end.
+- All top-level checkboxes `- [x]` AND the Global Review and Debugging Gate passed → print the ORCHESTRATION COMPLETE block and end.
 
 # Output discipline
 

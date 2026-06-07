@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const TEST_STORAGE_ROOT = mkdtempSync(join(tmpdir(), "omo-injector-storage-"))
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -21,6 +22,7 @@ mock.module("../../shared/opencode-storage-paths", () => ({
   PART_STORAGE: TEST_PART_STORAGE,
   SESSION_STORAGE: join(TEST_STORAGE_ROOT, "session"),
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const {
   findFirstMessageWithAgent,
@@ -79,6 +81,7 @@ afterEach(() => {
 })
 
 afterAll(() => {
+  restoreModuleMocksForTestFile(import.meta.url)
   rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
 })
 
@@ -246,8 +249,8 @@ describe("hook message injection boundaries", () => {
 
   it("does not leave message metadata when part write fails", () => {
     // given
-    mkdirSync(TEST_PART_STORAGE, { recursive: true })
-    chmodSync(TEST_PART_STORAGE, 0)
+    rmSync(TEST_PART_STORAGE, { recursive: true, force: true })
+    writeFileSync(TEST_PART_STORAGE, "not a directory")
 
     try {
       // when
@@ -260,7 +263,7 @@ describe("hook message injection boundaries", () => {
       expect(result).toBe(false)
       expect(listJsonFiles(join(TEST_MESSAGE_STORAGE, "ses_part_failure"))).toHaveLength(0)
     } finally {
-      chmodSync(TEST_PART_STORAGE, 0o700)
+      rmSync(TEST_PART_STORAGE, { force: true })
     }
   })
 })

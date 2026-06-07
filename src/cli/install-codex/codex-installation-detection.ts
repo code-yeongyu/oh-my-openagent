@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { join, win32 } from "node:path"
+import { posix, win32 } from "node:path"
 import { bunWhich } from "../../shared/bun-which-shim"
 import type { CodexInstallPlatform } from "./types"
 
@@ -154,12 +154,12 @@ async function findWindowsCodexStartApp(
 }
 
 function macCodexAppPaths(homeDir: string): readonly string[] {
-  return ["/Applications/Codex.app", join(homeDir, "Applications", "Codex.app")]
+  return ["/Applications/Codex.app", posix.join(homeDir, "Applications", "Codex.app")]
 }
 
 function macCodexDmgPaths(homeDir: string): readonly string[] {
-  const downloads = join(homeDir, "Downloads")
-  return [join(downloads, "codex.dmg"), join(downloads, "Codex.dmg")]
+  const downloads = posix.join(homeDir, "Downloads")
+  return [posix.join(downloads, "codex.dmg"), posix.join(downloads, "Codex.dmg")]
 }
 
 function windowsCodexCliPaths(env: { readonly [key: string]: string | undefined }): readonly string[] {

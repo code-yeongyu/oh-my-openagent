@@ -187,11 +187,6 @@ async function notifyParentSessionForTest(manager: BackgroundManager, task: Back
   return notifyParentSession.call(manager, task)
 }
 
-async function flushPendingParentWakeForTest(manager: BackgroundManager, sessionID: string): Promise<void> {
-  const flushPendingParentWake = Reflect.get(manager, "flushPendingParentWake") as (sessionID: string) => Promise<void>
-  return flushPendingParentWake.call(manager, sessionID)
-}
-
 async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
   const startedAt = Date.now()
   while (!predicate()) {
@@ -478,8 +473,10 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
     })
 
-    test("#when parent status is idle but latest assistant turn is still waiting on tool results #then background completion does not fork a reply", async () => {
+    test("#when parent status is idle but latest assistant turn is still waiting on tool results #then background completion records a no-reply wake", async () => {
       // given
+      const originalDateNow = Date.now
+      Date.now = () => 1778820000000
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
       }
@@ -505,16 +502,24 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
-      // when
-      await notifyParentSessionForTest(manager, task)
-      await waitForCoalescedFlush()
+      try {
+        // when
+        await notifyParentSessionForTest(manager, task)
+        await waitForCoalescedFlush()
 
-      // then
-      expect(promptAsyncCalls).toHaveLength(0)
+        // then
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
-    test("#when parent status is idle but latest assistant turn has running tool state without finish #then background completion does not fork a reply", async () => {
+    test("#when parent status is idle but latest assistant turn has running tool state without finish #then background completion records a no-reply wake", async () => {
       // given
+      const originalDateNow = Date.now
+      Date.now = () => 1778820000000
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
       }
@@ -543,12 +548,18 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
-      // when
-      await notifyParentSessionForTest(manager, task)
-      await waitForCoalescedFlush()
+      try {
+        // when
+        await notifyParentSessionForTest(manager, task)
+        await waitForCoalescedFlush()
 
-      // then
-      expect(promptAsyncCalls).toHaveLength(0)
+        // then
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
     test("#when stale tool-call history keeps blocking an all-complete wake #then completion eventually wakes the parent", async () => {
@@ -568,17 +579,21 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       ]
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses, undefined, sessionMessages)
       managerUnderTest = manager
-      const task = createTask({
-        id: "task-a",
-        parentSessionId: "parent-1",
-        description: "task A",
-        status: "completed",
-        completedAt: new Date("2026-05-15T13:40:19.368Z"),
-      })
-      getTasks(manager).set(task.id, task)
-      getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
-      await notifyParentSessionForTest(manager, task)
-      await waitForCoalescedFlush()
+      const queuePendingParentWake = Reflect.get(manager, "queuePendingParentWake") as (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      queuePendingParentWake.call(
+        manager,
+        "parent-1",
+        "<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>",
+        {},
+        true,
+        0,
+      )
       const pendingWake = getPendingParentWakes(manager).get("parent-1")
       expect(pendingWake).toBeDefined()
       if (!pendingWake) {
@@ -614,17 +629,21 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       ]
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses, undefined, sessionMessages)
       managerUnderTest = manager
-      const task = createTask({
-        id: "task-a",
-        parentSessionId: "parent-1",
-        description: "task A",
-        status: "completed",
-        completedAt: new Date("2026-05-15T13:40:19.368Z"),
-      })
-      getTasks(manager).set(task.id, task)
-      getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
-      await notifyParentSessionForTest(manager, task)
-      await waitForCoalescedFlush()
+      const queuePendingParentWake = Reflect.get(manager, "queuePendingParentWake") as (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      queuePendingParentWake.call(
+        manager,
+        "parent-1",
+        "<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>",
+        {},
+        true,
+        0,
+      )
       const pendingWake = getPendingParentWakes(manager).get("parent-1")
       expect(pendingWake).toBeDefined()
       if (!pendingWake) {
@@ -643,7 +662,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
     })
 
-    test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake still waits", async () => {
+    test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake records a no-reply wake", async () => {
       // given
       const originalDateNow = Date.now
       Date.now = () => 100_000
@@ -673,21 +692,14 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
       try {
+        // when
         await notifyParentSessionForTest(manager, task)
         await waitForCoalescedFlush()
-        const pendingWake = getPendingParentWakes(manager).get("parent-1")
-        expect(pendingWake).toBeDefined()
-        if (!pendingWake) {
-          throw new Error("Missing pending parent wake")
-        }
-        pendingWake.toolCallDeferralStartedAt = 90_000
-
-        // when
-        await flushPendingParentWakeForTest(manager, "parent-1")
 
         // then
-        expect(promptAsyncCalls).toHaveLength(0)
-        expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
       } finally {
         Date.now = originalDateNow
       }

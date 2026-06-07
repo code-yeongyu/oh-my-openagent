@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, afterEach } from "bun:test"
+import { describe, test, expect, afterEach, beforeEach } from "bun:test"
 import * as fs from "fs"
+import * as os from "os"
 import * as path from "path"
 import {
   AGENT_NAME_MAP,
@@ -326,11 +327,7 @@ describe("migrateConfigFile", () => {
   // sidecar next to the config (#3263). Clear the sidecar between tests so
   // state from an earlier test does not bleed into the next one.
   afterEach(() => {
-    try {
-      fs.unlinkSync(`${testConfigPath}.migrations.json`)
-    } catch {
-      // ignore — sidecar may not exist
-    }
+    fs.rmSync(`${testConfigPath}.migrations.json`, { force: true })
   })
 
   test("migrates experimental.hashline_edit to top-level hashline_edit", () => {
@@ -785,10 +782,14 @@ describe("migrateModelVersions", () => {
 })
 
 describe("migrateConfigFile _migrations tracking", () => {
+  function tempMigrationDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "migration-test-"))
+  }
+
   test("records migrations in _migrations field", () => {
     // given: Config with old model, no prior migrations
-    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const tmpDir = tempMigrationDir()
+    const configPath = path.join(tmpDir, "oh-my-opencode.json")
     const rawConfig: Record<string, unknown> = {
       agents: {
         sisyphus: { model: "openai/gpt-5.4-codex" },
@@ -808,8 +809,8 @@ describe("migrateConfigFile _migrations tracking", () => {
 
   test("skips re-migration when _migrations contains the key", () => {
     // given: Config with old model BUT migration already recorded
-    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const tmpDir = tempMigrationDir()
+    const configPath = path.join(tmpDir, "oh-my-opencode.json")
     const rawConfig: Record<string, unknown> = {
       agents: {
         sisyphus: { model: "openai/gpt-5.4-codex" },
@@ -831,8 +832,8 @@ describe("migrateConfigFile _migrations tracking", () => {
 
   test("migrates legacy in-config _migrations into the sidecar and appends new migrations (#3263)", () => {
     // given: Config with an existing legacy in-config _migrations history and a new migratable model
-    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const tmpDir = tempMigrationDir()
+    const configPath = path.join(tmpDir, "oh-my-opencode.json")
     const rawConfig: Record<string, unknown> = {
       agents: {
         prometheus: { model: "anthropic/claude-opus-4-5" },
@@ -1059,19 +1060,29 @@ describe("shouldDeleteAgentConfig", () => {
 
 describe("migrateConfigFile with backup", () => {
   const cleanupPaths: string[] = []
+  let workdir = ""
+
+  function tempConfigPath(label: string): string {
+    return path.join(workdir, `test-config-${label}.json`)
+  }
+
+  beforeEach(() => {
+    workdir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-migration-backup-"))
+  })
 
   afterEach(() => {
     cleanupPaths.forEach((p) => {
-      try {
-        fs.unlinkSync(p)
-      } catch {
-      }
+      fs.rmSync(p, { force: true })
     })
+    if (workdir) {
+      fs.rmSync(workdir, { recursive: true, force: true })
+      workdir = ""
+    }
   })
 
   test("creates backup file with timestamp when legacy migration needed", () => {
     // given: Config file path with legacy agent names needing migration
-    const testConfigPath = "/tmp/test-config-migration.json"
+    const testConfigPath = tempConfigPath("migration")
     const testConfigContent = globalThis.JSON.stringify({ agents: { omo: { model: "test" } } }, null, 2)
     const rawConfig: Record<string, unknown> = {
       agents: {
@@ -1106,7 +1117,7 @@ describe("migrateConfigFile with backup", () => {
 
   test("preserves model setting without auto-conversion to category", () => {
     // given: Config with model setting (should NOT be converted to category)
-    const testConfigPath = "/tmp/test-config-preserve-model.json"
+    const testConfigPath = tempConfigPath("preserve-model")
     const rawConfig: Record<string, unknown> = {
       agents: {
         "multimodal-looker": { model: "anthropic/claude-haiku-4-5" },
@@ -1132,7 +1143,7 @@ describe("migrateConfigFile with backup", () => {
 
   test("preserves category setting when explicitly set", () => {
     // given: Config with explicit category setting
-    const testConfigPath = "/tmp/test-config-preserve-category.json"
+    const testConfigPath = tempConfigPath("preserve-category")
     const rawConfig: Record<string, unknown> = {
       agents: {
         "multimodal-looker": { category: "quick" },
@@ -1156,7 +1167,7 @@ describe("migrateConfigFile with backup", () => {
 
   test("does not write or create backups for experimental.task_system", () => {
     //#given: Config with experimental.task_system enabled
-    const testConfigPath = "/tmp/test-config-task-system.json"
+    const testConfigPath = tempConfigPath("task-system")
     const rawConfig: Record<string, unknown> = {
       experimental: { task_system: true },
     }
@@ -1170,11 +1181,8 @@ describe("migrateConfigFile with backup", () => {
     const existingBackups = existingFiles.filter((f) => f.startsWith(`${basename}.bak.`))
     existingBackups.forEach((f) => {
       const backupPath = path.join(dir, f)
-      try {
-        fs.unlinkSync(backupPath)
-        cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
-      } catch {
-      }
+      fs.rmSync(backupPath, { force: true })
+      cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
     })
 
     //#when: Migrate config file
@@ -1190,7 +1198,7 @@ describe("migrateConfigFile with backup", () => {
 
   test("does not write when no migration needed", () => {
      // given: Config with no migrations needed
-     const testConfigPath = "/tmp/test-config-no-migration.json"
+     const testConfigPath = tempConfigPath("no-migration")
      const rawConfig: Record<string, unknown> = {
        agents: {
          sisyphus: { model: "test" },
@@ -1207,11 +1215,8 @@ describe("migrateConfigFile with backup", () => {
      const existingBackups = existingFiles.filter((f) => f.startsWith(`${basename}.bak.`))
      existingBackups.forEach((f) => {
        const backupPath = path.join(dir, f)
-       try {
-         fs.unlinkSync(backupPath)
-         cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
-       } catch {
-       }
+       fs.rmSync(backupPath, { force: true })
+       cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
      })
 
      // when: Migrate config file
@@ -1312,16 +1317,13 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
 
   afterEach(() => {
     for (const p of cleanupPaths) {
-      try {
-        fs.unlinkSync(p)
-      } catch {
-      }
+      fs.rmSync(p, { force: true, recursive: true })
     }
     cleanupPaths.length = 0
   })
 
   function tempConfigPath(label: string): string {
-    const workdir = fs.mkdtempSync(`/tmp/omo-migration-${label}-`)
+    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), `omo-migration-${label}-`))
     cleanupPaths.push(workdir)
     return path.join(workdir, "oh-my-openagent.json")
   }
@@ -1498,7 +1500,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
   })
 
   test("preserves _migrations in config when sidecar write fails", () => {
-    // given: Config with _migrations field and a read-only directory that will cause sidecar write to fail
+    // given: Config with _migrations field and a sidecar path collision that will cause sidecar write to fail
     const testConfigPath = tempConfigPath("sidecar-fail")
     const rawConfig: Record<string, unknown> = {
       agents: {
@@ -1507,10 +1509,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       _migrations: ["model-version:openai/gpt-5.4->openai/gpt-5.5"],
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
-
-    // Make the directory read-only to cause sidecar write to fail
-    const workdir = path.dirname(testConfigPath)
-    fs.chmodSync(workdir, 0o555)
+    fs.mkdirSync(sidecarPath(testConfigPath))
 
     // when: Migrate config file (sidecar write will fail)
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
@@ -1523,15 +1522,12 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     expect(migrations.length).toBeGreaterThanOrEqual(1)
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
 
-    // Sidecar should not exist because write failed
-    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
-
-    // cleanup: restore permissions for cleanup
-    fs.chmodSync(workdir, 0o755)
+    // Sidecar should still be the blocking directory because write failed
+    expect(fs.statSync(sidecarPath(testConfigPath)).isDirectory()).toBe(true)
   })
 
   test("writes _migrations into config as fallback when sidecar write fails and no prior _migrations existed", () => {
-    // given: config WITHOUT _migrations field and a read-only dir
+    // given: config WITHOUT _migrations field and a sidecar path collision
     const testConfigPath = tempConfigPath("sidecar-fail-no-prior")
     const rawConfig: Record<string, unknown> = {
       agents: {
@@ -1539,8 +1535,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       },
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
-    const workdir = path.dirname(testConfigPath)
-    fs.chmodSync(workdir, 0o555)
+    fs.mkdirSync(sidecarPath(testConfigPath))
 
     // when: migrate runs (sidecar write will fail)
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
@@ -1550,9 +1545,6 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     expect(rawConfig._migrations).toBeDefined()
     expect(Array.isArray(rawConfig._migrations)).toBe(true)
     expect((rawConfig._migrations as string[]).length).toBeGreaterThan(0)
-    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
-
-    // cleanup
-    fs.chmodSync(workdir, 0o755)
+    expect(fs.statSync(sidecarPath(testConfigPath)).isDirectory()).toBe(true)
   })
 })

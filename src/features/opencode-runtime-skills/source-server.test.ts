@@ -18,10 +18,10 @@ describe("runtime security skill source server", () => {
     cleanupServer = source
 
     // when
-    const indexResponse = await fetch(new URL("index.json", source.url))
+    const indexResponse = await source.fetch(new Request(new URL("index.json", source.url)))
     const index = await indexResponse.json()
-    const researchResponse = await fetch(new URL("security-research/SKILL.md", source.url))
-    const reviewResponse = await fetch(new URL("security-review/SKILL.md", source.url))
+    const researchResponse = await source.fetch(new Request(new URL("security-research/SKILL.md", source.url)))
+    const reviewResponse = await source.fetch(new Request(new URL("security-review/SKILL.md", source.url)))
     const researchMarkdown = await researchResponse.text()
     const reviewMarkdown = await reviewResponse.text()
 
@@ -49,7 +49,7 @@ describe("runtime security skill source server", () => {
     cleanupServer = source
 
     // when
-    const response = await fetch(new URL("missing/SKILL.md", source.url))
+    const response = await source.fetch(new Request(new URL("missing/SKILL.md", source.url)))
 
     // then
     expect(response.status).toBe(404)

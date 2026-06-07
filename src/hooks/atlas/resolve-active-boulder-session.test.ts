@@ -69,7 +69,7 @@ describe("resolveActiveBoulderSession", () => {
     // then
     expect(result).not.toBeNull()
     expect(result?.progress.isComplete).toBe(false)
-    expect(result?.boulderState.session_ids).toContain("ses_tracked")
+    expect(result?.boulderState.session_ids).toContain("opencode:ses_tracked")
   })
 
   test("returns tracked appended session for incomplete boulder plan", async () => {
@@ -94,7 +94,8 @@ describe("resolveActiveBoulderSession", () => {
     // then
     expect(result).not.toBeNull()
     expect(result?.progress.isComplete).toBe(false)
-    expect(result?.boulderState.session_ids).toContain("ses_appended")
+    expect(result?.boulderState.session_ids).toContain("opencode:ses_appended")
+    expect(result?.appendedSession).toBe(true)
   })
 
   test("returns null for tracked session when mirror boulder is paused", async () => {

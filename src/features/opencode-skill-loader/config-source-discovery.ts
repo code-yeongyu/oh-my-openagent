@@ -3,6 +3,7 @@ import { homedir } from "os"
 import { dirname, extname, isAbsolute, join, relative } from "path"
 import picomatch from "picomatch"
 import type { SkillsConfig } from "../../config/schema"
+import { resolveSymlinkAsync } from "../../shared/file-utils"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { deduplicateSkillsByName } from "./skill-deduplication"
 import { loadSkillsFromDir } from "./skill-directory-loader"
@@ -48,6 +49,15 @@ function filterByGlob(skills: LoadedSkill[], sourceBaseDir: string, globPattern?
   })
 }
 
+async function resolveRealPath(path: string): Promise<string> {
+  return resolveSymlinkAsync(path).catch((error) => {
+    if (error instanceof Error) {
+      return path
+    }
+    throw error
+  })
+}
+
 async function loadSourcePath(options: {
   sourcePath: string
   recursive: boolean
@@ -61,27 +71,28 @@ async function loadSourcePath(options: {
   const absolutePath = toAbsolutePath(options.sourcePath, options.configDir)
   const stat = await fs.stat(absolutePath).catch(() => null)
   if (!stat) return []
+  const realSourcePath = await resolveRealPath(absolutePath)
 
   if (stat.isFile()) {
-    if (!isMarkdownPath(absolutePath)) return []
+    if (!isMarkdownPath(realSourcePath)) return []
     const loaded = await loadSkillFromPath({
-      skillPath: absolutePath,
-      resolvedPath: dirname(absolutePath),
-      defaultName: inferSkillNameFromFileName(absolutePath),
+      skillPath: realSourcePath,
+      resolvedPath: dirname(realSourcePath),
+      defaultName: inferSkillNameFromFileName(realSourcePath),
       scope: "config",
     })
     if (!loaded) return []
-    return filterByGlob([loaded], dirname(absolutePath), options.globPattern)
+    return filterByGlob([loaded], dirname(realSourcePath), options.globPattern)
   }
 
   if (!stat.isDirectory()) return []
 
   const directorySkills = await loadSkillsFromDir({
-    skillsDir: absolutePath,
+    skillsDir: realSourcePath,
     scope: "config",
     maxDepth: options.recursive ? MAX_RECURSIVE_DEPTH : 0,
   })
-  return filterByGlob(directorySkills, absolutePath, options.globPattern)
+  return filterByGlob(directorySkills, realSourcePath, options.globPattern)
 }
 
 export async function discoverConfigSourceSkills(options: {

@@ -1,5 +1,8 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
-import { delimiter, join } from "node:path"
+import { delimiter, join, posix, win32 } from "node:path"
+import type { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import {
   buildPathWithBinaryFirst,
   collectCandidateBinaryPaths,
@@ -11,7 +14,7 @@ import {
 describe("collectCandidateBinaryPaths", () => {
   it("includes Bun.which results first and removes duplicates", () => {
     // given
-    const pathEnv = ["/bad", "/good"].join(delimiter)
+    const pathEnv = ["/bad", "/good"].join(posix.delimiter)
     const which = (command: string): string | undefined => {
       if (command === "opencode") return "/bad/opencode"
       return undefined
@@ -25,12 +28,24 @@ describe("collectCandidateBinaryPaths", () => {
     expect(candidates).toContain("/good/opencode")
     expect(candidates.filter((candidate) => candidate === "/bad/opencode")).toHaveLength(1)
   })
+
+  it("uses target Windows PATH rules when the target platform is Windows", () => {
+    // given
+    const pathEnv = ["C:\\bad", "C:\\good"].join(win32.delimiter)
+    const which = (): undefined => undefined
+
+    // when
+    const candidates = collectCandidateBinaryPaths(pathEnv, which, "win32")
+
+    // then
+    expect(candidates).toContain(win32.join("C:\\good", "opencode.exe"))
+  })
 })
 
 describe("findWorkingOpencodeBinary", () => {
   it("returns the first runnable candidate", async () => {
     // given
-    const pathEnv = ["/bad", "/good"].join(delimiter)
+    const pathEnv = ["/bad", "/good"].join(posix.delimiter)
     const which = (command: string): string | undefined => {
       if (command === "opencode") return "/bad/opencode"
       return undefined
@@ -50,9 +65,12 @@ describe("canExecuteBinary", () => {
   it("returns false when a binary probe cannot spawn the candidate", async () => {
     // given
     const binaryPath = join("/definitely-missing", "opencode")
+    const spawn = (): ReturnType<typeof spawnWithWindowsHide> => {
+      throw new Error("spawn failed")
+    }
 
     // when
-    const canExecute = await canExecuteBinary(binaryPath)
+    const canExecute = await canExecuteBinary(binaryPath, spawn)
 
     // then
     expect(canExecute).toBe(false)
