@@ -64,7 +64,7 @@ jobs:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests
-        run: bun run test
+        run: bun test
 
   typecheck:
     runs-on: ${{ matrix.os }}

@@ -2,21 +2,21 @@ import { describe, expect, test } from "bun:test"
 import { selectCiTestTargets } from "./run-ci-tests"
 
 describe("plain test script policy", () => {
-  test("#given global mock tests in the suite #then bun run test keeps one process with serialized scheduling", async () => {
+  test("#given global mock tests in the suite #then bun run test remains the package test script", async () => {
     //#given
     const packageJson = await Bun.file("package.json").json()
 
     //#then
-    expect(packageJson.scripts.test).toBe("bun test --max-concurrency=1")
+    expect(packageJson.scripts.test).toBe("bun test")
   })
 
-  test("#given CI root tests #then GitHub Actions uses the serialized package script", async () => {
+  test("#given CI root tests #then GitHub Actions uses the plain Bun test gate", async () => {
     // given
     const workflow = await Bun.file(".github/workflows/ci.yml").text()
 
     // then
-    expect(workflow).toContain("run: bun run test")
-    expect(workflow).not.toContain("run: bun test\n")
+    expect(workflow).toMatch(/- name: Run tests\s+run: bun test/)
+    expect(workflow).not.toContain("run: bun test --max-concurrency")
   })
 
   test("#given isolated test shards #when selecting targets #then shards are deterministic and complete", () => {
