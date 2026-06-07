@@ -36,6 +36,10 @@ type InstalledModuleMockLifecycle = {
   restoreModuleMocksForTestFile: (callerUrl: string) => void
 }
 
+type RestoreOptions = {
+  bunRestoreAlreadyRan?: boolean
+}
+
 let installedLifecycle: InstalledModuleMockLifecycle | undefined
 
 function toError(error: unknown): Error {
@@ -162,33 +166,51 @@ export function installModuleMockLifecycle(
     }
   }
 
-  function restoreAllModuleMocks(): void {
-    for (const snapshot of snapshots.values()) {
-      delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+  function restoreAllModuleMocks(options: RestoreOptions = {}): void {
+    if (!options.bunRestoreAlreadyRan) {
+      delegateRestore()
     }
 
     snapshots.clear()
     activeMocks.clear()
   }
 
-  function restoreUnpreservedModuleMocks(): void {
+  function restoreUnpreservedModuleMocks(options: RestoreOptions = {}): void {
+    let removedMocks = false
+    const snapshotsToReplay: ModuleSnapshot[] = []
+
     for (const [restoreSpecifier, activeMockStack] of activeMocks.entries()) {
       const preservedMocks = activeMockStack.filter((activeMock) => preserveOwners.has(activeMock.ownerUrl))
-      const preservedMock = preservedMocks.at(-1)
-
-      if (preservedMock) {
-        delegateModule(preservedMock.specifier, preservedMock.factory)
+      if (preservedMocks.length > 0) {
         activeMocks.set(restoreSpecifier, preservedMocks)
+        removedMocks = removedMocks || preservedMocks.length !== activeMockStack.length
         continue
       }
 
       const snapshot = snapshots.get(restoreSpecifier)
       if (snapshot) {
-        delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+        snapshotsToReplay.push(snapshot)
       }
       snapshots.delete(restoreSpecifier)
       activeMocks.delete(restoreSpecifier)
+      removedMocks = true
     }
+
+    if (!removedMocks) {
+      if (options.bunRestoreAlreadyRan) {
+        replayActiveMocks()
+      }
+      return
+    }
+
+    if (!options.bunRestoreAlreadyRan) {
+      delegateRestore()
+    }
+
+    for (const snapshot of snapshotsToReplay) {
+      delegateModule(snapshot.restoreSpecifier, snapshot.restoreFactory)
+    }
+    replayActiveMocks()
   }
 
   function restoreModuleMocks(): void {
@@ -292,7 +314,7 @@ export function installModuleMockLifecycle(
   mockApi.restore = (): unknown => {
     if (shouldPreserveActiveMocksOnRestore()) {
       const result = delegateRestore()
-      restoreUnpreservedModuleMocks()
+      restoreUnpreservedModuleMocks({ bunRestoreAlreadyRan: true })
       handledPreserveCleanup = true
       return result
     }
@@ -314,7 +336,7 @@ export function installModuleMockLifecycle(
 
     if (activeMocks.size > 0) {
       const result = delegateRestore()
-      restoreUnpreservedModuleMocks()
+      restoreUnpreservedModuleMocks({ bunRestoreAlreadyRan: true })
       return result
     }
 

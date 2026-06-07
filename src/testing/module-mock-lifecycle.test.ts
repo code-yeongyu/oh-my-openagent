@@ -146,6 +146,38 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("#given unpreserved active node builtin mock #when global test setup cleans up #then original builtin exports are replayed", () => {
+    // given
+    const events: string[] = []
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    const lifecycle = installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => "file:///repo/tests/example.test.ts",
+      resolveSpecifier: () => "node:fs/promises",
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      shouldPreserveActiveMocksOnRestore: () => true,
+    })
+
+    // when
+    mockApi.module("node:fs/promises", () => ({ named: "mocked" }))
+    mockApi.restore()
+    lifecycle.restoreModuleMocks()
+
+    // then
+    expect(events).toEqual([
+      "module:node:fs/promises:mocked",
+      "delegate:restore",
+      "module:node:fs/promises:original",
+    ])
+  })
+
   test("#given preserved active module mock #when global test setup cleans up #then preserved mock stays active", () => {
     // given
     const events: string[] = []
