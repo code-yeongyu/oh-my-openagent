@@ -5,7 +5,7 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		id: "kimi-k2.6",
 		family: "kimi",
 		reasoning: true,
-		temperature: true,
+		temperature: false,
 		toolCall: true,
 		modalities: {
 			input: ["text", "image", "video"],
