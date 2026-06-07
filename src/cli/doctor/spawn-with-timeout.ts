@@ -18,7 +18,7 @@ async function readPipe(stream: ReadableStream<Uint8Array> | undefined): Promise
   try {
     return await new Response(stream).text()
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("already been used")) {
+    if (error instanceof Error && error.message.includes("already been used")) {
       return ""
     }
     throw error
