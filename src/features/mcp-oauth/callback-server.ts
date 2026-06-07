@@ -1,6 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { createConnection } from "node:net"
-import { clearTimeout, setTimeout } from "node:timers"
 
 import { log } from "../../shared/logger"
 import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
@@ -21,6 +20,20 @@ export type CallbackServer = {
   port: number
   waitForCallback: () => Promise<OAuthCallbackResult>
   close: () => Promise<void>
+}
+
+const capturedSetTimeout = globalThis.setTimeout
+const capturedClearTimeout = globalThis.clearTimeout
+
+export type CallbackServerTimerHandle = ReturnType<typeof capturedSetTimeout>
+export type CallbackServerTimer = {
+  readonly setTimeout: (callback: () => void, delayMs: number) => CallbackServerTimerHandle
+  readonly clearTimeout: (handle: CallbackServerTimerHandle) => void
+}
+
+const CALLBACK_SERVER_TIMER: CallbackServerTimer = {
+  setTimeout: (callback, delayMs) => capturedSetTimeout(callback, delayMs),
+  clearTimeout: (handle) => capturedClearTimeout(handle),
 }
 
 const SUCCESS_HTML = `<!DOCTYPE html>
@@ -53,7 +66,7 @@ export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promi
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
-    setTimeout(resolve, ms)
+    capturedSetTimeout(() => resolve(), ms)
   })
 }
 
@@ -107,8 +120,12 @@ async function waitForServerAcceptingHttpRequests(port: number): Promise<void> {
   throw new Error(`OAuth callback server did not accept HTTP requests on port ${port}`)
 }
 
-export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {
+export async function startCallbackServer(
+  startPort: number = DEFAULT_PORT,
+  options: { readonly timer?: CallbackServerTimer } = {},
+): Promise<CallbackServer> {
   const requestedPort = startPort === 0 ? 0 : await findAvailablePort(startPort).catch(() => 0)
+  const timer = options.timer ?? CALLBACK_SERVER_TIMER
 
   let resolveCallback: ((result: OAuthCallbackResult) => void) | null = null
   let rejectCallback: ((error: Error) => void) | null = null
@@ -118,7 +135,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
     rejectCallback = reject
   })
 
-  const timeoutId = setTimeout(() => {
+  const timeoutId = timer.setTimeout(() => {
     rejectCallback?.(new Error("OAuth callback timed out after 5 minutes"))
     scheduleClose()
   }, TIMEOUT_MS)
@@ -135,11 +152,11 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
     const oauthError = url.searchParams.get("error")
     if (oauthError) {
       const description = url.searchParams.get("error_description") ?? oauthError
-      clearTimeout(timeoutId)
+      timer.clearTimeout(timeoutId)
       rejectCallback?.(new Error(`OAuth authorization failed: ${description}`))
       response.statusCode = 400
       response.end(`Authorization failed: ${description}`)
-      setTimeout(scheduleClose, 100)
+      timer.setTimeout(scheduleClose, 100)
       return
     }
 
@@ -147,21 +164,21 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
     const state = url.searchParams.get("state")
 
     if (!code || !state) {
-      clearTimeout(timeoutId)
+      timer.clearTimeout(timeoutId)
       rejectCallback?.(new Error("OAuth callback missing code or state parameter"))
       response.statusCode = 400
       response.end("Missing code or state parameter")
-      setTimeout(scheduleClose, 100)
+      timer.setTimeout(scheduleClose, 100)
       return
     }
 
     resolveCallback?.({ code, state })
-    clearTimeout(timeoutId)
+    timer.clearTimeout(timeoutId)
 
     response.statusCode = 200
     response.setHeader("content-type", "text/html; charset=utf-8")
     response.end(SUCCESS_HTML)
-    setTimeout(scheduleClose, 100)
+    timer.setTimeout(scheduleClose, 100)
   })
 
   let closePromise: Promise<void> | null = null
@@ -173,7 +190,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
   }
 
   function closeServer(): Promise<void> {
-    clearTimeout(timeoutId)
+    timer.clearTimeout(timeoutId)
 
     if (closePromise) {
       return closePromise
@@ -202,7 +219,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
 
   await new Promise<void>((resolve, reject) => {
     const handleError = (error: Error): void => {
-      clearTimeout(timeoutId)
+      timer.clearTimeout(timeoutId)
       reject(error)
     }
 

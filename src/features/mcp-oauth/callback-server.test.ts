@@ -3,9 +3,45 @@
 import { describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
 import { type IncomingMessage, request as httpRequest } from "node:http"
-import { startCallbackServer, type CallbackServer } from "./callback-server"
+import { startCallbackServer, type CallbackServer, type CallbackServerTimer, type CallbackServerTimerHandle } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
+
+type ScheduledCallback = {
+  readonly callback: () => void
+  readonly delayMs: number
+}
+
+function createControllableTimer(): {
+  readonly runTimersAtOrAfter: (minimumDelayMs: number) => void
+  readonly timer: CallbackServerTimer
+} {
+  const scheduled = new Map<CallbackServerTimerHandle, ScheduledCallback>()
+
+  return {
+    runTimersAtOrAfter: (minimumDelayMs) => {
+      for (const [handle, scheduledCallback] of Array.from(scheduled.entries())) {
+        if (scheduledCallback.delayMs < minimumDelayMs) {
+          continue
+        }
+        scheduled.delete(handle)
+        scheduledCallback.callback()
+      }
+    },
+    timer: {
+      setTimeout: (callback, delayMs) => {
+        const handle = globalThis.setTimeout(() => undefined, delayMs)
+        globalThis.clearTimeout(handle)
+        scheduled.set(handle, { callback, delayMs })
+        return handle
+      },
+      clearTimeout: (handle) => {
+        scheduled.delete(handle)
+        globalThis.clearTimeout(handle)
+      },
+    },
+  }
+}
 
 function request(url: string): Promise<Response> {
   return new Promise((resolve, reject) => {
@@ -120,41 +156,23 @@ describe("startCallbackServer", () => {
     }
   })
 
-  it("uses native timers for server lifetime when global timers are patched", async () => {
-    const originalSetTimeout = globalThis.setTimeout
-    const originalClearTimeout = globalThis.clearTimeout
-    globalThis.setTimeout = ((handler, timeout, ...args) => {
-      const timer = originalSetTimeout(handler, timeout, ...args)
-      if (typeof timeout === "number" && timeout >= 60_000 && typeof handler === "function") {
-        queueMicrotask(() => handler(...args))
-      }
-      return timer
-    }) as typeof globalThis.setTimeout
-    globalThis.clearTimeout = ((timer) => {
-      originalClearTimeout(timer)
-    }) as typeof globalThis.clearTimeout
-
-    let server: CallbackServer | undefined
+  it("#given injected callback timer #when OAuth lifetime expires #then callback rejects without global timer patches", async () => {
+    const { runTimersAtOrAfter, timer } = createControllableTimer()
+    const server = await startCallbackServer(0, { timer })
 
     try {
-      server = await startCallbackServer(0)
-      globalThis.setTimeout = originalSetTimeout
-      globalThis.clearTimeout = originalClearTimeout
+      const callbackRejection = server.waitForCallback().catch((error: Error) => error)
 
-      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=native-code&state=native-state`
-      const [result, response] = await Promise.all([
-        server.waitForCallback(),
-        request(callbackUrl),
-      ])
+      runTimersAtOrAfter(60_000)
 
-      expect(result).toEqual({ code: "native-code", state: "native-state" })
-      expect(response.status).toBe(200)
-    } finally {
-      if (server) {
-        await close(server)
+      const error = await callbackRejection
+      expect(error).toBeInstanceOf(Error)
+      if (!(error instanceof Error)) {
+        throw new Error("Expected callback timeout to reject with an Error")
       }
-      globalThis.setTimeout = originalSetTimeout
-      globalThis.clearTimeout = originalClearTimeout
+      expect(error.message).toContain("timed out")
+    } finally {
+      await close(server)
     }
   })
 
