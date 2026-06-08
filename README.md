@@ -372,6 +372,8 @@ Add your own under `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*
 
 ## Uninstallation
 
+If you only want to disable oh-my-openagent temporarily, remove the plugin entry from `opencode.json` and leave the config files in place. Restart OpenCode after editing the file. On Desktop, fully quit and reopen the app so the plugin process is recreated.
+
 To remove oh-my-openagent:
 
 1. **Remove the plugin from your OpenCode config**
@@ -400,9 +402,11 @@ To remove oh-my-openagent:
 3. **Verify removal**
 
    ```bash
-   opencode --version
-   # Plugin should no longer be loaded
+   bunx oh-my-openagent doctor --status
+   grep -R "oh-my-openagent\|oh-my-opencode" ~/.config/opencode/opencode.json ~/.config/opencode/opencode.jsonc 2>/dev/null
    ```
+
+   The doctor output should report that the plugin is not registered, and the `grep` command should print no active OpenCode plugin entry. If OpenCode still shows oh-my-openagent agents, restart the terminal or Desktop app after saving `opencode.json`.
 
 4. **Remove omo-codex (Codex CLI Light edition)**
 
@@ -417,6 +421,8 @@ To remove oh-my-openagent:
    ```
 
    The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old project-local Codex plugin state, run the command from that project or pass `--project <path>`; it repairs known project-local `.codex/config.toml` conflicts and reports project-local `.codex` artifacts without deleting project-owned files.
+
+   To verify Codex Light removal, check that `~/.codex/config.toml` no longer contains `sisyphuslabs` or `omo@sisyphuslabs`, then start a new Codex session from the project that previously failed.
 
 ## Features
 
