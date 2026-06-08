@@ -444,9 +444,9 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
 }
 ```
 
-### Example D — Adding DeepSeek as GPT Alternative
+### Example D - Adding DeepSeek V4 as GPT Alternative
 
-If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
+If you have DeepSeek, OpenRouter, or an OpenAI-compatible gateway and want DeepSeek V4 in the chain when GPT is unavailable:
 
 ```jsonc
 {
@@ -456,13 +456,28 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
       "variant": "high",
       "fallback_models": [
         "anthropic/claude-opus-4-7",
-        { "model": "openrouter/deepseek/deepseek-v3.2", "temperature": 0.7 },
+        { "model": "deepseek/deepseek-v4-pro", "reasoningEffort": "high" },
+        { "model": "openrouter/deepseek/deepseek-v4-pro", "reasoningEffort": "max" },
         "opencode-go/glm-5.1",
+      ],
+    },
+  },
+
+  "categories": {
+    "quick": {
+      "model": "openai/gpt-5.4-mini",
+      "fallback_models": [
+        { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "high" },
+        "opencode-go/minimax-m3",
       ],
     },
   },
 }
 ```
+
+Replace the provider prefix with the exact `provider/model` shown by `opencode models` for your setup. For example, use your gateway provider name if DeepSeek is exposed through LiteLLM, OpenRouter, Vercel AI Gateway, or another OpenAI-compatible proxy.
+
+`deepseek-chat` and `deepseek-reasoner` remain temporary compatibility aliases for `deepseek-v4-flash`. Avoid them in new configs because DeepSeek schedules both legacy IDs for retirement on 2026-07-24 15:59 UTC.
 
 `fallback_models` accepts a mix of plain model strings and per-fallback objects with `variant`, `reasoningEffort`, `temperature`, `top_p`, `maxTokens`, `thinking`.
 
