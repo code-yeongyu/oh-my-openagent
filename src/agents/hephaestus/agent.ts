@@ -134,7 +134,6 @@ export function createHephaestusAgent(
       "Autonomous Deep Worker - goal-oriented execution with GPT Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
     mode: MODE,
     model,
-    maxTokens: 32000,
     prompt,
     color: "#D97706",
     permission: {

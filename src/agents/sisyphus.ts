@@ -7,6 +7,7 @@ import {
   isGptNativeSisyphusModel,
   isClaudeOpus47Model,
   isKimiK2Model,
+  isDeepSeekModel,
 } from "./types";
 import {
   buildGeminiToolMandate,
@@ -505,7 +506,6 @@ export function createSisyphusAgent(
         "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
-      maxTokens: 64000,
       prompt,
       color: "#00CED1",
       permission: {
@@ -532,7 +532,6 @@ export function createSisyphusAgent(
         "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
-      maxTokens: 64000,
       prompt,
       color: "#00CED1",
       permission: {
@@ -559,7 +558,6 @@ export function createSisyphusAgent(
         "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
-      maxTokens: 64000,
       prompt,
       color: "#00CED1",
       permission: {
@@ -586,7 +584,6 @@ export function createSisyphusAgent(
         "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
       mode: MODE,
       model,
-      maxTokens: 64000,
       prompt,
       color: "#00CED1",
       permission: {
@@ -595,7 +592,7 @@ export function createSisyphusAgent(
         ...getFrontierToolSchemaPermission(model),
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
-      thinking: { type: "enabled", budgetTokens: 32000 },
+      thinking: { type: "enabled" },
     };
   }
 
@@ -641,7 +638,6 @@ export function createSisyphusAgent(
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
     mode: MODE,
     model,
-    maxTokens: 64000,
     prompt,
     color: "#00CED1",
     permission,
@@ -651,6 +647,10 @@ export function createSisyphusAgent(
     return { ...base, reasoningEffort: "medium" };
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
+  if (isDeepSeekModel(model)) {
+    return { ...base };
+  }
+
+  return { ...base, thinking: { type: "enabled" } };
 }
 createSisyphusAgent.mode = MODE;

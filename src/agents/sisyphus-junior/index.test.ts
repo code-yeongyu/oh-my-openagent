@@ -165,7 +165,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
       // then
       expect(result.reasoningEffort).toBeUndefined()
-      expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+      expect(result.thinking).toEqual({ type: "enabled" })
     })
 
     test("#given GLM reasoning model #when agent is created #then skips injected thinking", () => {

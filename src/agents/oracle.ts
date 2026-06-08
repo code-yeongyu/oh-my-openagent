@@ -585,7 +585,7 @@ export function createOracleAgent(model: string): AgentConfig {
 
   return {
     ...base,
-    thinking: { type: "enabled", budgetTokens: 32000 },
+    thinking: { type: "enabled" },
   } as AgentConfig;
 }
 createOracleAgent.mode = MODE;

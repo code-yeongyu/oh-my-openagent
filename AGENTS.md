@@ -1,3 +1,34 @@
+<!-- open-mem-global-context -->
+## Global Project Context
+
+This section provides context that applies to ALL projects using open-mem.
+
+### Centralized Memory System
+- Database: ~/.config/open-mem/data/memory.db
+- Global memories (scope='user') are accessible from any project
+- Project memories (scope='project') are isolated per project_path
+
+### Memory Classifications
+7 cognitive classifications from true-mem:
+- constraint: "Never use eval()" - hard constraints
+- preference: "I prefer TypeScript" - personal preferences  
+- learning: "Learned that X" - knowledge gained
+- procedural: "Always do X first" - processes
+- decision: "Decided to use Y" - architectural decisions
+- semantic: "API requires Z" - factual knowledge
+- episodic: "Yesterday we fixed..." - time-bound events (decays after 7 days)
+
+### Smart Decay
+- Episodic memories auto-decay after 7 days
+- Other classifications are permanent
+- Uses Ebbinghaus forgetting curve
+
+### Available Tools
+- Memory: mem-find, mem-create, mem_update, mem_delete, mem-get, mem-history, mem_stats
+- Project: project_switch, project_list
+- Scope: global (all projects), project (current only), all (combined)
+<!-- /open-mem-global-context -->
+
 # oh-my-opencode — OpenCode Plugin
 
 **Generated:** 2026-05-08 | **Commit:** cd31d2a1a | **Branch:** dev

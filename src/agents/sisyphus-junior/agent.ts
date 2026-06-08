@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model } from "../types"
+import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, isDeepSeekModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -131,7 +131,6 @@ export function createSisyphusJuniorAgentWithOverrides(
     mode: MODE,
     model,
     temperature,
-    maxTokens: 64000,
     prompt,
     color: override?.color ?? "#20B2AA",
     permission,
@@ -149,9 +148,13 @@ export function createSisyphusJuniorAgentWithOverrides(
     return base as AgentConfig
   }
 
+  if (isDeepSeekModel(model)) {
+    return base as AgentConfig
+  }
+
   return {
     ...base,
-    thinking: { type: "enabled", budgetTokens: 32000 },
+    thinking: { type: "enabled" },
   } as AgentConfig
 }
 
