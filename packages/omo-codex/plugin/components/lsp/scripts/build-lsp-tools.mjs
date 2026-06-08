@@ -8,11 +8,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const lspToolsDir = join(__dirname, "..", "..", "..", "..", "..", "lsp-tools-mcp");
 const packageJson = join(lspToolsDir, "package.json");
-const requiredOutputs = [
-	join(lspToolsDir, "dist", "cli.js"),
-	join(lspToolsDir, "dist", "tools.js"),
-	join(lspToolsDir, "dist", "lsp", "manager.js"),
-];
+const requiredOutputPaths = ["dist/cli.js", "dist/tools.js", "dist/lsp/manager.js"];
+const requiredOutputs = requiredOutputPaths.map((path) => join(lspToolsDir, path));
 const force = process.argv.includes("--force");
 
 if (!force && isBuildFresh(packageJson, requiredOutputs)) {
@@ -20,12 +17,13 @@ if (!force && isBuildFresh(packageJson, requiredOutputs)) {
 }
 
 if (!existsSync(packageJson)) {
-	if (!force && requiredOutputs.every((path) => existsSync(path))) {
-		console.log("Using bundled lsp-tools-mcp dist.");
+	const bundledRuntimeRoot = findBundledRuntimeRoot();
+	if (!force && bundledRuntimeRoot) {
+		console.log(`Using bundled lsp-tools-mcp dist at ${bundledRuntimeRoot}.`);
 		process.exit(0);
 	}
 	console.error(
-		`lsp-tools-mcp package metadata is missing at ${packageJson}; build packages/lsp-tools-mcp before codex-lsp`,
+		`lsp-tools-mcp package metadata is missing at ${packageJson}; checked bundled runtime dist candidates: ${getBundledRuntimeRootCandidates().join(", ")}; build packages/lsp-tools-mcp before codex-lsp`,
 	);
 	process.exit(1);
 }
@@ -43,4 +41,16 @@ function isBuildFresh(inputPath, outputPaths) {
 	if (outputPaths.some((path) => !existsSync(path))) return false;
 	const inputMtime = statSync(inputPath).mtimeMs;
 	return outputPaths.every((path) => statSync(path).mtimeMs >= inputMtime);
+}
+
+function findBundledRuntimeRoot() {
+	return getBundledRuntimeRootCandidates().find((root) => requiredOutputPaths.every((path) => existsSync(join(root, path))));
+}
+
+function getBundledRuntimeRootCandidates() {
+	return [
+		lspToolsDir,
+		join(__dirname, "..", "..", "lsp-tools-mcp"),
+		join(__dirname, "..", "..", "..", "mcp", "lsp"),
+	];
 }
