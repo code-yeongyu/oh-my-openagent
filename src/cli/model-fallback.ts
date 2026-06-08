@@ -4,6 +4,7 @@ import {
 } from "./model-fallback-requirements"
 import type { FallbackModelObject } from "../config/schema/fallback-models"
 import type { FallbackEntry } from "../shared/model-requirements"
+import { getModelCapabilities, resolveCompatibleModelSettings } from "@oh-my-opencode/model-core"
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
@@ -23,15 +24,70 @@ export type { GeneratedOmoConfig } from "./model-fallback-types"
 const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
-function toFallbackModelObject(entry: FallbackEntry, provider: string): FallbackModelObject {
+type CompatibleFallbackSettings = {
+  variant?: string
+  reasoningEffort?: FallbackModelObject["reasoningEffort"]
+  temperature?: number
+  top_p?: number
+  maxTokens?: number
+  thinking?: FallbackModelObject["thinking"]
+}
+
+function resolveCompatibleFallbackSettings(
+  providerID: string,
+  modelID: string,
+  desired: CompatibleFallbackSettings,
+): CompatibleFallbackSettings {
+  const compatibility = resolveCompatibleModelSettings({
+    providerID,
+    modelID,
+    desired: {
+      variant: desired.variant,
+      reasoningEffort: desired.reasoningEffort,
+      temperature: desired.temperature,
+      topP: desired.top_p,
+      maxTokens: desired.maxTokens,
+      thinking: desired.thinking,
+    },
+    capabilities: getModelCapabilities({ providerID, modelID }),
+  })
+
   return {
-    model: `${provider}/${transformModelForProvider(provider, entry.model)}`,
-    ...(entry.variant ? { variant: entry.variant } : {}),
-    ...(entry.reasoningEffort ? { reasoningEffort: entry.reasoningEffort as FallbackModelObject["reasoningEffort"] } : {}),
-    ...(entry.temperature !== undefined ? { temperature: entry.temperature } : {}),
-    ...(entry.top_p !== undefined ? { top_p: entry.top_p } : {}),
-    ...(entry.maxTokens !== undefined ? { maxTokens: entry.maxTokens } : {}),
-    ...(entry.thinking ? { thinking: entry.thinking } : {}),
+    ...(compatibility.variant ? { variant: compatibility.variant } : {}),
+    ...(compatibility.reasoningEffort ? { reasoningEffort: compatibility.reasoningEffort as FallbackModelObject["reasoningEffort"] } : {}),
+    ...(compatibility.temperature !== undefined ? { temperature: compatibility.temperature } : {}),
+    ...(compatibility.topP !== undefined ? { top_p: compatibility.topP } : {}),
+    ...(compatibility.maxTokens !== undefined ? { maxTokens: compatibility.maxTokens } : {}),
+    ...(compatibility.thinking !== undefined ? { thinking: compatibility.thinking as FallbackModelObject["thinking"] } : {}),
+  }
+}
+
+function toCompatibleModelConfig(model: string, desired: Pick<CompatibleFallbackSettings, "variant">): AgentConfig {
+  const slashIndex = model.indexOf("/")
+  if (slashIndex === -1) {
+    return desired.variant ? { model, variant: desired.variant } : { model }
+  }
+
+  const providerID = model.slice(0, slashIndex)
+  const modelID = model.slice(slashIndex + 1)
+  const compatible = resolveCompatibleFallbackSettings(providerID, modelID, desired)
+  return compatible.variant ? { model, variant: compatible.variant } : { model }
+}
+
+function toFallbackModelObject(entry: FallbackEntry, provider: string): FallbackModelObject {
+  const modelID = transformModelForProvider(provider, entry.model)
+  const compatible = resolveCompatibleFallbackSettings(provider, modelID, {
+    variant: entry.variant,
+    reasoningEffort: entry.reasoningEffort as FallbackModelObject["reasoningEffort"] | undefined,
+    temperature: entry.temperature,
+    top_p: entry.top_p,
+    maxTokens: entry.maxTokens,
+    thinking: entry.thinking,
+  })
+
+  return {
+    model: `${provider}/${modelID}`,
+    ...compatible,
   }
 }
 
@@ -129,7 +185,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (role === "librarian") {
       const resolved = resolveModelFromChain(req.fallbackChain, avail)
       if (resolved) {
-        const agentConfig = resolved.variant ? { model: resolved.model, variant: resolved.variant } : { model: resolved.model }
+        const agentConfig = toCompatibleModelConfig(resolved.model, { variant: resolved.variant })
         agents[role] = attachFallbackModels(agentConfig, req.fallbackChain, avail)
       }
       continue
@@ -151,7 +207,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         const resolved = resolveModelFromChain(req.fallbackChain, avail)
         if (resolved) {
           const variant = resolved.variant ?? req.variant
-          agentConfig = variant ? { model: resolved.model, variant } : { model: resolved.model }
+          agentConfig = toCompatibleModelConfig(resolved.model, { variant })
         } else {
           agentConfig = { model: "opencode/gpt-5-nano" }
         }
@@ -168,7 +224,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       const resolved = resolveModelFromChain(fallbackChain, avail)
       if (resolved) {
         const variant = resolved.variant ?? req.variant
-        const agentConfig = variant ? { model: resolved.model, variant } : { model: resolved.model }
+        const agentConfig = toCompatibleModelConfig(resolved.model, { variant })
         agents[role] = attachFallbackModels(agentConfig, fallbackChain, avail)
       }
       continue
@@ -184,7 +240,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     const resolved = resolveModelFromChain(req.fallbackChain, avail)
     if (resolved) {
       const variant = resolved.variant ?? req.variant
-      const agentConfig = variant ? { model: resolved.model, variant } : { model: resolved.model }
+      const agentConfig = toCompatibleModelConfig(resolved.model, { variant })
       agents[role] = attachFallbackModels(agentConfig, req.fallbackChain, avail)
     } else {
       agents[role] = { model: ULTIMATE_FALLBACK }
@@ -208,7 +264,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     const resolved = resolveModelFromChain(fallbackChain, avail)
     if (resolved) {
       const variant = resolved.variant ?? req.variant
-      const categoryConfig = variant ? { model: resolved.model, variant } : { model: resolved.model }
+      const categoryConfig = toCompatibleModelConfig(resolved.model, { variant })
       categories[cat] = attachFallbackModels(categoryConfig, fallbackChain, avail)
     } else {
       categories[cat] = { model: ULTIMATE_FALLBACK }
