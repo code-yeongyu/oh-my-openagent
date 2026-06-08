@@ -332,6 +332,24 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("falls back to MiniMax heuristic rules for Mimo model aliases", () => {
+    const result = getModelCapabilities({
+      providerID: "opencode-go",
+      modelID: "mimo-v2.5-pro",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "mimo-v2.5-pro",
+      family: "minimax",
+      variants: ["low", "medium", "high"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      family: { source: "heuristic" },
+    })
+  })
+
   test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
     const modelID = "minimax-m2.7"
