@@ -5,7 +5,7 @@
 > ```bash
 > npx lazycodex-ai install
 > ```
-> Ваш Codex будет писать чистый код и завершать задачи с помощью встроенного computer-use QA.
+> Ваш Codex получит локальные правила, comment checker, LSP, Git Bash для Windows, ultrawork и ulw-loop.
 > Подробности на [lazycodex.ai](https://lazycodex.ai).
 
 > [!NOTE]
@@ -169,9 +169,9 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | ⚡   | **`ultrawork` / `ulw`**                                  | Both     | Одно слово. Все агенты (Ultimate) или Codex-компонент `ultrawork` (Light) активируются. Не останавливается, пока задача не выполнена.                                                                                            |
 | 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Анализирует истинное намерение пользователя перед классификацией и действием. Триггеры `search` / `analyze` / `team` / `hyperplan`. (Light хукает только `ulw` / `ultrawork`.)                                                   |
 | 🔗   | **Инструмент правок на основе хэш-якорей**               | Ultimate | Хэш содержимого `LINE#ID` проверяет каждое изменение. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex использует собственный `apply_patch`.) |
-| 🛠️   | **LSP + AST-Grep**                                       | Ultimate | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. Точность IDE для агентов. (LSP также работает в Light через компонент `lsp`; AST-Grep только Ultimate.)                            |
+| 🛠️   | **LSP + AST-Grep**                                       | Both     | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. Ultimate предоставляет это как встроенные инструменты, Light — как plugin-scoped MCP `lsp` / `ast_grep`.                            |
 | 🧠   | **Фоновые агенты**                                       | Ultimate | Запускайте 5+ специалистов параллельно. Контекст остаётся компактным. Результаты — когда готовы.                                                                                                                                 |
-| 📚   | **Встроенные MCP**                                       | Ultimate | Exa (веб-поиск), Context7 (официальная документация), Grep.app (поиск по GitHub). Всегда включены. (В Light только LSP MCP.)                                                                                                     |
+| 📚   | **Встроенные MCP**                                       | Both     | Ultimate внедряет Exa (веб-поиск), Context7 (официальная документация) и Grep.app (поиск по GitHub) во время выполнения. Light предоставляет plugin-scoped MCP: `ast_grep`, `grep_app`, `context7`, `git_bash`, `lsp`.                                                                                                     |
 | 🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Самореферентный цикл. Не останавливается, пока задача не выполнена на 100%.                                                                                                                                                      |
 | ✅   | **Todo Enforcer** (Boulder)                              | Ultimate | Агент завис? Система немедленно возвращает его в работу. Ваша задача будет выполнена, точка.                                                                                                                                     |
 | 💬   | **Comment Checker**                                      | Both     | Никакого AI-мусора в комментариях. Тот же бинарник `@code-yeongyu/comment-checker` работает в обеих редакциях.                                                                                                                   |
