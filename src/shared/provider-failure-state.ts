@@ -9,7 +9,7 @@
  * This is a per-process in-memory store — cleared on plugin restart.
  */
 
-const failedProviders = new Set<string>()
+const failedProviders = new Map<string, number>()
 let cooldownMs = 120_000 // 2 minutes default
 
 /**
@@ -18,14 +18,19 @@ let cooldownMs = 120_000 // 2 minutes default
  * until `clearProviderFailure` is called or the cooldown expires.
  */
 export function markProviderFailed(providerID: string): void {
-  failedProviders.add(providerID.toLowerCase())
+  failedProviders.set(providerID.toLowerCase(), Date.now())
 }
 
 /**
  * Check if a provider has been marked as failed.
  */
 export function isProviderFailed(providerID: string): boolean {
-  return failedProviders.has(providerID.toLowerCase())
+  const id = providerID.toLowerCase()
+  const failedAt = failedProviders.get(id)
+  if (failedAt === undefined) return false
+  if (Date.now() - failedAt < cooldownMs) return true
+  failedProviders.delete(id)
+  return false
 }
 
 /**
@@ -46,7 +51,14 @@ export function clearAllProviderFailures(): void {
  * Get the set of currently failed providers (for debugging/logging).
  */
 export function getFailedProviders(): string[] {
-  return Array.from(failedProviders)
+  const now = Date.now()
+  const active: string[] = []
+  for (const [id, failedAt] of failedProviders) {
+    if (now - failedAt < cooldownMs) {
+      active.push(id)
+    }
+  }
+  return active
 }
 
 /**

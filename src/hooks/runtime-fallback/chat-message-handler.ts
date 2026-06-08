@@ -1,7 +1,7 @@
 import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { createFallbackState, isModelInCooldown } from "./fallback-state"
+import { createFallbackState, isModelInCooldown, stripVariant } from "./fallback-state"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -23,7 +23,6 @@ export function createChatMessageHandler(deps: HookDeps) {
       ? `${input.model.providerID}/${input.model.modelID}`
       : undefined
 
-    const stripVariant = (m: any) => String(m).replace(/\(.*?\)$/, "").toLowerCase()
     const reqLower = requestedModel ? requestedModel.toLowerCase() : undefined
 
     if (reqLower && reqLower !== stripVariant(state.currentModel)) {

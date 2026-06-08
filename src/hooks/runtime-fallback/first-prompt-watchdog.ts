@@ -13,6 +13,7 @@ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 
 const SOURCE = "first-prompt-watchdog"
 const SESSION_NEXT_EVENT_PREFIX = "session.next."
+const COMPLETED_SET_MAX_SIZE = 1000
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -218,6 +219,13 @@ export function createFirstPromptWatchdog(
       if (!sessionID) return
       if (armed.has(sessionID)) {
         cancel(sessionID)
+      }
+      // Prevent unbounded growth in long-running sessions with many subagent spawns.
+      if (completed.size >= COMPLETED_SET_MAX_SIZE) {
+        const firstKey = completed.values().next().value
+        if (firstKey !== undefined) {
+          completed.delete(firstKey)
+        }
       }
       completed.add(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (session terminal)`, { sessionID })

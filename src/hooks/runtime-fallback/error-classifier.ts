@@ -190,8 +190,6 @@ export function classifyErrorType(error: unknown): string | undefined {
   const errorCode = extractErrorCode(error)?.toLowerCase()?.replace(/[_-]/g, "")
   const errorType = extractErrorType(error)?.toLowerCase()?.replace(/[_-]/g, "")
 
-  const combinedErrorIdentifier = `${errorName || ""}${errorCode || ""}${errorType || ""}`
-
   if (
     errorName?.includes("ailoadapikeyerror") ||
     errorName?.includes("loadapi") ||

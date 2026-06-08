@@ -78,12 +78,12 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
 
   return {
     providerID: canonicalizeProviderFamily(parsed.providerID, parsed.modelID),
-    modelID: variant ? `${canonicalModelID}::${variant}` : canonicalModelID,
+    modelID: variant ? `${canonicalModelID}(${variant})` : canonicalModelID,
   }
 }
 
-function stripVariant(modelID: string): string {
-  const idx = modelID.indexOf("::")
+export function stripVariant(modelID: string): string {
+  const idx = modelID.indexOf("(")
   return idx >= 0 ? modelID.slice(0, idx) : modelID
 }
 
