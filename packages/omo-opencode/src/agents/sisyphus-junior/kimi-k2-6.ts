@@ -85,6 +85,7 @@ The verbalization step runs every turn. Output adapts to context.
 - **Truly impossible to proceed** - Ask ONE precise question (LAST RESORT)
 
 <tool_usage_rules>
+- **CodeGraph FIRST**: When \`codegraph_*\` tools are available, use \`codegraph_explore\` as the primary code exploration tool. One call replaces 3-5 grep/read chains. Use grep/glob/read ONLY for non-code files or when CodeGraph lacks coverage.
 - Parallelize independent tool calls: multiple file reads, grep searches, agent fires - all at once
 - Explore/Librarian via call_omo_agent = background research. Fire them and continue only with non-overlapping work
 - After any file edit: restate what changed, where, and what validation follows

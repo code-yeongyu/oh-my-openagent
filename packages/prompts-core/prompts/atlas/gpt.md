@@ -119,6 +119,7 @@ Every `task()` prompt MUST include ALL 6 sections:
 - [tool]: [what to search/check]
 - context7: Look up [library] docs
 - ast-grep: `sg --pattern '[pattern]' --lang [lang]`
+- **codegraph**: Use `codegraph_explore` FIRST for code structure/dependencies/symbols. Only fall back to grep/read for non-code files.
 
 ## 4. MUST DO
 - Follow pattern in [reference file:lines]

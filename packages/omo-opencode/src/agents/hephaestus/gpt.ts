@@ -180,6 +180,7 @@ ${librarianSection}
 **Parallelize EVERYTHING. Independent reads, searches, and agents run SIMULTANEOUSLY.**
 
 <tool_usage_rules>
+- **CodeGraph FIRST**: When \`codegraph_*\` tools are available, use \`codegraph_explore\` as the primary code exploration tool. One call replaces 3-5 grep/read chains. Use grep/glob/read ONLY for non-code files or when CodeGraph lacks coverage.
 - Parallelize independent tool calls: multiple file reads, grep searches, agent fires - all at once
 - Explore/Librarian = background grep. ALWAYS \`run_in_background=true\`, ALWAYS parallel
 - After any file edit: restate what changed, where, and what validation follows

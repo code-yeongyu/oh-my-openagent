@@ -5,6 +5,8 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
     let category: AvailableTool["category"] = "other"
     if (name.startsWith("lsp_")) {
       category = "lsp"
+    } else if (name.startsWith("codegraph_codegraph_")) {
+      category = "codegraph"
     } else if (name.startsWith("ast_grep")) {
       category = "ast"
     } else if (name === "grep" || name === "glob") {
@@ -19,11 +21,16 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
 }
 
 function formatToolsForPrompt(tools: AvailableTool[]): string {
+  const codegraphTools = tools.filter((tool) => tool.category === "codegraph")
   const lspTools = tools.filter((tool) => tool.category === "lsp")
   const astTools = tools.filter((tool) => tool.category === "ast")
   const searchTools = tools.filter((tool) => tool.category === "search")
 
   const parts: string[] = []
+
+  if (codegraphTools.length > 0) {
+    parts.push("`codegraph_*` (semantic code navigation)")
+  }
 
   if (searchTools.length > 0) {
     parts.push(...searchTools.map((tool) => `\`${tool.name}\``))

@@ -48,6 +48,15 @@ export function buildToolSelectionTable(
 ): string {
   const rows: string[] = ["### Tool & Agent Selection:", ""]
 
+  const hasCodegraph = tools.some((tool) => tool.category === "codegraph")
+
+  if (hasCodegraph) {
+    rows.push(
+      "**⚠️ CodeGraph Priority Rule**: When `codegraph_*` tools are available, use them as the **PRIMARY** code exploration tool. `codegraph_explore` replaces multiple grep/read calls with a single semantic query. Use grep/glob/read ONLY when CodeGraph lacks the needed data or for non-code files.",
+    )
+    rows.push("")
+  }
+
   if (tools.length > 0) {
     rows.push(
       `- ${getToolsPromptDisplay(tools)} - **FREE** - Not Complex, Scope Clear, No Implicit Assumptions`,
@@ -69,7 +78,11 @@ export function buildToolSelectionTable(
   }
 
   rows.push("")
-  rows.push("**Default flow**: explore/librarian (background) + tools → oracle (if required)")
+  if (hasCodegraph) {
+    rows.push("**Default flow**: codegraph (first choice for code) / explore/librarian (background) → oracle (if required)")
+  } else {
+    rows.push("**Default flow**: explore/librarian (background) + tools → oracle (if required)")
+  }
 
   return rows.join("\n")
 }
@@ -81,13 +94,19 @@ export function buildExploreSection(agents: AvailableAgent[]): string {
   }
 
   const useWhen = exploreAgent.metadata.useWhen || []
-  const avoidWhen = exploreAgent.metadata.avoidWhen || []
+  const avoidWhen = exploreAgent.metadata.useWhen || []
 
   return `### Explore Agent = Contextual Grep
 
 Use it as a **peer tool**, not a fallback. Fire liberally for discovery, not for files you already know.
 
 **Delegation Trust Rule:** Once you fire an explore agent for a search, do **not** manually perform that same search yourself. Use direct tools only for non-overlapping work or when you intentionally skipped delegation.
+
+**CodeGraph vs Explore vs Direct Tools priority:**
+1. \`codegraph_explore\` — FIRST choice for understanding code structure, finding symbols, tracing dependencies (single call replaces multiple grep/read chains)
+2. \`codegraph_search\` / \`codegraph_node\` — For targeted symbol lookups and source retrieval
+3. \`explore\` agent — For complex multi-angle searches that benefit from agent reasoning
+4. \`grep\` / \`glob\` / \`Read\` — For non-code files, known exact locations, or when CodeGraph lacks coverage
 
 **Use Direct Tools when:**
 ${avoidWhen.map((entry) => `- ${entry}`).join("\n")}
