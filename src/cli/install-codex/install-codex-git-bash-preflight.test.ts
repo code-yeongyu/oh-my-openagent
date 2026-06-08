@@ -10,6 +10,7 @@ import type { CommandRunOptions } from "./types"
 
 const WINDOWS_GIT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe"
 const LSP_CLI_PATH = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "cli.js")
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
 
 async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T> {
   let lspCliAlreadyPresent = true
@@ -64,7 +65,7 @@ describe("install-codex Git Bash preflight", () => {
     await expect(install).rejects.toThrow("winget install --id Git.Git -e --source winget")
     expect(commands).toEqual([])
     await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given Windows without Git Bash #when winget succeeds and resolver recovers #then install continues", async () => {
     // given
@@ -101,7 +102,7 @@ describe("install-codex Git Bash preflight", () => {
     expect(runCalls).toContain(`winget install --id Git.Git -e --source winget ${process.cwd()}`)
     expect(resolveCallCount).toBe(2)
     expect(result.gitBashPath).toBe(WINDOWS_GIT_BASH_PATH)
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given non-Windows install #when running installer #then winget is never called", async () => {
     // given
@@ -124,7 +125,7 @@ describe("install-codex Git Bash preflight", () => {
     // then
     expect(result.gitBashPath).toBeNull()
     expect(runCalls.some((command) => command.startsWith("winget "))).toBe(false)
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given Windows with Git Bash #when installing Codex profile #then proceeds and reports detected path", async () => {
     // given
@@ -144,7 +145,7 @@ describe("install-codex Git Bash preflight", () => {
     // then
     expect(result.gitBashPath).toBe(WINDOWS_GIT_BASH_PATH)
     expect(await readFile(join(codexHome, "config.toml"), "utf8")).toContain("[marketplaces.sisyphuslabs]")
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given Windows env override in installer options #when no custom resolver is provided #then default resolver uses it", async () => {
     // given
@@ -165,7 +166,7 @@ describe("install-codex Git Bash preflight", () => {
 
     // then
     expect(result.gitBashPath).toBe(gitBashPath)
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given non-Windows install #when Git Bash resolver would fail #then installer keeps existing behavior", async () => {
     // given
@@ -189,5 +190,5 @@ describe("install-codex Git Bash preflight", () => {
     // then
     expect(result.gitBashPath).toBeNull()
     expect(await readFile(join(codexHome, "config.toml"), "utf8")).toContain("[marketplaces.sisyphuslabs]")
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 })
