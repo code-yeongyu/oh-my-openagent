@@ -22,7 +22,22 @@ export async function capturePreservedAgentReasoning({ codexHome }) {
 	return preserved;
 }
 
-export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning = new Map() }) {
+export async function capturePreservedAgentServiceTier({ codexHome }) {
+	const agentsDir = join(codexHome, "agents");
+	if (!(await exists(agentsDir))) return new Map();
+
+	const preserved = new Map();
+	const agentEntries = await readdir(agentsDir, { withFileTypes: true });
+	for (const entry of agentEntries) {
+		if (!entry.name.endsWith(".toml")) continue;
+		const content = await readTextIfExists(join(agentsDir, entry.name));
+		if (content === null) continue;
+		preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
+	}
+	return preserved;
+}
+
+export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning = new Map(), preservedServiceTier = new Map() }) {
 	const bundledAgents = await discoverBundledAgents(pluginRoot);
 	if (bundledAgents.length === 0) {
 		await writeManifest(pluginRoot, []);
@@ -38,10 +53,24 @@ export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedR
 		const linkPath = join(agentsDir, agentFileName);
 		await replaceWithCopy(linkPath, agentPath);
 		await restorePreservedReasoning({ linkPath, target: agentPath, value: preservedReasoning.get(agentName) });
+		await restorePreservedServiceTier({
+			linkPath,
+			preserved: preservedServiceTier.has(agentName),
+			value: preservedServiceTier.get(agentName) ?? null,
+		});
 		linked.push({ name: agentFileName, path: linkPath, target: agentPath });
 	}
 	await writeManifest(pluginRoot, linked.map((entry) => entry.path));
 	return linked;
+}
+
+async function restorePreservedServiceTier({ linkPath, preserved, value }) {
+	if (!preserved) return;
+	const content = await readFile(linkPath, "utf8");
+	if (extractServiceTier(content) === value) return;
+	const replacement = replaceServiceTier(content, value);
+	if (!replacement.replaced) return;
+	await writeFile(linkPath, replacement.content);
 }
 
 async function discoverBundledAgents(pluginRoot) {
@@ -106,27 +135,71 @@ async function readTextIfExists(path) {
 }
 
 function extractReasoningEffort(content) {
+	return extractTopLevelStringSetting(content, "model_reasoning_effort");
+}
+
+function extractServiceTier(content) {
+	return extractTopLevelStringSetting(content, "service_tier");
+}
+
+function extractTopLevelStringSetting(content, key) {
 	for (const line of content.split(/\n/)) {
 		if (isSectionHeader(line)) return null;
-		const match = line.match(/^\s*model_reasoning_effort\s*=\s*("(?:[^"\\]|\\.)*")/);
-		if (match === null) continue;
-		return JSON.parse(match[1]);
+		const rawValue = topLevelStringSettingRawValue(line, key);
+		if (rawValue === undefined) continue;
+		return JSON.parse(rawValue);
 	}
 	return null;
 }
 
 function replaceReasoningEffort(content, value) {
+	return replaceTopLevelStringSetting(content, "model_reasoning_effort", value, { insertIfMissing: false });
+}
+
+function replaceServiceTier(content, value) {
+	return replaceTopLevelStringSetting(content, "service_tier", value, { insertIfMissing: true });
+}
+
+function replaceTopLevelStringSetting(content, key, value, options) {
 	let replaced = false;
 	const lines = content.split(/\n/);
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index];
 		if (isSectionHeader(line)) break;
-		if (!/^\s*model_reasoning_effort\s*=/.test(line)) continue;
+		if (topLevelStringSettingRawValue(line, key) === undefined) continue;
+		if (value === null) {
+			lines.splice(index, 1);
+			replaced = true;
+			break;
+		}
 		lines[index] = line.replace(/=\s*"(?:[^"\\]|\\.)*"/, `= ${JSON.stringify(value)}`);
 		replaced = true;
 		break;
 	}
+	if (!replaced && value !== null && options.insertIfMissing) {
+		lines.splice(topLevelInsertionIndex(lines), 0, `${key} = ${JSON.stringify(value)}`);
+		replaced = true;
+	}
 	return { content: lines.join("\n"), replaced };
+}
+
+function topLevelStringSettingRawValue(line, key) {
+	const match = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*")/);
+	if (match === null) return undefined;
+	const settingKey = match[1];
+	const rawValue = match[2];
+	if (settingKey !== key || rawValue === undefined) return undefined;
+	return rawValue;
+}
+
+function topLevelInsertionIndex(lines) {
+	const sectionIndex = lines.findIndex((line) => isSectionHeader(line));
+	const topLevelEnd = sectionIndex === -1 ? lines.length : sectionIndex;
+	let insertionIndex = topLevelEnd;
+	while (insertionIndex > 0 && lines[insertionIndex - 1] === "") {
+		insertionIndex -= 1;
+	}
+	return insertionIndex;
 }
 
 function isSectionHeader(line) {
