@@ -9,6 +9,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { RuntimeState, TeamSpec } from "../types"
+import { parseTeamCreateArgs } from "./lifecycle-inline-spec"
 
 const runtimes = new Map<string, RuntimeState>()
 let nextTeamRunNumber = 1
@@ -411,5 +412,48 @@ describe("createTeamCreateTool inline_spec normalization", () => {
         { name: "agent-3-quality-process-analyst", kind: "category", category: "analysis", prompt: "Role: Quality/Process Analyst\ntests, builds, CI/CD" },
       ],
     })
+  })
+})
+
+describe("parseTeamCreateArgs null-valued optional handling", () => {
+  test("treats null inline_spec as absent when teamName is provided", () => {
+    // given the tool-calling surface serializes the unused optional as null
+    const args = parseTeamCreateArgs({ teamName: "existing-team", inline_spec: null })
+
+    // then teamName is accepted as the single provided option
+    expect(args.teamName).toBe("existing-team")
+    expect(args.inline_spec ?? undefined).toBeUndefined()
+  })
+
+  test("treats null teamName as absent when inline_spec is provided", () => {
+    // given the tool-calling surface serializes the unused optional as null
+    const inlineSpec = { name: "smoke-test-team", members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }] }
+    const args = parseTeamCreateArgs({ teamName: null, inline_spec: inlineSpec })
+
+    // then inline_spec is accepted as the single provided option
+    expect(args.teamName ?? undefined).toBeUndefined()
+    expect(args.inline_spec).toEqual(inlineSpec)
+  })
+
+  test("still rejects when both teamName and inline_spec are provided", () => {
+    let errorMessage = ""
+    try {
+      parseTeamCreateArgs({ teamName: "existing-team", inline_spec: { name: "x", members: [] } })
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
+
+    expect(errorMessage).toContain("team_create requires exactly one of teamName or inline_spec")
+  })
+
+  test("still rejects when both teamName and inline_spec are null", () => {
+    let errorMessage = ""
+    try {
+      parseTeamCreateArgs({ teamName: null, inline_spec: null })
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
+
+    expect(errorMessage).toContain("team_create requires exactly one of teamName or inline_spec")
   })
 })
