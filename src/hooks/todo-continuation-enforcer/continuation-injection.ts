@@ -21,7 +21,6 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
   normalizeAgentForPrompt,
-  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
@@ -139,7 +138,6 @@ export async function injectContinuation(args: {
   const promptAgent = registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
     ? registeredAgentName
     : normalizeAgentForPrompt(agentName)
-  const launchAgent = promptAgent ? stripAgentListSortPrefix(promptAgent).trim() || undefined : undefined
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -181,7 +179,7 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: launchAgent ?? promptAgent,
+      agent: promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
@@ -204,7 +202,7 @@ ${todoList}`
       input: {
         path: { id: sessionID },
         body: {
-          agent: launchAgent ?? promptAgent,
+          agent: promptAgent,
           ...(launchModel ? { model: launchModel } : {}),
           ...(launchVariant ? { variant: launchVariant } : {}),
           ...(inheritedTools ? { tools: inheritedTools } : {}),
