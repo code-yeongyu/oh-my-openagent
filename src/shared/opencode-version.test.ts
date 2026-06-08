@@ -293,8 +293,8 @@ describe("opencode-version", () => {
   })
 
   describe("MINIMUM_OPENCODE_VERSION", () => {
-    test("is set to 1.1.1", () => {
-      expect(MINIMUM_OPENCODE_VERSION).toBe("1.1.1")
+    test("is set to 1.4.0", () => {
+      expect(MINIMUM_OPENCODE_VERSION).toBe("1.4.0")
     })
   })
 
