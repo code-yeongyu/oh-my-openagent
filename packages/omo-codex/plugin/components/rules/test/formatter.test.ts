@@ -42,7 +42,7 @@ describe("rules formatter hook context", () => {
 		);
 	});
 
-	it("#given static rules #when formatting SessionStart context #then it lists files to read without rule bodies", () => {
+	it("#given static rules #when formatting SessionStart context #then it injects rule bodies inline", () => {
 		// given
 		const rule = loadedRule({
 			path: "/repo/CONTEXT.md",
@@ -55,9 +55,14 @@ describe("rules formatter hook context", () => {
 
 		// then
 		expect(block).toBe(
-			["## Project Instructions", "", "must read project rules:", "- [CONTEXT.md]{/repo/CONTEXT.md}"].join("\n"),
+			[
+				"## Project Instructions",
+				"",
+				"Instructions from: /repo/CONTEXT.md",
+				"",
+				"Keep generated hook context readable.",
+			].join("\n"),
 		);
-		expect(block).not.toContain("Keep generated hook context readable.");
 	});
 
 	it("#given CRLF and bare CR rule bodies #when formatting context #then it normalizes line endings", () => {
@@ -74,7 +79,7 @@ describe("rules formatter hook context", () => {
 		expect(block).not.toContain("\r");
 	});
 
-	it("#given duplicate static rules with different line endings #when formatting context #then it lists one file to read", () => {
+	it("#given duplicate static rules with different line endings #when formatting context #then it injects one copy", () => {
 		// given
 		const lfRule = loadedRule({
 			path: "/repo/CONTEXT.md",
@@ -91,12 +96,12 @@ describe("rules formatter hook context", () => {
 		const block = formatStaticBlock([lfRule, crlfRule], FORMAT_OPTIONS);
 
 		// then
-		expect(occurrenceCount(block, "- [CONTEXT.md]{/repo/CONTEXT.md}")).toBe(1);
-		expect(block).not.toContain("Shared rule\nKeep one copy.");
+		expect(occurrenceCount(block, "Instructions from: /repo/CONTEXT.md")).toBe(1);
+		expect(occurrenceCount(block, "Shared rule\nKeep one copy.")).toBe(1);
 		expect(block).not.toContain("/repo/packages/CONTEXT.md");
 	});
 
-	it("#given a Hephaestus static rule #when formatting SessionStart context #then it expands inline before other rule links", () => {
+	it("#given a Hephaestus static rule #when formatting SessionStart context #then it injects its body before other rule bodies", () => {
 		// given
 		const rules = [
 			loadedRule({ path: "/repo/alpha.md", relativePath: "alpha.md", body: "Alpha guidance." }),
@@ -114,10 +119,11 @@ describe("rules formatter hook context", () => {
 		// then
 		expect(block).toContain("Instructions from: /repo/bundled-rules/hephaestus.md");
 		expect(block).toContain("Hephaestus guidance.");
-		expect(block).toContain("must read project rules:");
-		expect(block.indexOf("Hephaestus guidance.")).toBeLessThan(block.indexOf("must read project rules:"));
-		expect(block.indexOf("must read project rules:")).toBeLessThan(block.indexOf("- [alpha.md]{/repo/alpha.md}"));
-		expect(block.indexOf("- [alpha.md]{/repo/alpha.md}")).toBeLessThan(block.indexOf("- [beta.md]{/repo/beta.md}"));
+		expect(block).toContain("Alpha guidance.");
+		expect(block).toContain("Beta guidance.");
+		expect(block.indexOf("Hephaestus guidance.")).toBeLessThan(block.indexOf("Alpha guidance."));
+		expect(block.indexOf("Alpha guidance.")).toBeLessThan(block.indexOf("Beta guidance."));
+		expect(block).not.toContain("must read project rules:");
 		expect(block).not.toContain("- [hephaestus.md]");
 	});
 

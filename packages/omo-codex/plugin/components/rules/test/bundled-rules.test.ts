@@ -164,7 +164,7 @@ describe("plugin bundled rules", () => {
 		expect(output).toContain('"hookEventName":"SessionStart"');
 		expect(output).toContain(`Instructions from: ${bundledRulePath}`);
 		expect(output).toContain(BUNDLED_BODY);
-		expect(output).not.toContain("## Project Instructions");
+		expect(output).toContain("## Project Instructions");
 		expect(output).not.toContain("must read project rules:");
 		expect(output).not.toContain(`- [hephaestus.md]{${bundledRulePath}}`);
 	});
@@ -251,7 +251,7 @@ describe("plugin bundled rules", () => {
 		expect(output).not.toContain("[Truncated. Full:");
 	});
 
-	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then static context lists the file without body", async () => {
+	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then static context injects a truncated body", async () => {
 		// given
 		const root = mkdtempSync(join(tmpdir(), "codex-rules-project-large-project-"));
 		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-project-large-plugin-"));
@@ -275,8 +275,9 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
-		expect(output).toContain(`- [oversized.md]{${projectRulePath}}`);
+		expect(output).toContain(`Instructions from: ${projectRulePath}`);
+		expect(output).toContain("The project rule body is intentionally oversized for the cap test.");
+		expect(output).toContain("[Truncated. Full:");
 		expect(output).not.toContain(tailMarker);
-		expect(output).not.toContain("[Truncated. Full:");
 	});
 });
