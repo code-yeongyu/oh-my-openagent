@@ -75,7 +75,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   },
   {
     family: "minimax",
-    includes: ["minimax"],
+    includes: ["minimax", "mimo-"],
     variants: ["low", "medium", "high"],
     supportsThinking: false,
   },
