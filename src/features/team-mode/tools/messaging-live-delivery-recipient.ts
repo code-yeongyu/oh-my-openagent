@@ -94,12 +94,16 @@ export async function deliverLiveToRecipient(input: {
       },
     })
     if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
-      await releaseReservationSafely(reservation, {
+      await markLiveDeliveryAcceptedLike({
         teamRunId,
-        recipient: recipientName,
+        recipientName,
+        recipientSessionId,
         messageId: message.messageId,
+        reservation,
+        config,
+        logReason: "live delivery prompt failed ambiguously",
       })
-      log("[team-mailbox] live delivery prompt failed ambiguously, released reservation to inbox", {
+      log("[team-mailbox] live delivery prompt failed ambiguously, retained reservation against duplicate injection", {
         teamRunId,
         recipient: recipientName,
         recipientSessionId,
@@ -123,29 +127,15 @@ export async function deliverLiveToRecipient(input: {
       })
       return
     }
-    try {
-      await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
-    } catch (markError) {
-      try {
-        await commitDeliveryReservation(reservation)
-      } catch (commitError) {
-        log("[team-mailbox] live delivery prompt dispatched but pending mark and reservation commit failed", {
-          teamRunId,
-          recipient: recipientName,
-          recipientSessionId,
-          messageId: message.messageId,
-          error: commitError instanceof Error ? commitError.message : String(commitError),
-        })
-      }
-      log("[team-mailbox] live delivery prompt dispatched but pending mark failed, committed reservation directly", {
-        teamRunId,
-        recipient: recipientName,
-        recipientSessionId,
-        messageId: message.messageId,
-        error: markError instanceof Error ? markError.message : String(markError),
-      })
-      return
-    }
+    await markLiveDeliveryAcceptedLike({
+      teamRunId,
+      recipientName,
+      recipientSessionId,
+      messageId: message.messageId,
+      reservation,
+      config,
+      logReason: "live delivery prompt dispatched",
+    })
     log("[team-mailbox] live delivery reserved until recipient idle", {
       teamRunId,
       recipient: recipientName,
@@ -163,6 +153,41 @@ export async function deliverLiveToRecipient(input: {
       teamRunId,
       recipient: recipientName,
       messageId: message.messageId,
+    })
+  }
+}
+
+async function markLiveDeliveryAcceptedLike(input: {
+  readonly teamRunId: string
+  readonly recipientName: string
+  readonly recipientSessionId: string
+  readonly messageId: string
+  readonly reservation: DeliveryReservation
+  readonly config: TeamModeConfig
+  readonly logReason: string
+}): Promise<void> {
+  try {
+    await markLiveDeliveryPending(input.teamRunId, input.recipientName, input.messageId, input.config)
+  } catch (markError) {
+    try {
+      await commitDeliveryReservation(input.reservation)
+    } catch (commitError) {
+      log("[team-mailbox] live delivery accepted-like prompt but pending mark and reservation commit failed", {
+        teamRunId: input.teamRunId,
+        recipient: input.recipientName,
+        recipientSessionId: input.recipientSessionId,
+        messageId: input.messageId,
+        reason: input.logReason,
+        error: commitError instanceof Error ? commitError.message : String(commitError),
+      })
+    }
+    log("[team-mailbox] live delivery accepted-like prompt but pending mark failed, committed reservation directly", {
+      teamRunId: input.teamRunId,
+      recipient: input.recipientName,
+      recipientSessionId: input.recipientSessionId,
+      messageId: input.messageId,
+      reason: input.logReason,
+      error: markError instanceof Error ? markError.message : String(markError),
     })
   }
 }

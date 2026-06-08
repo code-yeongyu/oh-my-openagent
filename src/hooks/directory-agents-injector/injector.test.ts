@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
@@ -103,8 +103,8 @@ describe("processFilePathForAgentsInjection", () => {
 
     // then
     expect(agentsPaths).toEqual([
-      join(srcDirectory, "AGENTS.md"),
-      join(componentsDirectory, "AGENTS.md"),
+      realpathSync(join(srcDirectory, "AGENTS.md")),
+      realpathSync(join(componentsDirectory, "AGENTS.md")),
     ])
   })
 

@@ -49,6 +49,5 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 	const relative = path === root ? "" : path.slice(root.length + sep.length);
 	if (relative === "") return true;
 	const parts = relative.split(sep);
-	if (parts[parts.length - 1] === "package-lock.json") return false;
 	return !parts.some((part) => part === ".git" || part === "node_modules");
 }

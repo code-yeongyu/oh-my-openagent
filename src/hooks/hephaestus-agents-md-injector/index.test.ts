@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
@@ -45,7 +45,7 @@ describe("hephaestus agents md injector hook", () => {
     }, output)
 
     // then
-    expect(output.parts[0]?.text).toContain(`[Directory Context: ${join(temporaryDirectory, "AGENTS.md")}]`)
+    expect(output.parts[0]?.text).toContain(`[Directory Context: ${realpathSync(join(temporaryDirectory, "AGENTS.md"))}]`)
     expect(output.parts[0]?.text).toContain("Always force-load this rule.")
     expect(output.parts[0]?.text).toEndWith("Implement the thing")
   })

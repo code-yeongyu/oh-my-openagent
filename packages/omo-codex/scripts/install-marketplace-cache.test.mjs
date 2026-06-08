@@ -94,7 +94,7 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 		["npm", "run build", pluginRoot],
 	]);
 	assert.equal(commandLog[2][0], "npm");
-	assert.equal(commandLog[2][1], "install --omit=dev");
+	assert.equal(commandLog[2][1], "ci --omit=dev");
 	assert.equal(commandLog[2][2].startsWith(join(codexHome, "plugins", "cache", "debug-marketplace", "alpha", ".tmp-1.2.3-")), true);
 
 	const config = await readFile(join(codexHome, "config.toml"), "utf8");

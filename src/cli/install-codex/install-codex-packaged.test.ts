@@ -122,7 +122,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   const installCommand = commands[0]
   if (installCommand === undefined) throw new Error("missing cached plugin npm install command")
   expect(installCommand[0]).toBe("npm")
-  expect(installCommand[1]).toBe("install --omit=dev")
+  expect(installCommand[1]).toBe("ci --omit=dev")
   expect(installCommand[2].startsWith(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", ".tmp-4.5.12-"))).toBe(true)
   expect(cachedMcp.mcpServers.lsp.cwd).toBeUndefined()
   expect(cachedMcp.mcpServers.lsp.args).toEqual([cachedLspCli, "mcp"])

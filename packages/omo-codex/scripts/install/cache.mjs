@@ -1,4 +1,5 @@
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { realpathSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 
 import { createCachedMcpRuntimeArgRewriter } from "./mcp-runtime-cache.mjs";
@@ -17,7 +18,7 @@ export async function installCachedPlugin({ buildSource = true, codexHome, marke
 	try {
 		await copyDirectory(sourcePath, tempPath, shouldCopyPluginPath);
 		await rewriteCachedPackageLocalFileDependencies(tempPath, sourcePath);
-		await maybeRunNpmInstall(tempPath, runCommand, ["install", "--omit=dev"]);
+		await maybeRunNpmInstall(tempPath, runCommand, ["ci", "--omit=dev"]);
 		await rewriteCachedMcpManifest(tempPath, sourcePath);
 		await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
 		await promoteDirectory(tempPath, targetPath, renameDirectory);
@@ -105,7 +106,6 @@ function shouldCopyPluginPath(path, root) {
 	const relative = path === root ? "" : path.slice(root.length + sep.length);
 	if (relative === "") return true;
 	const parts = relative.split(sep);
-	if (parts[parts.length - 1] === "package-lock.json") return false;
 	return !parts.some((part) => part === ".git" || part === "node_modules");
 }
 
@@ -162,6 +162,7 @@ async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
 async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot) {
 	const packageJsonPaths = [];
 	await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths);
+	const packageLock = await readPackageLock(pluginRoot);
 	for (const packageJsonPath of packageJsonPaths) {
 		const raw = await readFile(packageJsonPath, "utf8");
 		const parsed = JSON.parse(raw);
@@ -178,11 +179,95 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
 				if (filePath.length === 0 || isAbsolute(filePath)) continue;
 				const targetPath = resolve(packageDir, filePath);
 				if (isPathInside(targetPath, pluginRoot)) continue;
-				dependencies[name] = `file:${resolve(sourcePackageDir, filePath)}`;
+				const sourceTargetPath = resolve(sourcePackageDir, filePath);
+				dependencies[name] = `file:${sourceTargetPath}`;
+				rewritePackageLockFileDependency({
+					dependencyName: name,
+					field,
+					packageDir,
+					packageLock,
+					pluginRoot,
+					sourceTargetPath,
+					targetPath,
+				});
 				changed = true;
 			}
 		}
 		if (changed) await writeFile(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}\n`);
+	}
+	if (packageLock.changed) await writeFile(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}\n`);
+}
+
+async function readPackageLock(pluginRoot) {
+	const path = join(pluginRoot, "package-lock.json");
+	try {
+		const parsed = JSON.parse(await readFile(path, "utf8"));
+		return { path, value: isRecord(parsed) ? parsed : null, changed: false };
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+			return { path, value: null, changed: false };
+		}
+		throw error;
+	}
+}
+
+function rewritePackageLockFileDependency({
+	dependencyName,
+	field,
+	packageDir,
+	packageLock,
+	pluginRoot,
+	sourceTargetPath,
+	targetPath,
+}) {
+	const packages = getPackageLockPackages(packageLock.value);
+	if (!packages) return;
+
+	const lockRoot = canonicalizeExistingPath(pluginRoot);
+	const packageKey = toPackageLockPath(relative(pluginRoot, packageDir));
+	const oldTargetKey = toPackageLockPath(relative(pluginRoot, targetPath));
+	const newTargetKey = toPackageLockPath(relative(lockRoot, sourceTargetPath));
+	const newSpecifier = `file:${sourceTargetPath}`;
+
+	const packageEntry = packages[packageKey];
+	if (isRecord(packageEntry)) {
+		const dependencyRecord = packageEntry[field];
+		if (isRecord(dependencyRecord) && dependencyRecord[dependencyName] !== newSpecifier) {
+			dependencyRecord[dependencyName] = newSpecifier;
+			packageLock.changed = true;
+		}
+	}
+
+	if (oldTargetKey !== newTargetKey && isRecord(packages[oldTargetKey])) {
+		packages[newTargetKey] = packages[oldTargetKey];
+		delete packages[oldTargetKey];
+		packageLock.changed = true;
+	}
+
+	const nodeModulesKey = `node_modules/${dependencyName}`;
+	const nodeModulesEntry = packages[nodeModulesKey];
+	if (isRecord(nodeModulesEntry) && nodeModulesEntry.resolved !== newTargetKey) {
+		nodeModulesEntry.resolved = newTargetKey;
+		packageLock.changed = true;
+	}
+}
+
+function getPackageLockPackages(packageLock) {
+	if (!packageLock) return null;
+	const packages = packageLock.packages;
+	return isRecord(packages) ? packages : null;
+}
+
+function toPackageLockPath(path) {
+	return path.split(sep).join("/");
+}
+
+function canonicalizeExistingPath(path) {
+	try {
+		return realpathSync(path);
+	} catch (error) {
+		if (error instanceof Error) return path;
+		throw error;
 	}
 }
 

@@ -7,6 +7,7 @@ Native Codex marketplace for the `omo` plugin.
 `omo` is one Codex plugin namespace with isolated internal components:
 
 - `components/comment-checker`: runs comment-checker automatically after successful `apply_patch` edits.
+- `components/git-bash`: exposes the Windows Git Bash MCP and reminds Codex before shell-like calls.
 - `components/rules`: injects local project rule files into Codex context through lifecycle hooks.
 - `components/lsp`: exposes Language Server Protocol diagnostics, navigation, symbols, and rename tools through MCP and post-edit hooks.
 - `components/ultrawork`: injects the ultrawork orchestration directive when a user prompt contains `ultrawork` or `ulw`.

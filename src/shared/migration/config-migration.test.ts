@@ -8,7 +8,7 @@ import { migrateConfigFile } from "./config-migration"
 import { getSidecarPath } from "./migrations-sidecar"
 
 const createdDirectories: string[] = []
-const MIGRATION_KEY = "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"
+const MIGRATION_KEY = "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7"
 
 function createWorkdir(): string {
   const workdir = mkdtempSync(join(tmpdir(), "omo-config-migration-"))
@@ -19,7 +19,7 @@ function createWorkdir(): string {
 function createLegacyConfig(): Record<string, unknown> {
   return {
     agents: {
-      prometheus: { model: "anthropic/claude-opus-4-5" },
+      prometheus: { model: "anthropic/claude-opus-4-4" },
     },
   }
 }
@@ -183,7 +183,7 @@ describe("migrateConfigFile backup skipping", () => {
     const configPath = join(workdir, "oh-my-opencode.json")
     const rawConfig = {
       agents: {
-        prometheus: { model: "anthropic/claude-opus-4-5" },
+        prometheus: { model: "anthropic/claude-opus-4-4" },
       },
     }
 

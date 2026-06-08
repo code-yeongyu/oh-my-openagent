@@ -1,11 +1,7 @@
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 
-export function getAdditionalPathBases(workingDirectory: string): string[] {
-	return [join(workingDirectory, "node_modules", ".bin")];
-}
-
-export function isServerInstalled(command: string[]): boolean {
+export function isServerInstalled(command: string[], _workingDirectory?: string): boolean {
 	if (command.length === 0) return false;
 
 	const [cmd] = command;
@@ -38,14 +34,6 @@ export function isServerInstalled(command: string[]): boolean {
 	for (const p of paths) {
 		for (const suffix of exts) {
 			if (existsSync(join(p, cmd + suffix))) {
-				return true;
-			}
-		}
-	}
-
-	for (const base of getAdditionalPathBases(process.cwd())) {
-		for (const suffix of exts) {
-			if (existsSync(join(base, cmd + suffix))) {
 				return true;
 			}
 		}
