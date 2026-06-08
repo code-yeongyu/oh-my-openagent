@@ -76,6 +76,28 @@ describe("resolveFormatters", () => {
     expect(result.get(".tsx")).toEqual([{ command: ["prettier", "--write", "$FILE"], environment: {} }])
   })
 
+  it("resolves formatters from direct SDK config responses", async () => {
+    //#given
+    const client = {
+      config: {
+        get: mock(() => Promise.resolve({
+          formatter: {
+            prettier: {
+              command: ["prettier", "--write", "$FILE"],
+              extensions: [".json"],
+            },
+          },
+        })),
+      },
+    }
+
+    //#when
+    const result = await resolveFormatters(client, "/project")
+
+    //#then
+    expect(result.get(".json")).toEqual([{ command: ["prettier", "--write", "$FILE"], environment: {} }])
+  })
+
   it("resolves formatters from experimental.hook.file_edited section", async () => {
     //#given
     const client = createMockClient({
