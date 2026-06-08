@@ -7,6 +7,7 @@ import type {
 import { findMatchingHooks, objectToSnakeCase, transformToolName, log } from "../../shared"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
+import { normalizeHookText } from "./hook-text"
 
 export interface PreToolUseContext {
   sessionId: string
@@ -73,6 +74,13 @@ export async function executePreToolUseHooks(
   const startTime = Date.now()
   let firstHookName: string | undefined
   const inputLines = buildInputLines(ctx.toolInput)
+  let accumulatedModifiedInput: Record<string, unknown> | undefined
+  const accumulatedCommonFields: {
+    continue?: boolean
+    stopReason?: string
+    suppressOutput?: boolean
+    systemMessage?: string
+  } = {}
 
    for (const matcher of matchers) {
      if (!matcher.hooks || matcher.hooks.length === 0) continue
@@ -92,22 +100,26 @@ export async function executePreToolUseHooks(
       if (result.exitCode === 2) {
         return {
           decision: "deny",
-          reason: result.stderr || result.stdout || "Hook blocked the operation",
+          reason: normalizeHookText(result.stderr) ?? normalizeHookText(result.stdout) ?? "Hook blocked the operation",
+          modifiedInput: accumulatedModifiedInput,
           elapsedMs: Date.now() - startTime,
           hookName: firstHookName,
           toolName: transformedToolName,
           inputLines,
+          ...accumulatedCommonFields,
         }
       }
 
       if (result.exitCode === 1) {
         return {
           decision: "ask",
-          reason: result.stderr || result.stdout,
+          reason: normalizeHookText(result.stderr) ?? normalizeHookText(result.stdout),
+          modifiedInput: accumulatedModifiedInput,
           elapsedMs: Date.now() - startTime,
           hookName: firstHookName,
           toolName: transformedToolName,
           inputLines,
+          ...accumulatedCommonFields,
         }
       }
 
@@ -122,7 +134,7 @@ export async function executePreToolUseHooks(
 
           if (output.hookSpecificOutput?.permissionDecision) {
             decision = output.hookSpecificOutput.permissionDecision
-            reason = output.hookSpecificOutput.permissionDecisionReason
+            reason = normalizeHookText(output.hookSpecificOutput.permissionDecisionReason)
             modifiedInput = output.hookSpecificOutput.updatedInput
           } else if (output.decision) {
             // Map deprecated values: approve->allow, block->deny, ask->ask
@@ -134,35 +146,46 @@ export async function executePreToolUseHooks(
             } else if (legacyDecision === "ask") {
               decision = "ask"
             }
-            reason = output.reason
+            reason = normalizeHookText(output.reason)
           }
 
-          // Return if decision is set OR if any common fields are set (fallback to allow)
-          const hasCommonFields = output.continue !== undefined || 
-            output.stopReason !== undefined || 
-            output.suppressOutput !== undefined || 
-            output.systemMessage !== undefined
-
-          if (decision || hasCommonFields) {
+          if (decision === "deny" || decision === "ask") {
             return {
-              decision: decision ?? "allow",
+              decision,
               reason,
-              modifiedInput,
+              modifiedInput: modifiedInput ?? accumulatedModifiedInput,
               elapsedMs: Date.now() - startTime,
               hookName: firstHookName,
               toolName: transformedToolName,
               inputLines,
-              continue: output.continue,
-              stopReason: output.stopReason,
-              suppressOutput: output.suppressOutput,
-              systemMessage: output.systemMessage,
+              continue: output.continue ?? accumulatedCommonFields.continue,
+              stopReason: normalizeHookText(output.stopReason) ?? accumulatedCommonFields.stopReason,
+              suppressOutput: output.suppressOutput ?? accumulatedCommonFields.suppressOutput,
+              systemMessage: normalizeHookText(output.systemMessage) ?? accumulatedCommonFields.systemMessage,
             }
           }
-        } catch {
+
+          // "allow" — accumulate modifiedInput and common fields, continue to next hook
+          if (modifiedInput) {
+            accumulatedModifiedInput = { ...accumulatedModifiedInput, ...modifiedInput }
+            Object.assign(stdinData.tool_input, objectToSnakeCase(modifiedInput))
+          }
+          if (output.continue !== undefined) accumulatedCommonFields.continue = output.continue
+          if (output.stopReason !== undefined) accumulatedCommonFields.stopReason = normalizeHookText(output.stopReason)
+          if (output.suppressOutput !== undefined) accumulatedCommonFields.suppressOutput = output.suppressOutput
+          if (output.systemMessage !== undefined) accumulatedCommonFields.systemMessage = normalizeHookText(output.systemMessage)
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) {
+            throw error
+          }
         }
       }
     }
   }
 
-  return { decision: "allow" }
+  return {
+    decision: "allow" as const,
+    ...(accumulatedModifiedInput ? { modifiedInput: accumulatedModifiedInput } : {}),
+    ...(Object.keys(accumulatedCommonFields).length > 0 ? accumulatedCommonFields : {}),
+  }
 }

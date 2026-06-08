@@ -8,6 +8,7 @@ export interface RalphLoopState {
   completion_promise: string
   initial_completion_promise?: string
   verification_attempt_id?: string
+  verification_attempt_started_at?: number
   verification_session_id?: string
   started_at: string
   prompt: string
@@ -17,9 +18,16 @@ export interface RalphLoopState {
   strategy?: "reset" | "continue"
 }
 
+export interface IterationCommitExpectation {
+  iteration: number
+  sessionID: string
+}
+
 export interface RalphLoopOptions {
   config?: RalphLoopConfig
   getTranscriptPath?: (sessionId: string) => string
   apiTimeout?: number
+  idleSettleMs?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  backgroundManager?: { getTasksByParentSession: (sessionId: string) => Array<{ status: string }> }
 }

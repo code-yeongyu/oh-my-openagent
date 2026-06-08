@@ -43,7 +43,10 @@ export function readMessages(sessionID: string): StoredMessageMeta[] {
     try {
       const content = readFileSync(join(messageDir, file), "utf-8")
       messages.push(JSON.parse(content))
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
@@ -62,7 +65,7 @@ export async function readMessagesFromSDK(
 ): Promise<StoredMessageMeta[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const data = normalizeSDKResponse(response, [] as unknown[], {
+    const data = normalizeSDKResponse<unknown[]>(response, [], {
       preferResponseOnMissingData: true,
     })
     if (!Array.isArray(data)) return []
@@ -77,7 +80,10 @@ export async function readMessagesFromSDK(
       if (aTime !== bTime) return aTime - bTime
       return a.id.localeCompare(b.id)
     })
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }

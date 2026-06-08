@@ -49,4 +49,8 @@ export interface WakeResult {
   success: boolean
   error?: string
   statusCode?: number
+  messageId?: string
+  platform?: string
+  channelId?: string
+  threadId?: string
 }

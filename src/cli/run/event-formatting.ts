@@ -47,8 +47,10 @@ export function serializeError(error: unknown): string {
       if (json !== "{}") {
         return json
       }
-    } catch (_) {
-      void _
+    } catch (stringifyError) {
+      if (!(stringifyError instanceof Error)) {
+        throw stringifyError
+      }
     }
   }
 
@@ -120,10 +122,16 @@ export function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
       let inputStr: string
       try {
         inputStr = JSON.stringify(input)
-      } catch {
+      } catch (jsonError) {
+        if (!(jsonError instanceof Error)) {
+          throw jsonError
+        }
         try {
           inputStr = String(input)
-        } catch {
+        } catch (stringError) {
+          if (!(stringError instanceof Error)) {
+            throw stringError
+          }
           inputStr = "[unserializable]"
         }
       }

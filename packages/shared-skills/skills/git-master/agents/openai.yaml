@@ -1,0 +1,13 @@
+interface:
+  display_name: "git-master (omo)"
+  short_description: "Atomic Git commits, history surgery, and source archaeology"
+  search_terms:
+    - "git-master"
+    - "git commit"
+    - "atomic commit"
+    - "rebase"
+    - "squash"
+    - "git blame"
+    - "git bisect"
+    - "history search"
+  default_prompt: "Use $git-master to inspect the repository state, preserve unrelated work, and handle the requested Git operation with atomic grouping, history safety checks, and evidence-backed verification."

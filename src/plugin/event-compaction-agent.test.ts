@@ -29,7 +29,6 @@ function createMinimalEventHandler() {
       sessionNotification: async () => {},
       todoContinuationEnforcer: { handler: async () => {} },
       unstableAgentBabysitter: { event: async () => {} },
-      contextWindowMonitor: { event: async () => {} },
       directoryAgentsInjector: { event: async () => {} },
       directoryReadmeInjector: { event: async () => {} },
       rulesInjector: { event: async () => {} },
@@ -54,8 +53,10 @@ describe("createEventHandler compaction agent filtering", () => {
     _resetForTesting()
     clearSessionModel("ses_compaction_poisoning")
     clearSessionModel("ses_compaction_model_poisoning")
+    clearSessionModel("ses_compaction_trim_poisoning")
     clearSessionPromptParams("ses_compaction_poisoning")
     clearSessionPromptParams("ses_compaction_model_poisoning")
+    clearSessionPromptParams("ses_compaction_trim_poisoning")
   })
 
   it("does not overwrite the stored session agent with compaction", async () => {
@@ -73,7 +74,7 @@ describe("createEventHandler compaction agent filtering", () => {
             role: "user",
             agent: "compaction",
             time: { created: Date.now() },
-            model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+            model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
           },
         },
       },
@@ -100,6 +101,38 @@ describe("createEventHandler compaction agent filtering", () => {
             sessionID,
             role: "user",
             agent: "compaction",
+            providerID: "anthropic",
+            modelID: "claude-opus-4-1",
+            time: { created: Date.now() },
+          },
+        },
+      },
+    }
+
+    // when
+    await eventHandler(input)
+
+    // then
+    expect(getSessionModel(sessionID)).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    })
+  })
+
+  it("does not overwrite the stored session model with whitespace around compaction marker", async () => {
+    // given
+    const sessionID = "ses_compaction_trim_poisoning"
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5" })
+    const eventHandler = createMinimalEventHandler()
+    const input: Parameters<ReturnType<typeof createEventHandler>>[0] = {
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg-compaction-trim",
+            sessionID,
+            role: "user",
+            agent: " compaction ",
             providerID: "anthropic",
             modelID: "claude-opus-4-1",
             time: { created: Date.now() },

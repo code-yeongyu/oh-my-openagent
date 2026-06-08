@@ -2,9 +2,10 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { CapacityConfig, TrackedSession } from "./types"
 import { log } from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, type SessionMapping } from "./decision-engine"
-import { executeActions } from "./action-executor"
+import { executeActions, type ExecuteActionsResult } from "./action-executor"
 import type { SessionCreatedEvent } from "./session-created-event"
 import { createTrackedSession } from "./tracked-session-state"
 
@@ -13,6 +14,7 @@ type OpencodeClient = PluginInput["client"]
 export interface SessionCreatedHandlerDeps {
   client: OpencodeClient
   tmuxConfig: TmuxConfig
+  directory: string
   serverUrl: string
   sourcePaneId: string | undefined
   sessions: Map<string, TrackedSession>
@@ -23,6 +25,8 @@ export interface SessionCreatedHandlerDeps {
   getSessionMappings: () => SessionMapping[]
   waitForSessionReady: (sessionId: string) => Promise<boolean>
   startPolling: () => void
+  queryWindowState?: typeof queryWindowState
+  executeActions?: typeof executeActions
 }
 
 export async function handleSessionCreated(
@@ -43,9 +47,9 @@ export async function handleSessionCreated(
   if (event.type !== "session.created") return
 
   const info = event.properties?.info
-  if (!info?.id || !info?.parentID) return
+  const sessionId = resolveSessionEventID(event.properties)
+  if (!sessionId || !info?.parentID) return
 
-  const sessionId = info.id
   const title = info.title ?? "Subagent"
 
   if (deps.sessions.has(sessionId) || deps.pendingSessions.has(sessionId)) {
@@ -61,7 +65,7 @@ export async function handleSessionCreated(
   deps.pendingSessions.add(sessionId)
 
   try {
-    const state = await queryWindowState(deps.sourcePaneId)
+    const state = await (deps.queryWindowState ?? queryWindowState)(deps.sourcePaneId)
     if (!state) {
       log("[tmux-session-manager] failed to query window state")
       return
@@ -100,8 +104,23 @@ export async function handleSessionCreated(
       return
     }
 
-    const result = await executeActions(decision.actions, {
+    // Wait for the child session to be registered in the opencode server's status
+    // map BEFORE spawning the tmux pane. If we spawn first, `opencode attach`
+    // exits immediately (session not yet visible), tmux auto-closes the pane, and
+    // the subagent runs invisibly in the background — the bug described in #3505.
+    const sessionReady = await deps.waitForSessionReady(sessionId)
+    if (!sessionReady) {
+      log("[tmux-session-manager] session readiness failed before spawn", {
+        sessionId,
+        stage: "session.created",
+      })
+      return
+    }
+
+    const runActions = deps.executeActions ?? executeActions
+    const result: ExecuteActionsResult = await runActions(decision.actions, {
       config: deps.tmuxConfig,
+      directory: deps.directory,
       serverUrl: deps.serverUrl,
       windowState: state,
     })
@@ -131,25 +150,6 @@ export async function handleSessionCreated(
           error: r.result.error,
         })),
       })
-      return
-    }
-
-    const sessionReady = await deps.waitForSessionReady(sessionId)
-    if (!sessionReady) {
-      log("[tmux-session-manager] session not ready after timeout, closing spawned pane", {
-        sessionId,
-        paneId: result.spawnedPaneId,
-      })
-
-      await executeActions(
-        [{ type: "close", paneId: result.spawnedPaneId, sessionId }],
-        {
-          config: deps.tmuxConfig,
-          serverUrl: deps.serverUrl,
-          windowState: state,
-        },
-      )
-
       return
     }
 

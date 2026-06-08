@@ -3,7 +3,11 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   omo: "sisyphus",
   OmO: "sisyphus",
   Sisyphus: "sisyphus",
+  "Sisyphus (Ultraworker)": "sisyphus",
   sisyphus: "sisyphus",
+
+  // Hephaestus variants → "hephaestus"
+  "Hephaestus (Deep Agent)": "hephaestus",
 
   // Prometheus variants → "prometheus"
   "OmO-Plan": "prometheus",
@@ -11,20 +15,24 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "Planner-Sisyphus": "prometheus",
   "planner-sisyphus": "prometheus",
   "Prometheus - Plan Builder": "prometheus",
+  "Prometheus (Plan Builder)": "prometheus",
   prometheus: "prometheus",
 
   // Atlas variants → "atlas"
   "orchestrator-sisyphus": "atlas",
   Atlas: "atlas",
+  "Atlas (Plan Executor)": "atlas",
   atlas: "atlas",
 
   // Metis variants → "metis"
   "plan-consultant": "metis",
   "Metis - Plan Consultant": "metis",
+  "Metis (Plan Consultant)": "metis",
   metis: "metis",
 
   // Momus variants → "momus"
   "Momus - Plan Critic": "momus",
+  "Momus (Plan Critic)": "momus",
   momus: "momus",
 
   // Sisyphus-Junior → "sisyphus-junior"

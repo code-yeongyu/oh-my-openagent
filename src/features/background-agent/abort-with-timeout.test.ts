@@ -1,6 +1,6 @@
-import { afterAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
-const logMock = mock(() => {})
+const logMock = mock((..._args: unknown[]) => {})
 
 mock.module("../../shared/logger", () => ({
   log: logMock,
@@ -19,7 +19,19 @@ function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): Ope
   } as never
 }
 
+function hasSessionID(value: unknown, sessionID: string): boolean {
+  return typeof value === "object" && value !== null && "sessionID" in value && value.sessionID === sessionID
+}
+
+function logCallsForSession(sessionID: string): unknown[][] {
+  return logMock.mock.calls.filter((call) => hasSessionID(call[1], sessionID))
+}
+
 describe("abortWithTimeout", () => {
+  beforeEach(() => {
+    logMock.mockClear()
+  })
+
   afterAll(() => {
     mock.restore()
   })
@@ -34,7 +46,23 @@ describe("abortWithTimeout", () => {
     // then
     expect(result).toBe(true)
     expect(abort).toHaveBeenCalledWith({ path: { id: "session-1" } })
-    expect(logMock).not.toHaveBeenCalled()
+    expect(logCallsForSession("session-1")).toHaveLength(0)
+  })
+
+  test("#given abort resolves with an SDK error response #when abortWithTimeout runs #then it reports cancellation failure", async () => {
+    // given
+    const error = { message: "session not found" }
+    const abort = mock(async () => ({ error }))
+
+    // when
+    const result = await abortWithTimeout(createClient(abort), "session-error-response", 10)
+
+    // then
+    expect(result).toBe(false)
+    expect(logMock).toHaveBeenCalledWith(
+      "[background-agent] Session abort returned an error response:",
+      { sessionID: "session-error-response", error },
+    )
   })
 
   test("#given abort hangs indefinitely #when abortWithTimeout runs #then it logs warning and continues", async () => {

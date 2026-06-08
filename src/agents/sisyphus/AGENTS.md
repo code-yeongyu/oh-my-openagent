@@ -1,0 +1,36 @@
+---
+name: sisyphus-variants
+description: Developer reference for Sisyphus orchestrator model-specific prompt variants — selection logic and key exports.
+---
+
+# src/agents/sisyphus/ -- Orchestrator Variants
+
+**Generated:** 2026-05-15
+
+## OVERVIEW
+
+5 prompt/export files. Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyphus.ts` routes to the correct variant based on active model.
+
+## FILES
+
+| File | Purpose |
+|------|---------|
+| `default.ts` | Base/Claude variant: task management, delegation guides, 542 LOC |
+| `gemini.ts` | Gemini-optimized: stricter tool-usage rules, 5 NEVER rules |
+| `gpt-5-4.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
+| `gpt-5-5.ts` | GPT-5.5-native: updated orchestration prompt tuned for GPT-5.5 |
+| `index.ts` | Barrel exports |
+
+## VARIANT SELECTION
+
+Parent `sisyphus.ts` selects variant by model name:
+- Contains "gemini" -> `gemini.ts`
+- Contains "gpt-5.5" -> `gpt-5-5.ts`
+- Contains "gpt-5.4" -> `gpt-5-4.ts`
+- Default -> `default.ts` (Claude, Kimi, GLM, etc.)
+
+## KEY EXPORTS
+
+Each variant exports:
+- `buildTaskManagementSection()` -- todo/task management prompt
+- `buildSisyphusPrompt()` or equivalent -- full prompt builder

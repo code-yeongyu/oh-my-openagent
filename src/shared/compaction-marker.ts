@@ -30,12 +30,16 @@ export function isCompactionMessage(message: CompactionMessageLike): boolean {
   return isCompactionAgent(message.info?.agent ?? message.agent) || hasCompactionPart(message.parts)
 }
 
+export function getCompactionPartStorageDir(messageID: string): string {
+  return join(PART_STORAGE, messageID)
+}
+
 export function hasCompactionPartInStorage(messageID: string | undefined): boolean {
   if (!messageID) {
     return false
   }
 
-  const partDir = join(PART_STORAGE, messageID)
+  const partDir = getCompactionPartStorageDir(messageID)
   if (!existsSync(partDir)) {
     return false
   }
@@ -47,11 +51,19 @@ export function hasCompactionPartInStorage(messageID: string | undefined): boole
         try {
           const content = readFileSync(join(partDir, fileName), "utf-8")
           return isCompactionPart(JSON.parse(content))
-        } catch {
+        } catch (error) {
+          if (error instanceof Error) {
+            return false
+          }
+
           return false
         }
       })
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return false
+    }
+
     return false
   }
 }

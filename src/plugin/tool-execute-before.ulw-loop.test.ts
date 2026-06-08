@@ -6,6 +6,7 @@ import { createToolExecuteAfterHandler } from "./tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { clearState, readState, writeState } from "../hooks/ralph-loop/storage"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 describe("tool.execute.before ultrawork oracle verification", () => {
 	function createCtx(directory: string) {
@@ -56,7 +57,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const handler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const output = { args: createOracleTaskArgs("Check it") }
@@ -78,7 +79,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		const directory = join(tmpdir(), `tool-before-ulw-${Date.now()}-plain`)
 		mkdirSync(directory, { recursive: true })
 		const handler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const output = { args: createOracleTaskArgs("Check it") }
@@ -96,8 +97,8 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		mkdirSync(directory, { recursive: true })
 		const startLoopCalls: Array<{ sessionID: string; prompt: string; options: Record<string, unknown> }> = []
 		const handler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
-			hooks: {
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
+			hooks: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"]>({
 				ralphLoop: {
 					startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
 						startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
@@ -106,7 +107,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 					cancelLoop: () => true,
 					getState: () => null,
 				},
-			} as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
+			}),
 		})
 		const output = {
 			args: {
@@ -132,6 +133,43 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		rmSync(directory, { recursive: true, force: true })
 	})
 
+	test("#given active ultrawork loop state and ulw-loop skill continue #when tool.execute.before runs #then resumes without replacing prompt", async () => {
+		const directory = join(tmpdir(), `tool-before-ulw-skill-resume-${Date.now()}`)
+		mkdirSync(directory, { recursive: true })
+		const startLoopCalls: Array<{ sessionID: string; prompt: string; options: Record<string, unknown> }> = []
+		const resumeLoopCalls: Array<{ sessionID: string }> = []
+		const handler = createToolExecuteBeforeHandler({
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
+			hooks: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"]>({
+				ralphLoop: {
+					startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
+						startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
+						return true
+					},
+					resumeLoop: (sessionID: string) => {
+						resumeLoopCalls.push({ sessionID })
+						return true
+					},
+					cancelLoop: () => true,
+					getState: () => null,
+				},
+			}),
+		})
+		const output = {
+			args: {
+				name: "ulw-loop",
+				user_message: "continue",
+			},
+		}
+
+		await handler({ tool: "skill", sessionID: "ses-main", callID: "call-skill-ulw-resume" }, output)
+
+		expect(resumeLoopCalls).toEqual([{ sessionID: "ses-main" }])
+		expect(startLoopCalls).toHaveLength(0)
+
+		rmSync(directory, { recursive: true, force: true })
+	})
+
 	test("#given ulw loop is awaiting verification #when oracle sync task metadata is persisted #then oracle session id is stored", async () => {
 		const directory = join(tmpdir(), `tool-after-ulw-${Date.now()}`)
 		mkdirSync(directory, { recursive: true })
@@ -148,7 +186,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const beforeHandler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const beforeOutput = { args: createOracleTaskArgs("Check it") }
@@ -156,7 +194,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		const metadataFromSyncTask = createSyncTaskMetadata(beforeOutput.args, "ses-oracle")
 
 		const handler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 
@@ -191,7 +229,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const handler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 
@@ -230,7 +268,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const handler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 
@@ -269,11 +307,11 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const beforeHandler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const afterHandler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: unsafeTestValue<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 

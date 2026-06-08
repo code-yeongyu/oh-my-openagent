@@ -8,10 +8,11 @@ const mockMigrateLegacyPluginEntry = mock(() => true)
 mock.module("./plugin-entry-migrator", () => ({
   migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
 }))
+mock.module("./plugin-entry-migrator.ts", () => ({
+  migrateLegacyPluginEntry: mockMigrateLegacyPluginEntry,
+}))
 
-async function importFreshAutoMigrateModule(): Promise<typeof import("./auto-migrate")> {
-  return import(`./auto-migrate?test=${Date.now()}-${Math.random()}`)
-}
+const autoMigrateModulePromise = import("./auto-migrate")
 
 describe("autoMigrateLegacyPluginEntry", () => {
   let testConfigDir = ""
@@ -35,7 +36,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
         JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n",
       )
 
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -56,7 +57,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
         JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2) + "\n",
       )
 
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -77,7 +78,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
         JSON.stringify({ plugin: ["oh-my-openagent", "oh-my-opencode"] }, null, 2) + "\n",
       )
 
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -92,7 +93,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
   describe("#given no config file exists", () => {
     it("#then returns migrated false", async () => {
       // given - empty dir
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -112,7 +113,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
         '{\n  // my config\n  "plugin": ["oh-my-opencode"]\n}\n',
       )
 
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -138,7 +139,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
 `,
       )
 
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)
@@ -151,13 +152,37 @@ describe("autoMigrateLegacyPluginEntry", () => {
     })
   })
 
+  describe("#given the migrator throws while rewriting a legacy entry", () => {
+    it("#then returns migrated false", async () => {
+      // given
+      writeFileSync(
+        join(testConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n",
+      )
+      mockMigrateLegacyPluginEntry.mockImplementation(() => {
+        throw new Error("rewrite failed")
+      })
+
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
+
+      // when
+      const result = autoMigrateLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.migrated).toBe(false)
+      expect(result.from).toBeNull()
+      expect(result.to).toBeNull()
+      expect(result.configPath).toBe(join(testConfigDir, "opencode.json"))
+    })
+  })
+
   describe("#given only canonical entry exists", () => {
     it("#then returns migrated false and leaves file untouched", async () => {
       // given
       const original = JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2) + "\n"
       writeFileSync(join(testConfigDir, "opencode.json"), original)
 
-      const { autoMigrateLegacyPluginEntry } = await importFreshAutoMigrateModule()
+      const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 
       // when
       const result = autoMigrateLegacyPluginEntry(testConfigDir)

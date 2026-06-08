@@ -9,9 +9,7 @@ import { getCurrentTmuxSession, captureTmuxPane } from "./tmux"
 import { startReplyListener, stopReplyListener } from "./reply-listener"
 import type { OpenClawConfig, OpenClawContext, OpenClawPayload, WakeResult } from "./types"
 
-const DEBUG =
-  process.env.OMO_OPENCLAW_DEBUG === "1"
-  || process.env.OMX_OPENCLAW_DEBUG === "1"
+const DEBUG = process.env.OMO_OPENCLAW_DEBUG === "1"
 
 function buildWhitelistedContext(context: OpenClawContext): OpenClawContext {
   const result: OpenClawContext = {}
@@ -132,10 +130,16 @@ export async function wakeOpenClaw(
 }
 
 export async function initializeOpenClaw(config: OpenClawConfig): Promise<void> {
-  const replyListener = config.replyListener
-  if (config.enabled && (replyListener?.discordBotToken || replyListener?.telegramBotToken)) {
+  const hasReplyListenerCredentials = Boolean(
+    config.replyListener?.discordBotToken || config.replyListener?.telegramBotToken,
+  )
+
+  if (config.enabled && hasReplyListenerCredentials) {
     await startReplyListener(config)
+    return
   }
+
+  await stopReplyListener()
 }
 
 export { startReplyListener, stopReplyListener }

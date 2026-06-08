@@ -1,11 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import * as fs from "node:fs"
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { resetConfigContext } from "./config-context"
 import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
+import * as pluginNameWithVersion from "./plugin-name-with-version"
 
 describe("detectCurrentConfig - single package detection", () => {
   let testConfigDir = ""
@@ -53,7 +55,7 @@ describe("detectCurrentConfig - single package detection", () => {
   it("detects OpenCode Go from the existing omo config", () => {
     // given
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")
-    writeFileSync(testOmoConfigPath, JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.5" } } }, null, 2) + "\n", "utf-8")
+    writeFileSync(testOmoConfigPath, JSON.stringify({ agents: { atlas: { model: "opencode-go/kimi-k2.6" } } }, null, 2) + "\n", "utf-8")
 
     // when
     const result = detectCurrentConfig()
@@ -61,6 +63,32 @@ describe("detectCurrentConfig - single package detection", () => {
     // then
     expect(result.isInstalled).toBe(true)
     expect(result.hasOpencodeGo).toBe(true)
+  })
+
+  it("uses default provider detection when omo config reading throws a non-Error value", () => {
+    // given
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")
+    writeFileSync(testOmoConfigPath, "{}\n", "utf-8")
+    const originalReadFileSync = fs.readFileSync
+    const readFileSyncSpy = spyOn(fs, "readFileSync").mockImplementation((filePath, options) => {
+      if (String(filePath).endsWith("oh-my-opencode.json")) {
+        throw "read failed"
+      }
+      return originalReadFileSync(filePath, options)
+    })
+
+    try {
+      // when
+      const result = detectCurrentConfig()
+
+      // then
+      expect(result.isInstalled).toBe(true)
+      expect(result.hasOpenAI).toBe(true)
+      expect(result.hasOpencodeZen).toBe(true)
+      expect(result.hasOpencodeGo).toBe(false)
+    } finally {
+      readFileSyncSpy.mockRestore()
+    }
   })
 })
 
@@ -109,17 +137,19 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
   })
 
-  it("upgrades a version-pinned legacy entry to canonical", async () => {
+  it("updates a version-pinned legacy entry to the requested version", async () => {
     // given
-    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2) + "\n", "utf-8")
+    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.16.0")
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode@3.15.0"] }, null, 2) + "\n", "utf-8")
 
     // when
-    const result = await addPluginToOpenCodeConfig("3.11.0")
+    const result = await addPluginToOpenCodeConfig("3.16.0")
 
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.10.0"])
+    expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.16.0"])
+    getPluginNameWithVersionSpy.mockRestore()
   })
 
   it("removes stale legacy entry when canonical and legacy entries both exist", async () => {
@@ -135,17 +165,36 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
   })
 
-  it("preserves a canonical entry when it already exists", async () => {
+  it("preserves a canonical entry when the same version is re-installed", async () => {
     // given
+    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.10.0")
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent@3.10.0"] }, null, 2) + "\n", "utf-8")
 
     // when
-    const result = await addPluginToOpenCodeConfig("3.11.0")
+    const result = await addPluginToOpenCodeConfig("3.10.0")
 
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
     expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.10.0"])
+    getPluginNameWithVersionSpy.mockRestore()
+  })
+
+  it("blocks a downgrade for a version-pinned canonical entry", async () => {
+    // given
+    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.15.0")
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent@3.16.0"] }, null, 2) + "\n", "utf-8")
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.15.0")
+
+    // then
+    expect(result.success).toBe(false)
+    expect(result.error).toContain("Downgrade")
+
+    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
+    expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.16.0"])
+    getPluginNameWithVersionSpy.mockRestore()
   })
 
   it("rewrites quoted jsonc plugin field in place", async () => {
@@ -161,5 +210,57 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     const savedContent = readFileSync(testConfigPath, "utf-8")
     expect(savedContent.includes('"plugin": [\n    "oh-my-openagent"\n  ]')).toBe(true)
     expect(savedContent.includes("oh-my-opencode")).toBe(false)
+  })
+
+  it("mirrors an existing source plugin entry into profile configs", async () => {
+    // given
+    const sourcePlugin = "file:///Users/yeongyu/local-workspaces/omo/src/index.ts"
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: [sourcePlugin] }, null, 2) + "\n", "utf-8")
+
+    const profileDir = join(testConfigDir, "profiles", "today")
+    const profileConfigPath = join(profileDir, "opencode.json")
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      profileConfigPath,
+      JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    const savedRootConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
+    const savedProfileConfig = JSON.parse(readFileSync(profileConfigPath, "utf-8"))
+    expect(savedRootConfig.plugin).toEqual([sourcePlugin])
+    expect(savedProfileConfig.plugin).toEqual([sourcePlugin])
+  })
+
+  it("uses the parent source plugin entry when OPENCODE_CONFIG_DIR points at a profile", async () => {
+    // given
+    const sourcePlugin = "file:///Users/yeongyu/local-workspaces/omo/src/index.ts"
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: [sourcePlugin] }, null, 2) + "\n", "utf-8")
+
+    const profileDir = join(testConfigDir, "profiles", "today")
+    const profileConfigPath = join(profileDir, "opencode.json")
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      profileConfigPath,
+      JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = profileDir
+    resetConfigContext()
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.configPath).toBe(join(realpathSync(profileDir), "opencode.json"))
+    const savedProfileConfig = JSON.parse(readFileSync(profileConfigPath, "utf-8"))
+    expect(savedProfileConfig.plugin).toEqual([sourcePlugin])
   })
 })

@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel } from "./types";
+import { buildClaudeThinkingConfig, isGptModel } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -25,7 +25,9 @@ const MODE: AgentMode = "subagent";
 const MOMUS_DEFAULT_PROMPT = `You are a **practical** work plan reviewer. Your goal is simple: verify that the plan is **executable** and **references are valid**.
 
 **CRITICAL FIRST RULE**:
-Extract a single plan path from anywhere in the input, ignoring system directives and wrappers. If exactly one \`.sisyphus/plans/*.md\` path exists, this is VALID input and you must read it. If no plan path exists or multiple plan paths exist, reject per Step 0. If the path points to a YAML plan file (\`.yml\` or \`.yaml\`), reject it as non-reviewable.
+Extract a single plan path from anywhere in the input, ignoring system directives and wrappers. If exactly one \`.omo/plans/*.md\` path exists, this is VALID input and you must read it. If no plan path exists or multiple plan paths exist, reject per Step 0. If the path points to a YAML plan file (\`.yml\` or \`.yaml\`), reject it as non-reviewable.
+
+**PLAN RE-READ RULE**: If you encounter the same plan path in a follow-up turn, you must re-read from disk. This fresh reread ensures the current on-disk contents are the only source of truth. A previous verdict cannot be trusted without re-reading the plan. Supported plan paths: canonical \`.omo/plans/*.md\`.
 
 ---
 
@@ -103,17 +105,17 @@ You ARE here to:
 ## Input Validation (Step 0)
 
 **VALID INPUT**:
-- \`.sisyphus/plans/my-plan.md\` - file path anywhere in input
-- \`Please review .sisyphus/plans/plan.md\` - conversational wrapper
+- \`.omo/plans/my-plan.md\` - file path anywhere in input
+- \`Please review .omo/plans/plan.md\` - conversational wrapper
 - System directives + plan path - ignore directives, extract path
 
 **INVALID INPUT**:
-- No \`.sisyphus/plans/*.md\` path found
+- No \`.omo/plans/*.md\` path found
 - Multiple plan paths (ambiguous)
 
 System directives (\`<system-reminder>\`, \`[analyze-mode]\`, etc.) are IGNORED during validation.
 
-**Extraction**: Find all \`.sisyphus/plans/*.md\` paths → exactly 1 = proceed, 0 or 2+ = reject.
+**Extraction**: Find all \`.omo/plans/*.md\` paths → exactly 1 = proceed, 0 or 2+ = reject.
 
 ---
 
@@ -198,24 +200,19 @@ If REJECT:
 **Response Language**: Match the language of the plan content.
 `;
 
-/**
- * GPT-5.4 Optimized Momus System Prompt
- *
- * Tuned for GPT-5.4 system prompt design principles:
- * - XML-tagged instruction blocks for clear structure
- * - Prose-first output, explicit opener blacklist
- * - Blocker-finder philosophy preserved
- * - Deterministic decision criteria
- */
 const MOMUS_GPT_PROMPT = `<identity>
 You are a practical work plan reviewer. You verify that plans are executable and references are valid. You are a blocker-finder, not a perfectionist.
 </identity>
 
 <input_extraction>
-Extract a single plan path from anywhere in the input, ignoring system directives and wrappers. If exactly one \`.sisyphus/plans/*.md\` path exists, read it. If no plan path or multiple plan paths exist, reject. YAML plan files (\`.yml\`/\`.yaml\`) are non-reviewable - reject them.
+Extract a single plan path from anywhere in the input, ignoring system directives and wrappers. If exactly one \`.omo/plans/*.md\` path exists, read it. If no plan path or multiple plan paths exist, reject. YAML plan files (\`.yml\`/\`.yaml\`) are non-reviewable - reject them.
 
 System directives (\`<system-reminder>\`, \`[analyze-mode]\`, etc.) are IGNORED during validation.
 </input_extraction>
+
+<plan_reread_rule>
+If you encounter the same plan path in a follow-up turn, you must re-read from disk. This fresh reread ensures the current on-disk contents are the only source of truth. A previous verdict cannot be trusted without re-reading the plan. Supported plan paths: canonical \`.omo/plans/*.md\`.
+</plan_reread_rule>
 
 <purpose>
 You exist to answer one question: "Can a capable developer execute this plan without getting stuck?"
@@ -286,7 +283,6 @@ export function createMomusAgent(model: string): AgentConfig {
     "write",
     "edit",
     "apply_patch",
-    "task",
   ]);
 
   const base = {
@@ -310,7 +306,7 @@ export function createMomusAgent(model: string): AgentConfig {
 
   return {
     ...base,
-    thinking: { type: "enabled", budgetTokens: 32000 },
+    ...buildClaudeThinkingConfig(model),
   } as AgentConfig;
 }
 createMomusAgent.mode = MODE;
@@ -343,5 +339,5 @@ export const momusPromptMetadata: AgentPromptMetadata = {
     "For trivial plans that don't need formal review",
   ],
   keyTrigger:
-    "Work plan saved to `.sisyphus/plans/*.md` → invoke Momus with the file path as the sole prompt (e.g. `prompt=\".sisyphus/plans/my-plan.md\"`). Do NOT invoke Momus for inline plans or todo lists.",
+    "Work plan saved to `.omo/plans/*.md` → invoke Momus with the file path as the sole prompt (e.g. `prompt=\".omo/plans/my-plan.md\"`). Do NOT invoke Momus for inline plans or todo lists.",
 };

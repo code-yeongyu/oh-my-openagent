@@ -22,8 +22,8 @@ describe("executeUnstableAgentTask timeout handling", () => {
     const { executeUnstableAgentTask } = require("./unstable-agent-task")
 
     const mockManager = {
-      launch: async () => ({ id: "task_001", sessionID: "ses_timeout", status: "running" }),
-      getTask: () => ({ id: "task_001", sessionID: "ses_timeout", status: "running" }),
+      launch: async () => ({ id: "task_001", sessionId: "ses_timeout", status: "running" }),
+      getTask: () => ({ id: "task_001", sessionId: "ses_timeout", status: "running" }),
     }
 
     const mockClient = {

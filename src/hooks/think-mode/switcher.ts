@@ -45,7 +45,7 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
 const HIGH_VARIANT_MAP: Record<string, string> = {
   // Claude
   "claude-sonnet-4-6": "claude-sonnet-4-6-high",
-  "claude-opus-4-6": "claude-opus-4-6-high",
+  "claude-opus-4-7": "claude-opus-4-7-high",
    // Gemini
    "gemini-3-1-pro": "gemini-3-1-pro-high",
    "gemini-3-1-pro-low": "gemini-3-1-pro-high",

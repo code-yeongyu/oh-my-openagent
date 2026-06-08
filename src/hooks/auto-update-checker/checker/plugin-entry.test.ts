@@ -1,9 +1,12 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { PACKAGE_NAME } from "../constants"
+import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../../shared/plugin-identity"
 
 type PluginEntryResult = {
   entry: string
@@ -11,6 +14,10 @@ type PluginEntryResult = {
   pinnedVersion: string | null
   configPath: string
 } | null
+
+function normalizePathForAssertion(filePath: string): string {
+  return filePath.replaceAll("\\", "/").replaceAll("/private/var/", "/var/")
+}
 
 function runFindPluginEntry(
   directory: string,
@@ -46,6 +53,10 @@ describe("findPluginEntry", () => {
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "omo-plugin-entry-test-"))
+    const emptyConfigDirectory = path.join(temporaryDirectory, "empty-config")
+    fs.mkdirSync(emptyConfigDirectory, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = emptyConfigDirectory
+
     const opencodeDirectory = path.join(temporaryDirectory, ".opencode")
     fs.mkdirSync(opencodeDirectory, { recursive: true })
     configPath = path.join(opencodeDirectory, "opencode.json")
@@ -120,6 +131,64 @@ describe("findPluginEntry", () => {
     expect(pluginInfo?.pinnedVersion).toBe("3.5.2")
   })
 
+  test("finds preferred plugin entry", async () => {
+    // #given preferred plugin entry is configured
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: [PLUGIN_NAME] }))
+
+    // #when plugin entry is detected
+    const execution = runFindPluginEntry(temporaryDirectory)
+
+    // #then preferred entry is returned
+    expect(execution.status).toBe(0)
+    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
+    expect(pluginInfo?.entry).toBe(PLUGIN_NAME)
+    expect(pluginInfo?.isPinned).toBe(false)
+    expect(pluginInfo?.pinnedVersion).toBeNull()
+  })
+
+  test("finds legacy plugin entry", async () => {
+    // #given legacy plugin entry is configured
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: [LEGACY_PLUGIN_NAME] }))
+
+    // #when plugin entry is detected
+    const execution = runFindPluginEntry(temporaryDirectory)
+
+    // #then legacy entry is returned
+    expect(execution.status).toBe(0)
+    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
+    expect(pluginInfo?.entry).toBe(LEGACY_PLUGIN_NAME)
+    expect(pluginInfo?.isPinned).toBe(false)
+    expect(pluginInfo?.pinnedVersion).toBeNull()
+  })
+
+  test("finds preferred plugin entry with pinned version", async () => {
+    // #given preferred plugin entry includes semver version
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: [`${PLUGIN_NAME}@3.15.0`] }))
+
+    // #when plugin entry is detected
+    const execution = runFindPluginEntry(temporaryDirectory)
+
+    // #then preferred versioned entry is returned
+    expect(execution.status).toBe(0)
+    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
+    expect(pluginInfo?.entry).toBe(`${PLUGIN_NAME}@3.15.0`)
+    expect(pluginInfo?.isPinned).toBe(true)
+    expect(pluginInfo?.pinnedVersion).toBe("3.15.0")
+  })
+
+  test("returns null for unrelated plugin entry", async () => {
+    // #given unrelated plugin entry is configured
+    fs.writeFileSync(configPath, JSON.stringify({ plugin: ["some-other-plugin"] }))
+
+    // #when plugin entry is detected
+    const execution = runFindPluginEntry(temporaryDirectory)
+
+    // #then no matching entry is returned
+    expect(execution.status).toBe(0)
+    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
+    expect(pluginInfo).toBeNull()
+  })
+
   test("reads user config from profile dir even when OPENCODE_CONFIG_DIR changes after import", async () => {
     // #given profile-specific user config after module import
     const profileConfigDir = path.join(temporaryDirectory, "profiles", "today")
@@ -138,7 +207,9 @@ describe("findPluginEntry", () => {
     expect(execution.status).toBe(0)
     const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
     expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.configPath).toEndWith("/profiles/today/opencode.json")
+    expect(normalizePathForAssertion(pluginInfo?.configPath ?? "")).toBe(
+      normalizePathForAssertion(path.join(profileConfigDir, "opencode.json")),
+    )
     expect(pluginInfo?.pinnedVersion).toBe("beta")
   })
 })

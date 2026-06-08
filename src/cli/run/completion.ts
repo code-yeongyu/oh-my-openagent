@@ -20,6 +20,11 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
       return false
     }
 
+    if (continuationState.hasActiveBackgroundTaskMarker) {
+      logWaiting(ctx, continuationState.activeHookMarkerReason ?? "background tasks are active")
+      return false
+    }
+
     if (!await areAllChildrenIdle(ctx)) {
       return false
     }

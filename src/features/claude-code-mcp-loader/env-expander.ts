@@ -35,7 +35,7 @@ export function expandEnvVars(value: string, options: ExpandEnvVarsOptions = {})
 }
 
 export function expandEnvVarsInObject<T>(obj: T, options: ExpandEnvVarsOptions = {}): T {
-  if (obj === null || obj === undefined) return obj
+  if (obj == null) return obj
   if (typeof obj === "string") return expandEnvVars(obj, options) as T
   if (Array.isArray(obj)) {
     return obj.map((item) => expandEnvVarsInObject(item, options)) as T

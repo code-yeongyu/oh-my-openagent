@@ -1,6 +1,55 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
+import { describe, it, expect } from "bun:test"
+
+function expectDefined<T>(value: T | null | undefined, label: string): T {
+  expect(value, label).toBeDefined()
+  if (value === null || value === undefined) {
+    throw new Error(`${label} must be defined`)
+  }
+  return value
+}
 
 describe("model-resolution check", () => {
+  describe("parseProviderModel", () => {
+    it("splits chutes model IDs at the provider separator", async () => {
+      const { parseProviderModel } = await import("./model-resolution")
+
+      // #given a provider-prefixed model whose model ID contains a slash
+      const value = "chutes/deepseek-ai/DeepSeek-V3.2-TEE"
+
+      // #when parsing the provider and model IDs
+      const result = parseProviderModel(value)
+
+      // #then only the first slash separates the provider
+      expect(result).toEqual({ providerID: "chutes", modelID: "deepseek-ai/DeepSeek-V3.2-TEE" })
+    })
+
+    it("splits simple provider model IDs", async () => {
+      const { parseProviderModel } = await import("./model-resolution")
+
+      // #given a provider-prefixed model without extra slashes
+      const value = "openai/gpt-5"
+
+      // #when parsing the provider and model IDs
+      const result = parseProviderModel(value)
+
+      // #then provider and model are split normally
+      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5" })
+    })
+
+    it("splits synthetic provider model IDs at the provider separator", async () => {
+      const { parseProviderModel } = await import("./model-resolution")
+
+      // #given a synthetic provider model whose model ID contains a slash
+      const value = "synthetic/hf:zai-org/GLM-5.1"
+
+      // #when parsing the provider and model IDs
+      const result = parseProviderModel(value)
+
+      // #then only the first slash separates the provider
+      expect(result).toEqual({ providerID: "synthetic", modelID: "hf:zai-org/GLM-5.1" })
+    })
+  })
+
   describe("getModelResolutionInfo", () => {
     // given: Model requirements are defined in model-requirements.ts
     // when: Getting model resolution info
@@ -12,10 +61,12 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfo()
 
       // then: Should have agent entries
-      const sisyphus = info.agents.find((a) => a.name === "sisyphus")
-      expect(sisyphus).toBeDefined()
-      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-6")
-      expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
+      const sisyphus = expectDefined(
+        info.agents.find((a) => a.name === "sisyphus"),
+        "sisyphus agent resolution",
+      )
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-7")
+      expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
     it("returns category requirements with provider chains", async () => {
@@ -24,10 +75,12 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfo()
 
       // then: Should have category entries
-      const visual = info.categories.find((c) => c.name === "visual-engineering")
-      expect(visual).toBeDefined()
-      expect(visual!.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
-      expect(visual!.requirement.fallbackChain[0]?.providers).toContain("google")
+      const visual = expectDefined(
+        info.categories.find((c) => c.name === "visual-engineering"),
+        "visual-engineering category resolution",
+      )
+      expect(visual.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
+      expect(visual.requirement.fallbackChain[0]?.providers).toContain("google")
     })
   })
 
@@ -42,17 +95,16 @@ describe("model-resolution check", () => {
       // given: User has override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-6" },
+          oracle: { model: "anthropic/claude-opus-4-7" },
         },
       }
 
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       // then: Oracle should show the override
-      const oracle = info.agents.find((a) => a.name === "oracle")
-      expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-6")
-      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
+      const oracle = expectDefined(info.agents.find((a) => a.name === "oracle"), "oracle agent resolution")
+      expect(oracle.userOverride).toBe("anthropic/claude-opus-4-7")
+      expect(oracle.effectiveResolution).toBe("User override: anthropic/claude-opus-4-7")
     })
 
     it("shows user override for category when configured", async () => {
@@ -68,10 +120,12 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       // then: visual-engineering should show the override
-      const visual = info.categories.find((c) => c.name === "visual-engineering")
-      expect(visual).toBeDefined()
-      expect(visual!.userOverride).toBe("openai/gpt-5.4")
-      expect(visual!.effectiveResolution).toBe("User override: openai/gpt-5.4")
+      const visual = expectDefined(
+        info.categories.find((c) => c.name === "visual-engineering"),
+        "visual-engineering category resolution",
+      )
+      expect(visual.userOverride).toBe("openai/gpt-5.4")
+      expect(visual.effectiveResolution).toBe("User override: openai/gpt-5.4")
     })
 
     it("shows provider fallback when no override exists", async () => {
@@ -83,11 +137,13 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       // then: Should show provider fallback chain
-      const sisyphus = info.agents.find((a) => a.name === "sisyphus")
-      expect(sisyphus).toBeDefined()
-      expect(sisyphus!.userOverride).toBeUndefined()
-      expect(sisyphus!.effectiveResolution).toContain("Provider fallback:")
-      expect(sisyphus!.effectiveResolution).toContain("anthropic")
+      const sisyphus = expectDefined(
+        info.agents.find((a) => a.name === "sisyphus"),
+        "sisyphus agent resolution",
+      )
+      expect(sisyphus.userOverride).toBeUndefined()
+      expect(sisyphus.effectiveResolution).toContain("Provider fallback:")
+      expect(sisyphus.effectiveResolution).toContain("anthropic")
     })
 
     it("captures user variant for agent when configured", async () => {
@@ -104,10 +160,9 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       //#then Oracle should have userVariant set
-      const oracle = info.agents.find((a) => a.name === "oracle")
-      expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("openai/gpt-5.4")
-      expect(oracle!.userVariant).toBe("xhigh")
+      const oracle = expectDefined(info.agents.find((a) => a.name === "oracle"), "oracle agent resolution")
+      expect(oracle.userOverride).toBe("openai/gpt-5.4")
+      expect(oracle.userVariant).toBe("xhigh")
     })
 
     it("captures user variant for category when configured", async () => {
@@ -124,20 +179,24 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       //#then visual-engineering should have userVariant set
-      const visual = info.categories.find((c) => c.name === "visual-engineering")
-      expect(visual).toBeDefined()
-      expect(visual!.userOverride).toBe("google/gemini-3-flash-preview")
-      expect(visual!.userVariant).toBe("high")
+      const visual = expectDefined(
+        info.categories.find((c) => c.name === "visual-engineering"),
+        "visual-engineering category resolution",
+      )
+      expect(visual.userOverride).toBe("google/gemini-3-flash-preview")
+      expect(visual.userVariant).toBe("high")
     })
 
     it("attaches snapshot-backed capability diagnostics for built-in models", async () => {
       const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
 
       const info = getModelResolutionInfoWithOverrides({})
-      const sisyphus = info.agents.find((a) => a.name === "sisyphus")
+      const sisyphus = expectDefined(
+        info.agents.find((a) => a.name === "sisyphus"),
+        "sisyphus agent resolution",
+      )
 
-      expect(sisyphus).toBeDefined()
-      expect(sisyphus!.capabilityDiagnostics).toMatchObject({
+      expect(sisyphus.capabilityDiagnostics).toMatchObject({
         resolutionMode: "snapshot-backed",
         snapshot: { source: "bundled-snapshot" },
       })
@@ -152,10 +211,12 @@ describe("model-resolution check", () => {
         },
       })
 
-      const visual = info.categories.find((category) => category.name === "visual-engineering")
-      expect(visual).toBeDefined()
-      expect(visual!.effectiveModel).toBe("google/gemini-3.1-pro-high")
-      expect(visual!.capabilityDiagnostics).toMatchObject({
+      const visual = expectDefined(
+        info.categories.find((category) => category.name === "visual-engineering"),
+        "visual-engineering category resolution",
+      )
+      expect(visual.effectiveModel).toBe("google/gemini-3.1-pro-high")
+      expect(visual.capabilityDiagnostics).toMatchObject({
         resolutionMode: "alias-backed",
         canonicalization: {
           source: "pattern-alias",
@@ -169,14 +230,13 @@ describe("model-resolution check", () => {
 
       const info = getModelResolutionInfoWithOverrides({
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-6-thinking" },
+          oracle: { model: "anthropic/claude-opus-4-7-thinking" },
         },
       })
 
-      const oracle = info.agents.find((agent) => agent.name === "oracle")
-      expect(oracle).toBeDefined()
-      expect(oracle!.effectiveModel).toBe("anthropic/claude-opus-4-6-thinking")
-      expect(oracle!.capabilityDiagnostics).toMatchObject({
+      const oracle = expectDefined(info.agents.find((agent) => agent.name === "oracle"), "oracle agent resolution")
+      expect(oracle.effectiveModel).toBe("anthropic/claude-opus-4-7-thinking")
+      expect(oracle.capabilityDiagnostics).toMatchObject({
         resolutionMode: "alias-backed",
         canonicalization: {
           source: "pattern-alias",
@@ -208,16 +268,16 @@ describe("model-resolution check", () => {
       const result = await checkModelResolution()
 
       // then: Details should contain agent/category resolution info
-      expect(result.details).toBeDefined()
-      expect(result.details!.length).toBeGreaterThan(0)
+      const details = expectDefined(result.details, "model resolution details")
+      expect(details.length).toBeGreaterThan(0)
       // Should have Available Models and Configured Models headers
-      expect(result.details!.some((d) => d.includes("Available Models"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("Configured Models"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("Agents:"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("Categories:"))).toBe(true)
+      expect(details.some((d) => d.includes("Available Models"))).toBe(true)
+      expect(details.some((d) => d.includes("Configured Models"))).toBe(true)
+      expect(details.some((d) => d.includes("Agents:"))).toBe(true)
+      expect(details.some((d) => d.includes("Categories:"))).toBe(true)
       // Should have legend
-      expect(result.details!.some((d) => d.includes("user override"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("capabilities: snapshot-backed"))).toBe(true)
+      expect(details.some((d) => d.includes("user override"))).toBe(true)
+      expect(details.some((d) => d.includes("capabilities: snapshot-backed"))).toBe(true)
     })
 
     it("collects warnings when configured models rely on compatibility fallback", async () => {
@@ -234,6 +294,28 @@ describe("model-resolution check", () => {
       expect(issues).toHaveLength(1)
       expect(issues[0]?.title).toContain("compatibility fallback")
       expect(issues[0]?.description).toContain("oracle=custom/unknown-llm")
+    })
+
+    it("does not warn for known provider aliases used by current recommended models", async () => {
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      // #given current recommended provider aliases from user configuration
+      const info = getModelResolutionInfoWithOverrides({
+        agents: {
+          sisyphus: { model: "kimi-for-coding/k2pb" },
+          metis: { model: "github-copilot/claude-opus-4.7" },
+        },
+        categories: {
+          "visual-engineering": { model: "github-copilot/claude-opus-4.7" },
+          artistry: { model: "github-copilot/claude-opus-4.7" },
+        },
+      })
+
+      // #when collecting doctor capability issues
+      const issues = collectCapabilityResolutionIssues(info)
+
+      // #then these known aliases do not create compatibility fallback warnings
+      expect(issues).toHaveLength(0)
     })
   })
 

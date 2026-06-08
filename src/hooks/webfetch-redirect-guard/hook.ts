@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { log, replaceToolArgs } from "../../shared"
 import {
   MAX_WEBFETCH_REDIRECTS,
   WEBFETCH_REDIRECT_ERROR_PATTERNS,
@@ -85,7 +85,7 @@ export function createWebFetchRedirectGuardHook(_ctx: PluginInput) {
         })
 
         if (resolution.type === "resolved") {
-          output.args.url = resolution.url
+          replaceToolArgs(output, { url: resolution.url })
           return
         }
 
@@ -94,12 +94,21 @@ export function createWebFetchRedirectGuardHook(_ctx: PluginInput) {
           storedAt: Date.now(),
         })
       } catch (error) {
-        log("[webfetch-redirect-guard] Failed to pre-resolve redirects", {
-          sessionID: input.sessionID,
-          callID: input.callID,
-          url,
-          error,
-        })
+        if (error instanceof Error) {
+          log("[webfetch-redirect-guard] Failed to pre-resolve redirects", {
+            sessionID: input.sessionID,
+            callID: input.callID,
+            url,
+            error,
+          })
+        } else {
+          log("[webfetch-redirect-guard] Failed to pre-resolve redirects", {
+            sessionID: input.sessionID,
+            callID: input.callID,
+            url,
+            error,
+          })
+        }
       }
     },
 

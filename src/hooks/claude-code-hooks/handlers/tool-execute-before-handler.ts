@@ -8,7 +8,7 @@ import {
 import { appendTranscriptEntry } from "../transcript"
 import { cacheToolInput } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
-import { isHookDisabled, log } from "../../../shared"
+import { isHookDisabled, log, replaceToolArgs } from "../../../shared"
 
 export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
@@ -19,7 +19,12 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 			let parsed: unknown
 			try {
 				parsed = JSON.parse(output.args.todos)
-			} catch {
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				log("todowrite todos JSON parse failed", {
+					sessionID: input.sessionID,
+					error: errorMessage,
+				})
 				throw new Error(
 					`[todowrite ERROR] Failed to parse todos string as JSON. ` +
 						`Received: ${
@@ -39,7 +44,7 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 				)
 			}
 
-			output.args.todos = parsed
+			replaceToolArgs(output, { todos: parsed })
 			log("todowrite: parsed todos string to array", { sessionID: input.sessionID })
 		}
 
@@ -82,12 +87,18 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 						duration: 4000,
 					},
 				})
-				.catch(() => {})
+				.catch((error: unknown) => {
+					if (error instanceof Error) {
+						log("PreToolUse hook toast failed", { sessionID: input.sessionID, error: error.message })
+					} else {
+						log("PreToolUse hook toast failed", { sessionID: input.sessionID, error: String(error) })
+					}
+				})
 			throw new Error(result.reason ?? "Hook blocked the operation")
 		}
 
 		if (result.modifiedInput) {
-			Object.assign(output.args, result.modifiedInput)
+			replaceToolArgs(output, result.modifiedInput as Record<string, unknown>)
 		}
 	}
 }

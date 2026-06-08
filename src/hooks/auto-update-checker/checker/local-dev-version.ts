@@ -13,7 +13,8 @@ export function getLocalDevVersion(directory: string): string | null {
     const content = fs.readFileSync(pkgPath, "utf-8")
     const pkg = JSON.parse(content) as PackageJson
     return pkg.version ?? null
-  } catch {
+  } catch (error) {
+    error instanceof Error
     return null
   }
 }

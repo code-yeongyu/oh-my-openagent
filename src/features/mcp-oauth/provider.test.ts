@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
-import { createHash, randomBytes } from "node:crypto"
+import { createHash } from "node:crypto"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { OAuthTokenData } from "./storage"
 import { resetDiscoveryCache } from "./discovery"
 
@@ -14,13 +17,32 @@ describe("McpOAuthProvider", () => {
   let generateCodeVerifier: ProviderModule["generateCodeVerifier"]
   let generateCodeChallenge: ProviderModule["generateCodeChallenge"]
   let buildAuthorizationUrl: ProviderModule["buildAuthorizationUrl"]
+  let originalConfigDir: string | undefined
+  let testConfigDir: string | null = null
 
   beforeEach(async () => {
+    originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    testConfigDir = mkdtempSync(join(tmpdir(), "mcp-oauth-provider-test-"))
+    process.env.OPENCODE_CONFIG_DIR = testConfigDir
+
     const providerModule = await importFreshProviderModule()
     McpOAuthProvider = providerModule.McpOAuthProvider
     generateCodeVerifier = providerModule.generateCodeVerifier
     generateCodeChallenge = providerModule.generateCodeChallenge
     buildAuthorizationUrl = providerModule.buildAuthorizationUrl
+  })
+
+  afterEach(() => {
+    if (originalConfigDir === undefined) {
+      delete process.env.OPENCODE_CONFIG_DIR
+    } else {
+      process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+    }
+
+    if (testConfigDir) {
+      rmSync(testConfigDir, { recursive: true, force: true })
+      testConfigDir = null
+    }
   })
 
   describe("generateCodeVerifier", () => {
@@ -170,26 +192,6 @@ describe("McpOAuthProvider", () => {
   })
 
   describe("saveTokens / tokens", () => {
-    let originalEnv: string | undefined
-
-    beforeEach(() => {
-      originalEnv = process.env.OPENCODE_CONFIG_DIR
-      const { mkdirSync } = require("node:fs")
-      const { tmpdir } = require("node:os")
-      const { join } = require("node:path")
-      const testDir = join(tmpdir(), "mcp-oauth-provider-test-" + Date.now())
-      mkdirSync(testDir, { recursive: true })
-      process.env.OPENCODE_CONFIG_DIR = testDir
-    })
-
-    afterEach(() => {
-      if (originalEnv === undefined) {
-        delete process.env.OPENCODE_CONFIG_DIR
-      } else {
-        process.env.OPENCODE_CONFIG_DIR = originalEnv
-      }
-    })
-
     it("persists and loads token data via storage", () => {
       // given
       const provider = new McpOAuthProvider({ serverUrl: "https://mcp.example.com" })
@@ -229,27 +231,14 @@ describe("McpOAuthProvider", () => {
 
   describe("refresh", () => {
     let originalFetch: typeof globalThis.fetch
-    let originalEnv: string | undefined
 
     beforeEach(() => {
       originalFetch = globalThis.fetch
-      originalEnv = process.env.OPENCODE_CONFIG_DIR
       resetDiscoveryCache()
-      const { mkdirSync } = require("node:fs")
-      const { tmpdir } = require("node:os")
-      const { join } = require("node:path")
-      const testDir = join(tmpdir(), `mcp-oauth-provider-refresh-test-${Date.now()}`)
-      mkdirSync(testDir, { recursive: true })
-      process.env.OPENCODE_CONFIG_DIR = testDir
     })
 
     afterEach(() => {
       globalThis.fetch = originalFetch
-      if (originalEnv === undefined) {
-        delete process.env.OPENCODE_CONFIG_DIR
-      } else {
-        process.env.OPENCODE_CONFIG_DIR = originalEnv
-      }
       resetDiscoveryCache()
     })
 
@@ -285,10 +274,8 @@ describe("McpOAuthProvider", () => {
           { status: 200, headers: { "content-type": "application/json" } },
         )
       })
-      const fetchMock = Object.assign(
-        async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> => fetchStub(...args),
-        { preconnect: originalFetch?.preconnect?.bind(originalFetch) ?? (() => {}) },
-      ) satisfies typeof fetch
+      const fetchMock = (async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> =>
+        fetchStub(...args)) satisfies typeof fetch
       globalThis.fetch = fetchMock
 
       // given
@@ -310,6 +297,58 @@ describe("McpOAuthProvider", () => {
       // then
       expect(result.accessToken).toBe("refreshed-access-token")
       expect(result.refreshToken).toBe("refresh-token-456") // preserved from input when absent in response
+    })
+
+    it("propagates non-Error token error-body parse failures", async () => {
+      // given
+      const nonErrorFailure = Object.freeze({ reason: "non-error json failure" })
+      const fetchStub = mock(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes("oauth-protected-resource")) {
+          return new Response(
+            JSON.stringify({ authorization_servers: ["https://auth.example.com"] }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          )
+        }
+        if (url.includes(".well-known")) {
+          return new Response(
+            JSON.stringify({
+              issuer: "https://auth.example.com",
+              authorization_endpoint: "https://auth.example.com/authorize",
+              token_endpoint: "https://auth.example.com/token",
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          )
+        }
+
+        const tokenResponse = new Response("", { status: 400 })
+        Object.defineProperty(tokenResponse, "json", {
+          value: async () => {
+            throw nonErrorFailure
+          },
+        })
+        return tokenResponse
+      })
+      const fetchMock = (async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> =>
+        fetchStub(...args)) satisfies typeof fetch
+      globalThis.fetch = fetchMock
+      const providerModule = await importFreshProviderModule()
+      const provider = new providerModule.McpOAuthProvider({
+        serverUrl: "https://mcp.example.com",
+        clientId: "my-client",
+      })
+      provider.saveTokens({
+        accessToken: "old-access-token",
+        refreshToken: "refresh-token-456",
+        expiresAt: Math.floor(Date.now() / 1000) - 60,
+        clientInfo: { clientId: "my-client" },
+      })
+
+      // when
+      const result = provider.refresh("refresh-token-456")
+
+      // then
+      await expect(result).rejects.toBe(nonErrorFailure)
     })
   })
 

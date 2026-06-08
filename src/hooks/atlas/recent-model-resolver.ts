@@ -11,9 +11,24 @@ type PromptContext = {
   tools?: Record<string, boolean>
 }
 
+type RecentPromptContextDeps = {
+  isSqliteBackend: typeof isSqliteBackend
+  getMessageDir: typeof getMessageDir
+  findNearestMessageWithFields: typeof findNearestMessageWithFields
+  findNearestMessageWithFieldsFromSDK: typeof findNearestMessageWithFieldsFromSDK
+}
+
+const defaultDeps: RecentPromptContextDeps = {
+  isSqliteBackend,
+  getMessageDir,
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+}
+
 export async function resolveRecentPromptContextForSession(
   ctx: PluginInput,
-  sessionID: string
+  sessionID: string,
+  deps: RecentPromptContextDeps = defaultDeps,
 ): Promise<PromptContext> {
   try {
     const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
@@ -54,16 +69,19 @@ export async function resolveRecentPromptContextForSession(
         return { model: { providerID: info.providerID, modelID: info.modelID }, tools }
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     // ignore - fallback to message storage
   }
 
   let currentMessage = null
-  if (isSqliteBackend()) {
-    currentMessage = await findNearestMessageWithFieldsFromSDK(ctx.client, sessionID)
+  if (deps.isSqliteBackend()) {
+    currentMessage = await deps.findNearestMessageWithFieldsFromSDK(ctx.client, sessionID)
   } else {
-    const messageDir = getMessageDir(sessionID)
-    currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    const messageDir = deps.getMessageDir(sessionID)
+    currentMessage = messageDir ? deps.findNearestMessageWithFields(messageDir) : null
   }
   const model = currentMessage?.model
   const tools = normalizePromptTools(currentMessage?.tools)

@@ -6,6 +6,7 @@ import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setSessionAgent } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook, setSessionFallbackChain } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
@@ -13,27 +14,27 @@ type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
 
 function asEventHandlerInput(input: EventInput): EventHandlerInput {
-	return input as unknown as EventHandlerInput
+	return unsafeTestValue<EventHandlerInput>(input)
 }
 
 function asEventHandlerContext(ctx: unknown): EventHandlerArgs["ctx"] {
-	return ctx as unknown as EventHandlerArgs["ctx"]
+	return unsafeTestValue<EventHandlerArgs["ctx"]>(ctx)
 }
 
 function asPluginConfig(config: unknown): EventHandlerArgs["pluginConfig"] {
-	return config as unknown as EventHandlerArgs["pluginConfig"]
+	return unsafeTestValue<EventHandlerArgs["pluginConfig"]>(config)
 }
 
 function asChatMessageHandlerContext(ctx: unknown): ChatMessageHandlerArgs["ctx"] {
-	return ctx as unknown as ChatMessageHandlerArgs["ctx"]
+	return unsafeTestValue<ChatMessageHandlerArgs["ctx"]>(ctx)
 }
 
 function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConfig"] {
-	return config as unknown as ChatMessageHandlerArgs["pluginConfig"]
+	return unsafeTestValue<ChatMessageHandlerArgs["pluginConfig"]>(config)
 }
 
 function createEventHandlerManagers(): EventHandlerArgs["managers"] {
-	return {
+	return unsafeTestValue<EventHandlerArgs["managers"]>({
 		tmuxSessionManager: {
 			onSessionCreated: async () => {},
 			onSessionDeleted: async () => {},
@@ -41,17 +42,17 @@ function createEventHandlerManagers(): EventHandlerArgs["managers"] {
 		skillMcpManager: {
 			disconnectSession: async () => {},
 		},
-	} as unknown as EventHandlerArgs["managers"]
+	})
 }
 
 function createEventHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): EventHandlerArgs["hooks"] {
-	return {
+	return unsafeTestValue<EventHandlerArgs["hooks"]>({
 		modelFallback,
-	} as unknown as EventHandlerArgs["hooks"]
+	})
 }
 
 function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): ChatMessageHandlerArgs["hooks"] {
-	return {
+	return unsafeTestValue<ChatMessageHandlerArgs["hooks"]>({
 		modelFallback,
 		stopContinuationGuard: null,
 		keywordDetector: null,
@@ -59,19 +60,19 @@ function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createMo
 		autoSlashCommand: null,
 		startWork: null,
 		ralphLoop: null,
-	} as unknown as ChatMessageHandlerArgs["hooks"]
+	})
 }
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
 
-afterEach(() => {
-	readConnectedProvidersCacheSpy?.mockRestore()
-	readProviderModelsCacheSpy?.mockRestore()
-	readConnectedProvidersCacheSpy = undefined
-	readProviderModelsCacheSpy = undefined
-	_resetForTesting()
-})
+		afterEach(() => {
+			readConnectedProvidersCacheSpy?.mockRestore()
+			readProviderModelsCacheSpy?.mockRestore()
+			readConnectedProvidersCacheSpy = undefined
+			readProviderModelsCacheSpy = undefined
+			_resetForTesting()
+		})
 
 describe("createEventHandler - category runtime fallback suppression", () => {
 	test("does not arm retry fallback when category session explicitly stores no fallback chain [regression #2941]", async () => {
@@ -83,11 +84,10 @@ describe("createEventHandler - category runtime fallback suppression", () => {
 		readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 		readProviderModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
 
-		clearPendingModelFallback(sessionID)
-		setSessionAgent(sessionID, "sisyphus-junior")
-		setSessionFallbackChain(sessionID, undefined)
-
 		const modelFallback = createModelFallbackHook()
+		clearPendingModelFallback(modelFallback, sessionID)
+		setSessionAgent(sessionID, "sisyphus-junior")
+		setSessionFallbackChain(modelFallback, sessionID, undefined)
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
 				directory: "/tmp",

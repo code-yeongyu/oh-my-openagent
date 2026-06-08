@@ -46,6 +46,14 @@ function resolveHeaders(
   return headers
 }
 
+async function readResponseTextOrEmpty(response: Response): Promise<string> {
+  try {
+    return await response.text()
+  } catch {
+    return ""
+  }
+}
+
 export async function executeHttpHook(
   hook: HookHttp,
   stdin: string
@@ -59,7 +67,11 @@ export async function executeHttpHook(
         stderr: `HTTP hook URL scheme "${parsed.protocol}" is not allowed. Only http: and https: are permitted.`,
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return { exitCode: 1, stderr: `HTTP hook URL is invalid: ${hook.url}` }
+    }
+
     return { exitCode: 1, stderr: `HTTP hook URL is invalid: ${hook.url}` }
   }
 
@@ -90,7 +102,7 @@ export async function executeHttpHook(
       return {
         exitCode: 1,
         stderr: `HTTP hook returned status ${response.status}: ${response.statusText}`,
-        stdout: await response.text().catch(() => ""),
+        stdout: await readResponseTextOrEmpty(response),
       }
     }
 
@@ -104,8 +116,12 @@ export async function executeHttpHook(
       if (typeof parsed.exitCode === "number") {
         return { exitCode: parsed.exitCode, stdout: body, stderr: "" }
       }
-    } catch {
-      // Non-JSON bodies are allowed and returned as stdout below.
+    } catch (error) {
+      if (error instanceof Error) {
+        return { exitCode: 0, stdout: body, stderr: "" }
+      }
+
+      return { exitCode: 0, stdout: body, stderr: "" }
     }
 
     return { exitCode: 0, stdout: body, stderr: "" }

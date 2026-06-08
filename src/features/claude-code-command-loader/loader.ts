@@ -4,12 +4,22 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
 import {
+  EXCLUDED_DIRS,
   findProjectOpencodeCommandDirs,
   getClaudeConfigDir,
   getOpenCodeCommandDirs,
 } from "../../shared"
 import { log } from "../../shared/logger"
+import {
+  clearCommandLoaderCache,
+  deleteCachedCommands,
+  getCachedCommands,
+  getCommandLoaderCacheKey,
+  setCachedCommands,
+} from "./loader-cache"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
+
+export { clearCommandLoaderCache }
 
 async function loadCommandsFromDir(
   commandsDir: string,
@@ -19,7 +29,10 @@ async function loadCommandsFromDir(
 ): Promise<LoadedCommand[]> {
   try {
     await fs.access(commandsDir)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      return []
+    }
     return []
   }
 
@@ -27,7 +40,11 @@ async function loadCommandsFromDir(
   try {
     realPath = await fs.realpath(commandsDir)
   } catch (error) {
-    log(`Failed to resolve command directory: ${commandsDir}`, error)
+    if (error instanceof Error) {
+      log(`Failed to resolve command directory: ${commandsDir}`, error)
+    } else {
+      log(`Failed to resolve command directory: ${commandsDir}`, error)
+    }
     return []
   }
 
@@ -40,7 +57,11 @@ async function loadCommandsFromDir(
   try {
     entries = await fs.readdir(commandsDir, { withFileTypes: true })
   } catch (error) {
-    log(`Failed to read command directory: ${commandsDir}`, error)
+    if (error instanceof Error) {
+      log(`Failed to read command directory: ${commandsDir}`, error)
+    } else {
+      log(`Failed to read command directory: ${commandsDir}`, error)
+    }
     return []
   }
 
@@ -48,6 +69,7 @@ async function loadCommandsFromDir(
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) continue
       if (entry.name.startsWith(".")) continue
       const subDirPath = join(commandsDir, entry.name)
       const subPrefix = prefix ? `${prefix}/${entry.name}` : entry.name
@@ -95,7 +117,11 @@ $ARGUMENTS
         scope,
       })
     } catch (error) {
-      log(`Failed to parse command: ${commandPath}`, error)
+      if (error instanceof Error) {
+        log(`Failed to parse command: ${commandPath}`, error)
+      } else {
+        log(`Failed to parse command: ${commandPath}`, error)
+      }
       continue
     }
   }
@@ -159,11 +185,29 @@ export async function loadOpencodeProjectCommands(directory?: string): Promise<R
 }
 
 export async function loadAllCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
-  const [user, project, global, projectOpencode] = await Promise.all([
+  const cacheKey = await getCommandLoaderCacheKey(directory)
+  const cachedCommands = getCachedCommands(cacheKey)
+  if (cachedCommands) {
+    return cachedCommands
+  }
+
+  const loadCommandsPromise = Promise.all([
     loadUserCommands(),
     loadProjectCommands(directory),
     loadOpencodeGlobalCommands(),
     loadOpencodeProjectCommands(directory),
   ])
-  return { ...projectOpencode, ...global, ...project, ...user }
+    .then(([user, project, global, projectOpencode]) => {
+      return { ...projectOpencode, ...global, ...project, ...user }
+    })
+    .catch((error) => {
+      deleteCachedCommands(cacheKey)
+      if (error instanceof Error) {
+        throw error
+      }
+      throw error
+    })
+
+  setCachedCommands(cacheKey, loadCommandsPromise)
+  return loadCommandsPromise
 }

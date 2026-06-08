@@ -1,8 +1,9 @@
-import { delimiter, dirname, join } from "node:path"
+import { delimiter, dirname, posix, win32 } from "node:path"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const OPENCODE_COMMANDS = ["opencode", "opencode-desktop"] as const
 const WINDOWS_SUFFIXES = ["", ".exe", ".cmd", ".bat", ".ps1"] as const
+type PathTools = Pick<typeof posix, "delimiter" | "join">
 
 function getCommandCandidates(platform: NodeJS.Platform): string[] {
   if (platform !== "win32") return [...OPENCODE_COMMANDS]
@@ -10,6 +11,11 @@ function getCommandCandidates(platform: NodeJS.Platform): string[] {
   return OPENCODE_COMMANDS.flatMap((command) =>
     WINDOWS_SUFFIXES.map((suffix) => `${command}${suffix}`),
   )
+}
+
+function getPathTools(platform: NodeJS.Platform): PathTools {
+  if (platform === "win32") return win32
+  return posix
 }
 
 export function collectCandidateBinaryPaths(
@@ -20,6 +26,7 @@ export function collectCandidateBinaryPaths(
   const seen = new Set<string>()
   const candidates: string[] = []
   const commandCandidates = getCommandCandidates(platform)
+  const pathTools = getPathTools(platform)
 
   const addCandidate = (binaryPath: string | undefined | null): void => {
     if (!binaryPath || seen.has(binaryPath)) return
@@ -31,24 +38,28 @@ export function collectCandidateBinaryPaths(
     addCandidate(which(command))
   }
 
-  for (const entry of (pathEnv ?? "").split(delimiter).filter(Boolean)) {
+  for (const entry of (pathEnv ?? "").split(pathTools.delimiter).filter(Boolean)) {
     for (const command of commandCandidates) {
-      addCandidate(join(entry, command))
+      addCandidate(pathTools.join(entry, command))
     }
   }
 
   return candidates
 }
 
-export async function canExecuteBinary(binaryPath: string): Promise<boolean> {
+export async function canExecuteBinary(
+  binaryPath: string,
+  spawn: typeof spawnWithWindowsHide = spawnWithWindowsHide,
+): Promise<boolean> {
   try {
-    const proc = spawnWithWindowsHide([binaryPath, "--version"], {
+    const proc = spawn([binaryPath, "--version"], {
       stdout: "pipe",
       stderr: "pipe",
     })
     await proc.exited
     return proc.exitCode === 0
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) return false
     return false
   }
 }

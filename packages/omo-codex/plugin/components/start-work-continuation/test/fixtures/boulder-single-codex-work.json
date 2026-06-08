@@ -1,0 +1,19 @@
+{
+	"schema_version": 2,
+	"active_work_id": "work_1",
+	"works": {
+		"work_1": {
+			"work_id": "work_1",
+			"active_plan": "/repo/.omo/plans/plan-with-unchecked.md",
+			"plan_name": "launch-plan",
+			"status": "active",
+			"started_at": "2026-05-28T00:00:00Z",
+			"session_ids": ["codex:sess_abc"]
+		}
+	},
+	"active_plan": "/repo/.omo/plans/plan-with-unchecked.md",
+	"plan_name": "legacy-launch-plan",
+	"started_at": "2026-05-28T00:00:00Z",
+	"status": "active",
+	"session_ids": ["codex:sess_legacy"]
+}

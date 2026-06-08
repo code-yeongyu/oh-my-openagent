@@ -12,8 +12,11 @@ describe("parseAnthropicTokenLimitError", () => {
 
     //#then
     expect(result).not.toBeNull()
-    expect(result!.currentTokens).toBe(250000)
-    expect(result!.maxTokens).toBe(200000)
+    if (result === null) {
+      throw new Error("expected token limit parser result")
+    }
+    expect(result.currentTokens).toBe(250000)
+    expect(result.maxTokens).toBe(200000)
   })
 
   it("#given a non-token-limit error #when parsing #then returns null", () => {
@@ -65,6 +68,38 @@ describe("parseAnthropicTokenLimitError", () => {
     expect(result).not.toBeNull()
   })
 
+  it("#given token limit text only in fallback JSON #when parsing #then detects the token limit", () => {
+    //#given
+    const error = {
+      payload: {
+        reason: "prompt is too long: 250000 tokens > 200000 maximum",
+      },
+    }
+
+    //#when
+    const result = parseAnthropicTokenLimitError(error)
+
+    //#then
+    expect(result).not.toBeNull()
+    if (result === null) {
+      throw new Error("expected token limit parser result")
+    }
+    expect(result.currentTokens).toBe(250000)
+    expect(result.maxTokens).toBe(200000)
+  })
+
+  it("#given a circular reference error without string fields #when parsing #then returns null without crashing", () => {
+    //#given
+    const circular: Record<string, unknown> = { payload: { current: 1 } }
+    circular.self = circular
+
+    //#when
+    const result = parseAnthropicTokenLimitError(circular)
+
+    //#then
+    expect(result).toBeNull()
+  })
+
   it("#given an error where data.responseBody has invalid JSON #when parsing #then handles gracefully", () => {
     //#given
     const error = {
@@ -77,8 +112,35 @@ describe("parseAnthropicTokenLimitError", () => {
 
     //#then
     expect(result).not.toBeNull()
-    expect(result!.currentTokens).toBe(300000)
-    expect(result!.maxTokens).toBe(200000)
+    if (result === null) {
+      throw new Error("expected token limit parser result")
+    }
+    expect(result.currentTokens).toBe(300000)
+    expect(result.maxTokens).toBe(200000)
+  })
+
+  it("#given responseBody JSON with nested error but no top-level type #when parsing #then preserves nested type and request id", () => {
+    //#given
+    const error = {
+      data: {
+        responseBody:
+          '{"error":{"type":"context_length_exceeded","message":"prompt is too long: 250000 tokens > 200000 maximum"},"request_id":"req_123"}',
+      },
+      message: "prompt is too long",
+    }
+
+    //#when
+    const result = parseAnthropicTokenLimitError(error)
+
+    //#then
+    expect(result).not.toBeNull()
+    if (result === null) {
+      throw new Error("expected token limit parser result")
+    }
+    expect(result.currentTokens).toBe(250000)
+    expect(result.maxTokens).toBe(200000)
+    expect(result.errorType).toBe("context_length_exceeded")
+    expect(result.requestId).toBe("req_123")
   })
 
   it("#given an error with data as a string (not object) #when parsing #then does not crash", () => {
@@ -93,5 +155,21 @@ describe("parseAnthropicTokenLimitError", () => {
 
     //#then
     expect(result).not.toBeNull()
+  })
+
+  it("#given an error with an unreadable message property #when parsing #then returns null without crashing", () => {
+    //#given
+    const error: Record<string, unknown> = {}
+    Object.defineProperty(error, "message", {
+      get() {
+        throw new TypeError("message is unavailable")
+      },
+    })
+
+    //#when
+    const result = parseAnthropicTokenLimitError(error)
+
+    //#then
+    expect(result).toBeNull()
   })
 })

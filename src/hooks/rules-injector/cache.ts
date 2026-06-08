@@ -1,4 +1,6 @@
 import { clearInjectedRules, loadInjectedRules } from "./storage";
+import { createRuleScanCache } from "./rule-scan-cache";
+import type { RuleScanCache } from "./rule-scan-cache";
 
 export type SessionInjectedRulesCache = {
   contentHashes: Set<string>;
@@ -12,10 +14,14 @@ export function createSessionCacheStore(): {
   const sessionCaches = new Map<string, SessionInjectedRulesCache>();
 
   function getSessionCache(sessionID: string): SessionInjectedRulesCache {
-    if (!sessionCaches.has(sessionID)) {
-      sessionCaches.set(sessionID, loadInjectedRules(sessionID));
+    const existingCache = sessionCaches.get(sessionID);
+    if (existingCache !== undefined) {
+      return existingCache;
     }
-    return sessionCaches.get(sessionID)!;
+
+    const cache = loadInjectedRules(sessionID);
+    sessionCaches.set(sessionID, cache);
+    return cache;
   }
 
   function clearSessionCache(sessionID: string): void {
@@ -24,4 +30,30 @@ export function createSessionCacheStore(): {
   }
 
   return { getSessionCache, clearSessionCache };
+}
+
+export function createSessionRuleScanCacheStore(): {
+  getSessionRuleScanCache: (sessionID: string) => RuleScanCache;
+  clearSessionRuleScanCache: (sessionID: string) => void;
+} {
+  const sessionCaches = new Map<string, RuleScanCache>();
+
+  function getSessionRuleScanCache(sessionID: string): RuleScanCache {
+    const existingCache = sessionCaches.get(sessionID);
+    if (existingCache) {
+      return existingCache;
+    }
+
+    const cache = createRuleScanCache();
+    sessionCaches.set(sessionID, cache);
+    return cache;
+  }
+
+  function clearSessionRuleScanCache(sessionID: string): void {
+    const cache = sessionCaches.get(sessionID);
+    cache?.clear();
+    sessionCaches.delete(sessionID);
+  }
+
+  return { getSessionRuleScanCache, clearSessionRuleScanCache };
 }

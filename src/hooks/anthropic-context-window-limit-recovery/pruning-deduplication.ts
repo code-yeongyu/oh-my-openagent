@@ -63,7 +63,10 @@ function readMessages(sessionID: string): MessagePart[] {
         messages.push(data)
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 
@@ -75,7 +78,10 @@ async function readMessagesFromSDK(client: OpencodeClient, sessionID: string): P
     const response = await client.session.messages({ path: { id: sessionID } })
     const rawMessages = normalizeSDKResponse(response, [] as Array<{ parts?: ToolPart[] }>, { preferResponseOnMissingData: true })
     return rawMessages.filter((m) => m.parts) as MessagePart[]
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -116,21 +122,25 @@ export async function executeDeduplication(
       
       const signature = createToolSignature(part.tool, part.state?.input)
       
-      if (!signatures.has(signature)) {
-        signatures.set(signature, [])
+      let calls = signatures.get(signature)
+      if (!calls) {
+        calls = []
+        signatures.set(signature, calls)
       }
-      
-      signatures.get(signature)!.push({
+
+      calls.push({
         toolName: part.tool,
         signature,
         callID: part.callID,
         turn: currentTurn,
       })
-      
-      if (!state.toolSignatures.has(signature)) {
-        state.toolSignatures.set(signature, [])
+
+      let stateCalls = state.toolSignatures.get(signature)
+      if (!stateCalls) {
+        stateCalls = []
+        state.toolSignatures.set(signature, stateCalls)
       }
-      state.toolSignatures.get(signature)!.push({
+      stateCalls.push({
         toolName: part.tool,
         signature,
         callID: part.callID,

@@ -1,5 +1,9 @@
 import type { GitFileStat } from "./types"
 
+function normalizePath(path: string): string {
+  return path.replaceAll("\\", "/")
+}
+
 export function formatFileChanges(stats: GitFileStat[], notepadPath?: string): string {
   if (stats.length === 0) return "[FILE CHANGES SUMMARY]\nNo file changes detected.\n"
 
@@ -34,7 +38,11 @@ export function formatFileChanges(stats: GitFileStat[], notepadPath?: string): s
   }
 
   if (notepadPath) {
-    const notepadStat = stats.find((s) => s.path.includes("notepad") || s.path.includes(".sisyphus"))
+    const normalizedNotepadPath = normalizePath(notepadPath)
+    const notepadStat = stats.find((s) => {
+      const normalizedPath = normalizePath(s.path)
+      return normalizedPath === normalizedNotepadPath
+    })
     if (notepadStat) {
       lines.push("[NOTEPAD UPDATED]")
       lines.push(`  ${notepadStat.path}  (+${notepadStat.added})`)

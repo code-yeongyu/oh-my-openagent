@@ -2,27 +2,20 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
-import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { log } from "../../shared/logger"
+import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
 
-import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
+import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
+import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
+import { startCountdown } from "./countdown"
 import { hasUnansweredQuestion } from "./pending-question-detection"
+import { resolveLatestMessageInfo } from "./resolve-message-info"
+import type { SessionStateStore } from "./session-state"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
-import type { MessageInfo, MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
-import { resolveLatestMessageInfo } from "./resolve-message-info"
-import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
-import type { SessionStateStore } from "./session-state"
-import { startCountdown } from "./countdown"
-
-function shouldAllowActivityProgress(modelID: string | undefined): boolean {
-  if (!modelID) {
-    return false
-  }
-
-  return !modelID.toLowerCase().includes("codex")
-}
+import type { MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
 
 export async function handleSessionIdle(args: {
   ctx: PluginInput
@@ -45,6 +38,12 @@ export async function handleSessionIdle(args: {
 
   const state = sessionStateStore.getState(sessionID)
   const observedCompactionEpoch = state.recentCompactionEpoch
+
+  if (state.allTodosCompletedAt) {
+    log(`[${HOOK_NAME}] Skipped: all todos were already completed`, { sessionID, allTodosCompletedAt: state.allTodosCompletedAt })
+    return
+  }
+
   if (state.isRecovering) {
     log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
     return
@@ -71,7 +70,7 @@ export async function handleSessionIdle(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
     : false
 
   if (hasRunningBgTasks) {
@@ -94,8 +93,13 @@ export async function handleSessionIdle(args: {
       log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
       return
     }
+    if (latestAssistantTurnBlocksInternalPrompt(prefetchedMessages)) {
+      log(`[${HOOK_NAME}] Skipped: pending internal continuation response`, { sessionID })
+      return
+    }
   } catch (error) {
-    log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(error) })
+    log(`[${HOOK_NAME}] Messages fetch failed, skipping continuation`, { sessionID, error: String(error) })
+    return
   }
 
   let todos: Todo[] = []
@@ -109,14 +113,13 @@ export async function handleSessionIdle(args: {
 
   if (!todos || todos.length === 0) {
     sessionStateStore.resetContinuationProgress(sessionID)
-    sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] No todos`, { sessionID })
     return
   }
 
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
-    sessionStateStore.resetContinuationProgress(sessionID)
+    state.allTodosCompletedAt = Date.now()
     sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return
@@ -142,7 +145,7 @@ export async function handleSessionIdle(args: {
   }
 
   const effectiveCooldown =
-    CONTINUATION_COOLDOWN_MS * Math.pow(2, Math.min(state.consecutiveFailures, 5))
+    CONTINUATION_COOLDOWN_MS * 2 ** Math.min(state.consecutiveFailures, 5)
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
     log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID, effectiveCooldown, consecutiveFailures: state.consecutiveFailures })
     return
@@ -206,7 +209,6 @@ export async function handleSessionIdle(args: {
     sessionID,
     incompleteCount,
     todos,
-    { allowActivityProgress: shouldAllowActivityProgress(resolvedInfo?.model?.modelID) },
   )
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return

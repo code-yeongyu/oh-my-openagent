@@ -1,8 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { createDynamicTruncator } from "../../shared/dynamic-truncator";
+import { log } from "../../shared/logger";
 import { findReadmeMdUp, resolveFilePath } from "./finder";
 import { loadInjectedPaths, saveInjectedPaths } from "./storage";
 
@@ -12,10 +13,19 @@ function getSessionCache(
   sessionCaches: Map<string, Set<string>>,
   sessionID: string,
 ): Set<string> {
-  if (!sessionCaches.has(sessionID)) {
-    sessionCaches.set(sessionID, loadInjectedPaths(sessionID));
+  const existing = sessionCaches.get(sessionID);
+  if (existing) {
+    return existing;
   }
-  return sessionCaches.get(sessionID)!;
+
+  const loaded = loadInjectedPaths(sessionID);
+  sessionCaches.set(sessionID, loaded);
+  return loaded;
+}
+
+function describeReadmeInjectionError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 export async function processFilePathForReadmeInjection(input: {
@@ -31,7 +41,7 @@ export async function processFilePathForReadmeInjection(input: {
 
   const dir = dirname(resolved);
   const cache = getSessionCache(input.sessionCaches, input.sessionID);
-  const readmePaths = findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
+  const readmePaths = await findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
 
   let dirty = false;
   for (const readmePath of readmePaths) {
@@ -39,7 +49,7 @@ export async function processFilePathForReadmeInjection(input: {
     if (cache.has(readmeDir)) continue;
 
     try {
-      const content = readFileSync(readmePath, "utf-8");
+      const content = await readFile(readmePath, "utf-8");
       const { result, truncated } = await input.truncator.truncate(
         input.sessionID,
         content,
@@ -50,7 +60,16 @@ export async function processFilePathForReadmeInjection(input: {
       input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
       cache.add(readmeDir);
       dirty = true;
-    } catch {}
+    } catch (error) {
+      const errorMessage = error instanceof Error
+        ? error.message
+        : describeReadmeInjectionError(error);
+      log("[directory-readme-injector] Skipped README injection after read/truncate failure", {
+        error: errorMessage,
+        readmePath,
+        sessionID: input.sessionID,
+      });
+    }
   }
 
   if (dirty) {

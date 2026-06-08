@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
+import { buildClaudeThinkingConfig } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
@@ -296,7 +297,6 @@ const metisRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
   "apply_patch",
-  "task",
 ])
 
 export function createMetisAgent(model: string): AgentConfig {
@@ -308,7 +308,7 @@ export function createMetisAgent(model: string): AgentConfig {
     temperature: 0.3,
     ...metisRestrictions,
     prompt: METIS_SYSTEM_PROMPT,
-    thinking: { type: "enabled", budgetTokens: 32000 },
+    ...buildClaudeThinkingConfig(model),
   } as AgentConfig
 }
 createMetisAgent.mode = MODE

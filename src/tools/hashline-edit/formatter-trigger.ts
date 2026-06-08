@@ -1,5 +1,6 @@
 import path from "path"
 import { log } from "../../shared"
+import { spawn as bunSpawn } from "../../shared/bun-spawn-shim"
 
 interface FormatterConfig {
   disabled?: boolean
@@ -106,7 +107,7 @@ export async function runFormattersForFile(
     const cmd = buildFormatterCommand(formatter.command, filePath)
     try {
       log("[formatter-trigger] Running formatter", { command: cmd, file: filePath })
-      const proc = Bun.spawn(cmd, {
+      const proc = bunSpawn(cmd, {
         cwd: directory,
         env: { ...process.env, ...formatter.environment },
         stdout: "ignore",

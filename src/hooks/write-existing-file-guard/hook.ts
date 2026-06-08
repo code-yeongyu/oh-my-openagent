@@ -3,9 +3,8 @@ import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { existsSync, realpathSync } from "fs"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "path"
 
-import { log } from "../../shared"
 import { handleWriteExistingFileGuardToolExecuteBefore } from "./tool-execute-before-handler"
-import { evictLeastRecentlyUsedSession, touchSession, trimSessionReadSet } from "./session-read-permissions"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 export type GuardArgs = {
   filePath?: string
@@ -16,7 +15,11 @@ export type GuardArgs = {
 
 const MAX_TRACKED_SESSIONS = 256
 export const MAX_TRACKED_PATHS_PER_SESSION = 1024
-const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
+
+type WriteExistingFileGuardOptions = {
+  maxTrackedSessions?: number
+  maxTrackedPathsPerSession?: number
+}
 
 export function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -47,7 +50,8 @@ export function toCanonicalPath(absolutePath: string): string {
   if (existsSync(absolutePath)) {
     try {
       canonicalPath = realpathSync.native(absolutePath)
-    } catch {
+    } catch (canonicalPathError) {
+      canonicalPathError instanceof Error
       canonicalPath = absolutePath
     }
   } else {
@@ -73,10 +77,20 @@ export function isOverwriteEnabled(value: boolean | string | undefined): boolean
   return false
 }
 
-export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
+export function createWriteExistingFileGuardHook(ctx: PluginInput, options?: WriteExistingFileGuardOptions): Hooks {
   const readPermissionsBySession = new Map<string, Set<string>>()
   const sessionLastAccess = new Map<string, number>()
-  const canonicalSessionRoot = toCanonicalPath(resolveInputPath(ctx, ctx.directory))
+  const maxTrackedSessions = options?.maxTrackedSessions ?? MAX_TRACKED_SESSIONS
+  const maxTrackedPathsPerSession = options?.maxTrackedPathsPerSession ?? MAX_TRACKED_PATHS_PER_SESSION
+  let canonicalSessionRoot: string | undefined
+
+  function getCanonicalSessionRoot(): string {
+    if (!canonicalSessionRoot) {
+      canonicalSessionRoot = toCanonicalPath(resolveInputPath(ctx, ctx.directory))
+    }
+
+    return canonicalSessionRoot
+  }
 
   return {
     "tool.execute.before": async (input, output) => {
@@ -86,8 +100,9 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
         output,
         readPermissionsBySession,
         sessionLastAccess,
-        canonicalSessionRoot,
-        maxTrackedSessions: MAX_TRACKED_SESSIONS,
+        getCanonicalSessionRoot,
+        maxTrackedSessions,
+        maxTrackedPathsPerSession,
       })
     },
     event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -95,8 +110,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
         return
       }
 
-      const props = event.properties as { info?: { id?: string } } | undefined
-      const sessionID = props?.info?.id
+      const sessionID = resolveSessionEventID(event.properties)
       if (!sessionID) {
         return
       }

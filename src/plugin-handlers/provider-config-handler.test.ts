@@ -97,6 +97,92 @@ describe("applyProviderConfig", () => {
     ])
   })
 
+  test("trusts user-configured multimodal-looker model even when provider config omits modalities", () => {
+    // given - user configures glm-5.1 as multimodal-looker but provider model entry has no modalities/capabilities
+    const modelCacheState = createModelCacheState()
+    const visionCapableModelsCache = modelCacheState.visionCapableModelsCache
+    if (!visionCapableModelsCache) {
+      throw new Error("visionCapableModelsCache should be initialized")
+    }
+    const config = {
+      provider: {
+        "zhipuai-coding-plan": {
+          models: {
+            "glm-5.1": {
+              limit: { context: 200000 },
+            },
+          },
+        },
+      },
+    } satisfies Record<string, unknown>
+
+    // when
+    applyProviderConfig({
+      config,
+      modelCacheState,
+      trustedVisionCapableModels: ["zhipuai-coding-plan/glm-5.1"],
+    })
+
+    // then - trusted model is in cache even though provider config did not declare image support
+    expect(Array.from(visionCapableModelsCache.keys())).toEqual([
+      "zhipuai-coding-plan/glm-5.1",
+    ])
+    expect(readVisionCapableModelsCache()).toEqual([
+      { providerID: "zhipuai-coding-plan", modelID: "glm-5.1" },
+    ])
+  })
+
+  test("does not duplicate a trusted model already discovered via provider modalities", () => {
+    // given
+    const modelCacheState = createModelCacheState()
+    const visionCapableModelsCache = modelCacheState.visionCapableModelsCache
+    if (!visionCapableModelsCache) {
+      throw new Error("visionCapableModelsCache should be initialized")
+    }
+    const config = {
+      provider: {
+        google: {
+          models: {
+            "gemini-3-flash": {
+              modalities: { input: ["text", "image"] },
+            },
+          },
+        },
+      },
+    } satisfies Record<string, unknown>
+
+    // when
+    applyProviderConfig({
+      config,
+      modelCacheState,
+      trustedVisionCapableModels: ["google/gemini-3-flash"],
+    })
+
+    // then
+    expect(Array.from(visionCapableModelsCache.keys())).toEqual([
+      "google/gemini-3-flash",
+    ])
+  })
+
+  test("ignores malformed trusted vision-capable model strings", () => {
+    // given - entries missing provider or model are skipped silently
+    const modelCacheState = createModelCacheState()
+    const visionCapableModelsCache = modelCacheState.visionCapableModelsCache
+    if (!visionCapableModelsCache) {
+      throw new Error("visionCapableModelsCache should be initialized")
+    }
+
+    // when
+    applyProviderConfig({
+      config: { provider: {} },
+      modelCacheState,
+      trustedVisionCapableModels: ["no-slash", "/missing-provider", "provider-only/"],
+    })
+
+    // then
+    expect(visionCapableModelsCache.size).toBe(0)
+  })
+
   test("clears stale vision-capable models when provider config changes", () => {
     // given
     const modelCacheState = createModelCacheState()

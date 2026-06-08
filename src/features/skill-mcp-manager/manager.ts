@@ -1,11 +1,11 @@
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { McpOAuthProvider } from "../mcp-oauth/provider"
 import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
-import { handleStepUpIfNeeded } from "./oauth-handler"
+import { handlePostRequestAuthError, handleStepUpIfNeeded } from "./oauth-handler"
 import type {
+  McpClient,
   OAuthProviderFactory,
   SkillMcpClientInfo,
   SkillMcpManagerState,
@@ -36,7 +36,7 @@ export class SkillMcpManager {
     return `${info.sessionID}:${info.skillName}:${info.serverName}`
   }
 
-  async getOrCreateClient(info: SkillMcpClientInfo, config: ClaudeCodeMcpServer): Promise<Client> {
+  async getOrCreateClient(info: SkillMcpClientInfo, config: ClaudeCodeMcpServer): Promise<McpClient> {
     const clientKey = this.getClientKey(info)
     return await getOrCreateClient({
       state: this.state,
@@ -106,10 +106,11 @@ export class SkillMcpManager {
   private async withOperationRetry<T>(
     info: SkillMcpClientInfo,
     config: ClaudeCodeMcpServer,
-    operation: (client: Client) => Promise<T>
+    operation: (client: McpClient) => Promise<T>
   ): Promise<T> {
     const maxRetries = 3
     let lastError: Error | null = null
+    const refreshAttempted = new Set<string>()
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -130,6 +131,17 @@ export class SkillMcpManager {
           continue
         }
 
+        const postRequestRefreshHandled = await handlePostRequestAuthError({
+          error: lastError,
+          config,
+          authProviders: this.state.authProviders,
+          createOAuthProvider: this.state.createOAuthProvider,
+          refreshAttempted,
+        })
+        if (postRequestRefreshHandled) {
+          continue
+        }
+
         if (!errorMessage.includes("not connected")) {
           throw lastError
         }
@@ -146,7 +158,7 @@ export class SkillMcpManager {
   }
 
   // NOTE: tests spy on this exact method name via `spyOn(manager as any, 'getOrCreateClientWithRetry')`.
-  private async getOrCreateClientWithRetry(info: SkillMcpClientInfo, config: ClaudeCodeMcpServer): Promise<Client> {
+  private async getOrCreateClientWithRetry(info: SkillMcpClientInfo, config: ClaudeCodeMcpServer): Promise<McpClient> {
     const clientKey = this.getClientKey(info)
     return await getOrCreateClientWithRetryImpl({
       state: this.state,

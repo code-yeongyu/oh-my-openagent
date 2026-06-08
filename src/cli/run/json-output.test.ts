@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import type { RunResult } from "./types"
 import { createJsonOutputManager } from "./json-output"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 interface MockWriteStream {
   write: (chunk: string) => boolean
@@ -18,6 +19,15 @@ function createMockWriteStream(): MockWriteStream {
   return stream
 }
 
+function requireWrite(stream: MockWriteStream, index: number): string {
+  const value = stream.writes[index]
+  expect(value).toBeDefined()
+  if (value === undefined) {
+    throw new Error(`Expected write at index ${index}`)
+  }
+  return value
+}
+
 describe("createJsonOutputManager", () => {
   let mockStdout: MockWriteStream
   let mockStderr: MockWriteStream
@@ -31,8 +41,8 @@ describe("createJsonOutputManager", () => {
     it("causes stdout writes to go to stderr", () => {
       // given
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+        stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
       })
       manager.redirectToStderr()
 
@@ -49,8 +59,8 @@ describe("createJsonOutputManager", () => {
     it("reverses the redirect", () => {
       // given
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+        stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
       })
       manager.redirectToStderr()
 
@@ -75,8 +85,8 @@ describe("createJsonOutputManager", () => {
         summary: "Test summary",
       }
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+        stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
       })
 
       // when
@@ -84,7 +94,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      const emitted = mockStdout.writes[0]!
+      const emitted = requireWrite(mockStdout, 0)
       expect(() => JSON.parse(emitted)).not.toThrow()
     })
 
@@ -98,15 +108,15 @@ describe("createJsonOutputManager", () => {
         summary: "Test summary",
       }
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+        stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
       })
 
       // when
       manager.emitResult(result)
 
       // then
-      const emitted = mockStdout.writes[0]!
+      const emitted = requireWrite(mockStdout, 0)
       const parsed = JSON.parse(emitted) as RunResult
       expect(parsed).toEqual(result)
       expect(parsed.sessionId).toBe("test-session")
@@ -126,8 +136,8 @@ describe("createJsonOutputManager", () => {
         summary: "Test",
       }
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+        stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
       })
       manager.redirectToStderr()
 
@@ -136,7 +146,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      expect(mockStdout.writes[0]!).toBe(JSON.stringify(result) + "\n")
+      expect(requireWrite(mockStdout, 0)).toBe(JSON.stringify(result) + "\n")
 
       mockStdout.write("after emit")
       expect(mockStdout.writes).toHaveLength(2)
@@ -148,8 +158,8 @@ describe("createJsonOutputManager", () => {
     it("work correctly", () => {
       // given
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+        stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
       })
 
       // when

@@ -6,8 +6,9 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
-import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
 import type { BoulderState } from "../../features/boulder-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-persisted-lineage-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -58,7 +59,7 @@ describe("atlas hook idle-event persisted lineage", () => {
     parentSessionIDs?: Record<string, string | undefined>,
     messagesBySession?: Record<string, Array<{ info: { agent: string; providerID: string; modelID: string } }>>,
   ) {
-    return createAtlasHook({
+    return createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -79,7 +80,7 @@ describe("atlas hook idle-event persisted lineage", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof createAtlasHook>[0])
+    }))
   }
 
   beforeEach(() => {
@@ -138,6 +139,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: "appended",
       },
     })
+    setSessionAgent(descendantSessionID, "sisyphus-junior")
     const hook = createHook(
       {
         [descendantSessionID]: MAIN_SESSION_ID,
@@ -173,7 +175,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
     })
 
-    const hook = createAtlasHook({
+    const hook = createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -193,7 +195,7 @@ describe("atlas hook idle-event persisted lineage", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof createAtlasHook>[0])
+    }))
 
     // when
     await hook.handler({
@@ -205,6 +207,78 @@ describe("atlas hook idle-event persisted lineage", () => {
 
     // then
     expect(promptCalls.length).toBe(0)
+  })
+
+  test("#given appended descendant lineage and matching agent #when descendant idles #then atlas injects continuation", async () => {
+    // given
+    const descendantSessionID = "ses_appended_descendant_match"
+    writeIncompleteBoulder({
+      agent: "atlas",
+      session_ids: [MAIN_SESSION_ID, descendantSessionID],
+      session_origins: {
+        [MAIN_SESSION_ID]: "direct",
+        [descendantSessionID]: "appended",
+      },
+    })
+    setSessionAgent(descendantSessionID, "atlas")
+
+    const hook = createHook(
+      {
+        [descendantSessionID]: MAIN_SESSION_ID,
+      },
+      {
+        [descendantSessionID]: [
+          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
+        ],
+      },
+    )
+
+    // when
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: descendantSessionID },
+      },
+    })
+
+    // then
+    expect(promptCalls.length).toBe(1)
+  })
+
+  test("#given appended descendant lineage with sisyphus agent #when atlas owns boulder #then atlas still injects continuation", async () => {
+    // given
+    const descendantSessionID = "ses_appended_descendant_sisyphus"
+    writeIncompleteBoulder({
+      agent: "atlas",
+      session_ids: [MAIN_SESSION_ID, descendantSessionID],
+      session_origins: {
+        [MAIN_SESSION_ID]: "direct",
+        [descendantSessionID]: "appended",
+      },
+    })
+    setSessionAgent(descendantSessionID, "sisyphus")
+
+    const hook = createHook(
+      {
+        [descendantSessionID]: MAIN_SESSION_ID,
+      },
+      {
+        [descendantSessionID]: [
+          { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.4" } },
+        ],
+      },
+    )
+
+    // when
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: descendantSessionID },
+      },
+    })
+
+    // then
+    expect(promptCalls.length).toBe(1)
   })
 
   test("injects continuation for directly tracked child session even when ancestor is also tracked and child agent mismatches", async () => {

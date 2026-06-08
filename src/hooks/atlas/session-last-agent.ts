@@ -4,13 +4,91 @@ import { join } from "node:path"
 import { getMessageDir, isSqliteBackend, normalizeSDKResponse } from "../../shared"
 import { hasCompactionPartInStorage, isCompactionMessage } from "../../shared/compaction-marker"
 
+type SessionLastAgentDeps = {
+  getMessageDir: typeof getMessageDir
+  isSqliteBackend: typeof isSqliteBackend
+  normalizeSDKResponse: typeof normalizeSDKResponse
+  hasCompactionPartInStorage: typeof hasCompactionPartInStorage
+  isCompactionMessage: typeof isCompactionMessage
+}
+
+const defaultSessionLastAgentDeps: SessionLastAgentDeps = {
+  getMessageDir,
+  isSqliteBackend,
+  normalizeSDKResponse,
+  hasCompactionPartInStorage,
+  isCompactionMessage,
+}
+
 type SessionMessagesClient = {
   session: {
     messages: (input: { path: { id: string } }) => Promise<unknown>
   }
 }
 
-function getLastAgentFromMessageDir(messageDir: string): string | null {
+async function getLastAgentFromSessionMessages(
+  sessionID: string,
+  client: SessionMessagesClient,
+  deps: SessionLastAgentDeps,
+): Promise<string | null> {
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const messages = deps.normalizeSDKResponse(response, [] as Array<{
+      id?: string
+      info?: { agent?: string; time?: { created?: number } }
+      parts?: Array<{ type?: string }>
+    }>, {
+      preferResponseOnMissingData: true,
+    }).sort((left, right) => {
+      const leftTime = (left as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+      const rightTime = (right as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+      if (leftTime !== rightTime) {
+        return rightTime - leftTime
+      }
+
+      const leftId = typeof left.id === "string" ? left.id : ""
+      const rightId = typeof right.id === "string" ? right.id : ""
+      return rightId.localeCompare(leftId)
+    })
+
+    for (const message of messages) {
+      if (deps.isCompactionMessage(message)) {
+        continue
+      }
+
+      const agent = message.info?.agent
+      if (typeof agent === "string") {
+        return agent.toLowerCase()
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return null
+  }
+
+  return null
+}
+
+export async function getLastAgentFromSession(
+  sessionID: string,
+  client?: SessionMessagesClient,
+  deps: Partial<SessionLastAgentDeps> = {},
+): Promise<string | null> {
+  const resolvedDeps: SessionLastAgentDeps = {
+    ...defaultSessionLastAgentDeps,
+    ...deps,
+  }
+
+  if (resolvedDeps.isSqliteBackend() && client) {
+    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+  }
+
+  const messageDir = resolvedDeps.getMessageDir(sessionID)
+  if (!messageDir && client) {
+    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+  }
+  if (!messageDir) return null
+
   try {
     const messages = readdirSync(messageDir)
       .filter((fileName) => fileName.endsWith(".json"))
@@ -24,7 +102,8 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
             agent: parsed.agent,
             createdAt: typeof parsed.time?.created === "number" ? parsed.time.created : Number.NEGATIVE_INFINITY,
           }
-        } catch {
+        } catch (error) {
+          if (!(error instanceof Error)) throw error
           return null
         }
       })
@@ -33,7 +112,7 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
 
     for (const message of messages) {
       if (!message) continue
-      if (isCompactionMessage({ agent: message.agent }) || hasCompactionPartInStorage(message?.id)) {
+      if (resolvedDeps.isCompactionMessage({ agent: message.agent }) || resolvedDeps.hasCompactionPartInStorage(message?.id)) {
         continue
       }
 
@@ -41,57 +120,14 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
         return message.agent.toLowerCase()
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
     return null
+  }
+
+  if (client) {
+    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
   }
 
   return null
-}
-
-export async function getLastAgentFromSession(
-  sessionID: string,
-  client?: SessionMessagesClient
-): Promise<string | null> {
-  if (isSqliteBackend() && client) {
-    try {
-      const response = await client.session.messages({ path: { id: sessionID } })
-      const messages = normalizeSDKResponse(response, [] as Array<{
-        id?: string
-        info?: { agent?: string; time?: { created?: number } }
-        parts?: Array<{ type?: string }>
-      }>, {
-        preferResponseOnMissingData: true,
-      }).sort((left, right) => {
-        const leftTime = (left as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
-        const rightTime = (right as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
-        if (leftTime !== rightTime) {
-          return rightTime - leftTime
-        }
-
-        const leftId = typeof left.id === "string" ? left.id : ""
-        const rightId = typeof right.id === "string" ? right.id : ""
-        return rightId.localeCompare(leftId)
-      })
-
-      for (const message of messages) {
-        if (isCompactionMessage(message)) {
-          continue
-        }
-
-        const agent = message.info?.agent
-        if (typeof agent === "string") {
-          return agent.toLowerCase()
-        }
-      }
-    } catch {
-      return null
-    }
-
-    return null
-  }
-
-  const messageDir = getMessageDir(sessionID)
-  if (!messageDir) return null
-
-  return getLastAgentFromMessageDir(messageDir)
 }

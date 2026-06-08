@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
@@ -167,6 +168,31 @@ describe("session-manager storage", () => {
     expect(messages[1].id).toBe("msg_002")
   })
 
+  test("readSessionMessages skips malformed message and part files", async () => {
+    // given
+    const sessionID = "ses_malformed_messages"
+    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
+    const partPath = join(TEST_PART_STORAGE, "msg_valid")
+    mkdirSync(sessionPath, { recursive: true })
+    mkdirSync(partPath, { recursive: true })
+
+    writeFileSync(join(sessionPath, "msg_bad.json"), "{")
+    writeFileSync(
+      join(sessionPath, "msg_valid.json"),
+      JSON.stringify({ id: "msg_valid", role: "user", time: { created: 1000 } }),
+    )
+    writeFileSync(join(partPath, "part_bad.json"), "{")
+    writeFileSync(join(partPath, "part_valid.json"), JSON.stringify({ id: "part_valid", type: "text", text: "hello" }))
+
+    // when
+    const messages = await readSessionMessages(sessionID)
+
+    // then
+    expect(messages).toHaveLength(1)
+    expect(messages[0].id).toBe("msg_valid")
+    expect(messages[0].parts).toEqual([{ id: "part_valid", type: "text", text: "hello" }])
+  })
+
   test("readSessionTodos returns empty array when no todos exist", async () => {
     // when
     const todos = await readSessionTodos("ses_nonexistent")
@@ -193,6 +219,17 @@ describe("session-manager storage", () => {
     expect(todos).toHaveLength(1)
     expect(todos[0].id).toBe("todo_exact")
     expect(todos[0].content).toBe("Exact match")
+  })
+
+  test("readSessionTodos returns empty array for malformed todo file", async () => {
+    // given
+    writeFileSync(join(TEST_TODO_DIR, "ses_bad.json"), "{")
+
+    // when
+    const todos = await readSessionTodos("ses_bad")
+
+    // then
+    expect(todos).toEqual([])
   })
 
   test("getSessionInfo returns null for non-existent session", async () => {
@@ -414,6 +451,42 @@ describe("session-manager storage - getMainSessions", () => {
     // then
     expect(sessions.length).toBe(2)
   })
+
+  test("getMainSessions skips malformed metadata files", async () => {
+    // given
+    const projectID = "proj_malformed"
+    const now = Date.now()
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    writeFileSync(join(projectDir, "ses_bad.json"), "{")
+    createSessionMetadata(projectID, "ses_valid", { directory: "/test/path", updated: now })
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/test/path" })
+
+    // then
+    expect(sessions.map((session) => session.id)).toEqual(["ses_valid"])
+  })
+
+  test("getMainSessions returns all main sessions when directory is the server root sentinel", async () => {
+    // given
+    const projectA = "proj_aaa"
+    const projectB = "proj_bbb"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_projA", { directory: "/path/to/projectA", updated: now })
+    createSessionMetadata(projectB, "ses_projB", { directory: "/path/to/projectB", updated: now - 1000 })
+
+    createMessageForSession("ses_projA", "msg_001", now)
+    createMessageForSession("ses_projB", "msg_001", now - 1000)
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/" })
+
+    // then
+    expect(sessions.length).toBe(2)
+    expect(sessions.map((s) => s.id).sort()).toEqual(["ses_projA", "ses_projB"])
+  })
 })
 
 describe("session-manager storage - SDK path (beta mode)", () => {
@@ -448,7 +521,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
 
     // Re-import to get fresh module with mocked isSqliteBackend
     const { setStorageClient, getMainSessions } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const sessions = await getMainSessions({ directory: "/test" })
@@ -473,7 +546,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, getAllSessions } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const sessionIDs = await getAllSessions()
@@ -503,7 +576,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionMessages } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const messages = await readSessionMessages("ses_test")
@@ -531,7 +604,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionTodos } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const todos = await readSessionTodos("ses_test")
@@ -555,7 +628,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionMessages } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     await expect(readSessionMessages("ses_test")).rejects.toThrow("API error")
   })

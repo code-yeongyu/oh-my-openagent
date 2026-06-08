@@ -36,7 +36,10 @@ export function replaceEmptyTextParts(messageID: string, replacementText: string
           anyReplaced = true
         }
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
@@ -71,6 +74,9 @@ export async function replaceEmptyTextPartsAsync(
 
     return anyReplaced
   } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     log("[session-recovery] replaceEmptyTextPartsAsync failed", { error: String(error) })
     return false
   }
@@ -112,7 +118,10 @@ export async function findMessagesWithEmptyTextPartsFromSDK(
     }
 
     return result
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }

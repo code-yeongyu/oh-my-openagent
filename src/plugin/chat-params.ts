@@ -1,6 +1,7 @@
-import { normalizeSDKResponse } from "../shared/normalize-sdk-response"
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
-import { getModelCapabilities, resolveCompatibleModelSettings } from "../shared"
+import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
+
+const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
 export type ChatParamsInput = {
   sessionID: string
@@ -58,8 +59,6 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
       ? model.id
       : undefined
   const providerId = provider.id
-  const variant = message.variant
-
   if (typeof providerID !== "string") return null
   if (typeof modelID !== "string") return null
   if (typeof providerId !== "string") return null
@@ -71,7 +70,6 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     provider: { id: providerId },
     message,
     rawMessage: message,
-    ...(typeof variant === "string" ? {} : {}),
   }
 }
 
@@ -100,7 +98,10 @@ export function createChatParamsHandler(args: {
       if (storedPromptParams.topP !== undefined) {
         output.topP = storedPromptParams.topP
       }
-      if (storedPromptParams.maxOutputTokens !== undefined) {
+      if (
+        typeof storedPromptParams.maxOutputTokens === "number" &&
+        storedPromptParams.maxOutputTokens > 0
+      ) {
         (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
       }
       if (storedPromptParams.options) {
@@ -166,10 +167,18 @@ export function createChatParamsHandler(args: {
     }
 
     if ("maxTokens" in compatibility) {
-      if (compatibility.maxTokens !== undefined) {
+      if (compatibility.maxTokens !== undefined && compatibility.maxTokens > 0) {
         output.maxOutputTokens = compatibility.maxTokens
       } else {
-        delete output.maxOutputTokens
+        const originalMaxOutputTokens = typeof output.maxOutputTokens === "number"
+          ? output.maxOutputTokens
+          : compatibility.maxTokens
+        output.maxOutputTokens = SAFE_MAX_OUTPUT_TOKENS_FALLBACK
+        if (typeof originalMaxOutputTokens === "number" && originalMaxOutputTokens <= 0) {
+          log(
+            `[plugin] maxOutputTokens=${originalMaxOutputTokens} is non-positive; using safe fallback ${SAFE_MAX_OUTPUT_TOKENS_FALLBACK}`,
+          )
+        }
       }
     }
 

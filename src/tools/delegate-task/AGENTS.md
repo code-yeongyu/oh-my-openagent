@@ -1,6 +1,6 @@
 # src/tools/delegate-task/ — Task Delegation Engine
 
-**Generated:** 2026-04-05
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
@@ -32,7 +32,7 @@
 sync-task.ts → sync-session-creator.ts → sync-prompt-sender.ts → sync-session-poller.ts → sync-result-fetcher.ts
 ```
 
-Each file handles one step. `sync-continuation.ts` handles session continuation (resume with session_id).
+Each file handles one step. `sync-continuation.ts` handles session continuation (resume with task_id).
 
 ## BACKGROUND EXECUTION
 
@@ -40,7 +40,7 @@ Each file handles one step. `sync-continuation.ts` handles session continuation 
 background-task.ts → BackgroundManager.launch() → (async polling) → background-continuation.ts
 ```
 
-`background-continuation.ts` handles `session_id` resume for existing background tasks.
+`background-continuation.ts` handles `task_id` resume for existing background tasks.
 
 ## CATEGORY RESOLUTION
 
@@ -51,7 +51,7 @@ background-task.ts → BackgroundManager.launch() → (async polling) → backgr
 
 ## MODEL STRING PARSER
 
-`model-string-parser.ts` handles `"model variant"` format (e.g., `"gpt-5.3-codex medium"` → model=`gpt-5.3-codex`, variant=`medium`).
+`model-string-parser.ts` handles `"model variant"` format (e.g., `"gpt-5.5 medium"` → model=`gpt-5.5`, variant=`medium`).
 
 ## UNSTABLE AGENT TRACKING
 

@@ -5,10 +5,12 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
-import { parseModelString } from "./model-string-parser"
+import { CATEGORY_PROMPT_APPEND_RESOLVERS } from "./constants"
+import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
@@ -23,6 +25,23 @@ function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig)
   if (config.reasoningEffort !== undefined) result.reasoningEffort = config.reasoningEffort
   if (config.thinking !== undefined) result.thinking = config.thinking
   return result
+}
+
+function resolveCategoryPromptAppendForModel(
+  categoryName: string,
+  actualModel: string | undefined,
+  staticPromptAppend: string,
+  userPromptAppend: string | undefined,
+): string | undefined {
+  const dynamicResolver = CATEGORY_PROMPT_APPEND_RESOLVERS[categoryName]
+  if (!dynamicResolver) {
+    return staticPromptAppend || undefined
+  }
+  const dynamicBase = dynamicResolver(actualModel)
+  if (!userPromptAppend) {
+    return dynamicBase || undefined
+  }
+  return dynamicBase ? `${dynamicBase}\n\n${userPromptAppend}` : userPromptAppend
 }
 
 export interface CategoryResolutionResult {
@@ -89,7 +108,7 @@ export async function resolveCategoryExecution(
 
 To use this category:
 1. Connect a provider with this model: ${requirement.requiresModel}
-2. Or configure an alternative model in your oh-my-opencode.json for this category
+2. Or configure an alternative model in your ${CONFIG_BASENAME}.json for this category
 
 Available categories: ${allCategoryNames}`,
       }
@@ -209,7 +228,12 @@ Available categories: ${allCategoryNames}`,
     const parsedModel = parseModelString(actualModel)
     categoryModel = parsedModel ?? undefined
   }
-  const categoryPromptAppend = resolved.promptAppend || undefined
+  const categoryPromptAppend = resolveCategoryPromptAppendForModel(
+    args.category!,
+    actualModel,
+    resolved.promptAppend,
+    userCategories?.[args.category!]?.prompt_append,
+  )
 
   if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
@@ -225,7 +249,7 @@ Available categories: ${allCategoryNames}`,
 
 Configure in one of:
 1. OpenCode: Set "model" in opencode.json
-2. Oh-My-OpenCode: Set category model in oh-my-opencode.json
+2. Oh-My-OpenCode: Set category model in ${CONFIG_BASENAME}.json
 3. Provider: Connect a provider with available models
 
 Current category: ${args.category}

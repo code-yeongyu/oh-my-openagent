@@ -1,8 +1,10 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
+import * as fs from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve, win32 } from "node:path"
 import {
   getOpenCodeConfigDir,
+  getOpenCodeConfigDirs,
   getOpenCodeConfigPaths,
   isDevBuild,
   detectExistingConfigDir,
@@ -45,7 +47,7 @@ describe("opencode-config-dir", () => {
       const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
 
       // then returns the custom path
-      expect(result).toBe("/custom/opencode/path")
+      expect(result).toBe(resolve("/custom/opencode/path"))
     })
 
     test("falls back to default when env var is not set", () => {
@@ -99,6 +101,27 @@ describe("opencode-config-dir", () => {
       expect(result).toBe(resolve("./my-opencode-config"))
     })
 
+    test("falls back to the resolved path when realpath throws a non-Error value", () => {
+      // given an existing OPENCODE_CONFIG_DIR whose realpath lookup fails
+      const existsSyncSpy = spyOn(fs, "existsSync").mockReturnValue(true)
+      const realpathSyncSpy = spyOn(fs, "realpathSync").mockImplementation(() => {
+        throw "realpath failed"
+      })
+      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      try {
+        // when getOpenCodeConfigDir is called with binary="opencode"
+        const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
+
+        // then returns the resolved path fallback
+        expect(result).toBe(resolve("/custom/opencode/path"))
+      } finally {
+        realpathSyncSpy.mockRestore()
+        existsSyncSpy.mockRestore()
+      }
+    })
+
     test("OPENCODE_CONFIG_DIR takes priority over XDG_CONFIG_HOME", () => {
       // given both OPENCODE_CONFIG_DIR and XDG_CONFIG_HOME are set
       process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
@@ -109,7 +132,23 @@ describe("opencode-config-dir", () => {
       const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
 
       // then OPENCODE_CONFIG_DIR takes priority
-      expect(result).toBe("/custom/opencode/path")
+      expect(result).toBe(resolve("/custom/opencode/path"))
+    })
+
+    test("returns both custom and default config directories for additive discovery", () => {
+      // given both OPENCODE_CONFIG_DIR and XDG_CONFIG_HOME are set
+      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      process.env.XDG_CONFIG_HOME = "/xdg/config"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when getOpenCodeConfigDirs is called
+      const result = getOpenCodeConfigDirs({ binary: "opencode", version: "1.0.200" })
+
+      // then the custom path stays first, but the default global path remains visible
+      expect(result).toEqual([
+        resolve("/custom/opencode/path"),
+        resolve("/xdg/config/opencode"),
+      ])
     })
   })
 
@@ -163,7 +202,7 @@ describe("opencode-config-dir", () => {
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
 
         // then returns $XDG_CONFIG_HOME/opencode
-        expect(result).toBe("/custom/config/opencode")
+        expect(result).toBe(resolve("/custom/config/opencode"))
       })
 
       test("returns ~/.config/opencode on macOS", () => {

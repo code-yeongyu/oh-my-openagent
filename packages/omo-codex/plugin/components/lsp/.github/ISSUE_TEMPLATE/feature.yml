@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose a focused codex-lsp improvement.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow should improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should codex-lsp do?
+    validations:
+      required: true

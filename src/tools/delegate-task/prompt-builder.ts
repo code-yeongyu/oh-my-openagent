@@ -22,6 +22,21 @@ ${TDD_LINE}`
   return PLAN_AGENT_PROMPT_BASE
 }
 
+function mergeNativeIntoAvailable(
+  skills: AvailableSkill[],
+  nativeSkillInfos: { name: string; description: string; location: string }[] | undefined,
+): AvailableSkill[] {
+  if (!nativeSkillInfos || nativeSkillInfos.length === 0) return skills
+  const knownNames = new Set(skills.map((s) => s.name))
+  const merged = [...skills]
+  for (const native of nativeSkillInfos) {
+    if (knownNames.has(native.name)) continue
+    merged.push({ name: native.name, description: native.description, location: "user" })
+    knownNames.add(native.name)
+  }
+  return merged
+}
+
 function buildAvailableSkillsSection(skills: AvailableSkill[]): string {
   if (skills.length === 0) {
     return ""
@@ -66,15 +81,18 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     agentName,
     availableCategories,
     availableSkills,
+    nativeSkillInfos,
   } = input
+
+  const effectiveAvailableSkills = mergeNativeIntoAvailable(availableSkills ?? [], nativeSkillInfos)
 
   const isPlan = isPlanAgent(agentName)
   const planAgentPrepend = isPlan
-    ? buildPlanAgentSystemPrepend(availableCategories, availableSkills)
+    ? buildPlanAgentSystemPrepend(availableCategories, effectiveAvailableSkills)
     : ""
 
   const skillsSection = !isPlan
-    ? buildAvailableSkillsSection(availableSkills ?? [])
+    ? buildAvailableSkillsSection(effectiveAvailableSkills)
     : ""
 
   const baseAgentsContext = agentsContext ?? planAgentPrepend

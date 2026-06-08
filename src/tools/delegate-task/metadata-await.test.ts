@@ -2,6 +2,7 @@ const { describe, test, expect } = require("bun:test")
 
 import { executeBackgroundTask } from "./executor"
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("task tool metadata awaiting", () => {
   test("executeBackgroundTask awaits ctx.metadata before returning", async () => {
@@ -28,7 +29,7 @@ describe("task tool metadata awaiting", () => {
       subagent_type: "explore",
     }
 
-    const executorCtx = {
+    const executorCtx = unsafeTestValue({
       manager: {
         launch: async () => ({
           id: "task_1",
@@ -36,11 +37,11 @@ describe("task tool metadata awaiting", () => {
           prompt: "Do something",
           agent: "explore",
           status: "pending",
-          sessionID: "ses_child",
+          sessionId: "ses_child",
         }),
         getTask: () => undefined,
       },
-    } as any
+    })
 
     const parentContext = {
       sessionID: "ses_parent",

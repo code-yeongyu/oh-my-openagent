@@ -57,6 +57,17 @@ describe("checkVersionCompatibility", () => {
     const result = checkVersionCompatibility("3.15.0", "v3.16.0")
     expect(result.canUpgrade).toBe(true)
   })
+
+  it("falls back cautiously when version comparison cannot parse a version", () => {
+    const result = checkVersionCompatibility("not-a-version", "3.16.0")
+
+    expect(result.canUpgrade).toBe(true)
+    expect(result.isDowngrade).toBe(false)
+    expect(result.requiresMigration).toBe(false)
+    expect(result.reason).toBe(
+      "Unable to compare versions not-a-version and 3.16.0 - proceeding with caution",
+    )
+  })
 })
 
 describe("extractVersionFromPluginEntry", () => {

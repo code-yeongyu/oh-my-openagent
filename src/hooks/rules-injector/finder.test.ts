@@ -3,12 +3,14 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findProjectRoot, findRuleFiles } from "./finder";
+import { clearProjectRootCache } from "./project-root-finder";
 
 describe("findRuleFiles", () => {
   const TEST_DIR = join(tmpdir(), `rules-injector-test-${Date.now()}`);
   const homeDir = join(TEST_DIR, "home");
 
   beforeEach(() => {
+    clearProjectRootCache();
     mkdirSync(TEST_DIR, { recursive: true });
     mkdirSync(homeDir, { recursive: true });
     mkdirSync(join(TEST_DIR, ".git"), { recursive: true });
@@ -184,8 +186,8 @@ describe("findRuleFiles", () => {
       const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
 
       // then should find claude rules
-      const paths = candidates.map((c) => c.path);
-      expect(paths.some((p) => p.includes(".claude/rules/"))).toBe(true);
+      const relativePaths = candidates.map((c) => c.relativePath);
+      expect(relativePaths.some((p) => p.includes(".claude/rules/"))).toBe(true);
     });
 
     it("should still discover .cursor/rules/ files", () => {
@@ -201,8 +203,8 @@ describe("findRuleFiles", () => {
       const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
 
       // then should find cursor rules
-      const paths = candidates.map((c) => c.path);
-      expect(paths.some((p) => p.includes(".cursor/rules/"))).toBe(true);
+      const relativePaths = candidates.map((c) => c.relativePath);
+      expect(relativePaths.some((p) => p.includes(".cursor/rules/"))).toBe(true);
     });
 
     it("should discover .mdc files in rule directories", () => {
@@ -251,13 +253,13 @@ describe("findRuleFiles", () => {
 
       // then should find all rules
       expect(candidates.length).toBeGreaterThanOrEqual(4);
-      const paths = candidates.map((c) => c.path);
-      expect(paths.some((p) => p.includes(".claude/rules/"))).toBe(true);
-      expect(paths.some((p) => p.includes(".cursor/rules/"))).toBe(true);
-      expect(paths.some((p) => p.includes(".github/instructions/"))).toBe(
+      const relativePaths = candidates.map((c) => c.relativePath);
+      expect(relativePaths.some((p) => p.includes(".claude/rules/"))).toBe(true);
+      expect(relativePaths.some((p) => p.includes(".cursor/rules/"))).toBe(true);
+      expect(relativePaths.some((p) => p.includes(".github/instructions/"))).toBe(
         true
       );
-      expect(paths.some((p) => p.includes("copilot-instructions.md"))).toBe(
+      expect(relativePaths.some((p) => p.includes("copilot-instructions.md"))).toBe(
         true
       );
     });
@@ -328,6 +330,7 @@ describe("findProjectRoot", () => {
   const TEST_DIR = join(tmpdir(), `project-root-test-${Date.now()}`);
 
   beforeEach(() => {
+    clearProjectRootCache();
     mkdirSync(TEST_DIR, { recursive: true });
   });
 

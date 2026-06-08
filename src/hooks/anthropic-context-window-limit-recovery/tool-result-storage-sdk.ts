@@ -53,7 +53,10 @@ export async function findToolResultsBySizeFromSDK(
     }
 
     return results.sort((a, b) => b.outputSize - a.outputSize)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -87,7 +90,8 @@ export async function truncateToolResultAsync(
     if (!patched) return { success: false }
     return { success: true, toolName, originalSize }
   } catch (error) {
-    log("[context-window-recovery] truncateToolResultAsync failed", { error: String(error) })
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    log("[context-window-recovery] truncateToolResultAsync failed", { error: errorMessage })
     return { success: false }
   }
 }
@@ -109,7 +113,10 @@ export async function countTruncatedResultsFromSDK(
     }
 
     return count
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return 0
   }
 }

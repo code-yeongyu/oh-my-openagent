@@ -5,8 +5,8 @@ import { PART_STORAGE, THINKING_TYPES } from "../constants"
 import type { MessageData, StoredPart } from "../types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
-import { log, isSqliteBackend, patchPart } from "../../../shared"
-import { normalizeSDKResponse } from "../../../shared"
+import { log, isSqliteBackend, normalizeSDKResponse, patchPart } from "../../../shared"
+import { isLatestAssistantMessage, isLatestAssistantMessageFromSDK } from "./latest-assistant-message"
 
 type OpencodeClient = PluginInput["client"]
 type StoredSignedThinkingPart = StoredPart & {
@@ -28,6 +28,8 @@ type ThinkingPrependDeps = {
   findLastThinkingPartFromSDK: typeof findLastThinkingPartFromSDK
   readTargetPartIDs: typeof readTargetPartIDs
   readTargetPartIDsFromSDK: typeof readTargetPartIDsFromSDK
+  isLatestAssistantMessage?: typeof isLatestAssistantMessage
+  isLatestAssistantMessageFromSDK?: typeof isLatestAssistantMessageFromSDK
 }
 
 const thinkingPrependDeps: ThinkingPrependDeps = {
@@ -38,6 +40,8 @@ const thinkingPrependDeps: ThinkingPrependDeps = {
   findLastThinkingPartFromSDK,
   readTargetPartIDs,
   readTargetPartIDsFromSDK,
+  isLatestAssistantMessage,
+  isLatestAssistantMessageFromSDK,
 }
 
 function readTargetPartIDs(messageID: string): string[] {
@@ -62,7 +66,12 @@ async function readTargetPartIDsFromSDK(
     return targetMessage.parts
       .map((part) => part.id)
       .filter((id): id is string => typeof id === "string")
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    log("[session-recovery] readTargetPartIDsFromSDK failed", { error: error.message })
     return []
   }
 }
@@ -137,6 +146,14 @@ export function prependThinkingPart(
     return false
   }
 
+  if (deps.isLatestAssistantMessage?.(sessionID, messageID) === true) {
+    deps.log("[session-recovery] Refusing to prepend thinking into latest assistant message", {
+      sessionID,
+      messageID,
+    })
+    return false
+  }
+
   const previousThinkingPart = deps.findLastThinkingPart(sessionID, messageID)
   if (!previousThinkingPart) {
     return false
@@ -158,7 +175,12 @@ export function prependThinkingPart(
       JSON.stringify(previousThinkingPart, null, 2)
     )
     return true
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    deps.log("[session-recovery] prependThinkingPart failed", { error: error.message })
     return false
   }
 }
@@ -186,7 +208,12 @@ async function findLastThinkingPartFromSDK(
         }
       }
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    log("[session-recovery] findLastThinkingPartFromSDK failed", { error: error.message })
     return null
   }
   return null
@@ -198,6 +225,17 @@ export async function prependThinkingPartAsync(
   messageID: string,
   deps: ThinkingPrependDeps = thinkingPrependDeps
 ): Promise<boolean> {
+  const isLatestAssistant = deps.isLatestAssistantMessageFromSDK
+    ? await deps.isLatestAssistantMessageFromSDK(client, sessionID, messageID)
+    : false
+  if (isLatestAssistant) {
+    deps.log("[session-recovery] Refusing to patch thinking into latest assistant message", {
+      sessionID,
+      messageID,
+    })
+    return false
+  }
+
   const previousThinkingPart = await deps.findLastThinkingPartFromSDK(client, sessionID, messageID)
   if (!previousThinkingPart) {
     return false
@@ -217,7 +255,11 @@ export async function prependThinkingPartAsync(
       toPatchBody(previousThinkingPart)
     )
   } catch (error) {
-    deps.log("[session-recovery] prependThinkingPartAsync failed", { error: String(error) })
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
+    deps.log("[session-recovery] prependThinkingPartAsync failed", { error: error.message })
     return false
   }
 }

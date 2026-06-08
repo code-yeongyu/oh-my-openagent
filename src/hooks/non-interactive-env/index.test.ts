@@ -12,12 +12,15 @@ describe("non-interactive-env hook", () => {
     originalEnv = {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
+      MSYSTEM: process.env.MSYSTEM,
+      ComSpec: process.env.ComSpec,
       CI: process.env.CI,
       OPENCODE_NON_INTERACTIVE: process.env.OPENCODE_NON_INTERACTIVE,
     }
     // given clean Unix-like environment for all tests
     // This prevents CI environments (which may have PSModulePath set) from
     // triggering PowerShell detection in tests that expect Unix behavior
+    Object.defineProperty(process, "platform", { value: "linux" })
     delete process.env.PSModulePath
     process.env.SHELL = "/bin/bash"
     process.env.OPENCODE_NON_INTERACTIVE = "true"
@@ -250,7 +253,57 @@ describe("non-interactive-env hook", () => {
       expect(cmd).toContain("; git commit")
     })
 
-    test("#given Windows with PowerShell env #when bash tool git command executes #then uses powershell syntax", async () => {
+    test("#given Windows cmd environment with PSModulePath #when bash tool git command executes #then uses cmd syntax", async () => {
+      delete process.env.SHELL
+      delete process.env.MSYSTEM
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git status")
+      expect(cmd).toContain('GIT_EDITOR=":"')
+      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows SHELL=cmd.exe #when bash tool git command executes #then uses cmd syntax", async () => {
+      process.env.SHELL = "C:\\Windows\\System32\\cmd.exe"
+      delete process.env.MSYSTEM
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git status")
+      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows ComSpec=pwsh.exe without SHELL #when bash tool git command executes #then uses powershell syntax", async () => {
+      delete process.env.SHELL
+      delete process.env.MSYSTEM
+      process.env.ComSpec = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
       Object.defineProperty(process, "platform", { value: "win32" })
 
@@ -267,14 +320,37 @@ describe("non-interactive-env hook", () => {
       const cmd = output.args.command as string
       expect(cmd).toStartWith("$env:")
       expect(cmd).toContain("; git status")
-      expect(cmd).toContain("$env:GIT_EDITOR=':'")
       expect(cmd).not.toContain("set ")
       expect(cmd).not.toContain("export ")
     })
 
-    test("#given Windows without SHELL env #when bash tool git command executes #then uses powershell syntax", async () => {
+    test("#given Windows SHELL=pwsh.exe #when bash tool git command executes #then uses powershell syntax", async () => {
+      process.env.SHELL = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+      delete process.env.MSYSTEM
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("set ")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows without SHELL env #when bash tool git command executes #then uses cmd syntax", async () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "win32" })
 
       const hook = createNonInteractiveEnvHook(mockCtx)
@@ -288,15 +364,18 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("$env:")
-      expect(cmd).toContain("; git log")
-      expect(cmd).not.toContain("set ")
-      expect(cmd).toContain("$env:GIT_EDITOR=':'")
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git log")
+      expect(cmd).toContain('GIT_EDITOR=":"')
+      expect(cmd).not.toContain("$env:")
       expect(cmd).not.toContain("export ")
     })
 
-    test("#given Windows Git Bash environment #when git command executes #then uses detected shell syntax", async () => {
-      // Git Bash sets SHELL env var — detectShellType respects this
+    test("#given Windows Git Bash SHELL=/usr/bin/bash #when git command executes #then uses powershell syntax (#3607)", async () => {
+      // Regression for #3607: OpenCode on Windows runs the bash tool through
+      // PowerShell by default, regardless of a Unix-shaped SHELL set by Git
+      // Bash. The export prefix is invalid PowerShell, so we must use
+      // PowerShell syntax even when SHELL points at /usr/bin/bash.
       delete process.env.PSModulePath
       process.env.SHELL = "/usr/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -312,14 +391,40 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      // Verify env prefix is applied (exact syntax depends on detected shell)
-      expect(cmd).toContain("git status")
-      expect(cmd.length).toBeGreaterThan("git status".length)
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("export ")
     })
 
-    test("#given Windows platform #when chained git commands via bash tool #then uses powershell syntax", async () => {
+    test("#given Windows MSYSTEM=MINGW64 without SHELL #when git command executes #then uses powershell syntax (#3607)", async () => {
+      // Regression for #3607: MSYSTEM is permanently set on systems with Git
+      // Bash installed, but OpenCode on Windows still spawns PowerShell.
+      // MSYSTEM alone must not select Unix env-prefix syntax.
+      delete process.env.SHELL
+      process.env.MSYSTEM = "MINGW64"
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows platform #when chained git commands via bash tool #then uses cmd syntax", async () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "win32" })
 
       const hook = createNonInteractiveEnvHook(mockCtx)
@@ -333,10 +438,109 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("$env:")
-      expect(cmd).toContain("; git add file && git commit")
-      expect(cmd).toContain("$env:GIT_EDITOR=':'")
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git add file && git commit")
+      expect(cmd).toContain('GIT_EDITOR=":"')
       expect(cmd).not.toContain("export ")
+      expect(cmd).not.toContain("$env:")
+    })
+
+    test("#given SHELL=/bin/bash on win32 #when git command executes #then uses powershell syntax (#3607)", async () => {
+      // Regression for #3607: a Unix-shaped SHELL value (Git Bash sets
+      // SHELL=/bin/bash or /usr/bin/bash) does NOT mean OpenCode will run
+      // the bash tool in a Unix shell on Windows — OpenCode spawns
+      // PowerShell, so the env prefix must use PowerShell syntax.
+      // WSL is not affected by this assertion because in WSL,
+      // process.platform === "linux", not "win32".
+      delete process.env.PSModulePath
+      process.env.SHELL = "/bin/bash"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given PSModulePath set on non-Windows #when git command executes #then uses powershell syntax", async () => {
+      // PowerShell detection via PSModulePath should work regardless of platform
+      delete process.env.SHELL
+      delete process.env.MSYSTEM
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git log" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git log")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given no SHELL and no PSModulePath on win32 #when git command executes #then uses cmd syntax", async () => {
+      // Platform fallback: win32 without env hints should use cmd
+      delete process.env.SHELL
+      delete process.env.PSModulePath
+      delete process.env.MSYSTEM
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git status")
+      expect(cmd).toContain('GIT_EDITOR=":"')
+      expect(cmd).not.toContain("export ")
+      expect(cmd).not.toContain("$env:")
+    })
+
+    test("#given no SHELL and no PSModulePath on linux #when git command executes #then uses unix syntax", async () => {
+      // Platform fallback: non-win32 without env hints should use unix
+      delete process.env.SHELL
+      delete process.env.PSModulePath
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("export ")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("set ")
     })
   })
 })

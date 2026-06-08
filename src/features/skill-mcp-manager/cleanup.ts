@@ -1,17 +1,20 @@
 import type { ManagedClient, SkillMcpManagerState } from "./types"
 
-async function closeManagedClient(managed: ManagedClient): Promise<void> {
+async function closeIgnoringErrors(close: () => Promise<void>): Promise<void> {
   try {
-    await managed.client.close()
-  } catch {
-    // Ignore close errors - process may already be terminated
-  }
+    await close()
+  } catch (error) {
+    if (error instanceof Error) {
+      return
+    }
 
-  try {
-    await managed.transport.close()
-  } catch {
-    // Transport may already be terminated
+    return
   }
+}
+
+async function closeManagedClient(managed: ManagedClient): Promise<void> {
+  await closeIgnoringErrors(() => managed.client.close())
+  await closeIgnoringErrors(() => managed.transport.close())
 }
 
 export function registerProcessCleanup(state: SkillMcpManagerState): void {
@@ -127,6 +130,10 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
 
 export async function disconnectAll(state: SkillMcpManagerState): Promise<void> {
   state.shutdownGeneration++
+  // Temporarily block new connections during cleanup. Reset at the end so that
+  // sessions surviving a plugin reload can reconnect. (Plugin reload calls
+  // disconnectAll via plugin-dispose, but existing sessions' tool closures still
+  // reference this manager instance and must be able to create new connections.)
   state.disposed = true
   stopCleanupTimer(state)
   unregisterProcessCleanup(state)
@@ -141,6 +148,8 @@ export async function disconnectAll(state: SkillMcpManagerState): Promise<void> 
   for (const managed of clients) {
     await closeManagedClient(managed)
   }
+
+  state.disposed = false
 }
 
 export async function forceReconnect(state: SkillMcpManagerState, clientKey: string): Promise<boolean> {

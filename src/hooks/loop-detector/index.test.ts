@@ -1,7 +1,6 @@
-import { describe, expect, test, beforeEach } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
   detectLoop,
-  type LoopDetection,
   type ToolCallRecord,
   LOOP_THRESHOLDS,
 } from "./index"

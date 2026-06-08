@@ -7,6 +7,7 @@ import { executeAction } from "./action-executor"
 
 export interface SessionDeletedHandlerDeps {
   tmuxConfig: TmuxConfig
+  directory: string
   serverUrl: string
   sourcePaneId: string | undefined
   sessions: Map<string, TrackedSession>
@@ -37,6 +38,7 @@ export async function handleSessionDeleted(
   if (closeAction) {
     await executeAction(closeAction, {
       config: deps.tmuxConfig,
+      directory: deps.directory,
       serverUrl: deps.serverUrl,
       windowState: state,
     })

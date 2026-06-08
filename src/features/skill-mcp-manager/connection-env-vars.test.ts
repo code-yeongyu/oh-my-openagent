@@ -1,6 +1,10 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, test } from "bun:test"
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
+import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import type { SkillMcpClientInfo, SkillMcpManagerState } from "./types"
+import { setHttpClientDependenciesForTesting } from "./http-client"
+import { setStdioClientDependenciesForTesting } from "./stdio-client"
 
 const trackedStates: SkillMcpManagerState[] = []
 const createdStdioTransports: MockStdioClientTransport[] = []
@@ -8,33 +12,62 @@ const createdHttpTransports: MockStreamableHTTPClientTransport[] = []
 
 class MockClient {
   readonly close = mock(async () => {})
+  readonly listTools = mock(async () => ({ tools: [] }))
+  readonly listResources = mock(async () => ({ resources: [] }))
+  readonly listPrompts = mock(async () => ({ prompts: [] }))
+  readonly callTool = mock(async () => ({ content: [] }))
+  readonly readResource = mock(async () => ({ contents: [] }))
+  readonly getPrompt = mock(async () => ({ messages: [] }))
 
   constructor(
     _clientInfo: { name: string; version: string },
     _options: { capabilities: Record<string, never> }
   ) {}
 
-  async connect(_transport: unknown): Promise<void> {
+  async connect(_transport: Transport): Promise<void> {
     // Successful connect, env-related assertions happen on transport constructor args
   }
 }
 
 class MockStdioClientTransport {
   readonly close = mock(async () => {})
-  readonly options: { command: string; args?: string[]; env?: Record<string, string>; stderr?: string }
+  readonly start = mock(async () => {})
+  readonly send = mock(async () => {})
+  readonly options: StdioServerParameters
 
-  constructor(options: { command: string; args?: string[]; env?: Record<string, string>; stderr?: string }) {
+  constructor(options: StdioServerParameters) {
     this.options = options
     createdStdioTransports.push(this)
   }
 }
 
 interface MockHttpTransportOptions {
-  requestInit?: { headers?: Record<string, string> }
+  requestInit?: RequestInit
+}
+
+function getHeaderValue(
+  headers: HeadersInit | undefined,
+  name: string,
+): string | undefined {
+  if (!headers) {
+    return undefined
+  }
+
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? undefined
+  }
+
+  if (Array.isArray(headers)) {
+    const entry = headers.find(([headerName]) => headerName.toLowerCase() === name.toLowerCase())
+    return entry?.[1]
+  }
+
+  return headers[name]
 }
 
 class MockStreamableHTTPClientTransport {
   readonly close = mock(async () => {})
+  readonly send = mock(async () => {})
   readonly url: URL
   readonly options?: MockHttpTransportOptions
 
@@ -46,18 +79,6 @@ class MockStreamableHTTPClientTransport {
 
   async start() {}
 }
-
-mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
-  Client: MockClient,
-}))
-
-mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-  StdioClientTransport: MockStdioClientTransport,
-}))
-
-mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
-  StreamableHTTPClientTransport: MockStreamableHTTPClientTransport,
-}))
 
 afterAll(() => {
   mock.restore()
@@ -89,12 +110,15 @@ function createState(): SkillMcpManagerState {
   return state
 }
 
-function createClientInfo(serverName: string): SkillMcpClientInfo {
+function createClientInfo(
+  serverName: string,
+  scope?: SkillMcpClientInfo["scope"],
+): SkillMcpClientInfo {
   return {
     serverName,
     skillName: "env-skill",
     sessionID: "session-env",
-    scope: "builtin",
+    ...(scope !== undefined ? { scope } : {}),
   }
 }
 
@@ -102,11 +126,17 @@ function createClientKey(info: SkillMcpClientInfo): string {
   return `${info.sessionID}:${info.skillName}:${info.serverName}`
 }
 
-const ORIGINAL_ENV = { ...process.env }
-
 beforeEach(() => {
   createdStdioTransports.length = 0
   createdHttpTransports.length = 0
+  setStdioClientDependenciesForTesting({
+    createClient: (clientInfo, options) => new MockClient(clientInfo, options),
+    createTransport: (options) => new MockStdioClientTransport(options),
+  })
+  setHttpClientDependenciesForTesting({
+    createClient: (clientInfo, options) => new MockClient(clientInfo, options),
+    createTransport: (url, options) => new MockStreamableHTTPClientTransport(url, options),
+  })
 })
 
 afterEach(async () => {
@@ -115,17 +145,73 @@ afterEach(async () => {
   }
   trackedStates.length = 0
 
-  for (const key of Object.keys(process.env)) {
-    if (!(key in ORIGINAL_ENV)) {
-      delete process.env[key]
-    }
-  }
-  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
-    process.env[key] = value
-  }
+  setStdioClientDependenciesForTesting()
+  setHttpClientDependenciesForTesting()
 })
 
 describe("getOrCreateClient env var expansion", () => {
+  describe("#given a scope-sensitive stdio skill MCP config", () => {
+    test.each([
+      ["opencode-project", "Authorization:Bearer "],
+      ["local", "Authorization:Bearer "],
+      ["user", "Authorization:Bearer xoxp-scope-token"],
+      ["builtin", "Authorization:Bearer xoxp-scope-token"],
+    ] satisfies Array<[NonNullable<SkillMcpClientInfo["scope"]>, string]>) (
+      "#when creating the client for %s scope #then args expand to %s",
+      async (scope, expectedAuthorizationHeader) => {
+        // given
+        process.env.SLACK_USER_TOKEN = "xoxp-scope-token"
+        const state = createState()
+        const info = createClientInfo(`scope-${scope}`, scope)
+        const clientKey = createClientKey(info)
+        const config: ClaudeCodeMcpServer = {
+          command: "npx",
+          args: [
+            "-y",
+            "mcp-remote",
+            "https://mcp.slack.com/mcp",
+            "--header",
+            "Authorization:Bearer ${SLACK_USER_TOKEN}",
+          ],
+        }
+
+        // when
+        await getOrCreateClient({ state, clientKey, info, config })
+
+        // then
+        expect(createdStdioTransports).toHaveLength(1)
+        expect(createdStdioTransports[0]?.options.args?.[4]).toBe(expectedAuthorizationHeader)
+      },
+    )
+
+    it("#when creating the client without scope #then env vars remain trusted for backward compatibility", async () => {
+      // given
+      process.env.SLACK_USER_TOKEN = "xoxp-undefined-scope-token"
+      const state = createState()
+      const info = createClientInfo("scope-undefined")
+      const clientKey = createClientKey(info)
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: [
+          "-y",
+          "mcp-remote",
+          "https://mcp.slack.com/mcp",
+          "--header",
+          "Authorization:Bearer ${SLACK_USER_TOKEN}",
+        ],
+      }
+
+      // when
+      await getOrCreateClient({ state, clientKey, info, config })
+
+      // then
+      expect(createdStdioTransports).toHaveLength(1)
+      expect(createdStdioTransports[0]?.options.args?.[4]).toBe(
+        "Authorization:Bearer xoxp-undefined-scope-token",
+      )
+    })
+  })
+
   describe("#given a stdio skill MCP config with sensitive env vars in args", () => {
     it("#when creating the client #then sensitive env vars in args are expanded", async () => {
       // given
@@ -200,11 +286,11 @@ describe("getOrCreateClient env var expansion", () => {
       // when
       await getOrCreateClient({ state, clientKey, info, config })
 
-      // then
-      expect(createdHttpTransports).toHaveLength(1)
-      expect(createdHttpTransports[0]?.options?.requestInit?.headers?.Authorization).toBe(
-        "Bearer xoxp-http-secret"
-      )
-    })
+        // then
+        expect(createdHttpTransports).toHaveLength(1)
+        expect(getHeaderValue(createdHttpTransports[0]?.options?.requestInit?.headers, "Authorization")).toBe(
+          "Bearer xoxp-http-secret"
+        )
+      })
   })
 })

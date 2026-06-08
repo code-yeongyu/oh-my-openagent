@@ -59,8 +59,8 @@ describe("executeUnstableAgentTask cleanup", () => {
     const cancelCalls: Array<{ taskId: string; options?: Record<string, unknown> }> = []
 
     const mockManager = {
-      launch: async () => ({ id: "bg_abort_monitoring", sessionID: "ses_abort_monitoring", status: "running" }),
-      getTask: () => ({ id: "bg_abort_monitoring", sessionID: "ses_abort_monitoring", status: "running" }),
+      launch: async () => ({ id: "bg_abort_monitoring", sessionId: "ses_abort_monitoring", status: "running" }),
+      getTask: () => ({ id: "bg_abort_monitoring", sessionId: "ses_abort_monitoring", status: "running" }),
       cancelTask: async (taskId: string, options?: Record<string, unknown>) => {
         cancelCalls.push({ taskId, options })
         return true
@@ -99,8 +99,8 @@ describe("executeUnstableAgentTask cleanup", () => {
     const cancelCalls: Array<{ taskId: string; options?: Record<string, unknown> }> = []
 
     const mockManager = {
-      launch: async () => ({ id: "bg_timeout_cleanup", sessionID: "ses_timeout_cleanup", status: "running" }),
-      getTask: () => ({ id: "bg_timeout_cleanup", sessionID: "ses_timeout_cleanup", status: "running" }),
+      launch: async () => ({ id: "bg_timeout_cleanup", sessionId: "ses_timeout_cleanup", status: "running" }),
+      getTask: () => ({ id: "bg_timeout_cleanup", sessionId: "ses_timeout_cleanup", status: "running" }),
       cancelTask: async (taskId: string, options?: Record<string, unknown>) => {
         cancelCalls.push({ taskId, options })
         return true

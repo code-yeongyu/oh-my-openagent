@@ -10,10 +10,7 @@ import {
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { queryWindowState } from "./pane-state-querier"
 import { log } from "../../shared"
-import type {
-  ActionResult,
-  ActionExecutorDeps,
-} from "./action-executor-core"
+import type { ActionResult } from "./action-executor-core"
 
 export type { ActionExecutorDeps, ActionResult } from "./action-executor-core"
 
@@ -25,6 +22,7 @@ export interface ExecuteActionsResult {
 
 export interface ExecuteContext {
   config: TmuxConfig
+  directory: string
   serverUrl: string
   windowState: WindowState
   sourcePaneId?: string
@@ -63,13 +61,30 @@ async function enforceLayoutAndMainPane(ctx: ExecuteContext): Promise<void> {
   await enforceMainPane(latestState, ctx.config)
 }
 
+/**
+ * Returns true when the pane lives in the source window's tracked layout.
+ *
+ * The wrapper enforces the user's main-vertical layout against the source pane
+ * after destructive actions. That is correct when the affected pane was part of
+ * the source window (its removal changes the user's split arrangement) but
+ * actively harmful when the pane lived in a separate window — closing an
+ * isolated container in another window should not scramble the user's main
+ * window layout. Callers route both cases through the same close action, so we
+ * detect the relationship from `windowState`.
+ */
+function isPaneInSourceWindow(paneId: string, windowState: WindowState): boolean {
+  if (windowState.mainPane?.paneId === paneId) return true
+  return windowState.agentPanes.some((pane) => pane.paneId === paneId)
+}
+
 export async function executeAction(
   action: PaneAction,
   ctx: ExecuteContext
 ): Promise<ActionResult> {
   if (action.type === "close") {
+    const closingPaneInSourceWindow = isPaneInSourceWindow(action.paneId, ctx.windowState)
     const success = await closeTmuxPane(action.paneId)
-    if (success) {
+    if (success && closingPaneInSourceWindow) {
       await enforceLayoutAndMainPane(ctx)
     }
     return { success }
@@ -79,10 +94,11 @@ export async function executeAction(
     const result = await replaceTmuxPane(
       action.paneId,
       action.newSessionId,
-      action.description,
-      ctx.config,
-      ctx.serverUrl
-    )
+		action.description,
+		ctx.config,
+		ctx.serverUrl,
+		ctx.directory,
+	)
     if (result.success) {
       await enforceLayoutAndMainPane(ctx)
     }
@@ -94,12 +110,13 @@ export async function executeAction(
 
   const result = await spawnTmuxPane(
     action.sessionId,
-    action.description,
-    ctx.config,
-    ctx.serverUrl,
-    action.targetPaneId,
-    action.splitDirection
-  )
+		action.description,
+		ctx.config,
+		ctx.serverUrl,
+		ctx.directory,
+		action.targetPaneId,
+		action.splitDirection
+	)
 
   if (result.success) {
     await enforceLayoutAndMainPane(ctx)

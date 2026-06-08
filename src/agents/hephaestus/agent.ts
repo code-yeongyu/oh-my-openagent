@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_4Model, isGpt5_3CodexModel } from "../types";
+import { isGpt5_5Model, isGptNativeSisyphusModel } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -8,23 +8,25 @@ import type {
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
 import { categorizeTools, buildAgentIdentitySection } from "../dynamic-agent-prompt-builder";
+import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard";
+import { getFrontierToolSchemaPermission } from "../frontier-tool-schema-guard";
 
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
-import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
+import { buildGpt55HephaestusPrompt as buildGpt55Prompt } from "./gpt-5-5";
 
 const MODE: AgentMode = "primary";
 
-export type HephaestusPromptSource = "gpt-5-4" | "gpt-5-3-codex" | "gpt";
+export type HephaestusPromptSource = "gpt-5-5" | "gpt-5-4" | "gpt";
 
 export function getHephaestusPromptSource(
   model?: string,
 ): HephaestusPromptSource {
-  if (model && isGpt5_4Model(model)) {
-    return "gpt-5-4";
+  if (model && isGpt5_5Model(model)) {
+    return "gpt-5-5";
   }
-  if (model && isGpt5_3CodexModel(model)) {
-    return "gpt-5-3-codex";
+  if (model && isGptNativeSisyphusModel(model)) {
+    return "gpt-5-4";
   }
   return "gpt";
 }
@@ -57,8 +59,8 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
 
   let basePrompt: string;
   switch (source) {
-    case "gpt-5-4":
-      basePrompt = buildGpt54Prompt(
+    case "gpt-5-5":
+      basePrompt = buildGpt55Prompt(
         agents,
         tools,
         skills,
@@ -66,8 +68,8 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
         useTaskSystem,
       );
       break;
-    case "gpt-5-3-codex":
-      basePrompt = buildGpt53CodexPrompt(
+    case "gpt-5-4":
+      basePrompt = buildGpt54Prompt(
         agents,
         tools,
         skills,
@@ -125,6 +127,8 @@ export function createHephaestusAgent(
     permission: {
       question: "allow",
       call_omo_agent: "deny",
+      ...getFrontierToolSchemaPermission(model),
+      ...getGptApplyPatchPermission(model),
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

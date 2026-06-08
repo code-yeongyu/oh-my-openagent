@@ -1,32 +1,24 @@
-import { statSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   readBoulderState,
-  writeBoulderState,
-  appendSessionId,
   findPrometheusPlans,
-  getPlanProgress,
-  createBoulderState,
-  getPlanName,
-  clearBoulderState,
+  normalizeSessionId,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import {
-  getAgentDisplayName,
-  getAgentListDisplayName,
-  stripAgentListSortPrefix,
-} from "../../shared/agent-display-names"
-import {
   isAgentRegistered,
+  resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
 import { createWorktreeActiveBlock } from "./worktree-block"
+import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
+const CONTEXT_INFO_MARKER = "<!-- omo-start-work-context -->"
 
 interface StartWorkHookInput {
   sessionID: string
@@ -86,20 +78,25 @@ export function createStartWorkHook(ctx: PluginInput) {
     const activeAgent = isAgentRegistered("atlas")
       ? "atlas"
       : "sisyphus"
-    const activeAgentDisplayName = activeAgent === "atlas"
-      ? getAgentListDisplayName(activeAgent)
-      : getAgentDisplayName(activeAgent)
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
-      output.message["agent"] = stripAgentListSortPrefix(activeAgentDisplayName)
+      output.message["agent"] = resolveRegisteredAgentName(activeAgent) ?? activeAgent
     }
 
     const existingState = readBoulderState(ctx.directory)
-    const sessionId = input.sessionID
+    const sessionId = normalizeSessionId(input.sessionID, "opencode")
     const timestamp = new Date().toISOString()
 
     const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
     const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
+    const preferredPlanPath = explicitPlanName
+      ? null
+      : await findRecentSessionPlanPath({
+          client: ctx.client,
+          directory: ctx.directory,
+          sessionID: sessionId,
+          availablePlans: findPrometheusPlans(ctx.directory),
+        })
 
     const contextInfo = buildStartWorkContextInfo({
       ctx,
@@ -110,20 +107,38 @@ export function createStartWorkHook(ctx: PluginInput) {
       activeAgent,
       worktreePath,
       worktreeBlock,
+      preferredPlanPath,
     })
 
-    const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
-    if (idx >= 0 && output.parts[idx].text) {
-      output.parts[idx].text = output.parts[idx].text
+    // Substitute placeholders across every text part: on an error-retry path
+    // OpenCode may re-issue the original template alongside the already-
+    // processed text, leaving a second <session-context> block with un-
+    // substituted $SESSION_ID / $TIMESTAMP literals (#4480).
+    let firstTextIdx = -1
+    let contextAlreadyInjected = false
+    for (let i = 0; i < output.parts.length; i++) {
+      const part = output.parts[i]
+      if (part.type !== "text" || !part.text) continue
+      part.text = part.text
         .replace(/\$SESSION_ID/g, sessionId)
         .replace(/\$TIMESTAMP/g, timestamp)
+      if (part.text.includes(CONTEXT_INFO_MARKER)) {
+        contextAlreadyInjected = true
+      }
+      if (firstTextIdx < 0) firstTextIdx = i
+    }
 
-      output.parts[idx].text += `\n\n---\n${contextInfo}`
+    // Marker-guarded append: keeps the hook idempotent when it fires more than
+    // once for the same session (e.g. command.execute.before + chat.message,
+    // or retry-driven re-firings).
+    if (!contextAlreadyInjected && firstTextIdx >= 0) {
+      output.parts[firstTextIdx].text += `\n\n---\n${CONTEXT_INFO_MARKER}\n${contextInfo}`
     }
 
     log(`[${HOOK_NAME}] Context injected`, {
       sessionID: input.sessionID,
       hasExistingState: !!existingState,
+      preferredPlanPath,
       worktreePath,
     })
   }

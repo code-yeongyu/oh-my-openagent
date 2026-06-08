@@ -43,6 +43,7 @@ interface ClientLike {
 export interface AssistantCompactionMessageInfo {
   sessionID: string
   id?: string
+  parts?: unknown
 }
 
 async function withTimeout<TValue>(
@@ -185,6 +186,7 @@ export function createPostCompactionDegradationMonitor(args: {
       sessionID: info.sessionID,
       messageID: info.id,
       directory,
+      parts: info.parts,
     })
 
     if (!isNoTextTail) {

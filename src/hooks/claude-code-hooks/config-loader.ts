@@ -3,6 +3,7 @@ import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
 import { getOpenCodeConfigDir } from "../../shared"
+import { bunFile } from "../../shared/bun-file-shim"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -10,7 +11,14 @@ export interface DisabledHooksConfig {
   Stop?: string[]
   PreToolUse?: string[]
   PostToolUse?: string[]
+  PostToolUseFailure?: string[]
+  PermissionRequest?: string[]
   UserPromptSubmit?: string[]
+  Notification?: string[]
+  SubagentStart?: string[]
+  SubagentStop?: string[]
+  SessionStart?: string[]
+  SessionEnd?: string[]
   PreCompact?: string[]
 }
 
@@ -61,10 +69,11 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
   }
 
   try {
-    const content = await Bun.file(path).text()
+    const content = await bunFile(path).text()
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
-    log("Failed to load config", { path, error })
+    const loggedError = error instanceof Error ? error : String(error)
+    log("Failed to load config", { path, error: loggedError })
     return null
   }
 }
@@ -77,10 +86,17 @@ function mergeDisabledHooks(
   if (!base) return override
 
   return {
-    Stop: override.Stop ?? base.Stop,
     PreToolUse: override.PreToolUse ?? base.PreToolUse,
     PostToolUse: override.PostToolUse ?? base.PostToolUse,
+    PostToolUseFailure: override.PostToolUseFailure ?? base.PostToolUseFailure,
+    PermissionRequest: override.PermissionRequest ?? base.PermissionRequest,
     UserPromptSubmit: override.UserPromptSubmit ?? base.UserPromptSubmit,
+    Notification: override.Notification ?? base.Notification,
+    Stop: override.Stop ?? base.Stop,
+    SubagentStart: override.SubagentStart ?? base.SubagentStart,
+    SubagentStop: override.SubagentStop ?? base.SubagentStop,
+    SessionStart: override.SessionStart ?? base.SessionStart,
+    SessionEnd: override.SessionEnd ?? base.SessionEnd,
     PreCompact: override.PreCompact ?? base.PreCompact,
   }
 }
@@ -126,7 +142,9 @@ function getRegex(pattern: string): RegExp {
     try {
       regex = new RegExp(pattern)
       regexCache.set(pattern, regex)
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      log("Invalid disabled hook regex, using literal match", { pattern, error: errorMessage })
       regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       regexCache.set(pattern, regex)
     }

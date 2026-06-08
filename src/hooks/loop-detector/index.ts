@@ -41,16 +41,6 @@ function getState(sessionID: string): SessionLoopState {
   return state
 }
 
-function argsEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-  const aKeys = Object.keys(a).sort()
-  const bKeys = Object.keys(b).sort()
-  if (aKeys.length !== bKeys.length) return false
-  for (const key of aKeys) {
-    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false
-  }
-  return true
-}
-
 function findRepeatedCalls(history: ToolCallRecord[]): { pattern: ToolCallRecord; count: number } | null {
   if (history.length < LOOP_THRESHOLDS.sameToolCall) return null
 
@@ -202,6 +192,7 @@ export function createLoopDetectorHook(_ctx: PluginInput): LoopDetectorHook {
       const detection = detectLoop(state.history)
 
       if (detection) {
+        state.loopDetectedAt = Date.now()
         state.warningCount++
         log(`[${HOOK_NAME}] Loop detected`, {
           sessionID,
@@ -209,6 +200,7 @@ export function createLoopDetectorHook(_ctx: PluginInput): LoopDetectorHook {
           pattern: detection.pattern,
           count: detection.count,
           warningCount: state.warningCount,
+          loopDetectedAt: state.loopDetectedAt,
         })
 
         const warning = createLoopWarning(detection)

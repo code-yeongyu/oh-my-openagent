@@ -15,7 +15,11 @@ export async function fetchNpmDistTags(packageName: string): Promise<NpmDistTags
     if (!res.ok) return null
     const data = (await res.json()) as NpmDistTags
     return data
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     return null
   }
 }

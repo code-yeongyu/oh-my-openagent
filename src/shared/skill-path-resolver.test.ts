@@ -126,6 +126,18 @@ describe("resolveSkillPathReferences", () => {
 		expect(result).toBe("/skills/frontend/scripts/search.py")
 	})
 
+	it("normalizes Windows native paths for prompt display", () => {
+		//#given
+		const content = "@scripts/search.py"
+		const basePath = "C:\\Users\\Admin\\.config\\opencode\\skills\\frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("C:/Users/Admin/.config/opencode/skills/frontend/scripts/search.py")
+	})
+
 	it("does not resolve traversal paths that escape the base directory", () => {
 		//#given
 		const content = "Read @data/../../../../etc/passwd before running"
@@ -148,5 +160,17 @@ describe("resolveSkillPathReferences", () => {
 
 		//#then
 		expect(result).toBe("Inspect @data/../../../secret/")
+	})
+
+	it("does not resolve npx --package=@scope/pkg as skill path", () => {
+		//#given
+		const content = "npx --package=@scope/pkg"
+		const basePath = "/skills/frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("npx --package=@scope/pkg")
 	})
 })

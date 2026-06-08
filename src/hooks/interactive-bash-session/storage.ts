@@ -30,7 +30,10 @@ export function loadInteractiveBashSessionState(
       tmuxSessions: new Set(serialized.tmuxSessions),
       updatedAt: serialized.updatedAt,
     };
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
     return null;
   }
 }

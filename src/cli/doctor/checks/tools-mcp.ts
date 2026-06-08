@@ -5,7 +5,7 @@ import { join } from "node:path"
 import type { McpServerInfo } from "../types"
 import { parseJsonc } from "../../../shared"
 
-const BUILTIN_MCP_SERVERS = ["context7", "grep_app"]
+const BUILTIN_MCP_SERVERS = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]
 
 interface McpConfigShape {
   mcpServers?: Record<string, unknown>
@@ -31,7 +31,11 @@ function loadUserMcpConfig(): Record<string, unknown> {
       if (config.mcpServers) {
         Object.assign(servers, config.mcpServers)
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
+
       continue
     }
   }

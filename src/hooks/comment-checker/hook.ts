@@ -1,20 +1,6 @@
 import type { PendingCall } from "./types"
 import type { CommentCheckerConfig } from "../../config/schema"
 
-import z from "zod"
-
-const ApplyPatchMetadataSchema = z.object({
-  files: z.array(
-    z.object({
-      filePath: z.string(),
-      movePath: z.string().optional(),
-      before: z.string(),
-      after: z.string(),
-      type: z.string().optional(),
-    }),
-  ),
-})
-
 import {
   initializeCommentCheckerCli,
   getCommentCheckerCliPathPromise,
@@ -22,12 +8,14 @@ import {
   processWithCli,
   processApplyPatchEditsWithCli,
 } from "./cli-runner"
+import { extractApplyPatchEdits } from "@oh-my-opencode/comment-checker-core"
 import {
   registerPendingCall,
   startPendingCallCleanup,
   stopPendingCallCleanup,
   takePendingCall,
 } from "./pending-calls"
+import { ensureCommentCheckerInitialization } from "./initialization-gate"
 
 import * as fs from "fs"
 import { tmpdir } from "os"
@@ -48,14 +36,16 @@ function debugLog(...args: unknown[]) {
 export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
   debugLog("createCommentCheckerHooks called", { config })
 
-  startPendingCallCleanup()
-  initializeCommentCheckerCli(debugLog)
-
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> },
     ): Promise<void> => {
+      ensureCommentCheckerInitialization(() => {
+        startPendingCallCleanup()
+        initializeCommentCheckerCli(debugLog)
+      })
+
       debugLog("tool.execute.before:", {
         tool: input.tool,
         callID: input.callID,
@@ -101,7 +91,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
     },
 
     "tool.execute.after": async (
-      input: { tool: string; sessionID: string; callID: string },
+      input: { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> },
       output: { title: string; output: string; metadata: unknown },
     ): Promise<void> => {
       debugLog("tool.execute.after:", { tool: input.tool, callID: input.callID })
@@ -123,20 +113,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
 
 
       if (toolLower === "apply_patch") {
-        const parsed = ApplyPatchMetadataSchema.safeParse(output.metadata)
-        if (!parsed.success) {
-          debugLog("apply_patch metadata schema mismatch, skipping")
-          return
-        }
-
-        const edits = parsed.data.files
-          .filter((f) => f.type !== "delete")
-          .map((f) => ({
-            filePath: f.movePath ?? f.filePath,
-            before: f.before,
-            after: f.after,
-          }))
-
+        const edits = extractApplyPatchEdits(output.metadata, input.args)
         if (edits.length === 0) {
           debugLog("apply_patch had no editable files, skipping")
           return

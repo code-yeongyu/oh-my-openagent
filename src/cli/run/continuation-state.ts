@@ -1,4 +1,4 @@
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getPlanProgress, normalizeSessionId, readBoulderState, resolveBoulderPlanPath } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
   getActiveContinuationMarkerReason,
@@ -16,6 +16,7 @@ export interface ContinuationState {
   hasActiveRalphLoop: boolean
   hasHookMarker: boolean
   hasTodoHookMarker: boolean
+  hasActiveBackgroundTaskMarker: boolean
   hasActiveHookMarker: boolean
   activeHookMarkerReason: string | null
 }
@@ -32,6 +33,7 @@ export async function getContinuationState(
     hasActiveRalphLoop: hasActiveRalphLoopContinuation(directory, sessionID),
     hasHookMarker: marker !== null,
     hasTodoHookMarker: marker?.sources.todo !== undefined,
+    hasActiveBackgroundTaskMarker: marker?.sources["background-task"]?.state === "active",
     hasActiveHookMarker: isContinuationMarkerActive(marker),
     activeHookMarkerReason: getActiveContinuationMarkerReason(marker),
   }
@@ -45,23 +47,29 @@ async function hasActiveBoulderContinuation(
   const boulder = readBoulderState(directory)
   if (!boulder) return false
 
-  const progress = getPlanProgress(boulder.active_plan)
+  const progress = getPlanProgress(resolveBoulderPlanPath(directory, boulder))
   if (progress.isComplete) return false
   if (!client) return false
 
-  const isTrackedSession = boulder.session_ids.includes(sessionID)
-  const sessionOrigin = boulder.session_origins?.[sessionID]
-  if (!isTrackedSession) {
+  const normalizedSessionID = normalizeSessionId(sessionID)
+  const normalizedTrackedSessionIDs = boulder.session_ids.map((trackedSessionID) => normalizeSessionId(trackedSessionID))
+  if (!normalizedTrackedSessionIDs.includes(normalizedSessionID)) {
     return false
   }
 
-  const isTrackedDescendant = await isTrackedDescendantSession(client, sessionID, boulder.session_ids)
-
-  if (isTrackedSession && sessionOrigin === "direct") {
+  const sessionOrigin = boulder.session_origins?.[sessionID] ?? boulder.session_origins?.[normalizedSessionID]
+  if (sessionOrigin === "direct") {
     return true
   }
 
-  if (isTrackedSession && sessionOrigin !== "direct" && !isTrackedDescendant) {
+  const trackedAncestorSessionIDs = normalizedTrackedSessionIDs
+    .filter((trackedSessionID) => trackedSessionID !== normalizedSessionID)
+  if (trackedAncestorSessionIDs.length === 0) {
+    return true
+  }
+
+  const isTrackedDescendant = await isTrackedDescendantSession(client, sessionID, trackedAncestorSessionIDs)
+  if (!isTrackedDescendant) {
     return false
   }
 
@@ -80,23 +88,22 @@ async function hasActiveBoulderContinuation(
     return false
   }
 
-  return isTrackedSession || isTrackedDescendant
+  return true
 }
 
 async function isTrackedDescendantSession(
   client: RunContext["client"],
   sessionID: string,
-  trackedSessionIDs: string[],
+  trackedAncestorSessionIDs: string[],
 ): Promise<boolean> {
-  const ancestorSessionIDs = trackedSessionIDs.filter((trackedSessionID) => trackedSessionID !== sessionID)
-  if (ancestorSessionIDs.length === 0) {
+  if (trackedAncestorSessionIDs.length === 0) {
     return false
   }
 
   return isSessionInBoulderLineage({
     client,
     sessionID,
-    boulderSessionIDs: ancestorSessionIDs,
+    boulderSessionIDs: trackedAncestorSessionIDs,
   })
 }
 

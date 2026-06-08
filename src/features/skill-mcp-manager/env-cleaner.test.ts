@@ -142,23 +142,55 @@ describe("createCleanMcpEnvironment", () => {
       expect(cleanEnv.NODE_ENV).toBe("production")
     })
 
-    it("filters secret keys from customEnv that would bypass process.env filtering", () => {
-      // given - customEnv tries to inject secrets that should be filtered
+    it("passes through secret-named keys from customEnv without filtering", () => {
+      // given - custom env values are explicitly declared in skill config
       process.env.PATH = "/usr/bin"
+      process.env.MCP_API_KEY = "ambient-secret-from-process-env"
       const customEnv = {
-        MCP_API_KEY: "secret-key-that-should-be-filtered",
-        CUSTOM_SECRET: "another-secret",
+        MCP_API_KEY: "skill-declared-api-key",
+        TELEGRAM_BOT_TOKEN: "skill-configured-bot-token",
         SAFE_VAR: "safe-value",
       }
 
       // when
       const cleanEnv = createCleanMcpEnvironment(customEnv)
 
-      // then - secret keys from customEnv are filtered despite not being in process.env
-      expect(cleanEnv.MCP_API_KEY).toBeUndefined()
-      expect(cleanEnv.CUSTOM_SECRET).toBeUndefined()
+      // then - custom env overrides ambient values and is not filtered
+      expect(cleanEnv.MCP_API_KEY).toBe("skill-declared-api-key")
+      expect(cleanEnv.TELEGRAM_BOT_TOKEN).toBe("skill-configured-bot-token")
       expect(cleanEnv.SAFE_VAR).toBe("safe-value")
       expect(cleanEnv.PATH).toBe("/usr/bin")
+    })
+
+    it("passes TELEGRAM_BOT_TOKEN through when declared in skill env (issue #3995)", () => {
+      // given - TELEGRAM_BOT_TOKEN matches /_TOKEN$/i but is explicitly declared
+      process.env.TELEGRAM_BOT_TOKEN = "ambient-bot-token"
+      const customEnv = {
+        TELEGRAM_BOT_TOKEN: "skill-bot-token",
+      }
+
+      // when
+      const cleanEnv = createCleanMcpEnvironment(customEnv)
+
+      // then
+      expect(cleanEnv.TELEGRAM_BOT_TOKEN).toBe("skill-bot-token")
+    })
+
+    it("still filters secret-named vars from process.env when customEnv is provided", () => {
+      // given
+      process.env.AMBIENT_API_KEY = "ambient-secret"
+      process.env.PATH = "/usr/bin"
+      const customEnv = {
+        SAFE_CUSTOM_VAR: "custom-value",
+      }
+
+      // when
+      const cleanEnv = createCleanMcpEnvironment(customEnv)
+
+      // then
+      expect(cleanEnv.AMBIENT_API_KEY).toBeUndefined()
+      expect(cleanEnv.PATH).toBe("/usr/bin")
+      expect(cleanEnv.SAFE_CUSTOM_VAR).toBe("custom-value")
     })
   })
 

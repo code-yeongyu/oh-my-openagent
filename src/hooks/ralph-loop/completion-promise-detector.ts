@@ -88,12 +88,18 @@ export function detectCompletionInTranscript(
 				if (!entryText) continue
 				if (!shouldInspectTranscriptEntry(entry, promise, entryText)) continue
 				if (pattern.test(entryText)) return true
-			} catch {
+			} catch (error) {
+				if (!(error instanceof Error)) {
+					throw error
+				}
 				continue
 			}
 		}
 		return false
-	} catch {
+	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error
+		}
 		return false
 	}
 }
@@ -130,8 +136,8 @@ export async function detectCompletionInSessionMessages(
 				: []
 
 		const scopedMessages =
-			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex < messageArray.length
-				? messageArray.slice(options.sinceMessageIndex)
+			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0
+				? messageArray.slice(Math.min(options.sinceMessageIndex, messageArray.length))
 				: messageArray
 
 		const assistantMessages = (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
@@ -153,11 +159,12 @@ export async function detectCompletionInSessionMessages(
 		}
 
 		return false
-	} catch (err) {
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error)
 		setTimeout(() => {
 			log(`[${HOOK_NAME}] Session messages check failed`, {
 				sessionID: options.sessionID,
-				error: String(err),
+				error: errorMessage,
 			})
 		}, 0)
 		return false

@@ -203,15 +203,16 @@ export function createDefinitionGatesHook(_ctx: PluginInput): DefinitionGatesHoo
         if (hasCompletingTodo) {
           log(`[${HOOK_NAME}] DoD reminder for todo completion`)
 
-          const reminder = `[DEFINITION OF DONE REMINDER]
-
-Before marking tasks complete, verify:
-- [ ] Tests pass
-- [ ] Types pass (lsp_diagnostics clean)
-- [ ] No forbidden patterns
-- [ ] Follows codebase style
-
-Have you verified all criteria?`
+          const reminder = createDoDReminder({
+            complete: false,
+            failedCriteria: [
+              "tests_pass",
+              "types_pass",
+              "no_forbidden_patterns",
+              "follows_codebase_style",
+            ],
+            message: "Verify Definition of Done before completion",
+          })
 
           output.output = output.output ? `${output.output}\n\n${reminder}` : reminder
         }

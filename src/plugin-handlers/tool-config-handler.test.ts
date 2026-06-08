@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { applyToolConfig } from "./tool-config-handler"
 import type { OhMyOpenCodeConfig } from "../config"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 
 function createParams(overrides: {
   taskSystem?: boolean
@@ -150,6 +151,31 @@ describe("applyToolConfig", () => {
       )
     })
 
+    describe("#when OPENCODE_CONFIG_CONTENT parsing throws a non-Error value", () => {
+      it("#then should fall back to interactive question permission", () => {
+        // given
+        const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
+          throw "parse failed"
+        })
+        process.env.OPENCODE_CONFIG_CONTENT = "{"
+        delete process.env.OPENCODE_CLI_RUN_MODE
+        const params = createParams({ agents: ["sisyphus"] })
+
+        try {
+          // when
+          applyToolConfig(params)
+
+          // then
+          const agent = params.agentResult.sisyphus as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.question).toBe("allow")
+        } finally {
+          parseSpy.mockRestore()
+        }
+      })
+    })
+
     describe("#when CLI_RUN_MODE is true and config does not deny", () => {
       it.each(["sisyphus", "hephaestus", "prometheus"])(
         "#then should deny question for %s via CLI_RUN_MODE",
@@ -247,6 +273,36 @@ describe("applyToolConfig", () => {
         expect(agent.permission.todowrite).toBeUndefined()
         expect(agent.permission.todoread).toBeUndefined()
       })
+    })
+  })
+
+  describe("#given agentResult uses clean display keys", () => {
+    it("#then should still resolve atlas permissions through the display key", () => {
+      const atlasKey = getAgentDisplayName("atlas")
+      const params = createParams({ agents: [atlasKey] })
+
+      applyToolConfig(params)
+
+      const agent = params.agentResult[atlasKey] as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.task).toBe("allow")
+      expect(agent.permission["task_*"]).toBe("allow")
+      expect(agent.permission.teammate).toBe("allow")
+    })
+
+    it("#then should allow teammate for hephaestus", () => {
+      // given
+      const params = createParams({ agents: ["hephaestus"] })
+
+      // when
+      applyToolConfig(params)
+
+      // then
+      const agent = params.agentResult.hephaestus as {
+        permission: Record<string, unknown>
+      }
+      expect(agent.permission.teammate).toBe("allow")
     })
   })
 

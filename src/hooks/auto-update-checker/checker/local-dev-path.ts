@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
 import { fileURLToPath } from "node:url"
 import type { OpencodeConfig } from "../types"
-import { PACKAGE_NAME } from "../constants"
+import { ACCEPTED_PACKAGE_NAMES } from "../constants"
 import { getConfigPaths } from "./config-paths"
 import { stripJsonComments } from "./jsonc-strip"
 
@@ -18,15 +18,21 @@ export function getLocalDevPath(directory: string): string | null {
       const plugins = config.plugin ?? []
 
       for (const entry of plugins) {
-        if (entry.startsWith("file://") && entry.includes(PACKAGE_NAME)) {
-          try {
-            return fileURLToPath(entry)
-          } catch {
-            return entry.replace("file://", "")
+        if (!entry.startsWith("file://")) continue
+        if (!ACCEPTED_PACKAGE_NAMES.some(name => entry.includes(name))) continue
+        try {
+          return fileURLToPath(entry)
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            throw error
           }
+          return entry.replace("file://", "")
         }
       }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }

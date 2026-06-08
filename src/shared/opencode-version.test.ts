@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { join } from "node:path"
 import {
   parseVersion,
   compareVersions,
@@ -132,6 +133,109 @@ describe("opencode-version", () => {
       // then returns null without executing command
       expect(result).toBe(null)
     })
+
+    test("reads adjacent package version before executing opencode binary", () => {
+      // given an opencode package next to the resolved binary
+      const calls: string[] = []
+      const packageRoot = join("/tmp", "opencode-ai")
+      const binaryPath = join(packageRoot, "bin", "opencode")
+      const packagePath = join(packageRoot, "package.json")
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => binaryPath,
+        realpath: (filePath) => filePath,
+        exists: (filePath) => filePath === packagePath,
+        readText: (filePath) => {
+          calls.push(`read:${filePath}`)
+          return JSON.stringify({ name: "opencode-ai", version: "1.14.41" })
+        },
+        execCommand: () => {
+          calls.push("exec")
+          return "1.14.41"
+        },
+      })
+
+      // then the version is resolved without spawning the CLI
+      expect(result).toBe("1.14.41")
+      expect(calls).toEqual([`read:${packagePath}`])
+    })
+
+    test("falls back to opencode binary when package version is unavailable", () => {
+      // given no adjacent package version can be read
+      const calls: string[] = []
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/custom-opencode",
+        realpath: (filePath) => filePath,
+        exists: () => false,
+        readText: () => {
+          calls.push("read")
+          return ""
+        },
+        execCommand: () => {
+          calls.push("exec")
+          return "opencode 1.14.42"
+        },
+      })
+
+      // then the original CLI fallback remains intact
+      expect(result).toBe("1.14.42")
+      expect(calls).toEqual(["exec"])
+    })
+
+    test("falls back to opencode binary when adjacent package JSON is invalid", () => {
+      // given adjacent package JSON cannot be parsed
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        realpath: (filePath) => filePath,
+        exists: (filePath) => filePath === "/tmp/opencode-ai/package.json",
+        readText: () => "{not json",
+        execCommand: () => "opencode 1.14.43",
+      })
+
+      // then the CLI fallback remains intact
+      expect(result).toBe("1.14.43")
+    })
+
+    test("falls back to opencode binary when resolving the adjacent package fails", () => {
+      // given the binary realpath lookup fails
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        realpath: () => {
+          throw new Error("realpath failed")
+        },
+        exists: () => true,
+        readText: () => JSON.stringify({ name: "opencode-ai", version: "1.14.44" }),
+        execCommand: () => "opencode 1.14.44",
+      })
+
+      // then the CLI fallback remains intact
+      expect(result).toBe("1.14.44")
+    })
+
+    test("returns null when opencode binary execution fails", () => {
+      // given package lookup is unavailable and the binary command fails
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => null,
+        realpath: (filePath) => filePath,
+        exists: () => false,
+        readText: () => "",
+        execCommand: () => {
+          throw new Error("opencode missing")
+        },
+      })
+
+      // then version detection remains fail-safe
+      expect(result).toBeNull()
+    })
   })
 
   describe("isOpenCodeVersionAtLeast", () => {
@@ -189,8 +293,8 @@ describe("opencode-version", () => {
   })
 
   describe("MINIMUM_OPENCODE_VERSION", () => {
-    test("is set to 1.1.1", () => {
-      expect(MINIMUM_OPENCODE_VERSION).toBe("1.1.1")
+    test("is set to 1.4.0", () => {
+      expect(MINIMUM_OPENCODE_VERSION).toBe("1.4.0")
     })
   })
 

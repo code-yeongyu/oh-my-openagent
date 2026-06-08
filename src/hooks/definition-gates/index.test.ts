@@ -3,8 +3,6 @@ import {
   checkDefinitionOfReady,
   checkDefinitionOfDone,
   type TaskContext,
-  type ReadinessResult,
-  type CompletenessResult,
 } from "./index"
 
 describe("definition-gates", () => {

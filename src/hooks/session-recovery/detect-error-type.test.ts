@@ -3,6 +3,22 @@ import { describe, expect, it } from "bun:test"
 import { detectErrorType, extractMessageIndex, extractUnavailableToolName } from "./detect-error-type"
 
 describe("detectErrorType", () => {
+  it("#given an error object throws a non-Error while reading data #when detecting #then rethrows", () => {
+    //#given
+    const thrownValue = { reason: "unexpected throw shape" }
+    class MalformedError {
+      get data(): string {
+        throw thrownValue
+      }
+    }
+
+    //#when
+    const run = () => detectErrorType(new MalformedError())
+
+    //#then
+    expect(run).toThrow()
+  })
+
   it("#given a tool_use/tool_result error #when detecting #then returns tool_result_missing", () => {
     //#given
     const error = { message: "tool_use block must be followed by tool_result" }
@@ -34,6 +50,42 @@ describe("detectErrorType", () => {
 
     //#then
     expect(result).toBe("thinking_disabled_violation")
+  })
+
+  it("#given a Bedrock thinking block modified error #when detecting #then returns thinking_block_modified", () => {
+    //#given
+    const error = {
+      message:
+        "undefined: The model returned the following errors: messages.17.content.28: `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified. These blocks must remain as they were in the original response.",
+    }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("thinking_block_modified")
+  })
+
+  it("#given a simple thinking block modified error #when detecting #then returns thinking_block_modified", () => {
+    //#given
+    const error = { message: "thinking blocks cannot be modified" }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("thinking_block_modified")
+  })
+
+  it("#given a modified-thinking error also says expected and found #when detecting #then returns thinking_block_modified", () => {
+    const error = {
+      message:
+        "messages.3.content.3: Expected `thinking` or `redacted_thinking`, but found `tool_use`. `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified.",
+    }
+
+    const result = detectErrorType(error)
+
+    expect(result).toBe("thinking_block_modified")
   })
 
   it("#given an unrecognized error #when detecting #then returns null", () => {

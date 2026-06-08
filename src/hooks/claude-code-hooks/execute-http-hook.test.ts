@@ -1,5 +1,6 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 import type { HookHttp } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const mockFetch = mock(() =>
   Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -9,7 +10,7 @@ const originalFetch = globalThis.fetch
 
 describe("executeHttpHook", () => {
   beforeEach(() => {
-    globalThis.fetch = mockFetch as unknown as typeof fetch
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
     mockFetch.mockReset()
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -33,7 +34,7 @@ describe("executeHttpHook", () => {
       await executeHttpHook(hook, stdinData)
 
       expect(mockFetch).toHaveBeenCalledTimes(1)
-      const [url, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [url, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
       expect(url).toBe("http://localhost:8080/hooks/pre-tool-use")
       expect(options.method).toBe("POST")
       expect(options.body).toBe(stdinData)
@@ -44,7 +45,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, stdinData)
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Content-Type"]).toBe("application/json")
     })
@@ -72,7 +73,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer secret-123")
     })
@@ -88,7 +89,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer secret-123")
     })
@@ -104,7 +105,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer ")
     })
@@ -121,7 +122,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
       expect(options.signal).toBeDefined()
     })
   })
@@ -210,6 +211,18 @@ describe("executeHttpHook", () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('"decision":"allow"')
     })
+
+    it("#when response has non-JSON body #then returns body as stdout", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(new Response("plain output", { status: 200 }))
+      )
+      const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
+      const { executeHttpHook } = await import("./execute-http-hook")
+
+      const result = await executeHttpHook(hook, "{}")
+
+      expect(result).toEqual({ exitCode: 0, stdout: "plain output", stderr: "" })
+    })
   })
 
   describe("#given a failing HTTP response", () => {
@@ -224,6 +237,29 @@ describe("executeHttpHook", () => {
 
       expect(result.exitCode).toBe(1)
       expect(result.stderr).toContain("400")
+    })
+
+    it("#when response body read fails #then keeps HTTP error result with empty stdout", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          unsafeTestValue<Response>({
+            ok: false,
+            status: 502,
+            statusText: "Bad Gateway",
+            text: () => Promise.reject(new Error("body unavailable")),
+          })
+        )
+      )
+      const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
+      const { executeHttpHook } = await import("./execute-http-hook")
+
+      const result = await executeHttpHook(hook, "{}")
+
+      expect(result).toEqual({
+        exitCode: 1,
+        stderr: "HTTP hook returned status 502: Bad Gateway",
+        stdout: "",
+      })
     })
 
     it("#when fetch throws network error #then returns exit code 1", async () => {

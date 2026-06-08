@@ -1,5 +1,6 @@
 import type { OAuthTokenData } from "./storage"
 import { loadToken, saveToken } from "./storage"
+import { PLUGIN_NAME } from "../../shared/plugin-identity"
 import { discoverOAuthServerMetadata } from "./discovery"
 import type { OAuthServerMetadata } from "./discovery"
 import { getOrRegisterClient } from "./dcr"
@@ -30,8 +31,8 @@ async function parseTokenResponse(tokenResponse: Response): Promise<Record<strin
           errorDetail += `: ${body.error_description}`
         }
       }
-    } catch {
-      // Response body not JSON
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
     }
     throw new Error(`Token exchange failed: ${errorDetail}`)
   }
@@ -141,7 +142,7 @@ export class McpOAuthProvider {
     const clientInfo = await getOrRegisterClient({
       registrationEndpoint: metadata.registrationEndpoint,
       serverIdentifier: this.serverUrl,
-      clientName: "oh-my-opencode",
+      clientName: PLUGIN_NAME,
       redirectUris: [this.redirectUrl()],
       tokenEndpointAuthMethod: "none",
       clientId: this.configClientId,

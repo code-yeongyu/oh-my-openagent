@@ -20,7 +20,10 @@ export async function getMessageIdsFromSDK(
     const response = await client.session.messages({ path: { id: sessionID } })
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
     return messages.map(msg => msg.info.id)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }

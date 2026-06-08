@@ -1,7 +1,8 @@
 import { describe, test, expect } from "bun:test"
-import { PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
-import { PROMETHEUS_GPT_SYSTEM_PROMPT } from "./prometheus/gpt"
-import { PROMETHEUS_GEMINI_SYSTEM_PROMPT } from "./prometheus/gemini"
+import { getPrometheusPrompt, PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
+
+const PROMETHEUS_GPT_SYSTEM_PROMPT = getPrometheusPrompt("gpt-5.5")
+const PROMETHEUS_GEMINI_SYSTEM_PROMPT = getPrometheusPrompt("gemini-3.1-pro")
 
 describe("PROMETHEUS_SYSTEM_PROMPT Momus invocation policy", () => {
   test("should direct providing ONLY the file path string when invoking Momus", () => {
@@ -82,6 +83,181 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
     expect(lowerPrompt).toMatch(/every task has agent-executed qa scenarios/)
     expect(lowerPrompt).toMatch(/happy-path and negative/)
     expect(lowerPrompt).toMatch(/zero acceptance criteria require human/)
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT spec-driven framework awareness", () => {
+  test("should contain openspec/ detection pattern", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("openspec/")
+  })
+
+  test("should contain .specify/ detection pattern for Spec Kit (not .spec-kit/)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when
+    const hasCorrectPattern = prompt.includes(".specify/")
+    const hasWrongPattern = prompt.includes(".spec-kit/")
+
+    //#then
+    expect(hasCorrectPattern).toBe(true)
+    expect(hasWrongPattern).toBe(false)
+  })
+
+  test("should contain OpenSpec command references", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:propose")
+    expect(prompt).toContain("specify spec")
+  })
+
+  test("should NOT contain wrong BMAD detection pattern", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).not.toContain(".bmad/")
+  })
+
+  test("should contain spec-driven or spec-aware terminology", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toMatch(/spec.driven|spec.aware/)
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT spec-driven intent type", () => {
+  test("should contain Spec-Driven as an intent type", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("Spec-Driven")
+  })
+
+  test("should preserve all original intent types unchanged", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when
+    const originalIntents = [
+      "Trivial/Simple",
+      "Refactoring",
+      "Build from Scratch",
+      "Mid-sized Task",
+      "Collaborative",
+      "Architecture",
+      "Research",
+    ]
+
+    //#then
+    for (const intent of originalIntents) {
+      expect(prompt).toContain(intent)
+    }
+  })
+
+  test("should contain spec-first focus description for Spec-Driven intent", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toContain("spec-first")
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT spec compliance section", () => {
+  test("should contain Spec Framework Integration section header", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("Spec Framework Integration")
+  })
+
+  test("should mark spec section as conditional (not mandatory)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when
+    const lowerPrompt = prompt.toLowerCase()
+
+    //#then
+    const hasIfDetected = lowerPrompt.includes("if detected")
+    const hasOmitNote = lowerPrompt.includes("omit this section")
+    expect(hasIfDetected || hasOmitNote).toBe(true)
+  })
+
+  test("should contain spec framework section (case-insensitive)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toMatch(/spec framework/i)
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT OpenSpec expanded commands", () => {
+  test("should contain /opsx:ff fast-forward command", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:ff")
+  })
+
+  test("should contain /opsx:explore command", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:explore")
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    // Must use fresh task() call with subagent_type="momus"
+    expect(prompt).toContain('subagent_type="momus"')
+    // Must pass exact on-disk plan path as prompt
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    // Must explicitly forbid continuation/task_id reuse for Momus (not yet present)
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
+describe("PROMETHEUS_GPT_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_GPT_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain('subagent_type="momus"')
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
+describe("PROMETHEUS_GEMINI_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_GEMINI_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain('subagent_type="momus"')
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
   })
 })
 

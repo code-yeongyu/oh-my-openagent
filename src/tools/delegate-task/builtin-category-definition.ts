@@ -5,4 +5,5 @@ export type BuiltinCategoryDefinition = {
   config: CategoryConfig
   description: string
   promptAppend: string
+  resolvePromptAppend?: (model: string | undefined) => string
 }

@@ -2,20 +2,34 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { extractUnavailableToolName } from "./detect-error-type"
 import { readParts } from "./storage"
 import type { MessageData } from "./types"
-import { normalizeSDKResponse } from "../../shared"
+import { isAmbiguousPostDispatchPromptFailure, normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
 interface ToolResultPart {
   type: "tool_result"
-  tool_use_id: string
-  content: string
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: Array<{ type: "text"; text: string }>
 }
 
 interface PromptWithToolResultInput {
   path: { id: string }
   body: { parts: ToolResultPart[] }
+}
+
+type ClientWithPromptAsync = Client & {
+  session: Client["session"] & {
+    promptAsync: (input: PromptWithToolResultInput) => Promise<unknown>
+  }
+}
+
+function hasPromptAsync(client: Client): client is ClientWithPromptAsync {
+  const promptAsync = (client.session as { promptAsync?: unknown }).promptAsync
+  return typeof promptAsync === "function"
 }
 
 interface ToolUsePart {
@@ -53,7 +67,10 @@ async function readPartsFromSDKFallback(
       id: "callID" in part ? (part as { callID?: string }).callID : part.id,
       name: "name" in part && typeof part.name === "string" ? part.name : ("tool" in part && typeof (part as { tool?: unknown }).tool === "string" ? (part as { tool: string }).tool : undefined),
     }))
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
@@ -69,11 +86,13 @@ export async function recoverUnavailableTool(
       parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     } else {
       const storedParts = readParts(failedAssistantMsg.info.id)
-      parts = storedParts.map((part) => ({
-        type: part.type === "tool" ? "tool_use" : part.type,
-        id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-        name: "tool" in part && typeof part.tool === "string" ? part.tool : undefined,
-      }))
+      parts = storedParts.length > 0
+        ? storedParts.map((part) => ({
+            type: part.type === "tool" ? "tool_use" : part.type,
+            id: "callID" in part ? (part as { callID?: string }).callID : part.id,
+            name: "tool" in part && typeof part.tool === "string" ? part.tool : undefined,
+          }))
+        : await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     }
   }
 
@@ -90,8 +109,10 @@ export async function recoverUnavailableTool(
 
   const toolResultParts = targetToolUses.map((part) => ({
     type: "tool_result" as const,
+    toolUseId: part.id,
     tool_use_id: part.id,
-    content: '{"status":"error","error":"Tool not available. Please continue without this tool."}',
+    isError: true,
+    content: [{ type: "text" as const, text: '{"status":"error","error":"Tool not available. Please continue without this tool."}' }],
   }))
 
   try {
@@ -99,10 +120,27 @@ export async function recoverUnavailableTool(
       path: { id: sessionID },
       body: { parts: toolResultParts },
     }
-    const promptAsync = client.session.promptAsync as (...args: never[]) => unknown
-    await Reflect.apply(promptAsync, client.session, [promptInput])
-    return true
-  } catch {
+    if (!hasPromptAsync(client)) {
+      return false
+    }
+
+    const promptResult = await dispatchInternalPrompt<PromptWithToolResultInput>({
+      mode: "async",
+      client,
+      sessionID,
+      source: "session-recovery-unavailable-tool",
+      queueBehavior: "defer",
+      checkToolState: false,
+      input: promptInput,
+    })
+    if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+      return true
+    }
+    return isInternalPromptDispatchAccepted(promptResult)
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return false
   }
 }
