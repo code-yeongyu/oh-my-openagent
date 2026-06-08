@@ -402,6 +402,24 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("detects OpenCode Go Qwen Max models through the heuristic fallback", () => {
+    const result = getModelCapabilities({
+      providerID: "opencode-go",
+      modelID: "qwen3.7-max",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "qwen3.7-max",
+      family: "qwen",
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      snapshot: { source: "none" },
+      family: { source: "heuristic" },
+    })
+  })
+
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
     const requirementModels = new Set<string>()
