@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
@@ -206,9 +206,50 @@ describe("rules-core", () => {
 
     // then
     expect(found).toEqual([
-      join(root, "packages", "AGENTS.md"),
-      join(root, "packages", "app", "AGENTS.md"),
+      realpathSync(join(root, "packages", "AGENTS.md")),
+      realpathSync(join(root, "packages", "app", "AGENTS.md")),
     ]);
+  });
+
+  it("#given start directory outside root #when walking AGENTS.md #then returns no files", async () => {
+    // given
+    const base = createTestRoot("rules-core-agents-boundary");
+    const root = join(base, "repo");
+    const outside = join(base, "outside");
+    mkdirSync(root, { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "AGENTS.md"), "# outside");
+
+    // when
+    const found = await findAgentsMdUp({
+      startDir: outside,
+      rootDir: root,
+      cache: createAgentsMdCache(),
+    });
+
+    // then
+    expect(found).toEqual([]);
+  });
+
+  it("#given AGENTS.md symlink points outside root #when walking AGENTS.md #then outside file is ignored", async () => {
+    // given
+    const base = createTestRoot("rules-core-agents-symlink-boundary");
+    const root = join(base, "repo");
+    const outside = join(base, "outside");
+    mkdirSync(join(root, "src"), { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "AGENTS.md"), "# outside symlink");
+    symlinkSync(join(outside, "AGENTS.md"), join(root, "src", "AGENTS.md"));
+
+    // when
+    const found = await findAgentsMdUp({
+      startDir: join(root, "src"),
+      rootDir: root,
+      cache: createAgentsMdCache(),
+    });
+
+    // then
+    expect(found).toEqual([]);
   });
 
   it("#given repeated same-directory targets #when using scan caches #then reuses cached candidates", () => {

@@ -63,7 +63,7 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
 	assert.notEqual(installCommand, undefined);
 	const [command, args, cwd] = installCommand;
 	assert.equal(command, "npm");
-	assert.equal(args, "install --omit=dev");
+	assert.equal(args, "ci --omit=dev");
 	assert.equal(cwd.startsWith(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", ".tmp-0.1.2-")), true);
 	assert.deepEqual(cachedMcp.mcpServers.lsp.args, [cachedLspCli, "mcp"]);
 	assert.equal((await stat(cachedLspCli)).isFile(), true);

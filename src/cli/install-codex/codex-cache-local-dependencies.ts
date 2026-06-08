@@ -1,10 +1,12 @@
+import { realpathSync } from "node:fs"
 import { readFile, readdir, writeFile } from "node:fs/promises"
-import { dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { isPathInside } from "./codex-cache-paths"
 
 export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: string, sourceRoot: string): Promise<void> {
   const packageJsonPaths: string[] = []
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths)
+  const packageLock = await readPackageLock(pluginRoot)
   for (const packageJsonPath of packageJsonPaths) {
     const raw = await readFile(packageJsonPath, "utf8")
     const parsed: unknown = JSON.parse(raw)
@@ -21,11 +23,101 @@ export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: stri
         if (filePath.length === 0 || isAbsolute(filePath)) continue
         const targetPath = resolve(packageDir, filePath)
         if (isPathInside(targetPath, pluginRoot)) continue
-        dependencies[name] = `file:${resolve(sourcePackageDir, filePath)}`
+        const sourceTargetPath = resolve(sourcePackageDir, filePath)
+        dependencies[name] = `file:${sourceTargetPath}`
+        rewritePackageLockFileDependency({
+          dependencyName: name,
+          field,
+          packageDir,
+          packageLock,
+          pluginRoot,
+          sourceTargetPath,
+          targetPath,
+        })
         changed = true
       }
     }
     if (changed) await writeFile(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}\n`)
+  }
+  if (packageLock.changed) await writeFile(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}\n`)
+}
+
+type PackageLockState = {
+  readonly path: string
+  readonly value: Record<string, unknown> | null
+  changed: boolean
+}
+
+async function readPackageLock(pluginRoot: string): Promise<PackageLockState> {
+  const path = join(pluginRoot, "package-lock.json")
+  try {
+    const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
+    return { path, value: isRecord(parsed) ? parsed : null, changed: false }
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return { path, value: null, changed: false }
+    }
+    throw error
+  }
+}
+
+function rewritePackageLockFileDependency(input: {
+  readonly dependencyName: string
+  readonly field: "dependencies" | "optionalDependencies" | "peerDependencies"
+  readonly packageDir: string
+  readonly packageLock: PackageLockState
+  readonly pluginRoot: string
+  readonly sourceTargetPath: string
+  readonly targetPath: string
+}): void {
+  const packages = getPackageLockPackages(input.packageLock.value)
+  if (!packages) return
+
+  const lockRoot = canonicalizeExistingPath(input.pluginRoot)
+  const packageKey = toPackageLockPath(relative(input.pluginRoot, input.packageDir))
+  const oldTargetKey = toPackageLockPath(relative(input.pluginRoot, input.targetPath))
+  const newTargetKey = toPackageLockPath(relative(lockRoot, input.sourceTargetPath))
+  const newSpecifier = `file:${input.sourceTargetPath}`
+
+  const packageEntry = packages[packageKey]
+  if (isRecord(packageEntry)) {
+    const dependencyRecord = packageEntry[input.field]
+    if (isRecord(dependencyRecord) && dependencyRecord[input.dependencyName] !== newSpecifier) {
+      dependencyRecord[input.dependencyName] = newSpecifier
+      input.packageLock.changed = true
+    }
+  }
+
+  if (oldTargetKey !== newTargetKey && isRecord(packages[oldTargetKey])) {
+    packages[newTargetKey] = packages[oldTargetKey]
+    delete packages[oldTargetKey]
+    input.packageLock.changed = true
+  }
+
+  const nodeModulesKey = `node_modules/${input.dependencyName}`
+  const nodeModulesEntry = packages[nodeModulesKey]
+  if (isRecord(nodeModulesEntry) && nodeModulesEntry.resolved !== newTargetKey) {
+    nodeModulesEntry.resolved = newTargetKey
+    input.packageLock.changed = true
+  }
+}
+
+function getPackageLockPackages(packageLock: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!packageLock) return null
+  const packages = packageLock.packages
+  return isRecord(packages) ? packages : null
+}
+
+function toPackageLockPath(path: string): string {
+  return path.split(sep).join("/")
+}
+
+function canonicalizeExistingPath(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch (error) {
+    if (error instanceof Error) return path
+    throw error
   }
 }
 

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -35,14 +35,17 @@ describe("withLspClient", () => {
 		writeFileSync(join(parentWorkspace, "package.json"), "{}");
 		writeFileSync(join(nestedWorkspace, "package.json"), "{}");
 		writeFileSync(filePath, "const value = 1;\n");
-		writeFileSync(userConfig, JSON.stringify({
-			lsp: {
-				callbackRoot: {
-					command: [process.execPath],
-					extensions: [".cbroot"],
+		writeFileSync(
+			userConfig,
+			JSON.stringify({
+				lsp: {
+					callbackRoot: {
+						command: [process.execPath],
+						extensions: [".cbroot"],
+					},
 				},
-			},
-		}));
+			}),
+		);
 		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
 
 		const manager = new LspManager({
