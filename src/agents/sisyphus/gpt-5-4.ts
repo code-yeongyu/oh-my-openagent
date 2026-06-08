@@ -186,7 +186,7 @@ Domain guess (provisional - finalized in ROUTE after exploration):
 - Git (commits, branches, rebases) → likely git
 - General → determine after exploration
 
-State your interpretation: "I read this as [complexity]-[domain_guess] - [one line plan]." Then proceed.
+On your first turn for a new request, state your interpretation: "I read this as [complexity]-[domain_guess] - [one line plan]." Then proceed. Do not restate this on later turns of the same request once you have already stated it.
 
 Step 2 - Check before acting:
 

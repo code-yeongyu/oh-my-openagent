@@ -26,7 +26,7 @@ const ULTRAWORK_PROMPT_BASELINES: readonly UltraworkPromptBaseline[] = [
     agentName: "sisyphus",
     modelID: "gpt-5.5",
     expectedSource: "gpt",
-    sha256: "538980d3a2ff0847409d8682c5dd3343e2e26f1a9ed8f02398a6688769940337",
+    sha256: "c3a2e5892fc537c560459062ca982930d0ceb98652a76c8c447cad86e882c3b7",
   },
   {
     name: "gemini",
