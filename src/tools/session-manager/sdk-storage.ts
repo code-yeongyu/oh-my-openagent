@@ -17,13 +17,33 @@ function throwOnNonFallbackableSdkError(response: unknown): void {
   throw error
 }
 
+const SDK_TRANSIENT_RETRY_ATTEMPTS = 3
+
+// session_read issues two SDK calls (session.list for existence + session.messages),
+// so a single transient HTTP failure on either call would fall back to file storage,
+// which does not exist for pure-sqlite sessions and surfaces a false "Session not found".
+// Retry only on transient/unavailable errors; semantic errors (e.g. "session not found")
+// still throw immediately so the caller can decide between fallback and rethrow.
+async function fetchSdkResponse(operation: () => Promise<unknown>): Promise<unknown> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= SDK_TRANSIENT_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const response = await operation()
+      throwOnNonFallbackableSdkError(response)
+      return response
+    } catch (error) {
+      lastError = error
+      if (!isSessionSdkUnavailableError(error)) throw error
+    }
+  }
+  throw lastError
+}
+
 export async function getSdkMainSessions(
   client: PluginInput["client"],
   directory?: string,
 ): Promise<SessionMetadata[]> {
-  const response = await client.session.list()
-  const error = unwrapSdkResponseError(response)
-  if (error) throw error
+  const response = await fetchSdkResponse(() => client.session.list())
 
   const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
   const mainSessions = sessions.filter((session) => !session.parentID)
@@ -37,15 +57,13 @@ export async function getSdkMainSessions(
 }
 
 export async function getSdkAllSessions(client: PluginInput["client"]): Promise<string[]> {
-  const response = await client.session.list()
-  throwOnNonFallbackableSdkError(response)
+  const response = await fetchSdkResponse(() => client.session.list())
   const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
   return sessions.map((session) => session.id)
 }
 
 export async function sdkSessionExists(client: PluginInput["client"], sessionID: string): Promise<boolean> {
-  const response = await client.session.list()
-  throwOnNonFallbackableSdkError(response)
+  const response = await fetchSdkResponse(() => client.session.list())
   const sessions = normalizeSDKResponse(response, [] as Array<{ id?: string }>)
   return sessions.some((session) => session.id === sessionID)
 }
@@ -54,8 +72,7 @@ export async function getSdkSessionMessages(
   client: PluginInput["client"],
   sessionID: string,
 ): Promise<SessionMessage[]> {
-  const response = await client.session.messages({ path: { id: sessionID } })
-  throwOnNonFallbackableSdkError(response)
+  const response = await fetchSdkResponse(() => client.session.messages({ path: { id: sessionID } }))
 
   const rawMessages = normalizeSDKResponse(response, [] as Array<{
     info?: {
@@ -112,8 +129,7 @@ export async function getSdkSessionMessages(
 }
 
 export async function getSdkSessionTodos(client: PluginInput["client"], sessionID: string): Promise<TodoItem[]> {
-  const response = await client.session.todo({ path: { id: sessionID } })
-  throwOnNonFallbackableSdkError(response)
+  const response = await fetchSdkResponse(() => client.session.todo({ path: { id: sessionID } }))
 
   const data = normalizeSDKResponse(response, [] as Array<{
     id?: string
