@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 
-import { generateModelConfig } from "./model-fallback"
+import { generateModelConfig, shouldShowChatGPTOnlyWarning } from "./model-fallback"
 import type { InstallConfig } from "./types"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
@@ -804,4 +804,44 @@ describe("generateModelConfig", () => {
       )
     })
   })
+})
+
+describe("shouldShowChatGPTOnlyWarning", () => {
+  test("returns true when OpenAI is the only configured provider", () => {
+    // #given
+    const config = createConfig({ hasOpenAI: true })
+
+    // #when
+    const result = shouldShowChatGPTOnlyWarning(config)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  const mixedProviderCases: Array<{ name: string; overrides: Partial<InstallConfig> }> = [
+    { name: "Claude", overrides: { hasClaude: true } },
+    { name: "Gemini", overrides: { hasGemini: true } },
+    { name: "Copilot", overrides: { hasCopilot: true } },
+    { name: "OpenCode Zen", overrides: { hasOpencodeZen: true } },
+    { name: "Z.ai Coding Plan", overrides: { hasZaiCodingPlan: true } },
+    { name: "Kimi for Coding", overrides: { hasKimiForCoding: true } },
+    { name: "OpenCode Go", overrides: { hasOpencodeGo: true } },
+    { name: "Bailian Coding Plan", overrides: { hasBailianCodingPlan: true } },
+    { name: "MiniMax CN Coding Plan", overrides: { hasMinimaxCnCodingPlan: true } },
+    { name: "MiniMax Coding Plan", overrides: { hasMinimaxCodingPlan: true } },
+    { name: "Vercel AI Gateway", overrides: { hasVercelAiGateway: true } },
+  ]
+
+  for (const { name, overrides } of mixedProviderCases) {
+    test(`returns false when OpenAI is configured with ${name}`, () => {
+      // #given
+      const config = createConfig({ hasOpenAI: true, ...overrides })
+
+      // #when
+      const result = shouldShowChatGPTOnlyWarning(config)
+
+      // #then
+      expect(result).toBe(false)
+    })
+  }
 })
