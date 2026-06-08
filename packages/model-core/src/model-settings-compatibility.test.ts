@@ -321,37 +321,39 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
-  test("GitHub Copilot GPT-5 variants downgrade xhigh to high", () => {
+  test("GitHub Copilot GPT-5 high-tier variants downgrade to high", () => {
     for (const modelID of ["gpt-5.4", "gpt-5.5"]) {
-      const capabilities = getModelCapabilities({
-        providerID: "github-copilot",
-        modelID,
-      })
-      const result = resolveCompatibleModelSettings({
-        providerID: "github-copilot",
-        modelID,
-        desired: { variant: "xhigh", reasoningEffort: "xhigh" },
-        capabilities,
-      })
+      for (const requested of ["xhigh", "max"]) {
+        const capabilities = getModelCapabilities({
+          providerID: "github-copilot",
+          modelID,
+        })
+        const result = resolveCompatibleModelSettings({
+          providerID: "github-copilot",
+          modelID,
+          desired: { variant: requested, reasoningEffort: requested },
+          capabilities,
+        })
 
-      expect(result).toEqual({
-        variant: "high",
-        reasoningEffort: "high",
-        changes: [
-          {
-            field: "variant",
-            from: "xhigh",
-            to: "high",
-            reason: "unsupported-by-model-metadata",
-          },
-          {
-            field: "reasoningEffort",
-            from: "xhigh",
-            to: "high",
-            reason: "unsupported-by-model-metadata",
-          },
-        ],
-      })
+        expect(result).toEqual({
+          variant: "high",
+          reasoningEffort: "high",
+          changes: [
+            {
+              field: "variant",
+              from: requested,
+              to: "high",
+              reason: "unsupported-by-model-metadata",
+            },
+            {
+              field: "reasoningEffort",
+              from: requested,
+              to: "high",
+              reason: "unsupported-by-model-metadata",
+            },
+          ],
+        })
+      }
     }
   })
   test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
