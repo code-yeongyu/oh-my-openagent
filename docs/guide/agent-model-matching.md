@@ -169,10 +169,10 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Prometheus (G
 |---|---|---|---|
 | 1 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Native OpenAI is the gold standard for principle-driven prompts. Hephaestus requires this family. |
 | 2 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
-| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
+| 3 | **DeepSeek V4 - LIMITED ALTERNATIVE** (`deepseek-v4-pro`, `deepseek-v4-flash`) | `deepseek`, `openrouter/deepseek`, OpenAI-compatible gateway | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains - add via `fallback_models` while fallback priority remains a maintainer policy decision. |
 | 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used only in **utility** fallback chains (Explore, Librarian, `quick`). Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
-> **DeepSeek ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
+> **DeepSeek V4 Pro / Flash ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
 
 ### Gemini Family (visual, different reasoning style)
 
@@ -193,7 +193,7 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 | If you lose... | Swap to (in order) | Avoid |
 |---|---|---|
 | Claude Opus/Sonnet | Kimi K2.5/K2.6 → GLM 5 → Big Pickle | Older GPT models |
-| GPT-5.4/5.5 | GPT-5.5 Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
+| GPT-5.4/5.5 | GPT-5.5 Codex → DeepSeek V4 Pro / Flash via `fallback_models` | MiniMax (except for utility work) |
 | Gemini 3.1 Pro | Qwen 3.6-plus / 3.5-plus | Claude/Kimi (wrong reasoning style for visual) |
 | Grok Code Fast 1 (Explore) | GPT-5.4 Mini Fast → MiniMax M2.7 Highspeed → MiniMax M3 → Claude Haiku | Opus (massive cost waste) |
 
@@ -268,6 +268,19 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | **GPT-5.5**       | High intelligence, strategic reasoning. Default for Oracle, Momus, and a key fallback for Prometheus / Atlas. Uses xhigh variant for Momus. |
 | **GPT-5.4 Mini**  | Fast + strong reasoning. Good for lightweight autonomous tasks. Default for quick category. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
+
+### DeepSeek Family
+
+OpenAI-compatible, agentic, and cost-sensitive. Best as an explicit GPT-family fallback for users who already route DeepSeek through the native DeepSeek provider, OpenRouter, or an OpenAI-compatible gateway.
+
+DeepSeek V4 is not part of the default fallback chains. Add it through `fallback_models` until the maintainer decides provider path and priority policy in [`src/shared/model-requirements.ts`](../../src/shared/model-requirements.ts).
+
+| Model | Strengths |
+| ----- | --------- |
+| **DeepSeek V4 Pro** (`deepseek-v4-pro`) | Strongest DeepSeek V4 option for autonomous coding and deep reasoning. Supports 1M context, tool calls, JSON output, and `high` / `max` reasoning effort normalization in OmO compatibility handling. Good candidate for Oracle, Momus, `deep`, and `unspecified-high` overrides. |
+| **DeepSeek V4 Flash** (`deepseek-v4-flash`) | Faster and cheaper DeepSeek V4 option. Supports the same API surface and 1M context. Good candidate for Explore, Librarian, `quick`, and budget-sensitive fallback entries. |
+
+Legacy DeepSeek model IDs `deepseek-chat` and `deepseek-reasoner` are deprecated and scheduled for retirement on 2026-07-24 15:59 UTC. They currently map to non-thinking and thinking modes of `deepseek-v4-flash`, respectively. Prefer the explicit V4 model IDs in new configs.
 
 ### Other Models
 
