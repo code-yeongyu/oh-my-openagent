@@ -15,7 +15,7 @@ Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. Entr
 | `codex-marketplace.ts` | Reads `packages/omo-codex/marketplace.json` and per-plugin `.codex-plugin/plugin.json`; validates path segments |
 | `codex-cache-install.ts` | Builds source, copies to temp cache dir, runs `npm ci --omit=dev`, rewrites MCP manifest, atomically promotes to `~/.codex/plugins/cache/{marketplace}/{name}/{version}/` |
 | `codex-cache-bins.ts` | Discovers `package.json` `bin` entries, links component CLIs into bin dir; writes `omo` runtime wrapper (POSIX shell / Windows `.cmd`) |
-| `link-cached-plugin-agents.ts` | Discovers bundled agent TOMLs under `components/*/agents/`, copies to `~/.codex/agents/`, preserves existing `model_reasoning_effort`, writes `.installed-agents.json` manifest |
+| `link-cached-plugin-agents.ts` | Discovers bundled agent TOMLs under `components/*/agents/`, copies to `~/.codex/agents/`, preserves existing `model_reasoning_effort` and `service_tier`, writes `.installed-agents.json` manifest |
 | `codex-marketplace-snapshot.ts` | Writes local marketplace snapshot to `~/.codex/.tmp/marketplaces/{marketplace}/` |
 | `codex-config-toml.ts` | Mutates `~/.codex/config.toml`: enables features, sets marketplace/plugin/agent/hook-trust blocks, optional autonomous permissions |
 | `codex-cleanup.ts` | Uninstall orchestrator: removes cache, agents, config blocks, project-local artifacts |
