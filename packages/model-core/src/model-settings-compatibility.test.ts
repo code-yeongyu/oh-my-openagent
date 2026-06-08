@@ -321,6 +321,39 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
+  test("GitHub Copilot GPT-5 variants downgrade xhigh to high", () => {
+    for (const modelID of ["gpt-5.4", "gpt-5.5"]) {
+      const capabilities = getModelCapabilities({
+        providerID: "github-copilot",
+        modelID,
+      })
+      const result = resolveCompatibleModelSettings({
+        providerID: "github-copilot",
+        modelID,
+        desired: { variant: "xhigh", reasoningEffort: "xhigh" },
+        capabilities,
+      })
+
+      expect(result).toEqual({
+        variant: "high",
+        reasoningEffort: "high",
+        changes: [
+          {
+            field: "variant",
+            from: "xhigh",
+            to: "high",
+            reason: "unsupported-by-model-metadata",
+          },
+          {
+            field: "reasoningEffort",
+            from: "xhigh",
+            to: "high",
+            reason: "unsupported-by-model-metadata",
+          },
+        ],
+      })
+    }
+  })
   test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
     for (const reasoningEffort of ["high", "max"]) {
       const result = resolveCompatibleModelSettings({
