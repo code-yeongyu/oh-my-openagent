@@ -89,6 +89,17 @@ describe("resolveRunAgent", () => {
     // then
     expect(agent).toBe("sisyphus")
   })
+
+  it("#given unknown custom agent #when resolving run agent #then leaves the custom prompt agent untouched", () => {
+    // given
+    const config = createConfig()
+
+    // when
+    const agent = resolveRunAgent({ message: "test", agent: "custom-agent" }, config, {})
+
+    // then
+    expect(agent).toBe("custom-agent")
+  })
 })
 
 describe("waitForEventProcessorShutdown", () => {
