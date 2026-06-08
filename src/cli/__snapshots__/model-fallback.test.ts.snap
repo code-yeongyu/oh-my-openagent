@@ -1448,7 +1448,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
         },
       ],
       "model": "github-copilot/gpt-5.5",
-      "variant": "xhigh",
+      "variant": "high",
     },
     "multimodal-looker": {
       "model": "github-copilot/gpt-5-nano",
@@ -1632,7 +1632,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
         },
       ],
       "model": "github-copilot/gpt-5.5",
-      "variant": "xhigh",
+      "variant": "high",
     },
     "multimodal-looker": {
       "model": "github-copilot/gpt-5-nano",
@@ -2114,7 +2114,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "fallback_models": [
         {
           "model": "github-copilot/gpt-5.5",
-          "variant": "xhigh",
+          "variant": "high",
         },
         {
           "model": "github-copilot/claude-opus-4.7",
@@ -2620,7 +2620,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         },
       ],
       "model": "github-copilot/gpt-5.5",
-      "variant": "xhigh",
+      "variant": "high",
     },
     "multimodal-looker": {
       "fallback_models": [
@@ -3010,7 +3010,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "fallback_models": [
         {
           "model": "github-copilot/gpt-5.5",
-          "variant": "xhigh",
+          "variant": "high",
         },
         {
           "model": "opencode/gpt-5.5",
@@ -3555,7 +3555,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "fallback_models": [
         {
           "model": "github-copilot/gpt-5.5",
-          "variant": "xhigh",
+          "variant": "high",
         },
         {
           "model": "opencode/gpt-5.5",
