@@ -32,7 +32,6 @@ type TeamTaskUpdateArgs = {
   teamRunId: string
   taskId: string
   status: "pending" | "claimed" | "in_progress" | "completed" | "deleted"
-  owner?: string
 }
 
 type TeamTaskGetArgs = {
@@ -73,12 +72,12 @@ export function createTeamTaskCreateTool(config: TeamModeConfig, client: Opencod
   void client
 
   return tool({
-    description: "Create a team task.",
+    description: "Create a pending shared team task. Members claim/update it with team_task_update; track progress and results with team_task_list/team_task_get plus member team_send_message reports.",
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
-      subject: tool.schema.string().describe("Task subject"),
-      description: tool.schema.string().describe("Task description"),
-      blockedBy: tool.schema.array(tool.schema.string()).optional().describe("Blocking task IDs"),
+      subject: tool.schema.string().describe("Short task subject shown in team_task_list."),
+      description: tool.schema.string().describe("Concrete assignment and expected result for the member."),
+      blockedBy: tool.schema.array(tool.schema.string()).optional().describe("Task IDs that must complete before this task is available."),
     },
     execute: async (args: TeamTaskCreateArgs): Promise<string> => {
       const createdTask: Task = await deps.createTask(args.teamRunId, {
@@ -98,11 +97,11 @@ export function createTeamTaskListTool(config: TeamModeConfig, client: OpencodeC
   void client
 
   return tool({
-    description: "List team tasks.",
+    description: "List shared team tasks with owner/status metadata. Use this to track task completion; it does not include member message bodies.",
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
-      status: tool.schema.enum(["pending", "claimed", "in_progress", "completed", "deleted"]).optional(),
-      owner: tool.schema.string().optional(),
+      status: tool.schema.enum(["pending", "claimed", "in_progress", "completed", "deleted"]).optional().describe("Optional status filter."),
+      owner: tool.schema.string().optional().describe("Optional member-name owner filter."),
     },
     execute: async (args: TeamTaskListArgs): Promise<string> => {
       const tasks = await deps.listTasks(args.teamRunId, config, { status: args.status, owner: args.owner })
@@ -115,19 +114,18 @@ export function createTeamTaskUpdateTool(config: TeamModeConfig, client: Opencod
   void client
 
   return tool({
-    description: "Update a team task.",
+    description: "Claim, start, complete, or delete a shared team task. Members should report substantive results separately with team_send_message.",
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
       taskId: tool.schema.string().describe("Task ID"),
-      status: tool.schema.enum(["pending", "claimed", "in_progress", "completed", "deleted"]).describe("Task status"),
-      owner: tool.schema.string().optional().describe("Task owner"),
+      status: tool.schema.enum(["pending", "claimed", "in_progress", "completed", "deleted"]).describe("New task status: claimed/in_progress while working, completed when done, deleted to remove."),
     },
     execute: async (args: TeamTaskUpdateArgs, ctx?: TeamTaskToolContext): Promise<string> => {
       const senderName = await resolveSenderName(args.teamRunId, config, ctx?.sessionID, deps)
 
       const updatedTask = args.status === "claimed"
         ? await deps.claimTask(args.teamRunId, args.taskId, senderName, config)
-        : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config)
+        : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, senderName, config)
 
       return JSON.stringify({ task: updatedTask })
     },
@@ -138,7 +136,7 @@ export function createTeamTaskGetTool(config: TeamModeConfig, client: OpencodeCl
   void client
 
   return tool({
-    description: "Get a team task.",
+    description: "Get one shared team task with its current owner/status metadata. It is for task state, not conversation history.",
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
       taskId: tool.schema.string().describe("Task ID"),

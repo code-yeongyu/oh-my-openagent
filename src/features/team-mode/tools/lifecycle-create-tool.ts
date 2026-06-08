@@ -66,11 +66,11 @@ export function createTeamCreateTool(
   deps: TeamCreateToolDeps = defaultTeamCreateToolDeps,
 ): ToolDefinition {
   return tool({
-    description: "Create a team run from a named or inline team spec.",
+    description: "Create a team run and spawn member sessions. Provide exactly one of teamName (existing declared spec) or inline_spec (one-off spec); omit unused optional args. Returns teamRunId; monitor with team_status/team_task_list.",
     args: {
-      teamName: tool.schema.string().optional().describe("Named team spec to load. Provide exactly one of teamName or inline_spec."),
-      inline_spec: TeamCreateInlineSpecToolSchema.optional().describe("Inline team spec object or JSON string. Provide exactly one of teamName or inline_spec; members must be a flat array, e.g. { name: \"project-analysis-team\", members: [{ name: \"structure-analyst\", category: \"quick\", prompt: \"Analyze project structure.\" }] }."),
-      leadSessionId: tool.schema.string().optional().describe("Optional non-empty session ID override. Usually omit this and let team_create use the current session."),
+      teamName: tool.schema.string().optional().describe("Name of an existing declared team spec to load. Omit when using inline_spec; do not pass an empty string."),
+      inline_spec: TeamCreateInlineSpecToolSchema.optional().describe("One-off team spec object or JSON string. Omit teamName when using this; members must be a flat array, e.g. { name: \"project-analysis-team\", members: [{ name: \"structure-analyst\", category: \"quick\", prompt: \"Analyze project structure.\" }] }."),
+      leadSessionId: tool.schema.string().optional().describe("Advanced non-empty session ID override. Usually omit and let team_create use the current session; do not pass an empty string."),
     },
     async execute(rawArgs, toolContext) {
       const args = parseTeamCreateArgs(rawArgs)

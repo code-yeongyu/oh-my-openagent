@@ -147,20 +147,45 @@ describe("team lifecycle tools", () => {
     expect(result.runtimeState.members[0]).toMatchObject({ name: "lead", agentType: "leader" })
   })
 
-  test("team_create rejects an empty leadSessionId override", async () => {
+  test("team_create treats empty optional strings as omitted for inline specs", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
 
     // when
-    let errorMessage = ""
-    try {
-      await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "" }, createToolContext("lead-session"))
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error)
-    }
+    const result = parseToolResult<{ teamRunId: string }>(await teamCreateTool.execute({ teamName: "", inline_spec: createSpec(), leadSessionId: "" }, createToolContext("lead-session")))
 
     // then
-    expect(errorMessage).toContain("leadSessionId")
+    expect(result.teamRunId).toBe("team-run-1")
+    expect(createTeamRunMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "lead-session",
+      expect.anything(),
+      config,
+      backgroundManager,
+      undefined,
+      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+    )
+  })
+
+  test("team_create treats empty optional strings as omitted for named specs", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+
+    // when
+    const result = parseToolResult<{ teamRunId: string }>(await teamCreateTool.execute({ teamName: "alpha-team", inline_spec: "", leadSessionId: "" }, createToolContext("lead-session")))
+
+    // then
+    expect(result.teamRunId).toBe("team-run-1")
+    expect(loadTeamSpecMock).toHaveBeenCalledWith("alpha-team", config, "/project", expect.anything())
+    expect(createTeamRunMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "lead-session",
+      expect.anything(),
+      config,
+      backgroundManager,
+      undefined,
+      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+    )
   })
 
   test("team_create checks participant conflicts against the effective leadSessionId override", async () => {

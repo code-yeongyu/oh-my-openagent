@@ -124,7 +124,7 @@ If step 2 errors because a member is still active, re-run \`team_status\`. Use \
 
 ## Task ownership
 
-Any agent can set or change task ownership via \`team_task_update\` with the \`owner\` field. Members typically claim work by setting \`owner: "<their-name>"\` and \`status: "claimed"\` (or directly \`"in_progress"\`). The lead can also pre-assign work by creating tasks with \`owner\` set.
+Members claim work with \`team_task_update\` by setting \`status: "claimed"\` or by moving directly to \`status: "in_progress"\`. The tool derives ownership from the caller session; do not pass an \`owner\` field.
 
 ## Automatic message delivery
 
@@ -148,7 +148,7 @@ Members and the lead use \`team_status({ teamRunId })\` to see who is active, th
 Members should:
 
 1. Check \`team_task_list\` periodically, **especially after completing each task**, to find newly unblocked work.
-2. Claim unassigned, unblocked tasks via \`team_task_update\` (set \`owner\` and \`status: "claimed"\` or \`"in_progress"\`). Prefer tasks in ID order (lowest first) — earlier tasks usually establish context for later ones.
+2. Claim unassigned, unblocked tasks via \`team_task_update\` with \`status: "claimed"\` or \`"in_progress"\`. Prefer tasks in ID order (lowest first) — earlier tasks usually establish context for later ones.
 3. Create new tasks via \`team_task_create\` when they identify additional work.
 4. Mark tasks completed via \`team_task_update\` with \`status: "completed"\`, then re-check the task list.
 5. If all available tasks are blocked, send a \`team_send_message\` to the lead to either resolve blockers or assign different work.
