@@ -876,7 +876,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(getSessionModel("subagent-session")).toBeUndefined()
   })
 
-  test("does not override explicit agent model overrides with stored session model", async () => {
+  test("reuses the stored main-session model over explicit agent model overrides", async () => {
     //#given
     setMainSession("test-session")
     setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
@@ -896,11 +896,11 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     await handler(input, output)
 
     //#then
-    expect(output.message["model"]).toBeUndefined()
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
   })
 
-  test("treats prefixed list-display agent names as explicit model overrides", async () => {
+  test("reuses the stored main-session model with prefixed list-display agent names", async () => {
     //#given
     setMainSession("test-session")
     setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
@@ -920,7 +920,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     await handler(input, output)
 
     //#then
-    expect(output.message["model"]).toBeUndefined()
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionAgent("test-session")).toBe("Prometheus - Plan Builder")
   })

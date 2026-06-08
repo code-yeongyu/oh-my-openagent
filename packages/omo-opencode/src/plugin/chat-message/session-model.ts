@@ -1,27 +1,9 @@
-import type { OhMyOpenCodeConfig } from "../../config"
 import { subagentSessions, getMainSessionID } from "../../features/claude-code-session-state"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../../shared/session-model-state"
 import type { ChatMessageHandlerOutput, ChatMessageInput, SessionModelOverride } from "./types"
 
-function hasExplicitAgentModelOverride(
-  agent: string | undefined,
-  pluginConfig: OhMyOpenCodeConfig,
-): boolean {
-  const configuredAgents = pluginConfig.agents
-  const normalizedAgent = typeof agent === "string" ? getAgentConfigKey(agent) : undefined
-  if (!normalizedAgent || !configuredAgents || !(normalizedAgent in configuredAgents)) {
-    return false
-  }
-
-  const configuredAgent = configuredAgents[normalizedAgent as keyof typeof configuredAgents]
-  const configuredModel = configuredAgent?.model
-  return typeof configuredModel === "string" && configuredModel.trim().length > 0
-}
-
 export function getStoredMainSessionModel(
   input: ChatMessageInput,
-  pluginConfig: OhMyOpenCodeConfig,
   isFirstMessage: boolean,
 ): SessionModelOverride | undefined {
   if (isFirstMessage) {
@@ -37,10 +19,6 @@ export function getStoredMainSessionModel(
   }
 
   if (input.model) {
-    return undefined
-  }
-
-  if (hasExplicitAgentModelOverride(input.agent, pluginConfig)) {
     return undefined
   }
 
