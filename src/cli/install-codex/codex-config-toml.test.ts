@@ -57,7 +57,7 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain('sandbox = "elevated"')
   })
 
-  test("#given empty Codex config #when updating config #then enables MultiAgentV2 with ten thousand session threads", async () => {
+  test("#given empty Codex config #when updating config #then creates MultiAgentV2 section with thread limit but no forced enabled flag", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-"))
     const configPath = join(root, "config.toml")
@@ -74,11 +74,13 @@ describe("codex-config-toml", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toContain("enabled = true")
+    const v2Section = content.slice(content.indexOf("[features.multi_agent_v2]"))
+      .split(/^\[/m).slice(0, 1).join("")
+    expect(v2Section).not.toContain("enabled")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
   })
 
-  test("#given existing MultiAgentV2 table #when updating config #then preserves unrelated tuning while setting ten thousand session threads", async () => {
+  test("#given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning while setting thread limit", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-existing-"))
     const configPath = join(root, "config.toml")
@@ -105,7 +107,7 @@ describe("codex-config-toml", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toContain("enabled = true")
+    expect(content).toContain("enabled = false")
     expect(content).toContain("usage_hint_enabled = false")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
     expect(content).not.toContain("max_concurrent_threads_per_session = 4")
@@ -218,7 +220,9 @@ describe("codex-config-toml", () => {
     const content = await readFile(configPath, "utf8")
     expect(content).not.toMatch(/^multi_agent_v2\s*=/m)
     expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toContain("enabled = true")
+    const v2LegacySection = content.slice(content.indexOf("[features.multi_agent_v2]"))
+      .split(/^\[/m).slice(0, 1).join("")
+    expect(v2LegacySection).not.toContain("enabled")
     expect(content).toContain("usage_hint_enabled = false")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
   })
@@ -250,7 +254,9 @@ describe("codex-config-toml", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toContain("enabled = true")
+    const v2ThreadsSection = content.slice(content.indexOf("[features.multi_agent_v2]"))
+      .split(/^\[/m).slice(0, 1).join("")
+    expect(v2ThreadsSection).not.toContain("enabled")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
     expect(content).toContain("[agents]")
     expect(content).not.toMatch(/^max_threads\s*=/m)

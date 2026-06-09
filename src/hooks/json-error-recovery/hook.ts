@@ -11,6 +11,15 @@ export const JSON_ERROR_TOOL_EXCLUDE_LIST = [
   "websearch_web_search_exa",
   "todowrite",
   "todoread",
+  "task",
+  "call_omo_agent",
+  "background_output",
+  "session_read",
+  "session_search",
+  "session_info",
+  "session_list",
+  "skill",
+  "skill_mcp",
 ] as const
 
 export const JSON_ERROR_PATTERNS = [

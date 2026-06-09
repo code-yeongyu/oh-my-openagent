@@ -9,11 +9,11 @@ import { TeamSpecSchema, type TeamSpec } from "../types"
 export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
 
 export const TeamCreateArgsSchema = z.object({
-  teamName: z.string().min(1).optional(),
-  inline_spec: z.unknown().optional(),
-  leadSessionId: z.string().optional(),
+  teamName: z.string().min(1).nullish(),
+  inline_spec: z.unknown().nullish(),
+  leadSessionId: z.string().nullish(),
 }).superRefine((value, ctx) => {
-  const optionCount = Number(value.teamName !== undefined) + Number(value.inline_spec !== undefined)
+  const optionCount = Number(value.teamName != null) + Number(value.inline_spec != null)
   if (optionCount !== 1) {
     ctx.addIssue({ code: "custom", message: "Provide exactly one of teamName or inline_spec." })
   }

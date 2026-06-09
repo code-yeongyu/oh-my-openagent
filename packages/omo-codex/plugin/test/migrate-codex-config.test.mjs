@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
+import { disableMultiAgentV2IfForced } from "../scripts/migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig, migrateCodexConfig } from "../scripts/migrate-codex-config.mjs";
 
 test("#given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys", () => {
@@ -359,6 +360,84 @@ test("#given config already matches current catalog #when catalog version advanc
 	assert.deepEqual(result.changed, []);
 	assert.equal(state.files[configPath].managed, true);
 	assert.equal(state.files[configPath].catalogVersion, "test.role-only");
+});
+
+test("#given installer-forced multi_agent_v2 enabled #when migrating config #then disables it so runtime decides per model", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		'model_reasoning_effort = "high"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = true",
+		"max_concurrent_threads_per_session = 10000",
+		"",
+	].join("\n");
+
+	const result = disableMultiAgentV2IfForced(config);
+
+	assert.match(result, /enabled = false/);
+	assert.doesNotMatch(result, /enabled = true/);
+	assert.match(result, /max_concurrent_threads_per_session = 10000/);
+});
+
+test("#given no multi_agent_v2 section #when migrating config #then returns config unchanged", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		'model_reasoning_effort = "high"',
+		"",
+		"[features]",
+		"plugins = true",
+		"",
+	].join("\n");
+
+	const result = disableMultiAgentV2IfForced(config);
+
+	assert.equal(result, config);
+});
+
+test("#given multi_agent_v2 already disabled #when migrating config #then returns config unchanged", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		'model_reasoning_effort = "high"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = false",
+		"max_concurrent_threads_per_session = 10000",
+		"",
+	].join("\n");
+
+	const result = disableMultiAgentV2IfForced(config);
+
+	assert.equal(result, config);
+});
+
+test("#given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-guard-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.5"',
+			'model_reasoning_effort = "high"',
+			"",
+			"[features.multi_agent_v2]",
+			"enabled = true",
+			"max_concurrent_threads_per_session = 10000",
+			"",
+		].join("\n"),
+	);
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	assert.deepEqual(result.changed, [configPath]);
+	const content = await readFile(configPath, "utf8");
+	assert.match(content, /enabled = false/);
+	assert.doesNotMatch(content, /enabled = true/);
 });
 
 async function canCreateSymlink(type) {

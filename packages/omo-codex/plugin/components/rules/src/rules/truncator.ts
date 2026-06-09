@@ -14,6 +14,13 @@ function truncationNotice(relativePath: string): string {
 	return TRUNCATION_NOTICE.replace("{path}", relativePath);
 }
 
+export function isNeverTruncatedRule(relativePath: string): boolean {
+	const normalized = relativePath.replace(/\\/g, "/");
+	const segments = normalized.split("/").filter((segment) => segment.length > 0);
+	const filename = segments.at(-1) ?? normalized;
+	return filename.toLowerCase() === "hephaestus.md";
+}
+
 function safeSliceEnd(body: string, end: number): number {
 	if (end <= 0) {
 		return 0;
@@ -28,6 +35,10 @@ function safeSliceEnd(body: string, end: number): number {
 }
 
 export function truncateRule(body: string, options: { maxChars: number; relativePath: string }): TruncationResult {
+	if (isNeverTruncatedRule(options.relativePath)) {
+		return { body, truncated: false, originalLength: body.length };
+	}
+
 	if (body.length <= options.maxChars) {
 		return { body, truncated: false, originalLength: body.length };
 	}
@@ -46,6 +57,12 @@ export function truncateBudget(input: { rules: ReadonlyArray<BudgetRule>; maxRes
 	let remainingBudget = input.maxResultChars;
 
 	for (const rule of input.rules) {
+		if (isNeverTruncatedRule(rule.relativePath)) {
+			results.push({ body: rule.body, truncated: false, relativePath: rule.relativePath });
+			remainingBudget -= rule.body.length;
+			continue;
+		}
+
 		if (remainingBudget >= rule.body.length) {
 			results.push({ body: rule.body, truncated: false, relativePath: rule.relativePath });
 			remainingBudget -= rule.body.length;
