@@ -61,12 +61,16 @@ describe("daemon roundtrip", () => {
 	it("#given a started daemon #when closed #then the socket and pid files are removed", async () => {
 		const paths = tempPaths();
 		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
-		expect(existsSync(paths.socket)).toBe(true);
+		if (process.platform !== "win32") {
+			expect(existsSync(paths.socket)).toBe(true);
+		}
 		expect(existsSync(paths.pid)).toBe(true);
 
 		await server.close();
 
-		expect(existsSync(paths.socket)).toBe(false);
+		if (process.platform !== "win32") {
+			expect(existsSync(paths.socket)).toBe(false);
+		}
 		expect(existsSync(paths.pid)).toBe(false);
 	});
 });

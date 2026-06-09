@@ -24,7 +24,11 @@ describe("daemon paths", () => {
 	it("#given version #when daemonPaths #then pins socket/lock/pid under versioned dir", () => {
 		const paths = daemonPaths({ CODEX_LSP_DAEMON_DIR: "/d" }, "1.2.3");
 		expect(paths.dir).toBe(join("/d", "v1.2.3"));
-		expect(paths.socket).toBe(join("/d", "v1.2.3", "daemon.sock"));
+		if (process.platform === "win32") {
+			expect(paths.socket.startsWith("\\\\.\\pipe\\omo-lsp-1.2.3-")).toBe(true);
+		} else {
+			expect(paths.socket).toBe(join("/d", "v1.2.3", "daemon.sock"));
+		}
 		expect(paths.lock).toBe(join("/d", "v1.2.3", "daemon.lock"));
 		expect(paths.pid).toBe(join("/d", "v1.2.3", "daemon.pid"));
 	});
@@ -32,8 +36,12 @@ describe("daemon paths", () => {
 	it("#given a very long base dir #when daemonPaths #then falls back to a short tmp socket", () => {
 		const longDir = `/${"x".repeat(120)}`;
 		const paths = daemonPaths({ CODEX_LSP_DAEMON_DIR: longDir }, "1.0.0");
-		expect(paths.socket.startsWith(tmpdir())).toBe(true);
-		expect(paths.socket.length).toBeLessThan(100);
+		if (process.platform === "win32") {
+			expect(paths.socket.startsWith("\\\\.\\pipe\\omo-lsp-1.0.0-")).toBe(true);
+		} else {
+			expect(paths.socket.startsWith(tmpdir())).toBe(true);
+			expect(paths.socket.length).toBeLessThan(100);
+		}
 		expect(paths.lock).toBe(join(longDir, "v1.0.0", "daemon.lock"));
 	});
 });
