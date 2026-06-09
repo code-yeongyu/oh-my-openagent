@@ -34,8 +34,12 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 	const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
 	for await (const line of lines) {
 		if (!line.trim()) continue;
-		const response = await handleLine(line, callOptions);
-		if (response) output.write(`${JSON.stringify(response)}\n`);
+		try {
+			const response = await handleLine(line, callOptions);
+			if (response) output.write(`${JSON.stringify(response)}\n`);
+		} catch (error) {
+			process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
+		}
 	}
 }
 

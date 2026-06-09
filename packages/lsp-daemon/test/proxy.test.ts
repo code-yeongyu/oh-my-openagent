@@ -101,4 +101,26 @@ describe("mcp stdio proxy", () => {
 		const responses = parseResponses(out);
 		expect((responses[0]?.["error"] as { code: number }).code).toBe(-32700);
 	});
+
+	it("#given the fallback tool throws #when proxied #then returns an isError response and keeps serving", async () => {
+		const paths = tempPaths();
+		const out: string[] = [];
+
+		await runMcpStdioProxy({
+			input: inputStream([
+				{ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "definitely_not_a_tool", arguments: {} } },
+				{ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "status", arguments: {} } },
+			]),
+			output: collectingWritable(out),
+			paths,
+			ensure: () => Promise.reject(new Error("spawn disabled")),
+		});
+
+		const responses = parseResponses(out);
+		const first = responses.find((response) => response["id"] === 1);
+		const second = responses.find((response) => response["id"] === 2);
+		expect((first?.["result"] as { isError?: boolean })?.isError).toBe(true);
+		const secondResult = second?.["result"] as { content: Array<{ text: string }> } | undefined;
+		expect(secondResult?.content[0]?.text).toContain("Configured LSP servers");
+	});
 });

@@ -44,7 +44,11 @@ export async function callToolViaDaemon(
 	}
 
 	logClientFallback(lastError);
-	return runLocally(name, args, options.context);
+	try {
+		return await runLocally(name, args, options.context);
+	} catch (error) {
+		return { content: [{ type: "text", text: errorText(error) }], isError: true };
+	}
 }
 
 export function callDiagnosticsViaDaemon(
@@ -126,7 +130,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function errorText(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 function logClientFallback(error: unknown): void {
-	const message = error instanceof Error ? error.message : String(error);
-	process.stderr.write(`[lsp-daemon] falling back to in-process execution: ${message}\n`);
+	process.stderr.write(`[lsp-daemon] falling back to in-process execution: ${errorText(error)}\n`);
 }
