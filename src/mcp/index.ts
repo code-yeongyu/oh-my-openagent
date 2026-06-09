@@ -2,6 +2,7 @@ import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
 import { document_reader } from "./document-reader"
+import { semantic_scholar } from "./semantic-scholar"
 import type { MatrixxConfig } from "../config/schema"
 
 export { McpNameSchema, type McpName } from "./types"
@@ -39,6 +40,10 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: MatrixxC
 
   if (!disabledMcps.includes("document_reader")) {
     mcps.document_reader = document_reader
+  }
+
+  if (!disabledMcps.includes("semantic_scholar")) {
+    mcps.semantic_scholar = semantic_scholar
   }
 
   return mcps
