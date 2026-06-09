@@ -31,6 +31,13 @@ const BUNDLED_MCP_RUNTIMES = [
     destinationArg: "./components/lsp-tools-mcp/dist/cli.js",
     destinationDistFromPlugin: "components/lsp-tools-mcp/dist",
   },
+  {
+    label: "LSP daemon",
+    sourceArg: "../../lsp-daemon/dist/cli.js",
+    sourceDistFromPlugin: "../../lsp-daemon/dist",
+    destinationArg: "./components/lsp-daemon/dist/cli.js",
+    destinationDistFromPlugin: "components/lsp-daemon/dist",
+  },
 ] as const satisfies readonly BundledMcpRuntime[]
 
 export async function copyBundledMcpRuntimeDists(input: {

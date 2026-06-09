@@ -201,7 +201,7 @@ describe("install-codex", () => {
     expect((await stat(mcpManifest.mcpServers.ast_grep.args[0] ?? "")).isFile()).toBe(true)
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath ?? "", "components", "git-bash-mcp", "dist", "cli.js"))
     expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
-    expect(mcpManifest.mcpServers.lsp.args[0]).toBe(join(pluginPath ?? "", "components", "lsp-tools-mcp", "dist", "cli.js"))
+    expect(mcpManifest.mcpServers.lsp.args[0]).toBe(join(pluginPath ?? "", "components", "lsp-daemon", "dist", "cli.js"))
     expect(mcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect(mcpManifest.mcpServers.lsp.args[0]?.startsWith(pluginPath ?? "")).toBe(true)
     expect((await stat(mcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
@@ -388,9 +388,9 @@ describe("install-codex", () => {
     )
     expect((await stat(snapshotMcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).toBe(
-      join(snapshotPluginPath, "components", "lsp-tools-mcp", "dist", "cli.js"),
+      join(snapshotPluginPath, "components", "lsp-daemon", "dist", "cli.js"),
     )
-    expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("../../lsp-tools-mcp")
+    expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("../../lsp-daemon")
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect((await stat(snapshotMcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })

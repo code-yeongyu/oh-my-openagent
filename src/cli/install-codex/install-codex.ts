@@ -18,6 +18,7 @@ import {
 } from "./lazycodex-version-stamp"
 import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
+import { reapLspDaemons } from "./lsp-daemon-reaper"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -140,6 +141,8 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     })
   }
+
+  await reapLspDaemons(codexHome).catch(() => [])
 
   const marketplaceRoot = join(codexHome, "plugins", "cache", marketplace.name)
   await writeCachedMarketplaceManifest({
