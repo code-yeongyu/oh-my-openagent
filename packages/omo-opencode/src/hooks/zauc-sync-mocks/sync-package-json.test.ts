@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } fr
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginEntryInfo } from "../auto-update-checker/checker/plugin-entry"
-import { CACHE_DIR } from "../auto-update-checker/constants"
+import { CACHE_DIR, PACKAGE_NAME } from "../auto-update-checker/constants"
 
 const CACHE_PACKAGES_DIR = CACHE_DIR
 const CACHE_PACKAGE_JSON_PATH = join(CACHE_PACKAGES_DIR, "package.json")
@@ -20,7 +20,7 @@ function resetTestCache(currentVersion = "3.10.0"): void {
   mkdirSync(CACHE_PACKAGES_DIR, { recursive: true })
   writeFileSync(
     CACHE_PACKAGE_JSON_PATH,
-    JSON.stringify({ dependencies: { "oh-my-opencode": currentVersion, other: "1.0.0" } }, null, 2)
+    JSON.stringify({ dependencies: { [PACKAGE_NAME]: currentVersion, other: "1.0.0" } }, null, 2)
   )
 }
 
@@ -33,7 +33,7 @@ function cleanupTestCache(): void {
 function readCachePackageJsonVersion(): string | undefined {
   const content = readFileSync(CACHE_PACKAGE_JSON_PATH, "utf-8")
   const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
-  return pkg.dependencies?.["oh-my-opencode"]
+  return pkg.dependencies?.[PACKAGE_NAME]
 }
 
 describe("syncCachePackageJsonToIntent", () => {
@@ -170,7 +170,7 @@ describe("syncCachePackageJsonToIntent", () => {
 
         const content = readFileSync(join(CACHE_PACKAGES_DIR, "package.json"), "utf-8")
         const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
-        expect(pkg.dependencies?.["oh-my-opencode"]).toBe("latest")
+        expect(pkg.dependencies?.[PACKAGE_NAME]).toBe("latest")
         expect(pkg.dependencies?.other).toBe("1.0.0")
     })
   })

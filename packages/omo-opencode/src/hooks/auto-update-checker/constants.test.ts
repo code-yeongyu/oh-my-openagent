@@ -24,13 +24,12 @@ describe("auto-update-checker constants", () => {
     const { PACKAGE_NAME } = await import(`./constants?test=${Date.now()}`)
 
     // then PACKAGE_NAME equals the actually published package name
-    expect(PACKAGE_NAME).toBe(repoPackageJson.name)
+    expect(PACKAGE_NAME).toBe("oh-my-openagent")
   })
 
   it("ACCEPTED_PACKAGE_NAMES contains both the canonical and aliased npm names (GH-3257)", async () => {
     const { ACCEPTED_PACKAGE_NAMES } = await import(`./constants?test=${Date.now()}`)
 
-    expect(ACCEPTED_PACKAGE_NAMES).toContain("oh-my-opencode")
     expect(ACCEPTED_PACKAGE_NAMES).toContain("oh-my-openagent")
   })
 

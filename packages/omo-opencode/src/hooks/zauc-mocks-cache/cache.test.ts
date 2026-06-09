@@ -11,7 +11,7 @@ function testInvalidatePackage(packageName?: string): boolean {
   return invalidatePackage(packageName, {
     acceptedPackageNames: ["oh-my-opencode", "oh-my-openagent"],
     cacheDir: TEST_OPENCODE_CACHE_DIR,
-    defaultPackageName: "oh-my-opencode",
+    defaultPackageName: "oh-my-openagent",
     userConfigDir: TEST_USER_CONFIG_DIR,
   })
 }

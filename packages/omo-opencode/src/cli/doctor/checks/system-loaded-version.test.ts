@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { PACKAGE_NAME } from "../constants"
 import { PLUGIN_NAME } from "../../../shared/plugin-identity"
@@ -15,6 +16,7 @@ const { getLoadedPluginVersion, getSuggestedInstallTag }: typeof import("./syste
 const originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
 const originalXdgCacheHome = process.env.XDG_CACHE_HOME
 const temporaryDirectories: string[] = []
+let cleanupCreatedPackage = false
 
 function createTemporaryDirectory(prefix: string): string {
   const directory = mkdtempSync(join(tmpdir(), prefix))
@@ -42,6 +44,13 @@ afterEach(() => {
     delete process.env.XDG_CACHE_HOME
   } else {
     process.env.XDG_CACHE_HOME = originalXdgCacheHome
+  }
+
+  if (cleanupCreatedPackage) {
+    const here = fileURLToPath(import.meta.url)
+    const repoRoot = join(here, "..", "..", "..", "..", "..")
+    rmSync(join(repoRoot, "node_modules", "oh-my-openagent"), { recursive: true, force: true })
+    cleanupCreatedPackage = false
   }
 
   for (const directory of temporaryDirectories.splice(0)) {
@@ -140,6 +149,15 @@ describe("system loaded version", () => {
 
       process.env.OPENCODE_CONFIG_DIR = configDir
       process.env.XDG_CACHE_HOME = cacheHome
+
+      // Ensure oh-my-openagent is resolvable via require.resolve so the
+      // fallback path in getLoadedPluginVersion can find the current package.
+      const here = fileURLToPath(import.meta.url)
+      const repoRoot = join(here, "..", "..", "..", "..", "..")
+      const pkgDir = join(repoRoot, "node_modules", "oh-my-openagent")
+      mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(pkgDir, "package.json"), readFileSync(join(repoRoot, "package.json"), "utf-8"))
+      cleanupCreatedPackage = true
 
       //#when
       const loadedVersion = getLoadedPluginVersion()

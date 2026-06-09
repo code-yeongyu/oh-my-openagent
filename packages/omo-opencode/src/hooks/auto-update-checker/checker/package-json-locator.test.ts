@@ -15,13 +15,15 @@ describe("findPackageJsonUp", () => {
     rmSync(workdir, { recursive: true, force: true })
   })
 
-  it("finds a package.json whose name is the canonical oh-my-opencode", () => {
+  it("no longer accepts the legacy oh-my-opencode package name", () => {
+    // ACCEPTED_PACKAGE_NAMES no longer includes the legacy "oh-my-opencode"
+    // since PUBLISHED_PACKAGE_NAME was changed to "oh-my-openagent".
     const pkgPath = join(workdir, "package.json")
     writeFileSync(pkgPath, JSON.stringify({ name: "oh-my-opencode", version: "3.16.0" }))
 
     const found = findPackageJsonUp(workdir)
 
-    expect(found).toBe(pkgPath)
+    expect(found).toBeNull()
   })
 
   it("finds a package.json whose name is the aliased oh-my-openagent (GH-3257)", () => {
