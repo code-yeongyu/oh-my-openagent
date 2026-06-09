@@ -245,4 +245,52 @@ describe("session-manager storage fallback", () => {
 
     await expect(storage.readSessionMessages("ses_missing")).rejects.toThrow("session not found")
   })
+
+  test("#given SDK list fails transiently then recovers #when sessionExists runs #then retries SDK and avoids false-negative file fallback", async () => {
+    // given a pure-sqlite session present in the SDK but absent from file storage
+    let attempts = 0
+    mockClient.session.list.mockImplementation(() => {
+      attempts += 1
+      if (attempts === 1) return Promise.reject(createSdkUnavailableError("fetch failed"))
+      return Promise.resolve({ data: [{ id: "ses_sqlite_only" }] })
+    })
+
+    // when sessionExists hits a single transient SDK failure
+    const exists = await storage.sessionExists("ses_sqlite_only")
+
+    // then it retries the SDK and confirms existence instead of dropping to nonexistent file storage
+    expect(exists).toBe(true)
+    expect(attempts).toBe(2)
+  })
+
+  test("#given SDK messages fail transiently then recover #when readSessionMessages runs #then retries SDK instead of returning empty file storage", async () => {
+    // given messages that live only in the SDK (pure-sqlite), not on disk
+    let attempts = 0
+    mockClient.session.messages.mockImplementation(() => {
+      attempts += 1
+      if (attempts === 1) return Promise.reject(createSdkUnavailableError("socket hang up"))
+      return Promise.resolve({
+        data: [{ info: { id: "msg_sdk", role: "user", time: { created: 5_000 } }, parts: [] }],
+      })
+    })
+
+    // when readSessionMessages hits a single transient SDK failure
+    const messages = await storage.readSessionMessages("ses_sqlite_only")
+
+    // then it retries the SDK and returns the real messages
+    expect(messages).toHaveLength(1)
+    expect(messages[0].id).toBe("msg_sdk")
+    expect(attempts).toBe(2)
+  })
+
+  test("#given non-transient SDK error #when readSessionMessages runs #then does not retry and rethrows immediately", async () => {
+    let attempts = 0
+    mockClient.session.messages.mockImplementation(() => {
+      attempts += 1
+      return Promise.resolve({ error: new Error("session not found") })
+    })
+
+    await expect(storage.readSessionMessages("ses_missing")).rejects.toThrow("session not found")
+    expect(attempts).toBe(1)
+  })
 })
