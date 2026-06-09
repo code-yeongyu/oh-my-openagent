@@ -14,7 +14,6 @@ import {
 import { resetMessageCursor } from "../shared";
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
 import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
-import { applySessionPromptParams } from "../shared/session-prompt-params-helpers";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
@@ -63,20 +62,12 @@ export async function handleSessionCreatedEvent(args: {
   managers: Managers;
   firstMessageVariantGate: FirstMessageVariantGate;
 }): Promise<void> {
-  const sessionInfo = args.props?.info as { id?: string; title?: string; parentID?: string; agent?: string } | undefined;
+  const sessionInfo = args.props?.info as { id?: string; title?: string; parentID?: string } | undefined;
   const sessionID = resolveSessionEventID(args.props);
   const isSubagentSession = !!sessionInfo?.parentID || !!sessionID && subagentSessions.has(sessionID);
 
   if (!isSubagentSession) setMainSession(sessionID);
   args.firstMessageVariantGate.markSessionCreated(sessionInfo);
-
-  if (sessionID && sessionInfo?.agent) {
-    const agentConfig = args.pluginConfig?.agents?.[sessionInfo.agent]
-      ?? args.pluginConfig?.categories?.[sessionInfo.agent]
-    if (agentConfig) {
-      applySessionPromptParams(sessionID, agentConfig)
-    }
-  }
 
   if (args.tmuxIntegrationEnabled && !isSubagentSession) {
     await args.managers.tmuxSessionManager.onSessionCreated(

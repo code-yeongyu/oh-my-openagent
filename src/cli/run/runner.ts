@@ -102,14 +102,6 @@ export async function run(options: RunOptions): Promise<number> {
         console.log(pc.dim(`Model: ${resolvedModel.providerID}/${resolvedModel.modelID}`))
       }
 
-      const agentConfig = pluginConfig?.agents?.[resolvedAgent] ?? pluginConfig?.categories?.[resolvedAgent]
-      if (agentConfig?.reasoningEffort) {
-        console.log(pc.dim(`Reasoning: ${agentConfig.reasoningEffort}`))
-      }
-      if (agentConfig?.temperature !== undefined) {
-        console.log(pc.dim(`Temperature: ${agentConfig.temperature}`))
-      }
-
       const ctx: RunContext = {
         client,
         sessionID,
@@ -120,7 +112,6 @@ export async function run(options: RunOptions): Promise<number> {
       const events = await client.event.subscribe({ query: { directory } })
       const eventState = createEventState()
       eventState.agentColorsByName = await loadAgentProfileColors(client)
-      eventState.agentReasoningEffort = agentConfig?.reasoningEffort
       const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
         () => {},
       )

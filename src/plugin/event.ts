@@ -8,7 +8,6 @@ import { getMainSessionID, subagentSessions, syncSubagentSessions } from "../fea
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../shared/event-session-id";
 import { log } from "../shared/logger";
-import { applySessionPromptParams } from "../shared/session-prompt-params-helpers";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { createUserAbortInterruptedRecoveryGuard } from "./user-abort-interrupted-recovery-guard";
@@ -204,13 +203,6 @@ export function createEventHandler(args: {
           userAbortInterruptedRecoveryGuard.noteSessionError(sessionID, extractErrorName(error));
         },
       });
-      if (state.sessionID && state.role === "user" && state.agent) {
-        const userAgentConfig = pluginConfig?.agents?.[state.agent]
-          ?? pluginConfig?.categories?.[state.agent]
-        if (userAgentConfig) {
-          applySessionPromptParams(state.sessionID, userAgentConfig)
-        }
-      }
       if (state.sessionID && ((typeof state.info?.finish === "string" && state.info.finish.length > 0) || state.info?.finish === true)) {
         invalidateContextWindowUsageCache(pluginContext as PluginInput, state.sessionID);
       }
