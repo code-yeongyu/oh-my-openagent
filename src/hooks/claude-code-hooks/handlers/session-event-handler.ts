@@ -2,6 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { ContextCollector } from "../../../features/context-injector"
 import { clearClaudeHooksConfigCache, loadClaudeHooksConfig } from "../config"
 import { clearPluginExtendedConfigCache, loadPluginExtendedConfig } from "../config-loader"
+import { executeSessionEndHooks, type SessionEndContext } from "../session-end"
+import { executeSessionStartHooks, type SessionStartContext } from "../session-start"
 import { executeStopHooks, type StopContext } from "../stop"
 import { clearTranscriptCache } from "../transcript"
 import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
@@ -39,9 +41,58 @@ export function createSessionEventHandler(
 			return
 		}
 
+		if (event.type === "session.created") {
+			const props = event.properties as Record<string, unknown> | undefined
+			const sessionInfo = props?.info as { id?: string; parentID?: string } | undefined
+			const sessionID = resolveSessionEventID(props)
+			// Skip subagent sessions — SessionStart hooks should fire only for top-level sessions
+			// to match Claude Code semantics.
+			if (sessionID && !sessionInfo?.parentID && !isHookDisabled(config, "SessionStart")) {
+				const claudeConfig = await loadClaudeHooksConfig()
+				const extendedConfig = await loadPluginExtendedConfig()
+
+				const startCtx: SessionStartContext = {
+					sessionId: sessionID,
+					cwd: ctx.directory,
+					source: "startup",
+				}
+
+				try {
+					const result = await executeSessionStartHooks(startCtx, claudeConfig, extendedConfig)
+					if (result.additionalContext.length > 0) {
+						log("SessionStart hooks produced context", {
+							sessionID,
+							contextCount: result.additionalContext.length,
+							elapsedMs: result.elapsedMs,
+						})
+					}
+				} catch (err) {
+					log("SessionStart hook execution failed", { sessionID, error: err })
+				}
+			}
+			return
+		}
+
 		if (event.type === "session.deleted") {
 			const props = event.properties as Record<string, unknown> | undefined
+			const sessionInfo = props?.info as { id?: string; parentID?: string } | undefined
 			const sessionID = resolveSessionEventID(props)
+			if (sessionID && !sessionInfo?.parentID && !isHookDisabled(config, "SessionEnd")) {
+				const claudeConfig = await loadClaudeHooksConfig()
+				const extendedConfig = await loadPluginExtendedConfig()
+
+				const endCtx: SessionEndContext = {
+					sessionId: sessionID,
+					cwd: ctx.directory,
+					reason: "other",
+				}
+
+				try {
+					await executeSessionEndHooks(endCtx, claudeConfig, extendedConfig)
+				} catch (err) {
+					log("SessionEnd hook execution failed", { sessionID, error: err })
+				}
+			}
 			if (sessionID) {
 				parentSessionIdCache.delete(sessionID)
 				clearTranscriptCache(sessionID)

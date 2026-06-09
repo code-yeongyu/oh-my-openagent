@@ -117,6 +117,22 @@ export interface PreCompactInput {
   hook_source?: HookSource
 }
 
+export interface SessionStartInput {
+  session_id: string
+  cwd: string
+  hook_event_name: "SessionStart"
+  source?: "startup" | "resume" | "clear" | "compact"
+  hook_source?: HookSource
+}
+
+export interface SessionEndInput {
+  session_id: string
+  cwd: string
+  hook_event_name: "SessionEnd"
+  reason?: "clear" | "logout" | "prompt_input_exit" | "other"
+  hook_source?: HookSource
+}
+
 export type PermissionDecision = "allow" | "deny" | "ask"
 
 /**
@@ -208,6 +224,19 @@ export interface PreCompactOutput extends HookCommonOutput {
     hookEventName: "PreCompact"
     /** Additional context strings to inject */
     additionalContext?: string[]
+  }
+}
+
+export interface SessionStartOutput extends HookCommonOutput {
+  hookSpecificOutput?: {
+    hookEventName: "SessionStart"
+    additionalContext?: string
+  }
+}
+
+export interface SessionEndOutput extends HookCommonOutput {
+  hookSpecificOutput?: {
+    hookEventName: "SessionEnd"
   }
 }
 
