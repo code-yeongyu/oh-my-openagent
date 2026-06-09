@@ -44,9 +44,8 @@ export function mergeAgentConfig(
   const { prompt_append, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
-  // Map reasoningEffort → variant for OpenCode's agent.variant lookup
-  if (!merged.variant && (merged as Record<string, unknown>).reasoningEffort) {
-    merged.variant = (merged as Record<string, unknown>).reasoningEffort as string
+  if (!rest.variant && (rest as Record<string, unknown>).reasoningEffort) {
+    merged.variant = (rest as Record<string, unknown>).reasoningEffort as string
   }
 
   if (merged.prompt && typeof merged.prompt === 'string' && merged.prompt.startsWith('file://')) {
