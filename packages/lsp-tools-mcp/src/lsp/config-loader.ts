@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 
+import { contextCwd, contextEnv } from "../request-context.js";
 import { BUILTIN_SERVERS } from "./server-definitions.js";
 import type { ResolvedServer } from "./types.js";
 
@@ -32,20 +33,19 @@ export function getConfigPaths(): { project: string; user: string } {
 }
 
 function resolveProjectConfigPath(path: string): string {
-	const cwd = process.cwd();
-	return isAbsolute(path) ? path : join(cwd, path);
+	return isAbsolute(path) ? path : join(contextCwd(), path);
 }
 
 function getProjectConfigPaths(): string[] {
-	const projectOverride = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
+	const projectOverride = contextEnv("LSP_TOOLS_MCP_PROJECT_CONFIG");
 	if (projectOverride) {
 		return projectOverride.split(delimiter).filter(Boolean).map(resolveProjectConfigPath);
 	}
-	return [join(process.cwd(), ".codex", "lsp-client.json")];
+	return [join(contextCwd(), ".codex", "lsp-client.json")];
 }
 
 function getUserConfigPath(): string {
-	const userOverride = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
+	const userOverride = contextEnv("LSP_TOOLS_MCP_USER_CONFIG");
 	if (!userOverride) return join(homedir(), ".codex", "lsp-client.json");
 	return isAbsolute(userOverride) ? userOverride : join(homedir(), userOverride);
 }
