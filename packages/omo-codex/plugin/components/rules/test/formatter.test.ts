@@ -145,6 +145,26 @@ describe("rules formatter hook context", () => {
 		expect(block).not.toContain("must read project rules:");
 	});
 
+	it("#given an oversized Hephaestus static rule #when formatting under a tight result budget #then its body is never truncated", () => {
+		// given
+		const tailMarker = "HEPHAESTUS_TAIL_SENTINEL";
+		const rule = loadedRule({
+			path: "/repo/bundled-rules/hephaestus.md",
+			relativePath: "bundled-rules/hephaestus.md",
+			body: `${"H".repeat(500)}\n\n${tailMarker}`,
+		});
+
+		// when
+		const block = formatStaticBlock([rule], {
+			maxRuleChars: 120,
+			maxResultChars: 200,
+		});
+
+		// then
+		expect(block).toContain(tailMarker);
+		expect(block).not.toContain("[Truncated. Full:");
+	});
+
 	it("#given multiple oversized rules #when formatting under a tight result budget #then every rule receives a fair truncated share with a read-full guide", () => {
 		// given
 		const rules = [

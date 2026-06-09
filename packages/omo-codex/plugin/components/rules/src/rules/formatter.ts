@@ -1,4 +1,4 @@
-import { truncateBudget, truncateRule } from "./truncator.js";
+import { isNeverTruncatedRule, truncateBudget, truncateRule } from "./truncator.js";
 import type { LoadedRule } from "./types.js";
 
 export interface FormatOptions {
@@ -35,13 +35,12 @@ function truncateRules(rules: ReadonlyArray<LoadedRule>, options: FormatOptions)
 	const perRuleBudgeted = perRuleNormalized.map((rule) => ({
 		path: rule.path,
 		relativePath: rule.relativePath,
-		body:
-			rule.source === "plugin-bundled"
-				? truncateRule(rule.body, { maxChars: perRuleResultChars, relativePath: rule.relativePath }).body
-				: truncateRule(rule.body, {
-						maxChars: Math.min(options.maxRuleChars, perRuleResultChars),
-						relativePath: rule.relativePath,
-					}).body,
+		body: isNeverTruncatedRule(rule.relativePath)
+			? rule.body
+			: truncateRule(rule.body, {
+					maxChars: Math.min(options.maxRuleChars, perRuleResultChars),
+					relativePath: rule.relativePath,
+				}).body,
 	}));
 	const budgetedRules = truncateBudget({
 		rules: perRuleBudgeted.map((rule) => ({ body: rule.body, relativePath: rule.relativePath })),
