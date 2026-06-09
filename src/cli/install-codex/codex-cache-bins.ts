@@ -1,4 +1,5 @@
 import { chmod, lstat, mkdir, readFile, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
 import { isNodeErrorWithCode, isRecord } from "./codex-cache-fs"
@@ -8,6 +9,12 @@ type LinkPlatform = NodeJS.Platform
 
 const RESERVED_NESTED_BIN_NAMES = new Set(["omo", "lazycodex", "lazycodex-ai", "oh-my-opencode", "oh-my-openagent"])
 const RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
+const CANONICAL_RUNTIME_PACKAGE = "oh-my-opencode"
+const RUNTIME_PACKAGE_NAMES = new Set(["oh-my-opencode", "oh-my-openagent", "lazycodex-ai"])
+
+type RuntimeTarget =
+  | { readonly kind: "path"; readonly value: string; readonly target: string }
+  | { readonly kind: "package"; readonly value: string; readonly target: string }
 
 export async function linkCachedPluginBins(input: {
   readonly binDir: string
@@ -33,20 +40,55 @@ export async function linkRootRuntimeBin(input: {
   readonly platform?: LinkPlatform
 }): Promise<{ readonly name: string; readonly path: string; readonly target: string } | null> {
   const cliPath = join(input.repoRoot, "dist", "cli", "index.js")
-  if (!(await isFile(cliPath))) return null
+  const runtimeTarget = await resolveRootRuntimeTarget(input.repoRoot, cliPath)
+  if (runtimeTarget === null) return null
 
   const platform = input.platform ?? process.platform
   await mkdir(input.binDir, { recursive: true })
   if (platform === "win32") {
     const linkPath = join(input.binDir, "omo.cmd")
-    await replaceRuntimeWrapper(linkPath, windowsRuntimeWrapper(cliPath, input.codexHome, input.binDir))
-    return { name: "omo", path: linkPath, target: cliPath }
+    await replaceRuntimeWrapper(linkPath, windowsRuntimeWrapper(runtimeTarget, input.codexHome, input.binDir))
+    return { name: "omo", path: linkPath, target: runtimeTarget.target }
   }
 
   const linkPath = join(input.binDir, "omo")
-  await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(cliPath, input.codexHome, input.binDir))
+  await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(runtimeTarget, input.codexHome, input.binDir))
   await chmod(linkPath, 0o755)
-  return { name: "omo", path: linkPath, target: cliPath }
+  return { name: "omo", path: linkPath, target: runtimeTarget.target }
+}
+
+async function resolveRootRuntimeTarget(repoRoot: string, cliPath: string): Promise<RuntimeTarget | null> {
+  const hasCli = await isFile(cliPath)
+  if (hasCli && !isTransientPath(repoRoot)) return { kind: "path", value: cliPath, target: cliPath }
+
+  const packageSpec = await resolveRuntimePackageSpec(repoRoot)
+  if (packageSpec !== null) return { kind: "package", value: packageSpec, target: packageSpec }
+  if (hasCli) return { kind: "path", value: cliPath, target: cliPath }
+  return null
+}
+
+async function resolveRuntimePackageSpec(repoRoot: string): Promise<string | null> {
+  const packageJsonPath = join(repoRoot, "package.json")
+  let packageJson: unknown
+  try {
+    packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"))
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return null
+    throw error
+  }
+  if (!isRecord(packageJson)) return null
+  if (typeof packageJson.name !== "string" || !RUNTIME_PACKAGE_NAMES.has(packageJson.name)) return null
+  if (typeof packageJson.version !== "string" || packageJson.version.trim().length === 0) return null
+  return `${CANONICAL_RUNTIME_PACKAGE}@${packageJson.version}`
+}
+
+function isTransientPath(path: string): boolean {
+  return isPathInside(resolve(path), resolve(tmpdir()))
+}
+
+function isPathInside(candidatePath: string, rootPath: string): boolean {
+  const pathFromRoot = relative(rootPath, candidatePath)
+  return pathFromRoot === "" || (pathFromRoot !== ".." && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot))
 }
 
 async function linkCachedPluginBin(
@@ -172,7 +214,7 @@ async function existingNonRuntimeWrapper(path: string): Promise<boolean> {
   }
 }
 
-function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: string): string {
+function posixRuntimeWrapper(runtimeTarget: RuntimeTarget, codexHome: string, binDir: string): string {
   const ulwLoopBin = join(binDir, "omo-ulw-loop")
   return [
     "#!/bin/sh",
@@ -184,12 +226,14 @@ function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: string)
     "  shift",
     '  exec "' + escapePosixDoubleQuoted(ulwLoopBin) + '" "$@"',
     "fi",
-    `exec "$BUN_BINARY" "${escapePosixDoubleQuoted(cliPath)}" "$@"`,
+    runtimeTarget.kind === "package"
+      ? `exec "$BUN_BINARY" x --bun "${escapePosixDoubleQuoted(runtimeTarget.value)}" "$@"`
+      : `exec "$BUN_BINARY" "${escapePosixDoubleQuoted(runtimeTarget.value)}" "$@"`,
     "",
   ].join("\n")
 }
 
-function windowsRuntimeWrapper(cliPath: string, codexHome: string, binDir: string): string {
+function windowsRuntimeWrapper(runtimeTarget: RuntimeTarget, codexHome: string, binDir: string): string {
   const ulwLoopBin = join(binDir, "omo-ulw-loop.cmd")
   return [
     "@echo off",
@@ -201,7 +245,9 @@ function windowsRuntimeWrapper(cliPath: string, codexHome: string, binDir: strin
     `  "${ulwLoopBin}" %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
-    `if defined BUN_BINARY ("%BUN_BINARY%" "${cliPath}" %*) else bun "${cliPath}" %*`,
+    runtimeTarget.kind === "package"
+      ? `if defined BUN_BINARY ("%BUN_BINARY%" x --bun "${runtimeTarget.value}" %*) else bun x --bun "${runtimeTarget.value}" %*`
+      : `if defined BUN_BINARY ("%BUN_BINARY%" "${runtimeTarget.value}" %*) else bun "${runtimeTarget.value}" %*`,
     "",
   ].join("\r\n")
 }

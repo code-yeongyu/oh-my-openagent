@@ -29,11 +29,33 @@ export async function capturePreservedAgentReasoning(input: {
   return preserved
 }
 
+export type PreservedAgentServiceTier =
+  | { readonly present: false }
+  | { readonly present: true; readonly value: string }
+
+export async function capturePreservedAgentServiceTier(input: {
+  readonly codexHome: string
+}): Promise<ReadonlyMap<string, PreservedAgentServiceTier>> {
+  const agentsDir = join(input.codexHome, "agents")
+  if (!(await exists(agentsDir))) return new Map()
+
+  const preserved = new Map<string, PreservedAgentServiceTier>()
+  const agentEntries = await readdir(agentsDir, { withFileTypes: true })
+  for (const entry of agentEntries) {
+    if (!entry.name.endsWith(".toml")) continue
+    const content = await readTextIfExists(join(agentsDir, entry.name))
+    if (content === null) continue
+    preserved.set(agentNameFromToml(entry.name), extractTopLevelStringSettingState(content, "service_tier"))
+  }
+  return preserved
+}
+
 export async function linkCachedPluginAgents(input: {
   readonly codexHome: string
   readonly pluginRoot: string
   readonly platform?: LinkPlatform
   readonly preservedReasoning?: ReadonlyMap<string, string>
+  readonly preservedServiceTier?: ReadonlyMap<string, PreservedAgentServiceTier>
 }): Promise<readonly LinkedAgent[]> {
   const bundledAgents = await discoverBundledAgents(input.pluginRoot)
   if (bundledAgents.length === 0) {
@@ -53,6 +75,10 @@ export async function linkCachedPluginAgents(input: {
       linkPath,
       target: agentPath,
       value: input.preservedReasoning?.get(agentName),
+    })
+    await restorePreservedServiceTier({
+      linkPath,
+      value: input.preservedServiceTier?.get(agentName),
     })
     linked.push({ name: agentFileName, path: linkPath, target: agentPath })
   }
@@ -130,6 +156,17 @@ function shouldUseBundledReasoning(input: {
   )
 }
 
+async function restorePreservedServiceTier(input: {
+  readonly linkPath: string
+  readonly value: PreservedAgentServiceTier | undefined
+}): Promise<void> {
+  if (input.value === undefined) return
+  const content = await readFile(input.linkPath, "utf8")
+  const replacement = replaceTopLevelStringSetting(content, "service_tier", input.value)
+  if (!replacement.changed) return
+  await writeFile(input.linkPath, replacement.content)
+}
+
 async function readTextIfExists(path: string): Promise<string | null> {
   try {
     return await readFile(path, "utf8")
@@ -161,6 +198,61 @@ function replaceReasoningEffort(content: string, value: string): { readonly cont
     return { content: lines.join("\n"), replaced: true }
   }
   return { content, replaced: false }
+}
+
+function extractTopLevelStringSettingState(content: string, key: string): PreservedAgentServiceTier {
+  for (const line of content.split(/\n/)) {
+    if (isSectionHeader(line)) break
+    const match = line.match(new RegExp(`^\\s*${key}\\s*=\\s*("(?:[^"\\\\]|\\\\.)*")`))
+    const rawValue = match?.[1]
+    if (rawValue === undefined) continue
+    const parsed = parseJsonString(rawValue)
+    if (parsed !== null) return { present: true, value: parsed }
+  }
+  return { present: false }
+}
+
+function replaceTopLevelStringSetting(
+  content: string,
+  key: string,
+  state: PreservedAgentServiceTier,
+): { readonly content: string; readonly changed: boolean } {
+  if (!state.present) return removeTopLevelSetting(content, key)
+  return upsertTopLevelStringSetting(content, key, state.value)
+}
+
+function removeTopLevelSetting(content: string, key: string): { readonly content: string; readonly changed: boolean } {
+  let changed = false
+  const kept: string[] = []
+  for (const line of content.split(/\n/)) {
+    if (!changed && !isSectionHeader(line) && new RegExp(`^\\s*${key}\\s*=`).test(line)) {
+      changed = true
+      continue
+    }
+    kept.push(line)
+  }
+  return { content: kept.join("\n"), changed }
+}
+
+function upsertTopLevelStringSetting(content: string, key: string, value: string): { readonly content: string; readonly changed: boolean } {
+  const lines = content.split(/\n/)
+  const replacement = `${key} = ${JSON.stringify(value)}`
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    if (line === undefined || isSectionHeader(line)) break
+    if (!new RegExp(`^\\s*${key}\\s*=`).test(line)) continue
+    if (line === replacement) return { content, changed: false }
+    lines[index] = replacement
+    return { content: lines.join("\n"), changed: true }
+  }
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    if (line === undefined || !isSectionHeader(line)) continue
+    lines.splice(index, 0, replacement)
+    return { content: lines.join("\n"), changed: true }
+  }
+  lines.splice(Math.max(0, lines.length - 1), 0, replacement)
+  return { content: lines.join("\n"), changed: true }
 }
 
 function isSectionHeader(line: string): boolean {

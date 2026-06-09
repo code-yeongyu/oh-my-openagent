@@ -22,7 +22,22 @@ export async function capturePreservedAgentReasoning({ codexHome }) {
 	return preserved;
 }
 
-export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning = new Map() }) {
+export async function capturePreservedAgentServiceTier({ codexHome }) {
+	const agentsDir = join(codexHome, "agents");
+	if (!(await exists(agentsDir))) return new Map();
+
+	const preserved = new Map();
+	const agentEntries = await readdir(agentsDir, { withFileTypes: true });
+	for (const entry of agentEntries) {
+		if (!entry.name.endsWith(".toml")) continue;
+		const content = await readTextIfExists(join(agentsDir, entry.name));
+		if (content === null) continue;
+		preserved.set(agentNameFromToml(entry.name), extractTopLevelStringSettingState(content, "service_tier"));
+	}
+	return preserved;
+}
+
+export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning = new Map(), preservedServiceTier = new Map() }) {
 	const bundledAgents = await discoverBundledAgents(pluginRoot);
 	if (bundledAgents.length === 0) {
 		await writeManifest(pluginRoot, []);
@@ -38,6 +53,7 @@ export async function linkCachedPluginAgents({ codexHome, pluginRoot, preservedR
 		const linkPath = join(agentsDir, agentFileName);
 		await replaceWithCopy(linkPath, agentPath);
 		await restorePreservedReasoning({ linkPath, target: agentPath, value: preservedReasoning.get(agentName) });
+		await restorePreservedServiceTier({ linkPath, value: preservedServiceTier.get(agentName) });
 		linked.push({ name: agentFileName, path: linkPath, target: agentPath });
 	}
 	await writeManifest(pluginRoot, linked.map((entry) => entry.path));
@@ -96,6 +112,14 @@ async function restorePreservedReasoning({ linkPath, target, value }) {
 	await writeFile(linkPath, replacement.content);
 }
 
+async function restorePreservedServiceTier({ linkPath, value }) {
+	if (value === undefined) return;
+	const content = await readFile(linkPath, "utf8");
+	const replacement = replaceTopLevelStringSetting(content, "service_tier", value);
+	if (!replacement.changed) return;
+	await writeFile(linkPath, replacement.content);
+}
+
 async function readTextIfExists(path) {
 	try {
 		return await readFile(path, "utf8");
@@ -127,6 +151,56 @@ function replaceReasoningEffort(content, value) {
 		break;
 	}
 	return { content: lines.join("\n"), replaced };
+}
+
+
+function extractTopLevelStringSettingState(content, key) {
+	for (const line of content.split(/\n/)) {
+		if (isSectionHeader(line)) break;
+		const match = line.match(new RegExp(`^\\s*${key}\\s*=\\s*("(?:[^"\\\\]|\\\\.)*")`));
+		if (match === null) continue;
+		return { present: true, value: JSON.parse(match[1]) };
+	}
+	return { present: false };
+}
+
+function replaceTopLevelStringSetting(content, key, state) {
+	if (!state.present) return removeTopLevelSetting(content, key);
+	return upsertTopLevelStringSetting(content, key, state.value);
+}
+
+function removeTopLevelSetting(content, key) {
+	let changed = false;
+	const lines = content.split(/\n/);
+	const kept = [];
+	for (const line of lines) {
+		if (!changed && !isSectionHeader(line) && new RegExp(`^\\s*${key}\\s*=`).test(line)) {
+			changed = true;
+			continue;
+		}
+		kept.push(line);
+	}
+	return { content: kept.join("\n"), changed };
+}
+
+function upsertTopLevelStringSetting(content, key, value) {
+	const lines = content.split(/\n/);
+	const replacement = `${key} = ${JSON.stringify(value)}`;
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index];
+		if (isSectionHeader(line)) break;
+		if (!new RegExp(`^\\s*${key}\\s*=`).test(line)) continue;
+		if (line === replacement) return { content, changed: false };
+		lines[index] = replacement;
+		return { content: lines.join("\n"), changed: true };
+	}
+	for (let index = 0; index < lines.length; index += 1) {
+		if (!isSectionHeader(lines[index])) continue;
+		lines.splice(index, 0, replacement);
+		return { content: lines.join("\n"), changed: true };
+	}
+	lines.splice(Math.max(0, lines.length - 1), 0, replacement);
+	return { content: lines.join("\n"), changed: true };
 }
 
 function isSectionHeader(line) {

@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./link-cached-plugin-agents"
+import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
 
 async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-agents-"))
@@ -141,6 +141,31 @@ describe("linkCachedPluginAgents", () => {
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).not.toContain('model_reasoning_effort = "xhigh"')
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
+  })
+
+  test("preserves removed installed agent service tier when reinstalling file copies", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
+      'name = "explorer"\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\nservice_tier = "fast"\n',
+    )
+    await writeFile(
+      join(agentsDir, "explorer.toml"),
+      'name = "explorer"\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\n',
+    )
+    const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+    const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux", preservedReasoning, preservedServiceTier })
+
+    // then
+    const content = await readFile(join(agentsDir, "explorer.toml"), "utf8")
+    expect(content).toContain('model_reasoning_effort = "low"')
+    expect(content).not.toContain("service_tier")
   })
 
   test("migrates old reviewer default reasoning to the bundled reviewer default", async () => {

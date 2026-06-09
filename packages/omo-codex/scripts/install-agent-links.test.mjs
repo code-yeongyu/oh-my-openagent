@@ -296,3 +296,49 @@ test(
 		assert.equal(snapshotPlan.includes('model_reasoning_effort = "high"'), false);
 	},
 );
+
+
+test(
+	"#given user removed installed agent service tier #when reinstalling after snapshot refresh #then removal survives",
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "explorer.toml"),
+			'name = "explorer"\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\nservice_tier = "fast"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+		await writeFile(
+			join(codexHome, "agents", "explorer.toml"),
+			'name = "explorer"\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\n',
+		);
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		const installedExplorer = await readFile(join(codexHome, "agents", "explorer.toml"), "utf8");
+		assert.equal(installedExplorer.includes('service_tier = "fast"'), false);
+		assert.ok(installedExplorer.includes('model_reasoning_effort = "low"'));
+	},
+);

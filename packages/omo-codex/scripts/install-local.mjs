@@ -13,7 +13,7 @@ import {
 	pruneMarketplacePluginCaches,
 } from "./install/cache.mjs";
 import { agentSourceRootsForInstall } from "./install/agent-source-roots.mjs";
-import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./install/agents.mjs";
+import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./install/agents.mjs";
 import { writeCachedMarketplaceManifest } from "./install/cached-marketplace-manifest.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
 import {
@@ -121,10 +121,11 @@ export async function installMarketplaceLocally(options = {}) {
 	}
 
 	const preservedReasoning = await capturePreservedAgentReasoning({ codexHome });
+	const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome });
 	const agentSourceRoots = await agentSourceRootsForInstall({ codexHome, marketplace, installed, pluginSources });
 	for (const plugin of installed) {
 		const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path;
-		const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform, preservedReasoning });
+		const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform, preservedReasoning, preservedServiceTier });
 		for (const link of agentLinks) {
 			log(`Linked agent ${link.name} -> ${link.target}`);
 			const agentName = agentNameFromToml(link.name);

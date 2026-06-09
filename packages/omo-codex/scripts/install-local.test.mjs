@@ -66,6 +66,38 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 	assert.match(wrapper, /omo-ulw-loop/);
 });
 
+test("#given installer runs from a transient bunx root #when installing locally #then generated omo wrapper does not pin the temp path", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const homeDir = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const pluginRoot = join(codexPackageRoot, "plugin");
+
+	await writeJson(join(repoRoot, "package.json"), { name: "oh-my-openagent", version: "4.8.1" });
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
+		name: "sisyphuslabs",
+		plugins: [{ name: "omo", source: "./plugins/omo" }],
+	});
+	await writePluginAt(pluginRoot, "omo", "0.1.0");
+	await mkdir(join(repoRoot, "dist", "cli"), { recursive: true });
+	await writeFile(join(repoRoot, "dist", "cli", "index.js"), "#!/usr/bin/env bun\n");
+
+	await installMarketplaceLocally({
+		repoRoot,
+		codexHome,
+		env: { PATH: "/usr/bin:/bin" },
+		homeDir,
+		platform: "linux",
+		runCommand: async () => {},
+		log: () => {},
+	});
+
+	const wrapper = await readFile(join(codexHome, "bin", "omo"), "utf8");
+	assert.match(wrapper, /OMO_GENERATED_RUNTIME_WRAPPER/);
+	assert.doesNotMatch(wrapper, new RegExp(escapeRegExp(repoRoot)));
+	assert.match(wrapper, /x --bun "oh-my-opencode@4\.8\.1"/);
+});
+
 test("#given explicit CODEX_LOCAL_BIN_DIR #when resolving local installer bin dir #then preserves installed omo precedence", () => {
 	const homeDir = join(tmpdir(), "omo-codex-home-explicit");
 	const codexHome = join(tmpdir(), "omo-codex-install-explicit");
