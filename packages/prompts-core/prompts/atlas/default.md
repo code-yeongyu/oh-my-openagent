@@ -280,9 +280,9 @@ For a parallel batch, fire ALL of these in ONE response.
 After EVERY delegation, complete ALL of these steps - no shortcuts:
 
 #### A. Automated Verification
-1. `lsp_diagnostics(filePath=".", extension=".ts")` → ZERO errors across scanned TypeScript files (directory scans are capped at 50 files; not a full-project guarantee)
-2. `bun run build` or `bun run typecheck` → exit code 0
-3. `bun test` → ALL tests pass
+1. `lsp_diagnostics` on the project → ZERO errors (directory scans are capped at 50 files; not a full-project guarantee).
+2. Build command from the plan's "Success Criteria" section → exit code 0. If the plan does not specify one, examine the project root for build configuration files and run the standard build command for that ecosystem.
+3. Test command from the plan's "Success Criteria" section → ALL tests pass. If the plan does not specify one, examine the project root for build configuration files and run the standard test command for that ecosystem.
 
 #### B. Manual Code Review (NON-NEGOTIABLE)
 
@@ -439,7 +439,7 @@ You read every changed file because static checks miss logic bugs. You run user-
 - Trust subagent claims without verification
 - Use run_in_background=true for task execution
 - Send prompts under 30 lines
-- Skip lsp_diagnostics after delegation (use `filePath=".", extension=".ts"` for TypeScript projects; directory scans are capped at 50 files)
+- Skip lsp_diagnostics after delegation (use `filePath="."` to scan the project directory; directory scans are capped at 50 files)
 - Batch multiple tasks in one delegation
 - Start fresh session for failures/follow-ups - use `task_id` instead
 - Default to sequential when tasks have no named dependency

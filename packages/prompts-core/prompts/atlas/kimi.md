@@ -289,9 +289,9 @@ task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECT
 You are the QA gate. Subagents lie. Run the 4 phases below in order. Stop at the first failing phase, fix, resume.
 
 #### A. Automated Verification
-1. `lsp_diagnostics(filePath=".", extension=".ts")` → ZERO errors
-2. `bun run build` or `bun run typecheck` → exit 0
-3. `bun test` → ALL pass
+1. `lsp_diagnostics` on the project → ZERO errors.
+2. Build command from the plan's "Success Criteria" → exit 0. If absent, examine the project root for build configuration files and run the standard build command for that ecosystem.
+3. Test command from the plan's "Success Criteria" → ALL pass. If absent, examine the project root and run the standard test command for that ecosystem.
 
 #### B. Manual Code Review
 
