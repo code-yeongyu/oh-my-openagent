@@ -48,7 +48,7 @@ const codexCompatibilityEndMarkers = [
 ];
 
 function findCodexCompatibilitySectionEnd(content, searchStart) {
-	const structuralEndPattern = /\n(?:---|#{1,6}\s)/g;
+	const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g;
 	structuralEndPattern.lastIndex = searchStart;
 	const structuralEnd = structuralEndPattern.exec(content);
 	if (structuralEnd) return structuralEnd.index + 1;
@@ -73,11 +73,21 @@ function removeCodexCompatibilityGuidance(content) {
 	}
 }
 
+function hasKnownGeneratedCodexCompatibilityGuidance(content, compatibilityIndex) {
+	return codexCompatibilityEndMarkers.some((marker) => content.indexOf(marker, compatibilityIndex) !== -1);
+}
+
 export function insertCodexCompatibilityGuidance(content) {
 	if (!opencodeOnlyOrchestrationPattern.test(content)) return content;
 	const firstExampleIndex = content.search(opencodeOnlyOrchestrationPattern);
 	const compatibilityIndex = content.indexOf("## Codex Harness Tool Compatibility");
-	if (compatibilityIndex !== -1 && compatibilityIndex < firstExampleIndex) return content;
+	if (
+		compatibilityIndex !== -1 &&
+		compatibilityIndex < firstExampleIndex &&
+		!hasKnownGeneratedCodexCompatibilityGuidance(content, compatibilityIndex)
+	) {
+		return content;
+	}
 
 	const contentWithoutGuidance = removeCodexCompatibilityGuidance(content);
 
