@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
-
+import { contextCwd } from "../request-context.js";
 import type { LspClient } from "./client.js";
 import {
 	isLspDeadConnectionError,
@@ -24,7 +24,7 @@ export function isDirectoryPath(filePath: string): boolean {
 }
 
 export function findWorkspaceRoot(filePath: string): string {
-	const abs = resolve(filePath);
+	const abs = resolve(contextCwd(), filePath);
 	let dir = abs;
 
 	if (!isDirectoryPath(dir)) {
@@ -101,7 +101,7 @@ export async function withLspClient<T>(
 	toolName: string,
 	options: WithLspClientOptions = {},
 ): Promise<T> {
-	const absPath = resolve(filePath);
+	const absPath = resolve(contextCwd(), filePath);
 
 	if (isDirectoryPath(absPath)) {
 		throw new LspInvalidPathError(
