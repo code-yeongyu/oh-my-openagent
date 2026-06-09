@@ -20,6 +20,17 @@ export const TmuxConfigSchema = z.object({
   main_pane_size: z.number().min(20).max(80).default(60),
   main_pane_min_width: z.number().min(40).default(120),
   agent_pane_min_width: z.number().min(20).default(40),
+  /**
+   * Override the server URL used for health checks and pane spawning.
+   * Use this when opencode auto-detects the wrong IP (e.g., Tailscale).
+   * Example: "http://localhost:4096"
+   */
+  server_url_override: z
+    .preprocess(
+      (val) => (val === "" || val === null ? undefined : val),
+      z.string().url().optional()
+    )
+    .optional(),
   isolation: TmuxIsolationSchema.default("inline"),
 })
 

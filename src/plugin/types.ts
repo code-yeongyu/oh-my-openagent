@@ -23,4 +23,5 @@ export type TmuxConfig = {
   main_pane_min_width: number
   agent_pane_min_width: number
   isolation: "inline" | "window" | "session"
+  server_url_override?: string
 }

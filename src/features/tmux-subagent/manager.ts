@@ -155,8 +155,9 @@ export class TmuxSessionManager {
       ? String(parsedPort)
       : "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
-    const rawServerUrl = ctx.serverUrl?.toString()
+    const rawServerUrl =  tmuxConfig.server_url_override || ctx.serverUrl?.toString()
     this.ctxServerUrl = rawServerUrl
+
     try {
       if (rawServerUrl) {
         const parsed = new URL(rawServerUrl)
