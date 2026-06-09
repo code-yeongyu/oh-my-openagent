@@ -5,6 +5,7 @@ export function renderAgentHeader(
   model: string | null,
   variant: string | null,
   agentColorsByName: Record<string, string>,
+  reasoningEffort?: string,
 ): void {
   if (!agent && !model) return
 
@@ -16,11 +17,12 @@ export function renderAgentHeader(
   const modelBase = normalizedModel ?? ""
   const variantSuffix = variant ? ` (${variant})` : ""
   const modelLabel = model ? pc.dim(`${modelBase}${variantSuffix}`) : ""
+  const reasoningLabel = reasoningEffort ? pc.dim(` [reasoning: ${reasoningEffort}]`) : ""
 
   process.stdout.write("\n")
 
   if (modelLabel) {
-    process.stdout.write(`  ${modelLabel}  \n`)
+    process.stdout.write(`  ${modelLabel}${reasoningLabel}  \n`)
   }
 
   if (agentLabel) {

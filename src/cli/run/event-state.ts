@@ -21,6 +21,7 @@ export interface EventState {
   currentMessageRole: string | null
   /** Agent profile colors keyed by display name */
   agentColorsByName: Record<string, string>
+  agentReasoningEffort?: string
   /** Part type registry keyed by partID (text, reasoning, tool, ...) */
   partTypesById: Record<string, string>
   /** Whether a THINK block is currently open in output */

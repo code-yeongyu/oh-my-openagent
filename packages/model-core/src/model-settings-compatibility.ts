@@ -113,7 +113,7 @@ function resolveField(
     return { value: undefined, reason: "unsupported-by-model-family" }
   }
 
-  return { value: undefined, reason: "unknown-model-family" }
+  return { value: normalized }
 }
 
 export function resolveCompatibleModelSettings(

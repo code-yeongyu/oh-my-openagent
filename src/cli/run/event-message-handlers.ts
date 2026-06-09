@@ -193,6 +193,6 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
     state.currentAgent = agent
     state.currentModel = model
     state.currentVariant = variant
-    renderAgentHeader(agent, model, variant, state.agentColorsByName)
+    renderAgentHeader(agent, model, variant, state.agentColorsByName, state.agentReasoningEffort)
   }
 }
