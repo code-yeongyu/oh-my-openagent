@@ -3460,7 +3460,7 @@ describe("sisyphus-task", () => {
 			const testConfigDir = join(tmpdir(), unique)
 			process.env.CLAUDE_CONFIG_DIR = testConfigDir
 			process.env.OPENCODE_CONFIG_DIR = testConfigDir
-			const skillDir = join(testConfigDir, "skills", "superpowers", "systematic-debugging")
+			const skillDir = join(testConfigDir, "skills", "toolkit", "systematic-debugging")
 			mkdirSync(skillDir, { recursive: true })
 			writeFileSync(
 				join(skillDir, "SKILL.md"),

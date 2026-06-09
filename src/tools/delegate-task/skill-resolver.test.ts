@@ -156,11 +156,11 @@ describe("resolveSkillContent — nativeSkills integration", () => {
 
   it("#given a namespaced OMO skill #when requested by unique short name with different case #then resolves it", async () => {
     // given
-    const skillsDir = join(TEST_DIR, ".opencode", "skills", "superpowers", "systematic-debugging")
+    const skillsDir = join(TEST_DIR, ".opencode", "skills", "toolkit", "systematic-debugging")
     mkdirSync(skillsDir, { recursive: true })
     writeFileSync(
       join(skillsDir, "SKILL.md"),
-      "---\nname: superpowers/systematic-debugging\ndescription: Systematic debugging\n---\nSHORT_NAME_BODY",
+      "---\nname: toolkit/systematic-debugging\ndescription: Systematic debugging\n---\nSHORT_NAME_BODY",
     )
 
     // when

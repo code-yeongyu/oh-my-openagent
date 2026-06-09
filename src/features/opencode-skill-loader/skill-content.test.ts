@@ -195,8 +195,8 @@ describe("resolveSkillContentAsync", () => {
 	})
 
 	it("resolves nested skill by unique short name async", async () => {
-		// given: a discovered nested skill superpowers/systematic-debugging
-		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "Short name test content")
+		// given: a discovered nested skill toolkit/systematic-debugging
+		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "Short name test content")
 
 		// when: resolving by short name
 		const result = await resolveSkillContentAsync("systematic-debugging")
@@ -208,7 +208,7 @@ describe("resolveSkillContentAsync", () => {
 
 	it("returns null for ambiguous short name async", async () => {
 		// given: two skills with same short name in different namespaces
-		createNestedSkill(testConfigDir, "superpowers", "nested-debug", "superpowers content")
+		createNestedSkill(testConfigDir, "toolkit", "nested-debug", "toolkit content")
 		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving by ambiguous short name
@@ -219,8 +219,8 @@ describe("resolveSkillContentAsync", () => {
 	})
 
 	it("prefers exact match over short name match async", async () => {
-		// given: an exact skill name "debugging" and a nested "superpowers/debugging"
-		createNestedSkill(testConfigDir, "superpowers", "debugging", "nested debugging")
+		// given: an exact skill name "debugging" and a nested "toolkit/debugging"
+		createNestedSkill(testConfigDir, "toolkit", "debugging", "nested debugging")
 		// Exact match as a non-namespaced dir with SKILL.md
 		const exactDir = join(testConfigDir, "skills", "debugging")
 		mkdirSync(exactDir, { recursive: true })
@@ -236,7 +236,7 @@ describe("resolveSkillContentAsync", () => {
 
 	it("is case-insensitive for short name matching async", async () => {
 		// given: a nested skill with lowercase name
-		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "case insensitive match")
+		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "case insensitive match")
 
 		// when: resolving by uppercase short name
 		const result = await resolveSkillContentAsync("Systematic-Debugging")
@@ -440,7 +440,7 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("resolves nested skill by unique short name in mixed batch", async () => {
 		// given: nested skill and builtin skill
-		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "short name resolved")
+		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "short name resolved")
 
 		// when: mixing short name with full builtin name
 		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
@@ -454,7 +454,7 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("does not resolve ambiguous short name in batch", async () => {
 		// given: two skills with same short name
-		createNestedSkill(testConfigDir, "superpowers", "nested-debug", "sp content")
+		createNestedSkill(testConfigDir, "toolkit", "nested-debug", "sp content")
 		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving ambiguous short name with builtin
@@ -471,7 +471,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const exactDir = join(testConfigDir, "skills", "debugging")
 		mkdirSync(exactDir, { recursive: true })
 		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
-		createNestedSkill(testConfigDir, "superpowers", "debugging", "nested content")
+		createNestedSkill(testConfigDir, "toolkit", "debugging", "nested content")
 
 		// when: resolving "debugging" in batch
 		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
