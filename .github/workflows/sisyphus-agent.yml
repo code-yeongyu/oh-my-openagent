@@ -110,7 +110,7 @@ jobs:
           # Override plugin to use local file reference
           OPENCODE_JSON=~/.config/opencode/opencode.json
           REPO_PATH=$(pwd)
-          jq --arg path "file://$REPO_PATH/src/index.ts" '
+          jq --arg path "file://$REPO_PATH/packages/omo-opencode/src/index.ts" '
             .plugin = [.plugin[] | select(. != "oh-my-opencode")] + [$path]
           ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
 

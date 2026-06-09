@@ -1,14 +1,14 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, mock } from "bun:test"
 import { rmSync } from "node:fs"
-import { _resetForTesting as resetClaudeSessionState } from "./src/features/claude-code-session-state/state"
-import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./src/features/task-toast-manager/manager"
-import { _resetForTesting as resetModelFallbackState } from "./src/hooks/model-fallback/hook"
-import { RULES_INJECTOR_STORAGE } from "./src/hooks/rules-injector/constants"
-import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./src/shared/connected-providers-cache"
-import { getOmoOpenCodeCacheDir } from "./src/shared/data-path"
-import { releaseAllPromptAsyncReservationsForTesting } from "./src/shared/prompt-async-gate"
-import { installModuleMockLifecycle } from "./src/testing/module-mock-lifecycle"
+import { _resetForTesting as resetClaudeSessionState } from "./packages/omo-opencode/src/features/claude-code-session-state/state"
+import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./packages/omo-opencode/src/features/task-toast-manager/manager"
+import { _resetForTesting as resetModelFallbackState } from "./packages/omo-opencode/src/hooks/model-fallback/hook"
+import { RULES_INJECTOR_STORAGE } from "./packages/omo-opencode/src/hooks/rules-injector/constants"
+import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./packages/omo-opencode/src/shared/connected-providers-cache"
+import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
+import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
+import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {

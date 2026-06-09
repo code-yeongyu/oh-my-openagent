@@ -18,7 +18,7 @@ const workflowChecks = [
     path: ciWorkflowPath,
     testRuns: [
       "run: bun test",
-      "run: bun test src/shared/dist-bundle-bun-globals.test.ts",
+      "run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
     ],
   },
   {
@@ -343,7 +343,7 @@ describe("test workflows", () => {
     // #then
     expect(buildStep).toContain("bun run build:binaries")
     expect(buildStep).toContain("bin/oh-my-opencode.js")
-    expect(buildStep).not.toContain("bun build src/cli/index.ts --compile")
+    expect(buildStep).not.toContain("bun build packages/omo-opencode/src/cli/index.ts --compile")
     expect(darwinVerifyStep).toContain("#!/usr/bin/env node")
     expect(darwinVerifyStep).not.toContain("codesign")
   })

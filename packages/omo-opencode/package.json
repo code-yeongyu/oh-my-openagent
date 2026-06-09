@@ -1,0 +1,20 @@
+{
+  "name": "@oh-my-opencode/omo-opencode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenCode harness adapter (Ultimate edition plugin).",
+  "scripts": { "typecheck": "tsgo --noEmit -p tsconfig.json" },
+  "dependencies": {
+    "@oh-my-opencode/agents-md-core": "workspace:*",
+    "@oh-my-opencode/boulder-state": "workspace:*",
+    "@oh-my-opencode/comment-checker-core": "workspace:*",
+    "@oh-my-opencode/hashline-core": "workspace:*",
+    "@oh-my-opencode/model-core": "workspace:*",
+    "@oh-my-opencode/omo-codex": "workspace:*",
+    "@oh-my-opencode/prompts-core": "workspace:*",
+    "@oh-my-opencode/rules-engine": "workspace:*",
+    "@oh-my-opencode/shared-skills": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
+  }
+}

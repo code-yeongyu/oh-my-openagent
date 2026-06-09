@@ -131,6 +131,22 @@
         "bun-types": "1.3.14",
       },
     },
+    "packages/omo-opencode": {
+      "name": "@oh-my-opencode/omo-opencode",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/agents-md-core": "workspace:*",
+        "@oh-my-opencode/boulder-state": "workspace:*",
+        "@oh-my-opencode/comment-checker-core": "workspace:*",
+        "@oh-my-opencode/hashline-core": "workspace:*",
+        "@oh-my-opencode/model-core": "workspace:*",
+        "@oh-my-opencode/omo-codex": "workspace:*",
+        "@oh-my-opencode/prompts-core": "workspace:*",
+        "@oh-my-opencode/rules-engine": "workspace:*",
+        "@oh-my-opencode/shared-skills": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+    },
     "packages/prompts-core": {
       "name": "@oh-my-opencode/prompts-core",
       "version": "0.1.0",
@@ -247,6 +263,8 @@
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
 
     "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
+
+    "@oh-my-opencode/omo-opencode": ["@oh-my-opencode/omo-opencode@workspace:packages/omo-opencode"],
 
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 

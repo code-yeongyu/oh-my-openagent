@@ -40,7 +40,7 @@ describe("Codex compatibility test script", () => {
 
     // #when
     const gitBashBuildIndex = packageManifest.indexOf("bun run build:git-bash-mcp")
-    const installerTestIndex = packageManifest.indexOf("src/cli/install-codex/install-codex.test.ts")
+    const installerTestIndex = packageManifest.indexOf("packages/omo-opencode/src/cli/install-codex/install-codex.test.ts")
     const buildsGitBashBeforeInstallerTests = gitBashBuildIndex >= 0 && installerTestIndex > gitBashBuildIndex
 
     // #then
