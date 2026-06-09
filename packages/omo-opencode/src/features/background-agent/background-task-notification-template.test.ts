@@ -140,7 +140,7 @@ Use \`background_output(task_id="task-2")\` to retrieve this result when ready.
 - \`task-2\`: Summarize logs [CANCELLED] - User aborted
 - \`task-3\`: Fallback task [ERROR] - Denied
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.
+All sibling background tasks are complete. Your next action should be to call \`background_output(task_id="<id>")\` for each task ID above.
 
 **ACTION REQUIRED:** 2 task(s) failed. Check errors above and decide whether to retry or proceed.
 </system-reminder>`
@@ -201,6 +201,33 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
       // then
       expect(notification).toContain("[BACKGROUND TASK COMPLETED]")
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    })
+
+    test("#when building the final notification #then it tells the agent to collect outputs immediately", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_task_1",
+          description: "Trace repo",
+          status: "completed",
+        },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          {
+            id: "bg_task_1",
+            description: "Trace repo",
+            status: "completed",
+          },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("All sibling background tasks are complete.")
+      expect(notification).toContain("Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above.")
+      expect(notification).not.toContain("Wait for the all-complete notification")
     })
 
     test("#when building the final notification #then it renders the spec-aligned balanced attempt timeline", () => {
