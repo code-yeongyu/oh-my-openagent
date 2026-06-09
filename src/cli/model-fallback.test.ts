@@ -28,6 +28,12 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
   }
 }
 
+function flattenConfiguredModels(result: ReturnType<typeof generateModelConfig>) {
+  return [
+    ...Object.values(result.agents ?? {}),
+    ...Object.values(result.categories ?? {}),
+  ].flatMap((entry) => [entry, ...(entry.fallback_models ?? [])])
+}
 describe("generateModelConfig", () => {
   describe("no providers available", () => {
     test("returns ULTIMATE_FALLBACK for all agents and categories when no providers", () => {
@@ -188,6 +194,35 @@ describe("generateModelConfig", () => {
       expect(result).toMatchSnapshot()
     })
 
+    test("downgrades unsupported GitHub Copilot GPT high-tier variants", () => {
+      // #given only GitHub Copilot is available
+      const config = createConfig({ hasCopilot: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Copilot GPT routes should not receive variants that hang the provider
+      const unsupportedEntries = flattenConfiguredModels(result).filter(
+        (entry) =>
+          entry.model.startsWith("github-copilot/gpt-5.") &&
+          (entry.variant === "max" || entry.variant === "xhigh")
+      )
+      expect(unsupportedEntries).toEqual([])
+      expect(result.agents?.momus).toEqual({
+        model: "github-copilot/gpt-5.5",
+        variant: "high",
+        fallback_models: [
+          {
+            model: "github-copilot/claude-opus-4.7",
+            variant: "max",
+          },
+          {
+            model: "github-copilot/gemini-3.1-pro-preview",
+            variant: "high",
+          },
+        ],
+      })
+    })
     test("omits librarian when only ZAI is available", () => {
       // #given only ZAI is available
       const config = createConfig({ hasZaiCodingPlan: true })
