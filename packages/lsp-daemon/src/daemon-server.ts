@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
+import { join } from "node:path";
 
 import { disposeDefaultLspManager, getLspManager } from "@code-yeongyu/lsp-tools-mcp/dist/lsp/manager.js";
 
@@ -54,8 +55,10 @@ export async function startDaemonServer(
 	});
 	server.on("error", (error) => logServerError(error));
 
+	const endpointPath = join(paths.dir, "daemon.endpoint");
 	await listen(server, paths.socket);
 	writeFileSync(paths.pid, `${process.pid}\n`);
+	writeFileSync(endpointPath, paths.socket);
 
 	let closed = false;
 	const close = async (): Promise<void> => {
@@ -67,6 +70,7 @@ export async function startDaemonServer(
 		await closeServer(server);
 		unlinkQuietly(paths.socket);
 		unlinkQuietly(paths.pid);
+		unlinkQuietly(endpointPath);
 		await disposeDefaultLspManager();
 	};
 

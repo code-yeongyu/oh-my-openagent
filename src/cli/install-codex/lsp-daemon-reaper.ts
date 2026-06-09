@@ -23,13 +23,23 @@ export async function reapLspDaemons(codexHome: string, deps: ReapLspDaemonsDeps
   for (const entry of entries) {
     const versionDir = join(daemonRoot, entry)
     const pid = await readPidFile(join(versionDir, "daemon.pid"))
-    if (pid !== null && (await isDaemonLive(join(versionDir, "daemon.sock"))) && killProcess(pid)) {
+    const socketPath = await readEndpointFile(join(versionDir, "daemon.endpoint"))
+    if (pid !== null && socketPath !== null && (await isDaemonLive(socketPath)) && killProcess(pid)) {
       reaped.push(pid)
     }
     await rm(versionDir, { recursive: true, force: true })
   }
 
   return reaped
+}
+
+async function readEndpointFile(path: string): Promise<string | null> {
+  try {
+    const content = (await readFile(path, "utf8")).trim()
+    return content.length > 0 ? content : null
+  } catch {
+    return null
+  }
 }
 
 async function readPidFile(path: string): Promise<number | null> {
