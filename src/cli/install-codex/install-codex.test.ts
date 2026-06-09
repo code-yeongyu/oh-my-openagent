@@ -104,6 +104,23 @@ describe("install-codex", () => {
     expect(repoRoot).toBe(wrapperRoot)
   })
 
+  test("#given post-move five-level package nesting #when resolving vendored repo root #then walks past the legacy five-parent cap", async () => {
+    // given
+    const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-deep-nesting-"))
+    await mkdir(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin"), { recursive: true })
+    await writeFile(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"), "{}")
+    const importerDir = join(repoRoot, "packages", "omo-opencode", "src", "cli", "install-codex")
+    await mkdir(importerDir, { recursive: true })
+
+    // when
+    const fromImporter = findRepoRootFromImporter(importerDir)
+    const fromFindRepoRoot = findRepoRoot({ importerDir })
+
+    // then
+    expect(fromImporter).toBe(repoRoot)
+    expect(fromFindRepoRoot).toBe(repoRoot)
+  })
+
   test("#given default CODEX_HOME #when resolving installer bin dir without override #then preserves user local bin precedence", () => {
     // given
     const homeDir = join(tmpdir(), "omo-codex-home-default")

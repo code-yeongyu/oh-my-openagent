@@ -232,7 +232,7 @@ function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {
 
 export function findRepoRootFromImporter(importerDir: string): string {
   let current = importerDir
-  for (let depth = 0; depth <= 5; depth += 1) {
+  for (let depth = 0; depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current)) return current
     for (const wrapperPackageRoot of [join(current, "node_modules", "oh-my-openagent"), join(current, "oh-my-openagent")]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot)) return wrapperPackageRoot
@@ -240,7 +240,7 @@ export function findRepoRootFromImporter(importerDir: string): string {
     current = resolve(current, "..")
   }
   throw new Error(
-    "Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 5 parent levels",
+    "Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 7 parent levels",
   )
 }
 
