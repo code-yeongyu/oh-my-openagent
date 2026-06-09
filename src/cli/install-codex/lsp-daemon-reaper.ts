@@ -1,12 +1,15 @@
 import { readFile, readdir, rm } from "node:fs/promises"
+import { connect } from "node:net"
 import { join } from "node:path"
 
 export interface ReapLspDaemonsDeps {
   readonly killProcess?: (pid: number) => boolean
+  readonly isDaemonLive?: (socketPath: string) => Promise<boolean>
 }
 
 export async function reapLspDaemons(codexHome: string, deps: ReapLspDaemonsDeps = {}): Promise<readonly number[]> {
   const killProcess = deps.killProcess ?? sendSigterm
+  const isDaemonLive = deps.isDaemonLive ?? probeSocketLive
   const daemonRoot = join(codexHome, "codex-lsp", "daemon")
   const reaped: number[] = []
 
@@ -20,7 +23,9 @@ export async function reapLspDaemons(codexHome: string, deps: ReapLspDaemonsDeps
   for (const entry of entries) {
     const versionDir = join(daemonRoot, entry)
     const pid = await readPidFile(join(versionDir, "daemon.pid"))
-    if (pid !== null && killProcess(pid)) reaped.push(pid)
+    if (pid !== null && (await isDaemonLive(join(versionDir, "daemon.sock"))) && killProcess(pid)) {
+      reaped.push(pid)
+    }
     await rm(versionDir, { recursive: true, force: true })
   }
 
@@ -34,6 +39,26 @@ async function readPidFile(path: string): Promise<number | null> {
   } catch {
     return null
   }
+}
+
+function probeSocketLive(socketPath: string, timeoutMs = 500): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect(socketPath)
+    const done = (ok: boolean): void => {
+      socket.destroy()
+      resolve(ok)
+    }
+    const timer = setTimeout(() => done(false), timeoutMs)
+    timer.unref()
+    socket.once("connect", () => {
+      clearTimeout(timer)
+      done(true)
+    })
+    socket.once("error", () => {
+      clearTimeout(timer)
+      done(false)
+    })
+  })
 }
 
 function sendSigterm(pid: number): boolean {

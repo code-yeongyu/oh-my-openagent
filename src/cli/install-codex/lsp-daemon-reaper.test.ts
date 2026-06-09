@@ -24,6 +24,7 @@ describe("reapLspDaemons", () => {
     const killed: number[] = []
 
     const reaped = await reapLspDaemons(codexHome, {
+      isDaemonLive: () => Promise.resolve(true),
       killProcess: (pid) => {
         killed.push(pid)
         return true
@@ -34,6 +35,24 @@ describe("reapLspDaemons", () => {
     expect(reaped.length).toBe(2)
     expect(existsSync(dirA)).toBe(false)
     expect(existsSync(dirB)).toBe(false)
+  })
+
+  test("#given a stale daemon whose socket is dead #when reaping #then does not kill the pid but removes the dir", async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-reap-stale-"))
+    const dir = await writeDaemonVersion(codexHome, "v0.1.0", "333")
+    const killed: number[] = []
+
+    const reaped = await reapLspDaemons(codexHome, {
+      isDaemonLive: () => Promise.resolve(false),
+      killProcess: (pid) => {
+        killed.push(pid)
+        return true
+      },
+    })
+
+    expect(killed).toEqual([])
+    expect(reaped).toEqual([])
+    expect(existsSync(dir)).toBe(false)
   })
 
   test("#given no daemon root #when reaping #then returns empty without throwing", async () => {
