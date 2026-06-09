@@ -1,6 +1,25 @@
 import { describe, expect, test } from "bun:test"
 import { selectCiTestTargets } from "./run-ci-tests"
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getRootOptionalDependencies(manifest: unknown): Record<string, string> {
+  if (!isRecord(manifest) || !isRecord(manifest.optionalDependencies)) {
+    return {}
+  }
+
+  const optionalDependencies: Record<string, string> = {}
+  for (const [name, version] of Object.entries(manifest.optionalDependencies)) {
+    if (typeof version === "string") {
+      optionalDependencies[name] = version
+    }
+  }
+
+  return optionalDependencies
+}
+
 describe("plain test script policy", () => {
   test("#given global mock tests in the suite #then bun run test remains the package test script", async () => {
     //#given
@@ -17,6 +36,22 @@ describe("plain test script policy", () => {
     // then
     expect(workflow).toMatch(/- name: Run tests\s+run: bun test/)
     expect(workflow).not.toContain("run: bun test --max-concurrency")
+  })
+
+  test("#given platform optional dependency versions #when CI runs frozen install #then bun lock stays in sync", async () => {
+    // given
+    const packageJson: unknown = await Bun.file("package.json").json()
+    const lockfile = await Bun.file("bun.lock").text()
+    const platformDependencies = Object.entries(getRootOptionalDependencies(packageJson)).filter(([name]) =>
+      name.startsWith("oh-my-opencode-")
+    )
+
+    // then
+    expect(platformDependencies.length).toBeGreaterThan(0)
+    for (const [name, version] of platformDependencies) {
+      expect(lockfile).toContain(`"${name}": "${version}"`)
+      expect(lockfile).toContain(`"${name}": ["${name}@${version}"`)
+    }
   })
 
   test("#given isolated test shards #when selecting targets #then shards are deterministic and complete", () => {
