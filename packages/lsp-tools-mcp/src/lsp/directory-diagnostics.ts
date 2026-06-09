@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, readdirSync, type Stats } from "node:fs";
 import { extname, join, resolve } from "node:path";
+import { contextCwd } from "../request-context.js";
 import { findWorkspaceRoot, formatServerLookupError } from "./client-wrapper.js";
 import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_DIRECTORY_FILES } from "./constants.js";
 import { LspInvalidPathError, LspServerLookupError } from "./errors.js";
@@ -68,7 +69,7 @@ export async function aggregateDiagnosticsForDirectory(
 		);
 	}
 
-	const absDir = resolve(directory);
+	const absDir = resolve(contextCwd(), directory);
 	if (!existsSync(absDir)) {
 		throw new LspInvalidPathError(`Directory does not exist: ${absDir}`);
 	}
