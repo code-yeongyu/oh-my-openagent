@@ -1,22 +1,37 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+/// <reference types="bun-types" />
 
-const processWithCli = mock(async () => {})
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import {
+  createCommentCheckerHooks,
+  type CommentCheckerHookDependencies,
+} from "./hook"
+import {
+  registerPendingCall,
+  startPendingCallCleanup,
+  stopPendingCallCleanup,
+  takePendingCall,
+} from "./pending-calls"
+import {
+  ensureCommentCheckerInitialization,
+  _resetCommentCheckerInitializationForTesting,
+} from "./initialization-gate"
 
-mock.module("./cli-runner", () => ({
-  initializeCommentCheckerCli: () => {},
-  getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
-  isCliPathUsable: () => true,
-  processWithCli,
-  processApplyPatchEditsWithCli: async () => {},
-}))
+const processWithCli = mock<CommentCheckerHookDependencies["processWithCli"]>(async () => {})
 
-afterAll(() => {
-  mock.restore()
-})
-
-const { createCommentCheckerHooks } = await import("./hook")
-const { stopPendingCallCleanup } = await import("./pending-calls")
-const { _resetCommentCheckerInitializationForTesting } = await import("./initialization-gate")
+function createDependencies(): CommentCheckerHookDependencies {
+  return {
+    initializeCommentCheckerCli: () => {},
+    getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
+    isCliPathUsable: (cliPath): cliPath is string => typeof cliPath === "string",
+    processWithCli,
+    processApplyPatchEditsWithCli: async () => {},
+    registerPendingCall,
+    startPendingCallCleanup,
+    stopPendingCallCleanup,
+    takePendingCall,
+    ensureCommentCheckerInitialization,
+  }
+}
 
 describe("comment-checker mutation tool routing", () => {
   beforeEach(() => {
@@ -32,7 +47,7 @@ describe("comment-checker mutation tool routing", () => {
 
   it("#given write tool with filePath #when before and after hooks run #then it checks the pending write", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, createDependencies())
     const input = { tool: "write", sessionID: "ses_test", callID: "call_write" }
 
     // when
@@ -43,24 +58,24 @@ describe("comment-checker mutation tool routing", () => {
 
     // then
     expect(processWithCli).toHaveBeenCalledTimes(1)
-    expect(processWithCli).toHaveBeenCalledWith(
-      input,
-      expect.objectContaining({
-        filePath: "/repo/src/write.ts",
-        content: "// write comment\nconst a = 1\n",
-        tool: "write",
-        sessionID: "ses_test",
-      }),
-      expect.any(Object),
-      "/tmp/fake-comment-checker",
-      undefined,
-      expect.any(Function),
-    )
+    const call = processWithCli.mock.calls[0]
+    if (!call) throw new Error("missing processWithCli call")
+    expect(call[0]).toBe(input)
+    expect(call[1]).toMatchObject({
+      filePath: "/repo/src/write.ts",
+      content: "// write comment\nconst a = 1\n",
+      tool: "write",
+      sessionID: "ses_test",
+    })
+    expect(call[2]).toEqual({ title: "ok", output: "Success", metadata: {} })
+    expect(call[3]).toBe("/tmp/fake-comment-checker")
+    expect(call[4]).toBeUndefined()
+    expect(typeof call[5]).toBe("function")
   })
 
   it("#given edit tool with file_path #when before and after hooks run #then it checks the pending edit", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, createDependencies())
     const input = { tool: "edit", sessionID: "ses_test", callID: "call_edit" }
 
     // when
@@ -75,24 +90,24 @@ describe("comment-checker mutation tool routing", () => {
 
     // then
     expect(processWithCli).toHaveBeenCalledTimes(1)
-    expect(processWithCli).toHaveBeenCalledWith(
-      input,
-      expect.objectContaining({
-        filePath: "/repo/src/edit.ts",
-        oldString: "const b = 1\n",
-        newString: "// edit comment\nconst b = 1\n",
-        tool: "edit",
-      }),
-      expect.any(Object),
-      "/tmp/fake-comment-checker",
-      undefined,
-      expect.any(Function),
-    )
+    const call = processWithCli.mock.calls[0]
+    if (!call) throw new Error("missing processWithCli call")
+    expect(call[0]).toBe(input)
+    expect(call[1]).toMatchObject({
+      filePath: "/repo/src/edit.ts",
+      oldString: "const b = 1\n",
+      newString: "// edit comment\nconst b = 1\n",
+      tool: "edit",
+    })
+    expect(call[2]).toEqual({ title: "ok", output: "Success", metadata: {} })
+    expect(call[3]).toBe("/tmp/fake-comment-checker")
+    expect(call[4]).toBeUndefined()
+    expect(typeof call[5]).toBe("function")
   })
 
   it("#given multiedit tool with path #when before and after hooks run #then it checks the pending multiedit", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, createDependencies())
     const input = { tool: "multiedit", sessionID: "ses_test", callID: "call_multiedit" }
     const edits = [{ old_string: "const c = 1\n", new_string: "// multiedit comment\nconst c = 1\n" }]
 
@@ -104,23 +119,23 @@ describe("comment-checker mutation tool routing", () => {
 
     // then
     expect(processWithCli).toHaveBeenCalledTimes(1)
-    expect(processWithCli).toHaveBeenCalledWith(
-      input,
-      expect.objectContaining({
-        filePath: "/repo/src/multiedit.ts",
-        edits,
-        tool: "multiedit",
-      }),
-      expect.any(Object),
-      "/tmp/fake-comment-checker",
-      undefined,
-      expect.any(Function),
-    )
+    const call = processWithCli.mock.calls[0]
+    if (!call) throw new Error("missing processWithCli call")
+    expect(call[0]).toBe(input)
+    expect(call[1]).toMatchObject({
+      filePath: "/repo/src/multiedit.ts",
+      edits,
+      tool: "multiedit",
+    })
+    expect(call[2]).toEqual({ title: "ok", output: "Success", metadata: {} })
+    expect(call[3]).toBe("/tmp/fake-comment-checker")
+    expect(call[4]).toBeUndefined()
+    expect(typeof call[5]).toBe("function")
   })
 
   it("#given non-mutation tool #when before and after hooks run #then it does not run the checker", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, createDependencies())
     const input = { tool: "read", sessionID: "ses_test", callID: "call_read" }
 
     // when

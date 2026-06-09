@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, mock, afterAll } from "bun:test"
+import { describe, test, expect, mock } from "bun:test"
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -29,8 +29,6 @@ function createScriptBinary(scriptContent: string, windowsScriptContent?: string
   }
   return binaryPath
 }
-
-afterAll(() => { mock.restore() })
 
 describe("comment-checker CLI", () => {
   describe("lazy initialization", () => {

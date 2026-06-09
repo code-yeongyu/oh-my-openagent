@@ -21,6 +21,32 @@ import * as fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 
+export interface CommentCheckerHookDependencies {
+  readonly initializeCommentCheckerCli: typeof initializeCommentCheckerCli
+  readonly getCommentCheckerCliPathPromise: typeof getCommentCheckerCliPathPromise
+  readonly isCliPathUsable: typeof isCliPathUsable
+  readonly processWithCli: typeof processWithCli
+  readonly processApplyPatchEditsWithCli: typeof processApplyPatchEditsWithCli
+  readonly registerPendingCall: typeof registerPendingCall
+  readonly startPendingCallCleanup: typeof startPendingCallCleanup
+  readonly stopPendingCallCleanup: typeof stopPendingCallCleanup
+  readonly takePendingCall: typeof takePendingCall
+  readonly ensureCommentCheckerInitialization: typeof ensureCommentCheckerInitialization
+}
+
+const defaultDependencies = {
+  initializeCommentCheckerCli,
+  getCommentCheckerCliPathPromise,
+  isCliPathUsable,
+  processWithCli,
+  processApplyPatchEditsWithCli,
+  registerPendingCall,
+  startPendingCallCleanup,
+  stopPendingCallCleanup,
+  takePendingCall,
+  ensureCommentCheckerInitialization,
+} satisfies CommentCheckerHookDependencies
+
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
 
@@ -33,7 +59,10 @@ function debugLog(...args: unknown[]) {
   }
 }
 
-export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
+export function createCommentCheckerHooks(
+  config?: CommentCheckerConfig,
+  dependencies: CommentCheckerHookDependencies = defaultDependencies,
+) {
   debugLog("createCommentCheckerHooks called", { config })
 
   return {
@@ -41,9 +70,9 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> },
     ): Promise<void> => {
-      ensureCommentCheckerInitialization(() => {
-        startPendingCallCleanup()
-        initializeCommentCheckerCli(debugLog)
+      dependencies.ensureCommentCheckerInitialization(() => {
+        dependencies.startPendingCallCleanup()
+        dependencies.initializeCommentCheckerCli(debugLog)
       })
 
       debugLog("tool.execute.before:", {
@@ -78,7 +107,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         filePath,
         tool: toolLower,
       })
-      registerPendingCall(input.callID, {
+      dependencies.registerPendingCall(input.callID, {
         filePath,
         content,
         oldString: oldString as string | undefined,
@@ -120,14 +149,14 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         }
 
         try {
-          const cliPath = await getCommentCheckerCliPathPromise()
-          if (!isCliPathUsable(cliPath)) {
+          const cliPath = await dependencies.getCommentCheckerCliPathPromise()
+          if (!dependencies.isCliPathUsable(cliPath)) {
             debugLog("CLI not available, skipping comment check")
             return
           }
 
           debugLog("using CLI for apply_patch:", cliPath)
-          await processApplyPatchEditsWithCli(
+          await dependencies.processApplyPatchEditsWithCli(
             input.sessionID,
             edits,
             output,
@@ -141,7 +170,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         return
       }
 
-      const pendingCall = takePendingCall(input.callID)
+      const pendingCall = dependencies.takePendingCall(input.callID)
       if (!pendingCall) {
         debugLog("no pendingCall found for:", input.callID)
         return
@@ -150,20 +179,20 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
       debugLog("processing pendingCall:", pendingCall)
 
       try {
-        const cliPath = await getCommentCheckerCliPathPromise()
-        if (!isCliPathUsable(cliPath)) {
+        const cliPath = await dependencies.getCommentCheckerCliPathPromise()
+        if (!dependencies.isCliPathUsable(cliPath)) {
           debugLog("CLI not available, skipping comment check")
           return
         }
 
         debugLog("using CLI:", cliPath)
-        await processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt, debugLog)
+        await dependencies.processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt, debugLog)
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
     },
     dispose: (): void => {
-      stopPendingCallCleanup()
+      dependencies.stopPendingCallCleanup()
     },
   }
 }
