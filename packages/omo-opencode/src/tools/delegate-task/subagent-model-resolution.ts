@@ -88,7 +88,8 @@ export async function resolveSubagentModel(
       normalizedAgentFallbackModels,
       defaultProviderID,
     )
-    fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
+    const hasExplicitModel = !!(agentOverride?.model || agentCategoryModel)
+    fallbackChain = configuredFallbackChain ?? ((resolutionSkipped && hasExplicitModel) ? undefined : agentRequirement?.fallbackChain)
     const effectiveEntry = resolveEffectiveFallbackEntry({
       categoryModel,
       configuredFallbackChain,
