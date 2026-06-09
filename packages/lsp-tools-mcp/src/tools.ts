@@ -29,6 +29,7 @@ import type {
 } from "./lsp/types.js";
 import { type ApplyResult, applyWorkspaceEdit } from "./lsp/workspace-edit.js";
 import { missingDependencyResult } from "./missing-dependency-result.js";
+import { contextCwd } from "./request-context.js";
 
 export interface TextContent {
 	type: "text";
@@ -222,7 +223,7 @@ export async function executeLspDiagnostics(
 	const severity = severityFilter(params);
 
 	try {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		if (isDirectoryPath(absPath)) {
 			const extension = inferExtensionFromDirectory(absPath);
 			if (!extension) {

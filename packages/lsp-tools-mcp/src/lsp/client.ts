@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { contextCwd } from "../request-context.js";
 import { LspClientConnection } from "./connection.js";
 import { getLanguageId } from "./language-mappings.js";
 import type {
@@ -30,7 +31,7 @@ export class LspClient extends LspClientConnection {
 	}
 
 	async openFile(filePath: string): Promise<void> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		const uri = pathToFileURL(absPath).href;
 		const text = readFileSync(absPath, "utf-8");
 
@@ -80,7 +81,7 @@ export class LspClient extends LspClientConnection {
 		line: number,
 		character: number,
 	): Promise<Location | LocationLink | Array<Location | LocationLink> | null> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		await this.openFile(absPath);
 		return this.sendRequest<Location | LocationLink | Array<Location | LocationLink> | null>(
 			"textDocument/definition",
@@ -92,7 +93,7 @@ export class LspClient extends LspClientConnection {
 	}
 
 	async references(filePath: string, line: number, character: number, includeDeclaration = true): Promise<Location[]> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		await this.openFile(absPath);
 		return this.sendRequest<Location[]>("textDocument/references", {
 			textDocument: { uri: pathToFileURL(absPath).href },
@@ -102,7 +103,7 @@ export class LspClient extends LspClientConnection {
 	}
 
 	async documentSymbols(filePath: string): Promise<Array<DocumentSymbol | SymbolInfo>> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		await this.openFile(absPath);
 		return this.sendRequest<Array<DocumentSymbol | SymbolInfo>>("textDocument/documentSymbol", {
 			textDocument: { uri: pathToFileURL(absPath).href },
@@ -121,7 +122,7 @@ export class LspClient extends LspClientConnection {
 	}
 
 	async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		const uri = pathToFileURL(absPath).href;
 		await this.openFile(absPath);
 		await new Promise((r) => setTimeout(r, POST_DIAGNOSTICS_WAIT_MS));
@@ -147,7 +148,7 @@ export class LspClient extends LspClientConnection {
 		line: number,
 		character: number,
 	): Promise<PrepareRenameResult | PrepareRenameDefaultBehavior | Range | null> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		await this.openFile(absPath);
 		return this.sendRequest<PrepareRenameResult | PrepareRenameDefaultBehavior | Range | null>(
 			"textDocument/prepareRename",
@@ -159,7 +160,7 @@ export class LspClient extends LspClientConnection {
 	}
 
 	async rename(filePath: string, line: number, character: number, newName: string): Promise<WorkspaceEdit | null> {
-		const absPath = resolve(filePath);
+		const absPath = resolve(contextCwd(), filePath);
 		await this.openFile(absPath);
 		return this.sendRequest<WorkspaceEdit | null>("textDocument/rename", {
 			textDocument: { uri: pathToFileURL(absPath).href },
