@@ -21,11 +21,29 @@ If the session is nearly empty or has no meaningful context, inform the user the
 
 ---
 
+# PHASE 0.5: SESSION READ FIRST (MANDATORY FIRST DATA STEP)
+
+Call session_read({ session_id: "$SESSION_ID" }) BEFORE any other context gathering step. The output of session_read is the only authoritative source for what the user originally asked. Do not reconstruct memory of the first request; long sessions and post-compact sessions truncate or summarize early messages, so in-context memory is unreliable.
+
+From the session_read output:
+
+1. Find the first user message in the returned session history (the earliest entry with role "user").
+2. Copy the text of that first user message verbatim into a working note. You will later place it into the USER REQUESTS (AS-IS) section unchanged.
+3. If the user has sent multiple distinct top-level requests in the session, also collect each subsequent verbatim user message that is a new top-level ask (not a follow-up clarification).
+
+Rules:
+- Do not reconstruct user requests from memory. Always quote from session_read output.
+- Do not paraphrase, summarize, or "tidy up" the user's wording.
+- Do not skip session_read even if you feel you remember the first user message.
+- If session_read fails or returns no user messages, state that explicitly in the USER REQUESTS (AS-IS) section rather than guessing.
+
+---
+
 # PHASE 1: GATHER PROGRAMMATIC CONTEXT
 
 Execute these tools to gather concrete data:
 
-1. session_read({ session_id: "$SESSION_ID" }) - full session history
+1. session_read({ session_id: "$SESSION_ID" }) - full session history (already executed in PHASE 0.5; reuse its output here)
 2. todoread() - current task progress
 3. Bash({ command: "git diff --stat HEAD~10..HEAD" }) - recent file changes
 4. Bash({ command: "git status --porcelain" }) - uncommitted changes
@@ -33,19 +51,20 @@ Execute these tools to gather concrete data:
 Suggested execution order:
 
 \`\`\`
-session_read({ session_id: "$SESSION_ID" })
+session_read({ session_id: "$SESSION_ID" })  # already called in PHASE 0.5
 todoread()
 Bash({ command: "git diff --stat HEAD~10..HEAD" })
 Bash({ command: "git status --porcelain" })
 \`\`\`
 
 Analyze the gathered outputs to understand:
-- What the user asked for (exact wording)
 - What work was completed
 - What tasks remain incomplete (include todo state)
 - What decisions were made
 - What files were modified or discussed (include git diff/stat + status)
 - What patterns, constraints, or preferences were established
+
+USER REQUESTS were already captured verbatim from session_read in PHASE 0.5; do not re-derive them here.
 
 ---
 
@@ -57,7 +76,7 @@ Focus on:
 - Capabilities and behavior, not file-by-file implementation details
 - What matters for continuing the work
 - Avoiding excessive implementation details (variable names, storage keys, constants) unless critical
-- USER REQUESTS (AS-IS) must be verbatim (do not paraphrase)
+- USER REQUESTS (AS-IS) must come from the PHASE 0.5 session_read extraction, copied verbatim (do not paraphrase, do not reconstruct from memory)
 - EXPLICIT CONSTRAINTS must be verbatim only (do not invent)
 
 Questions to consider when extracting:
