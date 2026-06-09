@@ -16,7 +16,7 @@ import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import type { AgentMode } from "./types";
 import {
-  isClaudeOpus47Model,
+  isClaudeOpus47OrLaterModel,
   isGpt5_5Model,
   isGptModel,
   isGptNativeSisyphusModel,
@@ -62,7 +62,7 @@ export function createSisyphusAgent(
     );
   }
 
-  if (isClaudeOpus47Model(model)) {
+  if (isClaudeOpus47OrLaterModel(model)) {
     return buildClaudeSisyphusAgentConfig(
       MODE,
       model,
