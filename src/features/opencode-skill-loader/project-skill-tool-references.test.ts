@@ -1,10 +1,21 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { join } from "node:path"
+import { existsSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const PROJECT_ROOT = fileURLToPath(new URL("../../..", import.meta.url))
+function __repoRootFrom(start: string): string {
+  let dir = start
+  for (;;) {
+    if (existsSync(join(dir, "bun.lock")) || existsSync(join(dir, ".git"))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error("repo root sentinel not found")
+    dir = parent
+  }
+}
+
+const PROJECT_ROOT = __repoRootFrom(dirname(fileURLToPath(import.meta.url)))
 
 async function readProjectSkill(...segments: string[]) {
   return Bun.file(join(PROJECT_ROOT, ".opencode", "skills", ...segments, "SKILL.md")).text()

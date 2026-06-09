@@ -1,8 +1,18 @@
 import { describe, expect, it } from "bun:test"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parse } from "jsonc-parser"
+
+function __repoRootFrom(start: string): string {
+  let dir = start
+  for (;;) {
+    if (existsSync(join(dir, "bun.lock")) || existsSync(join(dir, ".git"))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error("repo root sentinel not found")
+    dir = parent
+  }
+}
 
 type BunLock = {
   workspaces?: {
@@ -15,6 +25,7 @@ type BunLock = {
 
 const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.4"
 const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
+const REPO_ROOT = __repoRootFrom(REPOSITORY_ROOT)
 const FIRST_PARTY_SOURCE_PATHS = ["src", "packages", "script", "test-support"] as const
 
 function parseVersion(version: string): [number, number, number] {
@@ -66,7 +77,7 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
       ":(exclude)**/node_modules/**",
       ":(exclude)**/dist/**",
     ],
-    { cwd: join(REPOSITORY_ROOT, ".."), stdout: "pipe", stderr: "pipe" },
+    { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
   )
   if (result.exitCode === 1) return []
   expect(result.exitCode, result.stderr.toString()).toBe(0)
@@ -78,10 +89,10 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
 
 describe("dependency security", () => {
   it("#given picomatch is a runtime dependency #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
-    const packageJson = JSON.parse(readFileSync(join(REPOSITORY_ROOT, "..", "package.json"), "utf-8")) as {
+    const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf-8")) as {
       dependencies?: Record<string, string>
     }
-    const bunLock = parse(readFileSync(join(REPOSITORY_ROOT, "..", "bun.lock"), "utf-8")) as BunLock
+    const bunLock = parse(readFileSync(join(REPO_ROOT, "bun.lock"), "utf-8")) as BunLock
     const dependencyRange = packageJson.dependencies?.picomatch
     const lockedReference = bunLock.packages?.picomatch?.[0]
 
@@ -94,10 +105,10 @@ describe("dependency security", () => {
   })
 
   it("#given effect is only needed by OpenCode internals #when root dependencies are locked #then the root package does not depend on effect directly", () => {
-    const packageJson = JSON.parse(readFileSync(join(REPOSITORY_ROOT, "..", "package.json"), "utf-8")) as {
+    const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf-8")) as {
       dependencies?: Record<string, string>
     }
-    const bunLock = parse(readFileSync(join(REPOSITORY_ROOT, "..", "bun.lock"), "utf-8")) as BunLock
+    const bunLock = parse(readFileSync(join(REPO_ROOT, "bun.lock"), "utf-8")) as BunLock
     const opencodePluginDependencies = bunLock.packages?.["@opencode-ai/plugin"]?.[2]
 
     expect(packageJson.dependencies?.effect).toBeUndefined()

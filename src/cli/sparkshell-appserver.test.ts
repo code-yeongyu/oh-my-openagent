@@ -1,9 +1,10 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import {
   runSparkShell,
@@ -12,7 +13,17 @@ import {
   type SparkShellSpawnResult,
 } from "./sparkshell"
 
-const REPO_ROOT = resolve(import.meta.dir, "../..")
+function __repoRootFrom(start: string): string {
+  let dir = start
+  for (;;) {
+    if (existsSync(join(dir, "bun.lock")) || existsSync(join(dir, ".git"))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error("repo root sentinel not found")
+    dir = parent
+  }
+}
+
+const REPO_ROOT = __repoRootFrom(import.meta.dir)
 const unixSocketTest = process.platform === "win32" ? test.skip : test
 
 describe("sparkshell appserver routing", () => {

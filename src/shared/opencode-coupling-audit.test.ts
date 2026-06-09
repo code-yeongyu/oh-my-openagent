@@ -1,8 +1,19 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 
-const WORKSPACE_ROOT = path.resolve(import.meta.dir, "../..")
+function __repoRootFrom(start: string): string {
+  let dir = start
+  for (;;) {
+    if (existsSync(path.join(dir, "bun.lock")) || existsSync(path.join(dir, ".git"))) return dir
+    const parent = path.dirname(dir)
+    if (parent === dir) throw new Error("repo root sentinel not found")
+    dir = parent
+  }
+}
+
+const WORKSPACE_ROOT = __repoRootFrom(import.meta.dir)
 const PACKAGES_DIR = path.join(WORKSPACE_ROOT, "packages")
 const SKIP_PACKAGES = new Set(["lsp-tools-mcp"])
 

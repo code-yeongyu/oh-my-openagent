@@ -1,12 +1,23 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import ts from "typescript"
 
+function __repoRootFrom(start: string): string {
+  let dir = start
+  for (;;) {
+    if (existsSync(path.join(dir, "bun.lock")) || existsSync(path.join(dir, ".git"))) return dir
+    const parent = path.dirname(dir)
+    if (parent === dir) throw new Error("repo root sentinel not found")
+    dir = parent
+  }
+}
+
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
-const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
+const WORKSPACE_ROOT = __repoRootFrom(import.meta.dir)
 const MOCK_MODULE_TOKEN = "mock.module"
 const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
   // TODO(MOCK-MODULE-AUDIT): add cleanup for auto-update checker hook module mocks.
