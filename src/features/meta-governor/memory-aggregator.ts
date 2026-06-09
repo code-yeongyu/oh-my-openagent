@@ -162,15 +162,15 @@ export async function aggregateRead(
 
   const agentmemory = agentResult.status === "fulfilled"
     ? agentResult.value
-    : pushDegraded(degradedSources, errorMessages, "agentmemory", errorMessage(agentResult.reason));
+    : (pushDegraded(degradedSources, errorMessages, "agentmemory", errorMessage(agentResult.reason)), DEGRADED.agentmemory);
 
   const magicContext = magicResult.status === "fulfilled"
     ? magicResult.value
-    : pushDegraded(degradedSources, errorMessages, "magicContext", errorMessage(magicResult.reason));
+    : (pushDegraded(degradedSources, errorMessages, "magicContext", errorMessage(magicResult.reason)), DEGRADED.magicContext);
 
   const boulderState = boulderResult.status === "fulfilled"
     ? boulderResult.value
-    : pushDegraded(degradedSources, errorMessages, "boulderState", errorMessage(boulderResult.reason));
+    : (pushDegraded(degradedSources, errorMessages, "boulderState", errorMessage(boulderResult.reason)), DEGRADED.boulderState);
 
   return {
     query: input.query,
@@ -289,14 +289,18 @@ function pushDegraded(
   errorMessages: Partial<Record<MemorySource, string>>,
   source: MemorySource,
   reason: string,
-): MemoryRead["agentmemory"] {
+): void {
   list.push(source);
   errorMessages[source] = reason;
-  // Return a sane empty value so the caller can destructure safely.
-  if (source === "agentmemory") return { available: false, lessons: [] };
-  if (source === "magicContext") return { available: false, slots: [] };
-  return { available: false, tasks: [], planProgress: 0 };
 }
+
+// Typed fallback values for degraded sources.
+// These match the contract types exactly — pushDegraded is side-effect only.
+const DEGRADED = {
+  agentmemory: { available: false, lessons: [] } as const satisfies MemoryRead["agentmemory"],
+  magicContext: { available: false, slots: [] } as const satisfies MemoryRead["magicContext"],
+  boulderState: { available: false, tasks: [], planProgress: 0 } as const satisfies MemoryRead["boulderState"],
+} as const;
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
