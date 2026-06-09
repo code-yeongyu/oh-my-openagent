@@ -14,6 +14,7 @@ import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version
 import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
 import { detectCodexInstallation, formatCodexInstallationWarning, runCodexInstaller } from "./install-codex"
 import { starGitHubRepositories } from "./star-request"
+import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -106,21 +107,8 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     )
   }
 
-  if (
-    config.hasOpenCode &&
-    !config.hasClaude &&
-    !config.hasOpenAI &&
-    !config.hasGemini &&
-    !config.hasCopilot &&
-    !config.hasOpencodeZen &&
-    !config.hasZaiCodingPlan &&
-    !config.hasKimiForCoding &&
-    !config.hasOpencodeGo &&
-    !config.hasMinimaxCnCodingPlan &&
-    !config.hasMinimaxCodingPlan &&
-    !config.hasVercelAiGateway
-  ) {
-    p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
+  if (config.hasOpenCode && !hasAnyConfiguredProvider(config)) {
+    p.log.warn(getNoModelProvidersWarning())
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
