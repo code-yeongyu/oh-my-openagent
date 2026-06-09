@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 const HOOK_NAME = "loop-detector"
 
@@ -11,23 +12,41 @@ export const LOOP_THRESHOLDS = {
 } as const
 
 export interface ToolCallRecord {
-  tool: string
-  args: Record<string, unknown>
-  timestamp: number
+  readonly tool: string
+  readonly args: Record<string, unknown>
+  readonly timestamp: number
   error?: string
 }
 
 export interface LoopDetection {
-  type: "repeated_call" | "error_loop" | "alternating_pattern"
-  pattern: string
-  count: number
-  recommendation: string
+  readonly type: "repeated_call" | "error_loop" | "alternating_pattern"
+  readonly pattern: string
+  readonly count: number
+  readonly recommendation: string
 }
 
 interface SessionLoopState {
   history: ToolCallRecord[]
   loopDetectedAt?: number
   warningCount: number
+}
+
+interface ToolExecuteBeforeInput {
+  readonly tool: string
+  readonly sessionID: string
+  readonly callID: string
+}
+
+interface ToolExecuteBeforeOutput {
+  readonly args: Record<string, unknown>
+  message?: string
+}
+
+interface EventInput {
+  readonly event: {
+    readonly type: string
+    readonly properties?: unknown
+  }
 }
 
 const sessionStates = new Map<string, SessionLoopState>()
@@ -156,26 +175,34 @@ Before continuing:
 3. If stuck, ask the user for guidance`
 }
 
-export interface LoopDetectorHook {
-  "tool.execute.before": (
-    input: { tool: string; sessionID: string; callID: string },
-    output: { args: Record<string, unknown>; output?: string }
-  ) => Promise<{ args: Record<string, unknown>; output?: string }>
-  event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
+function appendMessage(output: ToolExecuteBeforeOutput, message: string): void {
+  output.message = output.message ? `${output.message}\n\n${message}` : message
 }
 
-export function createLoopDetectorHook(_ctx: PluginInput): LoopDetectorHook {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export interface LoopDetectorHook {
+  "tool.execute.before": (
+    input: ToolExecuteBeforeInput,
+    output: ToolExecuteBeforeOutput
+  ) => Promise<void>
+  event: (input: EventInput) => Promise<void>
+}
+
+export function createLoopDetectorHook(_ctx?: PluginInput): LoopDetectorHook {
   return {
     "tool.execute.before": async (
-      input: { tool: string; sessionID: string; callID: string },
-      output: { args: Record<string, unknown>; output?: string }
-    ): Promise<{ args: Record<string, unknown>; output?: string }> => {
+      input: ToolExecuteBeforeInput,
+      output: ToolExecuteBeforeOutput
+    ): Promise<void> => {
       const sessionID = input.sessionID
-      if (!sessionID) return output
+      if (!sessionID) return
 
       const state = getState(sessionID)
       const toolName = input.tool
-      const toolArgs = (output.args ?? {}) as Record<string, unknown>
+      const toolArgs = output.args
 
       const record: ToolCallRecord = {
         tool: toolName,
@@ -204,22 +231,20 @@ export function createLoopDetectorHook(_ctx: PluginInput): LoopDetectorHook {
         })
 
         const warning = createLoopWarning(detection)
-        output.output = output.output ? `${output.output}\n\n${warning}` : warning
+        appendMessage(output, warning)
 
         if (state.warningCount >= 3) {
           log(`[${HOOK_NAME}] Multiple warnings issued, consider blocking`, { sessionID })
         }
       }
-
-      return output
     },
 
     event: async ({ event }): Promise<void> => {
-      const props = event.properties as Record<string, unknown> | undefined
+      const props = isRecord(event.properties) ? event.properties : undefined
 
       if (event.type === "tool.execute.after") {
-        const sessionID = props?.sessionID as string | undefined
-        const error = props?.error as string | undefined
+        const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
+        const error = typeof props?.error === "string" ? props.error : undefined
 
         if (sessionID && error) {
           const state = getState(sessionID)
@@ -231,14 +256,12 @@ export function createLoopDetectorHook(_ctx: PluginInput): LoopDetectorHook {
       }
 
       if (event.type === "session.deleted") {
-        const sessionInfo = props?.info as { id?: string } | undefined
-        if (sessionInfo?.id) {
-          sessionStates.delete(sessionInfo.id)
-          log(`[${HOOK_NAME}] Cleaned up session state`, { sessionID: sessionInfo.id })
+        const sessionID = resolveSessionEventID(props)
+        if (sessionID) {
+          sessionStates.delete(sessionID)
+          log(`[${HOOK_NAME}] Cleaned up session state`, { sessionID })
         }
       }
     },
   }
 }
-
-export default createLoopDetectorHook

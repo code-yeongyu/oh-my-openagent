@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
+  createLoopDetectorHook,
   detectLoop,
   type ToolCallRecord,
   LOOP_THRESHOLDS,
@@ -124,6 +125,24 @@ describe("loop-detector", () => {
       expect(thresholds.sameToolCall).toBeGreaterThanOrEqual(3)
       expect(thresholds.sameErrorPattern).toBeGreaterThanOrEqual(2)
       expect(thresholds.historyWindow).toBeGreaterThanOrEqual(10)
+    })
+  })
+
+  describe("tool.execute.before", () => {
+    test("#given a repeated real tool call reaches the threshold #when hook runs #then it appends a loop warning message", async () => {
+      //#given
+      const hook = createLoopDetectorHook()
+      const input = { tool: "read", sessionID: "ses_loop_detector", callID: "call_1" }
+      const output = { args: { path: "/tmp/a.ts" } }
+
+      //#when
+      await hook["tool.execute.before"](input, output)
+      await hook["tool.execute.before"]({ ...input, callID: "call_2" }, output)
+      await hook["tool.execute.before"]({ ...input, callID: "call_3" }, output)
+
+      //#then
+      expect(output.message).toContain("[LOOP DETECTED - REPEATED_CALL]")
+      expect(output.message).toContain("Try a different approach")
     })
   })
 })

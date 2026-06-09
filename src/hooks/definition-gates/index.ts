@@ -4,35 +4,49 @@ import { log } from "../../shared/logger"
 const HOOK_NAME = "definition-gates"
 
 export interface TaskContext {
-  goal: string
-  filesIdentified: string[]
-  testCriteria: string
-  dependenciesMapped: boolean
-  hasAmbiguity: boolean
+  readonly goal: string
+  readonly filesIdentified: readonly string[]
+  readonly testCriteria: string
+  readonly dependenciesMapped: boolean
+  readonly hasAmbiguity: boolean
 }
 
 export interface CompletionContext {
-  testsPass: boolean
-  typesPass: boolean
-  noForbiddenPatterns: boolean
-  followsCodebaseStyle: boolean
-  todoMarkedComplete: boolean
+  readonly testsPass: boolean
+  readonly typesPass: boolean
+  readonly noForbiddenPatterns: boolean
+  readonly followsCodebaseStyle: boolean
+  readonly todoMarkedComplete: boolean
 }
 
 export interface ReadinessResult {
-  ready: boolean
-  missingCriteria: string[]
-  message: string
+  readonly ready: boolean
+  readonly missingCriteria: readonly string[]
+  readonly message: string
 }
 
 export interface CompletenessResult {
-  complete: boolean
-  failedCriteria: string[]
-  message: string
+  readonly complete: boolean
+  readonly failedCriteria: readonly string[]
+  readonly message: string
 }
 
 type ReadinessCriterion = "goal_is_atomic" | "files_identified" | "test_criteria_defined" | "dependencies_mapped" | "no_ambiguity"
 type CompletenessCriterion = "tests_pass" | "types_pass" | "no_forbidden_patterns" | "follows_codebase_style" | "todo_marked_complete"
+
+const DELEGATION_TOOLS = new Set(["task", "delegate_task", "delegate-task", "call_omo_agent"])
+const TODO_COMPLETION_TOOLS = new Set(["todowrite", "todo_write"])
+
+interface ToolExecuteBeforeInput {
+  readonly tool: string
+  readonly sessionID: string
+  readonly callID: string
+}
+
+interface ToolExecuteBeforeOutput {
+  readonly args: Record<string, unknown>
+  message?: string
+}
 
 export function checkDefinitionOfReady(context: TaskContext): ReadinessResult {
   const missingCriteria: ReadinessCriterion[] = []
@@ -136,6 +150,15 @@ function formatCriterion(criterion: string): string {
   return labels[criterion] ?? criterion
 }
 
+function appendMessage(output: ToolExecuteBeforeOutput, message: string): void {
+  output.message = output.message ? `${output.message}\n\n${message}` : message
+}
+
+function hasCompletedStatus(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+  return "status" in value && value.status === "completed"
+}
+
 function extractTaskContextFromPrompt(prompt: string): Partial<TaskContext> {
   const hasGoal = prompt.length > 10
   const hasFiles = /\.(ts|js|tsx|jsx|md|json)/.test(prompt)
@@ -156,22 +179,21 @@ function extractTaskContextFromPrompt(prompt: string): Partial<TaskContext> {
 
 export interface DefinitionGatesHook {
   "tool.execute.before": (
-    input: { tool: string; sessionID: string; callID: string },
-    output: { args: Record<string, unknown>; output?: string }
-  ) => Promise<{ args: Record<string, unknown>; output?: string }>
+    input: ToolExecuteBeforeInput,
+    output: ToolExecuteBeforeOutput
+  ) => Promise<void>
 }
 
-export function createDefinitionGatesHook(_ctx: PluginInput): DefinitionGatesHook {
+export function createDefinitionGatesHook(_ctx?: PluginInput): DefinitionGatesHook {
   return {
     "tool.execute.before": async (
-      input: { tool: string; sessionID: string; callID: string },
-      output: { args: Record<string, unknown>; output?: string }
-    ): Promise<{ args: Record<string, unknown>; output?: string }> => {
-      const toolName = input.tool
+      input: ToolExecuteBeforeInput,
+      output: ToolExecuteBeforeOutput
+    ): Promise<void> => {
+      const toolName = input.tool.toLowerCase().replace(/^mcp_/, "")
 
-      if (toolName === "mcp_delegate_task" || toolName === "delegate_task") {
-        const toolInput = output.args as Record<string, unknown>
-        const prompt = (toolInput.prompt as string) ?? ""
+      if (DELEGATION_TOOLS.has(toolName)) {
+        const prompt = typeof output.args.prompt === "string" ? output.args.prompt : ""
 
         const partialContext = extractTaskContextFromPrompt(prompt)
         const context: TaskContext = {
@@ -190,15 +212,15 @@ export function createDefinitionGatesHook(_ctx: PluginInput): DefinitionGatesHoo
           })
 
           const reminder = createDoRReminder(result)
-          output.output = output.output ? `${output.output}\n\n${reminder}` : reminder
+          appendMessage(output, reminder)
         }
       }
 
-      if (toolName === "mcp_todowrite" || toolName === "todowrite") {
-        const toolInput = output.args as Record<string, unknown>
-        const todos = toolInput.todos as Array<{ status?: string }> | undefined
+      if (TODO_COMPLETION_TOOLS.has(toolName)) {
+        const rawTodos = output.args.todos
+        const todos = Array.isArray(rawTodos) ? rawTodos : []
 
-        const hasCompletingTodo = todos?.some(t => t.status === "completed")
+        const hasCompletingTodo = todos.some(hasCompletedStatus)
 
         if (hasCompletingTodo) {
           log(`[${HOOK_NAME}] DoD reminder for todo completion`)
@@ -214,13 +236,9 @@ export function createDefinitionGatesHook(_ctx: PluginInput): DefinitionGatesHoo
             message: "Verify Definition of Done before completion",
           })
 
-          output.output = output.output ? `${output.output}\n\n${reminder}` : reminder
+          appendMessage(output, reminder)
         }
       }
-
-      return output
     },
   }
 }
-
-export default createDefinitionGatesHook

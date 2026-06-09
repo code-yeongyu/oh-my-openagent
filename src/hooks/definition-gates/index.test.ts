@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   checkDefinitionOfReady,
   checkDefinitionOfDone,
+  createDefinitionGatesHook,
   type TaskContext,
 } from "./index"
 
@@ -205,6 +206,48 @@ describe("definition-gates", () => {
       //#then
       expect(result.complete).toBe(false)
       expect(result.failedCriteria.length).toBe(5)
+    })
+  })
+
+  describe("tool.execute.before", () => {
+    test("#given task delegation lacks ready criteria #when hook runs #then it appends a Definition of Ready message", async () => {
+      //#given
+      const hook = createDefinitionGatesHook()
+      const output = {
+        args: {
+          prompt: "Investigate the login failure",
+        },
+      }
+
+      //#when
+      await hook["tool.execute.before"](
+        { tool: "task", sessionID: "ses_definition_gates", callID: "call_delegate" },
+        output,
+      )
+
+      //#then
+      expect(output.message).toContain("[DEFINITION OF READY - NOT MET]")
+      expect(output.message).toContain("Files to modify are identified")
+    })
+
+    test("#given TodoWrite completes a todo #when hook runs #then it appends a Definition of Done message", async () => {
+      //#given
+      const hook = createDefinitionGatesHook()
+      const output = {
+        args: {
+          todos: [{ content: "ship change", status: "completed" }],
+        },
+      }
+
+      //#when
+      await hook["tool.execute.before"](
+        { tool: "TodoWrite", sessionID: "ses_definition_gates", callID: "call_todo" },
+        output,
+      )
+
+      //#then
+      expect(output.message).toContain("[DEFINITION OF DONE - NOT MET]")
+      expect(output.message).toContain("Tests pass")
     })
   })
 })
