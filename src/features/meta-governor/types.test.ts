@@ -16,6 +16,10 @@ import type {
   SlotMemory,
   TokenPrediction,
   TokenRecommendation,
+  TokenPredictorConfig,
+  TokenPredictorInput,
+  TokenPredictorOutput,
+  TokenRecommendation,
 } from "./types"
 
 describe("meta-governor types", () => {
@@ -582,6 +586,86 @@ describe("meta-governor types", () => {
 
       // then
       expect(hasAll).toBe(true)
+    })
+  })
+
+  describe("TokenPredictorConfig", () => {
+    test("S1: accepts valid config with all thresholds", () => {
+      // given
+      const config: TokenPredictorConfig = {
+        compactBurnRateThreshold: 500,
+        compactUsageThreshold: 0.85,
+        switchModelUsageThreshold: 0.95,
+        delegateConsecutiveHighBurn: 5,
+        windowSize: 10,
+      }
+
+      // when + then - type check passes
+      expect(config.compactBurnRateThreshold).toBe(500)
+      expect(config.windowSize).toBe(10)
+    })
+  })
+
+  describe("TokenPredictorInput", () => {
+    test("S1: accepts valid input with all fields", () => {
+      // given
+      const input: TokenPredictorInput = {
+        currentUsage: 100000,
+        modelLimit: 200000,
+        recentTurnTokens: [100, 200, 150],
+        timestampISO: new Date().toISOString(),
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-20250514",
+        config: {
+          compactBurnRateThreshold: 500,
+          compactUsageThreshold: 0.85,
+          switchModelUsageThreshold: 0.95,
+          delegateConsecutiveHighBurn: 5,
+          windowSize: 10,
+        },
+      }
+
+      // when + then - type check passes
+      expect(input.currentUsage).toBe(100000)
+      expect(input.recentTurnTokens).toHaveLength(3)
+    })
+  })
+
+  describe("TokenPredictorOutput", () => {
+    test("S1: extends TokenPrediction with input metadata", () => {
+      // given
+      const output: TokenPredictorOutput = {
+        currentUsage: 100000,
+        burnRate: 100,
+        budgetLeft: 100000,
+        willOverflowAt: null,
+        recommendation: "no-action",
+        confidence: 0.8,
+        modelLimit: 200000,
+        windowRemaining: 100000,
+        input: {
+          currentUsage: 100000,
+          modelLimit: 200000,
+          recentTurnTokens: [100],
+          timestampISO: "2025-01-01T00:00:00Z",
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4-20250514",
+          config: {
+            compactBurnRateThreshold: 500,
+            compactUsageThreshold: 0.85,
+            switchModelUsageThreshold: 0.95,
+            delegateConsecutiveHighBurn: 5,
+            windowSize: 10,
+          },
+        },
+        computedAtISO: "2025-01-01T00:00:00Z",
+        turnsAnalyzed: 1,
+      }
+
+      // when + then - type check passes
+      expect(output.input.currentUsage).toBe(100000)
+      expect(output.turnsAnalyzed).toBe(1)
+      expect(typeof output.computedAtISO).toBe("string")
     })
   })
 })
