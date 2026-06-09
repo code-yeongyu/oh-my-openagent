@@ -4,6 +4,7 @@ import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { EU_HORIZON_SKILL_NAME } from "../features/builtin-skills/skills/eu-horizon"
 import { ACADEMIC_REVIEW_SKILL_NAME } from "../features/builtin-skills/skills/academic-review"
+import { ACADEMIC_REVIEW_AGENT_SKILL_NAME } from "../features/builtin-skills/skills/academic-review-agent"
 import { DELIVERABLE_WRITING_SKILL_NAME } from "../features/builtin-skills/skills/deliverable-writing"
 import { PROJECT_MANAGEMENT_SKILL_NAME } from "../features/builtin-skills/skills/project-management"
 import { TECHNICAL_LEAD_SKILL_NAME } from "../features/builtin-skills/skills/technical-lead"
@@ -20,6 +21,7 @@ const MODE: AgentMode = "all"
 const NIOBE_RESEARCH_SKILLS = [
   EU_HORIZON_SKILL_NAME,
   ACADEMIC_REVIEW_SKILL_NAME,
+  ACADEMIC_REVIEW_AGENT_SKILL_NAME,
   ACADEMIC_WRITING_SKILL_NAME,
   DELIVERABLE_WRITING_SKILL_NAME,
   PROJECT_MANAGEMENT_SKILL_NAME,
@@ -100,6 +102,16 @@ Each consultation is standalone, but follow-up questions via session continuatio
 - Constructive feedback: distinguish major vs minor revisions
 - Detect common weaknesses: missing baselines, overclaimed contributions, statistical issues
 - Review tone: rigorous but constructive, never dismissive
+
+### Academic Paper Review Agent (7-Stage Pipeline)
+- **Stage 0 INTAKE**: PDF → Markdown, extract sections, figures, references
+- **Stage 1 STRUCTURAL ANALYSIS**: IMRaD completeness, figure quality, reference currency, notation consistency
+- **Stage 2 CLAIM EXTRACTION**: Claim-evidence ledger with strength classification (Strong/Moderate/Weak/No-Evidence/Refutes)
+- **Stage 3 LITERATURE GROUNDING**: Parallel search — Related Work Searcher + Baseline Scout + Novelty Assessor
+- **Stage 4 METHODOLOGY VERIFICATION**: Statistical rigor, reproducibility, experimental design, math verification
+- **Stage 5 ADVERSARIAL RED TEAM**: Breaker (logical flaws) + Butcher (missing experiments) + Collector (novelty threats)
+- **Stage 6 SYNTHESIS**: Merge all outputs, venue-specific rubric calibration, quality gate, final recommendation
+- Use \`academic-review-agent\` skill for full pipeline reviews
 
 ### Research Methodology
 - Quantitative, qualitative, and mixed methods design
@@ -219,7 +231,7 @@ export function createNiobeAgent(model: string): AgentConfig {
 
   const base = {
     description:
-      "Full research lifecycle & technical leadership expert. Academic writing (journals/conferences), paper review, literature reviews, research methodology, grant proposals (EU/NSF/NIH/ERC), deliverable writing, project management (Agile/Waterfall/WBS), architecture decisions (ADRs), tech debt, data management (FAIR/DMP), IP exploitation, scientific presentations. (Niobe - Matrixx)",
+      "Full research lifecycle & technical leadership expert. Academic writing (journals/conferences), paper review (7-stage pipeline with adversarial red team), literature reviews, research methodology, grant proposals (EU/NSF/NIH/ERC), deliverable writing, project management (Agile/Waterfall/WBS), architecture decisions (ADRs), tech debt, data management (FAIR/DMP), IP exploitation, scientific presentations. (Niobe - Matrixx)",
     mode: MODE,
     model,
     skills: NIOBE_RESEARCH_SKILLS,
