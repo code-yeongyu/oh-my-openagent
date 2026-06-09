@@ -26,6 +26,7 @@ import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
+import { stripDisabledMcpReferencesFromAgents } from "./disabled-mcp-prompt-sanitizer"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -73,6 +74,7 @@ export async function createBuiltinAgents(
   useTaskSystem = false,
   disableOmoEnv = false,
   teamModeEnabled = false,
+  disabledMcps: string[] = [],
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -178,5 +180,5 @@ export async function createBuiltinAgents(
     result["atlas"] = atlasConfig
   }
 
-  return result
+  return stripDisabledMcpReferencesFromAgents(result, disabledMcps)
 }

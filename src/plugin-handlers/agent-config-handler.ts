@@ -36,6 +36,7 @@ export async function applyAgentConfig(
     useTaskSystem,
     disableOmoEnv,
     params.pluginConfig.team_mode?.enabled ?? false,
+    params.pluginConfig.disabled_mcps ?? [],
   );
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase()),
