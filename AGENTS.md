@@ -51,7 +51,7 @@ oh-my-opencode/
 │   └── web/                  # Marketing site (Next.js 15 + Cloudflare Workers). Independent package with own bun.lock
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
 ├── script/                   # Build/publish automation (singular, not scripts/)
-├── docs/                     # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, superpowers/, troubleshooting/)
+├── docs/                     # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, troubleshooting/)
 ├── assets/                   # oh-my-opencode.schema.json (auto-generated from Zod)
 ├── signatures/               # CLA signature registry (cla.json)
 ├── postinstall.mjs           # Verifies platform binary + OpenCode version

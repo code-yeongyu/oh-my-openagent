@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-19 Markdown files across 6 subdirectories + 2 root files. Categorized by audience: user-facing guides + reference, internal design docs (superpowers/), troubleshooting, legal. The web site at [packages/web/](file:///Users/yeongyu/local-workspaces/omo/packages/web/) consumes some of these (via `web-deploy.yml` triggers).
+18 Markdown files across 5 subdirectories + 3 root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](file:///Users/yeongyu/local-workspaces/omo/packages/web/) consumes some of these (via `web-deploy.yml` triggers).
 
 ## WHERE TO LOOK
 
@@ -28,7 +28,6 @@
 | Privacy & ToS | [docs/legal/](file:///Users/yeongyu/local-workspaces/omo/docs/legal/) |
 | Manifesto | [docs/manifesto.md](file:///Users/yeongyu/local-workspaces/omo/docs/manifesto.md) |
 | Ollama troubleshooting | [docs/troubleshooting/ollama.md](file:///Users/yeongyu/local-workspaces/omo/docs/troubleshooting/ollama.md) |
-| Internal design plans/specs | [docs/superpowers/plans/](file:///Users/yeongyu/local-workspaces/omo/docs/superpowers/plans/) + [docs/superpowers/specs/](file:///Users/yeongyu/local-workspaces/omo/docs/superpowers/specs/) |
 
 ## STRUCTURE
 
@@ -40,9 +39,6 @@ docs/
 ├── reference/                                # API / config / CLI reference (8 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
-├── superpowers/
-│   ├── plans/                                # In-flight design plans (model-settings, background-task-retry, log-rotation)
-│   └── specs/                                # Frozen design specs (model-settings-compatibility, background-task-retry-timeline)
 └── troubleshooting/
     └── ollama.md
 ```
@@ -50,7 +46,6 @@ docs/
 ## CONVENTIONS
 
 - **User-facing language only in `guide/` and `reference/`.** No `OmO` internal jargon without explanation.
-- **`superpowers/` is internal.** Design docs, plans, RFCs. Outside readers should not be expected to follow these.
 - **Path links** use the `file://` scheme so OpenCode renders them in TUI. Use absolute paths.
 - **No HTML.** Markdown only. No `<details>` / `<summary>` (causes rendering issues in some terminals).
 - **Code blocks** use language fences. Use `jsonc` for config snippets to preserve comments.
