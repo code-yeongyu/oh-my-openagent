@@ -39,6 +39,12 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   markServerRunningInProcessFn: markServerRunningInProcess,
 }
 
+const backgroundManagersByDirectory = new Map<string, BackgroundManager>()
+
+export function resetBackgroundManagerSingletonsForTesting(): void {
+  backgroundManagersByDirectory.clear()
+}
+
 export type Managers = {
   tmuxSessionManager: TmuxSessionManager
   backgroundManager: BackgroundManager
@@ -104,7 +110,7 @@ export function createManagers(args: {
     },
   })
 
-  backgroundManager = new deps.BackgroundManagerClass({
+  const backgroundManagerConfig = {
     pluginContext: ctx,
     config: pluginConfig.background_task,
     tmuxConfig,
@@ -150,7 +156,19 @@ export function createManagers(args: {
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
     modelFallbackControllerAccessor,
-  })
+  }
+
+  const backgroundManagerKey = ctx.directory
+  backgroundManager = backgroundManagersByDirectory.get(backgroundManagerKey)
+  if (backgroundManager) {
+    log("[create-managers] reusing BackgroundManager singleton", {
+      directory: backgroundManagerKey,
+    })
+    backgroundManager.updateRuntimeBindings(backgroundManagerConfig)
+  } else {
+    backgroundManager = new deps.BackgroundManagerClass(backgroundManagerConfig)
+    backgroundManagersByDirectory.set(backgroundManagerKey, backgroundManager)
+  }
 
   deps.initTaskToastManagerFn(ctx.client)
 
