@@ -9,7 +9,6 @@ This is explicitly separate from model fallback.
 ## Problem
 
 Today, logic for `variant` and `reasoningEffort` compatibility is scattered across multiple places:
-- `hooks/anthropic-effort`
 - `plugin/chat-params`
 - agent/category/fallback config layers
 - delegate/background prompt plumbing
@@ -136,7 +135,6 @@ Why:
 ### Phase 1
 - add resolver module and tests
 - integrate into `chat.params`
-- migrate `anthropic-effort` to either use the resolver or become a thin Claude-specific supplement around it
 
 ### Phase 2
 - expand to `thinking`, `maxTokens`, `temperature`, `top_p`

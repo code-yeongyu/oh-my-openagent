@@ -798,7 +798,6 @@ Current composition counts:
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
 | **category-skill-reminder** | Event + PostToolUse | Reminds agents about available category skills for delegation.                                                                                              |
-| **anthropic-effort**        | Params              | Adjusts Anthropic API effort level based on context.                                                                                                        |
 
 #### Quality & Safety
 

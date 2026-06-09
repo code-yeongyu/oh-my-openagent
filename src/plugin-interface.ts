@@ -37,7 +37,6 @@ export function createPluginInterface(args: {
 
     "chat.params": async (input: unknown, output: unknown) => {
       const handler = createChatParamsHandler({
-        anthropicEffort: hooks.anthropicEffort,
         client: ctx.client,
       })
       await handler(input, output)
