@@ -39,6 +39,8 @@ const componentSkillSources = [
 ];
 
 const codexCompatibilityEndMarkers = [
+	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
+	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `wait_agent` timeout only means no new mailbox update arrived. Treat a running child or latest `WORKING:` message as alive. Do not use `list_agents` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
 	"Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained `message` and usually should use a non-full-history fork mode such as `fork_turns=\"none\"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
@@ -273,15 +275,12 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
 	const syncedWorkflow = await readFile(join(root, "skills", "ulw-loop", "references", "full-workflow.md"), "utf8");
 	const requiredPatterns = [
-		["list_agents polling guard", /list_agents/],
-		["status polling warning", /polling loop/],
-		["large payload replay risk", /replay large payloads/],
+		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
 		["local spawned-name tracking", /Track spawned agent names locally/],
 		["wait_agent mailbox path", /wait_agent.*mailbox signals/],
 		["progress status contract", /WORKING:/],
-		["single list_agents reassurance", /single `list_agents`/],
 		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
-		["bounded plan/reviewer polling", /short wait_agent cycles/],
+		["bounded plan/reviewer polling", /multi_agent_v1\.wait_agent.*cycles/],
 		["single long wait guard", /single long blocking wait/],
 		["git-master checkpointing", /git-master/],
 		["touched-path commit-style probe", /touched-path commit history/],

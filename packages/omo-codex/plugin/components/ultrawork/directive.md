@@ -183,7 +183,7 @@ When discovery needs multiple angles or the module layout is
 unfamiliar, delegate to the `explorer` subagent (read-only codebase
 search, absolute-path results). For research that leaves the repo —
 library/API/docs/web — delegate to the `librarian` subagent. Spawn them
-`fork_turns: "none"` and keep doing root work while they run.
+`fork_context: false` and keep doing root work while they run.
 
 # Execution loop (strict TDD — RED → GREEN → SURFACE → CLEAN)
 Until every success-criteria scenario PASSES with BOTH evidence pieces:
@@ -230,18 +230,18 @@ Parallel-batch independent reads / searches / subagents within a step,
 but NEVER parallelise RED and GREEN of the same criterion.
 
 # Codex subagent reliability
-Every `spawn_agent` message is self-contained and starts with
+Every `multi_agent_v1.spawn_agent` message is self-contained and starts with
 `TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`, and
 `VERIFY`. State that it is an executable assignment, not a context
-handoff. Prefer `fork_turns: "none"` unless full history is truly
+handoff. Use `fork_context: false` unless full history is truly
 required; paste only the context the child needs. Full-history forks can
 make the child continue old parent context instead of the delegated task.
 
 # TOML-backed subagent routing compatibility
-Treat TOML-backed role routing as **routing-unverified**. The available
-`spawn_agent` schema accepts only `task_name`, `message`, and
-`fork_turns`; it cannot select a TOML-backed role, model, reasoning
-effort, or `service_tier`. Say so briefly in the notepad, paste the
+Treat TOML-backed role routing as **routing-unverified**. The
+`multi_agent_v1.spawn_agent` schema accepts `message`, `fork_context`,
+`agent_type`, and `model`; it cannot select a TOML-backed role, model, reasoning
+effort, or `service_tier` by name alone. Say so briefly in the notepad, paste the
 role requirements into the message, and judge the result from delivered
 evidence. Never claim the reviewer, planner, or explorer role was
 selected from TOML unless runtime evidence confirms it.
@@ -250,18 +250,14 @@ Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, tell the child to send
 `WORKING: <task> - <current phase>` before long reading, testing, or
 review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned agent names locally. Use `wait_agent` for mailbox
-signals, but a timeout only means no new mailbox update arrived. After
-a timeout, run a single `list_agents` check for the named child when
-you need reassurance; if it is running or its latest message is
-`WORKING:`, treat it as alive and keep doing independent root work.
-Do not use `list_agents` as a polling loop or status feed; it can
-replay large payloads. Send `TASK STILL ACTIVE: return <deliverable> or
-BLOCKED: <reason>` only when the child is completed without the
+Track spawned agent names locally. Use `multi_agent_v1.wait_agent` for mailbox
+signals, but a timeout only means no new mailbox update arrived.
+Treat a running child as alive and keep doing independent root work.
+Fallback only when the child is completed without the
 deliverable, ack-only, or no longer running. If that followup is still
 silent or ack-only, record the result as inconclusive, do not count it
 as approval/pass, close it if safe, and respawn a smaller
-`fork_turns: "none"` task with the missing deliverable.
+`fork_context: false` task with the missing deliverable.
 
 # Subagent-dependent transition barrier
 Do not mark an `update_plan` step `completed` while an active child owns
@@ -270,7 +266,7 @@ audit, research, or review result is integrated or explicitly recorded
 as inconclusive. Do not generate a plan before spawned research lanes
 that feed the plan have returned or been closed as inconclusive.
 Do not write the final answer, PR handoff, or completion summary while
-active child agents remain open. Use short `wait_agent` cycles.
+active child agents remain open. Use short `multi_agent_v1.wait_agent` cycles.
 After two silent waits send `TASK STILL ACTIVE: return <deliverable> or
 BLOCKED: <reason>`. After four silent or ack-only checks, close the lane as
 inconclusive, record that it is not approval, and respawn smaller only
@@ -285,8 +281,8 @@ Trigger when ANY apply:
   anything the user called deep.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn a child with `fork_turns: "none"` and a self-contained reviewer
-   assignment in `message`. The `spawn_agent` schema cannot select a
+1. Spawn a child with `fork_context: false` and a self-contained reviewer
+   assignment in `message`. The `multi_agent_v1.spawn_agent` schema cannot select a
    TOML-backed reviewer role, so paste the reviewer requirements into
    the message.
    Pass: goal, success-criteria, scenario evidence, full diff, notepad

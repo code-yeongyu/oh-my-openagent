@@ -22,15 +22,14 @@ When translating `load_skills=[...]`, name the skills inside the spawned agent's
 
 ## Codex Subagent Reliability
 
-Every `spawn_agent` message must be self-contained. Start with
+Every `multi_agent_v1.spawn_agent` message must be self-contained. Start with
 `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and
 `VERIFY`. State that it is an executable assignment, not a context
-handoff. Role or specialty instructions belong inside `message`; the
-Codex tool schema only accepts `task_name`, `message`, and `fork_turns`.
-Prefer `fork_turns: "none"` unless full history is truly
+handoff. Role or specialty instructions belong inside `message`.
+Use `fork_context: false` unless full history is truly
 required; paste only the context the child needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, require the child to send
@@ -39,16 +38,13 @@ review passes, and `BLOCKED: <reason>` only when it cannot progress.
 While any child is active, keep the parent visibly alive with active
 subagent count, agent names, latest `WORKING:` phase, and whether the
 parent is waiting for mailbox updates. Track spawned agent names
-locally. Use `wait_agent` for mailbox signals, not proof of completion.
-A timeout only means no new mailbox update arrived; after a timeout,
-run a single `list_agents` check for the named child when you need
-reassurance. If it is running or its latest message is `WORKING:`,
-treat it as alive. Do not use `list_agents` as a polling loop or status
-feed; it can replay large payloads. Fallback only when the child is
+locally. Use `multi_agent_v1.wait_agent` for mailbox signals, not proof of completion.
+A timeout only means no new mailbox update arrived. Treat a running child as alive.
+Fallback only when the child is
 completed without the deliverable, ack-only after followup, explicitly
 `BLOCKED:`, or no longer running. Then record the result as
 inconclusive, do not count it as pass/review approval, close if safe,
-and respawn a smaller `fork_turns: "none"` task with the missing
+and respawn a smaller `fork_context: false` task with the missing
 deliverable.
 
 # start-work
@@ -116,7 +112,7 @@ If `--worktree` is set, verify the path with `git worktree list --porcelain` or 
 2. Find the first unchecked column-0 checkbox in `## TODOs` or `## Final Verification Wave`.
 3. Ignore nested checkboxes under acceptance criteria, evidence, and definition-of-done sections.
 4. Decompose that checkbox into atomic sub-tasks.
-5. Dispatch independent sub-tasks in parallel with `spawn_agent`; serialize only when one sub-task has a named dependency on another.
+5. Dispatch independent sub-tasks in parallel with `multi_agent_v1.spawn_agent`; serialize only when one sub-task has a named dependency on another.
 
 Each sub-task message must include:
 

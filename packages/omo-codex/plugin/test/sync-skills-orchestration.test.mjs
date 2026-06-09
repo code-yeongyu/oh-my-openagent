@@ -110,8 +110,7 @@ test("#given synced aggregate Codex skills #when they describe background orches
 		["working progress message", /WORKING:/],
 		["blocked progress message", /BLOCKED:/],
 		["mailbox timeout framing", /timeout only means no new mailbox update arrived/],
-		["single liveness check", /single `list_agents` check|one `list_agents` check/],
-		["polling-loop guard", /Do not use `list_agents` as a polling loop|Do NOT use `list_agents` as a polling loop/],
+		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
 		["explicit fallback conditions", /Fallback only when|Mark a file for retry only when/],
 	];
 	const bannedPatterns = [
@@ -148,5 +147,5 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /Overall Verdict: PASSED \/ FAILED \/ INCONCLUSIVE/);
 	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
-	assert.match(content, /Do not use `send_message` as an interrupt/);
+	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
 });

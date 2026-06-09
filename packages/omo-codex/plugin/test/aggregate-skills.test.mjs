@@ -5,7 +5,7 @@ import test from "node:test";
 
 import {
 	findInvalidSpawnAgentRoleParameters,
-	findSpawnAgentCallsWithoutForkTurnsNone,
+	findSpawnAgentCallsWithoutForkContextFalse,
 	root,
 } from "./aggregate-plugin-fixture.mjs";
 
@@ -27,7 +27,7 @@ test("#given synced skills with Codex compatibility guidance #when spawn_agent i
 	assert.deepEqual(invalidCalls, []);
 });
 
-test('#given synced skills and bundled rules #when role-specific agents are spawned #then they set fork_turns="none"', async () => {
+test('#given synced skills and bundled rules #when role-specific agents are spawned #then they set fork_context=false', async () => {
 	const skillsDir = join(root, "skills");
 	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
 	const promptFiles = skillEntries
@@ -35,15 +35,15 @@ test('#given synced skills and bundled rules #when role-specific agents are spaw
 		.map((entry) => join(skillsDir, entry.name, "SKILL.md"));
 	promptFiles.push(join(root, "components", "rules", "bundled-rules", "hephaestus.md"));
 
-	const missingForkTurns = [];
+	const missingForkContext = [];
 	for (const promptPath of promptFiles) {
 		const content = await readFile(promptPath, "utf8");
-		for (const call of findSpawnAgentCallsWithoutForkTurnsNone(content)) {
-			missingForkTurns.push(`${basename(dirname(promptPath))}/${basename(promptPath)}: ${call}`);
+		for (const call of findSpawnAgentCallsWithoutForkContextFalse(content)) {
+			missingForkContext.push(`${basename(dirname(promptPath))}/${basename(promptPath)}: ${call}`);
 		}
 	}
 
-	assert.deepEqual(missingForkTurns, []);
+	assert.deepEqual(missingForkContext, []);
 });
 
 test("#given long-running orchestration prompts #when waiting on child agents #then parent liveness is surfaced", async () => {
