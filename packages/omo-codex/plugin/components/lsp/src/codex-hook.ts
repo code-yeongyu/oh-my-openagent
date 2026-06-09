@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { executeLspDiagnostics } from "@code-yeongyu/lsp-tools-mcp/dist/tools.js";
+import { callDiagnosticsViaDaemon, currentRequestContext } from "@code-yeongyu/lsp-daemon";
 
 import {
 	isUnavailableLspDiagnostics,
@@ -59,7 +59,7 @@ const CONTEXT_PRESSURE_MARKERS = [
 ] as const;
 
 export async function runLspDiagnosticsText(filePath: string): Promise<string> {
-	const result = await executeLspDiagnostics({ filePath, severity: "error" });
+	const result = await callDiagnosticsViaDaemon(filePath, { context: currentRequestContext() });
 	return result.content.map((block) => block.text).join("\n");
 }
 

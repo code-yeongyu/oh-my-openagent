@@ -5,7 +5,7 @@ import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, type SessionMapping } from "./decision-engine"
-import { executeActions } from "./action-executor"
+import { executeActions, type ExecuteActionsResult } from "./action-executor"
 import type { SessionCreatedEvent } from "./session-created-event"
 import { createTrackedSession } from "./tracked-session-state"
 
@@ -25,6 +25,8 @@ export interface SessionCreatedHandlerDeps {
   getSessionMappings: () => SessionMapping[]
   waitForSessionReady: (sessionId: string) => Promise<boolean>
   startPolling: () => void
+  queryWindowState?: typeof queryWindowState
+  executeActions?: typeof executeActions
 }
 
 export async function handleSessionCreated(
@@ -63,7 +65,7 @@ export async function handleSessionCreated(
   deps.pendingSessions.add(sessionId)
 
   try {
-    const state = await queryWindowState(deps.sourcePaneId)
+    const state = await (deps.queryWindowState ?? queryWindowState)(deps.sourcePaneId)
     if (!state) {
       log("[tmux-session-manager] failed to query window state")
       return
@@ -115,7 +117,8 @@ export async function handleSessionCreated(
       return
     }
 
-    const result = await executeActions(decision.actions, {
+    const runActions = deps.executeActions ?? executeActions
+    const result: ExecuteActionsResult = await runActions(decision.actions, {
       config: deps.tmuxConfig,
       directory: deps.directory,
       serverUrl: deps.serverUrl,

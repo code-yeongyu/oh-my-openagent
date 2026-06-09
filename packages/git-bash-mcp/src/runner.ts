@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export interface GitBashRunInput {
   readonly bashPath: string;
@@ -19,15 +22,38 @@ export type RunGitBashCommand = (input: GitBashRunInput) => Promise<GitBashRunRe
 
 export async function runGitBashCommand(input: GitBashRunInput): Promise<GitBashRunResult> {
   return await new Promise<GitBashRunResult>((resolve, reject) => {
+    const outputDirectory = mkdtempSync(join(tmpdir(), "omo-git-bash-run-"));
+    const stdoutPath = join(outputDirectory, "stdout");
+    const stderrPath = join(outputDirectory, "stderr");
+    const stdoutFd = openSync(stdoutPath, "w+");
+    const stderrFd = openSync(stderrPath, "w+");
+    let outputClosed = false;
+
+    function closeOutputFiles(): void {
+      if (outputClosed) {
+        return;
+      }
+
+      closeSync(stdoutFd);
+      closeSync(stderrFd);
+      outputClosed = true;
+    }
+
+    function readAndRemoveOutput(): Pick<GitBashRunResult, "stdout" | "stderr"> {
+      closeOutputFiles();
+      const stdout = readFileSync(stdoutPath, "utf8");
+      const stderr = readFileSync(stderrPath, "utf8");
+      rmSync(outputDirectory, { recursive: true, force: true });
+      return { stdout, stderr };
+    }
+
     const child = spawn(input.bashPath, ["-lc", input.command], {
       cwd: input.cwd,
       env: input.env,
       windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", stdoutFd, stderrFd],
     });
 
-    let stdout = "";
-    let stderr = "";
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -35,21 +61,16 @@ export async function runGitBashCommand(input: GitBashRunInput): Promise<GitBash
     }, input.timeoutMs);
     timeout.unref();
 
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
     child.on("error", (error) => {
       clearTimeout(timeout);
+      closeOutputFiles();
+      rmSync(outputDirectory, { recursive: true, force: true });
       reject(error);
     });
     child.on("close", (exitCode) => {
       clearTimeout(timeout);
-      resolve({ exitCode, stdout, stderr, timedOut });
+      const output = readAndRemoveOutput();
+      resolve({ exitCode, ...output, timedOut });
     });
   });
 }

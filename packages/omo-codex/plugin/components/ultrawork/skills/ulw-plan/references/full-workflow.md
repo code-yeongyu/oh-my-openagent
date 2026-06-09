@@ -22,8 +22,8 @@ Size your interview depth before diving in:
 ## Phase 1 - Ground (explore exhaustively BEFORE asking)
 Eliminate unknowns by discovering facts, not by asking the user. Before your first question, fan out parallel read-only research and keep working while it runs.
 
-- `spawn_agent(agent_type="explorer", fork_turns="none", ...)` per internal aspect: existing patterns, conventions, similar implementations, naming/registration, test infrastructure. One agent per aspect.
-- `spawn_agent(agent_type="librarian", fork_turns="none", ...)` per external aspect: official docs, API contracts, recommended patterns, pitfalls.
+- `multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","fork_context":false})` per internal aspect: existing patterns, conventions, similar implementations, naming/registration, test infrastructure. One agent per aspect.
+- `multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","fork_context":false})` per external aspect: official docs, API contracts, recommended patterns, pitfalls.
 - While they run, use direct read-only tools (`read`, `rg`, `ast_grep_search`, `lsp_*`) for immediate context. Do not idle.
 
 ### Dynamic workflow for architecture and bootstrap planning
@@ -61,7 +61,7 @@ Then **wait for the user's explicit okay** before generating the plan. No Metis,
 Narrow `$start-work` bootstrap exception: if `$start-work` invoked this skill because there was no active Boulder work and no selectable plan, the user's `start work` request counts as approval to generate the plan and begin execution. Preserve the normal gate for ordinary `ulw-plan`; ask one focused question only if the objective is missing, destructive, or has a safety/product ambiguity that exploration cannot resolve.
 
 ## Phase 3 - Generate the plan (only after approval)
-1. **Metis gap analysis (mandatory):** `spawn_agent(agent_type="metis", fork_turns="none", message="TASK: review this planning session for gaps. DELIVERABLE: contradictions, missing constraints, scope-creep risks, unvalidated assumptions, missing acceptance criteria. VERIFY: each gap names a concrete fix.")`. Fold the findings in silently.
+1. **Metis gap analysis (mandatory):** `multi_agent_v1.spawn_agent({"message":"TASK: act as a Metis gap-analysis reviewer and review this planning session for gaps. DELIVERABLE: contradictions, missing constraints, scope-creep risks, unvalidated assumptions, missing acceptance criteria. VERIFY: each gap names a concrete fix.","fork_context":false})`. Fold the findings in silently.
 2. Write ONE plan to `.omo/plans/<slug>.md` using the template below. No "Phase 1 plan / Phase 2 plan" splits; 50+ todos is fine. Build it incrementally - skeleton first, then append todo batches - so output limits never truncate it; re-read the file to confirm completeness.
 3. **Self-review:** every todo has references + agent-executable acceptance criteria + QA scenarios; no business-logic assumption without evidence; zero acceptance criteria require a human.
 
@@ -116,14 +116,14 @@ Critical path: ...
 ```
 
 ## Phase 4 - High-accuracy review (optional)
-If the user wants maximum rigor, `spawn_agent(agent_type="momus", fork_turns="none", message=".omo/plans/<slug>.md")` and pass ONLY the plan path. Fix every cited issue and resubmit until it approves.
+If the user wants maximum rigor, call `multi_agent_v1.spawn_agent({"message":"TASK: act as a Momus plan reviewer. DELIVERABLE: review .omo/plans/<slug>.md only. VERIFY: cite every required fix or approve.","fork_context":false})` and pass ONLY the plan path in `message`. Fix every cited issue and resubmit until it approves.
 
 ## Delegation discipline (Codex)
-- Every `spawn_agent` message starts with `TASK:`, then `DELIVERABLE`, `SCOPE`, `VERIFY`. `agent_type` selects the role; `model` + `reasoning_effort` alone creates a default agent, not that role. Prefer `fork_turns: "none"`.
-- Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
+- Every `multi_agent_v1.spawn_agent` message starts with `TASK:`, then `DELIVERABLE`, `SCOPE`, `VERIFY`. Put role and specialty instructions inside `message`. Use `fork_context: false` unless full history is truly required.
+- Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles. Never use a single long blocking wait for them.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops.
 - Keep yourself visibly alive while children run: active subagent count, agent names, latest `WORKING:` phase, and whether you are waiting on mailbox updates.
-- Use `wait_agent` for mailbox signals, not proof. A timeout only means no new mailbox update arrived; after a timeout, run a single `list_agents` check for the named child when you need reassurance. If it is running or its latest message is `WORKING:`, treat it as alive. Do not use `list_agents` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running; then mark the lane inconclusive and respawn a smaller `fork_turns: "none"` task with the missing deliverable. `close_agent` after integrating each result.
+- Use `multi_agent_v1.wait_agent` for mailbox signals, not proof. A timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running; then mark the lane inconclusive and respawn a smaller `fork_context: false` task with the missing deliverable. `multi_agent_v1.close_agent` after integrating each result.
 
 ## Stop rules
 - Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent: DONE.

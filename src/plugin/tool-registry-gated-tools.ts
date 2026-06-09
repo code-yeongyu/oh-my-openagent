@@ -31,17 +31,6 @@ export function createHashlineToolsRecord(args: {
   return pluginConfig.hashline_edit ? { edit: factories.createHashlineEditTool(ctx) } : {}
 }
 
-export function createConsensusToolsRecord(args: {
-  readonly pluginConfig: OhMyOpenCodeConfig
-  readonly ctx: PluginContext
-  readonly factories: ToolRegistryFactories
-}): Record<string, ToolDefinition> {
-  const { pluginConfig, ctx, factories } = args
-  return pluginConfig.consensus?.enabled ?? true
-    ? { consensus: factories.createConsensusTool(ctx, pluginConfig.consensus) }
-    : {}
-}
-
 export function getTaskSystemEnabled(pluginConfig: OhMyOpenCodeConfig): boolean {
   return isTaskSystemEnabled(pluginConfig)
 }

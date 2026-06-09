@@ -4,81 +4,23 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
+import {
+	CONTEXT_PRESSURE_SKILL_BUDGET_BYTES,
+	assertPackagedContentMatches,
+	componentSkillSources,
+	expectedSkills,
+	listSkillFiles,
+	removeCodexCompatibilityGuidance,
+	removeCodexSkillOverlays,
+} from "./sync-skills-test-support.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
-const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
-
-const expectedSkills = [
-	"comment-checker",
-	"debugging",
-	"frontend-ui-ux",
-	"git-master",
-	"init-deep",
-	"lcx-contribute-bug-fix",
-	"lcx-report-bug",
-	"lsp",
-	"programming",
-	"refactor",
-	"remove-ai-slops",
-	"review-work",
-	"rules",
-	"start-work",
-	"ultraresearch",
-	"ulw-loop",
-	"ulw-plan",
-	"visual-qa",
-];
-
-const componentSkillSources = [
-	["comment-checker", "components/comment-checker/skills/comment-checker"],
-	["lsp", "components/lsp/skills/lsp"],
-	["rules", "components/rules/skills/rules"],
-	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
-	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
-];
-
-const codexCompatibilityEndMarkers = [
-	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `wait_agent` timeout only means no new mailbox update arrived. Treat a running child or latest `WORKING:` message as alive. Do not use `list_agents` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
-	"Codex full-history forks inherit the parent agent type, model, and reasoning effort, so role-specific spawns with `agent_type` must use a non-full-history fork mode such as `fork_turns=\"none\"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-];
-
-function removeCodexCompatibilityGuidance(content) {
-	const start = content.indexOf("## Codex Harness Tool Compatibility\n\n");
-	if (start === -1) return content;
-	const endMarker = codexCompatibilityEndMarkers.find((marker) => content.indexOf(marker, start) !== -1);
-	assert.notEqual(endMarker, undefined, "Codex compatibility guidance block is missing its terminator");
-	const end = content.indexOf(endMarker, start);
-	assert.notEqual(end, -1, "Codex compatibility guidance block is missing its terminator");
-	return `${content.slice(0, start)}${content.slice(end + endMarker.length)}`;
-}
-
-async function listSkillFiles(dir) {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const files = [];
-	for (const entry of entries) {
-		if (entry.isDirectory()) {
-			const nested = await listSkillFiles(join(dir, entry.name));
-			for (const nestedPath of nested) files.push(join(entry.name, nestedPath));
-		} else {
-			files.push(entry.name);
-		}
-	}
-	return files.sort();
-}
 
 async function readPackagedSkillFile(...segments) {
 	const path = join(root, "skills", ...segments);
 	const content = await readFile(path, "utf8");
 	return { path, content };
-}
-
-function assertPackagedContentMatches({ path, content }, requirements) {
-	for (const [label, pattern] of requirements) {
-		assert.match(content, pattern, `${path} missing packaged skill contract: ${label}`);
-	}
 }
 
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
@@ -135,7 +77,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
-			removeCodexCompatibilityGuidance(aggregateContent),
+			removeCodexSkillOverlays(skillName, removeCodexCompatibilityGuidance(aggregateContent)),
 			removeCodexCompatibilityGuidance(sharedContent),
 			`${skillName} drifted from shared-skills`,
 		);
@@ -234,15 +176,12 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
 	const syncedWorkflow = await readFile(join(root, "skills", "ulw-loop", "references", "full-workflow.md"), "utf8");
 	const requiredPatterns = [
-		["list_agents polling guard", /list_agents/],
-		["status polling warning", /polling loop/],
-		["large payload replay risk", /replay large payloads/],
+		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
 		["local spawned-name tracking", /Track spawned agent names locally/],
 		["wait_agent mailbox path", /wait_agent.*mailbox signals/],
 		["progress status contract", /WORKING:/],
-		["single list_agents reassurance", /single `list_agents`/],
 		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
-		["bounded plan/reviewer polling", /short wait_agent cycles/],
+		["bounded plan/reviewer polling", /multi_agent_v1\.wait_agent.*cycles/],
 		["single long wait guard", /single long blocking wait/],
 		["git-master checkpointing", /git-master/],
 		["touched-path commit-style probe", /touched-path commit history/],

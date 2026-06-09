@@ -11,12 +11,58 @@ type TeamSpecEntry = {
   path: string
 }
 
+type PathDeps = {
+  readonly chmod: typeof chmod
+  readonly log: typeof log
+  readonly mkdir: typeof mkdir
+  readonly stat: typeof stat
+}
+
+const defaultPathDeps = {
+  chmod,
+  log,
+  mkdir,
+  stat,
+} satisfies PathDeps
+
 function getTeamDirectory(baseDir: string, teamName: string, scope: "user" | "project", projectRoot?: string): string {
   if (scope === "project") {
     return path.join(projectRoot ?? "", ".omo", "teams", teamName)
   }
 
   return path.join(baseDir, "teams", teamName)
+}
+
+export class TeamPathTraversalError extends Error {
+  constructor() {
+    super("team path escapes base directory")
+    this.name = "TeamPathTraversalError"
+  }
+}
+
+function resolveContainedPath(baseDir: string, pathSegments: readonly string[]): string {
+  for (const pathSegment of pathSegments) {
+    if (
+      pathSegment.length === 0 ||
+      pathSegment === "." ||
+      pathSegment === ".." ||
+      pathSegment.includes("/") ||
+      pathSegment.includes("\\") ||
+      pathSegment.includes("\0")
+    ) {
+      throw new TeamPathTraversalError()
+    }
+  }
+
+  const resolvedBaseDir = path.resolve(baseDir)
+  const resolvedPath = path.resolve(resolvedBaseDir, ...pathSegments)
+  const relativePath = path.relative(resolvedBaseDir, resolvedPath)
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new TeamPathTraversalError()
+  }
+
+  return resolvedPath
 }
 
 export function resolveBaseDir(config: TeamModeConfig): string {
@@ -33,19 +79,39 @@ export function getTeamSpecPath(
 }
 
 export function getRuntimeStateDir(baseDir: string, teamRunId: string): string {
-  return path.join(baseDir, "runtime", teamRunId)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId])
 }
 
 export function getInboxDir(baseDir: string, teamRunId: string, memberName: string): string {
-  return path.join(baseDir, "runtime", teamRunId, "inboxes", memberName)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "inboxes", memberName])
 }
 
 export function getTasksDir(baseDir: string, teamRunId: string): string {
-  return path.join(baseDir, "runtime", teamRunId, "tasks")
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks"])
+}
+
+function assertSafeTaskId(taskId: string): void {
+  if (!/^\d+$/.test(taskId)) {
+    throw new TeamPathTraversalError()
+  }
+}
+
+export function getTaskFilePath(baseDir: string, teamRunId: string, taskId: string): string {
+  assertSafeTaskId(taskId)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks", `${taskId}.json`])
+}
+
+export function getTaskClaimsDir(baseDir: string, teamRunId: string): string {
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks", "claims"])
+}
+
+export function getTaskClaimLockPath(baseDir: string, teamRunId: string, taskId: string): string {
+  assertSafeTaskId(taskId)
+  return resolveContainedPath(baseDir, ["runtime", teamRunId, "tasks", "claims", `${taskId}.lock`])
 }
 
 export function getWorktreeDir(baseDir: string, teamRunId: string, memberName: string): string {
-  return path.join(baseDir, "worktrees", teamRunId, memberName)
+  return resolveContainedPath(baseDir, ["worktrees", teamRunId, memberName])
 }
 
 async function readTeamSpecDirectories(directoryPath: string, scope: "project" | "user"): Promise<TeamSpecEntry[]> {
@@ -68,6 +134,7 @@ async function readTeamSpecDirectories(directoryPath: string, scope: "project" |
 export async function discoverTeamSpecs(
   config: TeamModeConfig,
   projectRoot: string,
+  deps: Pick<PathDeps, "log"> = defaultPathDeps,
 ): Promise<Array<{ name: string; scope: "project" | "user"; path: string }>> {
   const baseDir = resolveBaseDir(config)
   const projectTeamsDir = path.resolve(projectRoot, ".omo", "teams")
@@ -85,7 +152,7 @@ export async function discoverTeamSpecs(
     if (projectTeamNames.has(userTeamSpec.name)) {
       const projectTeamSpec = projectTeamSpecs.find((entry) => entry.name === userTeamSpec.name)
       if (projectTeamSpec) {
-        log("team-spec collision", {
+        deps.log("team-spec collision", {
           event: "team-spec-collision",
           teamName: userTeamSpec.name,
           projectPath: projectTeamSpec.path,
@@ -101,16 +168,25 @@ export async function discoverTeamSpecs(
   return discoveredTeamSpecs
 }
 
-async function safeChmod(directoryPath: string, mode: number): Promise<void> {
+type ErrnoLike = {
+  readonly code?: unknown
+  readonly syscall?: unknown
+}
+
+function isErrnoLike(error: unknown): error is ErrnoLike {
+  return typeof error === "object" && error !== null
+}
+
+async function safeChmod(directoryPath: string, mode: number, deps: Pick<PathDeps, "chmod" | "log">): Promise<void> {
   try {
-    await chmod(directoryPath, mode)
+    await deps.chmod(directoryPath, mode)
   } catch (error) {
-    const errnoError = error as NodeJS.ErrnoException
-    if (errnoError?.code === "EPERM" || errnoError?.code === "ENOTSUP" || errnoError?.code === "EINVAL") {
-      log("team-mode: chmod refused on base directory; continuing with existing permissions", {
+    const code = isErrnoLike(error) && typeof error.code === "string" ? error.code : undefined
+    if (code === "EPERM" || code === "ENOTSUP" || code === "EINVAL") {
+      deps.log("team-mode: chmod refused on base directory; continuing with existing permissions", {
         path: directoryPath,
-        code: errnoError.code,
-        syscall: errnoError.syscall,
+        code,
+        syscall: isErrnoLike(error) && typeof error.syscall === "string" ? error.syscall : undefined,
       })
       return
     }
@@ -118,7 +194,7 @@ async function safeChmod(directoryPath: string, mode: number): Promise<void> {
   }
 }
 
-export async function ensureBaseDirs(baseDir: string): Promise<void> {
+export async function ensureBaseDirs(baseDir: string, deps: PathDeps = defaultPathDeps): Promise<void> {
   const directories = [
     baseDir,
     path.join(baseDir, "teams"),
@@ -127,14 +203,14 @@ export async function ensureBaseDirs(baseDir: string): Promise<void> {
   ]
 
   for (const directoryPath of directories) {
-    await mkdir(directoryPath, { recursive: true, mode: 0o700 })
-    await safeChmod(directoryPath, 0o700)
+    await deps.mkdir(directoryPath, { recursive: true, mode: 0o700 })
+    await safeChmod(directoryPath, 0o700, deps)
   }
 
   await Promise.all(directories.map(async (directoryPath) => {
-    const directoryStat = await stat(directoryPath)
+    const directoryStat = await deps.stat(directoryPath)
     if ((directoryStat.mode & 0o777) !== 0o700) {
-      await safeChmod(directoryPath, 0o700)
+      await safeChmod(directoryPath, 0o700, deps)
     }
   }))
 }

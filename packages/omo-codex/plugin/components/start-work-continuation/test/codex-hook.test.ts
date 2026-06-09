@@ -124,6 +124,38 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toMatch(/global-review-debug-gate-passed/);
 	});
 
+	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {
+		// given
+		const transcriptPath = "/repo/transcript.jsonl";
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+			}),
+			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+			[transcriptPath]: [
+				JSON.stringify({
+					type: "message",
+					payload: {
+						content: {
+							error: {
+								code: "context_too_large",
+							},
+						},
+					},
+				}),
+				"Your input exceeds the context window of this model.",
+				"",
+			].join("\n"),
+		});
+
+		// when
+		const output = runStopHook({ ...createStopInput(), transcript_path: transcriptPath }, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given active codex work #when continuation directive is emitted #then subagent guidance is reliable", () => {
 		// given
 		const fs = createMemoryFs({
@@ -140,12 +172,11 @@ describe("start-work Stop hook", () => {
 		// then
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toMatch(/TASK:/);
-		expect(parsed.reason).toMatch(/fork_turns:\s*"none"/);
+		expect(parsed.reason).toMatch(/fork_context:\s*false/);
 		expect(parsed.reason).toMatch(/wait_agent.*mailbox signals/);
 		expect(parsed.reason).toMatch(/TASK STILL ACTIVE/);
 		expect(parsed.reason).toMatch(/respawn.*smaller/);
 		expect(parsed.reason).toMatch(/WORKING:/);
-		expect(parsed.reason).toMatch(/single `list_agents`/);
 	});
 
 	it("#given active codex work #when continuation directive is emitted #then completion requires global review and debugging", () => {

@@ -7,11 +7,13 @@ Internally each component remains isolated under `components/`:
 - `components/comment-checker`
 - `components/rules`
 - `components/lsp`
+- `components/git-bash`
+- `components/start-work-continuation`
 - `components/ultrawork`
 - `components/ulw-loop`
 - `components/telemetry`
 
-The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and the LSP MCP server.
+The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and plugin-scoped MCP servers for `ast_grep`, `grep_app`, `context7`, `git_bash`, and `lsp`.
 
 ## Telemetry
 

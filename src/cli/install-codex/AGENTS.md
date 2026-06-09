@@ -13,7 +13,7 @@ Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. Entr
 | `install-codex.ts` | Main orchestrator `runCodexInstaller()` — resolves paths, loops over marketplace plugins, drives cache/install/config phases |
 | `types.ts` | `CodexInstallOptions`, `CodexInstallResult`, `MarketplaceManifest`, `PluginManifest`, `InstalledPlugin` |
 | `codex-marketplace.ts` | Reads `packages/omo-codex/marketplace.json` and per-plugin `.codex-plugin/plugin.json`; validates path segments |
-| `codex-cache-install.ts` | Builds source, copies to temp cache dir, runs `npm install --omit=dev`, rewrites MCP manifest, atomically promotes to `~/.codex/plugins/cache/{marketplace}/{name}/{version}/` |
+| `codex-cache-install.ts` | Builds source, copies to temp cache dir, runs `npm ci --omit=dev`, rewrites MCP manifest, atomically promotes to `~/.codex/plugins/cache/{marketplace}/{name}/{version}/` |
 | `codex-cache-bins.ts` | Discovers `package.json` `bin` entries, links component CLIs into bin dir; writes `omo` runtime wrapper (POSIX shell / Windows `.cmd`) |
 | `link-cached-plugin-agents.ts` | Discovers bundled agent TOMLs under `components/*/agents/`, copies to `~/.codex/agents/`, preserves existing `model_reasoning_effort`, writes `.installed-agents.json` manifest |
 | `codex-marketplace-snapshot.ts` | Writes local marketplace snapshot to `~/.codex/.tmp/marketplaces/{marketplace}/` |
@@ -29,7 +29,7 @@ runCodexInstaller()
   3. codex-marketplace.ts: read marketplace.json + plugin manifests
   4. lazycodex-version-stamp.ts: resolve plugin version from distribution manifest
   5. For each marketplace plugin:
-     a. codex-cache-install.ts: build, copy, npm install, rewrite MCP manifest, promote to cache
+     a. codex-cache-install.ts: build, copy, npm ci, rewrite MCP manifest, promote to cache
      b. codex-cache-bins.ts: link component CLIs + omo runtime wrapper
      c. link-cached-plugin-agents.ts: copy agent TOMLs to ~/.codex/agents/
   6. codex-cache-prune.ts: remove stale plugins + legacy marketplace caches

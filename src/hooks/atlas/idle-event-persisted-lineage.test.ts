@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
-import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
@@ -139,6 +139,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: "appended",
       },
     })
+    setSessionAgent(descendantSessionID, "sisyphus-junior")
     const hook = createHook(
       {
         [descendantSessionID]: MAIN_SESSION_ID,
@@ -219,6 +220,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: "appended",
       },
     })
+    setSessionAgent(descendantSessionID, "atlas")
 
     const hook = createHook(
       {
@@ -254,6 +256,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: "appended",
       },
     })
+    setSessionAgent(descendantSessionID, "sisyphus")
 
     const hook = createHook(
       {

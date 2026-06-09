@@ -3,7 +3,7 @@
 oh-my-openagent ships in **two editions** of the same product:
 
 - **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
-- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`. No agent orchestration, no `team_*` tools, no built-in web/docs/code search MCPs — Codex CLI's native surface does that work.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `ast_grep`, `grep_app`, `context7`, `git_bash`, and `lsp`. No agent orchestration and no `team_*` tools — Codex CLI's native surface does that work.
 
 Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
 
@@ -178,7 +178,7 @@ fi
 
 If missing, spawn a subagent to install OpenCode and report back — saves context.
 
-Required: OpenCode `>= 1.0.150`.
+Required: OpenCode `>= 1.4.0`.
 
 #### For platform `codex` or `both`
 
@@ -267,7 +267,7 @@ bunx oh-my-openagent install \
 | Platform | Writes |
 |----------|--------|
 | `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into `~/.config/opencode/oh-my-openagent.jsonc`. |
-| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm install --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
+| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Packaged `lazycodex-ai` installs use bundled component artifacts and run `npm ci --omit=dev` in the cache; source checkout installs may build the plugin first. Writes a local installed-marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/` for marketplace metadata, and copies bundled agent TOMLs into `~/.codex/agents/` so role definitions survive cache or temporary snapshot cleanup. Symlinks component CLIs into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`). Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with local source `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, managed `[agents.*]`, and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. If `--codex-autonomous` is selected, also writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and the matching `[notice]` warning suppressions. |
 
 Both halves are independent and idempotent — re-running is safe.
 
@@ -276,7 +276,7 @@ Both halves are independent and idempotent — re-running is safe.
 #### Verify OpenCode plugin (skip if platform=codex)
 
 ```bash
-opencode --version  # Should be 1.0.150 or higher
+opencode --version  # Should be 1.4.0 or higher
 cat ~/.config/opencode/opencode.json
 # Plugin array should contain "oh-my-openagent" (legacy "oh-my-opencode" still loads with a warning)
 bunx oh-my-openagent doctor
@@ -300,7 +300,7 @@ grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
 grep -E 'approval_policy|sandbox_mode|network_access' ~/.codex/config.toml
 
 # Component binaries linked?
-ls ~/.local/bin/ | grep -E '^(omo|omo-(comment-checker|lsp|rules|start-work-continuation|telemetry|ultrawork))$'
+ls ~/.local/bin/ | grep -E '^(omo|omo-(comment-checker|git-bash-hook|lsp|rules|start-work-continuation|telemetry|ultrawork|ulw-loop))$'
 
 # Codex CLI sees the plugin?
 codex --help

@@ -21,12 +21,12 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
   normalizeAgentForPrompt,
-  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
+  CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
 } from "./constants"
@@ -95,7 +95,8 @@ export async function injectContinuation(args: {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
     todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
-    log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? error : String(error)
+    log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: loggedError })
     return
   }
 
@@ -137,7 +138,6 @@ export async function injectContinuation(args: {
   const promptAgent = registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
     ? registeredAgentName
     : normalizeAgentForPrompt(agentName)
-  const launchAgent = promptAgent ? stripAgentListSortPrefix(promptAgent).trim() || undefined : undefined
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -179,7 +179,7 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: launchAgent ?? promptAgent,
+      agent: promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
@@ -198,10 +198,11 @@ ${todoList}`
       source: HOOK_NAME,
       settleMs: 0,
       queueBehavior: "defer",
+      semanticDedupeHoldMs: CONTINUATION_COOLDOWN_MS,
       input: {
         path: { id: sessionID },
         body: {
-          agent: launchAgent ?? promptAgent,
+          agent: promptAgent,
           ...(launchModel ? { model: launchModel } : {}),
           ...(launchVariant ? { variant: launchVariant } : {}),
           ...(inheritedTools ? { tools: inheritedTools } : {}),

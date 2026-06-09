@@ -6,7 +6,8 @@ import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { type ToolContext } from "@opencode-ai/plugin/tool"
+import { type ToolContext, type ToolResult } from "@opencode-ai/plugin/tool"
+import { z } from "zod"
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import { _resetForTesting, registerAgentName } from "../../claude-code-session-state"
 import { SessionCategoryRegistry } from "../../../shared/session-category-registry"
@@ -86,6 +87,13 @@ const mockClient: LiveDeliveryClient = {
   },
 }
 
+const TeamSendToolResultSchema = z.object({
+  messageId: z.string(),
+  deliveredTo: z.array(z.string()),
+}).strict()
+
+type TeamSendToolResult = z.infer<typeof TeamSendToolResultSchema>
+
 afterEach(() => {
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
@@ -113,6 +121,10 @@ function createToolContext(sessionID: string, directory: string): ToolContext {
     metadata: () => {},
     ask: async () => undefined,
   }
+}
+
+function parseToolResult(result: string | ToolResult): TeamSendToolResult {
+  return TeamSendToolResultSchema.parse(JSON.parse(typeof result === "string" ? result : result.output))
 }
 
 async function createTeamFixture() {
@@ -211,7 +223,7 @@ describe("createTeamSendMessageTool", () => {
       to: "m2",
       body: "hello",
     }, fixture.toolContext(fixture.memberOneSessionId))
-    const parsedResult = JSON.parse(result)
+    const parsedResult = parseToolResult(result)
 
     // then
     expect(parsedResult.deliveredTo).toEqual(["m2"])
@@ -219,6 +231,23 @@ describe("createTeamSendMessageTool", () => {
     const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
     expect(message.from).toBe("m1")
+  })
+
+  test("#given recipient tries path traversal #when team_send_message runs #then it rejects without creating an escaped inbox", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const escapedInboxRoot = path.join(resolveBaseDir(fixture.config), "runtime", "escape")
+
+    // when
+    const result = fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "../../escape",
+      body: "escape attempt",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    await expect(result).rejects.toThrow("unknown or inactive team recipient")
+    await expect(readdir(escapedInboxRoot)).rejects.toThrow()
   })
 
   test("persists optional message metadata from tool arguments", async () => {
@@ -235,7 +264,7 @@ describe("createTeamSendMessageTool", () => {
       summary: "metadata summary",
       references: [{ path: "src/features/team-mode/tools/messaging.ts", description: "send tool" }],
     }, fixture.toolContext(fixture.memberOneSessionId))
-    const parsedResult = JSON.parse(result)
+    const parsedResult = parseToolResult(result)
 
     // then
     expect(parsedResult.deliveredTo).toEqual(["m2"])
@@ -271,7 +300,7 @@ describe("createTeamSendMessageTool", () => {
       body: "team announcement",
       kind: "announcement",
     }, fixture.toolContext(fixture.leadSessionId))
-    const parsedLeadResult = JSON.parse(leadResult)
+    const parsedLeadResult = parseToolResult(leadResult)
 
     // then
     expect(parsedLeadResult.deliveredTo).toEqual(["m1", "m2"])
@@ -348,7 +377,7 @@ describe("createTeamSendMessageTool", () => {
       to: "m2",
       body: "ping",
     }, fixture.toolContext(fixture.memberOneSessionId))
-    const parsedResult = JSON.parse(result)
+    const parsedResult = parseToolResult(result)
 
     // then
     expect(parsedResult.deliveredTo).toEqual(["m2"])
@@ -598,7 +627,7 @@ describe("createTeamSendMessageTool", () => {
       to: "m2",
       body: "hello",
     }, fixture.toolContext(fixture.memberOneSessionId))
-    const parsedResult = JSON.parse(result)
+    const parsedResult = parseToolResult(result)
 
     // then
     expect(parsedResult.deliveredTo).toEqual(["m2"])
@@ -675,7 +704,7 @@ describe("createTeamSendMessageTool", () => {
       body: "broadcast ping",
       kind: "announcement",
     }, fixture.toolContext(fixture.leadSessionId))
-    const parsedResult = JSON.parse(result)
+    const parsedResult = parseToolResult(result)
 
     // then
     expect(parsedResult.deliveredTo).toEqual(["m1", "m2"])
@@ -708,7 +737,7 @@ describe("createTeamSendMessageTool", () => {
     expect(inboxEntries).toHaveLength(1)
   })
 
-  test("#given live delivery promptAsync fails ambiguously #when delivery falls back #then it releases the message for mailbox injection", async () => {
+  test("#given live delivery promptAsync fails ambiguously #when delivery handles the accepted-like failure #then it marks pending without inbox retry", async () => {
     // given
     const fixture = await createTeamFixture()
     let promptCalls = 0
@@ -732,25 +761,28 @@ describe("createTeamSendMessageTool", () => {
     // then
     expect(promptCalls).toBe(1)
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(1)
+    expect(unread).toHaveLength(0)
 
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     expect(inboxEntries).toHaveLength(1)
-    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(false)
+    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(true)
 
     const { loadRuntimeState: loadState } = await import("../team-state-store/store")
     const runtimeState = await loadState(fixture.teamRunId, fixture.config)
     const recipient = runtimeState.members.find((member) => member.name === "m2")
-    expect(recipient?.pendingInjectedMessageIds).toHaveLength(0)
+    expect(recipient?.pendingInjectedMessageIds).toHaveLength(1)
   })
 
-  test("#given dispatchInternalPrompt fails ambiguously #when deliverLive handles the failure #then the message is released back to inbox as unread AND pendingInjectedMessageIds is NOT updated", async () => {
+  test("#given dispatchInternalPrompt fails ambiguously #when pending mark fails #then the reservation is committed to processed", async () => {
     // given
     const fixture = await createTeamFixture()
     const failingClient = {
       session: {
-        promptAsync: async () => { throw new Error("JSON Parse error: Unexpected EOF") },
+        promptAsync: async () => {
+          await rm(path.join(resolveBaseDir(fixture.config), "runtime", fixture.teamRunId, "state.json"))
+          throw new Error("JSON Parse error: Unexpected EOF")
+        },
       },
     } satisfies LiveDeliveryClient
     const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
@@ -764,16 +796,13 @@ describe("createTeamSendMessageTool", () => {
 
     // then
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(1)
+    expect(unread).toHaveLength(0)
 
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = await readdir(inboxDir)
     expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
-
-    const { loadRuntimeState: loadState } = await import("../team-state-store/store")
-    const runtimeState = await loadState(fixture.teamRunId, fixture.config)
-    const recipient = runtimeState.members.find((member) => member.name === "m2")
-    expect(recipient?.pendingInjectedMessageIds).toHaveLength(0)
+    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
+    expect(processedEntries).toHaveLength(1)
   })
 
   test("#given live delivery prompt dispatches but pending mark fails #when delivery finishes #then the reservation is committed to processed", async () => {

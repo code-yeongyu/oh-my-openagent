@@ -8,15 +8,13 @@ const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = dirname(dirname(dirname(pluginRoot)));
 const startWorkSkillPaths = [
 	join(repoRoot, "packages", "shared-skills", "skills", "start-work", "SKILL.md"),
+	join(pluginRoot, "skills", "start-work", "SKILL.md"),
 ];
-const reviewWorkSkillPath = join(repoRoot, "packages", "shared-skills", "skills", "review-work", "SKILL.md");
-const hephaestusRulePath = join(
-	pluginRoot,
-	"components",
-	"rules",
-	"bundled-rules",
-	"hephaestus.md",
-);
+const reviewWorkSkillPaths = [
+	join(repoRoot, "packages", "shared-skills", "skills", "review-work", "SKILL.md"),
+	join(pluginRoot, "skills", "review-work", "SKILL.md"),
+];
+const hephaestusRulePath = join(pluginRoot, "components", "rules", "bundled-rules", "hephaestus.md");
 const stopHookPath = join(
 	pluginRoot,
 	"components",
@@ -75,45 +73,50 @@ test("#given worker done claim #when start-work contract is inspected #then adve
 	assert.deepEqual(missing, []);
 });
 
-test("#given start-work completion surfaces #when inspected #then global review and debugging gate completion", async () => {
+test("#given start-work completion surfaces #when inspected #then global review and debugging gate blocks completion", async () => {
 	// given
-	const [startWorkSkill, reviewWorkSkill, hephaestusRule] = await Promise.all([
-		readFile(startWorkSkillPaths[0], "utf8"),
-		readFile(reviewWorkSkillPath, "utf8"),
+	const [startWorkSkills, reviewWorkSkills, hephaestusRule] = await Promise.all([
+		Promise.all(startWorkSkillPaths.map((skillPath) => readFile(skillPath, "utf8"))),
+		Promise.all(reviewWorkSkillPaths.map((skillPath) => readFile(skillPath, "utf8"))),
 		readFile(hephaestusRulePath, "utf8"),
 	]);
 
 	// then
-	assert.match(startWorkSkill, /Global Review and Debugging Gate/);
-	assert.match(startWorkSkill, /fresh scoped final gate marker/);
-	assert.match(startWorkSkill, /PR creation/);
-	assert.match(startWorkSkill, /\breview-work\b/);
-	assert.match(startWorkSkill, /\bdebugging\b/);
-	assert.match(startWorkSkill, /inconclusive/i);
-	assert.match(startWorkSkill, /redact|mask/i);
-	assert.match(startWorkSkill, /raw (?:tokens|credentials|auth headers|cookies)/i);
-	assert.match(startWorkSkill, /subagent prompts, repro artifacts/);
-	assert.match(startWorkSkill, /global-review-debug-gate-passed/);
-	assert.match(startWorkSkill, /verdict: "PASS"/);
-	assert.match(startWorkSkill, /work_id/);
-	assert.match(startWorkSkill, /plan_path/);
-	assert.match(startWorkSkill, /started_at/);
-	assert.match(startWorkSkill, /"started_at": "<ISO-8601 start timestamp>"/);
-	assert.match(startWorkSkill, /prefixed `session_id`/);
-	assert.match(startWorkSkill, /latest relevant ledger event/);
-	assert.match(startWorkSkill, /verification: \{ "verdict": "PASS", "commands": \["\.\.\."\] \}/);
-	assert.match(startWorkSkill, /review: \{ "verdict": "PASS", "lanes": \["goal", "quality", "security", "qa", "context"\] \}/);
-	assert.match(startWorkSkill, /debugging: \{ "verdict": "PASS", "hypotheses": \["\.\.\.", "\.\.\.", "\.\.\."\] \}/);
-	assert.match(startWorkSkill, /artifact: \{ "redacted": true, "summary": "\.\.\." \}/);
-	assert.match(startWorkSkill, /cleanup: \{ "status": "complete", "summary": "\.\.\." \}/);
-	assert.match(startWorkSkill, /fresh PASS marker/);
-	assert.match(startWorkSkill, /ORCHESTRATION COMPLETE/);
-	assert.match(reviewWorkSkill, /debugging/i);
-	assert.match(reviewWorkSkill, /inconclusive/i);
-	assert.match(reviewWorkSkill, /raw tokens/i);
+	for (const startWorkSkill of startWorkSkills) {
+		assert.match(startWorkSkill, /Global Review and Debugging Gate/);
+		assert.match(startWorkSkill, /fresh scoped final gate marker/);
+		assert.match(startWorkSkill, /PR creation/);
+		assert.match(startWorkSkill, /\breview-work\b/);
+		assert.match(startWorkSkill, /\bdebugging\b/);
+		assert.match(startWorkSkill, /inconclusive/i);
+		assert.match(startWorkSkill, /redact|mask/i);
+		assert.match(startWorkSkill, /raw (?:tokens|credentials|auth headers|cookies)/i);
+		assert.match(startWorkSkill, /subagent prompts, repro artifacts/);
+		assert.match(startWorkSkill, /global-review-debug-gate-passed/);
+		assert.match(startWorkSkill, /verdict: "PASS"/);
+		assert.match(startWorkSkill, /work_id/);
+		assert.match(startWorkSkill, /plan_path/);
+		assert.match(startWorkSkill, /started_at/);
+		assert.match(startWorkSkill, /"started_at": "<ISO-8601 start timestamp>"/);
+		assert.match(startWorkSkill, /prefixed `session_id`/);
+		assert.match(startWorkSkill, /latest relevant ledger event/);
+		assert.match(startWorkSkill, /verification: \{ "verdict": "PASS", "commands": \["\.\.\."\] \}/);
+		assert.match(startWorkSkill, /review: \{ "verdict": "PASS", "lanes": \["goal", "quality", "security", "qa", "context"\] \}/);
+		assert.match(startWorkSkill, /debugging: \{ "verdict": "PASS", "hypotheses": \["\.\.\.", "\.\.\.", "\.\.\."\] \}/);
+		assert.match(startWorkSkill, /artifact: \{ "redacted": true, "summary": "\.\.\." \}/);
+		assert.match(startWorkSkill, /cleanup: \{ "status": "complete", "summary": "\.\.\." \}/);
+		assert.match(startWorkSkill, /fresh PASS marker/);
+		assert.match(startWorkSkill, /ORCHESTRATION COMPLETE/);
+	}
+	for (const reviewWorkSkill of reviewWorkSkills) {
+		assert.match(reviewWorkSkill, /debugging/i);
+		assert.match(reviewWorkSkill, /inconclusive/i);
+		assert.match(reviewWorkSkill, /raw tokens/i);
+	}
 	assert.match(hephaestusRule, /Post-implementation Global Review and Debugging Gate/);
 	assert.match(hephaestusRule, /redact|mask/i);
 	assert.match(hephaestusRule, /raw (?:tokens|credentials|auth headers|cookies)/i);
+	assert.match(hephaestusRule, /redact.*secrets.*PII/s);
 });
 
 test("#given start-work continuation hook #when inspected #then it remains Boulder-only without planning bootstrap logic", async () => {

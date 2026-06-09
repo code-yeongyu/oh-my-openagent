@@ -213,6 +213,9 @@ describe("integration: --on-complete", () => {
       exitCode: 0,
       durationMs: 5000,
       messageCount: 10,
+    }, {
+      spawnWithWindowsHide: spawnWithWindowsHideModule.spawnWithWindowsHide,
+      log: () => {},
     })
 
     // then
@@ -294,6 +297,9 @@ describe("integration: option combinations", () => {
       exitCode: result.success ? 0 : 1,
       durationMs: result.durationMs,
       messageCount: result.messageCount,
+    }, {
+      spawnWithWindowsHide: spawnWithWindowsHideModule.spawnWithWindowsHide,
+      log: () => {},
     })
 
     // then - json emits result AND on-complete hook runs

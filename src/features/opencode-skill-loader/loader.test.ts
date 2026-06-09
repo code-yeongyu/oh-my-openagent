@@ -734,7 +734,7 @@ Body.
     it("#given a namespaced skill #when getSkillByName is called with its unique short name #then it returns the skill", async () => {
       // given - a namespaced skill that is the unique short-name match
       const skillContent = `---
-name: superpowers/systematic-debugging
+name: toolkit/systematic-debugging
 description: Namespaced skill the agent should be able to load by short name
 ---
 Body.
@@ -751,7 +751,7 @@ Body.
 
         // then - the short-name lookup must succeed, mirroring matchSkillByName semantics
         expect(skill).toBeDefined()
-        expect(skill?.name).toBe("superpowers/systematic-debugging")
+        expect(skill?.name).toBe("toolkit/systematic-debugging")
       } finally {
         process.chdir(originalCwd)
       }

@@ -126,6 +126,18 @@ describe("resolveSkillPathReferences", () => {
 		expect(result).toBe("/skills/frontend/scripts/search.py")
 	})
 
+	it("normalizes Windows native paths for prompt display", () => {
+		//#given
+		const content = "@scripts/search.py"
+		const basePath = "C:\\Users\\Admin\\.config\\opencode\\skills\\frontend"
+
+		//#when
+		const result = resolveSkillPathReferences(content, basePath)
+
+		//#then
+		expect(result).toBe("C:/Users/Admin/.config/opencode/skills/frontend/scripts/search.py")
+	})
+
 	it("does not resolve traversal paths that escape the base directory", () => {
 		//#given
 		const content = "Read @data/../../../../etc/passwd before running"

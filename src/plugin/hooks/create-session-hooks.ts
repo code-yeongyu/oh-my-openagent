@@ -29,7 +29,6 @@ import {
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
 } from "../../hooks"
-import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -62,7 +61,6 @@ export type SessionHooks = {
   hephaestusAgentsMdInjector: ReturnType<typeof createHephaestusAgentsMdInjectorHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook> | null
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
-  anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
 }
@@ -214,10 +212,6 @@ export function createSessionHooks(args: {
     ? safeHook("task-resume-info", () => createTaskResumeInfoHook())
     : null
 
-  const anthropicEffort = isHookEnabled("anthropic-effort")
-    ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
-    : null
-
   const runtimeFallbackConfig =
     typeof pluginConfig.runtime_fallback === "boolean"
       ? { enabled: pluginConfig.runtime_fallback }
@@ -257,7 +251,6 @@ export function createSessionHooks(args: {
     hephaestusAgentsMdInjector,
     questionLabelTruncator,
     taskResumeInfo,
-    anthropicEffort,
     runtimeFallback,
     legacyPluginToast,
   }

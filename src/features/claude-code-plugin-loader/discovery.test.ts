@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 
 const originalClaudePluginsHome = process.env.CLAUDE_PLUGINS_HOME
 const temporaryDirectories: string[] = []
@@ -867,7 +867,7 @@ describe("discoverInstalledPlugins", () => {
         mkdirSync(join(dir, ".claude-plugin"), { recursive: true })
         writeFileSync(
           join(dir, ".claude-plugin", "plugin.json"),
-          JSON.stringify({ name: "multi-ver", version: dir.split("/").pop() }),
+          JSON.stringify({ name: "multi-ver", version: basename(dir) }),
           "utf-8",
         )
       }

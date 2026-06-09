@@ -30,14 +30,10 @@ export class ParentWakeFlushRunner {
       await settleAfterSessionIdle()
 
       if (await this.isSessionActive(sessionID)) {
-        const latestWake = this.deps.pendingQueue.getWake(sessionID)
-        if (latestWake) {
-          await this.sendParentWakePrompt(sessionID, latestWake, {
-            emptyAssistantTurnRetry: false,
-            toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
-            forceNoReply: true,
-          })
-        }
+        this.schedulePendingParentWakeFlush(sessionID)
+        log("[background-agent] Deferred parent wake because parent session became active after idle settle:", {
+          sessionID,
+        })
         return
       }
     }
@@ -47,10 +43,9 @@ export class ParentWakeFlushRunner {
       return
     }
     if (sessionActive) {
-      await this.sendParentWakePrompt(sessionID, latestWake, {
-        emptyAssistantTurnRetry: false,
-        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
-        forceNoReply: true,
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred parent wake because parent session is active:", {
+        sessionID,
       })
       return
     }

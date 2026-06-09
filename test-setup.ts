@@ -10,9 +10,19 @@ import { getOmoOpenCodeCacheDir } from "./src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./src/shared/prompt-async-gate"
 import { installModuleMockLifecycle } from "./src/testing/module-mock-lifecycle"
 
-const { restoreModuleMocks } = installModuleMockLifecycle(mock)
+let isGlobalMockCleanup = false
+const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
+  shouldPreserveActiveMocksOnRestore: () => isGlobalMockCleanup,
+  registerGlobalRestore: true,
+})
 let environmentSnapshot: NodeJS.ProcessEnv = { ...process.env }
 let workingDirectorySnapshot = process.cwd()
+const fetchSnapshot = globalThis.fetch
+const dateNowSnapshot = Date.now
+const setTimeoutSnapshot = globalThis.setTimeout
+const clearTimeoutSnapshot = globalThis.clearTimeout
+const setIntervalSnapshot = globalThis.setInterval
+const clearIntervalSnapshot = globalThis.clearInterval
 
 function cleanupOmoCacheDir(cacheDir: string): void {
   rmSync(cacheDir, { recursive: true, force: true })
@@ -56,6 +66,12 @@ afterEach(() => {
   if (process.cwd() !== workingDirectorySnapshot) {
     process.chdir(workingDirectorySnapshot)
   }
+  globalThis.fetch = fetchSnapshot
+  Date.now = dateNowSnapshot
+  globalThis.setTimeout = setTimeoutSnapshot
+  globalThis.clearTimeout = clearTimeoutSnapshot
+  globalThis.setInterval = setIntervalSnapshot
+  globalThis.clearInterval = clearIntervalSnapshot
 
   cleanupOmoCacheDir(currentCacheDir)
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
@@ -63,6 +79,11 @@ afterEach(() => {
   resetTaskToastManager()
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
-  mock.restore()
-  restoreModuleMocks()
+  isGlobalMockCleanup = true
+  try {
+    mock.restore()
+    restoreModuleMocks()
+  } finally {
+    isGlobalMockCleanup = false
+  }
 })

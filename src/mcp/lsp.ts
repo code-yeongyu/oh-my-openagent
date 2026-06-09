@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { delimiter, dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { hasCliSuffix } from "./cli-suffix"
 import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable"
@@ -7,7 +7,7 @@ import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutabl
 const PACKAGE_REL = "packages/lsp-tools-mcp"
 const DIST_CLI_REL = "dist/cli.js"
 const SOURCE_CLI_REL = "src/cli.ts"
-const PROJECT_LSP_CONFIG = ".opencode/lsp.json"
+const PROJECT_LSP_CONFIGS = [".opencode/lsp.json", ".omo/lsp.json", ".omo/lsp-client.json"] as const
 const LSP_BOOTSTRAP_SCRIPT = [
   "const { existsSync } = require('node:fs')",
   "const { join } = require('node:path')",
@@ -161,7 +161,7 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
     command: resolvedCommand.command,
     enabled: resolvedCommand.exists,
     environment: {
-      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIG,
+      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.join(delimiter),
     },
   }
 }

@@ -107,6 +107,7 @@ export function resolveModelForDelegateTask(input: {
   // OpenCode will use its system default model when no model is specified in the prompt.
   if (
     input.availableModels.size === 0 &&
+    connectedProviders === null &&
     !connectedProvidersCache.hasProviderModelsCache() &&
     !connectedProvidersCache.hasConnectedProvidersCache()
   ) {

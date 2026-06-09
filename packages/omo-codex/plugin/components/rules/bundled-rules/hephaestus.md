@@ -75,18 +75,18 @@ Exploration is cheap; assumption is expensive. Over-exploration is also failure.
 
 omo-codex bundles three read-only Codex subagent roles in `CODEX_HOME/agents/`: `explorer` (codebase search), `librarian` (external docs + OSS code via gh CLI and web), and `plan` (strategic planning). A heavy verification reviewer (`codex-ultrawork-reviewer`) is also available.
 
-**Default to parallel `spawn_agent` over self-research.** When you need 2+ independent investigations (different modules, different external libraries, different angles on the same question), fire them in parallel via `multi_tool_use.parallel` instead of running searches yourself. Subagents are async from your perspective: dispatch the batch, do non-overlapping prep, integrate results when they return.
+**Default to parallel `multi_agent_v1.spawn_agent` over self-research.** When you need 2+ independent investigations (different modules, different external libraries, different angles on the same question), fire them in parallel instead of running searches yourself. Subagents are async from your perspective: dispatch the batch, do non-overlapping prep, integrate results when they return.
 
 **Routing:**
 
-- "Where is X?" / "Find code that does Y" -> `spawn_agent(agent_type="explorer", fork_turns="none", ...)`
-- "How does library Z work?" / "What's the API contract?" -> `spawn_agent(agent_type="librarian", fork_turns="none", ...)`
-- 5+ interdependent steps, ambiguous scope, multi-module work -> `spawn_agent(agent_type="plan", fork_turns="none", ...)`
-- Heavy verification of a finished change -> `spawn_agent(agent_type="codex-ultrawork-reviewer", fork_turns="none", ...)`
+- "Where is X?" / "Find code that does Y" -> `multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","fork_context":false})`
+- "How does library Z work?" / "What's the API contract?" -> `multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","fork_context":false})`
+- 5+ interdependent steps, ambiguous scope, multi-module work -> `multi_agent_v1.spawn_agent({"message":"TASK: act as a planning agent. ...","fork_context":false})`
+- Heavy verification of a finished change -> `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","fork_context":false})`
 
 **Don't duplicate.** Once a subagent is dispatched for a question, do not re-do the same search yourself. Once results return, do not re-verify by repeating their tool calls; integrate and move on.
 
-**Keep parent liveness visible.** While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, latest `WORKING:` phase, and whether the parent is waiting for mailbox updates. Do this during long `wait_agent` cycles so the session does not look idle while children are still running.
+**Keep parent liveness visible.** While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, latest `WORKING:` phase, and whether the parent is waiting for mailbox updates. Do this during long `multi_agent_v1.wait_agent` cycles so the session does not look idle while children are still running.
 
 # Operating Loop
 
@@ -132,6 +132,12 @@ LSP diagnostics catch type errors, not logic bugs; tests cover only what their a
 - **No matching surface** - ask: how would a real user discover this works? Do exactly that.
 
 Reading the source and concluding "this should work" does not pass this gate. If usage reveals a defect, that defect is yours to fix in this turn - same turn, not "follow-up".
+
+# Global Review and Debugging Gate
+
+For significant implementation work and every PR handoff, run `review-work` plus a `debugging` runtime audit before declaring completion. Timeout, missing deliverable, ack-only, `BLOCKED:`, and inconclusive review lanes fail the gate. Record at least three debugging hypotheses and the runtime evidence that confirms or refutes each one.
+
+Do not print completion, create a PR, produce a PR handoff, or produce a branch handoff until the gate passes. Always redact secrets, tokens, credentials, auth headers, cookies, env dumps, private logs, and PII from subagent prompts, repro artifacts, logs, ledgers, PR bodies, comments, and handoffs.
 
 # Failure Recovery
 

@@ -20,6 +20,11 @@ import type {
 } from "./types"
 
 const MODEL_ID_OVERRIDES: Record<string, ModelCapabilityOverride> = {}
+const GITHUB_COPILOT_GPT5_MODEL = /(?:^|\/)gpt-5(?:[.-]|$)/
+const GITHUB_COPILOT_GPT5_OVERRIDE: ModelCapabilityOverride = {
+	variants: ["low", "medium", "high"],
+	reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
+}
 
 function normalizeLookupModelID(modelID: string): string {
 	return modelID.trim().toLowerCase()
@@ -29,9 +34,17 @@ function getOverride(modelID: string): ModelCapabilityOverride | undefined {
 	return MODEL_ID_OVERRIDES[normalizeLookupModelID(modelID)]
 }
 
+function getProviderOverride(providerID: string, modelID: string): ModelCapabilityOverride | undefined {
+	if (providerID.trim().toLowerCase() !== "github-copilot") return undefined
+	return GITHUB_COPILOT_GPT5_MODEL.test(normalizeLookupModelID(modelID))
+		? GITHUB_COPILOT_GPT5_OVERRIDE
+		: undefined
+}
+
 export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCapabilities {
 	const canonicalization = resolveModelIDAlias(input.modelID)
 	const override = getOverride(input.modelID)
+	const providerOverride = getProviderOverride(input.providerID, canonicalization.canonicalModelID)
 	const runtimeModel = readRuntimeModel(
 		input.runtimeModel ?? input.providerCache?.findProviderModelMetadata(input.providerID, input.modelID),
 	)
@@ -59,9 +72,9 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const familySource: ModelCapabilitiesDiagnostics["family"]["source"] =
 		snapshotEntry?.family ? "snapshot" : heuristicFamily?.family ? "heuristic" : "none"
 	const variantsSource: ModelCapabilitiesDiagnostics["variants"]["source"] =
-		runtimeVariants ? "runtime" : override?.variants ? "override" : heuristicFamily?.variants ? "heuristic" : "none"
+		runtimeVariants ? "runtime" : providerOverride?.variants ? "override" : override?.variants ? "override" : heuristicFamily?.variants ? "heuristic" : "none"
 	const reasoningEffortsSource: ModelCapabilitiesDiagnostics["reasoningEfforts"]["source"] =
-		override?.reasoningEfforts ? "override" : heuristicFamily?.reasoningEfforts ? "heuristic" : "none"
+		providerOverride?.reasoningEfforts ? "override" : override?.reasoningEfforts ? "override" : heuristicFamily?.reasoningEfforts ? "heuristic" : "none"
 	const reasoningSource: ModelCapabilitiesDiagnostics["reasoning"]["source"] =
 		runtimeReasoning === undefined ? snapshotEntry?.reasoning === undefined ? "none" : snapshotSource : "runtime"
 	const supportsThinkingSource: ModelCapabilitiesDiagnostics["supportsThinking"]["source"] =
@@ -107,8 +120,8 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		requestedModelID: canonicalization.requestedModelID,
 		canonicalModelID: canonicalization.canonicalModelID,
 		family: snapshotEntry?.family ?? heuristicFamily?.family,
-		variants: runtimeVariants ?? override?.variants ?? heuristicFamily?.variants,
-		reasoningEfforts: override?.reasoningEfforts ?? heuristicFamily?.reasoningEfforts,
+		variants: runtimeVariants ?? providerOverride?.variants ?? override?.variants ?? heuristicFamily?.variants,
+		reasoningEfforts: providerOverride?.reasoningEfforts ?? override?.reasoningEfforts ?? heuristicFamily?.reasoningEfforts,
 		reasoning: runtimeReasoning ?? snapshotEntry?.reasoning,
 		supportsThinking: override?.supportsThinking ?? runtimeThinking ?? snapshotEntry?.reasoning ?? heuristicFamily?.supportsThinking,
 		supportsTemperature: runtimeTemperature ?? override?.supportsTemperature ?? snapshotEntry?.temperature,

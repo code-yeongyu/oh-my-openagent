@@ -12,6 +12,7 @@ import { MessageSchema } from "../types"
 import {
   BroadcastNotPermittedError,
   DuplicateMessageIdError,
+  InvalidRecipientError,
   PayloadTooLargeError,
   RecipientBackpressureError,
   sendMessage,
@@ -129,6 +130,41 @@ describe("sendMessage", () => {
 
     // then
     await expect(result).rejects.toBeInstanceOf(DuplicateMessageIdError)
+  })
+
+  test("#given direct recipient is not an active or reserved member #when sendMessage runs #then no inbox directory is created", async () => {
+    // given
+    const baseDir = await createBaseDirectory()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const message = createMessage({ to: "../../escape" })
+
+    // when
+    const result = sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["m1"] })
+
+    // then
+    await expect(result).rejects.toBeInstanceOf(InvalidRecipientError)
+    await expect(readdir(path.join(resolveBaseDir(config), "runtime", "escape"))).rejects.toThrow()
+  })
+
+  test("#given direct recipient is reserved but not currently active #when sendMessage runs #then it can write to that reserved member", async () => {
+    // given
+    const baseDir = await createBaseDirectory()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const message = createMessage({ to: "m2" })
+
+    // when
+    const result = await sendMessage(message, teamRunId, config, {
+      isLead: false,
+      activeMembers: ["m1"],
+      reservedRecipients: new Set(["m2"]),
+    })
+
+    // then
+    expect(result.deliveredTo).toEqual(["m2"])
+    const inboxFiles = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "m2"))
+    expect(inboxFiles.filter((entry) => entry.endsWith(".json"))).toHaveLength(1)
   })
 
   test("gates broadcasts to leads and fans out to each active member", async () => {

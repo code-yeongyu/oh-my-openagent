@@ -1,19 +1,21 @@
 import assert from "node:assert/strict";
+import { realpathSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 import test from "node:test";
 
 import { installCachedPlugin } from "./install/cache.mjs";
 import { makeTempDir } from "./install-test-fixtures.mjs";
 
-test("#given source plugin has a stale npm lockfile #when caching plugin #then lockfile is regenerated rather than copied", async () => {
+test("#given source plugin has an npm lockfile #when caching plugin #then lockfile is preserved for deterministic install", async () => {
 	// given
 	const root = await makeTempDir();
 	const codexHome = join(root, "codex-home");
 	const sourceRoot = join(root, "plugin");
 	await mkdir(sourceRoot, { recursive: true });
 	await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }));
-	await writeFile(join(sourceRoot, "package-lock.json"), '{"packages":{"components/ulw-loop":{}}}\n');
+	const lockfile = '{"packages":{"components/ulw-loop":{}}}\n';
+	await writeFile(join(sourceRoot, "package-lock.json"), lockfile);
 
 	// when
 	const installed = await installCachedPlugin({
@@ -26,7 +28,63 @@ test("#given source plugin has a stale npm lockfile #when caching plugin #then l
 	});
 
 	// then
-	await assert.rejects(stat(join(installed.path, "package-lock.json")));
+	assert.equal(await readFile(join(installed.path, "package-lock.json"), "utf8"), lockfile);
+});
+
+test("#given cached file dependency is rewritten #when lockfile exists #then package lock stays in sync", async () => {
+	// given
+	const root = await makeTempDir();
+	const codexHome = join(root, "codex-home");
+	const sourceRoot = join(root, "packages", "omo-codex", "plugin");
+	await mkdir(sourceRoot, { recursive: true });
+	await writeFile(
+		join(sourceRoot, "package.json"),
+		JSON.stringify({
+			name: "@scope/omo",
+			version: "0.1.0",
+			dependencies: { "@scope/lsp-tools": "file:../lsp-tools-mcp" },
+		}),
+	);
+	await writeFile(
+		join(sourceRoot, "package-lock.json"),
+		JSON.stringify({
+			name: "@scope/omo",
+			version: "0.1.0",
+			lockfileVersion: 3,
+			packages: {
+				"": {
+					name: "@scope/omo",
+					version: "0.1.0",
+					dependencies: { "@scope/lsp-tools": "file:../lsp-tools-mcp" },
+				},
+				"../lsp-tools-mcp": { name: "@scope/lsp-tools", version: "0.1.0" },
+				"node_modules/@scope/lsp-tools": {
+					resolved: "../lsp-tools-mcp",
+					link: true,
+				},
+			},
+		}),
+	);
+
+	// when
+	const installed = await installCachedPlugin({
+		codexHome,
+		marketplaceName: "debug",
+		name: "omo",
+		sourcePath: sourceRoot,
+		version: "0.1.0",
+		runCommand: async () => {},
+	});
+
+	// then
+	const sourceDependencyPath = join(root, "packages", "omo-codex", "lsp-tools-mcp");
+	const packageLockDependencyPath = relative(realpathSync(installed.path), sourceDependencyPath).split(sep).join("/");
+	const cachedPackageJson = JSON.parse(await readFile(join(installed.path, "package.json"), "utf8"));
+	const cachedPackageLock = JSON.parse(await readFile(join(installed.path, "package-lock.json"), "utf8"));
+	assert.equal(cachedPackageJson.dependencies["@scope/lsp-tools"], `file:${sourceDependencyPath}`);
+	assert.equal(cachedPackageLock.packages[""].dependencies["@scope/lsp-tools"], `file:${sourceDependencyPath}`);
+	assert.deepEqual(cachedPackageLock.packages[packageLockDependencyPath], { name: "@scope/lsp-tools", version: "0.1.0" });
+	assert.equal(cachedPackageLock.packages["node_modules/@scope/lsp-tools"].resolved, packageLockDependencyPath);
 });
 
 test("#given existing cache #when npm install fails #then previous active cache is preserved", async () => {
@@ -49,7 +107,7 @@ test("#given existing cache #when npm install fails #then previous active cache 
 			sourcePath: sourceRoot,
 			version: "0.1.0",
 			runCommand: async (_command, args) => {
-				if (args.join(" ") === "install --omit=dev") throw new Error("spawn npm ENOENT");
+				if (args.join(" ") === "ci --omit=dev") throw new Error("spawn npm ENOENT");
 			},
 		}),
 		/spawn npm ENOENT/,

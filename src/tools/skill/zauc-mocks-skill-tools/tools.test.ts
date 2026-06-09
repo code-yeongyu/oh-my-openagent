@@ -881,32 +881,32 @@ describe("skill tool - bundled security skills", () => {
 describe("skill tool - short name resolution", () => {
   it("resolves namespaced skill by short name when unambiguous", async () => {
     // given
-    const loadedSkills = [createMockSkill("superpowers/systematic-debugging")]
+    const loadedSkills = [createMockSkill("toolkit/systematic-debugging")]
     const tool = createSkillTool({ skills: loadedSkills })
 
     // when
     const result = await tool.execute({ name: "systematic-debugging" }, mockContext)
 
     // then
-    expect(result).toContain("superpowers/systematic-debugging")
+    expect(result).toContain("toolkit/systematic-debugging")
   })
 
   it("still resolves by exact full name", async () => {
     // given
-    const loadedSkills = [createMockSkill("superpowers/systematic-debugging")]
+    const loadedSkills = [createMockSkill("toolkit/systematic-debugging")]
     const tool = createSkillTool({ skills: loadedSkills })
 
     // when
-    const result = await tool.execute({ name: "superpowers/systematic-debugging" }, mockContext)
+    const result = await tool.execute({ name: "toolkit/systematic-debugging" }, mockContext)
 
     // then
-    expect(result).toContain("superpowers/systematic-debugging")
+    expect(result).toContain("toolkit/systematic-debugging")
   })
 
   it("does not resolve short name when ambiguous (multiple matches)", async () => {
     // given
     const loadedSkills = [
-      createMockSkill("superpowers/debugging"),
+      createMockSkill("toolkit/debugging"),
       createMockSkill("utils/debugging"),
     ]
     const tool = createSkillTool({ skills: loadedSkills })
@@ -921,14 +921,14 @@ describe("skill tool - short name resolution", () => {
     // given, "debugging" exists as both exact and as part of a namespace
     const loadedSkills = [
       createMockSkill("debugging"),
-      createMockSkill("superpowers/debugging"),
+      createMockSkill("toolkit/debugging"),
     ]
     const tool = createSkillTool({ skills: loadedSkills })
 
     // when
     const result = await tool.execute({ name: "debugging" }, mockContext)
 
-    // then, should match "debugging" exactly, not "superpowers/debugging"
+    // then, should match "debugging" exactly, not "toolkit/debugging"
     expect(result).toContain("## Skill: debugging")
   })
 })

@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import {
   getPlanProgress,
   getWorkForSession,
+  normalizeSessionId,
   readBoulderState,
   resolveBoulderPlanPath,
   resolveBoulderPlanPathForWork,
@@ -27,7 +28,8 @@ export async function resolveActiveBoulderSession(input: {
   }
 
   const sessionWork = getWorkForSession(input.directory, input.sessionID)
-  if (!sessionWork && !boulderState.session_ids.includes(input.sessionID)) {
+  const normalizedSessionID = normalizeSessionId(input.sessionID)
+  if (!sessionWork && !boulderState.session_ids.includes(normalizedSessionID)) {
     return null
   }
 
@@ -59,8 +61,16 @@ export async function resolveActiveBoulderSession(input: {
       : resolveBoulderPlanPath(input.directory, nextBoulderState),
   )
   if (progress.isComplete) {
-    return { boulderState: nextBoulderState, progress, appendedSession: false }
+    return {
+      boulderState: nextBoulderState,
+      progress,
+      appendedSession: nextBoulderState.session_origins?.[normalizedSessionID] === "appended",
+    }
   }
 
-  return { boulderState: nextBoulderState, progress, appendedSession: false }
+  return {
+    boulderState: nextBoulderState,
+    progress,
+    appendedSession: nextBoulderState.session_origins?.[normalizedSessionID] === "appended",
+  }
 }

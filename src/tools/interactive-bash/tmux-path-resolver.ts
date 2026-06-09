@@ -1,4 +1,5 @@
 import { spawn } from "../../shared/bun-spawn-shim"
+import { bunWhich } from "../../shared/bun-which-shim"
 import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 
 let tmuxPath: string | null = null
@@ -10,6 +11,15 @@ function getEnvironmentKey(): "cmux" | "tmux" {
 }
 
 async function findCommandPath(command: string): Promise<string | null> {
+  try {
+    const resolvedPath = bunWhich(command)
+    if (resolvedPath) {
+      return resolvedPath
+    }
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+  }
+
   const isWindows = process.platform === "win32"
   const cmd = isWindows ? "where" : "which"
 
@@ -26,7 +36,7 @@ async function findCommandPath(command: string): Promise<string | null> {
     }
 
     const stdout = await new Response(proc.stdout).text()
-    const path = stdout.trim().split("\n")[0]
+    const path = stdout.trim().split(/\r?\n/)[0]?.trim()
 
     if (!path) {
       return null

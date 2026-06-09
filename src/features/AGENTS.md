@@ -1,6 +1,6 @@
-# src/features/ — 20 Feature Modules
+# src/features/ — 21 Feature Modules
 
-**Generated:** 2026-05-20
+**Generated:** 2026-06-08
 
 ## OVERVIEW
 
@@ -28,6 +28,7 @@ File counts are NON-TEST `.ts` files only (test files co-located but excluded fr
 | **context-injector** | 4 | LOW | no | AGENTS.md/README.md injection into session context |
 | **hook-message-injector** | 4 | LOW | no | System message injection helper used by hooks |
 | **run-continuation-state** | 4 | LOW | no | Persistent state for `oh-my-opencode run` continuation across invocations |
+| **opencode-runtime-skills** | 4 | LOW–MED | no | Runtime security-skill source — `selectRuntimeSecuritySkills()` + `createRuntimeSkillSourceServer()` serve security skills to sessions at runtime |
 | **claude-code-command-loader** | 4 | LOW | no | Load `/commands` from `.opencode/commands/` and Claude Code plugins |
 | **claude-tasks** | 3 | MEDIUM | yes | Sisyphus task schema + atomic file storage + OpenCode todo API sync |
 | **task-toast-manager** | 3 | MEDIUM | no | Task progress notifications |

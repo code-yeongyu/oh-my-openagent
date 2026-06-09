@@ -4,9 +4,9 @@ import { dirname, join } from "path"
 
 /**
  * Minimum OpenCode version required for this plugin.
- * This plugin only supports OpenCode 1.1.1+ which uses the permission system.
+ * This plugin only supports OpenCode 1.4.0+.
  */
-export const MINIMUM_OPENCODE_VERSION = "1.1.1"
+export const MINIMUM_OPENCODE_VERSION = "1.4.0"
 
 /**
  * OpenCode version that introduced native AGENTS.md injection.

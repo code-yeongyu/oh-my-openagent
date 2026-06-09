@@ -87,6 +87,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
       project,
       directory: testDirectory,
       worktree: testDirectory,
+      experimental_workspace: { register: () => {} },
       serverUrl: new URL("https://example.com"),
       $: Bun.$,
     } satisfies PluginInput
@@ -165,7 +166,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
     expect(taskSession).toBeDefined()
     expect(taskSession?.started_at).toBeString()
     expect(taskSession?.status).toBe("running")
-    expect(taskSession?.session_id).toBe(childSessionID)
+    expect(taskSession?.session_id).toBe(`opencode:${childSessionID}`)
   })
 
   it("ends task timer when todo:1 checkbox transitions to checked", async () => {

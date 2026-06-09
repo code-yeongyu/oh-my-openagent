@@ -70,6 +70,38 @@ describe("test workflows", () => {
     expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
   })
 
+  test("runs Codex compatibility checks before publish jobs", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  preflight-trust:")
+
+    // #when
+    const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
+    const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
+    const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
+    const buildsLspToolsMcp =
+      codexCompatibilityJob.includes("name: Build vendored lsp-tools-mcp package") &&
+      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
+      codexCompatibilityJob.indexOf("name: Build vendored lsp-tools-mcp package") <
+        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
+    const runsCodexCommand = codexCompatibilityJob.includes("run: bun run test:codex")
+    const publishMainNeedsCodex =
+      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
+      workflow.includes("needs.codex-compatibility.result == 'success'")
+    const publishPlatformNeedsCodex =
+      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]") &&
+      workflow.includes("needs.codex-compatibility.result == 'success'")
+
+    // #then
+    expect(hasCodexMatrixJob, "publish workflow must expose a Codex compatibility job").toBe(true)
+    expect(hasSupportedOsMatrix, "publish Codex compatibility must cover supported OSes").toBe(true)
+    expect(hasNodeSetup, "publish Codex compatibility must setup Node for MCP package builds").toBe(true)
+    expect(buildsLspToolsMcp, "publish Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
+    expect(runsCodexCommand, "publish Codex compatibility must run the shared Codex test script").toBe(true)
+    expect(publishMainNeedsCodex, "main wrapper publish must wait for Codex compatibility").toBe(true)
+    expect(publishPlatformNeedsCodex, "platform publish must wait for Codex compatibility").toBe(true)
+  })
+
   test("exercise root checks across linux macos and windows", () => {
     // #given
     const workflow = readFileSync(ciWorkflowPath, "utf8")
@@ -120,7 +152,7 @@ describe("test workflows", () => {
     // #when
     const codexTestScriptBuildsMcpRuntimes =
       packageManifest.includes(
-        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
+        '"test:codex": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
       )
 
     // #then
@@ -182,7 +214,7 @@ describe("test workflows", () => {
     const computesVersionOnce = (workflow.match(/id: version/g) ?? []).length === 1
     const platformUsesMetadata = workflow.includes("version: ${{ needs.release-metadata.outputs.version }}") &&
       workflow.includes("dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}")
-    const mainWaitsForPlatform = workflow.includes("needs: [test, typecheck, preflight-trust, release-metadata, publish-platform]") &&
+    const mainWaitsForPlatform = workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
       workflow.includes("inputs.skip_platform == true || needs.publish-platform.result == 'success'")
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")
     const wrappersVerifyPlatformPackages = workflow.includes("name: Verify platform packages are published") &&

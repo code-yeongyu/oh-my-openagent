@@ -81,10 +81,9 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
   return isRecord(raw.options)
 }
 
-export function createChatParamsHandler(args: {
-  anthropicEffort: { "chat.params"?: (input: ChatParamsHookInput, output: ChatParamsOutput) => Promise<void> } | null
+export function createChatParamsHandler(_args: {
   client?: unknown
-}): (input: unknown, output: unknown) => Promise<void> {
+} = {}): (input: unknown, output: unknown) => Promise<void> {
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
@@ -189,7 +188,5 @@ export function createChatParamsHandler(args: {
         delete output.options.thinking
       }
     }
-
-    await args.anthropicEffort?.["chat.params"]?.(normalizedInput, output)
   }
 }

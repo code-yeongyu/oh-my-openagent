@@ -21,7 +21,11 @@ export function isOpenAiOnlyAvailability(availability: ProviderAvailability): bo
     !availability.opencodeZen &&
     !availability.copilot &&
     !availability.zai &&
-    !availability.kimiForCoding
+    !availability.kimiForCoding &&
+    !availability.bailianCodingPlan &&
+    !availability.minimaxCnCodingPlan &&
+    !availability.minimaxCodingPlan &&
+    !availability.vercelAiGateway
   )
 }
 

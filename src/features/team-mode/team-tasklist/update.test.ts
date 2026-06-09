@@ -103,3 +103,18 @@ test("updateTaskStatus rejects non-owner updates except deletion", async () => {
     await fixture.cleanup()
   }
 })
+
+test("#given traversal task id #when updating a task #then it rejects before writing outside the task directory", async () => {
+  // given
+  const fixture = await createTasklistFixture()
+
+  try {
+    // when
+    const updatedTask = updateTaskStatus(fixture.teamRunId, "../escape", "completed", "member-a", fixture.config)
+
+    // then
+    await expect(updatedTask).rejects.toThrow("team path escapes base directory")
+  } finally {
+    await fixture.cleanup()
+  }
+})

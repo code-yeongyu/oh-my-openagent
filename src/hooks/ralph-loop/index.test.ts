@@ -1545,8 +1545,8 @@ Original task: Build something`
 
       // then - should complete quickly (not hang for 10s)
       expect(elapsed).toBeLessThan(6000)
-      // then - loop should continue (API error = no completion detected)
-      expect(promptCalls.length).toBe(1)
+      // then - unknown latest assistant state should not receive an overlapping continuation
+      expect(promptCalls.length).toBe(0)
       expect(apiCallCount).toBeGreaterThan(0)
     })
   })

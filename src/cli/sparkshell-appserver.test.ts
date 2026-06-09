@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -11,9 +13,10 @@ import {
 } from "./sparkshell"
 
 const REPO_ROOT = resolve(import.meta.dir, "../..")
+const unixSocketTest = process.platform === "win32" ? test.skip : test
 
 describe("sparkshell appserver routing", () => {
-  test("#given appserver socket #when direct argv runs #then wire client initializes before command exec", async () => {
+  unixSocketTest("#given appserver socket #when direct argv runs #then wire client initializes before command exec", async () => {
     // given
     const tempDir = await mkdtemp(join(tmpdir(), "omo-sparkshell-appserver-"))
     const socketPath = join(tempDir, "appserver.sock")
@@ -68,7 +71,7 @@ describe("sparkshell appserver routing", () => {
     }
   })
 
-  test("#given unresponsive appserver socket #when direct argv runs #then raw fallback is bounded", async () => {
+  unixSocketTest("#given unresponsive appserver socket #when direct argv runs #then raw fallback is bounded", async () => {
     // given
     const tempDir = await mkdtemp(join(tmpdir(), "omo-sparkshell-timeout-"))
     const socketPath = join(tempDir, "appserver.sock")

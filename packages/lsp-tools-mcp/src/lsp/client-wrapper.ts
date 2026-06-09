@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
-
+import { contextCwd } from "../request-context.js";
 import type { LspClient } from "./client.js";
 import {
 	isLspDeadConnectionError,
@@ -24,7 +24,7 @@ export function isDirectoryPath(filePath: string): boolean {
 }
 
 export function findWorkspaceRoot(filePath: string): string {
-	const abs = resolve(filePath);
+	const abs = resolve(contextCwd(), filePath);
 	let dir = abs;
 
 	if (!isDirectoryPath(dir)) {
@@ -97,11 +97,11 @@ const READ_ONLY_RETRY_TOOLS = new Set([
 
 export async function withLspClient<T>(
 	filePath: string,
-	fn: (client: LspClient) => Promise<T>,
+	fn: (client: LspClient, workspaceRoot: string) => Promise<T>,
 	toolName: string,
 	options: WithLspClientOptions = {},
 ): Promise<T> {
-	const absPath = resolve(filePath);
+	const absPath = resolve(contextCwd(), filePath);
 
 	if (isDirectoryPath(absPath)) {
 		throw new LspInvalidPathError(
@@ -124,7 +124,7 @@ export async function withLspClient<T>(
 		const client = await manager.getClient(root, server, options.signal);
 
 		try {
-			return await fn(client);
+			return await fn(client, root);
 		} catch (err) {
 			if (allowRetry && READ_ONLY_RETRY_TOOLS.has(toolName) && isLspDeadConnectionError(err)) {
 				manager.invalidateClient(root, server.id, client);

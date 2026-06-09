@@ -73,7 +73,7 @@ describe("createAutoSlashCommandHook", () => {
         join(commandDir, "project-only-command.md"),
         `---\ndescription: Project command\n---\nExecute from project directory.\n`,
       )
-      process.chdir("/tmp")
+      process.chdir(tempDir)
 
       const hook = createAutoSlashCommandHook({ directory: projectDir })
       const input = createMockInput(`test-session-project-${Date.now()}`)

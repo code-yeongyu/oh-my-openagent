@@ -1,8 +1,7 @@
 import { access, mkdir } from "node:fs/promises"
-import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { getTasksDir, resolveBaseDir } from "../team-registry"
+import { getTaskClaimLockPath, getTaskClaimsDir, getTaskFilePath, resolveBaseDir } from "../team-registry"
 import { atomicWrite, detectStaleLock, reapStaleLock, withLock } from "../team-state-store/locks"
 import { TaskSchema } from "../types"
 import type { Task } from "../types"
@@ -50,10 +49,9 @@ export async function claimTask(
   config: TeamModeConfig,
 ): Promise<Task> {
   const baseDirectory = resolveBaseDir(config)
-  const tasksDirectory = getTasksDir(baseDirectory, teamRunId)
-  const claimsDirectory = path.join(tasksDirectory, "claims")
-  const taskPath = path.join(tasksDirectory, `${taskId}.json`)
-  const claimLockPath = path.join(claimsDirectory, `${taskId}.lock`)
+  const claimsDirectory = getTaskClaimsDir(baseDirectory, teamRunId)
+  const taskPath = getTaskFilePath(baseDirectory, teamRunId, taskId)
+  const claimLockPath = getTaskClaimLockPath(baseDirectory, teamRunId, taskId)
 
   await mkdir(claimsDirectory, { recursive: true, mode: 0o700 })
 

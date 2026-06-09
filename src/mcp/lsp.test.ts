@@ -174,7 +174,9 @@ describe("createLspMcpConfig", () => {
 
     // then
     expect(config.enabled).toBe(false)
-    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toBe(".opencode/lsp.json")
+    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toContain(".opencode/lsp.json")
+    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toContain(".omo/lsp.json")
+    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toContain(".omo/lsp-client.json")
   })
 })
 

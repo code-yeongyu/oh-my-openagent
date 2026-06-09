@@ -92,3 +92,18 @@ test("claimTask reaps a stale claim lock before claiming", async () => {
     await fixture.cleanup()
   }
 })
+
+test("#given traversal task id #when claiming a task #then it rejects before creating an escaped claim lock", async () => {
+  // given
+  const fixture = await createTasklistFixture()
+
+  try {
+    // when
+    const claimedTask = claimTask(fixture.teamRunId, "../escape", "member-a", fixture.config)
+
+    // then
+    await expect(claimedTask).rejects.toThrow("team path escapes base directory")
+  } finally {
+    await fixture.cleanup()
+  }
+})

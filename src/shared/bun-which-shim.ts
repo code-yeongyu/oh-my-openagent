@@ -16,7 +16,7 @@ function isUnsafeCommandName(commandName: string): boolean {
 
 function isExecutable(filePath: string): boolean {
   try {
-    accessSync(filePath, constants.X_OK)
+    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK)
     return true
   } catch (error) {
     if (!(error instanceof Error) && Object.prototype.toString.call(error) !== "[object Error]") {
@@ -35,6 +35,7 @@ function resolvePathValue(): string | undefined {
 
 function getWindowsCandidates(commandName: string): string[] {
   if (process.platform !== "win32") return [commandName]
+  if (/\.[^\\/]+$/.test(commandName)) return [commandName]
 
   return [commandName, `${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`]
 }
@@ -42,7 +43,13 @@ function getWindowsCandidates(commandName: string): string[] {
 export function bunWhich(commandName: string): string | null {
   if (!commandName) return null
   if (isUnsafeCommandName(commandName)) return null
-  if (IS_BUN) return runtime.Bun?.which(commandName) ?? null
+  const candidateNames = getWindowsCandidates(commandName)
+  if (IS_BUN) {
+    for (const candidateName of candidateNames) {
+      const resolvedPath = runtime.Bun?.which(candidateName) ?? null
+      if (resolvedPath !== null) return resolvedPath
+    }
+  }
 
   const pathValue = resolvePathValue()
   if (!pathValue) return null
@@ -50,7 +57,6 @@ export function bunWhich(commandName: string): string | null {
   const pathEntries = pathValue.split(delimiter).filter((pathEntry) => pathEntry.length > 0)
   if (pathEntries.length === 0) return null
 
-  const candidateNames = getWindowsCandidates(commandName)
   for (const pathEntry of pathEntries) {
     for (const candidateName of candidateNames) {
       const candidatePath = join(pathEntry, candidateName)

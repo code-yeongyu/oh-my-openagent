@@ -81,7 +81,7 @@ describe("config loader", () => {
 		}
 	});
 
-	it("#given one invalid LSP config entry #when merging servers #then keeps valid sibling entries", () => {
+	it("#given one invalid user LSP config entry #when merging servers #then keeps valid sibling entries", () => {
 		// given
 		const previousProject = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
 		const previousUser = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
@@ -90,8 +90,9 @@ describe("config loader", () => {
 		const projectConfig = join(root, "project.json");
 		const userConfig = join(root, "user.json");
 		mkdirSync(root, { recursive: true });
+		writeFileSync(projectConfig, JSON.stringify({ lsp: {} }));
 		writeFileSync(
-			projectConfig,
+			userConfig,
 			JSON.stringify({
 				lsp: {
 					valid: { command: ["valid-lsp", "--stdio"], extensions: [".valid"], priority: 7 },
@@ -99,7 +100,6 @@ describe("config loader", () => {
 				},
 			}),
 		);
-		writeFileSync(userConfig, JSON.stringify({ lsp: {} }));
 		process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = projectConfig;
 		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
 
@@ -114,7 +114,7 @@ describe("config loader", () => {
 					command: ["valid-lsp", "--stdio"],
 					extensions: [".valid"],
 					priority: 7,
-					source: "project",
+					source: "user",
 				}),
 			);
 			expect(servers.some((server) => server.id === "invalid")).toBe(false);

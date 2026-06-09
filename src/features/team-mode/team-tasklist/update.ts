@@ -1,7 +1,5 @@
-import path from "node:path"
-
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { getTasksDir, resolveBaseDir } from "../team-registry"
+import { getTaskFilePath, resolveBaseDir } from "../team-registry"
 import { atomicWrite } from "../team-state-store/locks"
 import { TaskSchema } from "../types"
 import type { Task } from "../types"
@@ -65,9 +63,8 @@ export async function updateTaskStatus(
     updatedAt: Date.now(),
   })
 
-  const tasksDirectory = getTasksDir(resolveBaseDir(config), teamRunId)
   await atomicWrite(
-    path.join(tasksDirectory, `${taskId}.json`),
+    getTaskFilePath(resolveBaseDir(config), teamRunId, taskId),
     `${JSON.stringify(updatedTask, null, 2)}\n`,
   )
 

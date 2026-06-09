@@ -73,6 +73,7 @@ function defaultRunTmuxCommand(_tmuxPath: string, args: Array<string>, _options?
 }
 
 const runTmuxCommandMock = mock(defaultRunTmuxCommand)
+const logMock = mock(() => undefined)
 
 const isServerRunningMock = mock(async (_serverUrl: string) => true)
 
@@ -81,6 +82,7 @@ async function loadLayoutModule() {
     runTmuxCommand: runTmuxCommandMock,
     isServerRunning: isServerRunningMock,
     getTmuxPath: async () => "tmux",
+    log: logMock,
     resolveCallerTmuxSession: async () => {
       if (!process.env.TMUX_PANE || !displaySuccess || !/^\$[0-9]+$/.test(displaySessionId)) {
         return null
@@ -117,6 +119,7 @@ describe("team-layout-tmux", () => {
 
   beforeEach(() => {
     runTmuxCommandMock.mockClear()
+    logMock.mockClear()
     isServerRunningMock.mockClear()
     isServerRunningMock.mockImplementation(async () => true)
     nextWindowNumber = 1
@@ -177,6 +180,7 @@ describe("team-layout-tmux", () => {
       runTmuxCommand: runTmuxCommandMock,
       isServerRunning: isServerRunningMock,
       getTmuxPath: async () => Promise.reject("tmux path unavailable"),
+      log: logMock,
       resolveCallerTmuxSession: async () => ({ sessionId: "$7", paneId: "%42", windowTarget: "test-session:0" }),
     }
     const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
@@ -186,7 +190,7 @@ describe("team-layout-tmux", () => {
 
     // then
     expect(result).toBeNull()
-    expect(sharedModule.log).toHaveBeenCalledWith("tmux visualization unavailable, skipping", { error: "tmux path unavailable" })
+    expect(logMock).toHaveBeenCalledWith("tmux visualization unavailable, skipping", { error: "tmux path unavailable" })
   })
 
   test("creates teammate panes in the caller window and sends attach via send-keys", async () => {
@@ -211,7 +215,7 @@ describe("team-layout-tmux", () => {
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
   })
 
-  test("#given env auth set #when createTeamLayout runs #then attach commands carry the env-prefix (fixes #4409)", async () => {
+  test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
     // given — fixtures assembled at runtime (never literals) so static secret
     // scanners don't flag a username/password pair (GitGuardian false-positive,
     // #4466). The embedded single quote still exercises the shell-escape path.
@@ -229,17 +233,21 @@ describe("team-layout-tmux", () => {
       await createTeamLayout("run-auth", members, tmuxMgr as never)
 
       // then
-      const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
+      const commands = getCommands()
+      const sendKeys = commands.filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
       if (attach === undefined) throw new Error("expected attach command")
-      // both auth vars are forwarded
-      expect(attach).toContain("OPENCODE_SERVER_PASSWORD=")
-      expect(attach).toContain("OPENCODE_SERVER_USERNAME=")
-      // embedded single quote is POSIX-escaped as '\'' (verified independently of the impl helper)
-      expect(attach).toContain("'a'\\''b'")
-      // env-prefix precedes the binary
-      expect(attach.indexOf("OPENCODE_SERVER_PASSWORD=")).toBeLessThan(attach.indexOf("opencode attach"))
+      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+      expect(attach).not.toContain("OPENCODE_SERVER_USERNAME")
+      expect(attach).not.toContain(fixturePassword)
+      expect(attach).not.toContain(fixtureUsername)
+
+      const splitWindow = commands.find((args) => args[0] === "split-window")
+      expect(splitWindow).toBeDefined()
+      expect(splitWindow).toContain("-e")
+      expect(splitWindow).toContain(`OPENCODE_SERVER_PASSWORD=${fixturePassword}`)
+      expect(splitWindow).toContain(`OPENCODE_SERVER_USERNAME=${fixtureUsername}`)
     } finally {
       if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
       if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
@@ -455,8 +463,8 @@ describe("team-layout-tmux", () => {
       ["kill-pane", "-t", "%11"],
       ["kill-pane", "-t", "%12"],
     ])
-    expect(sharedModule.log).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
-    expect(sharedModule.log).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
   })
 
   test("skips all panes when lead member missing", async () => {

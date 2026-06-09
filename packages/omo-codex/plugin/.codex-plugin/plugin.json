@@ -17,7 +17,7 @@
 	"interface": {
 		"displayName": "OMO",
 		"shortDescription": "Unified local Codex components",
-		"longDescription": "OMO exposes the local Codex Rules, Comment Checker, LSP, Ultrawork, and ulw-loop components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
+		"longDescription": "OMO exposes local Codex Rules, Comment Checker, Git Bash, LSP, Ultrawork, ulw-loop, start-work continuation, and telemetry components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
 		"developerName": "Yeongyu Kim",
 		"category": "Developer Tools",
 		"capabilities": ["Hooks", "MCP Tools", "Code Intelligence", "Workflow", "Context Injection"],

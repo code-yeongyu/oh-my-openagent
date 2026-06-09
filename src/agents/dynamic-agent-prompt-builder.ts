@@ -15,7 +15,6 @@ export {
   buildLibrarianSection,
   buildDelegationTable,
   buildOracleSection,
-  buildConsensusSection,
   buildFrontendGuidanceSection,
   buildNonClaudePlannerSection,
   buildParallelDelegationSection,

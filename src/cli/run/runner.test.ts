@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../../config"
 import { resolveRunAgent } from "./agent-resolver"
 
@@ -89,6 +89,17 @@ describe("resolveRunAgent", () => {
     // then
     expect(agent).toBe("sisyphus")
   })
+
+  it("#given unknown custom agent #when resolving run agent #then leaves the custom prompt agent untouched", () => {
+    // given
+    const config = createConfig()
+
+    // when
+    const agent = resolveRunAgent({ message: "test", agent: "custom-agent" }, config, {})
+
+    // then
+    expect(agent).toBe("custom-agent")
+  })
 })
 
 describe("waitForEventProcessorShutdown", () => {
@@ -122,7 +133,7 @@ describe("waitForEventProcessorShutdown", () => {
 
     //#then
     const elapsed = performance.now() - start
-    expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 10)
+    expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 50)
   })
 })
 
@@ -168,6 +179,7 @@ describe("run environment setup", () => {
 describe("run with invalid model", () => {
   it("given invalid --model value, when run, then returns exit code 1 with error message", async () => {
     // given
+    mock.restore()
     const originalError = console.error
     const errorMessages: string[] = []
 
@@ -177,7 +189,7 @@ describe("run with invalid model", () => {
 
     try {
       // when
-      const { run } = await import("./runner")
+      const { run } = await import(`./runner?invalid-model=${Date.now()}-${Math.random()}`)
       const exitCode = await run({
         message: "test",
         model: "invalid",

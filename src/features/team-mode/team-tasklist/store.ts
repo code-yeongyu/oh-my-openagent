@@ -2,7 +2,7 @@ import { mkdir, readFile } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { getTasksDir, resolveBaseDir } from "../team-registry"
+import { getTaskFilePath, getTasksDir, resolveBaseDir } from "../team-registry"
 import { atomicWrite, withLock } from "../team-state-store/locks"
 import { TaskSchema } from "../types"
 import type { Task } from "../types"
@@ -26,7 +26,8 @@ export async function createTask(
   taskInput: Omit<Task, "id" | "createdAt" | "updatedAt" | "version">,
   config: TeamModeConfig,
 ): Promise<Task> {
-  const tasksDirectory = getTasksDir(resolveBaseDir(config), teamRunId)
+  const baseDirectory = resolveBaseDir(config)
+  const tasksDirectory = getTasksDir(baseDirectory, teamRunId)
   await mkdir(tasksDirectory, { recursive: true, mode: 0o700 })
   await mkdir(path.join(tasksDirectory, "claims"), { recursive: true, mode: 0o700 })
 
@@ -45,7 +46,7 @@ export async function createTask(
     })
 
     await atomicWrite(
-      path.join(tasksDirectory, `${task.id}.json`),
+      getTaskFilePath(baseDirectory, teamRunId, task.id),
       `${JSON.stringify(task, null, 2)}\n`,
     )
 

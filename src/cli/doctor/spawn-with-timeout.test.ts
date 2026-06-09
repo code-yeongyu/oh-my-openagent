@@ -1,4 +1,7 @@
+/// <reference types="bun-types" />
+
 import { afterEach, describe, expect, it, mock } from "bun:test"
+import type { SpawnedProcess } from "../../shared/spawn-with-windows-hide"
 import { spawnWithTimeout } from "./spawn-with-timeout"
 
 describe("spawnWithTimeout", () => {
@@ -19,7 +22,7 @@ describe("spawnWithTimeout", () => {
     it("captures stderr output", async () => {
       // when
       const result = await spawnWithTimeout(
-        ["bash", "-c", "echo err >&2"],
+        [process.execPath, "-e", "console.error('err')"],
         { stdout: "pipe", stderr: "pipe" }
       )
 
@@ -44,7 +47,7 @@ describe("spawnWithTimeout", () => {
     it("returns timedOut true and kills the process", async () => {
       // when
       const result = await spawnWithTimeout(
-        ["bash", "-c", "while true; do :; done"],
+        [process.execPath, "-e", "setInterval(() => {}, 1000)"],
         { stdout: "pipe", stderr: "pipe" },
         200
       )
@@ -68,6 +71,20 @@ describe("spawnWithTimeout", () => {
       // then
       expect(result.timedOut).toBe(false)
       expect(result.exitCode).toBe(1)
+    })
+
+    it("does not consume process streams more than once", async () => {
+      // given
+      const unreadableCommand = process.platform === "win32" ? ["cmd", "/c", "exit", "9009"] : ["false"]
+
+      // when
+      const result = await spawnWithTimeout(unreadableCommand, { stdout: "pipe", stderr: "pipe" }, 2000)
+
+      // then
+      expect(result.timedOut).toBe(false)
+      expect(result.exitCode).not.toBe(0)
+      expect(typeof result.stdout).toBe("string")
+      expect(typeof result.stderr).toBe("string")
     })
   })
 
@@ -96,6 +113,42 @@ describe("spawnWithTimeout", () => {
 
       // then
       expect(result).toBe(unknownFailure)
+    })
+  })
+
+  describe("#given a spawned process exposes an already-used pipe", () => {
+    afterEach(() => {
+      mock.restore()
+    })
+
+    it("treats the pipe as empty output", async () => {
+      // given
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("ignored"))
+          controller.close()
+        },
+      })
+      await new Response(stream).text()
+      const spawnedProcess = {
+        exitCode: 1,
+        exited: Promise.resolve(1),
+        stdout: stream,
+        stderr: undefined,
+        kill: () => {},
+      } satisfies SpawnedProcess
+      mock.module("../../shared/spawn-with-windows-hide", () => ({
+        spawnWithWindowsHide: () => spawnedProcess,
+      }))
+      const { spawnWithTimeout: spawnWithMockedSpawn } = await import(
+        `./spawn-with-timeout?used-stream=${Date.now()}`
+      )
+
+      // when
+      const result = await spawnWithMockedSpawn(["test-command"], { stdout: "pipe", stderr: "pipe" })
+
+      // then
+      expect(result).toEqual({ stdout: "", stderr: "", exitCode: 1, timedOut: false })
     })
   })
 })

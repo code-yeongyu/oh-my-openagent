@@ -134,7 +134,5 @@ If verification fails:
 
 ${sections.oracleSection}
 
-${sections.consensusSection}
-
 ${sections.taskManagementSection}`;
 }

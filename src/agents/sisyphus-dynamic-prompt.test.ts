@@ -117,8 +117,8 @@ describe("buildFallbackSisyphusPrompt", () => {
       // then
       expectPromptFingerprint(
         prompt,
-        "9183ed36",
-        27886,
+        "610871ba",
+        27884,
       );
       expectInOrder(prompt, [
         "<Role>",
@@ -145,8 +145,8 @@ describe("buildFallbackSisyphusPrompt", () => {
       // then
       expectPromptFingerprint(
         prompt,
-        "a249afaa",
-        40385,
+        "6b3b127a",
+        40383,
       );
       expectInOrder(prompt, [
         "<intent_verbalization>",

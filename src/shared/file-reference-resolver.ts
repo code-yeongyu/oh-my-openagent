@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from "fs"
-import { isAbsolute, resolve } from "path"
+import { homedir } from "os"
+import { isAbsolute, posix, resolve, win32 } from "path"
 import { isWithinProject } from "./contains-path"
 import { log } from "./logger"
 
@@ -11,6 +12,47 @@ interface FileMatch {
 }
 
 const FILE_REFERENCE_PATTERN = /@([^\s@]+)/g
+
+function isPosixAbsolutePath(filePath: string): boolean {
+  return filePath.startsWith("/")
+}
+
+function isWindowsAbsolutePath(filePath: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith("\\\\")
+}
+
+function expandEnvironmentVariable(match: string, variableName: string | undefined): string {
+  if (!variableName) {
+    return match
+  }
+
+  const value = process.env[variableName]
+  if (value !== undefined) {
+    return value
+  }
+
+  if (variableName === "HOME") {
+    return homedir()
+  }
+
+  return match
+}
+
+function resolvePathForInput(filePath: string, cwd: string): string {
+  if (isWindowsAbsolutePath(filePath)) {
+    return win32.resolve(filePath)
+  }
+
+  if (isPosixAbsolutePath(filePath) || isPosixAbsolutePath(cwd)) {
+    return posix.resolve(cwd, filePath)
+  }
+
+  if (isWindowsAbsolutePath(cwd)) {
+    return win32.resolve(cwd, filePath)
+  }
+
+  return resolve(cwd, filePath)
+}
 
 function findFileReferences(text: string): FileMatch[] {
   const matches: FileMatch[] = []
@@ -32,18 +74,14 @@ function findFileReferences(text: string): FileMatch[] {
 
 export function resolveFilePath(filePath: string, cwd: string): string {
   const expanded = filePath.replace(/\$\{(\w+)\}|\$(\w+)/g, (match, braced: string | undefined, bare: string | undefined) => {
-    const variableName = braced ?? bare
-    if (!variableName) {
-      return match
-    }
-    return process.env[variableName] ?? match
+    return expandEnvironmentVariable(match, braced ?? bare)
   })
 
-  if (isAbsolute(expanded)) {
-    return resolve(expanded)
+  if (isAbsolute(expanded) || isPosixAbsolutePath(expanded) || isWindowsAbsolutePath(expanded)) {
+    return resolvePathForInput(expanded, cwd)
   }
 
-  return resolve(cwd, expanded)
+  return resolvePathForInput(expanded, cwd)
 }
 
 function readFileContent(resolvedPath: string): string {

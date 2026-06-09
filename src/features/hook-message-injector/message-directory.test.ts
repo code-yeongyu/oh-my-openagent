@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it, mock } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const TEST_STORAGE_ROOT = mkdtempSync(join(tmpdir(), "omo-message-directory-storage-"))
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -12,10 +13,12 @@ mock.module("../../shared/opencode-storage-paths", () => ({
   PART_STORAGE: join(TEST_STORAGE_ROOT, "part"),
   SESSION_STORAGE: join(TEST_STORAGE_ROOT, "session"),
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const { getOrCreateMessageDir } = await import("./message-directory")
 
 afterAll(() => {
+  restoreModuleMocksForTestFile(import.meta.url)
   rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
 })
 

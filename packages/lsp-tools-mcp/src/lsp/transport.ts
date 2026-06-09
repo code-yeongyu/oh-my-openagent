@@ -1,11 +1,8 @@
-import { delimiter } from "node:path";
-
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
 import { REQUEST_TIMEOUT_MS, STOP_HARD_KILL_TIMEOUT_MS, STOP_SIGKILL_GRACE_MS } from "./constants.js";
 import { LspConnectionClosedError, LspProcessExitedError, LspRequestTimeoutError } from "./errors.js";
 import { JsonRpcConnection } from "./json-rpc-connection.js";
 import { type SpawnedProcess, spawnProcess } from "./process.js";
-import { getAdditionalPathBases } from "./server-installation.js";
 import type { Diagnostic, ResolvedServer } from "./types.js";
 
 interface ConfigurationItem {
@@ -59,16 +56,10 @@ export class LspClientTransport {
 	}
 
 	async start(): Promise<void> {
-		const env: Record<string, string | undefined> = {
+		const env = createLspSpawnEnv(this.root, {
 			...process.env,
 			...this.server.env,
-		};
-		const pathValue = process.platform === "win32" ? (env["PATH"] ?? env["Path"] ?? "") : (env["PATH"] ?? "");
-		const spawnPath = [pathValue, ...getAdditionalPathBases(this.root)].filter(Boolean).join(delimiter);
-		if (process.platform === "win32" && env["Path"] !== undefined) {
-			env["Path"] = spawnPath;
-		}
-		env["PATH"] = spawnPath;
+		});
 
 		this.proc = spawnProcess(this.server.command, {
 			cwd: this.root,
@@ -270,6 +261,13 @@ export class LspClientTransport {
 	getStoredDiagnostics(uri: string): Diagnostic[] {
 		return this.diagnosticsStore.get(uri) ?? [];
 	}
+}
+
+export function createLspSpawnEnv(
+	_root: string,
+	input: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+	return { ...input };
 }
 
 function isDiagnostic(value: unknown): value is Diagnostic {

@@ -1,10 +1,10 @@
 # src/config/ — Zod v4 Schema System
 
-**Generated:** 2026-05-20
+**Generated:** 2026-06-08
 
 ## OVERVIEW
 
-30 non-test schema files composing `OhMyOpenCodeConfigSchema` (plus `schema/internal/permission.ts` for shared internal helpers). Zod v4 validation with `safeParse()`. All fields optional — omitted fields use defaults from the schema. Auto-emitted to `assets/oh-my-opencode.schema.json` via `bun run build:schema`.
+32 non-test schema files composing `OhMyOpenCodeConfigSchema` (plus `schema/internal/permission.ts` for shared internal helpers). Zod v4 validation with `safeParse()`. All fields optional — omitted fields use defaults from the schema. Auto-emitted to `assets/oh-my-opencode.schema.json` via `bun run build:schema`.
 
 ## SCHEMA TREE
 
@@ -15,7 +15,7 @@ config/schema/
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
 ├── agent-definitions.ts        # custom agent definition schema
 ├── categories.ts               # 8 built-in + custom categories
-├── hooks.ts                    # HookNameSchema (52 enum values; `team-tool-gating` is the only team-* one in schema — others are wired by direct config gates)
+├── hooks.ts                    # HookNameSchema (56 enum values; `team-tool-gating` is the only team-* one in schema — others are wired by direct config gates)
 ├── skills.ts                   # SkillsConfigSchema (sources, paths, recursive)
 ├── commands.ts                 # BuiltinCommandNameSchema
 ├── experimental.ts             # Feature flags incl plugin_load_timeout_ms (min 1000), task_system, max_tools
@@ -39,12 +39,14 @@ config/schema/
 ├── openclaw.ts                 # OpenClaw integration settings
 ├── model-capabilities.ts       # Model capabilities config
 ├── keyword-detector.ts         # disabled_keywords (ultrawork|search|analyze|team)
+├── default-mode.ts             # DefaultModeConfigSchema (auto-inject ultrawork / auto-start ralph_loop on session start)
+├── i18n.ts                     # I18nConfigSchema (locale override; falls back to LANG env var)
 └── team-mode.ts                # TeamModeConfigSchema (enabled, max_parallel_members, max_members, tmux_visualization)
 ```
 
 ## ROOT SCHEMA FIELDS
 
-`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `start_work`, `_migrations`, `model_fallback`, `model_capabilities`, `openclaw`, `mcp_env_allowlist`, `keyword_detector`, **`team_mode`**, `runtime_fallback`, `dynamic_context_pruning`.
+`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `start_work`, `_migrations`, `model_fallback`, `model_capabilities`, `openclaw`, `mcp_env_allowlist`, `keyword_detector`, **`team_mode`**, `runtime_fallback`, `dynamic_context_pruning`, `i18n`, `default_mode`.
 
 ## TEAM_MODE SCHEMA (11 fields)
 

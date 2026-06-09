@@ -30,7 +30,7 @@ export async function installCachedPlugin(input: {
     await copyDirectory(input.sourcePath, tempPath)
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
-    await maybeRunNpmInstall(tempPath, input.runCommand, ["install", "--omit=dev"])
+    await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
@@ -95,6 +95,5 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative === "") return true
   const parts = relative.split(sep)
-  if (parts[parts.length - 1] === "package-lock.json") return false
   return !parts.some((part) => part === ".git" || part === "node_modules")
 }

@@ -28,17 +28,17 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 		const text = await readFile(join(root, skillPath), "utf8");
 		if (
 			!/TASK:/.test(text) ||
-			!/fork_turns:\s*"none"/.test(text) ||
+			!/fork_context:\s*false/.test(text) ||
 			!/wait_agent.*mailbox signals/s.test(text) ||
 			!/Fallback only when/.test(text) ||
 			!/respawn.*smaller/s.test(text) ||
-			!/model.*reasoning_effort.*default agent/s.test(text) ||
+			!/multi_agent_v1\.spawn_agent/s.test(text) ||
 			!/Plan and reviewer agents may run for a long time/.test(text) ||
-			!/short wait_agent cycles/.test(text) ||
+			!/multi_agent_v1\.wait_agent.*cycles/s.test(text) ||
 			!/single long blocking wait/.test(text) ||
 			!/A timeout only means no new mailbox update arrived/i.test(text) ||
 			!/WORKING:/.test(text) ||
-			!/single `list_agents`/.test(text)
+			!/multi_agent_v1\.wait_agent/.test(text)
 		) {
 			missing.push(skillPath);
 		}
@@ -57,12 +57,43 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 
 	// then
 	assert.doesNotMatch(text, /any `gpt-5\.2`\s+xhigh reviewer/);
-	assert.match(text, /codex-ultrawork-reviewer/);
-	assert.match(text, /agent_type.*worker/s);
-	assert.match(text, /model.*reasoning_effort.*default agent/s);
+	assert.match(text, /self-contained reviewer/);
+	assert.match(text, /schema cannot select.*TOML-backed reviewer role/s);
+	assert.match(text, /paste the reviewer requirements into\s+the message/s);
 	assert.match(text, /timeout only means no new mailbox update arrived/i);
 	assert.match(text, /WORKING:/);
-	assert.match(text, /single `list_agents`/);
+	assert.match(text, /multi_agent_v1\.wait_agent/);
+});
+
+test("#given ultrawork directive #when inspected #then dependent subagent transitions are blocked", async () => {
+	// given
+	const directivePath = "components/ultrawork/directive.md";
+
+	// when
+	const text = await readFile(join(root, directivePath), "utf8");
+
+	// then
+	assert.match(text, /Subagent-dependent transition barrier/);
+	assert.match(text, /Do not mark.*update_plan.*completed.*active child/s);
+	assert.match(text, /Do not start dependent implementation.*audit.*research.*review.*integrated/s);
+	assert.match(text, /Do not write the final answer.*active child agents/s);
+	assert.match(text, /two silent waits.*TASK STILL ACTIVE/s);
+	assert.match(text, /four silent or ack-only checks.*inconclusive/s);
+});
+
+test("#given ultrawork directive #when inspected #then TOML-backed routing is treated as unverified when native spawn cannot select it", async () => {
+	// given
+	const directivePath = "components/ultrawork/directive.md";
+
+	// when
+	const text = await readFile(join(root, directivePath), "utf8");
+
+	// then
+	assert.match(text, /TOML-backed subagent routing compatibility/);
+	assert.match(text, /routing-unverified/);
+	assert.match(text, /multi_agent_v1\.spawn_agent.*schema accepts/s);
+	assert.match(text, /cannot select a TOML-backed role, model, reasoning\s+effort, or `service_tier`/s);
+	assert.match(text, /paste the\s+role requirements into the message/s);
 });
 
 test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {

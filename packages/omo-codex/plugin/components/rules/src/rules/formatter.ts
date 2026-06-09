@@ -1,4 +1,4 @@
-import { truncateBudget, truncateRule } from "./truncator.js";
+import { isNeverTruncatedRule, truncateBudget, truncateRule } from "./truncator.js";
 import type { LoadedRule } from "./types.js";
 
 export interface FormatOptions {
@@ -35,13 +35,12 @@ function truncateRules(rules: ReadonlyArray<LoadedRule>, options: FormatOptions)
 	const perRuleBudgeted = perRuleNormalized.map((rule) => ({
 		path: rule.path,
 		relativePath: rule.relativePath,
-		body:
-			rule.source === "plugin-bundled"
-				? truncateRule(rule.body, { maxChars: perRuleResultChars, relativePath: rule.relativePath }).body
-				: truncateRule(rule.body, {
-						maxChars: Math.min(options.maxRuleChars, perRuleResultChars),
-						relativePath: rule.relativePath,
-					}).body,
+		body: isNeverTruncatedRule(rule.relativePath)
+			? rule.body
+			: truncateRule(rule.body, {
+					maxChars: Math.min(options.maxRuleChars, perRuleResultChars),
+					relativePath: rule.relativePath,
+				}).body,
 	}));
 	const budgetedRules = truncateBudget({
 		rules: perRuleBudgeted.map((rule) => ({ body: rule.body, relativePath: rule.relativePath })),
@@ -75,19 +74,8 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 	}
 
 	const orderedRules = orderStaticRules(uniqueRulesByBody(rules));
-	const hephaestusRules = orderedRules.filter(isHephaestusRule);
-	const otherRules = orderedRules.filter((rule) => !isHephaestusRule(rule));
-	const blocks: string[] = [];
 
-	if (hephaestusRules.length > 0) {
-		blocks.push(truncateRules(hephaestusRules, options).map(formatRule).join("\n\n"));
-	}
-
-	if (otherRules.length > 0) {
-		blocks.push(["## Project Instructions", "", "must read project rules:", otherRules.map(formatStaticRuleReference).join("\n")].join("\n"));
-	}
-
-	return blocks.join("\n\n");
+	return ["## Project Instructions", "", truncateRules(orderedRules, options).map(formatRule).join("\n\n")].join("\n");
 }
 
 function orderStaticRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
@@ -105,10 +93,6 @@ function orderStaticRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
 
 function isHephaestusRule(rule: LoadedRule): boolean {
 	return displayFilename(rule).toLowerCase() === "hephaestus.md";
-}
-
-function formatStaticRuleReference(rule: LoadedRule): string {
-	return `- [${displayFilename(rule)}]{${rule.path}}`;
 }
 
 function displayFilename(rule: LoadedRule): string {

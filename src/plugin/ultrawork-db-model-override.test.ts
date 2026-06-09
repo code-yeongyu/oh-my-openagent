@@ -37,10 +37,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function formatLogCalls(calls: readonly (readonly unknown[])[]): string {
-  return calls.map((call: readonly unknown[]) => `${String(call[0])} ${JSON.stringify(call[1])}`).join("\n")
-}
-
 describe("scheduleDeferredModelOverride", () => {
   let tempDir: string
   let dbPath: string
@@ -81,19 +77,27 @@ describe("scheduleDeferredModelOverride", () => {
 
   function insertMessage(id: string, model: { providerID: string; modelID: string }) {
     const db = new Database(dbPath)
-    db.run(
+    const stmt = db.prepare(
       `INSERT INTO message (id, session_id, data) VALUES (?, ?, ?)`,
-      [id, "ses_test", JSON.stringify({ model })],
     )
-    db.close()
+    try {
+      stmt.run(id, "ses_test", JSON.stringify({ model }))
+    } finally {
+      stmt.finalize()
+      db.close()
+    }
   }
 
   function readMessageModel(id: string): { providerID: string; modelID: string } | null {
     const db = new Database(dbPath)
-    const row = db.query(`SELECT data FROM message WHERE id = ?`).get(id) as
-      | { data: string }
-      | null
-    db.close()
+    const stmt = db.query(`SELECT data FROM message WHERE id = ?`)
+    let row: { data: string } | null
+    try {
+      row = stmt.get(id) as { data: string } | null
+    } finally {
+      stmt.finalize()
+      db.close()
+    }
     if (!row) return null
     const parsed = JSON.parse(row.data)
     return parsed.model ?? null
@@ -101,27 +105,16 @@ describe("scheduleDeferredModelOverride", () => {
 
   function readMessageField(id: string, field: string): unknown {
     const db = new Database(dbPath)
-    const row = db.query(`SELECT data FROM message WHERE id = ?`).get(id) as
-      | { data: string }
-      | null
-    db.close()
+    const stmt = db.query(`SELECT data FROM message WHERE id = ?`)
+    let row: { data: string } | null
+    try {
+      row = stmt.get(id) as { data: string } | null
+    } finally {
+      stmt.finalize()
+      db.close()
+    }
     if (!row) return null
     return JSON.parse(row.data)[field] ?? null
-  }
-
-  async function waitForLogCall(
-    description: string,
-    predicate: (message: unknown, metadata: unknown) => boolean,
-  ): Promise<void> {
-    const deadline = Date.now() + 1_000
-    while (Date.now() < deadline) {
-      if (logSpy.mock.calls.some((call: readonly unknown[]) => predicate(call[0], call[1]))) {
-        return
-      }
-      await flushWithTimeout()
-    }
-
-    throw new Error(`Timed out waiting for log call: ${description}\n${formatLogCalls(logSpy.mock.calls)}`)
   }
 
   test("should update model in DB after microtask flushes", async () => {
@@ -129,11 +122,10 @@ describe("scheduleDeferredModelOverride", () => {
     insertMessage("msg_001", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_001",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await flushMicrotasks(5)
 
     //#then
     const model = readMessageModel("msg_001")
@@ -145,12 +137,11 @@ describe("scheduleDeferredModelOverride", () => {
     insertMessage("msg_002", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_002",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
       "max",
     )
-    await flushMicrotasks(5)
 
     //#then
     expect(readMessageField("msg_002", "variant")).toBe("max")
@@ -161,16 +152,10 @@ describe("scheduleDeferredModelOverride", () => {
     //#given no message inserted
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_nonexistent",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await waitForLogCall("setTimeout fallback failure for msg_nonexistent", (message, metadata) => (
-      typeof message === "string"
-      && message.includes("setTimeout fallback failed")
-      && isRecord(metadata)
-      && metadata.messageId === "msg_nonexistent"
-    ))
 
     //#then
     const fallbackFailureCall = logSpy.mock.calls.find((call: readonly unknown[]) => {
@@ -190,16 +175,10 @@ describe("scheduleDeferredModelOverride", () => {
     //#given no message inserted
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_retry_exhausted",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await waitForLogCall("microtask retry exhaustion for msg_retry_exhausted", (message, metadata) => (
-      message === "[ultrawork-db-override] Exhausted microtask retries, falling back to setTimeout"
-      && isRecord(metadata)
-      && metadata.messageId === "msg_retry_exhausted"
-      && metadata.attempt === 10
-    ))
 
     //#then
     const retryExhaustedCall = logSpy.mock.calls.find((call: readonly unknown[]) => {
@@ -220,11 +199,10 @@ describe("scheduleDeferredModelOverride", () => {
     insertMessage("msg_003", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_003",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await flushMicrotasks(5)
 
     //#then
     const model = readMessageModel("msg_003")
@@ -238,11 +216,10 @@ describe("scheduleDeferredModelOverride", () => {
     getDataDirSpy.mockReturnValue("/nonexistent/path/that/does/not/exist")
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_004",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await flushMicrotasks(5)
 
     //#then
     expect(logSpy).toHaveBeenCalledWith(
@@ -258,11 +235,10 @@ describe("scheduleDeferredModelOverride", () => {
     chmodSync(corruptedDbPath, 0o000)
 
     //#when
-    scheduleDeferredModelOverride(
+    await scheduleDeferredModelOverride(
       "msg_corrupt",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await flushMicrotasks(5)
 
     //#then
     const failureCall = logSpy.mock.calls.find((call: readonly unknown[]) => {
