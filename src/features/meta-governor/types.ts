@@ -340,3 +340,48 @@ export interface TokenPredictorOutput extends TokenPrediction {
   readonly computedAtISO: string
   readonly turnsAnalyzed: number
 }
+
+/**
+ * Scoring Engine types. PR 5 of 8.
+ *
+ * Configuration for the weighted evidence scoring system that maps
+ * a DecisionContext to a Decision. Thresholds are configurable; defaults
+ * match the Decision contract in types.ts (lines 50-59).
+ */
+
+export interface ScoringConfig {
+  /** Score >= this → continue silently. Default: 0.3. */
+  readonly continueThreshold: number
+  /** Score in [-warnThreshold, +warnThreshold] → continue with log. Default: 0.3. */
+  readonly warnThreshold: number
+  /** Score <= -warnThreshold && > -escalateThreshold → warn. Default: 0.6. */
+  readonly escalateThreshold: number
+  /** Score <= -escalateThreshold && > -stopThreshold → escalate. Default: 0.8. */
+  readonly stopThreshold: number
+  /** Number of consecutive stops that triggers paralysis override. Default: 3. */
+  readonly paralysisThreshold: number
+  /** Default escalation target when action is escalate. Default: "oracle". */
+  readonly defaultEscalationTarget: EscalationTarget
+}
+
+/**
+ * Weighted evidence contribution for a single signal.
+ */
+export interface EvidenceContribution {
+  readonly source: EvidenceSource
+  readonly rawScore: number
+  readonly weight: number
+  readonly weightedScore: number
+  readonly description: string
+}
+
+/**
+ * Full scoring result with per-signal breakdown.
+ */
+export interface ScoringResult {
+  readonly decision: Decision
+  readonly contributions: readonly EvidenceContribution[]
+  readonly rawScore: number
+  readonly paralysisOverride: boolean
+  readonly computedAtISO: string
+}
