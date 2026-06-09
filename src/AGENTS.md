@@ -55,7 +55,7 @@ Counts verified from each composer's return object. Numbers in brackets show cou
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 24: preemptiveCompaction, sessionRecovery,
+  │   ├─ createSessionHooks()     # 23: preemptiveCompaction, sessionRecovery,
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
@@ -63,7 +63,7 @@ createHooks()
   │   │                             prometheusMdOnly, sisyphusJuniorNotepad, noSisyphusGpt,
   │   │                             noHephaestusNonGpt, hephaestusAgentsMdInjector,
   │   │                             questionLabelTruncator, taskResumeInfo,
-  │   │                             anthropicEffort, runtimeFallback, legacyPluginToast
+  │   │                             runtimeFallback, legacyPluginToast
   │   ├─ createToolGuardHooks()   # 17 [+1 with team-mode]: commentChecker, toolOutputTruncator,
   │   │                             directoryAgentsInjector, directoryReadmeInjector,
   │   │                             emptyTaskResponseDetector, rulesInjector, tasksTodowriteDisabler,
@@ -84,7 +84,7 @@ createHooks()
     team-member-error-handler, team-member-status-handler
 ```
 
-Total: 55 base, 62 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
+Total: 54 base, 61 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 

@@ -34,71 +34,6 @@ describe("createChatParamsHandler", () => {
     }
   })
 
-  test("normalizes object-style agent payload and runs chat.params hooks", async () => {
-    //#given
-    let called = false
-    const handler = createChatParamsHandler({
-      anthropicEffort: {
-        "chat.params": async (input) => {
-          called = input.agent.name === "sisyphus"
-        },
-      },
-    })
-
-    const input = {
-      sessionID: "ses_chat_params",
-      agent: { name: "sisyphus" },
-      model: { providerID: "opencode", modelID: "claude-opus-4-7" },
-      provider: { id: "opencode" },
-      message: {},
-    }
-
-    const output: ChatParamsOutput = {
-      temperature: 0.1,
-      topP: 1,
-      topK: 1,
-      options: {},
-    }
-
-    //#when
-    await handler(input, output)
-
-    //#then
-    expect(called).toBe(true)
-  })
-  test("passes the original mutable message object to chat.params hooks", async () => {
-    //#given
-    const handler = createChatParamsHandler({
-      anthropicEffort: {
-        "chat.params": async (input) => {
-          input.message.variant = "high"
-        },
-      },
-    })
-
-    const message = { variant: "max" }
-    const input = {
-      sessionID: "ses_chat_params",
-      agent: { name: "sisyphus" },
-      model: { providerID: "opencode", modelID: "claude-sonnet-4-6" },
-      provider: { id: "opencode" },
-      message,
-    }
-
-    const output: ChatParamsOutput = {
-      temperature: 0.1,
-      topP: 1,
-      topK: 1,
-      options: {},
-    }
-
-    //#when
-    await handler(input, output)
-
-    //#then
-    expect(message.variant).toBe("high")
-  })
-
   test("applies stored prompt params for the session", async () => {
     //#given
     sharedModule.writeProviderModelsCache({
@@ -130,9 +65,7 @@ describe("createChatParamsHandler", () => {
       },
     })
 
-    const handler = createChatParamsHandler({
-      anthropicEffort: null,
-    })
+    const handler = createChatParamsHandler()
 
     const input = {
       sessionID: "ses_chat_params_temperature",
@@ -182,9 +115,7 @@ describe("createChatParamsHandler", () => {
       maxOutputTokens: 200_000,
     })
 
-    const handler = createChatParamsHandler({
-      anthropicEffort: null,
-    })
+    const handler = createChatParamsHandler()
 
     const input = {
       sessionID: "ses_chat_params_temperature",
@@ -223,9 +154,7 @@ describe("createChatParamsHandler", () => {
       },
     })
 
-    const handler = createChatParamsHandler({
-      anthropicEffort: null,
-    })
+    const handler = createChatParamsHandler()
 
     const input = {
       sessionID: "ses_chat_params",
@@ -261,9 +190,7 @@ describe("createChatParamsHandler", () => {
       maxOutputTokens: 0,
     })
 
-    const handler = createChatParamsHandler({
-      anthropicEffort: null,
-    })
+    const handler = createChatParamsHandler()
 
     const input = {
       sessionID: "ses_chat_params",
@@ -298,9 +225,7 @@ describe("createChatParamsHandler", () => {
       maxOutputTokens: -1,
     })
 
-    const handler = createChatParamsHandler({
-      anthropicEffort: null,
-    })
+    const handler = createChatParamsHandler()
 
     const input = {
       sessionID: "ses_chat_params",
