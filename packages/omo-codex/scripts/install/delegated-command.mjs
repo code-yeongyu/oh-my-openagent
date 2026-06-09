@@ -4,7 +4,11 @@ export async function runDelegatedOmoCommand(parsed, options) {
 		options.log(`${invocation.command} ${invocation.args.join(" ")}`);
 		return;
 	}
-	await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd });
+	// The lazycodex wrapper sets OMO_INVOCATION_NAME=lazycodex to route into this
+	// Codex installer path. The delegated `omo` process must NOT inherit that name,
+	// otherwise it re-enters the lazycodex installer and recurses forever.
+	const env = { ...process.env, OMO_INVOCATION_NAME: "omo" };
+	await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env });
 }
 
 export function buildDelegatedOmoInvocation(parsed) {
