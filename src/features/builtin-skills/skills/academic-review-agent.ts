@@ -462,80 +462,310 @@ Before finalizing, challenge your own review:
 
 ---
 
-## FINAL OUTPUT FORMAT
+## FINAL OUTPUT — TWO MANDATORY DOCUMENTS
 
-### Structured Review Report
+**After completing all 7 stages, you MUST produce exactly TWO documents.**
+**Both documents MUST follow the templates below EXACTLY. Do not deviate from the structure.**
 
-\`\`\`
-# Paper Review Report
+---
+
+### DOCUMENT 1: REVIEW SUMMARY (Editor-Facing / Internal)
+
+This is the comprehensive review record. It contains all scores, evidence, and adversarial findings.
+Write this to a file named \`review-summary.md\`.
+
+\`\`\`markdown
+# Review Summary
 
 ## Manuscript Information
-- **Title**: [full title]
-- **Authors**: [list]
-- **Target Venue**: [journal/conference]
-- **Review Date**: [date]
+| Field | Value |
+|-------|-------|
+| **Title** | [full title] |
+| **Authors** | [list, or "Withheld for blind review"] |
+| **Target Venue** | [journal/conference name] |
+| **Publisher** | [Elsevier / Springer / IEEE / ACM / etc.] |
+| **Review Date** | [YYYY-MM-DD] |
+| **Review Depth** | [standard / thorough / exhaustive] |
+
+---
 
 ## Executive Summary
-[3-5 sentences: what the paper does, key contribution, main strengths, main concerns]
 
-## Detailed Assessment
+[3-5 sentences covering: (1) what the paper proposes, (2) the key contribution, (3) the main strength, (4) the main concern, (5) the recommendation in brief.]
 
-### 1. Novelty & Significance
-**Score**: [X/10]
-[Detailed assessment with specific evidence]
+---
 
-### 2. Technical Soundness
-**Score**: [X/10]
-[Detailed assessment with specific evidence]
+## Dimension Scores
 
-### 3. Presentation & Clarity
-**Score**: [X/10]
-[Detailed assessment with specific evidence]
+| # | Dimension | Weight | Score (1-10) | Weighted | Justification |
+|---|-----------|--------|-------------|----------|---------------|
+| 1 | Novelty & Significance | [w]% | [X] | [X × w] | [1 sentence] |
+| 2 | Technical Soundness | [w]% | [X] | [X × w] | [1 sentence] |
+| 3 | Experimental Validation | [w]% | [X] | [X × w] | [1 sentence] |
+| 4 | Presentation & Clarity | [w]% | [X] | [X × w] | [1 sentence] |
+| 5 | Reproducibility | [w]% | [X] | [X × w] | [1 sentence] |
+| | **Weighted Total** | 100% | | **[sum]** | |
 
-### 4. Reproducibility
-**Score**: [X/10]
-[Detailed assessment with specific evidence]
+**Venue Calibration**: [venue name] — Novelty Bar: [paradigm-shifting / high / moderate / incremental]
 
-### 5. Related Work & Positioning
-**Score**: [X/10]
-[Detailed assessment with specific evidence]
+---
 
 ## Strengths
-1. [Strength with specific evidence from the paper]
-2. [...]
-3. [...]
+
+1. **[Strength Title]**: [2-3 sentences with specific evidence — cite section, table, or figure]
+2. **[Strength Title]**: [2-3 sentences with specific evidence]
+3. **[Strength Title]**: [2-3 sentences with specific evidence]
+
+---
 
 ## Weaknesses
-1. **[Weakness]**: [Why it matters]. [Specific suggestion to address]
-2. [...]
-3. [...]
 
-## Missing References
-1. [Paper title] — [Why it should be cited]
-2. [...]
+1. **[Weakness Title]** [Severity: critical / major / minor]:
+   - **Problem**: [What is wrong — be specific: cite page, line, table, figure]
+   - **Impact**: [Why this matters for the paper's claims]
+   - **Suggestion**: [Concrete, actionable fix — not vague advice]
+2. **[Weakness Title]** [Severity: critical / major / minor]:
+   - **Problem**: [...]
+   - **Impact**: [...]
+   - **Suggestion**: [...]
+3. [Continue as needed]
 
-## Questions for Authors
-1. [Specific, answerable question]
-2. [...]
+---
 
-## Minor Comments
-- Page X, Line Y: [specific editorial comment]
-- [...]
+## Claim-Evidence Ledger (Stage 2 Summary)
 
-## Adversarial Findings (from Red Team)
-[Key findings that significantly impact the assessment]
+| # | Claim | Type | Evidence Strength | Notes |
+|---|-------|------|-------------------|-------|
+| 1 | [exact quote or paraphrase] | [novelty/performance/generalization/efficiency/theoretical] | [Strong/Moderate/Weak/No-Evidence/Refutes] | [concern if any] |
+| 2 | [...] | [...] | [...] | [...] |
+
+**Evidence Distribution**: Strong [n] (x%) | Moderate [n] (x%) | Weak [n] (x%) | No-Evidence [n] (x%) | Refutes [n] (x%)
+
+---
+
+## Literature Grounding (Stage 3 Summary)
+
+### Missing Related Work
+| # | Paper | Why It Should Be Cited | Severity |
+|---|-------|------------------------|----------|
+| 1 | [Title — Authors, Year] | [reason] | [critical / major / minor] |
+
+### Missing Baselines
+| # | Method | Why It Should Be Compared | Severity |
+|---|--------|---------------------------|----------|
+| 1 | [Method name — paper] | [reason] | [critical / major / minor] |
+
+### Novelty Assessment
+- **Claimed Novelty**: [what the authors claim is new]
+- **Actual Novelty**: [what is genuinely new after literature search]
+- **Delta Significance**: [high / medium / low]
+- **Risk of Being Scooped**: [high / medium / low]
+
+---
+
+## Methodology Verification (Stage 4 Summary)
+
+| Check Area | Verdict | Key Issues |
+|------------|---------|------------|
+| Statistical Rigor | [pass / concerns / fail] | [1 sentence] |
+| Reproducibility | [pass / concerns / fail] | [1 sentence] |
+| Experimental Design | [pass / concerns / fail] | [1 sentence] |
+| Math Verification | [pass / concerns / fail / N/A] | [1 sentence] |
+
+---
+
+## Adversarial Red Team Findings (Stage 5 Summary)
+
+### Breaker — Logical Flaws
+| # | Flaw | Severity | Impact |
+|---|------|----------|--------|
+| 1 | [description] | [critical/major/minor] | [why it matters] |
+
+### Butcher — Missing Evidence
+| # | Missing Experiment | Severity | Why Needed |
+|---|--------------------|----------|------------|
+| 1 | [description] | [critical/major/minor] | [reason] |
+
+### Collector — Novelty Threats
+| # | Prior Work | Severity | How It Undermines Novelty |
+|---|------------|----------|---------------------------|
+| 1 | [paper] | [critical/major/minor] | [explanation] |
+
+**Red Team Severity**: Critical [n] | Major [n] | Minor [n]
+
+---
+
+## Self-Critique (Stage 6.3)
+
+| Question | Assessment |
+|----------|------------|
+| Am I being too harsh? | [yes/no + brief reasoning] |
+| Am I being too lenient? | [yes/no + brief reasoning] |
+| Are my criticisms actionable? | [yes/no — if no, fix them] |
+| Did I miss anything important? | [yes/no + note] |
+
+---
 
 ## Overall Assessment
-- **Recommendation**: [Accept / Minor Revision / Major Revision / Reject]
-- **Confidence**: [High / Medium / Low]
-- **Overall Score**: [X/10]
-- **Justification**: [3-5 sentences explaining the recommendation based on evidence]
+
+| Field | Value |
+|-------|-------|
+| **Recommendation** | [Accept / Minor Revision / Major Revision / Reject] |
+| **Confidence** | [High / Medium / Low] |
+| **Overall Score** | [X.X / 10] |
+| **Venue-Calibrated Threshold** | Accept ≥ [X] / Minor ≥ [Y] / Major ≥ [Z] |
+
+### Justification
+[3-5 sentences explaining the recommendation. Reference specific scores, evidence strengths, and adversarial findings. Be precise — this is the definitive rationale.]
+
+---
 
 ## Metadata
-- **Stages Completed**: [list]
-- **Literature Search Scope**: [databases searched, date range]
-- **Review Depth**: [standard/thorough/exhaustive]
+
+| Field | Value |
+|-------|-------|
+| **Stages Completed** | 0-INTAKE, 1-STRUCTURAL, 2-CLAIMS, 3-LITERATURE, 4-METHODOLOGY, 5-ADVERSARIAL, 6-SYNTHESIS |
+| **Literature Search Scope** | [Semantic Scholar, Exa Web Search, etc.] |
+| **Papers Reviewed for Comparison** | [N] |
+| **Review Duration** | [estimated time] |
 \`\`\`
+
+---
+
+### DOCUMENT 2: RESPONSE TO AUTHORS (Author-Facing)
+
+This is the document sent to the authors. It is constructive, actionable, and free of adversarial internals.
+Write this to a file named \`response-to-authors.md\`.
+
+\`\`\`markdown
+# Response to Authors
+
+## Manuscript Information
+| Field | Value |
+|-------|-------|
+| **Manuscript Title** | [full title] |
+| **Target Venue** | [journal/conference name] |
+| **Review Date** | [YYYY-MM-DD] |
+
+---
+
+## Overall Assessment
+
+[2-3 paragraphs providing a balanced summary of the paper. Start with what the paper does and its intended contribution. Then summarize the main strengths and the primary concerns. End with the overall impression. Be professional, constructive, and specific. Do NOT reveal the recommendation here — that is for the editor.]
+
+---
+
+## Major Issues Requiring Attention
+
+> These are issues that **must** be addressed before the paper can be considered for publication.
+> Each issue includes a specific, actionable suggestion.
+
+### M1. [Issue Title]
+**Location**: Section [X], Page [Y], [Paragraph/Figure/Table reference]
+
+**Issue**: [Clear description of the problem. Be specific — cite exact claims, results, or statements.]
+
+**Why It Matters**: [Explain how this affects the paper's validity, novelty, or clarity.]
+
+**Suggestion**: [Concrete recommendation for how to fix this. Be specific: "Add an ablation study comparing X against Y on dataset Z" rather than "add more experiments."]
+
+### M2. [Issue Title]
+[Same structure as above]
+
+[Continue for all major issues]
+
+---
+
+## Minor Issues and Suggestions
+
+> These are improvements that would strengthen the paper but are not blocking.
+
+### Minor Issues Table
+
+| # | Location | Issue | Suggestion |
+|---|----------|-------|------------|
+| m1 | Page X, Line Y | [brief description] | [brief fix] |
+| m2 | Section X, Table Y | [brief description] | [brief fix] |
+| m3 | Figure X | [brief description] | [brief fix] |
+
+---
+
+## Questions for the Authors
+
+> Please address these questions in your revised manuscript or response letter.
+
+1. [Specific, answerable question about a design choice, assumption, or result]
+2. [Specific question about a claimed contribution or limitation]
+3. [Continue as needed]
+
+---
+
+## Missing References
+
+> The following works are relevant to the manuscript's contribution and should be considered for inclusion in the related work section.
+
+1. [Authors, "Title," Venue, Year] — [1 sentence explaining relevance]
+2. [Continue as needed]
+
+---
+
+## Presentation and Writing
+
+> General comments on the manuscript's readability and presentation quality.
+
+- [Comment on writing quality, organization, or clarity — be specific]
+- [Comment on figure/table quality if applicable]
+- [Comment on notation consistency if applicable]
+
+---
+
+## Summary of Required Changes
+
+| Category | Count | Priority |
+|----------|-------|----------|
+| Major Issues | [n] | Must address |
+| Minor Issues | [n] | Should address |
+| Questions | [n] | Must respond |
+| Missing References | [n] | Should consider |
+
+---
+
+*This review was conducted following a rigorous 7-stage evaluation pipeline including structural analysis, claim-evidence mapping, literature grounding, methodology verification, and adversarial assessment. The reviewer's goal is to help improve the quality of the work.*
+\`\`\`
+
+---
+
+### FORMAT ENFORCEMENT RULES
+
+<critical_warning>
+**THESE RULES ARE NON-NEGOTIABLE. VIOLATION = INVALID REVIEW.**
+</critical_warning>
+
+1. **Always produce TWO documents**: \`review-summary.md\` and \`response-to-authors.md\`
+2. **Always use the exact section headers** from the templates above — do not rename, reorder, or omit sections
+3. **Always include the dimension scores table** in the Review Summary with weights and weighted totals
+4. **Always include the claim-evidence ledger** summary in the Review Summary
+5. **Always include the adversarial red team findings** in the Review Summary — but NEVER in the Response to Authors
+6. **Response to Authors MUST be constructive** — no adversarial language, no "the reviewer found critical flaws"
+7. **Every weakness MUST have**: (a) exact location, (b) why it matters, (c) concrete suggestion
+8. **Never vague-critique**: "needs more experiments" → specify WHICH experiments on WHICH dataset
+9. **Never reveal the recommendation** in the Response to Authors — that is for the editor only
+10. **Use consistent severity levels**: critical (blocks publication), major (should fix), minor (nice to fix)
+11. **Number all issues**: Major issues as M1, M2, ...; Minor issues as m1, m2, ...
+12. **Self-critique is mandatory** — the Review Summary must include the self-critique section
+
+### Document Relationship
+
+| Aspect | Review Summary | Response to Authors |
+|--------|---------------|---------------------|
+| **Audience** | Editor + internal record | Authors |
+| **Contains scores** | Yes (full rubric) | No |
+| **Contains adversarial findings** | Yes | No |
+| **Contains recommendation** | Yes | No |
+| **Contains self-critique** | Yes | No |
+| **Tone** | Analytical, evidence-based | Constructive, supportive |
+| **Actionable** | For editorial decision | For manuscript revision |
+| **File name** | \`review-summary.md\` | \`response-to-authors.md\` |
 
 ---
 
