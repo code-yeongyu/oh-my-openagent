@@ -48,6 +48,23 @@ describe("resolveRunnableRunAgent", () => {
     expect(agent).toBe("Sisyphus - ultraworker")
   })
 
+  it("#given built-in agent has configured display name #when resolving config key #then returns configured server name", async () => {
+    // given
+    const client = createClient(["总指挥"])
+
+    // when
+    const agent = await resolveRunnableRunAgent(client, "sisyphus", {
+      agents: {
+        sisyphus: {
+          displayName: "总指挥",
+        },
+      },
+    })
+
+    // then
+    expect(agent).toBe("总指挥")
+  })
+
   it("#given agent list lookup fails with Error #when resolving runnable agent #then preserves pre-resolved run agent", async () => {
     // given
     const client = unsafeTestValue<RunAgentListClient>({

@@ -94,7 +94,7 @@ export async function run(options: RunOptions): Promise<number> {
         sessionId: options.sessionId,
         directory,
       })
-      const runnableAgent = await resolveRunnableRunAgent(client, resolvedAgent)
+      const runnableAgent = await resolveRunnableRunAgent(client, resolvedAgent, pluginConfig)
 
       console.log(pc.dim(`Session: ${sessionID}`))
 
