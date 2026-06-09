@@ -1,0 +1,212 @@
+/**
+ * MetaGovernor type contracts.
+ *
+ * PR 1 of 8. Defines ONLY the type surface that later PRs implement against.
+ * No logic, no I/O, no MCP calls. This file is the source of truth for the
+ * MetaGovernor architecture; later PRs import these types and conform to them.
+ *
+ * Architectural invariants (from AGENTS.md, must respect):
+ * - All session.promptAsync calls go through prompt-async-gate (not enforced here)
+ * - MetaGovernor composes AFT + agentmemory + magic-context + boulder-state
+ * - 5 recovery hooks wrap into post-repair-recorder (not enforced here)
+ *
+ * Public surface (5 contracts):
+ * - DecisionContext: input to score()
+ * - Decision: output of score()
+ * - Evidence: atomic evidence unit attached to a Decision
+ * - MemoryRead: cross-system read result
+ * - TokenPrediction: token burn rate prediction
+ *
+ * All enums/actions are union string types (no enums) for Zod compat and
+ * JSON-serialisability across the prompt-async-gate.
+ */
+
+/**
+ * What the judge sees when deciding continue|warn|escalate|stop.
+ *
+ * All fields are required. `undefined` is not a valid DecisionContext —
+ * collectors must fill every field even if the value is an empty array,
+ * false, or 0. Empty inputs are signals, not bugs.
+ */
+export interface DecisionContext {
+  /** Whether the last Oracle invocation returned verified=true. */
+  readonly oracleVerified: boolean
+  /** Whether the last assistant turn produced no progress (zero tokens, no content). */
+  readonly noProgress: boolean
+  /** Detected deviations from expected behavior. Empty array = no deviations. */
+  readonly deviations: readonly Deviation[]
+  /** iteration / maxIterations. 0..1. 1.0 = at the cap. */
+  readonly iterationRatio: number
+  /** Lessons retrieved from agentmemory that match the current decision pattern. */
+  readonly lessonsRelevant: readonly RelevantLesson[]
+  /** Cross-session memory snapshot from the meta_state slot. */
+  readonly slotMemory: SlotMemory
+  /** Free-form context the calling site can attach (sessionID, directory, mode). */
+  readonly ambient: AmbientContext
+}
+
+/**
+ * Decision the judge returns. Always carries evidence (cite-or-abstain).
+ *
+ * Score ∈ [-1, +1]:
+ *   >= +0.3 → continue silently
+ *   -0.3..+0.3 → continue with log
+ *   -0.6..-0.3 → continue with warn
+ *   -0.8..-0.6 → escalate (oracle or user)
+ *   < -0.8 → stop loop
+ *
+ * Note: actual thresholds are config-driven in PR 8. Defaults are above.
+ */
+export interface Decision {
+  readonly action: "continue" | "warn" | "escalate" | "stop"
+  readonly score: number
+  /** Human-readable one-sentence explanation. Required, never empty. */
+  readonly reasoning: string
+  /** Cite-or-abstain: at least 1 evidence unit when action !== "continue" silently. */
+  readonly evidence: readonly Evidence[]
+  /** When action === "escalate", which actor should be invoked. */
+  readonly shouldEscalateTo: EscalationTarget | null
+}
+
+export type EscalationTarget = "oracle" | "user"
+
+/**
+ * Atomic evidence unit. Carries provenance so the judge can be audited.
+ *
+ * `confidence` ∈ [0, 1]: how sure the source is about `value`.
+ * `weight` ∈ [0, 1]: how much this evidence influences the score
+ *  (assigned by the scoring function, not the collector).
+ */
+export interface Evidence {
+  readonly source: EvidenceSource
+  readonly value: string
+  readonly confidence: number
+  readonly weight: number
+}
+
+export type EvidenceSource =
+  | "oracle-verified"
+  | "no-progress-detector"
+  | "deviation-detector"
+  | "iteration-budget"
+  | "lesson-recall"
+  | "slot-memory"
+  | "ambient"
+  | "token-predictor"
+
+/**
+ * A deviation from expected behavior. Severity follows the prior
+ * moderator-gate (PR 4405) taxonomy for backward compat.
+ */
+export interface Deviation {
+  readonly severity: "leve" | "media" | "grave"
+  readonly category: string
+  readonly detail: string
+  readonly filePath?: string
+}
+
+/**
+ * A lesson retrieved from agentmemory.lesson_recall. Confidence is the
+ * stored confidence in the memory store, not the relevance to this query.
+ */
+export interface RelevantLesson {
+  readonly id: string
+  readonly title: string
+  readonly advice: "continue" | "stop" | "warn" | "info"
+  readonly confidence: number
+  readonly concepts: readonly string[]
+}
+
+/**
+ * Cross-session state held in the magic-context `meta_state` slot.
+ *
+ * `consecutiveStops` is read by the judge to detect paralysis (3 stops
+ * in a row → force continue with warning, prevents infinite conservatism).
+ */
+export interface SlotMemory {
+  readonly lastDecision?: Decision
+  readonly consecutiveStops: number
+  readonly consecutiveContinues: number
+  readonly lastUpdatedISO: string
+}
+
+/**
+ * Free-form context the calling site can attach. Used for audit trails
+ * and to enable the judge to factor in mode (ultrawork vs simple) or
+ * session state. Fields are optional to keep the contract lean.
+ */
+export interface AmbientContext {
+  readonly sessionID: string
+  readonly directory: string
+  readonly mode: "ultrawork" | "ulw" | "simple" | "ralph-loop"
+  readonly agentName: string
+  readonly iteration: number
+  readonly maxIterations: number
+}
+
+/**
+ * Cross-system memory read result. All three sources read in parallel;
+ * any of them may be unavailable (graceful degradation in PR 2).
+ *
+ * `query` is echoed back so callers can correlate the read with the
+ * query that produced it.
+ */
+export interface MemoryRead {
+  readonly query: string
+  readonly timestampISO: string
+  readonly agentmemory: AgentMemoryRead
+  readonly magicContext: MagicContextRead
+  readonly boulderState: BoulderStateRead
+  readonly degradedSources: readonly MemorySource[]
+}
+
+export type MemorySource = "agentmemory" | "magicContext" | "boulderState"
+
+export interface AgentMemoryRead {
+  readonly available: boolean
+  readonly lessons: readonly RelevantLesson[]
+  readonly errorMessage?: string
+}
+
+export interface MagicContextRead {
+  readonly available: boolean
+  readonly slots: readonly { readonly label: string; readonly content: string }[]
+  readonly errorMessage?: string
+}
+
+export interface BoulderStateRead {
+  readonly available: boolean
+  readonly tasks: readonly { readonly id: string; readonly status: string; readonly title: string }[]
+  readonly planProgress: number
+  readonly errorMessage?: string
+}
+
+/**
+ * Token burn rate prediction. Computed from recent turn metrics.
+ *
+ * `willOverflowAt` is an ISO timestamp predicted from current usage +
+ * burn rate + model limit. `null` when not expected to overflow.
+ *
+ * `recommendation` is action-typed; the caller (PR 7 integration) maps
+ * these to actual hook invocations:
+ *   - "compact-now" → invoke preemptive-compaction-degradation-monitor
+ *   - "switch-model" → invoke model-fallback chat-message-fallback-handler
+ *   - "delegate-to-subagent" → invoke delegate-task with a sub-scope
+ *   - "no-action" → silent
+ */
+export interface TokenPrediction {
+  readonly currentUsage: number
+  readonly burnRate: number
+  readonly budgetLeft: number
+  readonly willOverflowAt: string | null
+  readonly recommendation: TokenRecommendation
+  readonly confidence: number
+  readonly modelLimit: number
+  readonly windowRemaining: number
+}
+
+export type TokenRecommendation =
+  | "compact-now"
+  | "switch-model"
+  | "delegate-to-subagent"
+  | "no-action"
