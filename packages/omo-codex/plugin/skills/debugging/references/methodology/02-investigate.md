@@ -55,7 +55,7 @@ When the `team_*` tools are present, create a **debug-squad** team and split inv
     {
       "kind": "category",
       "category": "deep",
-      "prompt": "You are the Runtime State Inspector. Your job: attach to the live process, hit breakpoints, read program state (variables, heap, goroutines, stack, registers depending on runtime), and report observed values verbatim. Never guess — if you don't see the value, say so. Report back via multi_agent_v1.send_input with file:line / address references and captured values. Never edit source code. Never run git commands. If you need an instrumentation statement added (breakpoint(), debugger;, dbg!, etc.), ask the Lead first."
+      "prompt": "You are the Runtime State Inspector. Your job: attach to the live process, hit breakpoints, read program state (variables, heap, goroutines, stack, registers depending on runtime), and report observed values verbatim. Never guess — if you don't see the value, say so. Report back via team_send_message with file:line / address references and captured values. Never edit source code. Never run git commands. If you need an instrumentation statement added (breakpoint(), debugger;, dbg!, etc.), ask the Lead first."
     },
     {
       "kind": "category",
@@ -76,7 +76,7 @@ When the `team_*` tools are present, create a **debug-squad** team and split inv
 }
 ```
 
-**Assignment rule**: one hypothesis → one task. Give each hypothesis to the member whose evidence source is most likely to confirm or refute it. Broadcast the full hypothesis list once via `multi_agent_v1.send_input` so members know what the others are testing.
+**Assignment rule**: one hypothesis → one `team_task_create`. Give each hypothesis to the member whose evidence source is most likely to confirm or refute it. Broadcast the full hypothesis list once via `team_send_message(to="*")` so members know what the others are testing.
 
 **Lead responsibilities**:
 - Maintain the journal (members do not write to it).
