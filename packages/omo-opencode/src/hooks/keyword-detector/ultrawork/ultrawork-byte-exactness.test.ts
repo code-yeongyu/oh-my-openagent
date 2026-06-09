@@ -19,14 +19,14 @@ const ULTRAWORK_PROMPT_BASELINES: readonly UltraworkPromptBaseline[] = [
     agentName: "sisyphus",
     modelID: "claude-sonnet-4-6",
     expectedSource: "default",
-    sha256: "4485ef94d3b4b0835b20e42f2874e12b886a0dbed7256c0a2ce37d5e35aa6692",
+    sha256: "3c8ad63bff52e04a2e3d60f1250843be0f3f1693f8ee925b882e180247c40fec",
   },
   {
     name: "gpt",
     agentName: "sisyphus",
     modelID: "gpt-5.5",
     expectedSource: "gpt",
-    sha256: "c3a2e5892fc537c560459062ca982930d0ceb98652a76c8c447cad86e882c3b7",
+    sha256: "eaee5b959a225ca477ad2526b7eb0d8966110880db205130c6b64dafc97bc833",
   },
   {
     name: "gemini",

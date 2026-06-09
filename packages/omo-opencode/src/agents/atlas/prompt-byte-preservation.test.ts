@@ -59,32 +59,32 @@ const VARIANT_PROMPT_CASES = [
   {
     variant: "default",
     model: "anthropic/claude-sonnet-4-6",
-    expectedHash: "b29612f266994284487c37342c8e253f158b5d08daf95266e71651cbfcf1b9f9",
-    expectedLength: 25847,
+    expectedHash: "4b3d24c5542e3d8af0a0825caa56f047ce34e5abd6ced367f988f4d7e77fb94c",
+    expectedLength: 26141,
   },
   {
     variant: "gpt",
     model: "openai/gpt-5.5",
-    expectedHash: "187a6d5f63dd166c88b568e9c2e142205eb4d8537386e1c81a38707e4ac59efb",
-    expectedLength: 24707,
+    expectedHash: "089333c55e704d19a5a7ef1b8f29633f456c0871dce84dc7b6eb8062d8ea62ab",
+    expectedLength: 24795,
   },
   {
     variant: "gemini",
     model: "google/gemini-3.1-pro",
-    expectedHash: "194f4508da8c5a885a44a8d253cb6f6504190cf60d634cc42801a794bc4c8d33",
-    expectedLength: 27579,
+    expectedHash: "a67474b903e27eb9eddb5e5ec4303d94c255896854c9295d3149b6ed5b67aca5",
+    expectedLength: 27588,
   },
   {
     variant: "kimi",
     model: "moonshotai/kimi-k2.6",
-    expectedHash: "2d1d3e3fb665493e624f5d810a693e2df637346b3dab7800b9a689b6ed7932bf",
-    expectedLength: 26107,
+    expectedHash: "c8e5d343965d3a0af5df0bdaf3393bd24223ff89f77c910c38649656e2c2db1e",
+    expectedLength: 26352,
   },
   {
     variant: "opus-4-7",
     model: "anthropic/claude-opus-4-7",
-    expectedHash: "353bd5d9ceaeb2b4eb53cb851d65d206a777643c6542505ab32e0bd1993c3de2",
-    expectedLength: 26729,
+    expectedHash: "ffefdcb2ddf1b6031518b66a2e3099befd6ff29a5f72fde71284bbea7acbc945",
+    expectedLength: 26974,
   },
 ] satisfies readonly VariantPromptCase[]
 
