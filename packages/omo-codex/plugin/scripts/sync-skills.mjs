@@ -109,11 +109,12 @@ const startWorkOriginalCompletion = `When all top-level checkboxes in \`## TODOs
 const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
-2. Complete the **Global Review and Debugging Gate** before any completion claim, PR handoff, or branch handoff:
+2. Complete the **Global Review and Debugging Gate** before any completion claim, PR creation, PR handoff, or branch handoff:
    - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
    - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to \`.omo/start-work/ledger.jsonl\`.
    - If any review lane or debugging hypothesis fails, invoke the \`debugging\` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
-   - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/start-work/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
+   - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing subagent prompts, repro artifacts, logs, \`.omo/start-work/ledger.jsonl\`, PR bodies, comments, or handoffs. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
+   - When the gate passes, append a JSONL ledger entry with \`event: "global-review-debug-gate-passed"\`, \`verdict: "PASS"\`, current \`work_id\`, \`plan\`, \`plan_path\`, Boulder \`started_at\`, and prefixed \`session_id\`, plus structured redacted \`verification\`, \`review\`, \`debugging\`, \`artifact\`, and \`cleanup\` evidence: \`verification: { "verdict": "PASS", "commands": ["..."] }\`, \`review: { "verdict": "PASS", "lanes": ["goal", "quality", "security", "qa", "context"] }\`, \`debugging: { "verdict": "PASS", "hypotheses": ["...", "...", "..."] }\`, \`artifact: { "redacted": true, "summary": "..." }\`, and \`cleanup: { "status": "complete", "summary": "..." }\`. This PASS marker must be the latest relevant ledger event for the current scope; if any scoped or unscoped work evidence is appended after it, rerun the gate. The Stop hook only accepts a fresh PASS marker scoped to the current Boulder work, plan path, \`started_at\`, and \`codex:<session_id>\`.
    - If the work includes creating, updating, or handing off a PR, refresh \`git status\` and the PR/branch state after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
 3. If worktree mode was used, sync \`.omo/\` state back to the main repo, merge or hand off exactly as requested, and remove the worktree only after successful merge or explicit handoff.
 4. Remove or mark the Boulder work as completed.
@@ -134,10 +135,10 @@ runtime behavior may be wrong, fix with evidence, and rerun the affected lane
 before claiming completion or handing off a PR.
 
 Review evidence must be safe to share. Redact or mask secrets and sensitive
-user data before including evidence in logs, PR bodies, or handoffs. Never
-include raw tokens, credentials, auth headers, cookies, API keys, env dumps,
-private logs, or PII; summarize with lengths, hashes, and short non-sensitive
-prefixes when identity is needed.
+user data before including evidence in subagent prompts, repro artifacts, logs,
+PR bodies, comments, or handoffs. Never include raw tokens, credentials, auth
+headers, cookies, API keys, env dumps, private logs, or PII; summarize with
+lengths, hashes, and short non-sensitive prefixes when identity is needed.
 `;
 
 function applyCodexSkillOverlays(skillName, content) {

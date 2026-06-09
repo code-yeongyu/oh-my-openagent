@@ -291,19 +291,19 @@ describe("createBuiltinSkills", () => {
 		expect(reviewWork?.template).toContain("Context Mining")
 	})
 
-	test("review-work skill explains Codex tool compatibility before OpenCode orchestration examples", () => {
+	test("review-work skill explains Codex subagent reliability before orchestration examples", () => {
 		// #given
 		const skills = createBuiltinSkills()
 
 		// #when
 		const reviewWork = skills.find((s) => s.name === "review-work")
 		const reviewWorkTemplate = reviewWork?.template ?? ""
-		const compatibilityIndex = reviewWorkTemplate.indexOf("## Codex Harness Tool Compatibility")
+		const reliabilityIndex = reviewWorkTemplate.indexOf("## Codex Subagent Reliability")
 		const opencodeExampleIndex = reviewWorkTemplate.search(/\b(?:background_output|team_[a-z_]+|task)\s*\(/)
 
 		// #then
-		expect(compatibilityIndex >= 0).toBe(true)
-		expect(compatibilityIndex < opencodeExampleIndex).toBe(true)
+		expect(reliabilityIndex >= 0).toBe(true)
+		expect(reliabilityIndex < opencodeExampleIndex).toBe(true)
 	})
 
 	test("remove-ai-slops skill has correct structure", () => {
