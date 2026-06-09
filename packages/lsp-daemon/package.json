@@ -5,6 +5,8 @@
 	"type": "module",
 	"packageManager": "npm@11.16.0",
 	"license": "MIT",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"bin": {
 		"omo-lsp-daemon": "./dist/cli.js"
 	},
