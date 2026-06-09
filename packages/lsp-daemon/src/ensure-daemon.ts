@@ -9,7 +9,7 @@ import { type LockHandle, tryAcquireLock, unlinkQuietly } from "./lock.js";
 import type { DaemonPaths } from "./paths.js";
 
 const PROBE_TIMEOUT_MS = 500;
-const DEFAULT_READY_TIMEOUT_MS = 10_000;
+const DEFAULT_READY_TIMEOUT_MS = 5_000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
 
 export class DaemonUnreachableError extends Error {
