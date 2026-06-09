@@ -385,3 +385,41 @@ export interface ScoringResult {
   readonly paralysisOverride: boolean
   readonly computedAtISO: string
 }
+
+// ─── Decision Handler Types (PR 6) ────────────────────────────────
+
+export interface DecisionHandlerConfig {
+  /** Master switch: false = always continue (pass-through) */
+  readonly enabled: boolean
+  /** Max history entries per session before oldest are trimmed */
+  readonly maxHistoryPerSession: number
+  /** How many consecutive stops before forcing continue */
+  readonly forceContinueAfterStops: number
+  /** Template for warn messages. Placeholders: {score}, {reasoning}, {evidenceCount} */
+  readonly warnMessageTemplate: string
+  /** Template for escalation messages. Placeholders: {target}, {reasoning} */
+  readonly escalateMessageTemplate: string
+  /** Template for stop messages. Placeholders: {reasoning}, {evidenceCount} */
+  readonly stopMessageTemplate: string
+  /** Default escalation target when Decision.shouldEscalateTo is null */
+  readonly defaultEscalationTarget?: string
+}
+
+export interface DecisionHandlerInput {
+  readonly scoringResult: ScoringResult
+  readonly sessionID: string
+}
+
+export interface DecisionHistoryEntry {
+  readonly decision: Decision
+  readonly action: "continue" | "warn" | "escalate" | "stop"
+  readonly timestampISO: string
+  readonly sessionID: string
+  readonly reasoning: string
+}
+
+export interface DecisionHandlerOutput {
+  readonly action: "continue" | "warn" | "escalate" | "stop"
+  readonly message: string | null
+  readonly historyEntry: DecisionHistoryEntry
+}
