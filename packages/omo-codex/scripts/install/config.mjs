@@ -5,7 +5,7 @@ import { ensureCodexMultiAgentV2Config } from "./multi-agent-v2-config.mjs";
 import { readCodexModelCatalog } from "./model-catalog.mjs";
 import { ensureCodexReasoningConfig } from "./reasoning-config.mjs";
 import { ensureAutonomousPermissions } from "./permissions.mjs";
-import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-editor.mjs";
+import { appendBlock, escapeRegExp, findTomlSection, replaceOrInsertSetting } from "./toml-editor.mjs";
 import { exists } from "./utils.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
@@ -44,8 +44,8 @@ export async function updateCodexConfig({
 	config = removeStaleManagedAgentBlocks(config, new Set(agentConfigs.map((agentConfig) => agentConfig.name)));
 	config = ensureFeatureEnabled(config, "plugins");
 	config = ensureFeatureEnabled(config, "plugin_hooks");
-	config = ensureFeatureEnabled(config, "multi_agent");
-	config = ensureFeatureEnabled(config, "child_agents_md");
+	config = ensureFeatureDefault(config, "multi_agent", false);
+	config = ensureFeatureDefault(config, "child_agents_md", false);
 	config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(repoRoot));
 	config = ensureCodexMultiAgentV2Config(config);
 	if (autonomousPermissions === true) config = ensureAutonomousPermissions(config);
@@ -122,6 +122,15 @@ function ensureFeatureEnabled(config, featureName) {
 	const section = findTomlSection(config, "features");
 	if (!section) return appendBlock(config, `[features]\n${featureName} = true\n`);
 	return replaceOrInsertSetting(config, section, featureName, "true");
+}
+
+function ensureFeatureDefault(config, featureName, enabled) {
+	const section = findTomlSection(config, "features");
+	const value = enabled ? "true" : "false";
+	if (!section) return appendBlock(config, `[features]\n${featureName} = ${value}\n`);
+	const linePattern = new RegExp(`^\\s*${escapeRegExp(featureName)}\\s*=`, "m");
+	if (linePattern.test(section.text)) return config;
+	return replaceOrInsertSetting(config, section, featureName, value);
 }
 
 function ensureMarketplaceBlock(config, marketplaceName, source) {

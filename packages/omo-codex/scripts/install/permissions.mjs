@@ -1,6 +1,6 @@
 import { appendBlock, findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-editor.mjs";
 
-const AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"];
+const AUTONOMOUS_FEATURES = ["unified_exec", "goals"];
 
 export function ensureAutonomousPermissions(config) {
 	let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"));

@@ -7,6 +7,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
 
+function readSectionText(content: string, header: string): string {
+  const lines = content.split("\n")
+  const start = lines.findIndex((line) => line.trim() === `[${header}]`)
+  if (start === -1) throw new Error(`Missing TOML section: ${header}`)
+  const nextSectionOffset = lines
+    .slice(start + 1)
+    .findIndex((line) => line.trim().startsWith("[") && line.trim().endsWith("]"))
+  const end = nextSectionOffset === -1 ? lines.length : start + 1 + nextSectionOffset
+  return lines.slice(start, end).join("\n")
+}
+
 describe("codex-config-toml", () => {
   test("#given autonomous permissions requested #when updating config #then enables full Codex autonomy", async () => {
     // given
@@ -74,9 +85,8 @@ describe("codex-config-toml", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain("[features.multi_agent_v2]")
-    const v2Section = content.slice(content.indexOf("[features.multi_agent_v2]"))
-      .split(/^\[/m).slice(0, 1).join("")
-    expect(v2Section).not.toContain("enabled")
+    const v2Section = readSectionText(content, "features.multi_agent_v2")
+    expect(v2Section).not.toMatch(/^\s*enabled\s*=/m)
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
   })
 
@@ -111,6 +121,40 @@ describe("codex-config-toml", () => {
     expect(content).toContain("usage_hint_enabled = false")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
     expect(content).not.toContain("max_concurrent_threads_per_session = 4")
+  })
+
+  test("#given commented MultiAgentV2 table enabled value #when updating config #then preserves the user's enabled setting", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-existing-commented-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[features.multi_agent_v2]",
+        "  enabled = true # user opted in",
+        "usage_hint_enabled = false",
+        "max_concurrent_threads_per_session = 4",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    const multiAgentV2Section = readSectionText(content, "features.multi_agent_v2")
+    expect(multiAgentV2Section.match(/^\s*enabled\s*=/gm)).toHaveLength(1)
+    expect(multiAgentV2Section).toContain("  enabled = true # user opted in")
+    expect(multiAgentV2Section).toContain("usage_hint_enabled = false")
+    expect(multiAgentV2Section).toContain("max_concurrent_threads_per_session = 10000")
+    expect(multiAgentV2Section).not.toContain("max_concurrent_threads_per_session = 4")
   })
 
   test("#given empty Codex config #when updating config #then leaves Context7 to the plugin MCP manifest", async () => {
@@ -190,7 +234,7 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("YOUR_API_KEY")
   })
 
-  test("#given legacy boolean MultiAgentV2 flag and table #when updating config #then normalizes to table config", async () => {
+  test("#given legacy boolean MultiAgentV2 flag and table #when updating config #then normalizes to table config without forcing enabled", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-"))
     const configPath = join(root, "config.toml")
@@ -218,16 +262,49 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
+    const multiAgentV2Section = readSectionText(content, "features.multi_agent_v2")
     expect(content).not.toMatch(/^multi_agent_v2\s*=/m)
-    expect(content).toContain("[features.multi_agent_v2]")
-    const v2LegacySection = content.slice(content.indexOf("[features.multi_agent_v2]"))
-      .split(/^\[/m).slice(0, 1).join("")
-    expect(v2LegacySection).not.toContain("enabled")
-    expect(content).toContain("usage_hint_enabled = false")
-    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(multiAgentV2Section).toContain("usage_hint_enabled = false")
+    expect(multiAgentV2Section).toContain("max_concurrent_threads_per_session = 10000")
+    expect(multiAgentV2Section).not.toMatch(/^\s*enabled\s*=/m)
   })
 
-  test("#given legacy agents max_threads #when updating config #then removes the conflicting legacy thread cap", async () => {
+  test("#given commented legacy MultiAgentV2 flag #when updating config #then removes legacy flag without forcing enabled", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-commented-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[features]",
+        "  multi_agent_v2 = true # user enabled before table migration",
+        "plugins = false",
+        "",
+        "[features.multi_agent_v2]",
+        "usage_hint_enabled = false",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    const multiAgentV2Section = readSectionText(content, "features.multi_agent_v2")
+    expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
+    expect(multiAgentV2Section).toContain("usage_hint_enabled = false")
+    expect(multiAgentV2Section).toContain("max_concurrent_threads_per_session = 10000")
+    expect(multiAgentV2Section).not.toMatch(/^\s*enabled\s*=/m)
+  })
+
+  test("#given legacy agents max_threads #when updating config #then removes the conflicting legacy thread cap without enabling MultiAgentV2", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))
     const configPath = join(root, "config.toml")
@@ -254,9 +331,8 @@ describe("codex-config-toml", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain("[features.multi_agent_v2]")
-    const v2ThreadsSection = content.slice(content.indexOf("[features.multi_agent_v2]"))
-      .split(/^\[/m).slice(0, 1).join("")
-    expect(v2ThreadsSection).not.toContain("enabled")
+    const v2ThreadsSection = readSectionText(content, "features.multi_agent_v2")
+    expect(v2ThreadsSection).not.toMatch(/^\s*enabled\s*=/m)
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
     expect(content).toContain("[agents]")
     expect(content).not.toMatch(/^max_threads\s*=/m)

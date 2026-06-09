@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { ensureAgentConfig, removeStaleManagedAgentBlocks } from "./codex-config-agents"
-import { ensureFeatureEnabled } from "./codex-config-features"
+import { ensureFeatureDefault, ensureFeatureEnabled } from "./codex-config-features"
 import {
   ensureMarketplaceBlock,
   legacyMarketplaceNames,
@@ -45,8 +45,8 @@ export async function updateCodexConfig(input: {
   )
   config = ensureFeatureEnabled(config, "plugins")
   config = ensureFeatureEnabled(config, "plugin_hooks")
-  config = ensureFeatureEnabled(config, "multi_agent")
-  config = ensureFeatureEnabled(config, "child_agents_md")
+  config = ensureFeatureDefault(config, "multi_agent", false)
+  config = ensureFeatureDefault(config, "child_agents_md", false)
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
   config = ensureCodexMultiAgentV2Config(config)
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)

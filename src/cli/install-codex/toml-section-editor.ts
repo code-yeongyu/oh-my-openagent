@@ -24,9 +24,9 @@ export function findTomlSection(config: string, header: string): TomlSection | n
 }
 
 export function replaceOrInsertSetting(config: string, section: TomlSection, key: string, value: string): string {
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
+  const linePattern = new RegExp(`^(\\s*)${escapeRegExp(key)}\\s*=.*$`, "m")
   const replacement = linePattern.test(section.text)
-    ? section.text.replace(linePattern, `${key} = ${value}`)
+    ? section.text.replace(linePattern, (_match: string, indent: string) => `${indent}${key} = ${value}`)
     : insertSetting(section.text, key, value)
   return config.slice(0, section.start) + replacement + config.slice(section.end)
 }
@@ -41,9 +41,9 @@ export function replaceOrInsertRootSetting(config: string, key: string, value: s
   const sectionStart = findFirstTableStart(config)
   const root = config.slice(0, sectionStart)
   const suffix = config.slice(sectionStart)
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
+  const linePattern = new RegExp(`^(\\s*)${escapeRegExp(key)}\\s*=.*$`, "m")
   const replacement = linePattern.test(root)
-    ? root.replace(linePattern, `${key} = ${value}`)
+    ? root.replace(linePattern, (_match: string, indent: string) => `${indent}${key} = ${value}`)
     : `${root.trimEnd()}${root.trimEnd().length > 0 ? "\n" : ""}${key} = ${value}\n`
   if (suffix.length === 0) return replacement
   return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`

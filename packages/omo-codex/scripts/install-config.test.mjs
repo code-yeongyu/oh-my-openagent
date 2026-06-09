@@ -6,7 +6,18 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install/config.mjs";
 
-test("#given empty Codex config #when script installer updates config #then enables MultiAgentV2 with ten thousand session threads", async () => {
+function readSectionText(content, header) {
+	const lines = content.split("\n");
+	const start = lines.findIndex((line) => line.trim() === `[${header}]`);
+	if (start === -1) throw new Error(`Missing TOML section: ${header}`);
+	const nextSectionOffset = lines
+		.slice(start + 1)
+		.findIndex((line) => line.trim().startsWith("[") && line.trim().endsWith("]"));
+	const end = nextSectionOffset === -1 ? lines.length : start + 1 + nextSectionOffset;
+	return lines.slice(start, end).join("\n");
+}
+
+test("#given empty Codex config #when script installer updates config #then creates MultiAgentV2 section with thread limit but no forced enabled flag", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-"));
 	const configPath = join(root, "config.toml");
@@ -23,8 +34,9 @@ test("#given empty Codex config #when script installer updates config #then enab
 	// then
 	const config = await readFile(configPath, "utf8");
 	assert.match(config, /\[features\.multi_agent_v2\]/);
-	assert.match(config, /enabled = true/);
-	assert.match(config, /max_concurrent_threads_per_session = 10000/);
+	const multiAgentV2Section = readSectionText(config, "features.multi_agent_v2");
+	assert.doesNotMatch(multiAgentV2Section, /^\s*enabled\s*=/m);
+	assert.match(multiAgentV2Section, /max_concurrent_threads_per_session = 10000/);
 });
 
 test("#given empty Codex config #when script installer updates config #then leaves Context7 to the plugin MCP manifest", async () => {
@@ -151,7 +163,7 @@ test("#given sisyphuslabs config without explicit source #when script installer 
 	assert.doesNotMatch(config, /ref = "main"/);
 });
 
-test("#given existing MultiAgentV2 table #when script installer updates config #then preserves unrelated tuning while setting ten thousand session threads", async () => {
+test("#given existing MultiAgentV2 table #when script installer updates config #then preserves the user's enabled setting while updating the session thread cap", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-existing-"));
 	const configPath = join(root, "config.toml");
@@ -178,13 +190,47 @@ test("#given existing MultiAgentV2 table #when script installer updates config #
 	// then
 	const config = await readFile(configPath, "utf8");
 	assert.match(config, /\[features\.multi_agent_v2\]/);
-	assert.match(config, /enabled = true/);
+	assert.match(config, /enabled = false/);
 	assert.match(config, /usage_hint_enabled = false/);
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
 	assert.doesNotMatch(config, /max_concurrent_threads_per_session = 4/);
 });
 
-test("#given legacy boolean MultiAgentV2 flag and table #when script installer updates config #then normalizes to table config", async () => {
+test("#given commented MultiAgentV2 table enabled value #when script installer updates config #then preserves the user's enabled setting", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-existing-commented-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features.multi_agent_v2]",
+			"  enabled = true # user opted in",
+			"usage_hint_enabled = false",
+			"max_concurrent_threads_per_session = 4",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const multiAgentV2Section = readSectionText(config, "features.multi_agent_v2");
+	assert.equal(multiAgentV2Section.match(/^\s*enabled\s*=/gm)?.length, 1);
+	assert.match(multiAgentV2Section, /^  enabled = true # user opted in$/m);
+	assert.match(multiAgentV2Section, /usage_hint_enabled = false/);
+	assert.match(multiAgentV2Section, /max_concurrent_threads_per_session = 10000/);
+	assert.doesNotMatch(multiAgentV2Section, /max_concurrent_threads_per_session = 4/);
+});
+
+test("#given legacy boolean MultiAgentV2 flag and table #when script installer updates config #then normalizes to table config without forcing enabled", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-legacy-"));
 	const configPath = join(root, "config.toml");
@@ -212,14 +258,49 @@ test("#given legacy boolean MultiAgentV2 flag and table #when script installer u
 
 	// then
 	const config = await readFile(configPath, "utf8");
+	const multiAgentV2Section = readSectionText(config, "features.multi_agent_v2");
 	assert.doesNotMatch(config, /^multi_agent_v2\s*=/m);
-	assert.match(config, /\[features\.multi_agent_v2\]/);
-	assert.match(config, /enabled = true/);
-	assert.match(config, /usage_hint_enabled = false/);
-	assert.match(config, /max_concurrent_threads_per_session = 10000/);
+	assert.match(multiAgentV2Section, /usage_hint_enabled = false/);
+	assert.match(multiAgentV2Section, /max_concurrent_threads_per_session = 10000/);
+	assert.doesNotMatch(multiAgentV2Section, /^\s*enabled\s*=/m);
 });
 
-test("#given legacy agents max_threads #when script installer updates config #then removes the conflicting legacy thread cap", async () => {
+test("#given commented legacy MultiAgentV2 flag #when script installer updates config #then removes legacy flag without forcing enabled", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-legacy-commented-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features]",
+			"  multi_agent_v2 = true # user enabled before table migration",
+			"plugins = false",
+			"",
+			"[features.multi_agent_v2]",
+			"usage_hint_enabled = false",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const multiAgentV2Section = readSectionText(config, "features.multi_agent_v2");
+	assert.doesNotMatch(config, /^\s*multi_agent_v2\s*=/m);
+	assert.match(multiAgentV2Section, /usage_hint_enabled = false/);
+	assert.match(multiAgentV2Section, /max_concurrent_threads_per_session = 10000/);
+	assert.doesNotMatch(multiAgentV2Section, /^\s*enabled\s*=/m);
+});
+
+test("#given legacy agents max_threads #when script installer updates config #then removes the conflicting legacy thread cap without enabling MultiAgentV2", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-legacy-threads-"));
 	const configPath = join(root, "config.toml");
@@ -246,8 +327,9 @@ test("#given legacy agents max_threads #when script installer updates config #th
 	// then
 	const config = await readFile(configPath, "utf8");
 	assert.match(config, /\[features\.multi_agent_v2\]/);
-	assert.match(config, /enabled = true/);
-	assert.match(config, /max_concurrent_threads_per_session = 10000/);
+	const multiAgentV2Section = readSectionText(config, "features.multi_agent_v2");
+	assert.doesNotMatch(multiAgentV2Section, /^\s*enabled\s*=/m);
+	assert.match(multiAgentV2Section, /max_concurrent_threads_per_session = 10000/);
 	assert.match(config, /\[agents\]/);
 	assert.doesNotMatch(config, /^max_threads\s*=/m);
 	assert.match(config, /max_depth = 4/);
