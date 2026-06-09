@@ -303,3 +303,40 @@ export interface LearnFromOutcomeOutput {
   readonly decisionSaved: MemoryDecision | null
   readonly reason: string
 }
+
+/**
+ * Token Predictor types. PR 4 of 8.
+ *
+ * Computes token burn rate from recent turn metrics and recommends
+ * preemptive actions (compact, switch model, delegate) before context
+ * window exhaustion.
+ */
+
+export interface TokenPredictorConfig {
+  /** Burn rate threshold (tokens/sec) above which to recommend compact-now. Default: 500. */
+  readonly compactBurnRateThreshold: number
+  /** Context usage ratio (0..1) above which to recommend compact-now. Default: 0.85. */
+  readonly compactUsageThreshold: number
+  /** Context usage ratio above which to recommend switch-model. Default: 0.95. */
+  readonly switchModelUsageThreshold: number
+  /** Max consecutive high-burn turns before recommending delegate. Default: 5. */
+  readonly delegateConsecutiveHighBurn: number
+  /** Number of recent turns to use for burn rate calculation. Default: 10. */
+  readonly windowSize: number
+}
+
+export interface TokenPredictorInput {
+  readonly currentUsage: number
+  readonly modelLimit: number
+  readonly recentTurnTokens: readonly number[]
+  readonly timestampISO: string
+  readonly providerID: string
+  readonly modelID: string
+  readonly config: TokenPredictorConfig
+}
+
+export interface TokenPredictorOutput extends TokenPrediction {
+  readonly input: TokenPredictorInput
+  readonly computedAtISO: string
+  readonly turnsAnalyzed: number
+}
