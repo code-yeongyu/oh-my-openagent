@@ -38,6 +38,7 @@ export function createPluginInterface(args: {
     "chat.params": async (input: unknown, output: unknown) => {
       const handler = createChatParamsHandler({
         client: ctx.client,
+        pluginConfig,
       })
       await handler(input, output)
     },

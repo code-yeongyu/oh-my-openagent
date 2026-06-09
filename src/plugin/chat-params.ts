@@ -1,5 +1,7 @@
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
+import { applySessionPromptParams } from "../shared/session-prompt-params-helpers"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
+import type { OhMyOpenCodeConfig } from "../config"
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
@@ -83,13 +85,25 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
 
 export function createChatParamsHandler(_args: {
   client?: unknown
+  pluginConfig?: OhMyOpenCodeConfig
 } = {}): (input: unknown, output: unknown) => Promise<void> {
+  const { pluginConfig } = _args
+
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
     if (!isChatParamsOutput(output)) return
 
-    const storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
+    let storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
+
+    if (!storedPromptParams && pluginConfig && normalizedInput.agent.name) {
+      const agentConfig = pluginConfig.agents?.[normalizedInput.agent.name]
+        ?? pluginConfig.categories?.[normalizedInput.agent.name]
+      if (agentConfig) {
+        applySessionPromptParams(normalizedInput.sessionID, agentConfig)
+        storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
+      }
+    }
     if (storedPromptParams) {
       if (storedPromptParams.temperature !== undefined) {
         output.temperature = storedPromptParams.temperature
