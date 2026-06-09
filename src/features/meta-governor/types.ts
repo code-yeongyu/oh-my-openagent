@@ -210,3 +210,96 @@ export type TokenRecommendation =
   | "switch-model"
   | "delegate-to-subagent"
   | "no-action"
+
+/**
+ * Closed-loop learning types. PR 3 of 8.
+ *
+ * After every repair/action cycle, observeAndLearn() decides whether to
+ * persist a lesson or decision record to agentmemory. Future sessions
+ * retrieve these via aggregateRead() (PR 2) and factor them into
+ * scoring (PR 5).
+ */
+
+/**
+ * Configuration for the closed-loop learning system.
+ */
+export interface ClosedLoopConfig {
+  /** Master switch. false = observe only, never write. */
+  readonly enabled: boolean
+  /** Minimum severity to trigger a lesson write. */
+  readonly minSeverityToLearn: "leve" | "media" | "grave"
+  /** Maximum lessons to save per session (prevents flooding). Default 20. */
+  readonly maxLessonsPerSession: number
+  /** Whether to save decision records (lighter than lessons). Default true. */
+  readonly saveDecisions: boolean
+}
+
+/**
+ * A record of a decision that was made, saved to agentmemory for future retrieval.
+ */
+export interface MemoryDecision {
+  readonly id: string
+  readonly timestampISO: string
+  readonly action: Decision["action"]
+  readonly score: number
+  readonly reasoning: string
+  readonly sessionID: string
+  readonly directory: string
+  readonly deviations: readonly Deviation[]
+}
+
+/**
+ * A lesson extracted from an outcome, saved to agentmemory.
+ */
+export interface LessonLearned {
+  readonly id: string
+  readonly title: string
+  readonly content: string
+  readonly type: "pattern" | "bug" | "architecture" | "workflow"
+  readonly concepts: readonly string[]
+  readonly confidence: number
+  readonly files: readonly string[]
+  readonly sessionID: string
+}
+
+/**
+ * Interface for writing to agentmemory. DI pattern — same as AgentmemoryBackend for reads.
+ * The real implementation calls agentmemory_memory_save / agentmemory_memory_lesson_save via MCP.
+ */
+export interface AgentmemoryWriteBackend {
+  saveMemory(input: {
+    content: string
+    concepts: string[]
+    type: string
+    files?: string[]
+  }): Promise<{ id: string }>
+
+  saveLesson(input: {
+    content: string
+    context: string
+    confidence?: number
+    tags?: string[]
+  }): Promise<{ id: string }>
+}
+
+/**
+ * Input to observeAndLearn(). Carries everything the learning function needs
+ * to decide WHAT to learn and WHETHER to learn it.
+ */
+export interface LearnFromOutcomeInput {
+  readonly decision: Decision
+  readonly memoryRead: MemoryRead
+  readonly config: ClosedLoopConfig
+  readonly sessionID: string
+  readonly directory: string
+  readonly filesChanged: readonly string[]
+}
+
+/**
+ * Output from observeAndLearn(). Reports what was persisted (if anything).
+ */
+export interface LearnFromOutcomeOutput {
+  readonly lessonSaved: LessonLearned | null
+  readonly decisionSaved: MemoryDecision | null
+  readonly reason: string
+}

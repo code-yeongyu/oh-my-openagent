@@ -433,4 +433,155 @@ describe("meta-governor types", () => {
       expect(inRange).toBe(true)
     })
   })
+
+  describe("ClosedLoopConfig", () => {
+    test("CLT1: has all required fields with correct types", () => {
+      // given
+      const cfg: ClosedLoopConfig = {
+        enabled: true,
+        minSeverityToLearn: "media",
+        maxLessonsPerSession: 20,
+        saveDecisions: true,
+      }
+
+      // when
+      const isValid =
+        typeof cfg.enabled === "boolean" &&
+        (cfg.minSeverityToLearn === "leve" || cfg.minSeverityToLearn === "media" || cfg.minSeverityToLearn === "grave") &&
+        typeof cfg.maxLessonsPerSession === "number" &&
+        typeof cfg.saveDecisions === "boolean"
+
+      // then
+      expect(isValid).toBe(true)
+    })
+
+    test("CLT2: minSeverityToLearn accepts all 3 severity levels", () => {
+      const levels: ClosedLoopConfig["minSeverityToLearn"][] = ["leve", "media", "grave"]
+      expect(levels.length).toBe(3)
+    })
+  })
+
+  describe("MemoryDecision", () => {
+    test("CLT3: has all required fields matching Decision contract", () => {
+      // given
+      const md: MemoryDecision = {
+        id: "D-abc123",
+        timestampISO: "2026-06-09T12:00:00.000Z",
+        action: "warn",
+        score: -0.5,
+        reasoning: "deviation detected",
+        sessionID: "ses_test",
+        directory: "/tmp/test",
+        deviations: [{ severity: "media", category: "lint", detail: "style" }],
+      }
+
+      // when
+      const isValid =
+        typeof md.id === "string" &&
+        typeof md.timestampISO === "string" &&
+        typeof md.score === "number" &&
+        md.score >= -1 && md.score <= 1 &&
+        typeof md.sessionID === "string"
+
+      // then
+      expect(isValid).toBe(true)
+      expect(md.action).toBe("warn")
+    })
+
+    test("CLT4: action field matches Decision action union type", () => {
+      const actions: MemoryDecision["action"][] = ["continue", "warn", "escalate", "stop"]
+      expect(actions.length).toBe(4)
+    })
+  })
+
+  describe("AgentmemoryWriteBackend", () => {
+    test("CLT5: interface has saveMemory and saveLesson methods", () => {
+      // Compile-time check: if the interface is wrong, this won't typecheck
+      const impl: AgentmemoryWriteBackend = {
+        saveMemory: async () => ({ id: "mem-1" }),
+        saveLesson: async () => ({ id: "les-1" }),
+      }
+
+      // when
+      const hasBoth = typeof impl.saveMemory === "function" && typeof impl.saveLesson === "function"
+
+      // then
+      expect(hasBoth).toBe(true)
+    })
+  })
+
+  describe("LessonLearned", () => {
+    test("CLT6: has all required fields", () => {
+      // given
+      const lesson: LessonLearned = {
+        id: "L-abc",
+        title: "stop on config-change",
+        content: "When X then Y",
+        type: "pattern",
+        concepts: ["config-change", "grave"],
+        confidence: 0.7,
+        files: ["src/foo.ts"],
+        sessionID: "ses_test",
+      }
+
+      // when
+      const isValid =
+        typeof lesson.id === "string" &&
+        typeof lesson.title === "string" &&
+        typeof lesson.content === "string" &&
+        ["pattern", "bug", "architecture", "workflow"].includes(lesson.type) &&
+        lesson.confidence >= 0 && lesson.confidence <= 1
+
+      // then
+      expect(isValid).toBe(true)
+    })
+  })
+
+  describe("LearnFromOutcomeInput / Output", () => {
+    test("CLT7: Input carries decision, memoryRead, config, sessionID, directory, filesChanged", () => {
+      // given
+      const input: LearnFromOutcomeInput = {
+        decision: { action: "warn", score: -0.5, reasoning: "test", evidence: [], shouldEscalateTo: null },
+        memoryRead: {
+          query: "test",
+          timestampISO: "2026-06-09T12:00:00.000Z",
+          agentmemory: { available: true, lessons: [] },
+          magicContext: { available: true, slots: [] },
+          boulderState: { available: true, tasks: [], planProgress: 0 },
+          degradedSources: [],
+        },
+        config: { enabled: true, minSeverityToLearn: "media", maxLessonsPerSession: 20, saveDecisions: true },
+        sessionID: "ses_test",
+        directory: "/tmp/test",
+        filesChanged: ["src/foo.ts"],
+      }
+
+      // when
+      const hasAll =
+        typeof input.sessionID === "string" &&
+        typeof input.directory === "string" &&
+        Array.isArray(input.filesChanged)
+
+      // then
+      expect(hasAll).toBe(true)
+    })
+
+    test("CLT8: Output has lessonSaved, decisionSaved, reason", () => {
+      // given
+      const output: import("./types").LearnFromOutcomeOutput = {
+        lessonSaved: null,
+        decisionSaved: null,
+        reason: "no action",
+      }
+
+      // when
+      const hasAll =
+        "lessonSaved" in output &&
+        "decisionSaved" in output &&
+        typeof output.reason === "string"
+
+      // then
+      expect(hasAll).toBe(true)
+    })
+  })
 })
