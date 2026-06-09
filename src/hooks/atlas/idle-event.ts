@@ -16,6 +16,7 @@ import {
 import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import {
+  incrementAndCheckTotalInjectionCap,
   markContinuationStalled,
   resetStallStateForPlanChange,
   shouldAbortForNoToolProgress,
@@ -103,6 +104,32 @@ export async function handleAtlasSessionIdle(input: {
       noProgressIterations,
       reason: sessionState.stalledContinuationReason,
     })
+    return
+  }
+
+  // Hard-cap guard: absolute ceiling on continuation injections per session.
+  // This prevents infinite loops when the LLM makes qualifying tool calls
+  // (grep, read) that reset the no-tool-progress counter without actually
+  // resolving the underlying task.
+  if (incrementAndCheckTotalInjectionCap(sessionState)) {
+    markContinuationStalled(
+      sessionState,
+      boulderState.plan_name,
+      activePlanPath,
+    )
+    if (sessionState.pendingRetryTimer) {
+      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer = undefined
+    }
+    log(
+      `[${HOOK_NAME}] Aborting boulder continuation: total injection count exceeded hard cap`,
+      {
+        sessionID,
+        plan: boulderState.plan_name,
+        totalInjections: sessionState.totalContinuationInjections,
+        reason: sessionState.stalledContinuationReason,
+      },
+    )
     return
   }
 

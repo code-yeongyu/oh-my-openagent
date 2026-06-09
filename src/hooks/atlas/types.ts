@@ -56,4 +56,6 @@ export interface SessionState {
   stalledContinuationPlanPath?: string
   /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
   activeContinuationPlanPath?: string
+  /** Total number of continuation injections for this session (used by hard-cap guard). */
+  totalContinuationInjections?: number
 }
