@@ -1,6 +1,8 @@
 name: Sisyphus Agent
 
 on:
+  schedule:
+    - cron: "23 6 * * 1"
   workflow_dispatch:
     inputs:
       prompt:
@@ -16,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     # @sisyphus-dev-ai mention only (maintainers, exclude self)
     if: >-
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        contains(github.event.comment.body || '', '@sisyphus-dev-ai') &&
@@ -339,6 +342,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           EVENT_NAME: ${{ github.event_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          DISPATCH_PROMPT: ${{ github.event.inputs.prompt }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
@@ -346,6 +351,13 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           {
+            AUTHOR=""
+            COMMENT_ID=""
+            COMMENT_TEXT="$COMMENT_BODY"
+            ISSUE_NUM=""
+            TITLE=""
+            TYPE=""
+
             if [[ "$EVENT_NAME" == "issue_comment" ]]; then
               ISSUE_NUM="$ISSUE_NUMBER"
               AUTHOR="$COMMENT_AUTHOR"
@@ -355,17 +367,34 @@ jobs:
               ISSUE_DATA=$(gh api "repos/$REPO/issues/${ISSUE_NUM}")
               TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
               if echo "$ISSUE_DATA" | jq -e '.pull_request' > /dev/null; then
-                echo "type=pr"
-                echo "number=${ISSUE_NUM}"
+                TYPE="pr"
               else
-                echo "type=issue"
-                echo "number=${ISSUE_NUM}"
+                TYPE="issue"
               fi
-              echo "title=${TITLE}"
+            elif [[ "$EVENT_NAME" == "schedule" ]]; then
+              AUTHOR="github-actions[bot]"
+              TITLE="Weekly repository update"
+              TYPE="schedule"
+              COMMENT_TEXT=$(cat <<'WEEKLY_PROMPT_EOF'
+          Weekly repository update:
+          - Review dependency freshness, generated metadata, GitHub Actions health, and low-risk repository maintenance needs.
+          - Apply only concrete updates that can be verified in CI.
+          - Create a PR to the default branch when changes are needed.
+          - If no changes are needed, leave the repository clean and finish without committing.
+          WEEKLY_PROMPT_EOF
+              )
+            else
+              AUTHOR="$GITHUB_ACTOR"
+              TITLE="Manual Sisyphus Agent run"
+              TYPE="workflow_dispatch"
+              COMMENT_TEXT="${DISPATCH_PROMPT:-Run repository maintenance requested from GitHub Actions.}"
             fi
 
+            echo "type=${TYPE}"
+            echo "number=${ISSUE_NUM}"
+            echo "title=${TITLE}"
             echo "comment<<EOF"
-            echo "$COMMENT_BODY"
+            echo "$COMMENT_TEXT"
             echo "EOF"
             echo "author=$AUTHOR"
             echo "comment_id=$COMMENT_ID"
@@ -419,7 +448,45 @@ jobs:
         run: |
           export PATH="$HOME/.opencode/bin:$PATH"
 
-          PROMPT=$(cat <<'PROMPT_EOF'
+          if [[ -z "$CONTEXT_NUMBER" ]]; then
+            PROMPT=$(cat <<'PROMPT_EOF'
+          [analyze-mode]
+          ANALYSIS MODE. Gather context before diving deep:
+
+          CONTEXT GATHERING (parallel):
+          - 1-2 explore agents (codebase patterns, implementations)
+          - 1-2 librarian agents (if external library involved)
+          - Direct tools: Grep, AST-grep, LSP for targeted searches
+
+          IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
+          - Consult oracle for strategic guidance
+
+          SYNTHESIZE findings before proceeding.
+
+          ---
+
+          You are @sisyphus-dev-ai running in REPO_PLACEHOLDER from GitHub Actions.
+
+          ## Context
+          - Trigger: TYPE_PLACEHOLDER
+          - Title: TITLE_PLACEHOLDER
+          - Repository: REPO_PLACEHOLDER
+          - Default Branch: BRANCH_PLACEHOLDER
+
+          ## Request
+          COMMENT_PLACEHOLDER
+
+          ## Required Git Workflow
+          - Never push directly to `BRANCH_PLACEHOLDER`.
+          - If changes are needed, create a new branch from `origin/BRANCH_PLACEHOLDER`, commit there, push it, and open a PR to `BRANCH_PLACEHOLDER`.
+          - If no changes are needed, leave the repository clean and finish without committing.
+          - Run the most relevant tests or checks for any changed surface before opening a PR.
+
+          Plan with todo tools, execute the maintenance request, and keep output concise.
+          PROMPT_EOF
+            )
+          else
+            PROMPT=$(cat <<'PROMPT_EOF'
           [analyze-mode]
           ANALYSIS MODE. Gather context before diving deep:
 
@@ -491,7 +558,8 @@ jobs:
           Then investigate and satisfy the request. Only if user requested to you to work explicitly, then use plan agent to plan, todo obsessively then create a PR to `BRANCH_PLACEHOLDER` branch.
           When done, report the result to the issue/PR with `gh issue comment NUMBER_PLACEHOLDER` or `gh pr comment NUMBER_PLACEHOLDER`.
           PROMPT_EOF
-          )
+            )
+          fi
 
           PROMPT="${PROMPT//AUTHOR_PLACEHOLDER/$COMMENT_AUTHOR}"
           PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
@@ -508,14 +576,21 @@ jobs:
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          BRANCH=$(git branch --show-current)
+
           if [[ -n "$(git status --porcelain)" ]]; then
+            if [[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "$DEFAULT_BRANCH" ]]; then
+              echo "Refusing to commit or push changes on protected/default branch: $BRANCH"
+              git status --short
+              exit 1
+            fi
             git add -A
             git commit -m "chore: changes by sisyphus-dev-ai" || true
           fi
 
-          BRANCH=$(git branch --show-current)
-          if [[ "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
+          if [[ "$BRANCH" != "main" && "$BRANCH" != "master" && "$BRANCH" != "$DEFAULT_BRANCH" ]]; then
             git push origin "$BRANCH" || true
           fi
 
