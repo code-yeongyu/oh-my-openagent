@@ -155,6 +155,23 @@ describe("codex doctor checks", () => {
     expect(result.issues.map((issue) => issue.title)).toContain("LazyCodex marketplace is not configured")
   })
 
+  test("#given installed plugin without the omo runtime bin #when checking Codex doctor #then reports the missing omo command", async () => {
+    // given
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    await rm(join(binDir, process.platform === "win32" ? "omo.cmd" : "omo"))
+
+    // when
+    const result = await checkCodex({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+
+    // then
+    expect(result.status).toBe("fail")
+    expect(result.issues.map((issue) => issue.title)).toContain("omo runtime command is not linked")
+  })
+
   test("#given installed LazyCodex #when checking Codex doctor #then details include Codex-specific health surfaces", async () => {
     // given
     const { codexHome, binDir } = await createInstalledCodexHome()

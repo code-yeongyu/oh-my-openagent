@@ -115,6 +115,16 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
       affects: ["version reporting"],
     })
   }
+  if (summary.pluginRoot !== null && !summary.linkedBins.includes("omo")) {
+    issues.push({
+      title: "omo runtime command is not linked",
+      description:
+        "The omo runtime wrapper is missing from the installer bin directory, so `omo sparkshell` and `omo ulw-loop` fail in Codex sessions. lazycodex-ai 4.8.0/4.8.1 installs removed the legacy omo bin without writing a replacement.",
+      fix: "Run: npx lazycodex-ai@latest install",
+      severity: "error",
+      affects: ["omo sparkshell", "ulw-loop"],
+    })
+  }
   if (!summary.config.pluginEnabled) {
     issues.push({
       title: "Codex plugin is not enabled",
