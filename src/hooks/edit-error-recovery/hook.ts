@@ -23,8 +23,25 @@ You made an Edit mistake. STOP and do this NOW:
 3. APOLOGIZE briefly to the user for the error
 4. CONTINUE with corrected action based on the real file content
 
-DO NOT attempt another edit until you've read and verified the file state.
-`
+DO NOT attempt another edit until you've read and verified the file state.`
+
+/**
+ * Options for the edit error recovery hook.
+ */
+export interface EditErrorRecoveryOptions {
+  /**
+   * Post-repair callback for MetaGovernor. Called when an edit error is detected
+   * and the recovery reminder is injected.
+   */
+  onRecoveryOutcome?: (outcome: {
+    errorCode: string
+    fixStrategy: string
+    success: boolean
+    sessionID: string
+    directory: string
+    context?: string
+  }) => void
+}
 
 /**
  * Detects Edit tool errors caused by AI mistakes and injects a recovery reminder
@@ -36,7 +53,7 @@ DO NOT attempt another edit until you've read and verified the file state.
  *
  * @see https://github.com/sst/opencode/issues/4718
  */
-export function createEditErrorRecoveryHook(_ctx: PluginInput) {
+export function createEditErrorRecoveryHook(_ctx: PluginInput, options?: EditErrorRecoveryOptions) {
   return {
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -52,6 +69,18 @@ export function createEditErrorRecoveryHook(_ctx: PluginInput) {
 
       if (hasEditError) {
         output.output += `\n${EDIT_ERROR_REMINDER}`
+
+        // Record recovery outcome for MetaGovernor closed-loop learning
+        if (options?.onRecoveryOutcome) {
+          options.onRecoveryOutcome({
+            errorCode: "EDIT_ERROR",
+            fixStrategy: "read-and-retry",
+            success: false,
+            sessionID: input.sessionID,
+            directory: _ctx.directory,
+            context: output.output.slice(0, 200),
+          })
+        }
       }
     },
   }

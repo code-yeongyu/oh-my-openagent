@@ -58,6 +58,18 @@ export interface RuntimeFallbackOptions {
   config?: RuntimeFallbackConfig
   pluginConfig?: OhMyOpenCodeConfig
   session_timeout_ms?: number
+  /**
+   * Post-repair callback for MetaGovernor. Called after each fallback retry
+   * to record the outcome in agentmemory (closed-loop learning).
+   */
+  onRecoveryOutcome?: (outcome: {
+    errorCode: string
+    fixStrategy: string
+    success: boolean
+    sessionID: string
+    directory: string
+    context?: string
+  }) => void
 }
 
 export interface RuntimeFallbackHook {

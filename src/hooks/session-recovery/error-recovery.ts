@@ -163,6 +163,19 @@ export function createSessionErrorRecoveryHandler(
       if (success) {
         shouldKeepProcessingError = true
       }
+
+      // Record recovery outcome for MetaGovernor closed-loop learning
+      if (callbacks.onRecoveryOutcome) {
+        callbacks.onRecoveryOutcome({
+          errorCode: errorType,
+          fixStrategy: errorType,
+          success,
+          sessionID,
+          directory: ctx.directory,
+          context: info.error instanceof Error ? info.error.message : String(info.error ?? "unknown"),
+        })
+      }
+
       return success
     } catch (err) {
       if (!(err instanceof Error)) {

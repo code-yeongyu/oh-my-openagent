@@ -10,6 +10,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
   const callbacks: SessionRecoveryCallbacks = {
     onAbortCallback: null,
     onRecoveryCompleteCallback: null,
+    onRecoveryOutcome: options?.onRecoveryOutcome,
   }
 
   const setOnAbortCallback = (callback: (sessionID: string) => void): void => {

@@ -46,10 +46,27 @@ STOP and do this NOW:
 2. CORRECT your JSON syntax (missing braces, unescaped quotes, trailing commas, etc).
 3. RETRY the tool call with valid JSON.
 
-DO NOT repeat the exact same invalid call.
-`
+DO NOT repeat the exact same invalid call.`
 
-export function createJsonErrorRecoveryHook(_ctx: PluginInput) {
+/**
+ * Options for the JSON error recovery hook.
+ */
+export interface JsonErrorRecoveryOptions {
+  /**
+   * Post-repair callback for MetaGovernor. Called when a JSON error is detected
+   * and the recovery reminder is injected.
+   */
+  onRecoveryOutcome?: (outcome: {
+    errorCode: string
+    fixStrategy: string
+    success: boolean
+    sessionID: string
+    directory: string
+    context?: string
+  }) => void
+}
+
+export function createJsonErrorRecoveryHook(_ctx: PluginInput, options?: JsonErrorRecoveryOptions) {
   return {
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -63,6 +80,18 @@ export function createJsonErrorRecoveryHook(_ctx: PluginInput) {
 
       if (hasJsonError) {
         output.output += `\n${JSON_ERROR_REMINDER}`
+
+        // Record recovery outcome for MetaGovernor closed-loop learning
+        if (options?.onRecoveryOutcome) {
+          options.onRecoveryOutcome({
+            errorCode: "JSON_PARSE_ERROR",
+            fixStrategy: "read-and-retry",
+            success: false,
+            sessionID: input.sessionID,
+            directory: _ctx.directory,
+            context: `tool: ${input.tool}`,
+          })
+        }
       }
     },
   }

@@ -19,6 +19,18 @@ export interface AnthropicContextWindowLimitRecoveryOptions {
     log?: typeof log
     parseAnthropicTokenLimitError?: typeof parseAnthropicTokenLimitError
   }
+  /**
+   * Post-repair callback for MetaGovernor. Called after compaction recovery
+   * to record the outcome in agentmemory (closed-loop learning).
+   */
+  onRecoveryOutcome?: (outcome: {
+    errorCode: string
+    fixStrategy: string
+    success: boolean
+    sessionID: string
+    directory: string
+    context?: string
+  }) => void
 }
 
 function createRecoveryState(): AutoCompactState {
@@ -190,6 +202,18 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         pluginConfig,
         experimental,
       )
+
+      // Record recovery outcome for MetaGovernor closed-loop learning
+      if (options?.onRecoveryOutcome) {
+        options.onRecoveryOutcome({
+          errorCode: "CONTEXT_WINDOW_LIMIT",
+          fixStrategy: "compact",
+          success: true,
+          sessionID,
+          directory: ctx.directory,
+          context: `compacted with model ${providerID ?? "unknown"}/${modelID ?? "unknown"}`,
+        })
+      }
     }
   }
 

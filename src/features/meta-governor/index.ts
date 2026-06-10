@@ -4,6 +4,7 @@ export * from "./closed-loop-learning"
 export * from "./token-predictor"
 export * from "./scoring-engine"
 export * from "./decision-handler"
+export * from "./post-repair-recorder"
 
 export * from "./orchestrator"
 export * from "./config"

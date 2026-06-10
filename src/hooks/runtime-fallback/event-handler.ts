@@ -271,6 +271,19 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       resolvedAgent,
       source: "session.error",
     })
+
+    // Record recovery outcome for MetaGovernor closed-loop learning
+    if (deps.options?.onRecoveryOutcome) {
+      const errorStr = error instanceof Error ? error.message : String(error ?? "unknown")
+      deps.options.onRecoveryOutcome({
+        errorCode: classifyErrorType(error) ?? "runtime-error",
+        fixStrategy: "fallback",
+        success: true,
+        sessionID,
+        directory: deps.ctx.directory,
+        context: `fallback from ${state.originalModel} to ${state.currentModel}: ${errorStr}`,
+      })
+    }
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {

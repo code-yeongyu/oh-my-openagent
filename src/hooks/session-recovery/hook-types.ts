@@ -10,6 +10,18 @@ export interface MessageInfo {
 
 export interface SessionRecoveryOptions {
   experimental?: ExperimentalConfig
+  /**
+   * Post-repair callback for MetaGovernor. Called after each recovery attempt
+   * to record the outcome in agentmemory (closed-loop learning).
+   */
+  onRecoveryOutcome?: (outcome: {
+    errorCode: string
+    fixStrategy: string
+    success: boolean
+    sessionID: string
+    directory: string
+    context?: string
+  }) => void
 }
 
 export interface SessionRecoveryHook {
@@ -23,4 +35,12 @@ export interface SessionRecoveryHook {
 export interface SessionRecoveryCallbacks {
   onAbortCallback: ((sessionID: string) => void) | null
   onRecoveryCompleteCallback: ((sessionID: string) => void) | null
+  onRecoveryOutcome?: (outcome: {
+    errorCode: string
+    fixStrategy: string
+    success: boolean
+    sessionID: string
+    directory: string
+    context?: string
+  }) => void
 }
