@@ -69,7 +69,7 @@ describe("mcp stdio proxy", () => {
 		expect(toolResult.content[0]?.text).toContain("Configured LSP servers");
 	});
 
-	it("#given an unreachable daemon #when a tool is proxied #then it is answered by in-process fallback", async () => {
+	it("#given an unreachable daemon #when a tool is proxied #then it returns a structured error instead of running locally", async () => {
 		const paths = tempPaths();
 		const out: string[] = [];
 
@@ -83,8 +83,10 @@ describe("mcp stdio proxy", () => {
 		});
 
 		const responses = parseResponses(out);
-		const toolResult = responses[0]?.["result"] as { content: Array<{ text: string }> };
-		expect(toolResult.content[0]?.text).toContain("Configured LSP servers");
+		const toolResult = responses[0]?.["result"] as { content: Array<{ text: string }>; isError?: boolean };
+		expect(toolResult.isError).toBe(true);
+		expect(toolResult.content[0]?.text).toContain("LSP daemon unreachable");
+		expect(toolResult.content[0]?.text).not.toContain("Configured LSP servers");
 	});
 
 	it("#given a malformed line #when proxied #then returns a parse error", async () => {
@@ -102,7 +104,7 @@ describe("mcp stdio proxy", () => {
 		expect((responses[0]?.["error"] as { code: number }).code).toBe(-32700);
 	});
 
-	it("#given the fallback tool throws #when proxied #then returns an isError response and keeps serving", async () => {
+	it("#given an unreachable daemon #when several tools are proxied #then each gets a structured error and the proxy keeps serving", async () => {
 		const paths = tempPaths();
 		const out: string[] = [];
 
@@ -120,7 +122,8 @@ describe("mcp stdio proxy", () => {
 		const first = responses.find((response) => response["id"] === 1);
 		const second = responses.find((response) => response["id"] === 2);
 		expect((first?.["result"] as { isError?: boolean })?.isError).toBe(true);
-		const secondResult = second?.["result"] as { content: Array<{ text: string }> } | undefined;
-		expect(secondResult?.content[0]?.text).toContain("Configured LSP servers");
+		const secondResult = second?.["result"] as { content: Array<{ text: string }>; isError?: boolean } | undefined;
+		expect(secondResult?.isError).toBe(true);
+		expect(secondResult?.content[0]?.text).toContain("LSP daemon unreachable");
 	});
 });

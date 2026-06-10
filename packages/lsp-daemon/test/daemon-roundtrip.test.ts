@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -22,6 +22,14 @@ function tempPaths(): DaemonPaths {
 }
 
 const noSpawn = (): Promise<void> => Promise.resolve();
+
+function firstBuiltinServerId(statusText: string): string {
+	for (const line of statusText.split("\n")) {
+		const match = /^- (\S+): \w+; source=builtin;/.exec(line);
+		if (match?.[1]) return match[1];
+	}
+	throw new Error(`no builtin server found in status output:\n${statusText}`);
+}
 
 describe("daemon roundtrip", () => {
 	it("#given a running daemon #when status tool is called #then returns content over the socket", async () => {
@@ -49,13 +57,47 @@ describe("daemon roundtrip", () => {
 		expect(b.content[0]?.text).toContain("Configured LSP servers");
 	});
 
-	it("#given the daemon is unreachable #when a tool is called #then it falls back to in-process execution", async () => {
+	it("#given the daemon is unreachable #when a tool is called #then it returns a structured error without running locally", async () => {
 		const paths = tempPaths();
 		const failingEnsure = (): Promise<void> => Promise.reject(new Error("spawn disabled in test"));
 
 		const result = await callToolViaDaemon("status", {}, { paths, ensure: failingEnsure });
 
-		expect(result.content[0]?.text).toContain("Configured LSP servers");
+		expect(result.isError).toBe(true);
+		const message = result.content[0]?.text ?? "";
+		expect(message).toContain("LSP daemon unreachable");
+		expect(message).toContain(paths.socket);
+		expect(message).toContain(paths.log);
+		expect(message).not.toContain("Configured LSP servers");
+	});
+
+	it("#given project config env in the request context #when a tool runs on the daemon #then config-loader honors it per-request", async () => {
+		const paths = tempPaths();
+		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
+		servers.push(server);
+
+		const baseline = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn });
+		const builtinId = firstBuiltinServerId(baseline.content[0]?.text ?? "");
+		const projectDir = tempPaths().dir;
+		mkdirSync(projectDir, { recursive: true });
+		const configPath = join(projectDir, "lsp.json");
+		writeFileSync(configPath, JSON.stringify({ lsp: { [builtinId]: { disabled: true } } }));
+
+		const scoped = await callToolViaDaemon(
+			"status",
+			{},
+			{
+				paths,
+				ensure: noSpawn,
+				context: { cwd: projectDir, env: { LSP_TOOLS_MCP_PROJECT_CONFIG: configPath } },
+			},
+		);
+
+		const scopedText = scoped.content[0]?.text ?? "";
+		expect(scopedText).toContain(`- ${builtinId}: disabled`);
+		const unscoped = await callToolViaDaemon("status", {}, { paths, ensure: noSpawn });
+		expect(unscoped.content[0]?.text ?? "").toContain(`- ${builtinId}: `);
+		expect(unscoped.content[0]?.text ?? "").not.toContain(`- ${builtinId}: disabled`);
 	});
 
 	it("#given a started daemon #when closed #then the socket and pid files are removed", async () => {

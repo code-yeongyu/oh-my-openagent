@@ -26,10 +26,10 @@ describe("createLspMcpConfig", () => {
     const packageRoot = createTemporaryDirectory("omo-lsp-package-root-")
     const unrelatedCwd = createTemporaryDirectory("omo-lsp-unrelated-cwd-")
     const moduleFilePath = join(packageRoot, "dist", "index.js")
-    const cliPath = join(packageRoot, "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const cliPath = join(packageRoot, "packages", "lsp-daemon", "dist", "cli.js")
     const nodePath = join(packageRoot, "bin", "node")
     mkdirSync(join(packageRoot, "dist"), { recursive: true })
-    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "dist"), { recursive: true })
     writeFileSync(cliPath, "#!/usr/bin/env node\n", "utf-8")
 
     // when
@@ -48,10 +48,10 @@ describe("createLspMcpConfig", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-lsp-source-root-")
     const moduleFilePath = join(packageRoot, "src", "mcp", "lsp.ts")
-    const sourceCliPath = join(packageRoot, "packages", "lsp-tools-mcp", "src", "cli.ts")
+    const sourceCliPath = join(packageRoot, "packages", "lsp-daemon", "src", "cli.ts")
     const bunPath = join(packageRoot, "bin", "bun")
     mkdirSync(join(packageRoot, "src", "mcp"), { recursive: true })
-    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "src"), { recursive: true })
     writeFileSync(sourceCliPath, "console.log('mcp')\n", "utf-8")
 
     // when
@@ -71,18 +71,18 @@ describe("createLspMcpConfig", () => {
     const packageRoot = createTemporaryDirectory("omo-lsp-safe-package-root-")
     const workspaceRoot = createTemporaryDirectory("omo-lsp-malicious-workspace-")
     const moduleFilePath = join(packageRoot, "dist", "index.js")
-    const workspaceCliPath = join(workspaceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const workspaceCliPath = join(workspaceRoot, "packages", "lsp-daemon", "dist", "cli.js")
     const gitPath = join(packageRoot, "bin", "git")
     const bunPath = join(packageRoot, "bin", "bun")
     const nodePath = join(packageRoot, "bin", "node")
     const npmPath = join(packageRoot, "bin", "npm")
     mkdirSync(join(packageRoot, "dist"), { recursive: true })
-    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp"), { recursive: true })
-    mkdirSync(join(workspaceRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon"), { recursive: true })
+    mkdirSync(join(workspaceRoot, "packages", "lsp-daemon", "dist"), { recursive: true })
     writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
     writeFileSync(
-      join(packageRoot, "packages", "lsp-tools-mcp", "package.json"),
-      JSON.stringify({ name: "@code-yeongyu/lsp-tools-mcp" }),
+      join(packageRoot, "packages", "lsp-daemon", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/lsp-daemon" }),
       "utf-8",
     )
     writeFileSync(workspaceCliPath, "console.log('malicious')\n", "utf-8")
@@ -130,11 +130,11 @@ describe("createLspMcpConfig", () => {
     const nodePath = join(packageRoot, "bin", "node")
     const npmPath = join(packageRoot, "bin", "npm")
     mkdirSync(join(packageRoot, "dist"), { recursive: true })
-    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon"), { recursive: true })
     writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
     writeFileSync(
-      join(packageRoot, "packages", "lsp-tools-mcp", "package.json"),
-      JSON.stringify({ name: "@code-yeongyu/lsp-tools-mcp" }),
+      join(packageRoot, "packages", "lsp-daemon", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/lsp-daemon" }),
       "utf-8",
     )
 
@@ -149,8 +149,13 @@ describe("createLspMcpConfig", () => {
     expect(config.enabled).toBe(true)
     expect(config.command[0]).toBe(nodePath)
     expect(config.command[1]).toBe("-e")
-    expect(config.command[2]).not.toContain("submodule")
-    expect(config.command[2]).toContain("npm")
+    const script = config.command[2] as string
+    expect(script).not.toContain("submodule")
+    expect(script).toContain("npm")
+    expect(script).toContain("build")
+    expect(script).toContain("packages/lsp-tools-mcp")
+    expect(script).toContain("packages/lsp-daemon")
+    expect(script.indexOf("packages/lsp-tools-mcp")).toBeLessThan(script.indexOf("packages/lsp-daemon"))
     expect(config.command[3]).toBe(packageRoot)
     expect(config.command[4]).toBe(npmPath)
     expect(config.command[5]).toBe(bunPath)
@@ -160,9 +165,9 @@ describe("createLspMcpConfig", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-lsp-no-runtime-root-")
     const moduleFilePath = join(packageRoot, "dist", "index.js")
-    const cliPath = join(packageRoot, "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const cliPath = join(packageRoot, "packages", "lsp-daemon", "dist", "cli.js")
     mkdirSync(join(packageRoot, "dist"), { recursive: true })
-    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "dist"), { recursive: true })
     writeFileSync(cliPath, "#!/usr/bin/env node\n", "utf-8")
 
     // when
