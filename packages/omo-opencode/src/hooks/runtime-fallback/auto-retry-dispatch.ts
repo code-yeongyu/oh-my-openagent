@@ -8,6 +8,7 @@ import { createInternalAgentContinuationTextPart } from "../../shared/internal-i
 import {
   dispatchInternalPrompt,
   isInternalPromptDispatchAccepted,
+  type InternalPromptDispatchResult,
 } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
@@ -135,7 +136,7 @@ export function createAutoRetryDispatcher(
         // Retry with linear backoff until the reservation is released.
         const MAX_RESERVED_RETRIES = 6
         const BASE_DELAY_MS = 500
-        let reservedResult = promptResult
+        let reservedResult: InternalPromptDispatchResult = promptResult
         for (let attempt = 0; attempt < MAX_RESERVED_RETRIES; attempt++) {
           const delay = BASE_DELAY_MS * (attempt + 1)
           log(`[${HOOK_NAME}] Session reserved, retrying fallback dispatch in ${delay}ms (${source})`, {
