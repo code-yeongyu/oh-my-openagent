@@ -167,6 +167,16 @@ export function createAutoRetryDispatcher(
           })
           if (reservedResult.status !== "reserved") break
         }
+        if (reservedResult.status === "failed") {
+          if (isAmbiguousPostDispatchPromptFailure(reservedResult)) {
+            retryMayHaveBeenAccepted = true
+            log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
+              sessionID,
+              error: String(reservedResult.error),
+            })
+          }
+          throw reservedResult.error
+        }
         if (!isInternalPromptDispatchAccepted(reservedResult)) {
           log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate after reserved retries (${source})`, {
             sessionID,
