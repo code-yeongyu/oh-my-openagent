@@ -57,7 +57,7 @@ export function storeToolMetadata(
  *
  * For background/child sessions the after-hook's sessionID can diverge
  * from the execute() sessionID, so an exact-key miss falls back to the
- * callID alone — but only when exactly one session holds that callID,
+ * callID alone - but only when exactly one session holds that callID,
  * declining ambiguous cross-session collisions.
  */
 export function consumeToolMetadata(
