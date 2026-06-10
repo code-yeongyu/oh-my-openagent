@@ -1,7 +1,7 @@
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
-import type { AgentOverrides } from "./config/schema/agent-overrides"
 
+import { applyAgentVariant } from "./shared/agent-variant"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -41,17 +41,12 @@ export function createPluginInterface(args: {
         agent?: string | { name?: string }
         message?: { variant?: string }
       }
-      if (chatParamsInput.agent && pluginConfig?.agents) {
-        const agentName =
-          typeof chatParamsInput.agent === "string"
-            ? chatParamsInput.agent
-            : chatParamsInput.agent?.name
-        if (agentName && pluginConfig.agents[agentName as keyof AgentOverrides]?.variant) {
-          if (chatParamsInput.message && !chatParamsInput.message.variant) {
-            chatParamsInput.message.variant =
-              pluginConfig.agents[agentName as keyof AgentOverrides]!.variant
-          }
-        }
+      const agentName =
+        typeof chatParamsInput.agent === "string"
+          ? chatParamsInput.agent
+          : chatParamsInput.agent?.name
+      if (chatParamsInput.message) {
+        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message)
       }
       const handler = createChatParamsHandler({
         client: ctx.client,

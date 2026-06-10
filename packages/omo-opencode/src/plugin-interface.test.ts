@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -312,7 +312,7 @@ describe("createPluginInterface - chat.params variant injection", () => {
       ctx: { client: {} } as never,
       pluginConfig: {
         agents: {
-          oracle: { variant: "high" },
+          sisyphus: { variant: "max" },
         },
       } as never,
       firstMessageVariantGate: {
@@ -322,20 +322,23 @@ describe("createPluginInterface - chat.params variant injection", () => {
         clear: () => {},
       },
       managers: {} as never,
-      hooks: {
-        anthropicEffort: { "chat.params": async () => {} },
-      } as never,
+      hooks: {} as never,
       tools: {},
     })
-
-    const input = { agent: "oracle", message: {} }
-    const output = {}
+    const input = {
+      sessionID: "ses-variant-inject",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      provider: { id: "anthropic" },
+      message: {} as { variant?: string },
+    }
+    const output = { options: {} }
 
     // when
     await pluginInterface["chat.params"]?.(input as never, output as never)
 
     // then
-    expect((input.message as Record<string, unknown>).variant).toBe("high")
+    expect(input.message.variant).toBe("max")
   })
 
   test("does not overwrite existing variant in chat.params message", async () => {
@@ -344,7 +347,7 @@ describe("createPluginInterface - chat.params variant injection", () => {
       ctx: { client: {} } as never,
       pluginConfig: {
         agents: {
-          oracle: { variant: "high" },
+          sisyphus: { variant: "max" },
         },
       } as never,
       firstMessageVariantGate: {
@@ -354,19 +357,22 @@ describe("createPluginInterface - chat.params variant injection", () => {
         clear: () => {},
       },
       managers: {} as never,
-      hooks: {
-        anthropicEffort: { "chat.params": async () => {} },
-      } as never,
+      hooks: {} as never,
       tools: {},
     })
-
-    const input = { agent: "oracle", message: { variant: "max" } }
-    const output = {}
+    const input = {
+      sessionID: "ses-variant-keep",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      provider: { id: "anthropic" },
+      message: { variant: "high" } as { variant?: string },
+    }
+    const output = { options: {} }
 
     // when
     await pluginInterface["chat.params"]?.(input as never, output as never)
 
     // then
-    expect((input.message as Record<string, unknown>).variant).toBe("max")
+    expect(input.message.variant).toBe("high")
   })
 })
