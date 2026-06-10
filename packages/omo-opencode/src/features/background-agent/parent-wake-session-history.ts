@@ -141,6 +141,15 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     log("[background-agent] Retrying parent wake after stale tool-call deferral:", { sessionID: input.sessionID })
     return { defer: false, skipPromptGateToolStateCheck: true }
   }
+  if (
+    now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs
+    && !latestAssistantTurnHasToolBlock(messages)
+    && input.wake.noReplyAdmittedAt !== undefined
+  ) {
+    delete input.wake.toolCallDeferralStartedAt
+    log("[background-agent] Retrying parent wake after retained no-reply admission deferral timeout:", { sessionID: input.sessionID })
+    return { defer: false, skipPromptGateToolStateCheck: true }
+  }
   log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
     sessionID: input.sessionID,
   })
