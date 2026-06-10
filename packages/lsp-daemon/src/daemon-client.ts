@@ -1,7 +1,6 @@
 import { connect } from "node:net";
 
-import { runWithRequestContext } from "@code-yeongyu/lsp-tools-mcp/dist/request-context.js";
-import { executeLspTool, type ToolExecutionResult } from "@code-yeongyu/lsp-tools-mcp/dist/tools.js";
+import type { ToolExecutionResult } from "@code-yeongyu/lsp-tools-mcp/dist/tools.js";
 
 import { ensureDaemonRunning } from "./ensure-daemon.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
@@ -43,12 +42,7 @@ export async function callToolViaDaemon(
 		}
 	}
 
-	logClientFallback(lastError);
-	try {
-		return await runLocally(name, args, options.context);
-	} catch (error) {
-		return { content: [{ type: "text", text: errorText(error) }], isError: true };
-	}
+	return daemonUnreachableResult(paths, lastError);
 }
 
 export function callDiagnosticsViaDaemon(
@@ -72,13 +66,15 @@ function withContext(args: Record<string, unknown>, context: DaemonToolContext |
 	return { ...args, [CONTEXT_KEY]: context };
 }
 
-function runLocally(
-	name: string,
-	args: Record<string, unknown>,
-	context: DaemonToolContext | undefined,
-): Promise<ToolExecutionResult> {
-	if (context) return runWithRequestContext(context, () => executeLspTool(name, args));
-	return executeLspTool(name, args);
+function daemonUnreachableResult(paths: DaemonPaths, error: unknown): ToolExecutionResult {
+	const text = [
+		`LSP daemon unreachable: ${errorText(error)}.`,
+		"The MCP server is a thin proxy and never runs language servers in-process.",
+		`Socket: ${paths.socket}`,
+		`Logs: ${paths.log}`,
+		"The daemon is auto-started on demand and will be retried on the next request.",
+	].join("\n");
+	return { content: [{ type: "text", text }], isError: true };
 }
 
 function sendToolCall(
@@ -132,8 +128,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function errorText(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
-}
-
-function logClientFallback(error: unknown): void {
-	process.stderr.write(`[lsp-daemon] falling back to in-process execution: ${errorText(error)}\n`);
 }
