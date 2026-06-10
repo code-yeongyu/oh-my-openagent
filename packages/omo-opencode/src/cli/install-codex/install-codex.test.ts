@@ -321,6 +321,8 @@ describe("install-codex", () => {
         expect(wrapper).toContain(`CODEX_HOME`)
         expect(wrapper).toContain("OMO_SPARKSHELL_APP_SERVER_SOCKET")
         expect(wrapper).toContain("omo-ulw-loop")
+        expect(wrapper).toContain("bun runtime not found")
+        expect(wrapper).toContain("https://bun.sh")
       } else if (process.platform === "win32") {
         const expectedTarget = join(pluginPath, entry.target)
         expect((await stat(linkPath)).isFile()).toBe(true)
