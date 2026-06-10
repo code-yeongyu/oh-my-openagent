@@ -269,6 +269,13 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
       smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
       smokeStep.includes("npx --yes --package oh-my-openagent omo doctor")
+    const installsRealPackageAndVerifiesOmoBin =
+      smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
+      smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
+      smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
+      smokeStep.includes('sparkshell_output=$("$CODEX_LOCAL_BIN_DIR/omo" sparkshell echo lazycodex-smoke 2>&1)') &&
+      smokeStep.includes('[ "$sparkshell_output" = "lazycodex-smoke" ]')
 
     // #then
     expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
@@ -277,6 +284,10 @@ describe("LazyCodex publish workflow", () => {
     expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)
     expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
+    expect(
+      installsRealPackageAndVerifiesOmoBin,
+      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes sparkshell",
+    ).toBe(true)
   })
 
   test("builds the Codex plugin components in publish-main before publishing the lazycodex-ai alias", () => {
