@@ -47,12 +47,29 @@ export const AgentOverrideConfigSchema = z.object({
     .object({
       model: z.string().optional(),
       variant: z.string().optional(),
+      /**
+       * Scoped fallback chain used only when an ultrawork-triggered request
+       * fails with the override model/variant. Falls back to the agent-level
+       * `fallback_models` when omitted, and finally to the hardcoded chain.
+       * See #3779 for motivation (#3538 directly demonstrates the failure when
+       * variant=max is unsupported by Copilot claude-opus-4.6).
+       */
+      fallback_models: FallbackModelsSchema.optional(),
     })
     .optional(),
   compaction: z
     .object({
       model: z.string().optional(),
       variant: z.string().optional(),
+      /**
+       * Scoped fallback chain used only when a compaction-triggered
+       * summarization fails with the override model/variant. Falls back to the
+       * agent-level `fallback_models` when omitted. Compaction has a separate
+       * chain because the summarization model is often deliberately different
+       * from the conversation model (e.g. cheap flash for context squeeze).
+       * See #3779 / #828 / #2062 for motivation.
+       */
+      fallback_models: FallbackModelsSchema.optional(),
     })
     .optional(),
 })

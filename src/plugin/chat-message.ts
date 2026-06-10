@@ -132,6 +132,7 @@ export function createChatMessageHandler(args: {
       pluginContext.client.tui,
       input.sessionID,
       pluginContext.client,
+      hooks.modelFallback,
     )
   }
 }

@@ -3,6 +3,12 @@ import type { AgentOverrides } from "../config/schema/agent-overrides"
 import { getSessionAgent } from "../features/claude-code-session-state"
 import { log } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
+import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models"
+import { getRawFallbackModelsForScope } from "../hooks/runtime-fallback/fallback-models"
+import {
+  setSessionFallbackChain,
+  type ModelFallbackHook,
+} from "../hooks/model-fallback/hook"
 import { scheduleDeferredModelOverride } from "./ultrawork-db-model-override"
 import { resolveValidUltraworkVariant } from "./ultrawork-variant-availability"
 
@@ -145,6 +151,35 @@ function applyResolvedUltraworkOverride(args: {
   )
 }
 
+/**
+ * Replace the session's runtime fallback chain with an ultrawork-scoped chain
+ * when `agents[X].ultrawork.fallback_models` is configured. Falls through to a
+ * no-op when no scoped chain is present so the previously-installed agent-level
+ * chain stays in effect. See #3779 / #3538.
+ */
+export function applyUltraworkScopedFallbackChain(args: {
+  pluginConfig: OhMyOpenCodeConfig
+  sessionID: string
+  agentName: string
+  currentProviderID: string
+  modelFallback: Pick<ModelFallbackHook, "setSessionFallbackChain"> | null | undefined
+}): void {
+  if (!args.modelFallback) return
+  const agentKey = getAgentConfigKey(args.agentName)
+  const raw = getRawFallbackModelsForScope(args.sessionID, agentKey, args.pluginConfig, "ultrawork")
+  if (!raw || raw.length === 0) return
+
+  const fallbackChain = buildFallbackChainFromModels(raw, args.currentProviderID)
+  if (!fallbackChain || fallbackChain.length === 0) return
+
+  setSessionFallbackChain(args.modelFallback, args.sessionID, fallbackChain)
+  log("[ultrawork-model-override] Applied ultrawork-scoped fallback chain", {
+    sessionID: args.sessionID,
+    agentKey,
+    chainSize: fallbackChain.length,
+  })
+}
+
 export function applyUltraworkModelOverrideOnMessage(
   pluginConfig: OhMyOpenCodeConfig,
   inputAgentName: string | undefined,
@@ -155,9 +190,33 @@ export function applyUltraworkModelOverrideOnMessage(
   tui: unknown,
   sessionID?: string,
   client?: unknown,
+  modelFallback?: Pick<ModelFallbackHook, "setSessionFallbackChain"> | null,
 ): void | Promise<void> {
   const override = resolveUltraworkOverride(pluginConfig, inputAgentName, output, sessionID)
   if (!override) return
+
+  // Override matched — try to install the scoped fallback chain. The actual
+  // model override still happens below; the chain is what tells the model
+  // fallback controller where to go when the override model errors out.
+  if (sessionID) {
+    const agentName =
+      inputAgentName ??
+      (typeof output.message["agent"] === "string"
+        ? (output.message["agent"] as string)
+        : undefined) ??
+      getSessionAgent(sessionID)
+    const currentProviderID =
+      override.providerID ?? (getMessageModel(output.message.model)?.providerID ?? "")
+    if (agentName) {
+      applyUltraworkScopedFallbackChain({
+        pluginConfig,
+        sessionID,
+        agentName,
+        currentProviderID,
+        modelFallback,
+      })
+    }
+  }
 
   const currentModel = getMessageModel(output.message.model)
   const variantTargetModel = override.providerID && override.modelID

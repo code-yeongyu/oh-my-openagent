@@ -12,7 +12,7 @@ import {
 import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
 import { fixEmptyMessages } from "./empty-content-recovery"
 
-import { resolveCompactionModel } from "../shared/compaction-model-resolver"
+import { resolveCompactionFallbackChain, resolveCompactionModel } from "../shared/compaction-model-resolver"
 import { log } from "../../shared/logger"
 
 const SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS = 120_000
@@ -140,12 +140,29 @@ export async function runSummarizeRetryStrategy(params: {
           "summarize retry attempt",
         )
 
-        const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+        const primary = resolveCompactionModel(
           params.pluginConfig,
           params.sessionID,
           providerID,
           modelID
         )
+
+        // On retries beyond the first attempt, walk the compaction-scoped
+        // fallback chain so the next summarize hits a different model rather
+        // than re-hitting the rate-limited / failing primary. #3779 / #2062.
+        const fallbackChain = resolveCompactionFallbackChain(
+          params.pluginConfig,
+          params.sessionID,
+          primary.providerID,
+        )
+        const fallbackIndex = retryState.attempt - 2
+        const fallbackEntry =
+          fallbackChain && fallbackIndex >= 0 ? fallbackChain[fallbackIndex] : undefined
+        // FallbackEntry stores `providers: string[]` (a chain of provider IDs
+        // for the same logical model) and `model: string` — pick the first
+        // provider as the canonical one. See packages/model-core FallbackEntry.
+        const targetProviderID = fallbackEntry?.providers[0] ?? primary.providerID
+        const targetModelID = fallbackEntry?.model ?? primary.modelID
 
         const summarizeBody = { providerID: targetProviderID, modelID: targetModelID, auto: true }
         await params.client.session.summarize({
@@ -153,6 +170,14 @@ export async function runSummarizeRetryStrategy(params: {
           body: summarizeBody as never,
           query: { directory: params.directory },
         })
+        if (fallbackEntry) {
+          log("[auto-compact] summarize retry used compaction-scoped fallback model", {
+            sessionID: params.sessionID,
+            attempt: retryState.attempt,
+            providerID: targetProviderID,
+            modelID: targetModelID,
+          })
+        }
         clearSessionState(params.autoCompactState, params.sessionID)
         return
       } catch (error) {

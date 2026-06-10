@@ -7,6 +7,7 @@ import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 let resolveUltraworkOverride: (typeof import("./ultrawork-model-override"))["resolveUltraworkOverride"]
 let detectUltrawork: (typeof import("./ultrawork-model-override"))["detectUltrawork"]
 let applyUltraworkModelOverrideOnMessage: (typeof import("./ultrawork-model-override"))["applyUltraworkModelOverrideOnMessage"]
+let applyUltraworkScopedFallbackChain: (typeof import("./ultrawork-model-override"))["applyUltraworkScopedFallbackChain"]
 
 async function importFreshUltraworkModelOverrideModule(): Promise<typeof import("./ultrawork-model-override")> {
   return import(`./ultrawork-model-override?test=${Date.now()}-${Math.random()}`)
@@ -17,6 +18,7 @@ async function loadFreshUltraworkModelOverrideModule(): Promise<void> {
     resolveUltraworkOverride,
     detectUltrawork,
     applyUltraworkModelOverrideOnMessage,
+    applyUltraworkScopedFallbackChain,
   } = await importFreshUltraworkModelOverrideModule())
 }
 
@@ -506,5 +508,93 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
 
     //#then - SDK says haiku has no max variant, so variant is NOT applied
     expect(output.message["variant"]).toBeUndefined()
+  })
+
+  test("swaps the session fallback chain to the ultrawork-scoped chain when configured (#3779)", () => {
+    //#given - sisyphus has agent-level fallback_models AND ultrawork-scoped
+    //         fallback_models. Triggering ultrawork must install the scoped
+    //         chain so the session.error recovery path picks from it instead
+    //         of the agent-level chain — see #3538 for the failure mode.
+    const config = unsafeTestValue<Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]>({
+      agents: {
+        sisyphus: {
+          fallback_models: ["openai/gpt-5.5"],
+          ultrawork: {
+            model: "anthropic/claude-opus-4-7",
+            variant: "max",
+            fallback_models: ["openai/gpt-5.5", "google/gemini-3.1-flash-preview"],
+          },
+        },
+      },
+    })
+    const output = createOutput("ultrawork do something", { messageId: "msg_123" })
+    const tui = createMockTui()
+    let installedChain: unknown
+    const modelFallback = {
+      setSessionFallbackChain: (sessionID: string, chain: unknown) => {
+        installedChain = { sessionID, chain }
+      },
+    }
+
+    //#when
+    applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui, "ses_ultrawork", undefined, modelFallback)
+
+    //#then - chain was installed and contains the scoped models
+    expect(installedChain).toBeDefined()
+    const installed = installedChain as { sessionID: string; chain: Array<{ providers: string[]; model: string }> }
+    expect(installed.sessionID).toBe("ses_ultrawork")
+    expect(installed.chain.length).toBeGreaterThan(0)
+    const models = installed.chain.map((entry) => entry.model)
+    expect(models).toContain("gemini-3.1-flash-preview")
+  })
+
+  test("does not touch the session fallback chain when ultrawork.fallback_models is absent (#3779)", () => {
+    //#given - only ultrawork.model is set, no fallback_models. The
+    //         agent-level chain installed at session.idle should stay intact.
+    const config = unsafeTestValue<Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]>({
+      agents: {
+        sisyphus: {
+          ultrawork: { model: "anthropic/claude-opus-4-7", variant: "max" },
+        },
+      },
+    })
+    const output = createOutput("ultrawork do something", { messageId: "msg_123" })
+    const tui = createMockTui()
+    let chainTouched = false
+    const modelFallback = {
+      setSessionFallbackChain: () => {
+        chainTouched = true
+      },
+    }
+
+    //#when
+    applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui, "ses_ultrawork_no_chain", undefined, modelFallback)
+
+    //#then - no scoped chain → no swap
+    expect(chainTouched).toBe(false)
+  })
+
+  test("applyUltraworkScopedFallbackChain is a no-op when modelFallback is undefined", () => {
+    //#given - guarantees the chain swap never throws when the model-fallback
+    //         hook is disabled (createCoreHooks may produce a null hook when
+    //         model_fallback config is false).
+    const config = unsafeTestValue<Parameters<typeof applyUltraworkScopedFallbackChain>[0]["pluginConfig"]>({
+      agents: {
+        sisyphus: {
+          ultrawork: { fallback_models: ["openai/gpt-5.5"] },
+        },
+      },
+    })
+
+    //#when / then - should not throw
+    expect(() =>
+      applyUltraworkScopedFallbackChain({
+        pluginConfig: config,
+        sessionID: "ses_no_hook",
+        agentName: "sisyphus",
+        currentProviderID: "anthropic",
+        modelFallback: null,
+      }),
+    ).not.toThrow()
   })
 })
