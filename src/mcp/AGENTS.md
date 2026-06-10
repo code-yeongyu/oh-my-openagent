@@ -27,7 +27,7 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 
 | Tier | Source | Mechanism |
 |------|--------|-----------|
-| 1. Built-in | `src/mcp/` | 3 remote HTTP MCPs + 2 local stdio MCPs (`lsp`, `ast_grep`) via `createBuiltinMcps()` |
+| 1. Built-in | `src/mcp/` | 3 remote HTTP MCPs + 3 local stdio MCPs (`lsp`, `ast_grep`, `sequential_thinking`) via `createBuiltinMcps()` |
 | 2. Claude Code | `.mcp.json` | `${VAR}` expansion via `claude-code-mcp-loader` |
 | 3. Skill-embedded | SKILL.md YAML | Managed by `SkillMcpManager` (stdio + HTTP) |
 
@@ -36,9 +36,10 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | File | Purpose |
 |------|---------|
 | `index.ts` | `createBuiltinMcps()` registry for built-in MCPs |
-| `types.ts` | `McpNameSchema`: `"websearch" \| "context7" \| "grep_app" \| "lsp" \| "ast_grep"` |
+| `types.ts` | `McpNameSchema`: `"websearch" \| "context7" \| "grep_app" \| "lsp" \| "ast_grep" \| "sequential_thinking"` |
 | `websearch.ts` | Exa/Tavily provider with config |
 | `context7.ts` | Context7 with optional auth header |
 | `grep-app.ts` | Grep.app (no auth) |
 | `lsp.ts` | Local stdio MCP config for packaged `lsp-tools-mcp` |
 | `ast-grep.ts` | Local stdio MCP config for packaged `ast-grep-mcp` |
+| `server-sequential-thinking.ts` | Local stdio MCP config wrapping `@modelcontextprotocol/server-sequential-thinking` |
