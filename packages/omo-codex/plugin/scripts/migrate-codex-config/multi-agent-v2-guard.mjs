@@ -7,6 +7,13 @@
  * would resolve per model, or the `[features]` boolean shorthand
  * `multi_agent_v2 = true` (removed here because a boolean key and a
  * `[features.multi_agent_v2]` table for the same name are conflicting TOML).
+ *
+ * Upstream basis: openai/codex#26753 — with the flag on, EVERY turn fails
+ * with a 400 ("spawn_agent declares encrypted parameters but is not
+ * configured for encrypted tool use by this model"), even on prompts that
+ * never touch subagents. OpenAI closed it NOT_PLANNED stating V2 is under
+ * development, not recommended, and bug reports are not accepted. Same
+ * failure class still being reported (openai/codex#27205).
  */
 export function forceDisableMultiAgentV2(config) {
 	let result = removeEnabledFeaturesShorthand(config);
