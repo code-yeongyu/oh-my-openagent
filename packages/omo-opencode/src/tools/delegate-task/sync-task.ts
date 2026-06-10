@@ -1,6 +1,7 @@
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { log } from "../../shared/logger"
 import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { reserveSyncSubagentSpawn } from "./sync-spawn-reservation"
@@ -152,6 +153,17 @@ export async function executeSyncTask(
   } finally {
     if (syncSessionID) {
       cleanupSyncSessionSideEffects(syncSessionID, executorCtx)
+
+      // Prevent todo-continuation-enforcer from re-awakening a completed sync subagent.
+      // When a sync subagent finishes, its session may still exist and have incomplete
+      // todos; without an explicit abort, the continuation hook sees session.idle and
+      // injects a continuation prompt, causing the subagent to resume after the parent
+      // has already moved on. This creates a race where two agents work concurrently.
+      if (typeof client.session.abort === "function") {
+        void client.session.abort({ path: { id: syncSessionID } }).catch((error: unknown) => {
+          log(`[task] Failed to abort completed sync session:`, error)
+        })
+      }
     }
   }
 }

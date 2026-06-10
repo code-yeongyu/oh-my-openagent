@@ -199,6 +199,17 @@ export async function executeSync(
       syncSubagentSessions.delete(sessionID)
       deleteSessionTools(sessionID)
       clearSessionAgent(sessionID)
+
+      // Prevent todo-continuation-enforcer from re-awakening a completed sync subagent.
+      // When a sync subagent finishes, its session may still exist and have incomplete
+      // todos; without an explicit abort, the continuation hook sees session.idle and
+      // injects a continuation prompt, causing the subagent to resume after the parent
+      // has already moved on. This creates a race where two agents work concurrently.
+      if (typeof ctx.client.session.abort === "function") {
+        void ctx.client.session.abort({ path: { id: sessionID } }).catch((error: unknown) => {
+          log(`[call_omo_agent] Failed to abort completed sync session:`, error)
+        })
+      }
     }
   }
 }
