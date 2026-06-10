@@ -3,6 +3,8 @@ import { tool } from "@opencode-ai/plugin"
 
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../config"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
+import type { DelegateTaskToolOptions } from "../tools/delegate-task/types"
+import type { SkillLoadOptions } from "../tools/skill/types"
 import type { ToolsRecord } from "./types"
 
 const fakeTool = tool({
@@ -221,6 +223,273 @@ describe("#given the OMO skill tool overrides OpenCode native skill discovery", 
         },
       ],
     })
+  })
+
+  test("#when PluginInput lacks skills but raw client can list skills #then skill and task tools share a native skill accessor", async () => {
+    const capturedSkillToolOptions: SkillLoadOptions[] = []
+    const capturedDelegateTaskOptions: DelegateTaskToolOptions[] = []
+    const nativeSkillEntries = [
+      {
+        name: "customize-opencode",
+        description: "Customize OpenCode configuration",
+        location: "<built-in>",
+        content: "# Customizing opencode",
+      },
+      {
+        name: "disabled-native",
+        description: "Disabled native skill",
+        location: "<built-in>",
+        content: "# Disabled",
+      },
+    ]
+    let resolveNativeSkills: (value: { data: typeof nativeSkillEntries }) => void = () => {}
+    const nativeSkillsPromise = new Promise<{ data: typeof nativeSkillEntries }>((resolve) => {
+      resolveNativeSkills = resolve
+    })
+    const rawGet = mock((input: { url: string; query: { directory: string } }) => {
+      expect(input).toEqual({ url: "/skill", query: { directory: "/tmp/project" } })
+      return nativeSkillsPromise
+    })
+    const localToolFactories = {
+      ...toolFactories,
+      createSkillTool: mock((options: SkillLoadOptions) => {
+        capturedSkillToolOptions.push(options)
+        return fakeTool
+      }),
+      createDelegateTask: mock((options: DelegateTaskToolOptions) => {
+        capturedDelegateTaskOptions.push(options)
+        return delegateTaskTool
+      }),
+    }
+
+    createToolRegistry({
+      ctx: {
+        directory: "/tmp/project",
+        client: {
+          app: {},
+          _client: {
+            get: rawGet,
+          },
+        },
+      } as unknown as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(["disabled-native"]),
+      },
+      availableCategories: [],
+      toolFactories: localToolFactories,
+    })
+
+    const skillToolOptions = capturedSkillToolOptions[0]
+    const delegateTaskOptions = capturedDelegateTaskOptions[0]
+    const nativeSkills = skillToolOptions?.nativeSkills
+
+    expect(nativeSkills).toBeDefined()
+    expect(delegateTaskOptions?.nativeSkills).toBe(nativeSkills)
+
+    resolveNativeSkills({ data: nativeSkillEntries })
+    await expect(nativeSkills?.all()).resolves.toEqual([nativeSkillEntries[0]])
+    await expect(nativeSkills?.get("customize-opencode")).resolves.toEqual(nativeSkillEntries[0])
+    await expect(nativeSkills?.get("disabled-native")).resolves.toBeUndefined()
+    expect(await nativeSkills?.dirs()).toEqual([])
+  })
+
+  test("#when raw client returns a direct array #then skills are normalized", async () => {
+    const capturedSkillToolOptions: SkillLoadOptions[] = []
+    const nativeSkillEntries = [{ name: "direct-skill", description: "Direct", location: "<built-in>", content: "# Direct" }]
+    const rawGet = mock(async () => nativeSkillEntries)
+    const localToolFactories = {
+      ...toolFactories,
+      createSkillTool: mock((options: SkillLoadOptions) => {
+        capturedSkillToolOptions.push(options)
+        return fakeTool
+      }),
+    }
+
+    createToolRegistry({
+      ctx: {
+        directory: "/tmp/project",
+        client: { app: {}, _client: { get: rawGet } },
+      } as unknown as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: localToolFactories,
+    })
+
+    const nativeSkills = capturedSkillToolOptions[0]?.nativeSkills
+    await expect(nativeSkills?.all()).resolves.toEqual(nativeSkillEntries)
+  })
+
+  test("#when raw client returns an empty object #then skills list is empty", async () => {
+    const capturedSkillToolOptions: SkillLoadOptions[] = []
+    const rawGet = mock(async () => ({ data: null }))
+    const localToolFactories = {
+      ...toolFactories,
+      createSkillTool: mock((options: SkillLoadOptions) => {
+        capturedSkillToolOptions.push(options)
+        return fakeTool
+      }),
+    }
+
+    createToolRegistry({
+      ctx: {
+        directory: "/tmp/project",
+        client: { app: {}, _client: { get: rawGet } },
+      } as unknown as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: localToolFactories,
+    })
+
+    const nativeSkills = capturedSkillToolOptions[0]?.nativeSkills
+    await expect(nativeSkills?.all()).resolves.toEqual([])
+  })
+
+  test("#when raw file is absent #then nativeSkills is undefined", async () => {
+    const capturedSkillToolOptions: SkillLoadOptions[] = []
+    const localToolFactories = {
+      ...toolFactories,
+      createSkillTool: mock((options: SkillLoadOptions) => {
+        capturedSkillToolOptions.push(options)
+        return fakeTool
+      }),
+    }
+
+    createToolRegistry({
+      ctx: {
+        directory: "/tmp/project",
+        client: { app: {} },
+      } as unknown as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: localToolFactories,
+    })
+
+    expect(capturedSkillToolOptions[0]?.nativeSkills).toBeUndefined()
+  })
+
+  test("#when raw file is present but get is missing #then nativeSkills is undefined", async () => {
+    const capturedSkillToolOptions: SkillLoadOptions[] = []
+    const localToolFactories = {
+      ...toolFactories,
+      createSkillTool: mock((options: SkillLoadOptions) => {
+        capturedSkillToolOptions.push(options)
+        return fakeTool
+      }),
+    }
+
+    createToolRegistry({
+      ctx: {
+        directory: "/tmp/project",
+        client: { app: {}, _client: {} },
+      } as unknown as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: localToolFactories,
+    })
+
+    expect(capturedSkillToolOptions[0]?.nativeSkills).toBeUndefined()
+  })
+
+  test("#when two concurrent all() calls race #then only one HTTP request is issued", async () => {
+    const capturedSkillToolOptions: SkillLoadOptions[] = []
+    let resolveRaw: (value: { data: { name: string; description: string; location: string; content: string }[] }) => void = () => {}
+    const rawPromise = new Promise<{ data: { name: string; description: string; location: string; content: string }[] }>((resolve) => {
+      resolveRaw = resolve
+    })
+    const rawGet = mock(() => rawPromise)
+    const localToolFactories = {
+      ...toolFactories,
+      createSkillTool: mock((options: SkillLoadOptions) => {
+        capturedSkillToolOptions.push(options)
+        return fakeTool
+      }),
+    }
+
+    createToolRegistry({
+      ctx: {
+        directory: "/tmp/project",
+        client: { app: {}, _client: { get: rawGet } },
+      } as unknown as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig(),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: localToolFactories,
+    })
+
+    const nativeSkills = capturedSkillToolOptions[0]?.nativeSkills
+    const p1 = nativeSkills?.all()
+    const p2 = nativeSkills?.all()
+
+    expect(rawGet).toHaveBeenCalledTimes(1)
+
+    const entries = [{ name: "dedup", description: "D", location: "<built-in>", content: "# D" }]
+    resolveRaw({ data: entries })
+    const [r1, r2] = await Promise.all([p1, p2])
+    expect(r1).toEqual(entries)
+    expect(r2).toEqual(entries)
   })
 })
 
