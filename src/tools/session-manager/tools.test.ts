@@ -58,6 +58,8 @@ function createTestTools() {
         excerpt: "test snippet",
         role: "user",
         match_count: 1,
+        message_offset: 0,
+        total_messages: 1,
       },
     ],
     formatSearchResults: (results) => `results:${results.length}`,
