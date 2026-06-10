@@ -44,9 +44,7 @@ describe("LazyCodex publish workflow", () => {
     const stampsCodexPluginMetadata =
       workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") &&
       workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json")
-    const lazycodexReleaseDefaultsOn = workflow.includes("sync_lazycodex_marketplace:") &&
-      workflow.includes('description: "Release the LazyCodex Codex marketplace repository when the omo-codex payload changed"') &&
-      workflow.includes("default: true")
+    const lazycodexSyncHasNoManualOptOut = !workflow.includes("sync_lazycodex_marketplace")
     const publishAliasDefaultsOn = workflow.includes("publish_lazycodex:") &&
       workflow.includes('description: "Publish the lazycodex-ai npm alias"') &&
       workflow.includes("default: true")
@@ -81,8 +79,9 @@ describe("LazyCodex publish workflow", () => {
       publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
       publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
-    const syncsLazycodexMarketplaceWhenEnabled = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
-      workflow.includes("if: inputs.sync_lazycodex_marketplace != false")
+    const syncsLazycodexMarketplaceOnStableReleases = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
+      syncMarketplaceStep.includes("if: needs.release-metadata.outputs.dist_tag == ''") &&
+      lazycodexReleaseStateStep.includes("if: needs.release-metadata.outputs.dist_tag == ''")
     const tokenRequirementBeforePublish = workflow.indexOf("name: Require LazyCodex sync token") <
       workflow.indexOf("publish-main:")
     const requiresLazycodexSyncToken = workflow.includes("LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
@@ -104,14 +103,19 @@ describe("LazyCodex publish workflow", () => {
       lazycodexReleaseStateStep.includes("lazycodex_changed=false") &&
       lazycodexReleaseStateStep.includes("previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}")
     const createsLazycodexReleaseOnlyWhenChanged =
-      lazycodexReleaseStep.includes("if: inputs.sync_lazycodex_marketplace != false && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'") &&
+      lazycodexReleaseStep.includes(
+        "if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'",
+      ) &&
       lazycodexReleaseStep.includes("GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
       lazycodexReleaseStep.includes('gh release create "v${VERSION}" --repo code-yeongyu/lazycodex') &&
       lazycodexReleaseStep.includes("--notes-file /tmp/lazycodex-release-notes.md")
 
     // #then
     expect(stampsCodexPluginMetadata, "LazyCodex plugin metadata must be stamped with the release version").toBe(true)
-    expect(lazycodexReleaseDefaultsOn, "LazyCodex marketplace release must default to enabled").toBe(true)
+    expect(
+      lazycodexSyncHasNoManualOptOut,
+      "LazyCodex marketplace sync must not expose a manual opt-out input",
+    ).toBe(true)
     expect(publishAliasDefaultsOn, "LazyCodex npm alias publish must stay enabled by default").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
@@ -122,7 +126,10 @@ describe("LazyCodex publish workflow", () => {
     expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
     expect(alwaysChecksLazycodexNpm, "release must always check lazycodex using the release version").toBe(true)
     expect(publishesLazycodexNpm, "lazycodex npm publish must be part of the normal release, tag stable releases as latest, and fail loudly").toBe(true)
-    expect(syncsLazycodexMarketplaceWhenEnabled, "LazyCodex marketplace sync must be explicitly skippable").toBe(true)
+    expect(
+      syncsLazycodexMarketplaceOnStableReleases,
+      "LazyCodex marketplace sync must run on every stable release (empty dist_tag)",
+    ).toBe(true)
     expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
     expect(capturesPreviousLazycodexBeforePublishing, "release metadata must capture the previous lazycodex-ai version before publishing the new one").toBe(true)
     expect(comparesAgainstPreviousLazycodexVersion, "LazyCodex release state must compare current payload with the previous lazycodex-ai package").toBe(true)
