@@ -3048,7 +3048,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     function createMockClient() {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async () => ({ data: { directory: "/test/dir" } }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
@@ -3066,7 +3066,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     ) {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async ({ path }: { path: { id: string } }) => {
             if (options?.sessionLookupError) {
               throw options.sessionLookupError
@@ -3348,7 +3348,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   describe("task transitions pending→running when slot available", () => {
     test("does not override parent session permission when creating child session", async () => {
       // given
-      const createCalls: any[] = []
+      const createCalls: Array<{ body?: { permission?: unknown } }> = []
       const parentPermission = [
         { permission: "question", action: "allow" as const, pattern: "*" },
         { permission: "plan_enter", action: "deny" as const, pattern: "*" },
@@ -3356,7 +3356,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const customClient = {
         session: {
-          create: async (args?: any) => {
+          create: async (args: { body?: { permission?: unknown } }) => {
             createCalls.push(args)
             return { data: { id: `ses_${crypto.randomUUID()}` } }
           },
