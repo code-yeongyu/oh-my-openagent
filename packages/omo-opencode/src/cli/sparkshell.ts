@@ -10,10 +10,12 @@ import {
 } from "./sparkshell-appserver"
 import {
   hasTopLevelSparkShellHelpFlag,
+  hasTopLevelSparkShellJsonFlag,
   parseSparkShellFallbackInvocation,
   SPARKSHELL_USAGE,
   type SparkShellFallbackInvocation,
 } from "./sparkshell-parse"
+import { loadCodexSessionContext } from "./sparkshell-session-context"
 
 export const SPARKSHELL_BIN_ENV = "OMO_SPARKSHELL_BIN"
 
@@ -48,6 +50,12 @@ export type SparkShellRunOptions = {
   readonly writeStderr?: (value: string) => void
   readonly commandExists?: (command: string) => boolean
   readonly appServerClient?: SparkShellAppServerClient | null
+  readonly loadSessionContext?: (env: RuntimeEnv) => string
+}
+
+type SparkShellExecOutcome = {
+  readonly code: number
+  readonly executed: boolean
 }
 
 export async function runSparkShell(args: readonly string[], options: SparkShellRunOptions = {}): Promise<number> {
@@ -66,10 +74,28 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
     return 1
   }
 
+  const outcome = await executeSparkShell(args, options, { cwd, env, writeStdout, writeStderr })
+  if (outcome.executed && !hasTopLevelSparkShellJsonFlag(args)) {
+    writeSessionContext(env, writeStdout, options.loadSessionContext)
+  }
+  return outcome.code
+}
+
+async function executeSparkShell(
+  args: readonly string[],
+  options: SparkShellRunOptions,
+  context: {
+    readonly cwd: string
+    readonly env: RuntimeEnv
+    readonly writeStdout: (value: string) => void
+    readonly writeStderr: (value: string) => void
+  },
+): Promise<SparkShellExecOutcome> {
+  const { cwd, env, writeStdout, writeStderr } = context
   const nativeBinaryPath = resolveNativeBinaryOverride(env, cwd)
   const spawn = options.spawn ?? defaultSpawn
   if (nativeBinaryPath.length > 0) {
-    return runSpawnedCommand(spawn, nativeBinaryPath, args, { cwd, env }, writeStdout, writeStderr)
+    return { code: runSpawnedCommand(spawn, nativeBinaryPath, args, { cwd, env }, writeStdout, writeStderr), executed: true }
   }
 
   const appServerClient = options.appServerClient === undefined ? createDefaultSparkShellAppServerClient(env) : options.appServerClient
@@ -100,15 +126,29 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     writeStderr(`${message}\n`)
-    return 1
+    return { code: 1, executed: false }
   }
 
   const [command, ...commandArgs] = invocation.argv
   if (command === undefined) {
     writeStderr(`Missing command to run.\n${SPARKSHELL_USAGE}\n`)
-    return 1
+    return { code: 1, executed: false }
   }
-  return runSpawnedCommand(spawn, command, commandArgs, { cwd, env }, writeStdout, writeStderr)
+  return { code: runSpawnedCommand(spawn, command, commandArgs, { cwd, env }, writeStdout, writeStderr), executed: true }
+}
+
+function writeSessionContext(env: RuntimeEnv, writeStdout: (value: string) => void, load?: (env: RuntimeEnv) => string): void {
+  const loadSessionContext = load ?? loadCodexSessionContext
+  let block = ""
+  try {
+    block = loadSessionContext(env)
+  } catch {
+    return
+  }
+  if (block.length === 0) {
+    return
+  }
+  writeStdout(`\n${block}\n`)
 }
 
 function resolveNativeBinaryOverride(env: RuntimeEnv, cwd: string): string {
@@ -131,7 +171,7 @@ async function runAppServerCommand(
     readonly writeStdout: (value: string) => void
     readonly writeStderr: (value: string) => void
   },
-): Promise<number> {
+): Promise<SparkShellExecOutcome> {
   let invocation: SparkShellFallbackInvocation
   const platform = isShellInvocation(args) ? await appServerClient.getPlatform() : options.platform
   try {
@@ -143,16 +183,19 @@ async function runAppServerCommand(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     options.writeStderr(`${message}\n`)
-    return 1
+    return { code: 1, executed: false }
   }
 
   if (invocation.kind === "tmux-pane") {
     const [command, ...commandArgs] = invocation.argv
     if (command === undefined) {
       options.writeStderr(`Missing command to run.\n${SPARKSHELL_USAGE}\n`)
-      return 1
+      return { code: 1, executed: false }
     }
-    return runSpawnedCommand(options.spawn, command, commandArgs, { cwd: options.cwd, env: options.env }, options.writeStdout, options.writeStderr)
+    return {
+      code: runSpawnedCommand(options.spawn, command, commandArgs, { cwd: options.cwd, env: options.env }, options.writeStdout, options.writeStderr),
+      executed: true,
+    }
   }
 
   const result = await appServerClient.exec({
@@ -166,7 +209,7 @@ async function runAppServerCommand(
   if (result.stderr.length > 0) {
     options.writeStderr(result.stderr)
   }
-  return result.exitCode
+  return { code: result.exitCode, executed: true }
 }
 
 function isDefaultWindowsAppServerShell(command: string): boolean {

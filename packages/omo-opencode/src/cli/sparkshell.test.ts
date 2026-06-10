@@ -201,6 +201,102 @@ describe("sparkshell CLI", () => {
     expect(stderr.join("")).toContain("tmux is required for --tmux-pane mode")
   })
 
+  test("#given a resolvable Codex session #when a command runs #then appends the session context after the shell result", async () => {
+    // given
+    const stdout: string[] = []
+    const contextEnvs: Array<Readonly<Record<string, string | undefined>>> = []
+
+    // when
+    const exitCode = await runSparkShell(["git", "status"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 3, stdout: "shell-output\n" }),
+      loadSessionContext: (env) => {
+        contextEnvs.push(env)
+        return "===== codex session context ====="
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(3)
+    expect(stdout.join("")).toBe("shell-output\n\n===== codex session context =====\n")
+    expect(contextEnvs).toEqual([{ CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" }])
+  })
+
+  test("#given the top-level --json flag #when a command runs #then keeps output free of the session context", async () => {
+    // given
+    const stdout: string[] = []
+    let contextLoads = 0
+
+    // when
+    const exitCode = await runSparkShell(["--json", "git", "status"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: "{}" }),
+      loadSessionContext: () => {
+        contextLoads += 1
+        return "===== codex session context ====="
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toBe("{}")
+    expect(contextLoads).toBe(0)
+  })
+
+  test("#given a parse failure #when nothing executes #then does not attach the session context", async () => {
+    // given
+    let contextLoads = 0
+
+    // when
+    const exitCode = await runSparkShell(["--shell"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0 }),
+      loadSessionContext: () => {
+        contextLoads += 1
+        return "===== codex session context ====="
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(contextLoads).toBe(0)
+  })
+
+  test("#given a session context loader that throws #when a command runs #then the shell exit code is preserved", async () => {
+    // given
+    const stdout: string[] = []
+
+    // when
+    const exitCode = await runSparkShell(["git", "status"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: "ok\n" }),
+      loadSessionContext: () => {
+        throw new Error("rollout unavailable")
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toBe("ok\n")
+  })
+
   test("#given native sidecar override #when running Sparkshell #then delegates original args to sidecar", async () => {
     // given
     const calls: string[][] = []

@@ -86,6 +86,7 @@ describe("Codex Sparkshell awareness", () => {
 
 		// then
 		expect(parseAdditionalContext(output)).toContain("omo sparkshell <command>");
+		expect(parseAdditionalContext(output)).toContain("OMO_SPARKSHELL_SESSION_CONTEXT");
 	});
 
 	it("#given inactive env #when SessionStart runs #then emits no Sparkshell guidance", async () => {

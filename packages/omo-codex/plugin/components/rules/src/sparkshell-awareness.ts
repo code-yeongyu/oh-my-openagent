@@ -85,6 +85,7 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env, dep
 		`- Use \`${command} sparkshell --shell '<command>'\` only when shell metacharacters are required.`,
 		`- Use \`${command} sparkshell --tmux-pane <pane-id> --tail-lines 400\` to inspect an existing tmux pane. Tail lines must stay between 100 and 1000.`,
 		"- When no native sidecar or appserver is available, Sparkshell silently falls back to raw command execution. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
+		"- When `CODEX_THREAD_ID` identifies a Codex session, Sparkshell appends recent session context (first/latest user request + last 5 conversation messages) after the shell result so output consumers stay aligned with the session goals. `OMO_SPARKSHELL_SESSION_CONTEXT=0` disables it.",
 	].join("\n");
 }
 

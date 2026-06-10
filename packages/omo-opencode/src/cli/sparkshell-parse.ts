@@ -6,6 +6,8 @@ export const SPARKSHELL_USAGE = [
   "Runs Sparkshell with a native sidecar when configured, otherwise falls back to raw command execution.",
   "Shell metacharacters are interpreted only with explicit --shell opt-in.",
   "Environment: OMO_SPARKSHELL_BIN selects the native sidecar path.",
+  "When CODEX_THREAD_ID (or OMO_SPARKSHELL_SESSION_ID) identifies a Codex session, recent session context",
+  "is appended after the shell result. OMO_SPARKSHELL_SESSION_CONTEXT=0 disables the attachment.",
 ].join("\n")
 
 export type SparkShellFallbackInvocation =
@@ -89,6 +91,31 @@ export function hasTopLevelSparkShellHelpFlag(args: readonly string[]): boolean 
     }
     if (token === "--json") {
       continue
+    }
+    if (token === "--budget") {
+      const next = args[index + 1]
+      if (!next || next.startsWith("-")) {
+        return false
+      }
+      index += 1
+      continue
+    }
+    if (token?.startsWith("--budget=")) {
+      continue
+    }
+    return false
+  }
+  return false
+}
+
+export function hasTopLevelSparkShellJsonFlag(args: readonly string[]): boolean {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]
+    if (token === "--") {
+      return false
+    }
+    if (token === "--json") {
+      return true
     }
     if (token === "--budget") {
       const next = args[index + 1]
