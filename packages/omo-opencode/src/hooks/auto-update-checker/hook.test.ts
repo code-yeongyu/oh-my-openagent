@@ -266,7 +266,7 @@ describe("auto-update-checker hook", () => {
     )
   })
 
-  // regression: issue #4211 — banner must show bundled (build-time) version, not the
+  // regression: issue #4211 - banner must show bundled (build-time) version, not the
   // potentially stale package.json sitting in OpenCode's plugin cache.
   test("banner shows bundled build-time version even when cached install drifts", async () => {
     // given: cached install reports an old version (simulating a stale plugin cache),
