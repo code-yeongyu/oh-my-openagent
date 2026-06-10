@@ -1,8 +1,9 @@
 import { existsSync, lstatSync, readdirSync, type Stats } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { contextCwd } from "../request-context.js";
 import { findWorkspaceRoot, formatServerLookupError } from "./client-wrapper.js";
 import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_DIRECTORY_FILES } from "./constants.js";
+import { effectiveExtension } from "./effective-extension.js";
 import { LspInvalidPathError, LspServerLookupError } from "./errors.js";
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "./formatters.js";
 import { getLspManager } from "./manager.js";
@@ -47,7 +48,7 @@ export function collectFilesWithExtension(dir: string, extension: string, maxFil
 				if (!SKIP_DIRECTORIES.has(entry)) {
 					walk(fullPath);
 				}
-			} else if (stat.isFile() && extname(fullPath) === extension) {
+			} else if (stat.isFile() && effectiveExtension(fullPath) === extension) {
 				files.push(fullPath);
 			}
 		}

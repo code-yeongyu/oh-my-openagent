@@ -1,7 +1,8 @@
 import { existsSync, statSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { contextCwd } from "../request-context.js";
 import type { LspClient } from "./client.js";
+import { effectiveExtension } from "./effective-extension.js";
 import {
 	isLspDeadConnectionError,
 	LspInvalidPathError,
@@ -136,7 +137,7 @@ export async function withLspClient<T>(
 		);
 	}
 
-	const ext = extname(absPath);
+	const ext = effectiveExtension(absPath);
 	const result = findServerForExtension(ext);
 	if (result.status !== "found") {
 		throw new LspServerLookupError(formatServerLookupError(result));
