@@ -21,31 +21,19 @@ Role-specific behavior must be described in a self-contained `message`. Use `for
 
 For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.
 
+## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER
+
+**YOU DO NOT WRITE CODE. YOU DO NOT EDIT PRODUCT FILES. YOU DO NOT RUN QA YOURSELF. EVERY unit of implementation, test, QA, and review work MUST be delegated to a spawned subagent. NO EXCEPTIONS.** Your hands touch only plan selection, `.omo/` state (Boulder, ledger, plan checkboxes), decomposition, dispatch, verdicts, and evidence records. About to edit a product file or run an implementation command yourself? **STOP. SPAWN A WORKER INSTEAD.** Orchestrate at **MAXIMUM PARALLELISM**: every independent unit runs concurrently; only named dependencies serialize.
+
 ## Codex Subagent Reliability
 
-Every `multi_agent_v1.spawn_agent` message is self-contained and an
-executable assignment, not a context handoff: start with
-`TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and
-`VERIFY`, with role and specialty instructions inside `message`.
-Use `fork_context: false` unless full history is truly
-required; paste only the context the child needs.
+Every `multi_agent_v1.spawn_agent` message is a self-contained executable assignment: `TASK: <imperative assignment>`, then `DELIVERABLE`, `SCOPE`, and `VERIFY`, with role instructions inside `message`. Use `fork_context: false` unless full history is truly required; paste only the context the child needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles. Never use a single long blocking wait, and never spin on tiny timeouts as a failure budget.
-
-Treat child status as a progress signal, not a timeout counter.
-A timeout only means no new mailbox update arrived; treat a running
-child as alive. Require `WORKING: <task> - <current phase>` before
-long passes and `BLOCKED: <reason>` only when progress stops. Track
-spawned agent names locally and keep the parent visibly alive with
-active subagent count, agent names, and latest `WORKING:` phase.
-Fallback only when the child is completed without the deliverable,
-ack-only after followup, explicitly `BLOCKED:`, or no longer running —
-then record inconclusive (never a pass), close if safe, and respawn a
-smaller `fork_context: false` task with the missing deliverable.
+Plan and reviewer agents may run for a long time: spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles — never a single long blocking wait. A timeout only means no new mailbox update arrived; treat a running child as alive. Require `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. Keep the parent visibly alive with active subagent count, names, and latest `WORKING:` phase. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running — then record inconclusive (never a pass), close if safe, and respawn a smaller `fork_context: false` task with the missing deliverable.
 
 # start-work
 
-Execute a Prometheus work plan until every top-level checkbox is complete. This skill pairs with the Codex `Stop` / `SubagentStop` continuation hook in `components/start-work-continuation`, which re-injects the next turn while `.omo/boulder.json` says the current `codex:<session_id>` still has unchecked plan work.
+Execute a Prometheus work plan until every top-level checkbox is complete. This skill pairs with the Codex `Stop` / `SubagentStop` continuation hook (`components/start-work-continuation`), which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
 
 ## Usage
 
@@ -53,8 +41,8 @@ Execute a Prometheus work plan until every top-level checkbox is complete. This 
 $start-work [plan-name] [--worktree <absolute-path>]
 ```
 
-- `plan-name` is optional. It may be a full or partial file stem under `.omo/plans/`.
-- `--worktree` is optional. Use it only when the user explicitly asks to work in a separate git worktree.
+- `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
+- `--worktree` (optional): only when the user explicitly asks for a separate git worktree.
 
 ## Phase 1: Select the plan
 
@@ -68,7 +56,7 @@ $start-work [plan-name] [--worktree <absolute-path>]
 
 ### No-plan bootstrap
 
-When the user explicitly said `start work` / `$start-work` and no selectable plan exists, treat that phrase as approval: bootstrap `ulw-plan` to create the approved plan before execution and implementation, instead of stalling or asking for generic approval again.
+When the user explicitly said `start work` / `$start-work` and no selectable plan exists, treat that phrase as approval: bootstrap `ulw-plan` to create the approved plan before execution and implementation, instead of stalling or asking for generic approval again. A brief or notes file without waves, checkboxes, and acceptance criteria is NOT decision-complete — enter this bootstrap too.
 
 1. Invoke the `ulw-plan` skill from the current request and require its dynamic adversarial workflow: collect, verify, design, adversarial plan-review, synthesize.
 2. The generated Prometheus plan must be saved under `.omo/plans/<slug>.md` before implementation or Boulder state writes that point at plan work.
@@ -78,7 +66,7 @@ When the user explicitly said `start work` / `$start-work` and no selectable pla
 
 ## Phase 2: Create or update Boulder state
 
-Write `.omo/boulder.json` before implementation starts. Session ids must be prefixed with `codex:` so the continuation hook can identify its own session.
+Write `.omo/boulder.json` before implementation starts. Prefix session ids with `codex:` so the continuation hook can identify its own session.
 
 ```json
 {
@@ -105,19 +93,19 @@ If `--worktree` is set, verify the path with `git worktree list --porcelain` or 
 2. Find the first unchecked column-0 checkbox in `## TODOs` or `## Final Verification Wave`.
 3. Ignore nested checkboxes under acceptance criteria, evidence, and definition-of-done sections.
 4. Classify the checkbox tier and record it in its ledger entry. Default is LIGHT — a narrow change inside existing layers. Take HEAVY only on a fact you can point to: a new module / abstraction / domain model; auth, security, or session; an external integration; a DB schema or migration; concurrency or transaction boundaries; a cross-domain refactor; or the plan or user signals care. When unsure, take HEAVY; upgrade and redo skipped gates the moment a HEAVY fact surfaces; never downgrade.
-5. Decompose that checkbox into atomic sub-tasks.
-6. Dispatch independent sub-tasks in parallel with `multi_agent_v1.spawn_agent`; serialize only when one sub-task has a named dependency on another.
+5. Decompose that checkbox into atomic sub-tasks. Collect every other unchecked checkbox in the same plan wave whose dependencies are met — their lanes execute concurrently.
+6. **DELEGATE EVERYTHING. YOU NEVER IMPLEMENT.** Dispatch ALL independent sub-tasks across those checkboxes in one parallel `multi_agent_v1.spawn_agent` burst; serialize only named dependencies. Verification and checkbox marking stay per-checkbox.
 
 Each sub-task message must include:
 
 1. Goal and exact files or directories in scope.
-2. When the task touches existing behavior: a baseline characterization test, written first, that asserts current observable behavior and passes on the unchanged code, pinned as rigorously as the new proof (exact inputs, exact observable, exact assertion). Then the failing-first proof for the new behavior before production changes — a unit test where a seam exists, otherwise the sub-task's Manual-QA scenario captured failing. A test that mirrors its implementation (mock-call assertions, pinned constants) is not evidence.
+2. When the task touches existing behavior: a baseline characterization test, written first, that pins current observable behavior and passes on the unchanged code (exact inputs, exact observable, exact assertion). Then the failing-first proof for the new behavior before production changes — a unit test where a seam exists, otherwise the sub-task's Manual-QA scenario captured failing. A test that mirrors its implementation (mock-call assertions, pinned constants) is not evidence.
 3. Implementation constraints from the plan and project rules.
 4. Automated verification commands to run.
 5. One Manual-QA channel, named with the exact tool and exact invocation (the literal `curl`, `send-keys`, `page.click`, payload, selectors, and the binary observable that decides PASS/FAIL), not "verify it works". A LIGHT checkbox needs one real-surface proof of its deliverable, and auxiliary surfaces (CLI stdout, DB state diff, parsed config dump) are first-class when the surface is CLI- or data-shaped:
    - HTTP call: `curl -i` against the live endpoint.
    - tmux: a `tmux` session driven with `send-keys`, dumped via `capture-pane`.
-   - Browser use: use Chrome to drive the real page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser).
+   - Browser use: drive the real page with Chrome, or agent-browser (https://github.com/vercel-labs/agent-browser) when Chrome is unavailable.
    - Computer use: OS-level GUI automation against the running desktop app when the surface is not a page.
 6. The adversarial classes that apply to this sub-task (from the 9 ultraqa classes) and how each is probed.
 7. Required artifact path and cleanup receipt.
@@ -131,14 +119,14 @@ For each checkbox, complete all five gates before marking it done:
 1. Plan reread: confirm the checkbox and acceptance criteria.
 2. Automated verification: run tests, typecheck, lint, build, or the plan-specific equivalent.
 3. Manual-QA channel: capture a real artifact, not a dry-run claim.
-4. Adversarial QA: exercise every class the Phase 3 trigger map marks applicable and capture the observable result for each. "Tests pass" and a clean happy-path artifact are NOT sufficient when an applicable class was not probed.
-5. Cleanup: register every QA resource teardown as its own todo the moment it is spawned (QA scripts, tmux assets, browser / agent-browser sessions, PIDs, ports, containers, temp dirs), then execute each and capture the receipt. No QA asset is left running.
+4. Adversarial QA: exercise every class the Phase 3 trigger map marks applicable and capture the observable result for each.
+5. Cleanup: register every QA resource teardown as its own todo when spawned (QA scripts, tmux assets, browser sessions, PIDs, ports, containers, temp dirs), execute each, and capture the receipt. No QA asset is left running.
 
-Append evidence to `.omo/start-work/ledger.jsonl` using one JSON object per line. Include at least `event`, `plan`, `task`, `session_id`, `commands`, `artifact`, `adversarial_classes`, and `cleanup` fields. `adversarial_classes` lists each probed class with its observable result and each ruled-out class with a one-line reason.
+Append evidence to `.omo/start-work/ledger.jsonl`, one JSON object per line. Include at least `event`, `plan`, `task`, `session_id`, `commands`, `artifact`, `adversarial_classes`, and `cleanup` fields. `adversarial_classes` lists each probed class with its observable result and each ruled-out class with a one-line reason.
 
 ### Sisyphus-style completion contract
 
-A worker done claim is never final. Each implementation sub-task returns a `DoneClaim`, then a different context runs `AdversarialVerify`, then the verifier probes or reproduces the claim, then failures loop back to the executor, and only a confirmed verifier verdict becomes `FullyDone`.
+A worker done claim is never final: each implementation sub-task returns a `DoneClaim`, a different context runs `AdversarialVerify` probing or reproducing the claim, failures loop back to the executor, and only a confirmed verifier verdict becomes `FullyDone`.
 
 ```json
 {
@@ -165,7 +153,6 @@ Rules:
 - A worker done claim must be independently verified before it becomes checkbox completion.
 - On any non-confirmed verdict, append the feedback to the ledger, reset the checkbox work to in-progress, and re-dispatch the executor with the exact failure.
 - The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.
-- Tests passing, green builds, or a worker DoneClaim without independent verification are not enough to mark a checkbox complete.
 
 ## Phase 5: Mark progress
 
@@ -196,6 +183,7 @@ When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are
 - No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
 - No `--dry-run` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
+- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
 - No `ORCHESTRATION COMPLETE`, final response, PR creation, or PR handoff before the Global Review and Debugging Gate passes with recorded evidence.
 - No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.
