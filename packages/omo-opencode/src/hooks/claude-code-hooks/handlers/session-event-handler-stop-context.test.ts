@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, mock, test } from "bun:test"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
-import { getTranscriptPath } from "../transcript"
 
 const executeStopHooks = mock(async (_context: { transcriptPath?: string }) => ({
 	block: false,
@@ -20,6 +19,11 @@ mock.module("../config-loader", () => ({
 
 mock.module("../stop", () => ({
 	executeStopHooks,
+}))
+
+mock.module("../transcript", () => ({
+	clearTranscriptCache: () => {},
+	getTranscriptPath: (sessionId: string) => `/mocked/transcripts/${sessionId}.jsonl`,
 }))
 
 afterAll(() => {
@@ -53,6 +57,6 @@ describe("createSessionEventHandler stop context", () => {
 		//#then
 		expect(executeStopHooks).toHaveBeenCalledTimes(1)
 		const stopContext = executeStopHooks.mock.calls[0]?.[0]
-		expect(stopContext?.transcriptPath).toBe(getTranscriptPath("ses_stop_transcript"))
+		expect(stopContext?.transcriptPath).toBe("/mocked/transcripts/ses_stop_transcript.jsonl")
 	})
 })
