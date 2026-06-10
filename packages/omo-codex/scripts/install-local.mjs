@@ -39,17 +39,8 @@ import {
 } from "./install/lazycodex-version-stamp.mjs";
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
-
-export function resolveCodexInstallerBinDir(options = {}) {
-	const homeDir = resolve(options.homeDir ?? homedir());
-	const env = options.env ?? process.env;
-	const explicitBinDir = nonEmptyEnvValue(env, "CODEX_LOCAL_BIN_DIR");
-	if (explicitBinDir !== undefined) return explicitBinDir;
-
-	const codexHome = resolve(options.codexHome ?? nonEmptyEnvValue(env, "CODEX_HOME") ?? join(homeDir, ".codex"));
-	const defaultCodexHome = resolve(join(homeDir, ".codex"));
-	return codexHome === defaultCodexHome ? join(homeDir, ".local", "bin") : join(codexHome, "bin");
-}
+export { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
+import { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
 
 export async function installMarketplaceLocally(options = {}) {
 	const repoRoot = resolve(options.repoRoot ?? process.cwd());
@@ -165,6 +156,7 @@ export async function installMarketplaceLocally(options = {}) {
 		marketplaceSource: { sourceType: "local", source: marketplaceRoot },
 		pluginNames,
 		platform,
+		gitBashEnabled: platform === "win32" && gitBashResolution.found,
 		trustedHookStates,
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 		autonomousPermissions: options.autonomousPermissions !== false,
@@ -200,13 +192,6 @@ function formatUnknownError(error) {
 
 function agentNameFromToml(fileName) {
 	return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
-}
-
-function nonEmptyEnvValue(env, key) {
-	const value = env[key];
-	if (typeof value !== "string") return undefined;
-	const trimmed = value.trim();
-	return trimmed.length === 0 ? undefined : trimmed;
 }
 
 function legacyCacheMarketplaces(marketplaceName) {

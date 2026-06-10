@@ -1,6 +1,6 @@
-import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
+import { homedir } from "node:os"
 import { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { writeCachedMarketplaceManifest } from "./codex-cached-marketplace-manifest"
 import { shouldBuildSourcePackages } from "./codex-package-layout"
@@ -19,6 +19,7 @@ import {
 import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import { reapLspDaemons } from "./lsp-daemon-reaper"
+import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -163,6 +164,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceSource: codexMarketplaceSource(marketplaceRoot),
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     platform,
+    gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false,
@@ -193,21 +195,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   }
 }
 
-export function resolveCodexInstallerBinDir(input: {
-  readonly binDir?: string
-  readonly codexHome: string
-  readonly env?: { readonly [key: string]: string | undefined }
-  readonly homeDir?: string
-}): string {
-  const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR
-  if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0) return resolve(explicitBinDir)
-
-  const homeDir = input.homeDir ?? homedir()
-  const defaultCodexHome = resolve(homeDir, ".codex")
-  const resolvedCodexHome = resolve(input.codexHome)
-  if (resolvedCodexHome !== defaultCodexHome) return join(resolvedCodexHome, "bin")
-  return resolve(homeDir, ".local", "bin")
-}
+export { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
 
 function agentNameFromToml(fileName: string): string {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName
