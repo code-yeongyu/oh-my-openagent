@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync } from "node:fs";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 
+import { effectiveExtension } from "./effective-extension.js";
 import { EXT_TO_LANG } from "./language-mappings.js";
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next", "out"]);
@@ -40,7 +41,7 @@ export function inferExtensionFromDirectory(directory: string): string | null {
 					walk(fullPath);
 				}
 			} else if (stat.isFile()) {
-				const ext = extname(fullPath);
+				const ext = effectiveExtension(fullPath);
 				if (ext && ext in EXT_TO_LANG) {
 					extensionCounts.set(ext, (extensionCounts.get(ext) ?? 0) + 1);
 				}

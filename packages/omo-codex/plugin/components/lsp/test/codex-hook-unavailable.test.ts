@@ -118,6 +118,35 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 		});
 	});
 
+	it("#given the LSP daemon is unreachable #when PostToolUse runs #then it suppresses feedback and caches the extension", async () => {
+		// given
+		const pluginData = tempPluginData();
+		const input = postToolUseInput("session-daemon-down", "src/app.ts");
+		const daemonDown = [
+			"LSP daemon unreachable: daemon did not become reachable.",
+			"The MCP server is a thin proxy and never runs language servers in-process.",
+			"Logs: /tmp/daemon.log",
+		].join("\n");
+		let calls = 0;
+
+		await withPluginData(pluginData, async () => {
+			// when
+			const firstOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return daemonDown;
+			});
+			const secondOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return "error[typescript] (2304) at 1:1: skipped after daemon-down cache.";
+			});
+
+			// then
+			expect(firstOutput).toBe("");
+			expect(secondOutput).toBe("");
+			expect(calls).toBe(1);
+		});
+	});
+
 	it("#given markdown LSP is cached unavailable #when TypeScript diagnostics run #then real diagnostics still block", async () => {
 		// given
 		const pluginData = tempPluginData();
