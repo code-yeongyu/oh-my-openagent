@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path"
 
 import {
   parseSparkShellFallbackInvocation,
+  parseTopLevelSparkShellBudget,
   resolveFallbackShellArgv,
   runSparkShell,
   SPARKSHELL_USAGE,
@@ -148,6 +149,15 @@ describe("sparkshell CLI", () => {
     })
   })
 
+  test("#given top-level --budget #when reading the budget #then returns the clamped value only for Sparkshell-owned flags", () => {
+    expect(parseTopLevelSparkShellBudget(["--budget", "5000", "git", "status"])).toBe(5000)
+    expect(parseTopLevelSparkShellBudget(["--json", "--budget=9000", "git", "status"])).toBe(9000)
+    expect(parseTopLevelSparkShellBudget(["git", "status", "--budget", "5000"])).toBeNull()
+    expect(parseTopLevelSparkShellBudget(["--", "--budget", "5000"])).toBeNull()
+    expect(parseTopLevelSparkShellBudget(["--budget", "junk", "git"])).toBeNull()
+    expect(parseTopLevelSparkShellBudget(["--budget", "10", "git"])).toBe(2000)
+  })
+
   test("#given explicit shell script #when resolving fallback argv #then uses platform shell", () => {
     // given
     const script = "printf '%s' hello && printf '%s' world"
@@ -217,7 +227,7 @@ describe("sparkshell CLI", () => {
       spawn: (): SparkShellSpawnResult => ({ status: 3, stdout: "shell-output\n" }),
       loadSessionContext: (env) => {
         contextEnvs.push(env)
-        return "===== codex session context ====="
+        return { block: "===== codex session context =====", firstUserRequest: "", latestUserRequest: "" }
       },
     })
 
@@ -243,7 +253,7 @@ describe("sparkshell CLI", () => {
       spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: "{}" }),
       loadSessionContext: () => {
         contextLoads += 1
-        return "===== codex session context ====="
+        return { block: "===== codex session context =====", firstUserRequest: "", latestUserRequest: "" }
       },
     })
 
@@ -265,7 +275,7 @@ describe("sparkshell CLI", () => {
       spawn: (): SparkShellSpawnResult => ({ status: 0 }),
       loadSessionContext: () => {
         contextLoads += 1
-        return "===== codex session context ====="
+        return { block: "===== codex session context =====", firstUserRequest: "", latestUserRequest: "" }
       },
     })
 
@@ -295,6 +305,176 @@ describe("sparkshell CLI", () => {
     // then
     expect(exitCode).toBe(0)
     expect(stdout.join("")).toBe("ok\n")
+  })
+
+  test("#given the default spawn #when a real command runs #then its output is captured through writeStdout", async () => {
+    // given
+    const stdout: string[] = []
+
+    // when
+    const exitCode = await runSparkShell(["printf", "captured-via-pipe"], {
+      env: {},
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toContain("captured-via-pipe")
+  })
+
+  test("#given oversized output and a session goal #when a command runs #then condenses within the budget keeping goal lines", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeLog = `${Array.from({ length: 2000 }, (_, index) =>
+      index === 1000 ? "applying fable-fallback.ts migration step" : `worker ${index} idle and waiting for jobs`,
+    ).join("\n")}\n`
+
+    // when
+    const exitCode = await runSparkShell(["--budget", "5000", "cat", "huge.log"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeLog }),
+      loadSessionContext: () => ({
+        block: "CTX-BLOCK",
+        firstUserRequest: "fix the `fable-fallback.ts` regression",
+        latestUserRequest: "ship fable-fallback.ts after green tests",
+      }),
+    })
+
+    // then
+    const combined = stdout.join("")
+    const commandOutput = combined.slice(0, combined.indexOf("CTX-BLOCK"))
+    expect(exitCode).toBe(0)
+    expect(combined).toContain("[sparkshell] condensed:")
+    expect(combined).toContain("applying fable-fallback.ts migration step")
+    expect(combined).toContain("CTX-BLOCK")
+    expect(commandOutput.length).toBeLessThanOrEqual(5200)
+    expect(combined.indexOf("[sparkshell] condensed:")).toBeLessThan(combined.indexOf("CTX-BLOCK"))
+  })
+
+  test("#given the condense kill switch #when oversized output flows #then passes it through raw", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeLog = `${"x".repeat(30_000)}\n`
+
+    // when
+    const exitCode = await runSparkShell(["cat", "huge.log"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e", OMO_SPARKSHELL_CONDENSE: "0" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeLog }),
+      loadSessionContext: () => ({ block: "CTX-BLOCK", firstUserRequest: "", latestUserRequest: "" }),
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toContain(hugeLog)
+    expect(stdout.join("")).not.toContain("[sparkshell] condensed:")
+  })
+
+  test("#given the top-level --json flag #when oversized output flows #then never condenses", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeJson = `{"items":[${"1,".repeat(20_000)}1]}`
+
+    // when
+    const exitCode = await runSparkShell(["--json", "cat", "huge.json"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeJson }),
+      loadSessionContext: () => ({ block: "CTX-BLOCK", firstUserRequest: "", latestUserRequest: "" }),
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toBe(hugeJson)
+  })
+
+  test("#given the appserver path #when oversized output returns #then condenses it like the fallback path", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeLog = Array.from({ length: 2000 }, (_, index) => `request ${index} handled`).join("\n")
+
+    // when
+    const exitCode = await runSparkShell(["--budget", "4000", "cat", "huge.log"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: {
+        getPlatform: async () => "darwin" as const,
+        exec: async () => ({ exitCode: 0, stdout: hugeLog, stderr: "" }),
+      },
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      loadSessionContext: () => null,
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toContain("[sparkshell] condensed:")
+    expect(stdout.join("").length).toBeLessThanOrEqual(4400)
+  })
+
+  test("#given a native sidecar #when oversized output returns #then leaves the sidecar output untouched", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeLog = `${"sidecar-owned ".repeat(3000)}\n`
+
+    // when
+    const exitCode = await runSparkShell(["git", "status"], {
+      env: { OMO_SPARKSHELL_BIN: "/tmp/omo-sparkshell", CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeLog }),
+      loadSessionContext: () => null,
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toBe(hugeLog)
+  })
+
+  test("#given an output overflowing the capture buffer #when the spawn reports ENOBUFS #then surfaces truncation instead of a launch failure", async () => {
+    // given
+    const stdout: string[] = []
+    const stderr: string[] = []
+    const overflowError = Object.assign(new Error("spawnSync /bin/cat ENOBUFS"), { code: "ENOBUFS" })
+
+    // when
+    const exitCode = await runSparkShell(["cat", "giant.bin"], {
+      env: {},
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
+      spawn: (): SparkShellSpawnResult => ({ status: null, error: overflowError, stdout: "partial-output" }),
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(stdout.join("")).toContain("partial-output")
+    expect(stderr.join("")).toContain("capture limit")
+    expect(stderr.join("")).not.toContain("failed to launch")
   })
 
   test("#given native sidecar override #when running Sparkshell #then delegates original args to sidecar", async () => {

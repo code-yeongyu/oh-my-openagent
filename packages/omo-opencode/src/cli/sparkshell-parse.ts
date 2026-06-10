@@ -8,6 +8,9 @@ export const SPARKSHELL_USAGE = [
   "Environment: OMO_SPARKSHELL_BIN selects the native sidecar path.",
   "When CODEX_THREAD_ID (or OMO_SPARKSHELL_SESSION_ID) identifies a Codex session, recent session context",
   "is appended after the shell result. OMO_SPARKSHELL_SESSION_CONTEXT=0 disables the attachment.",
+  "Oversized output is condensed to a budget (default 20000 chars; --budget <chars> or",
+  "OMO_SPARKSHELL_CONDENSE_BUDGET overrides) preserving error signatures, repeated patterns,",
+  "session-goal matches, and head/tail. OMO_SPARKSHELL_CONDENSE=0 disables condensation.",
 ].join("\n")
 
 export type SparkShellFallbackInvocation =
@@ -106,6 +109,39 @@ export function hasTopLevelSparkShellHelpFlag(args: readonly string[]): boolean 
     return false
   }
   return false
+}
+
+const MIN_BUDGET_CHARS = 2000
+
+export function parseTopLevelSparkShellBudget(args: readonly string[]): number | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]
+    if (token === "--" ) {
+      return null
+    }
+    if (token === "--json") {
+      continue
+    }
+    if (token === "--budget") {
+      return normalizeBudget(args[index + 1])
+    }
+    if (token?.startsWith("--budget=")) {
+      return normalizeBudget(token.slice("--budget=".length))
+    }
+    return null
+  }
+  return null
+}
+
+function normalizeBudget(rawValue: string | undefined): number | null {
+  if (!rawValue || rawValue.startsWith("-")) {
+    return null
+  }
+  const parsed = Number.parseInt(rawValue, 10)
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    return null
+  }
+  return Math.max(MIN_BUDGET_CHARS, parsed)
 }
 
 export function hasTopLevelSparkShellJsonFlag(args: readonly string[]): boolean {

@@ -4,6 +4,7 @@ import { join } from "node:path"
 import {
   findRolloutPath,
   loadCodexSessionContext,
+  loadCodexSessionContextDetails,
   resolveCodexSessionId,
   type SessionContextDeps,
 } from "./sparkshell-session-context"
@@ -147,6 +148,41 @@ describe("sparkshell session context", () => {
     expect(block).toContain("1. [user] also check the session refresh path")
     expect(block).toContain("5. [agent] tests are green, preparing commit")
     expect(block).not.toContain("starting with the auth suite")
+  })
+
+  test("#given a rollout transcript #when loading details #then exposes raw first/latest requests alongside the block", () => {
+    // given
+    const dayDir = join("/codex-home", "sessions", uuidDayDir())
+    const rolloutPath = join(dayDir, ROLLOUT_NAME)
+    const rollout = buildRollout([
+      sessionMetaLine(),
+      userMessageLine("first request: fix the flaky login test"),
+      agentMessageLine("starting"),
+      userMessageLine("latest request: ship it after green tests"),
+    ])
+    const deps = fakeFsDeps({ [dayDir]: [ROLLOUT_NAME] }, { [rolloutPath]: rollout })
+
+    // when
+    const details = loadCodexSessionContextDetails({ CODEX_HOME: "/codex-home", CODEX_THREAD_ID: SESSION_ID }, deps)
+
+    // then
+    expect(details?.firstUserRequest).toBe("first request: fix the flaky login test")
+    expect(details?.latestUserRequest).toBe("latest request: ship it after green tests")
+    expect(details?.block).toContain("codex session context")
+  })
+
+  test("#given the kill switch #when loading details #then returns null", () => {
+    const dayDir = join("/codex-home", "sessions", uuidDayDir())
+    const rolloutPath = join(dayDir, ROLLOUT_NAME)
+    const rollout = buildRollout([sessionMetaLine(), userMessageLine("real request")])
+    const deps = fakeFsDeps({ [dayDir]: [ROLLOUT_NAME] }, { [rolloutPath]: rollout })
+
+    expect(
+      loadCodexSessionContextDetails(
+        { CODEX_HOME: "/codex-home", CODEX_THREAD_ID: SESSION_ID, OMO_SPARKSHELL_SESSION_CONTEXT: "0" },
+        deps,
+      ),
+    ).toBeNull()
   })
 
   test("#given a single user request #when loading session context #then marks the latest request as the first one", () => {
