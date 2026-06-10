@@ -69,6 +69,58 @@ describe("createToolExecuteBeforeHandler", () => {
 		}
 	})
 
+	it("#given apply_patch with virtual hook denial #when handler runs #then throws with reason from virtual hook", async () => {
+		// given
+		preToolUseResult = {
+			decision: "deny",
+			reason: "blocked by virtual hook",
+			toolName: "Write",
+			hookName: "guard",
+		}
+		const handler = createToolExecuteBeforeHandler(
+			{
+				client: {
+					tui: {
+						showToast: async () => ({}),
+					},
+				},
+				directory: "/repo",
+			} as never,
+			{},
+		)
+
+		// when
+		const action = handler(
+			{ tool: "apply_patch", sessionID: "ses_test", callID: "call_test" },
+			{ args: { patchText: "*** Begin Patch\n*** Add File: src/new.ts\n+hello\n*** End Patch" } },
+		)
+
+		// then
+		await expect(action).rejects.toThrow("blocked by virtual hook")
+	})
+
+	it("#given apply_patch with virtual hook allow #when handler runs #then proceeds to regular PreToolUse", async () => {
+		// given
+		preToolUseResult = { decision: "allow" }
+		const handler = createToolExecuteBeforeHandler(
+			{
+				client: {
+					tui: {
+						showToast: async () => ({}),
+					},
+				},
+				directory: "/repo",
+			} as never,
+			{},
+		)
+
+		// when/then — should not throw
+		await handler(
+			{ tool: "apply_patch", sessionID: "ses_test", callID: "call_test" },
+			{ args: { patchText: "*** Begin Patch\n*** Add File: src/new.ts\n+hello\n*** End Patch" } },
+		)
+	})
+
 	it("#given denial toast rejects with a non-Error value #when hook denies #then the hook denial still wins", async () => {
 		// given
 		const thrownValue = "toast failed"

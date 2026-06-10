@@ -9,6 +9,13 @@ import { appendTranscriptEntry } from "../transcript"
 import { cacheToolInput } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
 import { isHookDisabled, log, replaceToolArgs } from "../../../shared"
+import {
+	isApplyPatchTool,
+	extractVirtualEdits,
+	hasDirectApplyPatchMatcher,
+	buildVirtualToolInput,
+	deduplicateByFilePath,
+} from "../apply-patch-adapter"
 
 export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
@@ -64,6 +71,55 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 
 		const claudeConfig = await loadClaudeHooksConfig()
 		const extendedConfig = await loadPluginExtendedConfig()
+
+		// Virtual hook expansion: apply_patch → Edit/Write for CC hook compatibility
+		if (
+			isApplyPatchTool(input.tool) &&
+			!hasDirectApplyPatchMatcher(claudeConfig, "PreToolUse")
+		) {
+			const virtualEdits = extractVirtualEdits(undefined, output.args)
+			for (const edit of deduplicateByFilePath(virtualEdits)) {
+				const virtualCtx: PreToolUseContext = {
+					sessionId: input.sessionID,
+					toolName: edit.ccToolName === "Write" ? "write" : "edit",
+					toolInput: buildVirtualToolInput(edit),
+					cwd: ctx.directory,
+					toolUseId: input.callID,
+				}
+				const virtualResult = await executePreToolUseHooks(virtualCtx, claudeConfig, extendedConfig)
+				if (virtualResult.decision === "deny") {
+					ctx.client.tui
+						.showToast({
+							body: {
+								title: "PreToolUse Hook Executed",
+								message: `[BLOCKED] ${virtualResult.toolName ?? edit.ccToolName} ${
+									virtualResult.hookName ?? "hook"
+								} (apply_patch→${edit.ccToolName}): ${virtualResult.elapsedMs ?? 0}ms\n${
+									virtualResult.reason ?? ""
+								}`,
+								variant: "error" as const,
+								duration: 4000,
+							},
+						})
+						.catch((error: unknown) => {
+							if (error instanceof Error) {
+								log("apply_patch virtual PreToolUse hook toast failed", {
+									sessionID: input.sessionID,
+									error: error.message,
+								})
+							} else {
+								log("apply_patch virtual PreToolUse hook toast failed", {
+									sessionID: input.sessionID,
+									error: String(error),
+								})
+							}
+						})
+					throw new Error(
+						virtualResult.reason ?? "Hook blocked the operation (apply_patch virtual)",
+					)
+				}
+			}
+		}
 
 		const preCtx: PreToolUseContext = {
 			sessionId: input.sessionID,
