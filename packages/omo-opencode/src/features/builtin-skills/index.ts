@@ -1,2 +1,7 @@
 export * from "./types"
-export { createBuiltinSkills, type CreateBuiltinSkillsOptions } from "./skills"
+export {
+  createBuiltinSkills,
+  resolveActiveBuiltinSkills,
+  type CreateBuiltinSkillsOptions,
+  type ResolveActiveBuiltinSkillsOptions,
+} from "./skills"

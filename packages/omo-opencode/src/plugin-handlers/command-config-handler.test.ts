@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import * as builtinCommands from "../features/builtin-commands";
 import * as commandLoader from "../features/claude-code-command-loader";
+import * as mcpLoader from "../features/claude-code-mcp-loader";
 import * as skillLoader from "../features/opencode-skill-loader";
 import type { OhMyOpenCodeConfig } from "../config";
 import type { PluginComponents } from "./plugin-components-loader";
@@ -47,8 +48,10 @@ describe("applyCommandConfig", () => {
   let loadOpencodeProjectSkillsSpy: ReturnType<typeof spyOn>;
   let loadProjectAgentsSkillsSpy: ReturnType<typeof spyOn>;
   let loadGlobalAgentsSkillsSpy: ReturnType<typeof spyOn>;
+  let getSystemMcpServerNamesSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
+    getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set());
     loadBuiltinCommandsSpy = spyOn(builtinCommands, "loadBuiltinCommands").mockReturnValue({});
     loadUserCommandsSpy = spyOn(commandLoader, "loadUserCommands").mockResolvedValue({});
     loadProjectCommandsSpy = spyOn(commandLoader, "loadProjectCommands").mockResolvedValue({});
@@ -64,6 +67,7 @@ describe("applyCommandConfig", () => {
   });
 
   afterEach(() => {
+    getSystemMcpServerNamesSpy.mockRestore();
     loadBuiltinCommandsSpy.mockRestore();
     loadUserCommandsSpy.mockRestore();
     loadProjectCommandsSpy.mockRestore();
@@ -156,6 +160,92 @@ describe("applyCommandConfig", () => {
     // then
     const commandConfig = config.command as Record<string, { agent?: string }>;
     expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"));
+  });
+
+  test("registers builtin skills like init-deep and security-review as opencode commands", async () => {
+    // given
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, { description?: string; template?: string }>;
+    expect(commandConfig["init-deep"]?.description).toContain("Initialize hierarchical AGENTS.md");
+    expect(commandConfig["init-deep"]?.template).toContain("<skill-instruction>");
+    expect(commandConfig["init-deep"]?.template).toContain("$ARGUMENTS");
+    expect(commandConfig["security-review"]?.template).toContain("<skill-instruction>");
+    expect(commandConfig["team-mode"]).toBeUndefined();
+  });
+
+  test("keeps the builtin command definition when a builtin skill shares its name", async () => {
+    // given
+    loadBuiltinCommandsSpy.mockReturnValue({
+      "remove-ai-slops": {
+        name: "remove-ai-slops",
+        description: "(builtin) Remove AI-generated code smells from branch changes and critically review the results",
+        template: "builtin command template",
+      },
+    });
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, { template?: string }>;
+    expect(commandConfig["remove-ai-slops"]?.template).toBe("builtin command template");
+  });
+
+  test("excludes builtin skills disabled via disabled_skills from the command config", async () => {
+    // given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      ...createPluginConfig(),
+      disabled_skills: ["init-deep"],
+    };
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, { template?: string }>;
+    expect(commandConfig["init-deep"]).toBeUndefined();
+    expect(commandConfig["security-review"]?.template).toContain("<skill-instruction>");
+  });
+
+  test("excludes builtin skills whose MCP servers already exist in the system MCP config", async () => {
+    // given
+    getSystemMcpServerNamesSpy.mockReturnValue(new Set(["playwright"]));
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, { template?: string }>;
+    expect(commandConfig["playwright"]).toBeUndefined();
+    expect(commandConfig["init-deep"]?.template).toContain("<skill-instruction>");
   });
 
   test("includes host config skills declared in config.skills.paths by other plugins", async () => {

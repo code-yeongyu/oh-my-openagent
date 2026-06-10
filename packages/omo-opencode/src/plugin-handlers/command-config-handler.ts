@@ -10,7 +10,10 @@ import {
   loadOpencodeProjectCommands,
 } from "../features/claude-code-command-loader";
 import { loadBuiltinCommands } from "../features/builtin-commands";
+import { resolveActiveBuiltinSkills } from "../features/builtin-skills";
+import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader";
 import {
+  builtinSkillsToCommandDefinitionRecord,
   discoverConfigSourceSkills,
   loadGlobalAgentsSkills,
   loadProjectAgentsSkills,
@@ -38,6 +41,14 @@ export async function applyCommandConfig(params: {
     useRegisteredAgents: true,
     teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
   });
+  const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
+    resolveActiveBuiltinSkills({
+      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+      disabledSkills: new Set(params.pluginConfig.disabled_skills ?? []),
+      teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+      systemMcpNames: getSystemMcpServerNames(),
+    }),
+  );
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
@@ -84,6 +95,7 @@ export async function applyCommandConfig(params: {
   ]);
 
   params.config.command = {
+    ...builtinSkillCommands,
     ...builtinCommands,
     ...skillsToCommandDefinitionRecord(configSourceSkills),
     ...skillsToCommandDefinitionRecord(hostConfigSkills),
