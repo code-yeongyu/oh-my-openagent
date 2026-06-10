@@ -12,6 +12,7 @@ export type PendingParentWake = {
   notifications: string[]
   shouldReply: boolean
   dispatchedAt?: number
+  noReplyAdmittedAt?: number
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
 }
@@ -33,6 +34,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     notifications: [...wake.notifications],
     shouldReply: wake.shouldReply,
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
+    ...(wake.noReplyAdmittedAt !== undefined ? { noReplyAdmittedAt: wake.noReplyAdmittedAt } : {}),
     ...(wake.toolCallDeferralStartedAt !== undefined
       ? { toolCallDeferralStartedAt: wake.toolCallDeferralStartedAt }
       : {}),
@@ -84,6 +86,19 @@ function parentWakeReplyModeIsCovered(latestWake: PendingParentWake, dispatchedW
 function parentWakeNotificationsAreCovered(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
   const dispatchedNotifications = new Set(dispatchedWake.notifications)
   return latestWake.notifications.every((notification) => dispatchedNotifications.has(notification))
+}
+
+export function isFailureParentWake(wake: PendingParentWake): boolean {
+  return wake.shouldReply && wake.notifications.some((notification) =>
+    getSystemReminderHeaderLines(notification).some(isBackgroundTaskFailureHeader)
+  )
+}
+
+function isBackgroundTaskFailureHeader(line: string): boolean {
+  return line === "[BACKGROUND TASK ERROR]"
+    || line === "[BACKGROUND TASK CANCELLED]"
+    || line === "[BACKGROUND TASK INTERRUPTED]"
+    || (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]"))
 }
 
 function isFinalBackgroundTaskNotification(notification: string): boolean {

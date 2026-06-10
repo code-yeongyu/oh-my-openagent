@@ -233,7 +233,7 @@ describe("BackgroundManager parent wake active turn events", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
   test("#when parent idle event follows fresh reasoning delta #then background completion still records an admit-only wake", async () => {
@@ -269,6 +269,6 @@ describe("BackgroundManager parent wake active turn events", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 })

@@ -79,7 +79,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(notifier.getPendingParentWakes().has("parent-local-unknown")).toBe(false)
+    expect(notifier.getPendingParentWakes().has("parent-local-unknown")).toBe(true)
     expect(messageReads).toBe(1)
 
     notifier.shutdown()
@@ -161,7 +161,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-question-unanswered")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-question-unanswered")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -241,7 +241,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

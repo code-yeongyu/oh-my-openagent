@@ -100,7 +100,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-boundary")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-boundary")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -263,7 +263,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(false)
+    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(true)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
@@ -301,7 +301,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-    expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
@@ -526,7 +526,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -578,7 +578,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-internal-tail-tools")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-tools")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -622,7 +622,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -669,7 +669,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(notifier.getPendingParentWakes().has("parent-mixed-user-race")).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-mixed-user-race")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
