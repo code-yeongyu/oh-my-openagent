@@ -7,9 +7,12 @@ function clearRequireCache(modulePath: string): void {
   }
 }
 
+type AddTaskArg = Parameters<import("../../features/task-toast-manager/manager").TaskToastManager["addTask"]>[0]
+type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
+
 describe("executeSyncTask - cleanup on error paths", () => {
   let removeTaskCalls: string[] = []
-  let addTaskCalls: any[] = []
+  let addTaskCalls: AddTaskArg[] = []
   let deleteCalls: string[] = []
   let addCalls: string[] = []
   let resetToastManager: (() => void) | null = null
@@ -40,7 +43,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
       tui: { showToast: mock(() => Promise.resolve()) },
     })
 
-    spyOn(toastManager, "addTask").mockImplementation((task: any) => {
+    spyOn(toastManager, "addTask").mockImplementation((task: AddTaskArg) => {
       addTaskCalls.push(task)
     })
     spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
@@ -637,11 +640,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
       fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
     }
 
-    const metadataCalls: any[] = []
+    const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
-      metadata: (input: any) => { metadataCalls.push(input) },
+      metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
@@ -844,11 +847,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
       fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
     }
 
-    const metadataCalls: any[] = []
+    const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
-      metadata: (input: any) => { metadataCalls.push(input) },
+      metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
@@ -885,7 +888,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
 
     expect(result).toContain("Result from ses_second")
-    expect(onSyncSessionCreated.mock.calls.map((call: any[]) => call[0])).toEqual([
+    expect(onSyncSessionCreated.mock.calls.map((call: unknown[]) => call[0])).toEqual([
       { sessionID: "ses_first", parentID: "parent-session", title: "test task" },
       { sessionID: "ses_second", parentID: "parent-session", title: "test task" },
     ])
@@ -918,11 +921,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
       fetchSyncResult: async () => ({ ok: true as const, textContent: "unused" }),
     }
 
-    const metadataCalls: any[] = []
+    const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
-      metadata: (input: any) => { metadataCalls.push(input) },
+      metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
@@ -1056,11 +1059,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
-    const metadataCalls: any[] = []
+    const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
-      metadata: (input: any) => { metadataCalls.push(input) },
+      metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
@@ -1086,7 +1089,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     //#then - the spawnDepth recorded in metadata MUST match what reserveSubagentSpawn returned
     expect(reservedDepth).toBe(3)
-    const taskMeta = metadataCalls.find((c) => c.metadata?.spawnDepth !== undefined)
+    const taskMeta = metadataCalls.find((c) => c.metadata?.spawnDepth !== undefined)!
     expect(taskMeta).toBeDefined()
     expect(taskMeta.metadata.spawnDepth).toBe(3) // NOT 1 (the fallback value)
   })
