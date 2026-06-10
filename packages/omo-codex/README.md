@@ -39,6 +39,14 @@ The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/
 
 To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
+If Codex auth/provider switching (official ChatGPT login vs relay `base_url`) strips `omo@sisyphuslabs` from `~/.codex/config.toml` while the plugin cache is still present, run:
+
+```bash
+npx lazycodex-ai repair-config
+```
+
+This restores only OMO-managed marketplace/plugin/hook/agent blocks and leaves `model_provider`, `base_url`, and other user auth settings untouched. The repair shim also runs automatically from the `omo` runtime wrapper and from LazyCodex `SessionStart` auto-update checks when the plugin is enabled.
+
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 The same plugin-scoped MCP manifest also bundles `ast_grep`, `grep_app`, `git_bash`, and `lsp`. `git_bash` is enabled only on Windows by default.
 

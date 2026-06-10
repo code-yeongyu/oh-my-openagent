@@ -14,6 +14,7 @@ import {
 	writeState,
 } from "./auto-update-state.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
+import { repairOmoCodexConfig } from "./repair-omo-config.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
@@ -147,6 +148,13 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 }
 
 async function runConfigMigration({ env }) {
+	if (env.LAZYCODEX_CONFIG_REPAIR_DISABLED !== "1" && env.OMO_CODEX_CONFIG_REPAIR_DISABLED !== "1") {
+		try {
+			await repairOmoCodexConfig({ env });
+		} catch (error) {
+			if (!(error instanceof Error)) throw error;
+		}
+	}
 	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return;
 	try {
 		await migrateCodexConfig({ env });

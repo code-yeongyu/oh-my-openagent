@@ -39,6 +39,7 @@ import {
 } from "./install/lazycodex-version-stamp.mjs";
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
+import { installRepairConfigShim, repairOmoCodexConfig } from "./install/repair-omo-config.mjs";
 export { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
 import { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
 
@@ -161,6 +162,11 @@ export async function installMarketplaceLocally(options = {}) {
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 		autonomousPermissions: options.autonomousPermissions !== false,
 	});
+	for (const plugin of installed) {
+		if (marketplace.name !== "sisyphuslabs" || plugin.name !== "omo") continue;
+		const repairShimPath = await installRepairConfigShim({ codexHome, pluginRoot: plugin.path });
+		log(`Installed OMO config repair shim -> ${repairShimPath}`);
+	}
 	const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({ startDirectory: projectDirectory, codexHome, log });
 	for (const configCleanup of projectCleanup.configs) {
 		if (!configCleanup.changed) continue;
@@ -212,6 +218,19 @@ async function main() {
 		const packageJson = JSON.parse(await readFile(join(resolveDefaultRepoRoot(), "package.json"), "utf8"));
 		const version = typeof packageJson.version === "string" ? packageJson.version : "unknown";
 		console.log(`lazycodex-ai ${version}`);
+		return;
+	}
+	if (parsed.kind === "repair-config") {
+		if (parsed.dryRun) {
+			console.log("node packages/omo-codex/plugin/scripts/repair-omo-config.mjs");
+			return;
+		}
+		const result = await repairOmoCodexConfig({ env: process.env });
+		if (result.repaired) {
+			console.log(`Repaired OMO Codex config (${result.reason}). Backup: ${result.backupPath ?? "none"}`);
+			return;
+		}
+		console.log(`OMO Codex config repair skipped (${result.reason}).`);
 		return;
 	}
 	if (parsed.kind === "command") {

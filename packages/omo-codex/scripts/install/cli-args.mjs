@@ -1,5 +1,6 @@
 const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs.";
 export const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run", "ulw-loop"]);
+export const NATIVE_COMMANDS = new Set(["repair-config"]);
 
 export function parseLazyCodexInstallCliArgs(argv) {
 	const args = [...argv];
@@ -100,6 +101,9 @@ export function parseLazyCodexInstallCliArgs(argv) {
 		if (arg === "uninstall") {
 			return { kind: "command", command: "cleanup", dryRun, args: args.slice(index + 1) };
 		}
+		if (arg === "repair-config") {
+			return { kind: "repair-config", dryRun };
+		}
 		if (PASSTHROUGH_COMMANDS.has(arg)) {
 			return { kind: "command", command: arg, dryRun, args: args.slice(index + 1) };
 		}
@@ -137,6 +141,7 @@ export function formatLazyCodexInstallHelp() {
 		"Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
 		"       lazycodex-ai uninstall [--project <path>]",
 		"       lazycodex-ai update [--dry-run] [--repo-root <path>]",
+		"       lazycodex-ai repair-config [--dry-run]",
 		"       lazycodex-ai version",
 		"       lazycodex-ai <command> [args...]",
 		"",

@@ -164,11 +164,13 @@ async function existingNonRuntimeWrapper(path) {
 
 function posixRuntimeWrapper(cliPath, codexHome, binDir) {
 	const ulwLoopBin = join(binDir, "omo-ulw-loop");
+	const repairScript = join(codexHome, "plugins", "data", "omo-sisyphuslabs", "repair-omo-config.mjs");
 	return [
 		"#!/bin/sh",
 		`# ${RUNTIME_WRAPPER_MARKER}`,
 		`export CODEX_HOME="\${CODEX_HOME:-${escapePosixDoubleQuoted(codexHome)}}"`,
 		'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
+		`if [ -f "${escapePosixDoubleQuoted(repairScript)}" ]; then node "${escapePosixDoubleQuoted(repairScript)}" >/dev/null 2>&1 || true; fi`,
 		'if [ "$1" = "ulw-loop" ] && [ -x "' + escapePosixDoubleQuoted(ulwLoopBin) + '" ]; then',
 		"  shift",
 		'  exec "' + escapePosixDoubleQuoted(ulwLoopBin) + '" "$@"',
@@ -196,11 +198,13 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir) {
 
 function windowsRuntimeWrapper(cliPath, codexHome, binDir) {
 	const ulwLoopBin = join(binDir, "omo-ulw-loop.cmd");
+	const repairScript = join(codexHome, "plugins", "data", "omo-sisyphuslabs", "repair-omo-config.mjs");
 	return [
 		"@echo off",
 		`rem ${RUNTIME_WRAPPER_MARKER}`,
 		`if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
 		'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
+		`if exist "${repairScript}" node "${repairScript}" >nul 2>&1`,
 		`if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
 		"  shift /1",
 		`  "${ulwLoopBin}" %*`,
