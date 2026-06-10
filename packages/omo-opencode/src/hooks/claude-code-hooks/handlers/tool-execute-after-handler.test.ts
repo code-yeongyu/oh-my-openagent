@@ -20,12 +20,10 @@ const appendTranscriptEntry = mock((sessionId: string, entry: unknown) => {
 let postToolUseResult: PostToolUseMockResult = { warnings: [] }
 
 mock.module("../config", () => ({
-  clearClaudeHooksConfigCache: () => {},
   loadClaudeHooksConfig: async () => ({}),
 }))
 
 mock.module("../config-loader", () => ({
-  clearPluginExtendedConfigCache: () => {},
   loadPluginExtendedConfig: async () => ({}),
 }))
 
@@ -35,7 +33,6 @@ mock.module("../post-tool-use", () => ({
 
 mock.module("../transcript", () => ({
   appendTranscriptEntry,
-  clearTranscriptCache: () => {},
   getTranscriptPath: () => "/tmp/transcript.jsonl",
 }))
 
