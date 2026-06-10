@@ -300,6 +300,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 | **dev-browser**    | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
 | **frontend-ui-ux** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
 | **review-work**    | "review work", "review my work", "QA my work"         | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                      |
+| **tech-debt-audit**| "tech debt", "technical debt", "debt audit", "code health" | 9-dimension technical debt audit across the entire codebase: architecture, consistency, types, tests, dependencies, performance, error handling, security, documentation. Uses AST-grep (tree-sitter), grep, and language-native tooling. Optionally integrates with GitNexus knowledge graph for dead code and circular dependency analysis. Produces `TECH_DEBT_AUDIT.md` with file:line citations. |
 | **$omo:remove-ai-slops**| "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                             |
 
 #### git-master Core Principles
@@ -620,6 +621,18 @@ These user-facing tool names are served by the built-in local `ast_grep` MCP bac
 | -------------------- | -------------------------------------------- |
 | **ast_grep_search**  | AST-aware code pattern search (25 languages) |
 | **ast_grep_replace** | AST-aware code replacement                   |
+
+### GitNexus Code Knowledge Graph Tools
+
+Gated on `gitnexus.server_url` being configured (see [Configuration](configuration.md#gitnexus-code-knowledge-graph)). When configured, these tools connect to a GitNexus server for semantic code graph analysis.
+
+| Tool                   | Description                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| **gitnexus_list_repos** | List indexed repositories with file/node/edge counts                          |
+| **gitnexus_query**      | Natural language search of the knowledge graph (processes, symbols, communities) |
+| **gitnexus_cypher**     | Execute raw Cypher queries for dead code detection, circular deps, custom analysis |
+| **gitnexus_context**    | 360-degree view of a symbol: callers, callees, dependencies                   |
+| **gitnexus_impact**     | Blast radius analysis — what breaks if you change a symbol                    |
 
 ### Delegation Tools
 

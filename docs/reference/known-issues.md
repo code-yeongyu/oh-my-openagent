@@ -32,6 +32,29 @@ The original failure-mode the PR targets remains in v4.2.0.
 
 Issue #4059 tracks the reland with stabilized regression coverage. The reland is deferred to a follow-up release and should account for current schema-shape changes plus prompt-async-gate semantics.
 
+## v4.8.1 — `bunx oh-my-openagent doctor` fails with module resolution error (PR #5144, resolved)
+
+### Symptom
+
+Running `bunx oh-my-openagent doctor` (the recommended doctor invocation) fails immediately:
+```
+ResolveMessage: Cannot find module 'oh-my-opencode/package.json'
+```
+
+### Root Cause
+
+`PUBLISHED_PACKAGE_NAME` in `plugin-identity.ts` was unconditionally set to the legacy name `"oh-my-opencode"`. When the package is installed via `bunx oh-my-openagent`, the `node_modules` directory is named `oh-my-openagent`, but the doctor constructed paths using `"oh-my-opencode"`.
+
+### Resolution
+
+Fixed in PR #5144. `PUBLISHED_PACKAGE_NAME` now resolves at runtime by checking which name is actually installed. The doctor fix messages also use the canonical `"oh-my-openagent"` name. The `getExpectedVersion` fallback iterates over all accepted package names instead of a single hardcoded name.
+
+Workaround (still works): `bunx oh-my-opencode doctor` uses the legacy package name directly.
+
+### Tracking
+
+PR #5144. Closed.
+
 ## #4225 — Custom LSP config in `.opencode/oh-my-openagent.jsonc` is silently ignored
 
 - **Affects**: v4.2.3+ after the LSP to MCP migration.

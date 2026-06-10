@@ -938,6 +938,30 @@ Notes:
 - Manual refresh is available via `bunx oh-my-opencode refresh-model-capabilities`.
 - Provider runtime metadata still takes priority when OmO resolves capabilities for compatibility checks.
 
+### GitNexus (Code Knowledge Graph)
+
+GitNexus provides a semantic code knowledge graph with symbol relationships, community detection, execution flow tracing, and impact analysis. When configured, OmO registers 5 `gitnexus_*` tools for dead code detection, circular dependency analysis, architecture queries, blast radius analysis, and graph Cypher queries.
+
+```json
+{
+  "gitnexus": {
+    "server_url": "http://localhost:6789",
+    "api_key": "optional-api-key",
+    "request_timeout_ms": 30000
+  }
+}
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `server_url` | (not set, tools disabled) | GitNexus server URL. When set, enables `gitnexus_list_repos`, `gitnexus_query`, `gitnexus_cypher`, `gitnexus_context`, and `gitnexus_impact` tools. |
+| `api_key` | (none) | Optional API key for GitNexus server authentication. |
+| `request_timeout_ms` | `30000` | Timeout in milliseconds for GitNexus API requests. |
+
+When `server_url` is not configured, none of the `gitnexus_*` tools are registered (zero overhead).
+
+**Related skills:** The `tech-debt-audit` user skill (see Skills section) uses GitNexus tools automatically when available for dead code detection, circular dependency tracing, and architecture community analysis.
+
 ### Hashline Edit
 
 Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` references to prevent stale-line edits. Disabled by default.
