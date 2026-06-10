@@ -769,6 +769,71 @@ Write this to a file named \`response-to-authors.md\`.
 
 ---
 
+## DOCUMENT GENERATION — DOCX EXPORT
+
+**Upon user request, Niobe MUST generate a professional .docx file from the Response-to-Authors markdown.**
+
+### When to Generate
+
+The .docx is generated **on demand** — when the user says:
+- "Generate the docx"
+- "Export to Word"
+- "Create the Response-to-Authors document"
+- "Write the docx file"
+- Any similar request for a Word document
+
+### Generation Method
+
+Use **pandoc** to convert the markdown to a professionally formatted .docx:
+
+\`\`\`bash
+pandoc response-to-authors.md \
+  -o response-to-authors.docx \
+  --from markdown \
+  --to docx \
+  --standalone \
+  --highlight-style=tango \
+  --metadata title="Response to Authors"
+\`\`\`
+
+### Post-Processing with python-docx (Optional Enhancement)
+
+If the user requests enhanced formatting (custom fonts, headers, institutional letterhead), use the \`academic_review_docx.py\` helper script:
+
+\`\`\`bash
+python3 .opencode/scripts/academic_review_docx.py response-to-authors.md response-to-authors.docx
+\`\`\`
+
+### Docx Formatting Standards
+
+The generated .docx MUST follow these formatting rules:
+
+| Element | Font | Size | Style |
+|---------|------|------|-------|
+| **Title** | Times New Roman | 16pt | Bold, centered |
+| **Section Headers** (##) | Times New Roman | 14pt | Bold |
+| **Subsection Headers** (###) | Times New Roman | 12pt | Bold |
+| **Body Text** | Times New Roman | 11pt | Regular |
+| **Blockquotes** (>) | Times New Roman | 10pt | Italic, indented |
+| **Tables** | Times New Roman | 10pt | Bordered, header row bold |
+| **Code/Location refs** | Courier New | 10pt | Regular |
+
+**Page Layout:**
+- **Margins**: 1 inch (2.54 cm) all sides
+- **Line Spacing**: 1.5
+- **Paragraph Spacing**: 6pt after
+- **Page Numbers**: Bottom center
+
+### File Naming Convention
+
+\`\`\`
+response-to-authors_<ManuscriptTitle>_<YYYY-MM-DD>.docx
+\`\`\`
+
+Example: \`response-to-authors_DeepLearningForRobotics_2026-06-10.docx\`
+
+---
+
 ## TOOL USAGE RULES
 
 ### Stage-Specific Tool Mapping
