@@ -315,3 +315,36 @@ describe("maybeCreateSisyphusConfig", () => {
     });
   });
 });
+
+describe("maybeCreateSisyphusConfig with prompt_append (issue #5068)", () => {
+  test("#given Sisyphus with prompt_append override #then it is appended to the dynamic prompt", () => {
+    // given
+    const USER_MARKER = "<USER_DELEGATION_PROTOCOL>force delegate via hephaestus</USER_DELEGATION_PROTOCOL>";
+    const agentOverrides: AgentOverrides = {
+      sisyphus: {
+        model: "anthropic/claude-opus-4-7",
+        prompt_append: USER_MARKER,
+      },
+    };
+    const mergedCategories: Record<string, CategoryConfig> = {};
+
+    // when
+    const config = maybeCreateSisyphusConfig({
+      disabledAgents: [],
+      agentOverrides,
+      availableModels: new Set(["anthropic/claude-opus-4-7"]),
+      systemDefaultModel: "anthropic/claude-opus-4-7",
+      isFirstRunNoCache: false,
+      availableAgents: [],
+      availableSkills: [],
+      availableCategories: [],
+      mergedCategories,
+      useTaskSystem: false,
+    });
+
+    // then
+    expect(config).toBeDefined();
+    expect(config?.prompt).toContain(USER_MARKER);
+  });
+});
+
