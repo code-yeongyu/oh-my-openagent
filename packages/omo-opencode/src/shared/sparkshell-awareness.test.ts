@@ -79,5 +79,7 @@ describe("sparkshell runtime awareness", () => {
     expect(context).toContain("--tmux-pane")
     expect(context).toContain("OMO_SPARKSHELL_BIN")
     expect(context).toContain("OMO_SPARKSHELL_SESSION_CONTEXT")
+    expect(context).toContain("OMO_SPARKSHELL_CONDENSE")
+    expect(context).toContain("log")
   })
 })

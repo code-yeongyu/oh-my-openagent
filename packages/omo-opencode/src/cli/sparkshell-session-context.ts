@@ -88,30 +88,44 @@ export function findRolloutPath(sessionId: string, env: RuntimeEnv, deps: Sessio
   return null
 }
 
-export function loadCodexSessionContext(env: RuntimeEnv, deps: SessionContextDeps = {}): string {
+export type SessionContextDetails = {
+  readonly block: string
+  readonly firstUserRequest: string
+  readonly latestUserRequest: string
+}
+
+export function loadCodexSessionContextDetails(env: RuntimeEnv, deps: SessionContextDeps = {}): SessionContextDetails | null {
   if (isFalsy(env[SPARKSHELL_SESSION_CONTEXT_ENV])) {
-    return ""
+    return null
   }
   const sessionId = resolveCodexSessionId(env)
   if (sessionId === null) {
-    return ""
+    return null
   }
   const rolloutPath = findRolloutPath(sessionId, env, deps)
   if (rolloutPath === null) {
-    return ""
+    return null
   }
   const readTextFile = deps.readTextFile ?? ((path: string) => readFileSync(path, "utf8"))
   let rolloutText: string
   try {
     rolloutText = readTextFile(rolloutPath)
   } catch {
-    return ""
+    return null
   }
   const extracted = extractSessionContext(rolloutText)
   if (extracted === null) {
-    return ""
+    return null
   }
-  return formatSessionContextBlock(sessionId, extracted)
+  return {
+    block: formatSessionContextBlock(sessionId, extracted),
+    firstUserRequest: extracted.firstUserRequest,
+    latestUserRequest: extracted.latestUserRequest,
+  }
+}
+
+export function loadCodexSessionContext(env: RuntimeEnv, deps: SessionContextDeps = {}): string {
+  return loadCodexSessionContextDetails(env, deps)?.block ?? ""
 }
 
 function extractSessionContext(rolloutText: string): ExtractedSessionContext | null {
