@@ -37,7 +37,7 @@ function expectedBinName(name: string): string {
   return process.platform === "win32" ? `${name}.cmd` : name
 }
 
-async function createRepoWithBuiltComponentBins(): Promise<string> {
+async function createRepoWithBuiltComponentBins(input: { readonly includeRootCliDist?: boolean } = {}): Promise<string> {
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-built-bins-repo-"))
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
@@ -51,8 +51,10 @@ async function createRepoWithBuiltComponentBins(): Promise<string> {
     JSON.stringify({ name: "sisyphuslabs", plugins: [{ name: "omo", source: "./plugins/omo" }] }),
   )
 
-  await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
-  await writeFile(join(repoRoot, "dist", "cli", "index.js"), "#!/usr/bin/env node\n")
+  if (input.includeRootCliDist !== false) {
+    await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
+    await writeFile(join(repoRoot, "dist", "cli", "index.js"), "#!/usr/bin/env node\n")
+  }
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
   await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "0.1.0" }))
   await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }))
@@ -333,6 +335,25 @@ describe("install-codex", () => {
       expect(linkedNames).not.toContain(staleName)
       expect(linkedNames).not.toContain(`${staleName}.cmd`)
     }
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-no-dist-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-no-dist-"))
+    const repoRoot = await createRepoWithBuiltComponentBins({ includeRootCliDist: false })
+    const logs: string[] = []
+
+    // when
+    await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined, log: (line) => logs.push(line) })
+
+    // then
+    const cliPath = join(repoRoot, "dist", "cli", "index.js")
+    const wrapperWarnings = logs.filter((line) => line.includes("omo runtime wrapper"))
+    expect(wrapperWarnings.length).toBeGreaterThan(0)
+    expect(wrapperWarnings.join("\n")).toContain(cliPath)
+    const linkedNames = await readdir(binDir)
+    expect(linkedNames).not.toContain(expectedBinName("omo"))
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given installation guide #when component binaries are documented #then docs use omo-prefixed names only", async () => {

@@ -95,6 +95,10 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       const runtimeLink = await linkRootRuntimeBin({ binDir, codexHome, repoRoot, platform })
       if (runtimeLink !== null) log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`)
+      else
+        log(
+          `Warning: skipped the omo runtime wrapper because ${join(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+        )
     }
     pluginSources.push({ name: entry.name, sourcePath })
     installed.push(plugin)
