@@ -1,3 +1,4 @@
+import http from "node:http"
 import type { RuntimeSkillSourceEntry } from "./runtime-skill-config"
 
 export type RuntimeSkillSourceServer = {
@@ -38,9 +39,9 @@ function markdownResponse(markdown: string): Response {
   })
 }
 
-export function createRuntimeSkillSourceServer(options: {
+export async function createRuntimeSkillSourceServer(options: {
   readonly skills: readonly RuntimeSkillSourceEntry[]
-}): RuntimeSkillSourceServer {
+}): Promise<RuntimeSkillSourceServer> {
   const skillMarkdownByPath = new Map(
     options.skills.map((skill) => [`/${skill.name}/SKILL.md`, skill.markdown]),
   )
@@ -49,11 +50,6 @@ export function createRuntimeSkillSourceServer(options: {
       name: skill.name,
       files: ["SKILL.md"],
     })),
-  }
-
-  const bun = runtime.Bun
-  if (!bun) {
-    throw new Error("Runtime skill source server requires Bun.serve")
   }
 
   function handleRequest(request: Request): Response | Promise<Response> {
@@ -68,15 +64,61 @@ export function createRuntimeSkillSourceServer(options: {
     return new Response("not found", { status: 404 })
   }
 
-  const server = bun.serve({
-    hostname: "127.0.0.1",
-    port: 0,
-    fetch: handleRequest,
+  const bun = runtime.Bun
+  if (bun) {
+    const server = bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: handleRequest,
+    })
+
+    return {
+      url: server.url.toString(),
+      fetch: handleRequest,
+      stop: () => server.stop(true),
+    }
+  }
+
+  // Node.js HTTP server fallback for non-Bun environments (like Electron)
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? "", "http://127.0.0.1")
+    if (url.pathname === "/" || url.pathname === "/index.json") {
+      res.writeHead(200, {
+        "cache-control": "no-store",
+        "content-type": "application/json; charset=utf-8",
+      })
+      res.end(JSON.stringify(index))
+      return
+    }
+
+    const markdown = skillMarkdownByPath.get(url.pathname)
+    if (markdown) {
+      res.writeHead(200, {
+        "cache-control": "no-store",
+        "content-type": "text/markdown; charset=utf-8",
+      })
+      res.end(markdown)
+      return
+    }
+
+    res.writeHead(404, { "content-type": "text/plain" })
+    res.end("not found")
   })
 
+  await new Promise<void>((resolve, reject) => {
+    server.on("listening", resolve)
+    server.on("error", reject)
+    server.listen(0, "127.0.0.1")
+  })
+
+  const address = server.address()
+  const port = typeof address === "object" && address !== null ? address.port : 0
+
   return {
-    url: server.url.toString(),
+    url: `http://127.0.0.1:${port}/`,
     fetch: handleRequest,
-    stop: () => server.stop(true),
+    stop: () => {
+      server.close()
+    },
   }
 }

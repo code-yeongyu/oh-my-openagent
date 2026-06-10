@@ -16,7 +16,7 @@ interface OpencodeConfigWithAgents {
 }
 
 function getConfigPaths(directory: string): string[] {
-  const globalConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const globalConfigDir = getOpenCodeConfigDir()
   const paths = [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),

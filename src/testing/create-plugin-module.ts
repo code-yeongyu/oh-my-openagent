@@ -95,7 +95,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     deps.installAgentSortShim()
-    deps.initConfigContext("opencode", null)
+    const isDesktop = process.env.OPENCODE_CLIENT === "desktop"
+    const binary = isDesktop ? "opencode-desktop" : "opencode"
+    deps.initConfigContext(binary, null)
     deps.log("[oh-my-openagent] ENTRY - plugin loading", {
       directory: input.directory,
     })
@@ -117,10 +119,10 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
     const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
-    let runtimeSkillSource: ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]> | undefined
+    let runtimeSkillSource: Awaited<ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]>> | undefined
     if (runtimeSecuritySkills.length > 0) {
       try {
-        runtimeSkillSource = deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
+        runtimeSkillSource = await deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         console.warn(`[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: ${detail}`)

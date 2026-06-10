@@ -25,7 +25,7 @@ function getOpenCodeConfigPath(overrideConfigDir?: string): string | null {
     return null
   }
 
-  const { configJsonc, configJson } = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+  const { configJsonc, configJson } = getOpenCodeConfigPaths({ version: null })
 
   if (existsSync(configJsonc)) return configJsonc
   if (existsSync(configJson)) return configJson

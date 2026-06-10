@@ -39,7 +39,7 @@ function resolveConfigPathAfterLegacyMigration(detectedPath: string): string {
 }
 
 function getUserConfigLayers(): Array<{ readonly configDir: string; readonly configPath: string | null }> {
-  const userConfigDirs = [...getOpenCodeConfigDirs({ binary: "opencode" })].reverse();
+  const userConfigDirs = [...getOpenCodeConfigDirs()].reverse();
   return userConfigDirs.map((configDir) => {
     const detected = detectPluginConfigFile(configDir, {
       basenames: [CONFIG_BASENAME],

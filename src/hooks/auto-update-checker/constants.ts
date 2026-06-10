@@ -31,7 +31,7 @@ export function getWindowsAppdataDir(): string | null {
 }
 
 export function getUserConfigDir(): string {
-  return getOpenCodeConfigDir({ binary: "opencode" })
+  return getOpenCodeConfigDir()
 }
 
 export function getUserOpencodeConfig(): string {

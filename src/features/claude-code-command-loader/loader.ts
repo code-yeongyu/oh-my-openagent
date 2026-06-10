@@ -167,7 +167,7 @@ export async function loadProjectCommands(directory?: string): Promise<Record<st
 }
 
 export async function loadOpencodeGlobalCommands(): Promise<Record<string, CommandDefinition>> {
-  const opencodeCommandDirs = getOpenCodeCommandDirs({ binary: "opencode" })
+  const opencodeCommandDirs = getOpenCodeCommandDirs()
   const allCommands = await Promise.all(
     opencodeCommandDirs.map((commandsDir) => loadCommandsFromDir(commandsDir, "opencode")),
   )

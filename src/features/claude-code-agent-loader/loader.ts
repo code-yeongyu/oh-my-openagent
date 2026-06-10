@@ -52,7 +52,7 @@ export function loadProjectAgents(directory?: string, anthropicProvider?: string
 
 export function loadOpencodeGlobalAgents(): Record<string, ClaudeCodeAgentConfig> {
   const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
-  const configDirs = getOpenCodeConfigDirs({ binary: "opencode" })
+  const configDirs = getOpenCodeConfigDirs()
 
   for (const configDir of configDirs) {
     const opencodeAgentsDir = join(configDir, "agents")

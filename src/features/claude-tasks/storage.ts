@@ -18,7 +18,7 @@ export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
     return isAbsolute(storagePath) ? storagePath : join(process.cwd(), storagePath)
   }
 
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const configDir = getOpenCodeConfigDir()
   const listId = resolveTaskListId(config)
   return join(configDir, "tasks", listId)
 }

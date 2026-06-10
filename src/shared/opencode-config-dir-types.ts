@@ -1,7 +1,7 @@
 export type OpenCodeBinaryType = "opencode" | "opencode-desktop"
 
 export type OpenCodeConfigDirOptions = {
-  binary: OpenCodeBinaryType
+  binary?: OpenCodeBinaryType
   version?: string | null
   checkExisting?: boolean
 }
@@ -12,4 +12,10 @@ export type OpenCodeConfigPaths = {
   configJsonc: string
   packageJson: string
   omoConfig: string
+}
+
+export type ConfigContext = {
+  binary: OpenCodeBinaryType
+  version: string | null
+  paths: OpenCodeConfigPaths
 }
