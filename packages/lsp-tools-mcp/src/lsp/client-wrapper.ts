@@ -10,6 +10,7 @@ import {
 	LspServerLookupError,
 } from "./errors.js";
 import { getLspManager, type LspManager } from "./manager.js";
+import { loadInstallDecision } from "./server-install-state.js";
 import { findServerForExtension } from "./server-resolution.js";
 import type { ServerLookupResult } from "./types.js";
 
@@ -47,19 +48,7 @@ export function findWorkspaceRoot(filePath: string): string {
 
 export function formatServerLookupError(result: Exclude<ServerLookupResult, { status: "found" }>): string {
 	if (result.status === "not_installed") {
-		const { server, installHint } = result;
-		return [
-			`LSP server '${server.id}' is configured but NOT INSTALLED.`,
-			"",
-			`Command not found: ${server.command[0]}`,
-			"",
-			"To install:",
-			`  ${installHint}`,
-			"",
-			`Supported extensions: ${server.extensions.join(", ")}`,
-			"",
-			"After installation, the server will be available automatically.",
-		].join("\n");
+		return formatNotInstalled(result);
 	}
 
 	return [
@@ -78,6 +67,43 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
 		"      }",
 		"    }",
 		"  }",
+	].join("\n");
+}
+
+function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_installed" }>): string {
+	const { server, installHint } = result;
+	const extensions = server.extensions.join(", ");
+	const decision = loadInstallDecision(server.id)?.decision;
+
+	if (decision === "declined") {
+		return `LSP server '${server.id}' (${extensions}) is NOT INSTALLED; user previously declined installation — proceed without LSP.`;
+	}
+
+	const header = [
+		`LSP server '${server.id}' for ${extensions} is NOT INSTALLED.`,
+		"",
+		`Command not found: ${server.command[0]}`,
+		"",
+	];
+
+	if (decision === "allowed") {
+		return [
+			...header,
+			"The user has pre-authorized LSP installation. Run the install command, then retry this tool:",
+			`  ${installHint}`,
+		].join("\n");
+	}
+
+	return [
+		...header,
+		"To install, run:",
+		`  ${installHint}`,
+		"",
+		"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+		"- If the user agrees: run the install command above, then retry this tool.",
+		"- If the user declines, OR has NOT explicitly asked for LSP installation:",
+		`    call lsp_install_decision { server_id: "${server.id}", decision: "declined" },`,
+		"    then ignore this message and proceed WITHOUT LSP.",
 	].join("\n");
 }
 

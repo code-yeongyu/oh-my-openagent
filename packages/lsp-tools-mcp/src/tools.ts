@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { isDirectoryPath, type WithLspClientOptions, withLspClient } from "./lsp/client-wrapper.js";
+import { getMergedServers } from "./lsp/config-loader.js";
 import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_REFERENCES, DEFAULT_MAX_SYMBOLS } from "./lsp/constants.js";
 import { aggregateDiagnosticsForDirectory } from "./lsp/directory-diagnostics.js";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./lsp/formatters.js";
 import { inferExtensionFromDirectory } from "./lsp/infer-extension.js";
 import { getLspManager } from "./lsp/manager.js";
+import { type InstallDecision, isInstallDecision, recordInstallDecision } from "./lsp/server-install-state.js";
 import { getAllServers } from "./lsp/server-resolution.js";
 import type {
 	Diagnostic,
@@ -518,6 +520,40 @@ async function executeLspRename(params: Record<string, unknown>, signal?: AbortS
 	}
 }
 
+async function executeLspInstallDecision(params: Record<string, unknown>): Promise<ToolExecutionResult> {
+	const serverId = requireString(params, "server_id");
+	const decision = params["decision"];
+	if (!isInstallDecision(decision)) {
+		return text(
+			`Invalid decision '${String(decision)}'. Expected "declined" or "allowed".`,
+			{ serverId, errorKind: "invalid_decision" },
+			true,
+		);
+	}
+
+	const serverIds = [...new Set(getMergedServers().map((server) => server.id))];
+	if (!serverIds.includes(serverId)) {
+		const preview = serverIds.slice(0, 20).join(", ");
+		return text(
+			`Unknown LSP server '${serverId}'. Known servers: ${preview}${serverIds.length > 20 ? "..." : ""}`,
+			{ serverId, errorKind: "unknown_server" },
+			true,
+		);
+	}
+
+	recordInstallDecision(serverId, decision);
+	return text(`Recorded install decision for '${serverId}': ${decision}. ${decisionFollowUp(decision)}`, {
+		serverId,
+		decision,
+	});
+}
+
+function decisionFollowUp(decision: InstallDecision): string {
+	return decision === "declined"
+		? "Future LSP lookups for this server stay quiet; proceed without LSP."
+		: "Future LSP lookups keep install instructions without asking the user.";
+}
+
 export async function executeLspTool(
 	name: string,
 	params: Record<string, unknown>,
@@ -644,5 +680,27 @@ export const LSP_MCP_TOOLS: LspMcpTool[] = [
 			["filePath", "line", "character", "newName"],
 		),
 		execute: executeLspRename,
+	},
+	{
+		name: "install_decision",
+		aliases: ["lsp_install_decision"],
+		title: "LSP Install Decision",
+		description:
+			"Record whether the user allowed or declined installing a missing LSP server. Record 'declined' when the user declines, or has not explicitly asked for LSP installation, to silence future prompts.",
+		inputSchema: objectSchema(
+			{
+				server_id: {
+					type: "string",
+					description: "The LSP server id from the not-installed message (e.g. 'rust').",
+				},
+				decision: {
+					type: "string",
+					enum: ["declined", "allowed"],
+					description: "'declined' silences future prompts; 'allowed' pre-authorizes installation.",
+				},
+			},
+			["server_id", "decision"],
+		),
+		execute: executeLspInstallDecision,
 	},
 ];
