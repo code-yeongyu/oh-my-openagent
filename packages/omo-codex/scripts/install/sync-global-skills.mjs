@@ -1,0 +1,1 @@
+export { removeManagedOmoGlobalSkills, syncOmoGlobalSkills } from "../../plugin/scripts/sync-global-skills.mjs";

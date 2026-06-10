@@ -5,6 +5,7 @@ import { copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises"
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { syncOmoGlobalSkills } from "./sync-global-skills.mjs";
 
 const MARKETPLACE_NAME = "sisyphuslabs";
 const PLUGIN_NAME = "omo";
@@ -36,13 +37,14 @@ export async function repairOmoCodexConfig({ env = process.env, codexHome = reso
 
 	const configPath = join(codexHome, "config.toml");
 	const before = await readConfig(configPath);
+	const skillSync = await syncOmoGlobalSkills({ codexHome, pluginRoot: installState.pluginRoot, now });
 	if (isOmoConfigHealthy(before, installState)) {
 		try {
 			await installRepairConfigShim({ codexHome, pluginRoot: installState.pluginRoot });
 		} catch (error) {
 			if (!(error instanceof Error)) throw error;
 		}
-		return { repaired: false, reason: "ok" };
+		return { repaired: false, reason: "ok", skillSync };
 	}
 
 	const after = applyOmoConfigRepair(before, installState);
@@ -56,7 +58,7 @@ export async function repairOmoCodexConfig({ env = process.env, codexHome = reso
 	} catch (error) {
 		if (!(error instanceof Error)) throw error;
 	}
-	return { repaired: true, reason: "restored", configPath, backupPath };
+	return { repaired: true, reason: "restored", configPath, backupPath, skillSync };
 }
 
 export async function discoverOmoInstallState({ codexHome, platform = process.platform }) {

@@ -40,6 +40,7 @@ import {
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
 import { installRepairConfigShim, repairOmoCodexConfig } from "./install/repair-omo-config.mjs";
+import { syncOmoGlobalSkills } from "./install/sync-global-skills.mjs";
 export { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
 import { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
 
@@ -166,6 +167,10 @@ export async function installMarketplaceLocally(options = {}) {
 		if (marketplace.name !== "sisyphuslabs" || plugin.name !== "omo") continue;
 		const repairShimPath = await installRepairConfigShim({ codexHome, pluginRoot: plugin.path });
 		log(`Installed OMO config repair shim -> ${repairShimPath}`);
+		const skillSync = await syncOmoGlobalSkills({ codexHome, pluginRoot: plugin.path });
+		if (skillSync.synced) {
+			log(`Synced ${skillSync.skills.length} OMO skill(s) to ${join(codexHome, "skills")}`);
+		}
 	}
 	const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({ startDirectory: projectDirectory, codexHome, log });
 	for (const configCleanup of projectCleanup.configs) {

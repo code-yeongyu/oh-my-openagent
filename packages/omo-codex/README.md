@@ -45,7 +45,7 @@ If Codex auth/provider switching (official ChatGPT login vs relay `base_url`) st
 npx lazycodex-ai repair-config
 ```
 
-This restores only OMO-managed marketplace/plugin/hook/agent blocks and leaves `model_provider`, `base_url`, and other user auth settings untouched. The repair shim also runs automatically from the `omo` runtime wrapper and from LazyCodex `SessionStart` auto-update checks when the plugin is enabled.
+This restores only OMO-managed marketplace/plugin/hook/agent blocks and leaves `model_provider`, `base_url`, and other user auth settings untouched. LazyCodex also mirrors OMO plugin skills into `~/.codex/skills/` (the same durable location used by manually installed skills such as `nature-*` or `zenmux-*`), so OMO skills remain discoverable even if a provider switch temporarily strips plugin config. The repair shim also runs automatically from the `omo` runtime wrapper and from LazyCodex `SessionStart` auto-update checks when the plugin is enabled.
 
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 The same plugin-scoped MCP manifest also bundles `ast_grep`, `grep_app`, `git_bash`, and `lsp`. `git_bash` is enabled only on Windows by default.

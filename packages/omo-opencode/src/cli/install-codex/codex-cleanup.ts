@@ -22,6 +22,7 @@ export interface CodexCleanupResult {
   readonly removedPaths: readonly string[]
   readonly removedAgentLinks: readonly string[]
   readonly skippedAgentLinks: readonly string[]
+  readonly removedGlobalSkills: readonly string[]
   readonly projectCleanup: ProjectLocalCodexCleanupResult
 }
 
@@ -33,6 +34,7 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
   const agentPaths = await collectInstalledAgentPaths(codexHome, configPath)
   const configCleanup = await cleanupCodexConfig(configPath, input.now)
   const agentCleanup = await removeManifestListedAgentLinks(codexHome, agentPaths)
+  const globalSkillCleanup = await removeManagedOmoGlobalSkills({ codexHome })
 
   const removedPaths: string[] = []
   for (const path of managedGlobalStatePaths(codexHome)) {
@@ -55,8 +57,34 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
     removedPaths,
     removedAgentLinks: agentCleanup.removed,
     skippedAgentLinks: agentCleanup.skipped,
+    removedGlobalSkills: globalSkillCleanup.removed,
     projectCleanup,
   }
+}
+
+async function removeManagedOmoGlobalSkills(input: { readonly codexHome: string }): Promise<{ readonly removed: readonly string[] }> {
+  const manifestPath = join(input.codexHome, "plugins", "data", "omo-sisyphuslabs", "global-skills-manifest.json")
+  let manifest: { skills?: unknown }
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { skills?: unknown }
+  } catch (error) {
+    if (error instanceof Error) return { removed: [] }
+    throw error
+  }
+
+  const skillNames = Array.isArray(manifest.skills)
+    ? manifest.skills.filter((value): value is string => typeof value === "string")
+    : []
+  const removed: string[] = []
+  for (const skillName of skillNames) {
+    const targetPath = join(input.codexHome, "skills", skillName)
+    if (!(await exists(targetPath))) continue
+    await rm(targetPath, { recursive: true, force: true })
+    removed.push(skillName)
+  }
+
+  await rm(manifestPath, { force: true })
+  return { removed }
 }
 
 export { cleanupCodexLightConfigText } from "./codex-cleanup-config"
