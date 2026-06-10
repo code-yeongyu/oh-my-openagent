@@ -9,7 +9,7 @@ Model-agnostic technical debt audit for oh-my-openagent (OMO). Uses OMO's built-
 
 ## GitNexus Enhancement (Optional)
 
-When running as the lead orchestrator (not a sub-agent), check if GitNexus tools are available AND whether the current repo is indexed:
+When running as the lead orchestrator (not a sub-agent), check if GitNexus tools are available (they register when `gitnexus.server_url` is set in config) AND whether the current repo is indexed:
 
 ```
 gitnexus_list_repos()

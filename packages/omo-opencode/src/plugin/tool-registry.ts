@@ -17,6 +17,7 @@ import {
   getTaskSystemEnabled,
 } from "./tool-registry-gated-tools"
 import { createTeamModeToolsRecord } from "./tool-registry-team-tools"
+import { createGitNexusToolsRecord } from "./tool-registry-gitnexus-tools"
 export { trimToolsToCap } from "./tool-registry-trimming"
 import { trimToolsToCap } from "./tool-registry-trimming"
 
@@ -61,6 +62,7 @@ export function createToolRegistry(args: {
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createTaskToolsRecord({ taskSystemEnabled, pluginConfig, ctx, factories }),
     ...createHashlineToolsRecord({ pluginConfig, ctx, factories }),
+    ...createGitNexusToolsRecord(pluginConfig),
   }
 
   const allToolNames = Object.keys(allTools)
