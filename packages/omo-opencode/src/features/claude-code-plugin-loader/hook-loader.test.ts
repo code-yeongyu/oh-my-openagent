@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { loadPluginHooksConfigs } from "./hook-loader"
 import type { LoadedPlugin } from "./types"
 
-// Regression coverage for #4458 — every command/http action loaded from a
+// Regression coverage for #4458 - every command/http action loaded from a
 // plugin's hooks config must carry the plugin's installPath as `pluginRoot`
 // so the downstream dispatcher can export CLAUDE_PLUGIN_ROOT on the spawn.
 describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
@@ -22,7 +22,7 @@ describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
   function makePlugin(pluginName: string, hooksJson: unknown): LoadedPlugin {
     const installPath = join(tempDirectory, pluginName)
     const hooksPath = join(installPath, "hooks.json")
-    // Use mkdir via writeFileSync target dir trick — easier to just create the
+    // Use mkdir via writeFileSync target dir trick - easier to just create the
     // install dir explicitly.
     rmSync(installPath, { recursive: true, force: true })
     const fs = require("node:fs") as typeof import("node:fs")

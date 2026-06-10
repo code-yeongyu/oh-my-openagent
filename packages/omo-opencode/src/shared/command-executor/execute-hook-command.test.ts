@@ -79,7 +79,7 @@ describe("executeHookCommand", () => {
     expect(Date.now() - startedAt).toBeLessThan(1000)
   })
 
-  // Regression coverage for #4458 — plugin-sourced hooks must run with
+  // Regression coverage for #4458 - plugin-sourced hooks must run with
   // CLAUDE_PLUGIN_ROOT exported into the child env (so scripts can read
   // process.env.CLAUDE_PLUGIN_ROOT) AND substituted in the command string
   // (so commands written as `$CLAUDE_PLUGIN_ROOT/scripts/foo.sh` resolve).
