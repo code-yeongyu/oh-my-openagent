@@ -1011,8 +1011,18 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry for `omo-codex` only |
 | `OMO_CODEX_GIT_BASH_PATH` | Native Windows Codex installs only. Absolute path to Git Bash, for example `C:\Program Files\Git\bin\bash.exe`, when `where bash` cannot find it |
 | `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL` | Set to `1` to skip the best-effort `winget install --id Git.Git -e --source winget` attempt during native Windows Codex installs |
+| `LAZYCODEX_CONFIG_MIGRATION_DISABLED` | Set to `1` to skip the Codex config migration that runs on every session start (including the `multi_agent_v2` force-disable and managed reasoning-profile sync), leaving `config.toml` untouched |
+| `OMO_CODEX_CONFIG_MIGRATION_DISABLED` | Alias of `LAZYCODEX_CONFIG_MIGRATION_DISABLED` |
+| `OMO_SPARKSHELL_CONDENSE` | Set to `0` to disable sparkshell's oversized-output condensation and always print raw output |
+| `OMO_SPARKSHELL_CONDENSE_BUDGET` | Character budget before sparkshell condenses command output (default `20000`) |
+| `OMO_SPARKSHELL_SESSION_CONTEXT` | Set to `0` to stop sparkshell from appending Codex session context (first/latest user request and recent messages) to command output |
+| `LSP_TOOLS_MCP_INSTALL_DECISIONS` | Override the path of the LSP install-decisions file (default `~/.codex/lsp-install-decisions.json`) |
 | `POSTHOG_API_KEY` | Optional override for the built-in PostHog project API key |
 | `POSTHOG_HOST` | Override the PostHog ingestion host. Defaults to `https://us.i.posthog.com` |
+
+### LSP Install Decisions
+
+When an LSP tool hits a language server that is not installed, it asks once per server and persists the answer to `~/.codex/lsp-install-decisions.json` (override with `LSP_TOOLS_MCP_INSTALL_DECISIONS`). A `declined` entry collapses all future diagnostics for that server to a one-line note. To get prompted again — or to re-enable a server that an agent declined on your behalf — delete the file (or the server's entry in it).
 
 ### Codex Light Git Bash MCP
 
