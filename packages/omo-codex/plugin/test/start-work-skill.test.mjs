@@ -92,6 +92,40 @@ test("#given packaged start-work completion surfaces #when inspected #then globa
 	assert.match(hephaestusRule, /redact.*secrets.*PII/s);
 });
 
+test("#given start-work skill #when tier triage is inspected #then checkboxes classify LIGHT/HEAVY with trigger-mapped adversarial classes", async () => {
+	// given
+	const missing = [];
+
+	// when
+	for (const skillPath of startWorkSkillPaths) {
+		const skill = await readFile(skillPath, "utf8");
+		if (
+			!/[Tt]ier triage|[Cc]lassify the checkbox tier/.test(skill) ||
+			!/LIGHT/.test(skill) ||
+			!/HEAVY/.test(skill) ||
+			!/When unsure[^.]{0,30}HEAVY/.test(skill) ||
+			!/never downgrade/i.test(skill) ||
+			!/A class applies when/i.test(skill) ||
+			/plausibly applies/.test(skill) ||
+			!/mirrors its implementation/.test(skill)
+		) {
+			missing.push(skillPath);
+		}
+	}
+
+	// then
+	assert.deepEqual(missing, []);
+});
+
+test("#given start-work skill #when echo discipline is inspected #then the ultraqa class list is enumerated once and the budget holds", async () => {
+	// given
+	const skill = await readFile(startWorkSkillPaths[0], "utf8");
+
+	// then
+	assert.equal((skill.match(/malformed input/g) ?? []).length, 1);
+	assert.ok(skill.split(/\s+/).filter(Boolean).length <= 1924);
+});
+
 test("#given start-work continuation hook #when inspected #then it remains Boulder-only without planning bootstrap logic", async () => {
 	// given
 	const hook = await readFile(stopHookPath, "utf8");

@@ -243,7 +243,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/commit in the observed style/);
 		expect(text).toMatch(/omnibus commit/);
 		expect(text).toContain("Every worker message MUST carry");
-		expect(text).toContain("Each worker does strict TDD");
+		expect(text).toContain("Each worker captures evidence failing-first");
 	});
 
 	it("#given Codex subagent delegation #when worker guidance is inspected #then assignment ambiguity is hardened", async () => {
