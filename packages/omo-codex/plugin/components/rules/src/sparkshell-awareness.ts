@@ -1,4 +1,12 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 type RuntimeEnv = Readonly<Record<string, string | undefined>>;
+
+interface OmoResolutionDeps {
+	readonly fileExists?: (path: string) => boolean;
+	readonly platform?: NodeJS.Platform;
+}
 
 const SPARKSHELL_AWARENESS_MARKER = "## Sparkshell Runtime";
 
@@ -23,7 +31,38 @@ function isSparkShellAppServerConfigured(env: RuntimeEnv = process.env): boolean
 	return codexSocketPath.length > 0 || omoSocketPath.length > 0;
 }
 
-export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env): string {
+export function resolveOmoInvocation(env: RuntimeEnv = process.env, deps: OmoResolutionDeps = {}): string | null {
+	const fileExists = deps.fileExists ?? existsSync;
+	const platform = deps.platform ?? process.platform;
+	const binNames = platform === "win32" ? ["omo.cmd", "omo.exe", "omo"] : ["omo"];
+	const pathDelimiter = platform === "win32" ? ";" : ":";
+	const pathEntries = (env["PATH"] ?? "").split(pathDelimiter).filter((entry) => entry.trim().length > 0);
+	for (const pathEntry of pathEntries) {
+		for (const binName of binNames) {
+			if (fileExists(join(pathEntry, binName))) return "omo";
+		}
+	}
+	for (const candidateDir of omoCandidateBinDirs(env)) {
+		for (const binName of binNames) {
+			const candidate = join(candidateDir, binName);
+			if (fileExists(candidate)) return candidate;
+		}
+	}
+	return null;
+}
+
+function omoCandidateBinDirs(env: RuntimeEnv): readonly string[] {
+	const dirs: string[] = [];
+	const localBinDir = env["CODEX_LOCAL_BIN_DIR"]?.trim() ?? "";
+	if (localBinDir.length > 0) dirs.push(localBinDir);
+	const home = env["HOME"]?.trim() || env["USERPROFILE"]?.trim() || "";
+	const codexHome = env["CODEX_HOME"]?.trim() || (home.length > 0 ? join(home, ".codex") : "");
+	if (codexHome.length > 0) dirs.push(join(codexHome, "bin"));
+	if (home.length > 0) dirs.push(join(home, ".local", "bin"));
+	return dirs;
+}
+
+export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env, deps: OmoResolutionDeps = {}): string {
 	const override = env["OMO_SPARKSHELL_AWARENESS"] ?? env["LAZYCODEX_SPARKSHELL_AWARENESS"];
 	if (isFalsy(override)) {
 		return "";
@@ -32,12 +71,19 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env): st
 		return "";
 	}
 
+	const resolved = resolveOmoInvocation(env, deps);
+	const invocation = resolved ?? (isTruthy(override) ? "omo" : null);
+	if (invocation === null) {
+		return "";
+	}
+	const command = /\s/.test(invocation) ? `"${invocation}"` : invocation;
+
 	return [
 		SPARKSHELL_AWARENESS_MARKER,
 		"",
-		"- Prefer `omo sparkshell <command>` for repo inspection, CLI smoke tests, git/history checks, and bounded verification before falling back to raw shell commands.",
-		"- Use `omo sparkshell --shell '<command>'` only when shell metacharacters are required.",
-		"- Use `omo sparkshell --tmux-pane <pane-id> --tail-lines 400` to inspect an existing tmux pane. Tail lines must stay between 100 and 1000.",
+		`- Prefer \`${command} sparkshell <command>\` for repo inspection, CLI smoke tests, git/history checks, and bounded verification before falling back to raw shell commands.`,
+		`- Use \`${command} sparkshell --shell '<command>'\` only when shell metacharacters are required.`,
+		`- Use \`${command} sparkshell --tmux-pane <pane-id> --tail-lines 400\` to inspect an existing tmux pane. Tail lines must stay between 100 and 1000.`,
 		"- When no native sidecar or appserver is available, Sparkshell silently falls back to raw command execution. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
 	].join("\n");
 }

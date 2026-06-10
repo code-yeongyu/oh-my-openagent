@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { runSessionStartHook, runUserPromptSubmitHook } from "../src/codex-hook.js";
 import { formatAdditionalContextOutput } from "../src/hook-output.js";
@@ -45,13 +45,29 @@ function parseHookOutput(value: unknown): HookOutput {
 	};
 }
 
+const fixtureRoot = mkdtempSync(join(tmpdir(), "codex-sparkshell-omo-bin-"));
+const omoOnPathDir = join(fixtureRoot, "path-bin");
+const emptyHomeDir = join(fixtureRoot, "empty-home");
+const localBinHomeDir = join(fixtureRoot, "local-bin-home");
+mkdirSync(omoOnPathDir, { recursive: true });
+mkdirSync(emptyHomeDir, { recursive: true });
+mkdirSync(join(localBinHomeDir, ".local", "bin"), { recursive: true });
+writeFileSync(join(omoOnPathDir, "omo"), "#!/bin/sh\n");
+writeFileSync(join(localBinHomeDir, ".local", "bin", "omo"), "#!/bin/sh\n");
+
 describe("Codex Sparkshell awareness", () => {
-	it("#given active Codex app server env #when SessionStart runs #then emits Sparkshell guidance", async () => {
+	afterAll(() => {
+		rmSync(fixtureRoot, { recursive: true, force: true });
+	});
+
+	it("#given active Codex app server env with omo on PATH #when SessionStart runs #then emits Sparkshell guidance", async () => {
 		// given
 		const env = {
 			CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "Codex Desktop",
 			CODEX_SHELL: "1",
 			CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+			PATH: omoOnPathDir,
+			HOME: emptyHomeDir,
 		};
 
 		// when
@@ -102,6 +118,8 @@ describe("Codex Sparkshell awareness", () => {
 			OMO_SPARKSHELL_APP_SERVER_SOCKET: "/tmp/app-server-control.sock",
 			CODEX_THREAD_ID: "thread-sparkshell-cli",
 			CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+			PATH: omoOnPathDir,
+			HOME: emptyHomeDir,
 		};
 
 		// when
@@ -120,6 +138,64 @@ describe("Codex Sparkshell awareness", () => {
 
 		// then
 		expect(parseAdditionalContext(output)).toContain("omo sparkshell <command>");
+	});
+
+	it("#given active Codex app env without a resolvable omo command #when SessionStart runs #then emits no Sparkshell guidance", async () => {
+		// given
+		const env = {
+			CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "Codex Desktop",
+			CODEX_SHELL: "1",
+			CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+			PATH: join(fixtureRoot, "missing-path-entry"),
+			HOME: emptyHomeDir,
+		};
+
+		// when
+		const output = await runSessionStartHook(
+			{
+				session_id: "session-sparkshell-unresolvable",
+				transcript_path: null,
+				cwd: process.cwd(),
+				hook_event_name: "SessionStart",
+				model: "gpt-5.5",
+				permission_mode: "default",
+				source: "startup",
+			},
+			{ env },
+		);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given omo only under HOME/.local/bin #when SessionStart runs #then emits guidance with the absolute omo path", async () => {
+		// given
+		const env = {
+			CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "Codex Desktop",
+			CODEX_SHELL: "1",
+			CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+			PATH: join(fixtureRoot, "missing-path-entry"),
+			HOME: localBinHomeDir,
+		};
+
+		// when
+		const output = await runSessionStartHook(
+			{
+				session_id: "session-sparkshell-local-bin",
+				transcript_path: null,
+				cwd: process.cwd(),
+				hook_event_name: "SessionStart",
+				model: "gpt-5.5",
+				permission_mode: "default",
+				source: "startup",
+			},
+			{ env },
+		);
+
+		// then
+		const context = parseAdditionalContext(output);
+		expect(context).toContain(`${join(localBinHomeDir, ".local", "bin", "omo")} sparkshell <command>`);
+		expect(context).not.toContain("`omo sparkshell <command>`");
 	});
 
 	it("#given explicit force-on env #when SessionStart runs #then emits Sparkshell guidance", async () => {
@@ -181,6 +257,8 @@ describe("Codex Sparkshell awareness", () => {
 			CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "Codex Desktop",
 			CODEX_SHELL: "1",
 			CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+			PATH: omoOnPathDir,
+			HOME: emptyHomeDir,
 		};
 		try {
 			const firstOutput = await runSessionStartHook(
