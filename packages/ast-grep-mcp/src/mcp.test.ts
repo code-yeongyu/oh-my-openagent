@@ -261,7 +261,11 @@ describe("ast-grep MCP", () => {
     expect(searchTool?.description).toContain("Meta-variables");
   });
 
-  it("#given idle stdio connection #when no request arrives before timeout #then server exits through idle callback", async () => {
+  // win32 bun wedges forever here: the unref'd 1ms idle timer can fail to fire
+  // on windows-latest, and with no ref'd handles left bun's per-test timeout
+  // cannot interrupt the await (PR #5077 froze at this test on every Windows run).
+  const nonWindowsIt = process.platform === "win32" ? it.skip : it;
+  nonWindowsIt("#given idle stdio connection #when no request arrives before timeout #then server exits through idle callback", async () => {
     const input = new PassThrough();
     const output = new PassThrough();
     let idleCallCount = 0;
