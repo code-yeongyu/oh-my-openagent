@@ -1,9 +1,13 @@
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide";
 
 const mockLoadInteractiveBashSessionState = mock(() => null);
 const mockSaveInteractiveBashSessionState = mock(() => {});
 const mockClearInteractiveBashSessionState = mock(() => {});
-const mockSpawnWithWindowsHide = mock(() => {
+// spyOn instead of mock.module: bun module mocks are process-global and survive
+// mock.restore(), so they leak into other test files that touch this module
+// (order-dependent CI failures); the spy patches the shared instance in place.
+const mockSpawnWithWindowsHide = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation(() => {
   throw new Error("tmux unavailable");
 });
 
@@ -11,10 +15,6 @@ mock.module("./storage", () => ({
   loadInteractiveBashSessionState: mockLoadInteractiveBashSessionState,
   saveInteractiveBashSessionState: mockSaveInteractiveBashSessionState,
   clearInteractiveBashSessionState: mockClearInteractiveBashSessionState,
-}));
-
-mock.module("../../shared/spawn-with-windows-hide", () => ({
-  spawnWithWindowsHide: mockSpawnWithWindowsHide,
 }));
 
 const trackerModulePromise = import("./interactive-bash-session-tracker");

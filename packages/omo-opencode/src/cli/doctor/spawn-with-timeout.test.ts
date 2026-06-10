@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { SpawnedProcess } from "../../shared/spawn-with-windows-hide"
+import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
 import { spawnWithTimeout } from "./spawn-with-timeout"
 
 describe("spawnWithTimeout", () => {
@@ -96,17 +97,12 @@ describe("spawnWithTimeout", () => {
     it("rethrows the unknown value", async () => {
       // given
       const unknownFailure = { reason: "spawn failed" } as const
-      mock.module("../../shared/spawn-with-windows-hide", () => ({
-        spawnWithWindowsHide: () => {
-          throw unknownFailure
-        },
-      }))
-      const { spawnWithTimeout: spawnWithMockedSpawn } = await import(
-        `./spawn-with-timeout?non-error=${Date.now()}`
-      )
+      spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation(() => {
+        throw unknownFailure
+      })
 
       // when
-      const result = await spawnWithMockedSpawn(["test-command"], { stdout: "pipe", stderr: "pipe" }).then(
+      const result = await spawnWithTimeout(["test-command"], { stdout: "pipe", stderr: "pipe" }).then(
         () => "resolved",
         (error: unknown) => error,
       )
@@ -137,15 +133,10 @@ describe("spawnWithTimeout", () => {
         stderr: undefined,
         kill: () => {},
       } satisfies SpawnedProcess
-      mock.module("../../shared/spawn-with-windows-hide", () => ({
-        spawnWithWindowsHide: () => spawnedProcess,
-      }))
-      const { spawnWithTimeout: spawnWithMockedSpawn } = await import(
-        `./spawn-with-timeout?used-stream=${Date.now()}`
-      )
+      spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation(() => spawnedProcess)
 
       // when
-      const result = await spawnWithMockedSpawn(["test-command"], { stdout: "pipe", stderr: "pipe" })
+      const result = await spawnWithTimeout(["test-command"], { stdout: "pipe", stderr: "pipe" })
 
       // then
       expect(result).toEqual({ stdout: "", stderr: "", exitCode: 1, timedOut: false })
