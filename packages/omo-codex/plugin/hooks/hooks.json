@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook session-start",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Loading Project Rules"
+						"statusMessage": "LazyCodex(4.8.1): Loading Project Rules"
 					}
 				]
 			},
@@ -17,7 +17,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/telemetry/dist/cli.js\" hook session-start",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Recording Session Telemetry"
+						"statusMessage": "LazyCodex(4.8.1): Recording Session Telemetry"
 					}
 				]
 			},
@@ -28,7 +28,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/scripts/auto-update.mjs\" hook session-start",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Checking Auto Update"
+						"statusMessage": "LazyCodex(4.8.1): Checking Auto Update"
 					}
 				]
 			}
@@ -40,7 +40,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Loading Project Rules"
+						"statusMessage": "LazyCodex(4.8.1): Loading Project Rules"
 					}
 				]
 			},
@@ -50,7 +50,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/ultrawork/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Checking Ultrawork Trigger"
+						"statusMessage": "LazyCodex(4.8.1): Checking Ultrawork Trigger"
 					}
 				]
 			},
@@ -60,7 +60,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Checking Ulw-Loop Steering"
+						"statusMessage": "LazyCodex(4.8.1): Checking Ulw-Loop Steering"
 					}
 				]
 			}
@@ -73,7 +73,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/git-bash/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Recommending Git Bash Mcp"
+						"statusMessage": "LazyCodex(4.8.1): Recommending Git Bash Mcp"
 					}
 				]
 			},
@@ -84,7 +84,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Enforcing Unlimited Goal Budget"
+						"statusMessage": "LazyCodex(4.8.1): Enforcing Unlimited Goal Budget"
 					}
 				]
 			}
@@ -97,13 +97,13 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/comment-checker/dist/cli.js\" hook post-tool-use",
 						"timeout": 30,
-						"statusMessage": "LazyCodex(0.1.0): Checking Comments"
+						"statusMessage": "LazyCodex(4.8.1): Checking Comments"
 					},
 					{
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-tool-use",
 						"timeout": 60,
-						"statusMessage": "LazyCodex(0.1.0): Checking LSP Diagnostics"
+						"statusMessage": "LazyCodex(4.8.1): Checking LSP Diagnostics"
 					}
 				]
 			},
@@ -114,7 +114,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-tool-use",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Matching Project Rules"
+						"statusMessage": "LazyCodex(4.8.1): Matching Project Rules"
 					}
 				]
 			}
@@ -127,7 +127,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/git-bash/dist/cli.js\" hook post-compact",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Resetting Git Bash Mcp Reminder"
+						"statusMessage": "LazyCodex(4.8.1): Resetting Git Bash Mcp Reminder"
 					}
 				]
 			},
@@ -138,7 +138,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-compact",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Resetting Project Rule Cache"
+						"statusMessage": "LazyCodex(4.8.1): Resetting Project Rule Cache"
 					}
 				]
 			},
@@ -149,7 +149,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-compact",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(0.1.0): Resetting LSP Diagnostics Cache"
+						"statusMessage": "LazyCodex(4.8.1): Resetting LSP Diagnostics Cache"
 					}
 				]
 			}
@@ -161,7 +161,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Checking Start-Work Continuation"
+						"statusMessage": "LazyCodex(4.8.1): Checking Start-Work Continuation"
 					}
 				]
 			}
@@ -173,7 +173,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook subagent-stop",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(0.1.0): Checking Start-Work Continuation"
+						"statusMessage": "LazyCodex(4.8.1): Checking Start-Work Continuation"
 					}
 				]
 			}

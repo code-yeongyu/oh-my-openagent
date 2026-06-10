@@ -18,8 +18,9 @@ test("#given aggregate plugin build script #when inspected #then hook status and
 	// then
 	assert.equal(
 		buildScript,
-		"node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
 	);
+	assert.match(buildScript, /^node scripts\/sync-version\.mjs &&/);
 	assert.equal(testScript, "node --test test/*.test.mjs");
 	assert(packageJson.workspaces.includes("components/ultrawork"));
 	assert.match(telemetrySyncScript, /syncTelemetryComponent/);

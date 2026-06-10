@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "0.1.0",
+	"version": "4.8.1",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -10,7 +10,14 @@
 	"homepage": "https://github.com/sisyphuslabs/omo",
 	"repository": "https://github.com/sisyphuslabs/omo",
 	"license": "MIT",
-	"keywords": ["codex", "codex-plugin", "omo", "hooks", "mcp", "skills"],
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"omo",
+		"hooks",
+		"mcp",
+		"skills"
+	],
 	"skills": "./skills/",
 	"hooks": "./hooks/hooks.json",
 	"mcpServers": "./.mcp.json",
@@ -20,7 +27,13 @@
 		"longDescription": "OMO exposes local Codex Rules, Comment Checker, Git Bash, LSP, Ultrawork, ulw-loop, start-work continuation, and telemetry components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
 		"developerName": "Yeongyu Kim",
 		"category": "Developer Tools",
-		"capabilities": ["Hooks", "MCP Tools", "Code Intelligence", "Workflow", "Context Injection"],
+		"capabilities": [
+			"Hooks",
+			"MCP Tools",
+			"Code Intelligence",
+			"Workflow",
+			"Context Injection"
+		],
 		"websiteURL": "https://github.com/sisyphuslabs/omo",
 		"privacyPolicyURL": "https://github.com/sisyphuslabs/omo#privacy",
 		"termsOfServiceURL": "https://github.com/sisyphuslabs/omo#license",
