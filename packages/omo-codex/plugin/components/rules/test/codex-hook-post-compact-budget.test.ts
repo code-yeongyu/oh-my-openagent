@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("codex rules post-compaction context budget", () => {
-	it("#given oversized project rules already injected #when static recovery runs after compaction #then it emits no duplicate static injection", async () => {
+	it("#given oversized project rules already injected #when static recovery runs after compaction #then it emits a mandatory read directive instead of rule bodies", async () => {
 		// given
 		const { root, pluginData } = makeOversizedProject();
 		const firstOutput = await runSessionStartHook(sessionStartInput(root), {
@@ -50,7 +50,12 @@ describe("codex rules post-compaction context budget", () => {
 		expect(firstContext).toContain("Project rule");
 		expect(firstContext).toContain("[Truncated. Full:");
 		expect(firstContext.length).toBeLessThan(31_000);
-		expect(output).toBe("");
+		const recoveryContext = readAdditionalContext(output);
+		expect(recoveryContext).toContain("MUST READ");
+		expect(recoveryContext).toContain("NO EXCUSES");
+		expect(recoveryContext).toContain(path.join(root, "CONTEXT.md"));
+		expect(recoveryContext).not.toContain("Project rule");
+		expect(recoveryContext.length).toBeLessThan(2_000);
 	});
 });
 

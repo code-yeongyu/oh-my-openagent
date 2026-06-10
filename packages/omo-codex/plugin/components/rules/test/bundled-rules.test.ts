@@ -200,7 +200,7 @@ describe("plugin bundled rules", () => {
 		expect(output).toBe("");
 	});
 
-	it("#given bundled static context already injected #when UserPromptSubmit runs after PostCompact #then it emits no duplicate bundled context", async () => {
+	it("#given bundled static context dropped by compaction #when UserPromptSubmit runs after PostCompact #then it re-injects the bundled persona body in full", async () => {
 		// given
 		const { root, pluginData, bundledRulePath } = makeFixture();
 		const firstOutput = await runSessionStartHook(sessionStartInput(root), {
@@ -219,7 +219,9 @@ describe("plugin bundled rules", () => {
 
 		// then
 		expect(compactOutput).toBe("");
-		expect(output).toBe("");
+		expect(output).toContain(`Instructions from: ${bundledRulePath}`);
+		expect(output).toContain(BUNDLED_BODY);
+		expect(output).not.toContain("[Truncated. Full:");
 	});
 
 	it("#given bundled Hephaestus rule body exceeds per-rule cap #when SessionStart runs #then static context expands the body within result budget", async () => {

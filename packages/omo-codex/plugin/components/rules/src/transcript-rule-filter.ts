@@ -13,7 +13,15 @@ export function filterRulesAlreadyInTranscript(
 	}
 
 	const transcriptText = readTranscriptSearchText(transcriptPath, options);
-	if (transcriptText === null) {
+	return filterRulesNotInTranscriptText(rules, transcriptText, markInjected);
+}
+
+export function filterRulesNotInTranscriptText(
+	rules: ReadonlyArray<LoadedRule>,
+	transcriptText: string | null,
+	markInjected: (rule: LoadedRule) => void,
+): LoadedRule[] {
+	if (rules.length === 0 || transcriptText === null) {
 		return [...rules];
 	}
 

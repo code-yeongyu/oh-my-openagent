@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe("codex rules compacted context recovery", () => {
-	it("#given compacted session source after PostCompact #when static rules re-inject #then output uses the compact recovery budget", async () => {
+	it("#given compacted session source after PostCompact #when static recovery runs #then output is a mandatory read directive", async () => {
 		// given
 		const { root, pluginData } = makeOversizedProject("compact-source");
 		const transcriptPath = writeCompactedTranscript(root, "summary dropped injected rules");
@@ -37,10 +37,10 @@ describe("codex rules compacted context recovery", () => {
 
 		// then
 		const postCompactContext = readAdditionalContext(output);
-		expect(postCompactContext.length).toBeLessThan(5_000);
-		expect(postCompactContext).toContain("Instructions from:");
+		expect(postCompactContext.length).toBeLessThan(2_000);
+		expect(postCompactContext).toContain("MUST READ");
 		expect(postCompactContext).toContain("CONTEXT.md");
-		expect(postCompactContext).toContain("Project rule");
+		expect(postCompactContext).not.toContain("Project rule");
 	});
 
 	it("#given compacted context warning and near-full transcript #when compact source starts twice #then handles compacted context warning once", async () => {
@@ -65,7 +65,7 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const firstContext = readOptionalAdditionalContext(firstOutput);
 		expect(firstContext.length).toBeLessThan(1_000);
-		expect(firstContext).toContain("Instructions from:");
+		expect(firstContext).toContain("MUST READ");
 		expect(firstContext).toContain("CONTEXT.md");
 		expect(secondOutput).toBe("");
 	});
@@ -88,7 +88,7 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("Instructions from:");
+		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
 	});
 
@@ -106,7 +106,7 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("Instructions from:");
+		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
 	});
 
@@ -128,7 +128,7 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("Instructions from:");
+		expect(context).toContain("MUST READ");
 		expect(context).toContain("CONTEXT.md");
 	});
 
@@ -157,7 +157,7 @@ describe("codex rules compacted context recovery", () => {
 		const contexts = outputs.map(readOptionalAdditionalContext);
 		expect(contexts.filter((context) => context.length > 0)).toHaveLength(1);
 		expect(contexts.join("").length).toBeLessThan(1_000);
-		expect(contexts.join("")).toContain("Instructions from:");
+		expect(contexts.join("")).toContain("MUST READ");
 		expect(contexts.join("")).toContain("CONTEXT.md");
 	});
 });

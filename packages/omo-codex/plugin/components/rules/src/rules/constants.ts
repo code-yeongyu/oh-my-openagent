@@ -88,6 +88,22 @@ export const DEFAULT_POST_COMPACT_MAX_RULE_CHARS = 3500;
 export const DEFAULT_POST_COMPACT_MAX_RESULT_CHARS = 4000;
 
 /**
+ * Per-rule / total caps for dynamic (PostToolUse) injection. Kept far below the
+ * static defaults so mid-session rule matches stay lightweight.
+ */
+export const DEFAULT_DYNAMIC_MAX_RULE_CHARS = 4000;
+
+export const DEFAULT_DYNAMIC_MAX_RESULT_CHARS = 10000;
+
+/**
+ * Per-rule / total caps for UserPromptSubmit static injection. SessionStart
+ * keeps the full budget; prompt-time stragglers inject at a reduced size.
+ */
+export const DEFAULT_PROMPT_MAX_RULE_CHARS = 6000;
+
+export const DEFAULT_PROMPT_MAX_RESULT_CHARS = 16000;
+
+/**
  * Truncation marker template. `{path}` is replaced with the relative path.
  */
 export const TRUNCATION_NOTICE = "\n\n[Truncated. Full: {path}]";

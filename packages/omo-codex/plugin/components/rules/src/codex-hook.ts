@@ -3,6 +3,7 @@ import { configFromEnvironment } from "./config.js";
 import { hasContextPressureMarker, transcriptHasContextPressureMarker } from "./context-pressure.js";
 import { createHookDebugTimer } from "./debug-log.js";
 import { fingerprintDynamicTargets } from "./dynamic-target-fingerprints.js";
+import { withDynamicBudget } from "./event-budget.js";
 import { formatAdditionalContextOutput } from "./hook-output.js";
 import { displayPath, uniqueStrings } from "./path-utils.js";
 import {
@@ -175,11 +176,12 @@ export async function runPostToolUseHook(
 		debugTimer.done({ outputBytes: 0, reason: "post-compact-recovery-in-progress" });
 		return "";
 	}
+	const dynamicConfig = withDynamicBudget(config);
 	const engine = createRulesEngine(
 		options,
 		completedPostCompactKind !== undefined
-			? withPostCompactBudget(config, { model: input.model, transcriptPath: input.transcript_path })
-			: config,
+			? withPostCompactBudget(dynamicConfig, { model: input.model, transcriptPath: input.transcript_path })
+			: dynamicConfig,
 	);
 	hydrateEngineState(engine, cachePath);
 	debugTimer.lap("hydrate", {
