@@ -13,6 +13,7 @@ import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
 import { deduplicateSkillsByName } from "./skill-deduplication"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import { loadSkillsFromDir } from "./skill-directory-loader"
 
 export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {

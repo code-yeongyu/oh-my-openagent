@@ -3,6 +3,7 @@ import { resolveCommandsInText } from "../../shared/command-executor/resolve-com
 import { resolveFileReferencesInText } from "../../shared/file-reference-resolver"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import * as commandDiscovery from "../../tools/slashcommand/command-discovery"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import type { CommandInfo as DiscoveredCommandInfo, CommandMetadata } from "../../tools/slashcommand/types"
 import type { ParsedSlashCommand } from "./types"
 
@@ -70,9 +71,7 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
 
 async function findCommand(commandName: string, options?: ExecutorOptions): Promise<CommandInfo | null> {
   const allCommands = await discoverAllCommands(options)
-  return allCommands.find(
-    (cmd) => cmd.name.toLowerCase() === commandName.toLowerCase()
-  ) ?? null
+  return matchSkillByName(allCommands, commandName) ?? null
 }
 
 async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<string> {
