@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { contextCwd } from "../request-context.js";
 import { LspClientConnection } from "./connection.js";
+import { effectiveExtension } from "./effective-extension.js";
 import { getLanguageId } from "./language-mappings.js";
 import type {
 	Diagnostic,
@@ -36,7 +37,7 @@ export class LspClient extends LspClientConnection {
 		const text = readFileSync(absPath, "utf-8");
 
 		if (!this.openedFiles.has(absPath)) {
-			const ext = extname(absPath);
+			const ext = effectiveExtension(absPath);
 			const languageId = getLanguageId(ext);
 			const version = 1;
 
