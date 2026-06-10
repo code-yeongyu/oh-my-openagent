@@ -4,6 +4,9 @@ import { clearVisionCapableModelsCache, setVisionCapableModelsCache } from "../.
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
+type LookAtPart = { type: string; url: string; mime: string; filename: string; text: string }
+type LookAtPromptBody = { model?: unknown; tools: Record<string, boolean>; parts: LookAtPart[] }
+
 describe("look-at tool", () => {
   afterEach(() => {
     clearVisionCapableModelsCache()
@@ -263,7 +266,7 @@ describe("look-at tool", () => {
     test("passes multimodal-looker model to sync prompt when available", async () => {
       setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]))
 
-      let promptBody: any
+      let promptBody!: LookAtPromptBody
 
       const mockClient = {
         app: {
@@ -280,7 +283,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_model_passthrough" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -574,7 +577,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then should send data URL to sync prompt
     test("sends data URL when image_data provided", async () => {
-      let promptBody: any
+      let promptBody!: LookAtPromptBody
 
       const mockClient = {
         app: {
@@ -583,7 +586,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_image_data_test" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -616,7 +619,7 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      const filePart = promptBody.parts.find((p: LookAtPart) => p.type === "file")!
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:image/png;base64")
       expect(filePart.mime).toBe("image/png")
@@ -627,7 +630,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then should detect mime type and create proper data URL
     test("handles raw base64 without data URI prefix", async () => {
-      let promptBody: any
+      let promptBody!: LookAtPromptBody
 
       const mockClient = {
         app: {
@@ -636,7 +639,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_raw_base64_test" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -669,7 +672,7 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      const filePart = promptBody.parts.find((p: LookAtPart) => p.type === "file")!
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:")
       expect(filePart.url).toContain("base64")
@@ -678,7 +681,7 @@ describe("look-at tool", () => {
 
   describe("createLookAt prompt conditional on Read availability", () => {
     const captureLastPromptBody = () => {
-      const captured: { body: any } = { body: undefined }
+      const captured: { body: LookAtPromptBody } = { body: undefined as unknown as LookAtPromptBody }
       const mockClient = {
         app: {
           agents: async () => ({ data: [] }),
@@ -686,7 +689,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_prompt_conditional" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             captured.body = input.body
             return { data: {} }
           },
@@ -728,7 +731,7 @@ describe("look-at tool", () => {
       )
 
       expect(captured.body.tools.read).toBe(false)
-      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptPart = captured.body.parts.find((p: LookAtPart) => p.type === "text")!
       expect(promptPart).toBeDefined()
       const promptText: string = promptPart.text
       expect(promptText).toContain("attached")
@@ -753,7 +756,7 @@ describe("look-at tool", () => {
       )
 
       expect(captured.body.tools.read).toBe(false)
-      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptPart = captured.body.parts.find((p: LookAtPart) => p.type === "text")!
       expect(promptPart).toBeDefined()
       const promptText: string = promptPart.text
       expect(promptText).toContain("attached")
@@ -777,7 +780,7 @@ describe("look-at tool", () => {
         buildToolContext(),
       )
 
-      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptPart = captured.body.parts.find((p: LookAtPart) => p.type === "text")!
       const promptText: string = promptPart.text
       // The prompt must mention the agent cannot use Read so the agent does not hallucinate
       expect(promptText.toLowerCase()).toContain("read tool")
