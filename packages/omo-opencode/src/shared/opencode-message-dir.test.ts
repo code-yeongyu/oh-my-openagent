@@ -31,11 +31,11 @@ describe("getMessageDir", () => {
   })
 
   afterEach(() => {
-    try { rmSync(TEST_MESSAGE_STORAGE, { recursive: true, force: true }) } catch {}
+    try { rmSync(TEST_MESSAGE_STORAGE, { recursive: true, force: true }) } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
   })
 
   afterAll(() => {
-    try { rmSync(TEST_STORAGE, { recursive: true, force: true }) } catch {}
+    try { rmSync(TEST_STORAGE, { recursive: true, force: true }) } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
   })
 
   it("returns null when sessionID does not start with ses_", () => {

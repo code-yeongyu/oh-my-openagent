@@ -16,9 +16,8 @@ export function writeMcpLifecycleLog(event: string, fields: Record<string, LogFi
   try {
     rotateLogIfNeeded(path);
     appendFileSync(path, `${JSON.stringify({ ts: new Date().toISOString(), event, pid: process.pid, ppid: process.ppid, ...fields })}\n`);
-  } catch (error) {
-    if (error instanceof Error) return;
-    return;
+  } catch {
+    // best-effort log write — never throws
   }
 }
 
@@ -26,8 +25,7 @@ function rotateLogIfNeeded(path: string): void {
   try {
     if (statSync(path).size < MAX_LOG_BYTES) return;
     renameSync(path, `${path}.1`);
-  } catch (error) {
-    if (error instanceof Error) return;
-    return;
+  } catch {
+    // best-effort log rotation — never throws
   }
 }

@@ -262,8 +262,7 @@ async function trackCodexInstallTelemetry(): Promise<void> {
     const posthog = createInstallPostHog()
     posthog.trackActive(getPostHogDistinctId(), "install_completed")
     await posthog.shutdown()
-  } catch (error) {
-    if (error instanceof Error) return
+  } catch {
     return
   }
 }

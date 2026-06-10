@@ -2,7 +2,8 @@ const { beforeEach, describe, test, expect, mock } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
 const { clearCallableAgentsCache } = require("./agent-resolver")
 
-type PluginInput = { client: any; directory: string }
+type OpencodeClient = import("@opencode-ai/plugin").PluginInput["client"]
+type PluginInput = { client: OpencodeClient; directory: string }
 type BackgroundManager = {
   assertCanSpawn: Function
   reserveSubagentSpawn: Function
@@ -16,7 +17,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       app: {
         agents: mock(() => Promise.resolve({ data: agents })),
       },
-    },
+    } as unknown as OpencodeClient,
     directory: "/test",
     }
 }
@@ -27,7 +28,7 @@ function createFailingMockCtx(error: Error = new Error("API unavailable")): Plug
       app: {
         agents: mock(() => Promise.reject(error)),
       },
-    },
+    } as unknown as OpencodeClient,
     directory: "/test",
     }
 }
