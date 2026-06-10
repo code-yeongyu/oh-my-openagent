@@ -6,6 +6,7 @@ import { detectCodexInstallation, type CodexInstallationDetection } from "../../
 import { resolveCodexInstallerBinDir } from "../../install-codex/install-codex"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, CodexConfigSummary, CodexDoctorSummary, DoctorIssue } from "../types"
+import packageJson from "../../../../package.json" with { type: "json" }
 
 type DetectCodexInstallation = () => Promise<CodexInstallationDetection>
 
@@ -13,6 +14,7 @@ export interface CodexDoctorDeps {
   readonly codexHome?: string
   readonly binDir?: string
   readonly detectCodexInstallation?: DetectCodexInstallation
+  readonly installerVersion?: string
 }
 
 interface JsonRecord {
@@ -41,6 +43,7 @@ export async function gatherCodexSummary(deps: CodexDoctorDeps = {}): Promise<Co
   const manifest = pluginRoot === null ? null : await readJson(join(pluginRoot, ".codex-plugin", "plugin.json"))
   const installSnapshot = pluginRoot === null ? null : await readJson(join(pluginRoot, "lazycodex-install.json"))
   const configPath = join(codexHome, "config.toml")
+  const pluginVersion = stringField(manifest, "version")
 
   return {
     codexPath: detection.found && "path" in detection ? detection.path : null,
@@ -48,7 +51,9 @@ export async function gatherCodexSummary(deps: CodexDoctorDeps = {}): Promise<Co
     codexAppId: detection.found && "appId" in detection ? detection.appId : null,
     marketplaceName: MARKETPLACE_NAME,
     pluginName: PLUGIN_NAME,
-    pluginVersion: stringField(manifest, "version"),
+    pluginVersion,
+    pluginVersionStamped: pluginVersion !== null && pluginVersion !== DEFAULT_PLUGIN_VERSION,
+    installerVersion: deps.installerVersion ?? packageJson.version,
     packageName: stringField(installSnapshot, "packageName"),
     packageVersion: stringField(installSnapshot, "version"),
     pluginRoot,
@@ -69,8 +74,9 @@ export async function checkCodex(deps: CodexDoctorDeps = {}): Promise<CheckResul
     message: status === "pass" ? "Codex checks passed" : `${issues.length} Codex issue(s) detected`,
     details: [
       `Codex: ${summary.codexPath ?? summary.codexAppId ?? "not detected"}`,
+      `CLI: oh-my-openagent@${summary.installerVersion}`,
       `Marketplace: ${summary.marketplaceName}`,
-      `Plugin: ${summary.pluginName}@${summary.pluginVersion ?? "unknown"}`,
+      `Plugin: ${summary.pluginName}@${summary.pluginVersion ?? "unknown"}${summary.pluginVersionStamped ? "" : " (placeholder, not stamped)"}`,
       `Distribution: ${summary.packageName ?? "unknown"}@${summary.packageVersion ?? "unknown"}`,
       `Config: ${summary.configPath}`,
       `Enabled plugin: ${summary.config.pluginEnabled ? "omo@sisyphuslabs" : "missing"}`,
@@ -99,6 +105,14 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
       fix: "Run: npx lazycodex-ai install",
       severity: "error",
       affects: ["plugin loading"],
+    })
+  } else if (!summary.pluginVersionStamped) {
+    issues.push({
+      title: "Codex plugin bundle is not version-stamped",
+      description: `The installed OMO Codex plugin reports the placeholder version ${summary.pluginVersion ?? "unknown"}${summary.packageVersion === null ? " and no distribution snapshot was found" : ""}. This usually means it was installed through the Codex app plugin UI instead of the CLI installer, so its version does not reflect the real release. Your CLI is oh-my-openagent ${summary.installerVersion}.`,
+      fix: "Run: npx lazycodex-ai install",
+      severity: "warning",
+      affects: ["version reporting"],
     })
   }
   if (!summary.config.pluginEnabled) {

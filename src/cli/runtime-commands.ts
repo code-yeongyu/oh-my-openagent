@@ -4,6 +4,7 @@ import { boulder } from "./boulder"
 import { codexUlwLoop } from "./codex-ulw-loop"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { runSparkShell } from "./sparkshell"
+import { PLUGIN_NAME } from "../shared"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -39,7 +40,7 @@ export function configureRuntimeCommands(program: Command): void {
     .command("version")
     .description("Show version information")
     .action(() => {
-      console.log(`oh-my-opencode v${VERSION}`)
+      console.log(`${PLUGIN_NAME} v${VERSION}`)
     })
 
   program
