@@ -77,12 +77,13 @@ function addAncestorCommandCandidates(
     const sourceCliPath = resolve(currentDirectory, PACKAGE_REL, SOURCE_CLI_REL)
     if (!seenPaths.has(sourceCliPath)) {
       const runtime = resolveExecutable("bun")
+      const engineDistPath = resolve(currentDirectory, LSP_TOOLS_PACKAGE_REL, DIST_CLI_REL)
       seenPaths.add(sourceCliPath)
       target.push({
         command: [runtime.command, sourceCliPath, "mcp"],
         root: currentDirectory,
         path: sourceCliPath,
-        exists: runtime.available && pathExists(sourceCliPath),
+        exists: runtime.available && pathExists(sourceCliPath) && pathExists(engineDistPath),
       })
     }
 

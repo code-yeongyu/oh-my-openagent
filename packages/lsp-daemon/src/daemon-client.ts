@@ -52,12 +52,18 @@ export function callDiagnosticsViaDaemon(
 	return callToolViaDaemon("diagnostics", { filePath, severity: "error" }, options);
 }
 
+const FORWARDED_ENV_KEYS = [
+	"LSP_TOOLS_MCP_PROJECT_CONFIG",
+	"LSP_TOOLS_MCP_USER_CONFIG",
+	"LSP_TOOLS_MCP_INSTALL_DECISIONS",
+] as const;
+
 export function currentRequestContext(env: NodeJS.ProcessEnv = process.env): DaemonToolContext {
 	const forwarded: Record<string, string> = {};
-	const project = env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
-	if (project !== undefined) forwarded["LSP_TOOLS_MCP_PROJECT_CONFIG"] = project;
-	const user = env["LSP_TOOLS_MCP_USER_CONFIG"];
-	if (user !== undefined) forwarded["LSP_TOOLS_MCP_USER_CONFIG"] = user;
+	for (const key of FORWARDED_ENV_KEYS) {
+		const value = env[key];
+		if (value !== undefined) forwarded[key] = value;
+	}
 	return { cwd: process.cwd(), env: forwarded };
 }
 

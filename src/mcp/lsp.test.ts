@@ -44,15 +44,18 @@ describe("createLspMcpConfig", () => {
     expect(config.command).toEqual([nodePath, cliPath, "mcp"])
   })
 
-  it("falls back to bun source cli for source checkouts before build", () => {
+  it("uses the bun daemon source cli when the engine dist is already built", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-lsp-source-root-")
     const moduleFilePath = join(packageRoot, "src", "mcp", "lsp.ts")
     const sourceCliPath = join(packageRoot, "packages", "lsp-daemon", "src", "cli.ts")
+    const toolsDistPath = join(packageRoot, "packages", "lsp-tools-mcp", "dist", "cli.js")
     const bunPath = join(packageRoot, "bin", "bun")
     mkdirSync(join(packageRoot, "src", "mcp"), { recursive: true })
     mkdirSync(join(packageRoot, "packages", "lsp-daemon", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
     writeFileSync(sourceCliPath, "console.log('mcp')\n", "utf-8")
+    writeFileSync(toolsDistPath, "#!/usr/bin/env node\n", "utf-8")
 
     // when
     const config = createLspMcpConfig({
@@ -64,6 +67,38 @@ describe("createLspMcpConfig", () => {
     // then
     expect(config.enabled).toBe(true)
     expect(config.command).toEqual([bunPath, sourceCliPath, "mcp"])
+  })
+
+  it("does not run the bun daemon source cli when the engine dist is missing; bootstraps instead", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-lsp-source-no-engine-root-")
+    const moduleFilePath = join(packageRoot, "src", "mcp", "lsp.ts")
+    const sourceCliPath = join(packageRoot, "packages", "lsp-daemon", "src", "cli.ts")
+    const bunPath = join(packageRoot, "bin", "bun")
+    const nodePath = join(packageRoot, "bin", "node")
+    const npmPath = join(packageRoot, "bin", "npm")
+    mkdirSync(join(packageRoot, "src", "mcp"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "src"), { recursive: true })
+    writeFileSync(sourceCliPath, "console.log('mcp')\n", "utf-8")
+    writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
+    writeFileSync(
+      join(packageRoot, "packages", "lsp-daemon", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/lsp-daemon" }),
+      "utf-8",
+    )
+
+    // when
+    const config = createLspMcpConfig({
+      cwd: createTemporaryDirectory("omo-lsp-source-no-engine-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath, node: nodePath, npm: npmPath }),
+    })
+
+    // then
+    expect(config.command).not.toContain(sourceCliPath)
+    expect(config.command[1]).toBe("-e")
+    expect(config.command[3]).toBe(packageRoot)
+    expect(config.enabled).toBe(true)
   })
 
   it("does not resolve the MCP command from the opened workspace", () => {
