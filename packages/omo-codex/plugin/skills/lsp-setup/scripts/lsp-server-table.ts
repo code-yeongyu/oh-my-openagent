@@ -147,6 +147,13 @@ export const LANGUAGES: readonly LanguageServer[] = [
 		installHint: "macOS: brew install hashicorp/tap/terraform-ls | https://github.com/hashicorp/terraform-ls",
 	},
 	{
+		language: "dockerfile",
+		serverId: "dockerfile",
+		command: ["docker-langserver", "--stdio"],
+		extensions: [".dockerfile"],
+		installHint: "npm install -g dockerfile-language-server-nodejs",
+	},
+	{
 		language: "haskell",
 		serverId: "haskell-language-server",
 		command: ["haskell-language-server-wrapper", "--lsp"],

@@ -28,6 +28,13 @@ const SKIP_DIRECTORIES = new Set<string>([
 
 const MAX_FILES = 50_000
 
+// Mirrors effectiveExtension() in packages/lsp-tools-mcp/src/lsp/effective-extension.ts:
+// extensionless Dockerfile/Containerfile resolve to .dockerfile (exact-case basenames).
+const BASENAME_EXTENSIONS: Record<string, string> = {
+	Dockerfile: ".dockerfile",
+	Containerfile: ".dockerfile",
+}
+
 interface ConfigFileState {
 	readonly path: string
 	readonly exists: boolean
@@ -74,7 +81,7 @@ function collectExtensions(root: string): ReadonlySet<string> {
 				if (!SKIP_DIRECTORIES.has(entry)) stack.push(fullPath)
 			} else if (kind === "file") {
 				visited += 1
-				const ext = extname(entry).toLowerCase()
+				const ext = (BASENAME_EXTENSIONS[entry] ?? extname(entry)).toLowerCase()
 				if (ext.length > 0) found.add(ext)
 			}
 		}
