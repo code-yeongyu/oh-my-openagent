@@ -2,6 +2,7 @@ import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../../
 import { getModelCapabilities } from "../../../shared/model-capabilities"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
+import { collectCustomProviderLimitIssues } from "./custom-provider-limits"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { loadOmoConfig } from "./model-resolution-config"
 import { buildModelResolutionDetails } from "./model-resolution-details"
@@ -133,6 +134,7 @@ export async function checkModels(): Promise<CheckResult> {
   }
 
   issues.push(...collectCapabilityResolutionIssues(info))
+  issues.push(...collectCustomProviderLimitIssues())
 
   const overrideCount =
     info.agents.filter((agent) => Boolean(agent.userOverride)).length +
