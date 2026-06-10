@@ -22,11 +22,6 @@ on:
         required: false
         type: boolean
         default: false
-      sync_lazycodex_marketplace:
-        description: "Release the LazyCodex Codex marketplace repository when the omo-codex payload changed"
-        required: false
-        type: boolean
-        default: true
       publish_lazycodex:
         description: "Publish the lazycodex-ai npm alias"
         required: false
@@ -122,13 +117,14 @@ jobs:
 
   preflight-trust:
     runs-on: ubuntu-latest
+    needs: [release-metadata]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     permissions:
       id-token: write
       contents: read
     steps:
       - name: Require LazyCodex sync token
-        if: inputs.sync_lazycodex_marketplace != false
+        if: needs.release-metadata.outputs.dist_tag == ''
         env:
           LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
         run: |
@@ -608,6 +604,9 @@ jobs:
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
+          node packages/omo-codex/plugin/scripts/sync-version.mjs
+          node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+
       - name: Commit version bump
         if: steps.release-state.outputs.release_commit_exists != 'true'
         env:
@@ -615,7 +614,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/hooks.json packages/omo-codex/plugin/components/*/hooks/hooks.json
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
@@ -654,7 +653,7 @@ jobs:
           fi
 
       - name: Checkout LazyCodex marketplace
-        if: inputs.sync_lazycodex_marketplace != false
+        if: needs.release-metadata.outputs.dist_tag == ''
         uses: actions/checkout@v4
         with:
           repository: code-yeongyu/lazycodex
@@ -663,7 +662,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sync LazyCodex Codex marketplace
-        if: inputs.sync_lazycodex_marketplace != false
+        if: needs.release-metadata.outputs.dist_tag == ''
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
@@ -692,7 +691,7 @@ jobs:
 
       - name: Resolve LazyCodex release payload
         id: lazycodex-release-state
-        if: inputs.sync_lazycodex_marketplace != false
+        if: needs.release-metadata.outputs.dist_tag == ''
         env:
           PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}
         run: |
@@ -727,7 +726,7 @@ jobs:
           echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Create LazyCodex GitHub release
-        if: inputs.sync_lazycodex_marketplace != false && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
+        if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
