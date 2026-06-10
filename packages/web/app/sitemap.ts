@@ -4,7 +4,7 @@ const BASE_URL = "https://omo.dev"
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = ["", "/docs", "/manifesto"]
-  const locales = ["en", "ko", "ja", "zh"]
+  const locales = ["en", "ko", "ja", "zh", "ru"]
 
   return routes.flatMap((route) =>
     locales.map((locale) => ({
