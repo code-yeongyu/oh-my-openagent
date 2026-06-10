@@ -79,7 +79,9 @@ function createCodexDoctorResult(): DoctorResult {
     codexAppId: null,
     marketplaceName: "sisyphuslabs",
     pluginName: "omo",
-    pluginVersion: "0.1.0",
+    pluginVersion: "4.7.5",
+    pluginVersionStamped: true,
+    installerVersion: "4.7.5",
     packageName: "lazycodex-ai",
     packageVersion: "4.7.5",
     pluginRoot: "/tmp/omo",
@@ -163,7 +165,7 @@ describe("formatDoctorOutput", () => {
       //#then
       expect(output).toContain("Codex")
       expect(output).toContain("/usr/local/bin/codex")
-      expect(output).toContain("Plugin     omo@0.1.0")
+      expect(output).toContain("Plugin     omo@4.7.5")
       expect(output).toContain("Package    lazycodex-ai@4.7.5")
       expect(output).toContain("Bins       omo · omo-rules")
       expect(output).not.toContain("opencode")
@@ -226,7 +228,7 @@ describe("formatDoctorOutput", () => {
       //#then
       expect(output).toContain("Codex Information")
       expect(output).toContain("marketplace sisyphuslabs")
-      expect(output).toContain("plugin     omo@0.1.0")
+      expect(output).toContain("plugin     omo@4.7.5")
       expect(output).toContain("package    lazycodex-ai@4.7.5")
       expect(output).not.toContain("OpenCode")
     })

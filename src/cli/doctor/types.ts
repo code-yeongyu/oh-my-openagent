@@ -90,6 +90,8 @@ export interface CodexDoctorSummary {
   readonly marketplaceName: string
   readonly pluginName: string
   readonly pluginVersion: string | null
+  readonly pluginVersionStamped: boolean
+  readonly installerVersion: string
   readonly packageName: string | null
   readonly packageVersion: string | null
   readonly pluginRoot: string | null

@@ -89,7 +89,9 @@ describe("formatDefault", () => {
       codexAppId: null,
       marketplaceName: "sisyphuslabs",
       pluginName: "omo",
-      pluginVersion: "0.1.0",
+      pluginVersion: "4.7.5",
+      pluginVersionStamped: true,
+      installerVersion: "4.7.5",
       packageName: "lazycodex-ai",
       packageVersion: "4.7.5",
       pluginRoot: "/tmp/omo",
@@ -109,7 +111,7 @@ describe("formatDefault", () => {
     const output = stripAnsi(formatDefault(result))
 
     //#then
-    expect(output).toContain("LazyCodex OK (codex /usr/local/bin/codex · omo 0.1.0 · lazycodex-ai 4.7.5)")
+    expect(output).toContain("LazyCodex OK (codex /usr/local/bin/codex · omo 4.7.5 · lazycodex-ai 4.7.5)")
     expect(output).not.toContain("opencode")
   })
 })

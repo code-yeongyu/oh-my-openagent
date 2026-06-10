@@ -11,9 +11,10 @@ export function formatStatus(result: DoctorResult): string {
     const codex = result.codex.codexPath ?? result.codex.codexAppId ?? "unknown"
     const pluginVersion = result.codex.pluginVersion ?? "unknown"
     const packageName = result.codex.packageName ?? "lazycodex-ai"
-    const packageVersion = result.codex.packageVersion ?? "unknown"
+    const packageVersion = result.codex.packageVersion ?? result.codex.installerVersion
     lines.push(`  Codex      ${codex}`)
-    lines.push(`  Plugin     ${result.codex.pluginName}@${pluginVersion}`)
+    lines.push(`  CLI        oh-my-openagent@${result.codex.installerVersion}`)
+    lines.push(`  Plugin     ${result.codex.pluginName}@${pluginVersion}${result.codex.pluginVersionStamped ? "" : " (placeholder)"}`)
     lines.push(`  Package    ${packageName}@${packageVersion}`)
     lines.push(`  Config     ${result.codex.configPath} ${result.codex.config.pluginEnabled ? color.green("(enabled)") : color.red("(disabled)")}`)
     lines.push(`  Bins       ${result.codex.linkedBins.length > 0 ? result.codex.linkedBins.join(" · ") : "none"}`)

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
@@ -22,7 +22,7 @@ async function createInstalledCodexHome(): Promise<{ readonly codexHome: string;
   await mkdir(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs", "plugins", "omo"), { recursive: true })
   await mkdir(join(codexHome, "agents"), { recursive: true })
   await mkdir(binDir, { recursive: true })
-  await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "0.1.0" }))
+  await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "4.7.5" }))
   await writeFile(join(pluginRoot, "lazycodex-install.json"), JSON.stringify({ packageName: "lazycodex-ai", version: "4.7.5" }))
   await writeFile(
     join(codexHome, "config.toml"),
@@ -64,7 +64,8 @@ describe("codex doctor checks", () => {
     expect(summary.codexPath).toBe("/usr/local/bin/codex")
     expect(summary.marketplaceName).toBe("sisyphuslabs")
     expect(summary.pluginName).toBe("omo")
-    expect(summary.pluginVersion).toBe("0.1.0")
+    expect(summary.pluginVersion).toBe("4.7.5")
+    expect(summary.pluginVersionStamped).toBe(true)
     expect(summary.packageName).toBe("lazycodex-ai")
     expect(summary.packageVersion).toBe("4.7.5")
     expect(summary.pluginRoot).toBe(pluginRoot)
@@ -169,11 +170,51 @@ describe("codex doctor checks", () => {
     expect(result.status).toBe("pass")
     expect(result.details).toContain("Codex: /usr/local/bin/codex")
     expect(result.details).toContain("Marketplace: sisyphuslabs")
-    expect(result.details).toContain("Plugin: omo@0.1.0")
+    expect(result.details).toContain("Plugin: omo@4.7.5")
     expect(result.details).toContain("Distribution: lazycodex-ai@4.7.5")
     expect(result.details).toContain("Enabled plugin: omo@sisyphuslabs")
     expect(result.details).toContain("Linked bins: omo, omo-rules")
     expect(result.details).toContain("Agents: plan")
+  })
+
+  test("#given a stamped plugin bundle #when gathering Codex summary #then it reports the installer version and stamped state", async () => {
+    // given
+    const { codexHome, binDir } = await createInstalledCodexHome()
+
+    // when
+    const summary = await gatherCodexSummary({
+      codexHome,
+      binDir,
+      installerVersion: "4.8.1",
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+
+    // then
+    expect(summary.pluginVersionStamped).toBe(true)
+    expect(summary.installerVersion).toBe("4.8.1")
+  })
+
+  test("#given an un-stamped placeholder plugin bundle with no install snapshot #when checking Codex doctor #then it warns and points at the installer version", async () => {
+    // given (Codex app plugin UI install leaves the placeholder version and no snapshot)
+    const { codexHome, binDir, pluginRoot } = await createInstalledCodexHome()
+    await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "0.1.0" }))
+    await rm(join(pluginRoot, "lazycodex-install.json"))
+
+    // when
+    const result = await checkCodex({
+      codexHome,
+      binDir,
+      installerVersion: "4.8.1",
+      detectCodexInstallation: async () => ({ found: true, source: "windows-start-app", appId: "com.openai.codex" }),
+    })
+
+    // then
+    expect(result.status).toBe("warn")
+    const stampIssue = result.issues.find((issue) => issue.title === "Codex plugin bundle is not version-stamped")
+    expect(stampIssue).toBeDefined()
+    expect(stampIssue?.severity).toBe("warning")
+    expect(stampIssue?.description).toContain("oh-my-openagent 4.8.1")
+    expect(stampIssue?.fix).toContain("npx lazycodex-ai install")
   })
 
   test("#given malformed lazycodex install snapshot #when gathering Codex summary #then does not crash", async () => {
