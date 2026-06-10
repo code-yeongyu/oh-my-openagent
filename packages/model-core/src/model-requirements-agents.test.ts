@@ -17,15 +17,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary?.variant).toBe("high")
   })
 
-  test("sisyphus keeps opus primary before k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
+  test("sisyphus keeps opus primary before k2p5, kimi-k2.5, gpt-5.5 medium, deepseek-v4-pro, and big-pickle", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, last] = sisyphus.fallbackChain
+    const [primary, second, third, fourth, fifth, sixth, seventh, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(7)
+    expect(sisyphus.fallbackChain).toHaveLength(8)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -40,67 +40,74 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.5",
       variant: "medium",
     })
-    expect(sixth?.providers[0]).toBe("zai-coding-plan")
-    expect(sixth?.model).toBe("glm-5")
+    expect(sixth).toEqual({
+      providers: ["llmgateway", "opencode", "vercel"],
+      model: "deepseek-v4-pro",
+      variant: "max",
+    })
+    expect(seventh?.providers[0]).toBe("zai-coding-plan")
+    expect(seventh?.model).toBe("glm-5")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
 
-  test("librarian keeps fast OpenAI primary before qwen, minimax, haiku, and nano fallbacks", () => {
+  test("librarian keeps fast OpenAI primary before qwen, deepseek-v4-flash, minimax, haiku, and nano fallbacks", () => {
     // given
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, seventh, eighth] =
+    const [primary, second, third, fourth, fifth, sixth, seventh, eighth, ninth] =
       librarian.fallbackChain
 
     // then
-    expect(librarian.fallbackChain).toHaveLength(8)
+    expect(librarian.fallbackChain).toHaveLength(9)
     expect(primary).toEqual({ providers: ["openai"], model: "gpt-5.4-mini-fast" })
     expect(second?.providers).toContain("opencode-go")
     expect(second?.providers).toContain("bailian-coding-plan")
     expect(second?.model).toBe("qwen3.5-plus")
-    expect(third).toEqual({ providers: ["vercel"], model: "minimax-m2.7-highspeed" })
-    expect(fourth?.providers).toContain("opencode-go")
-    expect(fourth?.model).toBe("minimax-m3")
-    expect(fifth).toEqual({
+    expect(third).toEqual({ providers: ["opencode-go", "vercel"], model: "deepseek-v4-flash" })
+    expect(fourth).toEqual({ providers: ["vercel"], model: "minimax-m2.7-highspeed" })
+    expect(fifth?.providers).toContain("opencode-go")
+    expect(fifth?.model).toBe("minimax-m3")
+    expect(sixth).toEqual({
       providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
       model: "MiniMax-M3",
     })
-    expect(sixth?.providers).toContain("opencode-go")
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(seventh?.providers).toContain("anthropic")
-    expect(seventh?.model).toBe("claude-haiku-4-5")
-    expect(eighth?.providers).toContain("openai")
-    expect(eighth?.model).toBe("gpt-5.4-nano")
+    expect(seventh?.providers).toContain("opencode-go")
+    expect(seventh?.model).toBe("minimax-m2.7")
+    expect(eighth?.providers).toContain("anthropic")
+    expect(eighth?.model).toBe("claude-haiku-4-5")
+    expect(ninth?.providers).toContain("openai")
+    expect(ninth?.model).toBe("gpt-5.4-nano")
   })
 
-  test("explore keeps fast OpenAI primary before qwen, minimax, haiku, and nano fallbacks", () => {
+  test("explore keeps fast OpenAI primary before qwen, deepseek-v4-flash, minimax, haiku, and nano fallbacks", () => {
     // given
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, seventh, eighth] = explore.fallbackChain
+    const [primary, second, third, fourth, fifth, sixth, seventh, eighth, ninth] = explore.fallbackChain
 
     // then
-    expect(explore.fallbackChain).toHaveLength(8)
+    expect(explore.fallbackChain).toHaveLength(9)
     expect(primary).toEqual({ providers: ["openai"], model: "gpt-5.4-mini-fast" })
     expect(second?.providers).toContain("opencode-go")
     expect(second?.providers).toContain("bailian-coding-plan")
     expect(second?.model).toBe("qwen3.5-plus")
-    expect(third).toEqual({ providers: ["vercel"], model: "minimax-m2.7-highspeed" })
-    expect(fourth?.providers).toContain("opencode-go")
-    expect(fourth?.model).toBe("minimax-m3")
-    expect(fifth).toEqual({
+    expect(third).toEqual({ providers: ["opencode-go", "vercel"], model: "deepseek-v4-flash" })
+    expect(fourth).toEqual({ providers: ["vercel"], model: "minimax-m2.7-highspeed" })
+    expect(fifth?.providers).toContain("opencode-go")
+    expect(fifth?.model).toBe("minimax-m3")
+    expect(sixth).toEqual({
       providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
       model: "MiniMax-M3",
     })
-    expect(sixth?.providers).toContain("opencode-go")
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(seventh?.providers).toContain("anthropic")
-    expect(seventh?.model).toBe("claude-haiku-4-5")
-    expect(eighth?.providers).toContain("openai")
-    expect(eighth?.model).toBe("gpt-5.4-nano")
+    expect(seventh?.providers).toContain("opencode-go")
+    expect(seventh?.model).toBe("minimax-m2.7")
+    expect(eighth?.providers).toContain("anthropic")
+    expect(eighth?.model).toBe("claude-haiku-4-5")
+    expect(ninth?.providers).toContain("openai")
+    expect(ninth?.model).toBe("gpt-5.4-nano")
   })
 
   test("multimodal-looker keeps vision-capable fallback order", () => {
