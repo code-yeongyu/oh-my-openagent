@@ -6,7 +6,7 @@ import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./syste
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared/jsonc-parser"
-import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
 
 interface SystemCheckDeps {
   findOpenCodeBinary: typeof findOpenCodeBinary
@@ -121,7 +121,7 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     issues.push({
       title: `${PLUGIN_NAME} is not registered`,
       description: "Plugin entry is missing from OpenCode configuration.",
-      fix: `Run: bunx ${PUBLISHED_PACKAGE_NAME} install`,
+      fix: `Run: bunx ${PLUGIN_NAME} install`,
       severity: "error",
       affects: ["all agents"],
     })
@@ -161,7 +161,7 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-        fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${PUBLISHED_PACKAGE_NAME}@${installTag}`,
+        fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${PLUGIN_NAME}@${installTag}`,
       severity: "warning",
       affects: ["plugin features"],
     })

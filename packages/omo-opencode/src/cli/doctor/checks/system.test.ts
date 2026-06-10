@@ -176,7 +176,7 @@ describe("system check", () => {
       //#then
       const outdatedIssue = result.issues.find((issue) => issue.title === "Loaded plugin is outdated")
       expect(outdatedIssue?.fix).toBe(
-        'Update: cd "/Users/test/Library/Caches/opencode with spaces" && bun add oh-my-opencode@canary'
+        'Update: cd "/Users/test/Library/Caches/opencode with spaces" && bun add oh-my-openagent@canary'
       )
     })
   })

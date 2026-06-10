@@ -7,7 +7,6 @@ import { resolveSymlink } from "../../../shared/file-utils"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { findPackageJsonUp } from "../../../hooks/auto-update-checker/checker/package-json-locator"
-import { PACKAGE_NAME } from "../constants"
 import { ACCEPTED_PACKAGE_NAMES, getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
 
 interface PackageJsonShape {
@@ -88,8 +87,13 @@ function selectInstalledPackage(candidate: InstallCandidate): PackageCandidate {
 }
 
 function getExpectedVersion(cachePackage: PackageJsonShape | null, packageName: string): string | null {
-  return normalizeVersion(cachePackage?.dependencies?.[packageName])
-    ?? normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
+  const directVersion = normalizeVersion(cachePackage?.dependencies?.[packageName])
+  if (directVersion) return directVersion
+  for (const name of ACCEPTED_PACKAGE_NAMES) {
+    const version = normalizeVersion(cachePackage?.dependencies?.[name])
+    if (version) return version
+  }
+  return null
 }
 
 function resolveInstalledPackageJsonPath(): { packageName: string; packageJsonPath: string } | null {
@@ -107,7 +111,7 @@ function resolveInstalledPackageJsonPath(): { packageName: string; packageJsonPa
     }
     const ownPackageJsonPath = findPackageJsonUp(fileURLToPath(import.meta.url))
     if (ownPackageJsonPath) {
-      return { packageName: PACKAGE_NAME, packageJsonPath: ownPackageJsonPath }
+      return { packageName: "oh-my-opencode", packageJsonPath: ownPackageJsonPath }
     }
   } catch (error) {
     if (!(error instanceof Error)) {
