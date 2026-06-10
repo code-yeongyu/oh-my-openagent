@@ -19,6 +19,10 @@ describe("mapClaudeModelToOpenCode", () => {
   })
 
   describe("#given Claude Code alias", () => {
+    it("#when called with claude #then maps to anthropic claude-opus-4-7 object", () => {
+      expect(mapClaudeModelToOpenCode("claude")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    })
+
     it("#when called with sonnet #then maps to anthropic claude-sonnet-4-6 object", () => {
       expect(mapClaudeModelToOpenCode("sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
     })

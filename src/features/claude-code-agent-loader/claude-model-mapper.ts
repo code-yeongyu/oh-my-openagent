@@ -4,6 +4,7 @@ import { normalizeModelID } from "../../shared/model-normalization"
 const ANTHROPIC_PREFIX = "anthropic/"
 
 const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
+  ["claude", `${ANTHROPIC_PREFIX}claude-opus-4-7`],
   ["sonnet", `${ANTHROPIC_PREFIX}claude-sonnet-4-6`],
   ["opus", `${ANTHROPIC_PREFIX}claude-opus-4-7`],
   ["haiku", `${ANTHROPIC_PREFIX}claude-haiku-4-5`],
