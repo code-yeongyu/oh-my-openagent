@@ -61,7 +61,3 @@ export function hasAnyConfiguredProvider(config: InstallConfig): boolean {
 export function getNoModelProvidersWarning(): string {
 	return `No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`
 }
-
-export function getClaudeNoSubscriptionHint(): string {
-	return `Will use ${ULTIMATE_FALLBACK} as fallback`
-}

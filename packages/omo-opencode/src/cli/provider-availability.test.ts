@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test"
 
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import {
-	getClaudeNoSubscriptionHint,
 	getNoModelProvidersWarning,
 	hasAnyConfiguredProvider,
 	isProviderAvailable,
@@ -47,7 +46,6 @@ describe("provider availability", () => {
     expect(getNoModelProvidersWarning()).toBe(
       `No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`,
     )
-    expect(getClaudeNoSubscriptionHint()).toBe(`Will use ${ULTIMATE_FALLBACK} as fallback`)
   })
 
   test("hasAnyConfiguredProvider treats Bailian-only config as configured", () => {
