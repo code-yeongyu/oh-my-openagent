@@ -51,9 +51,15 @@ export class ParentWakePendingQueue {
     const resolvedPromptContext = resolveParentWakePromptContext(promptContext)
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
-      pendingWake.notifications = mergeParentWakeNotifications(pendingWake.notifications, notification)
+      const mergedNotifications = mergeParentWakeNotifications(pendingWake.notifications, notification)
+      const notificationsChanged = mergedNotifications.length !== pendingWake.notifications.length
+        || mergedNotifications.some((merged, index) => merged !== pendingWake.notifications[index])
+      pendingWake.notifications = mergedNotifications
       pendingWake.promptContext = resolvedPromptContext
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
+      if (notificationsChanged) {
+        delete pendingWake.noReplyAdmittedAt
+      }
       return
     }
 
@@ -73,6 +79,7 @@ export class ParentWakePendingQueue {
       )
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
+      pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       return

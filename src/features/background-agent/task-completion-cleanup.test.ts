@@ -510,7 +510,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         // then
         expect(promptAsyncCalls).toHaveLength(1)
         expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-        expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
       }
@@ -556,7 +556,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         // then
         expect(promptAsyncCalls).toHaveLength(1)
         expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-        expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
       }
@@ -699,7 +699,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         // then
         expect(promptAsyncCalls).toHaveLength(1)
         expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-        expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
       }
