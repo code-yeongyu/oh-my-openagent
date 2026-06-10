@@ -125,6 +125,7 @@ async function interruptStaleTask(args: {
   timeoutConfigKey: "messageStalenessTimeoutMs" | "sessionGoneTimeoutMs" | "staleTimeoutMs"
   errorSuffix: string
   logReason: string
+  retryInFlightTaskIds?: ReadonlySet<string>
 }): Promise<void> {
   const {
     task,
@@ -140,6 +141,14 @@ async function interruptStaleTask(args: {
     logReason,
   } = args
 
+  if (args.retryInFlightTaskIds?.has(task.id)) {
+    log("[background-agent] Skipping stale interrupt for task with fallback retry in flight:", {
+      taskId: task.id,
+      sessionID,
+      reason,
+    })
+    return
+  }
   const aborted = await abortWithTimeout(client, sessionID)
   if (!aborted) {
     log("[background-agent] Task stale interruption skipped because session abort failed:", {
@@ -181,6 +190,7 @@ export async function checkAndInterruptStaleTasks(args: {
   sessionStatuses?: SessionStatusMap
   onTaskInterrupted?: (task: BackgroundTask) => void
   getSessionActivity?: SessionActivityResolver
+  retryInFlightTaskIds?: ReadonlySet<string>
 }): Promise<void> {
   const {
     tasks,
@@ -260,6 +270,7 @@ export async function checkAndInterruptStaleTasks(args: {
           timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "messageStalenessTimeoutMs",
           errorSuffix: " since start",
           logReason: "no progress since start",
+          retryInFlightTaskIds: args.retryInFlightTaskIds,
         }),
       )
       continue
@@ -310,6 +321,7 @@ export async function checkAndInterruptStaleTasks(args: {
         timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs",
         errorSuffix: "",
         logReason: "stale timeout",
+        retryInFlightTaskIds: args.retryInFlightTaskIds,
       }),
     )
   }
