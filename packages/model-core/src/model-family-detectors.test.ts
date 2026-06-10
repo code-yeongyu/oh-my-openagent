@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import {
+  isClaudeFable5Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
+  isClaudeOpus48Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
@@ -43,12 +45,29 @@ describe("model family detectors", () => {
     expect(isClaudeOpus47Model("anthropic/claude-sonnet-4-6")).toBe(false)
   })
 
+  test("#given Claude Opus 4.8 model ids #then detects Opus 4.8 only", () => {
+    expect(isClaudeOpus48Model("anthropic/claude-opus-4-8")).toBe(true)
+    expect(isClaudeOpus48Model("anthropic/claude-opus-4.8")).toBe(true)
+    expect(isClaudeOpus48Model("anthropic/claude-opus-4-7")).toBe(false)
+    expect(isClaudeOpus48Model("anthropic/claude-fable-5")).toBe(false)
+  })
+
+  test("#given Claude Fable 5 model ids #then detects Fable 5 only", () => {
+    expect(isClaudeFable5Model("anthropic/claude-fable-5")).toBe(true)
+    expect(isClaudeFable5Model("anthropic/claude-fable-5[1m]")).toBe(true)
+    expect(isClaudeFable5Model("claude-fable-5")).toBe(true)
+    expect(isClaudeFable5Model("anthropic/claude-opus-4-8")).toBe(false)
+    expect(isClaudeFable5Model("anthropic/claude-sonnet-4-6")).toBe(false)
+  })
+
   test("#given Claude Opus 4.7+ model ids #then detects 4.7 and later only", () => {
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-7")).toBe(true)
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-8")).toBe(true)
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4.8")).toBe(true)
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-5-0")).toBe(true)
     expect(isClaudeOpus47OrLaterModel("claude-opus-4-7")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-fable-5")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-fable-5[1m]")).toBe(true)
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-6")).toBe(false)
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-sonnet-4-6")).toBe(false)
     expect(isClaudeOpus47OrLaterModel("openai/gpt-5.5")).toBe(false)

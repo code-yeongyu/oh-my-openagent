@@ -12,10 +12,25 @@ export function isClaudeOpus47Model(model: string): boolean {
   return modelName.includes("claude-opus-4-7")
 }
 
+export function isClaudeOpus48Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return modelName.includes("claude-opus-4-8")
+}
+
+export function isClaudeFable5Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return modelName.includes("claude-fable-5")
+}
+
 const CLAUDE_OPUS_VERSION_RE = /claude-opus-(\d+)-(\d+)/
 
+/**
+ * Claude Fable shares the Opus 4.7+ request surface (adaptive thinking only,
+ * explicit enabled-thinking budgets rejected), so it counts as "4.7 or later".
+ */
 export function isClaudeOpus47OrLaterModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  if (modelName.includes("claude-fable")) return true
   const match = CLAUDE_OPUS_VERSION_RE.exec(modelName)
   if (!match) return false
   const major = Number(match[1])

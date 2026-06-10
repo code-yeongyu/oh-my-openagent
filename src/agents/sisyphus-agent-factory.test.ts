@@ -48,7 +48,15 @@ describe("createSisyphusAgent", () => {
         },
         {
           model: "anthropic/claude-opus-4-7",
-          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>"],
+          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-7"],
+        },
+        {
+          model: "anthropic/claude-opus-4-8",
+          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-8"],
+        },
+        {
+          model: "anthropic/claude-fable-5",
+          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-fable-5"],
         },
       ];
 
@@ -85,10 +93,14 @@ describe("createSisyphusAgent", () => {
     test("#when creating agents #then preserves current thinking config split", () => {
       // given
       const opus47Agent = createSisyphusAgent("anthropic/claude-opus-4-7");
+      const opus48Agent = createSisyphusAgent("anthropic/claude-opus-4-8");
+      const fable5Agent = createSisyphusAgent("anthropic/claude-fable-5");
       const sonnetAgent = createSisyphusAgent("anthropic/claude-sonnet-4-6");
 
       // then
       expect(opus47Agent.thinking).toBeUndefined();
+      expect(opus48Agent.thinking).toBeUndefined();
+      expect(fable5Agent.thinking).toBeUndefined();
       expect(sonnetAgent.thinking).toEqual({
         type: "enabled",
         budgetTokens: 32000,
