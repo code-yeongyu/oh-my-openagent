@@ -261,23 +261,28 @@ describe("ast-grep MCP", () => {
     expect(searchTool?.description).toContain("Meta-variables");
   });
 
-  // win32 bun wedges forever here: the unref'd 1ms idle timer can fail to fire
-  // on windows-latest, and with no ref'd handles left bun's per-test timeout
-  // cannot interrupt the await (PR #5077 froze at this test on every Windows run).
-  const nonWindowsIt = process.platform === "win32" ? it.skip : it;
-  nonWindowsIt("#given idle stdio connection #when no request arrives before timeout #then server exits through idle callback", async () => {
+  it("#given idle stdio connection #when no request arrives before timeout #then server exits through idle callback", async () => {
     const input = new PassThrough();
     const output = new PassThrough();
     let idleCallCount = 0;
 
-    await runMcpStdioServer(input, output, {}, {
-      idleTimeoutMs: 1,
-      onIdleTimeout: () => {
-        idleCallCount++;
-        input.end();
-      },
-    });
+    // The server's idle timer is unref'd; in production process.stdin keeps the
+    // event loop polling so it still fires. PassThrough refs nothing, and with
+    // zero ref'd handles win32 bun parks the loop forever (PR #5077 froze here
+    // on every Windows run), so hold a ref'd interval open as the stdin stand-in.
+    const keepEventLoopPolling = setInterval(() => {}, 5);
+    try {
+      await runMcpStdioServer(input, output, {}, {
+        idleTimeoutMs: 1,
+        onIdleTimeout: () => {
+          idleCallCount++;
+          input.end();
+        },
+      });
+    } finally {
+      clearInterval(keepEventLoopPolling);
+    }
 
     expect(idleCallCount).toBe(1);
-  });
+  }, 10_000);
 });
