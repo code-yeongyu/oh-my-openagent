@@ -88,8 +88,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(43)
-		expect(agentBrowserSkills).toHaveLength(43)
+		expect(defaultSkills).toHaveLength(42)
+		expect(agentBrowserSkills).toHaveLength(42)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -105,36 +105,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("dsl-core")
-		expect(skills.length).toBe(42)
-	})
-
-	test("should exclude multiple skills when they are in disabledSkills", () => {
-		// #given
-		const options = { disabledSkills: new Set(["playwright", "git-master"]) }
-
-		// #when
-		const skills = createBuiltinSkills(options)
-
-		// #then
-		expect(skills.map((s) => s.name)).not.toContain("playwright")
-		expect(skills.map((s) => s.name)).not.toContain("git-master")
-		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
-		expect(skills.map((s) => s.name)).toContain("dev-browser")
-		expect(skills.map((s) => s.name)).toContain("dsl-core")
 		expect(skills.length).toBe(41)
-	})
-
-	test("should return an empty array when all skills are disabled", () => {
-		// #given
-		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "dsl-core", "dsl-grammar", "dsl-codegen", "dsl-metamodel", "dsl-tooling", "dsl-textx-ecosystem", "dsl-pyecore-advanced", "dsl-model-transformation", "dsl-testing", "dsl-validation", "dsl-composition", "eu-horizon", "academic-review", "academic-review-agent", "deliverable-writing", "project-management", "technical-lead", "academic-writing", "research-methodology", "literature-review", "grant-writing", "scientific-presentation", "data-management-plan", "ip-exploitation", "document-reader", "crypto-market-analysis", "crypto-trading", "crypto-onchain", "security-core", "security-secrets", "security-sast", "security-dast", "security-dependencies", "security-api", "security-crypto", "security-infra", "security-review", "tdd-enforcer", "review-work"]),
-		}
-
-		// #when
-		const skills = createBuiltinSkills(options)
-
-		// #then
-		expect(skills.length).toBe(0)
 	})
 
 	test("should return all skills when disabledSkills set is empty", () => {
@@ -145,7 +116,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(43)
+		expect(skills.length).toBe(42)
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {

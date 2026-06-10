@@ -3,8 +3,7 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { EU_HORIZON_SKILL_NAME } from "../features/builtin-skills/skills/eu-horizon"
-import { ACADEMIC_REVIEW_SKILL_NAME } from "../features/builtin-skills/skills/academic-review"
-import { ACADEMIC_REVIEW_AGENT_SKILL_NAME } from "../features/builtin-skills/skills/academic-review-agent"
+import { ACADEMIC_PAPER_REVIEW_SKILL_NAME } from "../features/builtin-skills/skills/academic-paper-review"
 import { DELIVERABLE_WRITING_SKILL_NAME } from "../features/builtin-skills/skills/deliverable-writing"
 import { PROJECT_MANAGEMENT_SKILL_NAME } from "../features/builtin-skills/skills/project-management"
 import { TECHNICAL_LEAD_SKILL_NAME } from "../features/builtin-skills/skills/technical-lead"
@@ -20,8 +19,7 @@ const MODE: AgentMode = "all"
 
 const NIOBE_RESEARCH_SKILLS = [
   EU_HORIZON_SKILL_NAME,
-  ACADEMIC_REVIEW_SKILL_NAME,
-  ACADEMIC_REVIEW_AGENT_SKILL_NAME,
+  ACADEMIC_PAPER_REVIEW_SKILL_NAME,
   ACADEMIC_WRITING_SKILL_NAME,
   DELIVERABLE_WRITING_SKILL_NAME,
   PROJECT_MANAGEMENT_SKILL_NAME,
@@ -96,13 +94,6 @@ Each consultation is standalone, but follow-up questions via session continuatio
 - Abstract crafting, argumentation flow, citation practices
 - Cover letters, rebuttals/responses to reviewers, camera-ready preparation
 
-### Academic Paper Review
-- Structured manuscript evaluation following IMRaD conventions
-- Assessment against venue-specific criteria (journal impact, conference acceptance rate)
-- Constructive feedback: distinguish major vs minor revisions
-- Detect common weaknesses: missing baselines, overclaimed contributions, statistical issues
-- Review tone: rigorous but constructive, never dismissive
-
 ### Academic Paper Review Agent (7-Stage Pipeline)
 - **Stage 0 INTAKE**: PDF → Markdown, extract sections, figures, references
 - **Stage 1 STRUCTURAL ANALYSIS**: IMRaD completeness, figure quality, reference currency, notation consistency
@@ -111,7 +102,7 @@ Each consultation is standalone, but follow-up questions via session continuatio
 - **Stage 4 METHODOLOGY VERIFICATION**: Statistical rigor, reproducibility, experimental design, math verification
 - **Stage 5 ADVERSARIAL RED TEAM**: Breaker (logical flaws) + Butcher (missing experiments) + Collector (novelty threats)
 - **Stage 6 SYNTHESIS**: Merge all outputs, venue-specific rubric calibration, quality gate, final recommendation
-- Use \`academic-review-agent\` skill for full pipeline reviews
+- Use \`academic-paper-review\` skill for full pipeline reviews
 
 ### Research Methodology
 - Quantitative, qualitative, and mixed methods design

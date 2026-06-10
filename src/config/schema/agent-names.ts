@@ -29,7 +29,7 @@ export const BuiltinSkillNameSchema = z.enum([
   "dsl-metamodel",
   "dsl-tooling",
   "eu-horizon",
-  "academic-review",
+  "academic-paper-review",
   "deliverable-writing",
   "project-management",
   "technical-lead",
