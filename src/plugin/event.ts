@@ -10,6 +10,10 @@ import { resolveSessionEventID } from "../shared/event-session-id";
 import { log } from "../shared/logger";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
+import {
+  clearTurnState,
+  hasPlanInCurrentTurn,
+} from "../features/background-agent/subagent-turn-hold-state";
 import { createUserAbortInterruptedRecoveryGuard } from "./user-abort-interrupted-recovery-guard";
 import { extractErrorMessage, extractErrorName } from "./event-error-utils";
 import { createEventHookDispatcher, createEventHookRunner, getEventSessionID } from "./event-hook-dispatcher";
@@ -170,6 +174,8 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.deleted") {
+      const deletedSessionID = resolveSessionEventID(props);
+      if (deletedSessionID) clearTurnState(deletedSessionID);
       await handleSessionDeletedEvent({
         props,
         tmuxIntegrationEnabled,
@@ -205,6 +211,29 @@ export function createEventHandler(args: {
       });
       if (state.sessionID && ((typeof state.info?.finish === "string" && state.info.finish.length > 0) || state.info?.finish === true)) {
         invalidateContextWindowUsageCache(pluginContext as PluginInput, state.sessionID);
+
+        const mainSessionID = getMainSessionID();
+        if (
+          state.role === "assistant" &&
+          mainSessionID &&
+          state.sessionID === mainSessionID &&
+          managers.backgroundManager
+        ) {
+          try {
+            if (hasPlanInCurrentTurn(state.sessionID)) {
+              await managers.backgroundManager.dropHeldTasks(state.sessionID);
+            } else {
+              await managers.backgroundManager.releaseHeldTasks(state.sessionID);
+            }
+          } catch (err) {
+            log("[event] error processing held tasks on main session finish:", {
+              sessionID: state.sessionID,
+              error: err,
+            });
+          } finally {
+            clearTurnState(state.sessionID);
+          }
+        }
       }
       if (state.sessionID && state.role === "assistant") {
         try {

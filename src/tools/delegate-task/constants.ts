@@ -1,13 +1,14 @@
 import type {
-   AvailableCategory,
-   AvailableSkill,
- } from "../../agents/dynamic-agent-prompt-builder"
+  AvailableCategory,
+  AvailableSkill,
+} from "../../agents/dynamic-agent-prompt-builder"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { truncateDescription } from "../../shared/truncate-description"
+
 export {
   CATEGORY_DESCRIPTIONS,
-  CATEGORY_PROMPT_APPENDS,
   CATEGORY_PROMPT_APPEND_RESOLVERS,
+  CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
 } from "./builtin-categories"
 
@@ -25,12 +26,18 @@ MANDATORY CONTEXT GATHERING PROTOCOL:
    - call_omo_agent(description="Explore codebase patterns", subagent_type="explore", run_in_background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
    - call_omo_agent(description="Research documentation", subagent_type="librarian", run_in_background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
 
-2. After gathering context, ALWAYS present:
+2. Capture Task IDs from background agent responses when they are available:
+   - If call_omo_agent responses include "Task ID: <task_id>", extract and record each actual Task ID from the explore and librarian responses
+   - Include Context Gathering Task IDs only when background agents were launched and actual Task IDs are available
+   - Do NOT invent, guess, or fabricate Task IDs when a response does not provide them
+   - These Task IDs let the orchestrator reuse background context via background_output(task_id=...)
+
+3. After gathering context, ALWAYS present:
    - **User Request Summary**: Concise restatement of what the user is asking for
    - **Uncertainties**: List of unclear points, ambiguities, or assumptions you're making
    - **Clarifying Questions**: Specific questions to resolve the uncertainties
 
-3. ITERATE until ALL requirements are crystal clear:
+4. ITERATE until ALL requirements are crystal clear:
    - Do NOT proceed to planning until you have 100% clarity
    - Ask the user to confirm your understanding
    - Resolve every ambiguity before generating the work plan
@@ -157,13 +164,22 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 \`\`\`markdown
 # [Plan Title]
 
+## Context Gathering Task IDs
+
+Include this section only when you launched background agents during context gathering and their responses provided actual Task IDs. The orchestrator uses these IDs to retrieve raw context via background_output(task_id=...).
+
+- **Explore Agent Task ID**: [actual Task ID returned by the explore agent, if available]
+- **Librarian Agent Task ID**: [actual Task ID returned by the librarian agent, if available]
+
+Do NOT invent Task IDs. If no actual Task IDs are available, omit this section and summarize the gathered context directly.
+
 ## Context
 [User request summary, interview findings, research results]
 
 ## Task Dependency Graph
 [Dependency table - see Section 1]
 
-## Parallel Execution Graph  
+## Parallel Execution Graph
 [Wave structure - see Section 2]
 
 ## Tasks

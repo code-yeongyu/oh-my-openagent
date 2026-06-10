@@ -99,6 +99,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Reason for dropping this task (set when task is dropped instead of released) */
+  droppedReason?: string
 }
 
 export interface LaunchInput {

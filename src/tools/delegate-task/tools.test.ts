@@ -3605,8 +3605,13 @@ describe("sisyphus-task", () => {
       // then
       expect(result).toContain("<system>")
       expect(result).toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
+      expect(result).toContain("Context Gathering Task IDs")
+      expect(result).toContain("only when background agents were launched and actual Task IDs are available")
+      expect(result).toContain("Do NOT invent Task IDs")
       expect(result).toContain("### AVAILABLE CATEGORIES")
       expect(result).toContain("`deep`")
+      expect(result).not.toContain("- **Explore Agent Task ID**: bg_...")
+      expect(result).not.toContain("- **Librarian Agent Task ID**: bg_...")
       expect(result).not.toContain("prompt-engineer")
       expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
     })

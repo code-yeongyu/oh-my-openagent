@@ -1,17 +1,18 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import type { ToolDefinition } from "@opencode-ai/plugin"
+import { tool } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
+import { TASK_DROPPED_REASON_DELEGATED_TO_PLAN } from "../../features/background-agent/constants"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { recordBackgroundOutputConsumption } from "../../shared/background-output-consumption"
 import { log } from "../../shared/logger"
-import type { BackgroundOutputArgs } from "./types"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
-import { formatTaskStatus } from "./task-status-format"
-
-import { getAgentDisplayName } from "../../shared/agent-display-names"
-import { recordBackgroundOutputConsumption } from "../../shared/background-output-consumption"
+import { formatTaskDroppedMessage, formatTaskStatus } from "./task-status-format"
+import type { BackgroundOutputArgs } from "./types"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 const MISSING_BACKGROUND_TASK_RETRY_DELAY_MS = 100
@@ -172,6 +173,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const fullSession = args.full_session ?? false
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
+
+        if (resolvedTask.status === "cancelled" && resolvedTask.droppedReason === TASK_DROPPED_REASON_DELEGATED_TO_PLAN) {
+          return formatTaskDroppedMessage(resolvedTask)
+        }
 
         if (fullSession) {
           const output = await formatFullSession(resolvedTask, client, {
