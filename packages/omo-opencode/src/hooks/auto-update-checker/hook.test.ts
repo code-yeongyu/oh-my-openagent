@@ -312,4 +312,26 @@ describe("auto-update-checker hook", () => {
     )
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
   })
+
+  test("banner falls back to cached version when the bundled version dep is absent", async () => {
+    // given: an injected-deps caller predating getBundledVersion keeps the legacy banner
+    resetDeferredState()
+    const { hook, mocks } = await createHook({}, {
+      getBundledVersion: undefined,
+      getCachedVersion: () => "3.9.9",
+      getLocalDevVersion: () => null,
+    })
+
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
+
+    // then: the cached-version banner still renders instead of crashing the deferred check
+    expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
+    expect(mocks.showVersionToast).toHaveBeenCalledWith(
+      expect.anything(),
+      "3.9.9",
+      expect.any(String),
+    )
+  })
 })

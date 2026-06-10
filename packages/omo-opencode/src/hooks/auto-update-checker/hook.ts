@@ -12,7 +12,7 @@ import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 import { ignoreToastError } from "./hook/ignore-toast-error"
 
 interface AutoUpdateCheckerDeps {
-  getBundledVersion: typeof getBundledVersion
+  getBundledVersion?: typeof getBundledVersion
   getCachedVersion: typeof getCachedVersion
   getLocalDevVersion: typeof getLocalDevVersion
   showConfigErrorsIfAny: typeof showConfigErrorsIfAny
@@ -92,13 +92,15 @@ export function createAutoUpdateCheckerHook(
       scheduleDeferredStartupCheck(() => {
         hasChecked = true
         void (async () => {
-          const bundledVersion = deps.getBundledVersion()
+          const bundledVersion = deps.getBundledVersion?.()
           const localDevVersion = deps.getLocalDevVersion(ctx.directory)
           // Banner reflects the bundled (build-time) version so it never drifts
           // from `--version`, even if a stale cache copy lingers in OpenCode's
           // plugin sandbox. Background update-check still uses `getCachedVersion()`
           // because that's the artifact we're comparing against npm's `latest`.
-          const displayVersion = localDevVersion ?? bundledVersion
+          // getBundledVersion is optional so injected-deps callers built before
+          // it existed keep the legacy cached-version banner instead of crashing.
+          const displayVersion = localDevVersion ?? bundledVersion ?? deps.getCachedVersion()
 
           await deps.showConfigErrorsIfAny(ctx)
           await deps.updateAndShowConnectedProvidersCacheStatus(ctx)
