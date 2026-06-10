@@ -8,7 +8,15 @@ import { TeamSpecSchema, type TeamSpec } from "../types"
 
 export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
 
-export const TeamCreateArgsSchema = z.object({
+function omitEmptyStringArgs(rawArgs: unknown): unknown {
+  if (typeof rawArgs !== "object" || rawArgs === null || Array.isArray(rawArgs)) {
+    return rawArgs
+  }
+
+  return Object.fromEntries(Object.entries(rawArgs).filter(([, value]) => value !== ""))
+}
+
+export const TeamCreateArgsSchema = z.preprocess(omitEmptyStringArgs, z.object({
   teamName: z.string().min(1).nullish(),
   inline_spec: z.unknown().nullish(),
   leadSessionId: z.string().nullish(),
@@ -17,7 +25,7 @@ export const TeamCreateArgsSchema = z.object({
   if (optionCount !== 1) {
     ctx.addIssue({ code: "custom", message: "Provide exactly one of teamName or inline_spec." })
   }
-})
+}))
 
 export type TeamCreateArgs = z.infer<typeof TeamCreateArgsSchema>
 
