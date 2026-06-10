@@ -366,6 +366,42 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     })
   })
 
+  test("accepts inline_spec when the host injects empty optional fields", async () => {
+    // given the verbatim issue #4699 payload: a host serializing omitted optionals as empty strings
+    const createTeamCreateTool = await loadCreateTeamCreateTool()
+    const config = createConfig()
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+    const rawArgs = {
+      teamName: "",
+      inline_spec: {
+        name: "hyperplan-smoke-test",
+        members: [
+          { name: "worker", kind: "category", category: "quick", subagent_type: "", prompt: "Temporary smoke test member." },
+        ],
+        lead: { name: "", kind: "", category: "", subagent_type: "", prompt: "" },
+        leadAgentId: "",
+        teamAllowedPaths: [],
+        sessionPermission: "",
+      },
+      leadSessionId: "",
+    }
+
+    // when
+    await teamCreateTool.execute(rawArgs, createToolContext("lead-session", "Sisyphus"))
+    const firstCall = createTeamRunMock.mock.calls[0]
+
+    // then the empty-string optionals are treated as absent and the all-empty lead is dropped
+    expect(firstCall?.[0]).toMatchObject({
+      name: "hyperplan-smoke-test",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "subagent_type" },
+        { name: "worker", kind: "category", category: "quick", prompt: "Temporary smoke test member." },
+      ],
+    })
+    expect(firstCall?.[1]).toBe("lead-session")
+  })
+
   test("accepts role and capabilities style members with the configured fallback category", async () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
@@ -412,6 +448,39 @@ describe("createTeamCreateTool inline_spec normalization", () => {
         { name: "agent-3-quality-process-analyst", kind: "category", category: "analysis", prompt: "Role: Quality/Process Analyst\ntests, builds, CI/CD" },
       ],
     })
+  })
+})
+
+describe("parseTeamCreateArgs empty-string optional handling", () => {
+  test("treats empty-string teamName and leadSessionId as absent when inline_spec is provided", () => {
+    // given the tool-calling host serializes omitted optionals as empty strings
+    const inlineSpec = { name: "smoke-test-team", members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }] }
+    const args = parseTeamCreateArgs({ teamName: "", inline_spec: inlineSpec, leadSessionId: "" })
+
+    // then inline_spec is accepted as the single provided option
+    expect(args.teamName ?? undefined).toBeUndefined()
+    expect(args.leadSessionId ?? undefined).toBeUndefined()
+    expect(args.inline_spec).toEqual(inlineSpec)
+  })
+
+  test("treats empty-string inline_spec as absent when teamName is provided", () => {
+    // given the tool-calling host serializes the unused optional as an empty string
+    const args = parseTeamCreateArgs({ teamName: "existing-team", inline_spec: "" })
+
+    // then teamName is accepted as the single provided option
+    expect(args.teamName).toBe("existing-team")
+    expect(args.inline_spec ?? undefined).toBeUndefined()
+  })
+
+  test("still rejects when teamName and inline_spec are both empty strings", () => {
+    let errorMessage = ""
+    try {
+      parseTeamCreateArgs({ teamName: "", inline_spec: "" })
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
+
+    expect(errorMessage).toContain("team_create requires exactly one of teamName or inline_spec")
   })
 })
 

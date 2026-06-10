@@ -147,14 +147,33 @@ describe("team lifecycle tools", () => {
     expect(result.runtimeState.members[0]).toMatchObject({ name: "lead", agentType: "leader" })
   })
 
-  test("team_create rejects an empty leadSessionId override", async () => {
+  test("team_create treats an empty leadSessionId override as absent and uses the context session", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+
+    // when
+    await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "" }, createToolContext("lead-session"))
+
+    // then
+    expect(createTeamRunMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "lead-session",
+      expect.anything(),
+      config,
+      expect.anything(),
+      undefined,
+      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+    )
+  })
+
+  test("team_create rejects when neither leadSessionId nor a context session is available", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
 
     // when
     let errorMessage = ""
     try {
-      await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "" }, createToolContext("lead-session"))
+      await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "" }, createToolContext(""))
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error)
     }
