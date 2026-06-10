@@ -380,6 +380,26 @@ describe("team-layout-tmux", () => {
     expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
   })
 
+  test("#given ownedSession=false and paneIds #when removeTeamLayout runs #then it kills panes instead of the caller window", async () => {
+    // given
+    const { removeTeamLayout } = await loadLayoutModule()
+
+    // when
+    await removeTeamLayout("run-cleanup", {
+      ownedSession: false,
+      targetSessionId: "$caller",
+      focusWindowId: "test-session:0",
+      paneIds: ["%10", "%11"],
+    }, tmuxMgr as never)
+
+    // then
+    const commands = getCommands()
+    expect(commands).toContainEqual(["kill-pane", "-t", "%10"])
+    expect(commands).toContainEqual(["kill-pane", "-t", "%11"])
+    expect(commands.some((args) => args[0] === "kill-window")).toBe(false)
+    expect(commands.some((args) => args[0] === "kill-session")).toBe(false)
+  })
+
   test("#given ownedSession=true, targetSessionId='omo-team-xyz' #when removeTeamLayout runs #then kill-session is called with -t omo-team-xyz (legacy behavior preserved)", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
