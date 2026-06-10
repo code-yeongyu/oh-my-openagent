@@ -14,6 +14,10 @@ const CONFIG: PiRulesConfig = {
 	maxResultChars: 50_000,
 	postCompactMaxRuleChars: 12_000,
 	postCompactMaxResultChars: 20_000,
+	dynamicMaxRuleChars: 4_000,
+	dynamicMaxResultChars: 10_000,
+	promptMaxRuleChars: 6_000,
+	promptMaxResultChars: 16_000,
 	enabledSources: "auto",
 };
 

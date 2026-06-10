@@ -68,8 +68,11 @@ export function clearSessionState(cachePath: string): void {
 
 export function markSessionCompacted(cachePath: string): void {
 	const state = readSessionState(cachePath);
+	// Compaction drops injected static rule bodies, so pre-compaction static
+	// dedup marks must not suppress the post-compact recovery directive.
+	// Dynamic dedup survives: those rules are recovered as read-directive paths.
 	writeSessionState(cachePath, {
-		staticDedup: state.staticDedup,
+		staticDedup: [],
 		dynamicDedup: state.dynamicDedup,
 		...(state.dynamicTargetFingerprints === undefined
 			? {}
