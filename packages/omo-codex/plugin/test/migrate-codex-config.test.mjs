@@ -434,6 +434,42 @@ test("#given [features] boolean shorthand multi_agent_v2 = true #when forcing di
 	assert.match(result, /plugins = true/);
 });
 
+test("#given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = true",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.match(result, /openai\/codex#26753/);
+	assert.match(result, /LAZYCODEX_CONFIG_MIGRATION_DISABLED=1/);
+	assert.match(result, /^#[^\n]*\n(?:#[^\n]*\n)*\[features\.multi_agent_v2\]/m);
+});
+
+test("#given no multi_agent_v2 section #when forcing disable #then annotates the appended section", () => {
+	const config = ['model = "gpt-5.5"', ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.match(result, /openai\/codex#26753/);
+	assert.match(result, /^#[^\n]*\n(?:#[^\n]*\n)*\[features\.multi_agent_v2\]\nenabled = false\n/m);
+});
+
+test("#given an annotated managed section #when forcing disable runs again #then does not duplicate the comment", () => {
+	const config = ['model = "gpt-5.5"', "", "[features.multi_agent_v2]", "enabled = true", ""].join("\n");
+
+	const annotated = forceDisableMultiAgentV2(config);
+	const rerun = forceDisableMultiAgentV2(`${annotated.replace("enabled = false", "enabled = true")}`);
+
+	const markers = rerun.match(/openai\/codex#26753/g) ?? [];
+	assert.equal(markers.length, 1);
+	assert.match(rerun, /enabled = false/);
+});
+
 test("#given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then returns config unchanged", () => {
 	const config = [
 		'model = "gpt-5.5"',
