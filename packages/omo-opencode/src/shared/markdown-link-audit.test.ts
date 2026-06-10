@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises"
 import { dirname, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const WORKSPACE_ROOT = resolve(import.meta.dir, "../..")
+const WORKSPACE_ROOT = resolve(import.meta.dir, "../../../..")
 const MARKDOWN_REFERENCE_DEFINITION_RE = /^ {0,3}\[([^\]\n]+)\]:\s+(\S+)/
 const MAINTAINER_LOCAL_PATH_RE = /file:\/\/\/(?:Users|home)\/|(?:^|[\s(`'"])(?:\/Users|\/home)\//
 
