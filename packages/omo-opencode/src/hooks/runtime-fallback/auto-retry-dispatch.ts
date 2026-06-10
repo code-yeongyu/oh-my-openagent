@@ -130,7 +130,50 @@ export function createAutoRetryDispatcher(
         }
         throw promptResult.error
       }
-      if (!isInternalPromptDispatchAccepted(promptResult)) {
+      if (promptResult.status === "reserved") {
+        // Session still has an active reservation from the cancelled stream.
+        // Retry with linear backoff until the reservation is released.
+        const MAX_RESERVED_RETRIES = 6
+        const BASE_DELAY_MS = 500
+        let reservedResult = promptResult
+        for (let attempt = 0; attempt < MAX_RESERVED_RETRIES; attempt++) {
+          const delay = BASE_DELAY_MS * (attempt + 1)
+          log(`[${HOOK_NAME}] Session reserved, retrying fallback dispatch in ${delay}ms (${source})`, {
+            sessionID,
+            attempt: attempt + 1,
+            maxAttempts: MAX_RESERVED_RETRIES,
+          })
+          await new Promise((r) => setTimeout(r, delay))
+          reservedResult = await dispatchInternalPrompt({
+            mode: "async",
+            client: ctx.client,
+            sessionID,
+            source: `runtime-fallback:${source}:reserved-retry-${attempt + 1}`,
+            settleMs: 0,
+            queueBehavior: "defer",
+            input: {
+              path: { id: sessionID },
+              body: {
+                ...(launchAgent ? { agent: launchAgent } : {}),
+                ...retryModelPayload,
+                ...(retryPayload.system ? { system: retryPayload.system } : {}),
+                ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
+                ...(retryMessageID ? { messageID: retryMessageID } : {}),
+                parts: retryParts,
+              },
+              query: { directory: ctx.directory },
+            },
+          })
+          if (reservedResult.status !== "reserved") break
+        }
+        if (!isInternalPromptDispatchAccepted(reservedResult)) {
+          log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate after reserved retries (${source})`, {
+            sessionID,
+            status: reservedResult.status,
+          })
+          return
+        }
+      } else if (!isInternalPromptDispatchAccepted(promptResult)) {
         log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
           sessionID,
           status: promptResult.status,
