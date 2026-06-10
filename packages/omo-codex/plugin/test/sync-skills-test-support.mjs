@@ -11,6 +11,7 @@ export const expectedSkills = [
 	"git-master",
 	"init-deep",
 	"lcx-contribute-bug-fix",
+	"lcx-doctor",
 	"lcx-report-bug",
 	"lsp",
 	"programming",

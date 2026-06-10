@@ -18,7 +18,9 @@ test("#given synced lcx-report-bug skill #when inspected #then it files LazyCode
 	assert.match(skill, /^---\r?\nname: lcx-report-bug\r?\n/m);
 	assert.match(skill, /code-yeongyu\/lazycodex/);
 	assert.match(skill, /openai\/codex/);
-	assert.match(skill, /\/tmp\/openai-codex-source/);
+	assert.match(skill, /sync_latest_source code-yeongyu\/lazycodex \/tmp\/lazycodex-source/);
+	assert.match(skill, /sync_latest_source openai\/codex \/tmp\/openai-codex-source/);
+	assert.match(skill, /git -C "\$DEST" checkout -B "\$DEFAULT_BRANCH" FETCH_HEAD/);
 	assert.match(skill, /\$omo:debugging/);
 	assert.match(skill, /Repository Decision/);
 	assert.match(skill, /TARGET_REPO="code-yeongyu\/lazycodex" # or openai\/codex/);
@@ -49,6 +51,9 @@ test("#given synced lcx-contribute-bug-fix skill #when inspected #then it contri
 	// then
 	assert.match(skill, /^---\r?\nname: lcx-contribute-bug-fix\r?\n/m);
 	assert.match(skill, /Contribute a verified bug-fix PR/);
+	assert.match(skill, /sync_latest_source code-yeongyu\/lazycodex \/tmp\/lazycodex-source/);
+	assert.match(skill, /sync_latest_source openai\/codex \/tmp\/openai-codex-source/);
+	assert.match(skill, /git -C "\$DEST" checkout -B "\$DEFAULT_BRANCH" FETCH_HEAD/);
 	assert.match(skill, /fresh `\/tmp` clone\/worktree/);
 	assert.match(skill, /\/tmp\/lazycodex-fix-/);
 	assert.match(skill, /git worktree add/);
@@ -78,4 +83,32 @@ test("#given synced lcx-contribute-bug-fix skill #when inspected #then it contri
 	assert.match(script, /createLazyCodexBugFixPrBody/);
 	assert.match(script, /Problem Situation/);
 	assert.match(script, /Why I Am Confident/);
+});
+
+test("#given synced lcx-doctor skill #when inspected #then it diagnoses installs against latest /tmp sources without mutating them", async () => {
+	// given
+	const skillRoot = join(root, "skills", "lcx-doctor");
+
+	// when
+	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
+	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: lcx-doctor\r?\n/m);
+	assert.match(skill, /sync_latest_source code-yeongyu\/lazycodex \/tmp\/lazycodex-source/);
+	assert.match(skill, /sync_latest_source openai\/codex \/tmp\/openai-codex-source/);
+	assert.match(skill, /git -C "\$DEST" checkout -B "\$DEFAULT_BRANCH" FETCH_HEAD/);
+	assert.match(skill, /PASS\/WARN\/FAIL/);
+	assert.match(skill, /lazycodex doctor --json/);
+	assert.match(skill, /Diagnose only/);
+	assert.match(skill, /\$omo:debugging/);
+	assert.match(skill, /CODEX_HOME/);
+	assert.match(skill, /## LazyCodex Doctor Report/);
+	assert.match(skill, /### Remediations/);
+	assert.match(skill, /\$lcx-report-bug/);
+	assert.match(skill, /\$lcx-contribute-bug-fix/);
+	assert.match(skill, /gh issue list --repo code-yeongyu\/lazycodex/);
+	assert.match(interfaceMetadata, /display_name: "lcx-doctor \(omo\)"/);
+	assert.match(interfaceMetadata, /- "lazycodex doctor"/);
+	assert.match(interfaceMetadata, /- "lazycodex health check"/);
 });

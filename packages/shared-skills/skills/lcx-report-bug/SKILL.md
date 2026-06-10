@@ -33,24 +33,28 @@ Create or prepare a GitHub issue or PR that includes:
 
 1. Read the user's bug report and identify the affected surface: LazyCodex installer, Codex plugin, skill, hook, MCP, CLI alias, GitHub marketplace sync, or web/docs.
 2. Invoke `$omo:debugging` for the investigation. If Codex exposes only unqualified skill names in the current session, invoke `$debugging` and state that it is the OMO debugging skill.
-3. Materialize upstream Codex source under `/tmp` before deciding ownership:
+3. Materialize the latest LazyCodex and upstream Codex sources under `/tmp` before deciding ownership. Re-sync on every run so a cached checkout cannot go stale — stale source produces wrong routing and dead line references:
 
 ```bash
-CODEX_SRC="/tmp/openai-codex-source"
-if [ ! -d "$CODEX_SRC/.git" ]; then
-  gh repo clone openai/codex "$CODEX_SRC" -- --depth=1
-else
-  git -C "$CODEX_SRC" fetch --depth=1 origin
-fi
+sync_latest_source() {
+  REPO="$1"; DEST="$2"
+  if [ ! -d "$DEST/.git" ]; then
+    gh repo clone "$REPO" "$DEST" -- --depth=1 \
+      || git clone --depth=1 "https://github.com/$REPO" "$DEST"
+  fi
+  DEFAULT_BRANCH="$(git -C "$DEST" remote show origin | sed -n '/HEAD branch/s/.*: //p')"
+  git -C "$DEST" fetch --depth=1 origin "$DEFAULT_BRANCH"
+  git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
+}
+sync_latest_source code-yeongyu/lazycodex /tmp/lazycodex-source
+sync_latest_source openai/codex /tmp/openai-codex-source
 ```
-
-If `gh` is unavailable, use `git clone --depth=1 https://github.com/openai/codex "$CODEX_SRC"`.
 4. Follow the debugging skill far enough to gather runtime evidence:
    - form at least three plausible hypotheses
    - run the smallest reproduction that exercises the real surface
    - confirm the root cause by observing the failing state
    - identify the minimal fix path or maintainer action
-5. Compare local LazyCodex evidence with `/tmp/openai-codex-source` before choosing the target repo. Cite exact files, commands, logs, or source paths that support the routing decision.
+5. Compare runtime evidence with both `/tmp/lazycodex-source` and `/tmp/openai-codex-source` before choosing the target repo. Cite exact files, commands, logs, or source paths that support the routing decision.
 6. Choose the target repo:
    - Use `code-yeongyu/lazycodex` when the bug is in LazyCodex integration, distribution, bundled plugin code, skills, hooks, MCP wiring, installer behavior, aliases, marketplace sync, docs, or any behavior that disappears in clean upstream Codex.
    - Use `openai/codex` when the bug reproduces in clean upstream Codex without LazyCodex, or the failing behavior comes from Codex CLI core, plugin API contracts, sandboxing, approvals, config loading, or built-in tool behavior.
@@ -106,7 +110,7 @@ Write the issue body in English and keep it direct:
 ## Repository Decision
 - Target repository:
 - Why this belongs there:
-- LazyCodex evidence:
+- LazyCodex evidence (runtime + `/tmp/lazycodex-source`):
 - Upstream Codex source evidence from `/tmp/openai-codex-source`:
 
 ## Reproduction
@@ -150,7 +154,7 @@ Use this when a PR is the right artifact:
 ## Repository Decision
 - Target repository:
 - Why this belongs there:
-- LazyCodex evidence:
+- LazyCodex evidence (runtime + `/tmp/lazycodex-source`):
 - Upstream Codex source evidence from `/tmp/openai-codex-source`:
 
 ## Root Cause
@@ -227,6 +231,6 @@ Do not file:
 - a vague issue without reproduction steps
 - an issue that claims a root cause not supported by runtime evidence
 - a duplicate when commenting on an existing issue is enough
-- an upstream Codex issue without checking `/tmp/openai-codex-source`
+- an issue without checking the latest `/tmp/lazycodex-source` and `/tmp/openai-codex-source` checkouts
 - a LazyCodex issue when the bug is proven to reproduce in clean upstream Codex
 - a fix PR without a concrete branch, implemented fix, and verification result

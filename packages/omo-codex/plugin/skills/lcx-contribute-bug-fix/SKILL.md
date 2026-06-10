@@ -30,7 +30,22 @@ Create a PR that includes:
 
 1. Read the user's bug report and identify the affected surface.
 2. Invoke `$omo:debugging` for the investigation. If only unqualified skill names are exposed, invoke `$debugging` and state that it is the OMO debugging skill.
-3. Decide the target repository. If ownership is close, compare against upstream Codex source under `/tmp/openai-codex-source` before choosing.
+3. Materialize the latest sources, then decide the target repository. Sync both checkouts on every run and compare them before choosing — a stale checkout routes the fix to the wrong repo:
+
+```bash
+sync_latest_source() {
+  REPO="$1"; DEST="$2"
+  if [ ! -d "$DEST/.git" ]; then
+    gh repo clone "$REPO" "$DEST" -- --depth=1 \
+      || git clone --depth=1 "https://github.com/$REPO" "$DEST"
+  fi
+  DEFAULT_BRANCH="$(git -C "$DEST" remote show origin | sed -n '/HEAD branch/s/.*: //p')"
+  git -C "$DEST" fetch --depth=1 origin "$DEFAULT_BRANCH"
+  git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
+}
+sync_latest_source code-yeongyu/lazycodex /tmp/lazycodex-source
+sync_latest_source openai/codex /tmp/openai-codex-source
+```
 4. Create a fresh temporary clone and branch. Do not modify the user's current repository for the target fix unless the current repository is itself the requested target and the user explicitly asked for local edits.
 
 ```bash
