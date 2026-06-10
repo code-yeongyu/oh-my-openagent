@@ -237,8 +237,9 @@ function getTrackedSessions(manager: object): Map<string, { paneId: string; clos
   return Reflect.get(manager, 'sessions') as Map<string, { paneId: string; closePending: boolean; closeRetryCount: number }>
 }
 
-function getFailedReadinessSessions(manager: object): Map<string, { sessionId: string; title: string }> {
-  return Reflect.get(manager, 'failedReadinessSessions') as Map<string, { sessionId: string; title: string }>
+function getFailedReadinessSessions(manager: object): Map<string, { sessionId: string; title: string; rememberedAt: number }> {
+  const cache = Reflect.get(manager, 'failedReadinessCache') as object
+  return Reflect.get(cache, 'sessions') as Map<string, { sessionId: string; title: string; rememberedAt: number }>
 }
 
 describe('TmuxSessionManager', () => {
@@ -1686,7 +1687,7 @@ describe('TmuxSessionManager', () => {
         mockTmuxDeps,
       )
 
-      Reflect.get(manager, 'failedReadinessSessions').set('ses_bounce', {
+      getFailedReadinessSessions(manager).set('ses_bounce', {
         sessionId: 'ses_bounce',
         title: 'Bounce Session',
         rememberedAt: Date.now(),

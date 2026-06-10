@@ -56,6 +56,19 @@ export interface CategoryResolutionResult {
   error?: string
 }
 
+function categoryResolutionError(error: string): CategoryResolutionResult {
+  return {
+    agentToUse: "",
+    categoryModel: undefined,
+    categoryPromptAppend: undefined,
+    maxPromptTokens: undefined,
+    modelInfo: undefined,
+    actualModel: undefined,
+    isUnstableAgent: false,
+    error,
+  }
+}
+
 export async function resolveCategoryExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
@@ -70,16 +83,7 @@ export async function resolveCategoryExecution(
 
   if (!categoryExists) {
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
-    return {
-      agentToUse: "",
-      categoryModel: undefined,
-      categoryPromptAppend: undefined,
-      maxPromptTokens: undefined,
-      modelInfo: undefined,
-      actualModel: undefined,
-      isUnstableAgent: false,
-      error: `Unknown category: "${categoryName}". Available: ${allCategoryNames}`,
-    }
+    return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
   }
 
   const availableModels = await getAvailableModelsForDelegateTask(client)
@@ -96,34 +100,16 @@ export async function resolveCategoryExecution(
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
 
     if (categoryExists && requirement?.requiresModel) {
-      return {
-        agentToUse: "",
-        categoryModel: undefined,
-        categoryPromptAppend: undefined,
-        maxPromptTokens: undefined,
-        modelInfo: undefined,
-        actualModel: undefined,
-        isUnstableAgent: false,
-        error: `Category "${categoryName}" requires model "${requirement.requiresModel}" which is not available.
+      return categoryResolutionError(`Category "${categoryName}" requires model "${requirement.requiresModel}" which is not available.
 
 To use this category:
 1. Connect a provider with this model: ${requirement.requiresModel}
 2. Or configure an alternative model in your ${CONFIG_BASENAME}.json for this category
 
-Available categories: ${allCategoryNames}`,
-      }
+Available categories: ${allCategoryNames}`)
     }
 
-    return {
-      agentToUse: "",
-      categoryModel: undefined,
-      categoryPromptAppend: undefined,
-      maxPromptTokens: undefined,
-      modelInfo: undefined,
-      actualModel: undefined,
-      isUnstableAgent: false,
-      error: `Unknown category: "${categoryName}". Available: ${allCategoryNames}`,
-    }
+    return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
   }
 
   const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
@@ -188,16 +174,7 @@ Available categories: ${allCategoryNames}`,
       actualModel = resolvedModel
 
       if (!parseModelString(actualModel)) {
-        return {
-          agentToUse: "",
-          categoryModel: undefined,
-          categoryPromptAppend: undefined,
-          maxPromptTokens: undefined,
-          modelInfo: undefined,
-          actualModel: undefined,
-          isUnstableAgent: false,
-          error: `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-6").`,
-        }
+        return categoryResolutionError(`Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-6").`)
       }
 
       const type: "user-defined" | "inherited" | "category-default" | "system-default" =
@@ -237,15 +214,7 @@ Available categories: ${allCategoryNames}`,
 
   if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
-    return {
-      agentToUse: "",
-      categoryModel: undefined,
-      categoryPromptAppend: undefined,
-      maxPromptTokens: undefined,
-      modelInfo: undefined,
-      actualModel: undefined,
-      isUnstableAgent: false,
-      error: `Model not configured for category "${args.category}".
+    return categoryResolutionError(`Model not configured for category "${args.category}".
 
 Configure in one of:
 1. OpenCode: Set "model" in opencode.json
@@ -253,8 +222,7 @@ Configure in one of:
 3. Provider: Connect a provider with available models
 
 Current category: ${args.category}
-Available categories: ${categoryNames.join(", ")}`,
-    }
+Available categories: ${categoryNames.join(", ")}`)
   }
 
   const resolvedModel = actualModel?.toLowerCase()
