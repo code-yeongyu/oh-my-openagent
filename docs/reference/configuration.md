@@ -631,7 +631,7 @@ Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library do
 LSP tools are served by the built-in `lsp` MCP server (see [MCPs](#mcps)). The
 previous top-level `"lsp"` block in the plugin config is no longer read and is
 automatically stripped on next startup; existing configs containing it are
-silently migrated (see `src/shared/migration/config-migration.ts`).
+silently migrated (see `packages/omo-opencode/src/shared/migration/config-migration.ts`).
 
 To configure custom language servers, create `.opencode/lsp.json` at the project
 root. The MCP server is launched with `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json`

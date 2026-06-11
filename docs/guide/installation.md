@@ -758,7 +758,7 @@ Every `Read` tool output is tagged with `LINE#ID` content hashes. The `hashline_
 
 #### OpenClaw (optional outbound notifications)
 
-OpenClaw is a bidirectional external integration: outbound dispatchers fire on session events (idle, error, completion) to Discord/Telegram/HTTP/shell sinks; an optional inbound reply listener daemon polls Discord/Telegram and `send-keys` replies back into the tracked tmux pane. Configure under the `openclaw` config block. See `src/openclaw/` for the full reference.
+OpenClaw is a bidirectional external integration: outbound dispatchers fire on session events (idle, error, completion) to Discord/Telegram/HTTP/shell sinks; an optional inbound reply listener daemon polls Discord/Telegram and `send-keys` replies back into the tracked tmux pane. Configure under the `openclaw` config block. See `packages/omo-opencode/src/openclaw/` for the full reference.
 
 ### Step 10: Maintenance
 
