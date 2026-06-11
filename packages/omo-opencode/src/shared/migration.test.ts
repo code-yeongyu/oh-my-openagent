@@ -303,6 +303,19 @@ describe("migrateHookNames", () => {
     expect(removed).toEqual(["gpt-permission-continuation"])
   })
 
+  test("removes thinking-block-validator from disabled hooks", () => {
+    //#given
+    const hooks = ["thinking-block-validator", "comment-checker"]
+
+    //#when
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    //#then
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toEqual(["thinking-block-validator"])
+  })
+
   test("handles mixed migration and removal", () => {
     // given: Config with both legacy rename and removed hooks
     const hooks = ["anthropic-auto-compact", "preemptive-compaction", "sisyphus-orchestrator"]
