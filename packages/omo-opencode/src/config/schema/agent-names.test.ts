@@ -13,6 +13,8 @@ describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
         "init-deep",
         "security-research",
         "security-review",
+        "debugging",
+        "visual-qa",
       ],
     }
 
@@ -28,6 +30,8 @@ describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
         "init-deep",
         "security-research",
         "security-review",
+        "debugging",
+        "visual-qa",
       ])
     }
   })
