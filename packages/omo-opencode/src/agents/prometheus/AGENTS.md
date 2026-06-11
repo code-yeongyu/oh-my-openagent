@@ -5,11 +5,11 @@ description: Developer reference for the Prometheus strategic planner agent prom
 
 # src/agents/prometheus/ -- Strategic Planner
 
-**Generated:** 2026-05-24
+**Generated:** 2026-05-24 | **Updated:** 2026-06-11 (Claude per-model variants)
 
 ## OVERVIEW
 
-3 TypeScript files plus 3 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` routes model variants and applies runtime tool gating.
+3 TypeScript files plus 7 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` routes model variants and applies runtime tool gating.
 
 This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users/yeongyu/local-workspaces/omo/ROADMAP.md): prompts are harness-neutral core assets, while the OpenCode adapter keeps only model routing and runtime integration.
 
@@ -22,18 +22,39 @@ This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users
 | `system-prompt.test.ts` | Runtime behavior tests for Question tool filtering |
 | `prometheus-byte-exactness.test.ts` | Byte-exact sha256 characterization tests for all variants and Question disabled state |
 | `packages/prompts-core/prompts/prometheus/default.md` | Default/Claude markdown prompt variant |
+| `packages/prompts-core/prompts/prometheus/claude-fable-5.md` | Claude Fable 5 variant (default + Fable `<self_knowledge>` tuning block) |
+| `packages/prompts-core/prompts/prometheus/claude-opus-4-8.md` | Claude Opus 4.8 variant (default + 4.8 `<self_knowledge>` tuning block) |
+| `packages/prompts-core/prompts/prometheus/claude-opus-4-7.md` | Claude Opus 4.7 variant (default + 4.7 `<self_knowledge>` tuning block) |
+| `packages/prompts-core/prompts/prometheus/claude-opus-4-6.md` | Claude Opus 4.6 variant (default + 4.6 `<self_knowledge>` tuning block) |
 | `packages/prompts-core/prompts/prometheus/gpt.md` | GPT-optimized markdown prompt variant |
 | `packages/prompts-core/prompts/prometheus/gemini.md` | Gemini-optimized markdown prompt variant |
 
 ## MODEL VARIANT ROUTING
 
-[`system-prompt.ts`](file:///Users/yeongyu/local-workspaces/omo/src/agents/prometheus/system-prompt.ts) exposes `getPrometheusPromptSource(model)`:
+[`system-prompt.ts`](file:///Users/yeongyu/local-workspaces/omo/src/agents/prometheus/system-prompt.ts) exposes `getPrometheusPromptSource(model)` (checked in this order):
 
+- Claude Fable 5 (`isClaudeFable5Model`) routes to `"claude-fable-5"`.
+- Claude Opus 4.8 (`isClaudeOpus48Model`) routes to `"claude-opus-4-8"`.
+- Claude Opus 4.7 (`isClaudeOpus47Model`) routes to `"claude-opus-4-7"`.
+- Claude Opus 4.6 (`isClaudeOpus46Model`) routes to `"claude-opus-4-6"`.
 - GPT family models, as detected by `isGptModel(model)`, route to `"gpt"`.
 - Gemini family models, as detected by `isGeminiModel(model)`, route to `"gemini"`.
-- Missing models and all other families route to `"default"`.
+- Missing models and all other families (including Sonnet/Haiku) route to `"default"`.
 
 `getPrometheusPrompt(model, disabledTools)` then loads the selected markdown through `loadPromptSync({ source: prometheusPromptVariants[variant], name: "prometheus", variant })` and returns the loaded body.
+
+## CLAUDE PER-MODEL TUNING (design principles)
+
+The four Claude variants are byte-copies of `default.md` plus ONE inserted `<self_knowledge>` block after the Prometheus identity paragraph (same pattern as the Sisyphus per-model variants in [`src/agents/sisyphus/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/agents/sisyphus/)). Principles are distilled from the Anthropic per-model prompting guides:
+
+| Variant | Defaults countered |
+|---------|--------------------|
+| `claude-opus-4-6` | Over-exploration (bound to one 2-3 agent wave per question), subagent overuse (distinct angle per dispatch), overengineered plans (extras go to Must NOT Have), premature context-budget wrap-up |
+| `claude-opus-4-7` | Research under-triggering (favors recall over tool calls — fire explore/librarian), subagent under-spawning (dispatch full wave in one response), literal instruction following (plans must state scope explicitly), bounded exploration (one wave per question) |
+| `claude-opus-4-8` | 4.7 set, plus capability under-reach (dispatch NOW, no "worth it" debate), over-asking the user (research first, then ask the informed question), narration (lean interview turns) |
+| `claude-fable-5` | DELEGATED DISCOVERY MANDATE (Fable never greps/reads source itself — every discovery question becomes an explore/librarian dispatch), wide fan-out (3-6 agents per wave, one angle each), follow-up waves on gaps, stay async (never block on a wave), grounded claims only, no overplanning |
+
+When editing `default.md`, replicate content changes into the four Claude variants (only the `<self_knowledge>` block may differ), then refresh the sha256 baselines in `prometheus-byte-exactness.test.ts`.
 
 ## DISABLED TOOL HANDLING
 

@@ -55,6 +55,62 @@ const PROMETHEUS_PROMPT_BASELINES: readonly PrometheusPromptBaseline[] = [
     sha256: "192bc37467b0dcce4a636d61696bab8ea011ca517f657b66bd17896dace5b313",
     shouldContainQuestionTool: false,
   },
+  {
+    name: "claude-fable-5-enabled",
+    model: "anthropic/claude-fable-5",
+    disabledTools: [],
+    sha256: "e2eddb507144bfc58077f7b639e637ea10b0233fe4c527550e3cccb3a3e84a8d",
+    shouldContainQuestionTool: true,
+  },
+  {
+    name: "claude-fable-5-question-disabled",
+    model: "anthropic/claude-fable-5",
+    disabledTools: ["question"],
+    sha256: "cedb503c5e12d36ece93182125eceacc570431581b2bab6c3d391e1a9a0eeafe",
+    shouldContainQuestionTool: false,
+  },
+  {
+    name: "claude-opus-4-8-enabled",
+    model: "anthropic/claude-opus-4-8",
+    disabledTools: [],
+    sha256: "b7dd5acd7c273972854455bec0f4d890125072b2d43a322dd5ac7d6b455c01a9",
+    shouldContainQuestionTool: true,
+  },
+  {
+    name: "claude-opus-4-8-question-disabled",
+    model: "anthropic/claude-opus-4-8",
+    disabledTools: ["question"],
+    sha256: "0d6030028f7ffd39f051bec8e83d8785256bada55d9d837dcd4b62288a7fed5c",
+    shouldContainQuestionTool: false,
+  },
+  {
+    name: "claude-opus-4-7-enabled",
+    model: "anthropic/claude-opus-4-7",
+    disabledTools: [],
+    sha256: "590e2a119b1e9a2db05cc3856b4bbc2f18109281dfbfa16e6a19fa1b2868266e",
+    shouldContainQuestionTool: true,
+  },
+  {
+    name: "claude-opus-4-7-question-disabled",
+    model: "anthropic/claude-opus-4-7",
+    disabledTools: ["question"],
+    sha256: "bd6498f7f80ab629aa9f4d2786aade82c6c403f626f326786cb6db1c63290c82",
+    shouldContainQuestionTool: false,
+  },
+  {
+    name: "claude-opus-4-6-enabled",
+    model: "anthropic/claude-opus-4-6",
+    disabledTools: [],
+    sha256: "5ae419c9f3d2de4ee3ba7cb1105451d36d8602ab109ddc2cba58c4265da7c86b",
+    shouldContainQuestionTool: true,
+  },
+  {
+    name: "claude-opus-4-6-question-disabled",
+    model: "anthropic/claude-opus-4-6",
+    disabledTools: ["question"],
+    sha256: "9a0e714e252e9f8f1007fd4db88d5731912c4ef4bc75d42763470b2feb353d93",
+    shouldContainQuestionTool: false,
+  },
 ]
 
 describe("Prometheus prompt byte exactness", () => {

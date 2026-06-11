@@ -3,6 +3,12 @@ import { getPrometheusPrompt, PROMETHEUS_SYSTEM_PROMPT } from "./prometheus"
 
 const PROMETHEUS_GPT_SYSTEM_PROMPT = getPrometheusPrompt("gpt-5.5")
 const PROMETHEUS_GEMINI_SYSTEM_PROMPT = getPrometheusPrompt("gemini-3.1-pro")
+const PROMETHEUS_CLAUDE_VARIANT_PROMPTS = [
+  getPrometheusPrompt("anthropic/claude-opus-4-6"),
+  getPrometheusPrompt("anthropic/claude-opus-4-7"),
+  getPrometheusPrompt("anthropic/claude-opus-4-8"),
+  getPrometheusPrompt("anthropic/claude-fable-5"),
+]
 
 describe("PROMETHEUS_SYSTEM_PROMPT Momus invocation policy", () => {
   test("should direct providing ONLY the file path string when invoking Momus", () => {
@@ -268,6 +274,7 @@ describe("Prometheus prompts anti-duplication coverage", () => {
       PROMETHEUS_SYSTEM_PROMPT,
       PROMETHEUS_GPT_SYSTEM_PROMPT,
       PROMETHEUS_GEMINI_SYSTEM_PROMPT,
+      ...PROMETHEUS_CLAUDE_VARIANT_PROMPTS,
     ]
 
     // when / then
@@ -276,6 +283,22 @@ describe("Prometheus prompts anti-duplication coverage", () => {
       expect(prompt).toContain("Anti-Duplication Rule")
       expect(prompt).toContain("DO NOT perform the same search yourself")
       expect(prompt).toContain("non-overlapping work")
+    }
+  })
+})
+
+describe("Prometheus Claude variants planner invariants", () => {
+  test("all Claude variants should keep the planner identity, Momus loop, and QA constraints from default", () => {
+    // given
+    const prompts = PROMETHEUS_CLAUDE_VARIANT_PROMPTS
+
+    // when / then
+    for (const prompt of prompts) {
+      expect(prompt).toContain("YOU ARE A PLANNER. YOU ARE NOT AN IMPLEMENTER.")
+      expect(prompt).toContain('subagent_type="momus"')
+      expect(prompt).toContain(".omo/plans/{name}.md")
+      expect(prompt.toLowerCase()).toContain("zero human intervention")
+      expect(prompt.toLowerCase()).toContain("agent-executed qa scenarios")
     }
   })
 })

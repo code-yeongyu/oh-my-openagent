@@ -1,7 +1,21 @@
 import { loadPromptSync, prometheusPromptVariants } from "@oh-my-opencode/prompts-core"
-import { isGptModel, isGeminiModel } from "../types"
+import {
+  isClaudeFable5Model,
+  isClaudeOpus46Model,
+  isClaudeOpus47Model,
+  isClaudeOpus48Model,
+  isGeminiModel,
+  isGptModel,
+} from "../types"
 
-export type PrometheusPromptSource = "default" | "gpt" | "gemini"
+export type PrometheusPromptSource =
+  | "default"
+  | "gpt"
+  | "gemini"
+  | "claude-fable-5"
+  | "claude-opus-4-8"
+  | "claude-opus-4-7"
+  | "claude-opus-4-6"
 
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
@@ -23,8 +37,13 @@ function loadPrometheusVariant(variant: PrometheusPromptSource): string {
 export const PROMETHEUS_SYSTEM_PROMPT = loadPrometheusVariant("default")
 
 export function getPrometheusPromptSource(model?: string): PrometheusPromptSource {
-  if (model && isGptModel(model)) return "gpt"
-  if (model && isGeminiModel(model)) return "gemini"
+  if (!model) return "default"
+  if (isClaudeFable5Model(model)) return "claude-fable-5"
+  if (isClaudeOpus48Model(model)) return "claude-opus-4-8"
+  if (isClaudeOpus47Model(model)) return "claude-opus-4-7"
+  if (isClaudeOpus46Model(model)) return "claude-opus-4-6"
+  if (isGptModel(model)) return "gpt"
+  if (isGeminiModel(model)) return "gemini"
   return "default"
 }
 
