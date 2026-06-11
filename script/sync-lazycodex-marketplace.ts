@@ -66,6 +66,7 @@ export interface SyncLazycodexMarketplaceInput {
   readonly sourceRoot: string
   readonly lazycodexRoot: string
   readonly releaseVersion?: string
+  readonly allowMissingBundledDists?: boolean
 }
 
 interface MarketplaceManifest {
@@ -106,7 +107,7 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     filter: (path) => shouldCopyPluginPath(path, pluginRoot),
   })
   await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
-  await copyBundledMcpDists(sourceRoot, lazycodexRoot)
+  await copyBundledMcpDists(sourceRoot, lazycodexRoot, input.allowMissingBundledDists === true)
   await rewritePluginMcpManifest(destinationPluginRoot)
   await stampReleaseVersion(destinationPluginRoot, input.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION)
   await validateLazycodexPluginBundle(destinationPluginRoot)
@@ -152,9 +153,9 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
-async function copyBundledMcpDists(sourceRoot: string, lazycodexRoot: string): Promise<void> {
+async function copyBundledMcpDists(sourceRoot: string, lazycodexRoot: string, skipMissing: boolean): Promise<void> {
   for (const mcpDist of BUNDLED_MCP_DISTS) {
-    await copyBundledMcpDist(sourceRoot, lazycodexRoot, mcpDist)
+    await copyBundledMcpDist(sourceRoot, lazycodexRoot, mcpDist, skipMissing)
   }
 }
 
@@ -170,9 +171,14 @@ async function copyBundledMcpDist(
   sourceRoot: string,
   lazycodexRoot: string,
   mcpDist: (typeof BUNDLED_MCP_DISTS)[number],
+  skipMissing: boolean,
 ): Promise<void> {
   const sourcePath = join(sourceRoot, mcpDist.sourcePath)
   if (!(await isDirectory(sourcePath))) {
+    if (skipMissing) {
+      console.warn(`[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing ${mcpDist.label} dist at ${sourcePath}`)
+      return
+    }
     throw new Error(`missing built ${mcpDist.label} dist at ${sourcePath}`)
   }
   const destinationPath = join(lazycodexRoot, mcpDist.destinationPath)
@@ -282,10 +288,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 if (import.meta.main) {
-  const sourceRoot = process.argv[2] ?? process.cwd()
-  const lazycodexRoot = process.argv[3]
+  const args = process.argv.slice(2)
+  const positional = args.filter((a) => !a.startsWith("--"))
+  const sourceRoot = positional[0] ?? process.cwd()
+  const lazycodexRoot = positional[1]
   if (lazycodexRoot === undefined) {
     throw new Error("Usage: bun run script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>")
   }
-  await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+  await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot, allowMissingBundledDists: args.includes("--previous-payload") })
 }
