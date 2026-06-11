@@ -10,6 +10,7 @@ import {
   markLiveRouteUnavailable,
   resetLiveServerRouteForTesting,
   resolveDispatchClient,
+  tryResolveDispatchClientSync,
   warmLiveServerProbe,
   setLiveParentWakeRoutingDisabled,
 } from "./live-server-route"
@@ -323,6 +324,46 @@ describe("live-server-route", () => {
       // then
       expect(first.route).toBe("live")
       expect(second.route).toBe("live")
+    })
+  })
+
+  describe("tryResolveDispatchClientSync — synchronous fast path", () => {
+    test("#given an unregistered client #when tryResolveDispatchClientSync called #then it returns identity passthrough without awaiting", () => {
+      // given
+      const unregistered = { _marker: "unregistered" } as unknown
+
+      // when
+      const result = tryResolveDispatchClientSync(unregistered, "ses_sync_identity")
+
+      // then
+      expect(result).toEqual({ client: unregistered, route: "in-process", reason: "identity" })
+    })
+
+    test("#given a registered client with no probe yet #when tryResolveDispatchClientSync called #then it returns undefined (async probe required)", () => {
+      // given
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/sync", inProcessClient: fakeInProcessClient })
+
+      // when
+      const result = tryResolveDispatchClientSync(fakeInProcessClient, "ses_sync_stale")
+
+      // then
+      expect(result).toBeUndefined()
+    })
+
+    test("#given a registered client with a fresh available probe #when tryResolveDispatchClientSync called #then it returns the live route synchronously", async () => {
+      // given
+      const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }])
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/sync", inProcessClient: fakeInProcessClient })
+      _setLiveClientForTesting(fakeLiveClient)
+      await resolveDispatchClient(fakeInProcessClient, "ses_sync_warm")
+
+      // when
+      const result = tryResolveDispatchClientSync(fakeInProcessClient, "ses_sync_fresh")
+
+      // then
+      expect(result?.route).toBe("live")
+      expect(result?.client).toBe(fakeLiveClient)
     })
   })
 

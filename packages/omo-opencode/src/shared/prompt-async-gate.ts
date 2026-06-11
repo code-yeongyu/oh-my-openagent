@@ -5,6 +5,7 @@ import {
   isPreSendConnectionFailure,
   markLiveRouteUnavailable,
   resolveDispatchClient,
+  tryResolveDispatchClientSync,
 } from "./live-server-route"
 import { DEFAULT_SESSION_IDLE_SETTLE_MS } from "./session-idle-settle"
 import {
@@ -121,7 +122,8 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
     ?? (postDispatchHoldMs > 0 ? DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS : 0)
   const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
   const sessionName = args.mode === "async" ? "promptAsync" : "prompt"
-  const resolved = await resolveDispatchClient(args.client, sessionID)
+  const resolved = tryResolveDispatchClientSync(args.client, sessionID)
+    ?? await resolveDispatchClient(args.client, sessionID)
   type AsyncClient = { session?: { promptAsync?: (input: TInput) => Promise<unknown>; status?: () => Promise<unknown>; messages?: (...args: unknown[]) => Promise<unknown> } }
   type SyncClient = { session?: { prompt?: (input: TInput) => Promise<unknown>; status?: () => Promise<unknown>; messages?: (...args: unknown[]) => Promise<unknown> } }
   const dispatch = (() => {
