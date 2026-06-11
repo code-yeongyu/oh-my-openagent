@@ -11,6 +11,11 @@ export const SPARKSHELL_USAGE = [
   "Oversized output is condensed to a budget (default 20000 chars; --budget <chars> or",
   "OMO_SPARKSHELL_CONDENSE_BUDGET overrides) preserving error signatures, repeated patterns,",
   "session-goal matches, and head/tail. OMO_SPARKSHELL_CONDENSE=0 disables condensation.",
+  "Before that deterministic condensation, oversized output is summarized by the spark model",
+  "(codex exec; default gpt-5.5-codex-spark) fed with the session context: the summary reproduces",
+  "the output as-is, masks secrets with [REDACTED], and ends with a [sparkshell caption] line.",
+  "OMO_SPARKSHELL_SPARK=0 disables it; OMO_SPARKSHELL_SPARK_MODEL / OMO_SPARKSHELL_SPARK_TIMEOUT_MS /",
+  "OMO_SPARKSHELL_SPARK_BIN tune the invocation. Condensation is the automatic fallback.",
 ].join("\n")
 
 export type SparkShellFallbackInvocation =
@@ -167,6 +172,10 @@ export function hasTopLevelSparkShellJsonFlag(args: readonly string[]): boolean 
     return false
   }
   return false
+}
+
+export function stripTopLevelSparkShellArgs(args: readonly string[]): readonly string[] {
+  return stripSparkShellOptions(args).args
 }
 
 function parseTmuxPaneInvocation(args: readonly string[], commandExists: (command: string) => boolean): SparkShellFallbackInvocation {

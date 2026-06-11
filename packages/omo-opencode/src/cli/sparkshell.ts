@@ -14,10 +14,19 @@ import {
   parseSparkShellFallbackInvocation,
   parseTopLevelSparkShellBudget,
   SPARKSHELL_USAGE,
+  stripTopLevelSparkShellArgs,
   type SparkShellFallbackInvocation,
 } from "./sparkshell-parse"
 import { condenseOutput, extractContextHints } from "./sparkshell-condense"
 import { loadCodexSessionContextDetails, type SessionContextDetails } from "./sparkshell-session-context"
+import {
+  createDefaultSparkSummarizer,
+  isSparkSummaryEnabled,
+  resolveSparkModel,
+  SPARKSHELL_SPARK_ENV,
+  type SparkSummarizer,
+  type SparkSummaryRequest,
+} from "./sparkshell-spark"
 
 export const SPARKSHELL_BIN_ENV = "OMO_SPARKSHELL_BIN"
 export const SPARKSHELL_CONDENSE_ENV = "OMO_SPARKSHELL_CONDENSE"
@@ -33,6 +42,16 @@ export {
   resolveFallbackShellArgv,
   SPARKSHELL_USAGE,
 } from "./sparkshell-parse"
+
+export {
+  DEFAULT_SPARK_MODEL,
+  SPARKSHELL_SPARK_BIN_ENV,
+  SPARKSHELL_SPARK_ENV,
+  SPARKSHELL_SPARK_MODEL_ENV,
+  SPARKSHELL_SPARK_TIMEOUT_ENV,
+  type SparkSummarizer,
+  type SparkSummaryRequest,
+} from "./sparkshell-spark"
 
 export type SparkShellSpawnResult = {
   readonly status?: number | null
@@ -58,6 +77,7 @@ export type SparkShellRunOptions = {
   readonly commandExists?: (command: string) => boolean
   readonly appServerClient?: SparkShellAppServerClient | null
   readonly loadSessionContext?: (env: RuntimeEnv) => SessionContextDetails | null
+  readonly sparkSummarize?: SparkSummarizer | null
 }
 
 type SparkShellExecOutcome = {
@@ -83,7 +103,9 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
 
   const jsonMode = hasTopLevelSparkShellJsonFlag(args)
   const getDetails = createLazySessionDetails(env, options.loadSessionContext)
-  const transformOutput = jsonMode ? undefined : createCondenseTransform(args, env, getDetails)
+  const transformOutput = jsonMode
+    ? undefined
+    : createCondenseTransform(args, env, getDetails, resolveSparkSummarizer(options.sparkSummarize, env, cwd))
   const outcome = await executeSparkShell(args, options, { cwd, env, writeStdout, writeStderr, transformOutput })
   if (outcome.executed && !jsonMode) {
     const block = getDetails()?.block ?? ""
@@ -118,19 +140,64 @@ function createCondenseTransform(
   args: readonly string[],
   env: RuntimeEnv,
   getDetails: () => SessionContextDetails | null,
+  sparkSummarize: SparkSummarizer | null,
 ): ((text: string) => string) | undefined {
   if (isFalsyEnvValue(env[SPARKSHELL_CONDENSE_ENV])) {
     return undefined
   }
   const budget = parseTopLevelSparkShellBudget(args) ?? parseEnvBudget(env) ?? DEFAULT_CONDENSE_BUDGET_CHARS
+  const commandLine = stripTopLevelSparkShellArgs(args).join(" ")
   return (text: string): string => {
     if (text.length <= budget) {
       return text
     }
     const details = getDetails()
+    if (sparkSummarize) {
+      const summary = summarizeWithSpark(sparkSummarize, {
+        commandLine,
+        text,
+        budgetChars: budget,
+        sessionContext: details?.block ?? "",
+      })
+      if (summary !== null) {
+        return formatSparkSummary(summary, resolveSparkModel(env), text)
+      }
+    }
     const hints = details === null ? [] : extractContextHints([details.firstUserRequest, details.latestUserRequest])
     return condenseOutput(text, { budgetChars: budget, hints }).output
   }
+}
+
+function resolveSparkSummarizer(
+  option: SparkSummarizer | null | undefined,
+  env: RuntimeEnv,
+  cwd: string,
+): SparkSummarizer | null {
+  if (!isSparkSummaryEnabled(env)) {
+    return null
+  }
+  if (option !== undefined) {
+    return option
+  }
+  return createDefaultSparkSummarizer(env, cwd)
+}
+
+function summarizeWithSpark(sparkSummarize: SparkSummarizer, request: SparkSummaryRequest): string | null {
+  try {
+    const summary = sparkSummarize(request)
+    return summary !== null && summary.trim().length > 0 ? summary : null
+  } catch {
+    return null
+  }
+}
+
+function formatSparkSummary(summary: string, model: string, originalText: string): string {
+  const totalLines = originalText.split("\n").length
+  const header = [
+    `[sparkshell] spark summary (model: ${model}; original output: ${totalLines} lines, ${originalText.length} chars);`,
+    `as-is excerpt with [REDACTED] censorship and a bottom [sparkshell caption]. Set ${SPARKSHELL_SPARK_ENV}=0 to disable.`,
+  ].join(" ")
+  return `${header}\n${summary.trim()}\n`
 }
 
 function parseEnvBudget(env: RuntimeEnv): number | null {

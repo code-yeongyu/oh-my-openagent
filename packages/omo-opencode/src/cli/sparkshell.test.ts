@@ -10,6 +10,7 @@ import {
   SPARKSHELL_USAGE,
   type SparkShellSpawnResult,
 } from "./sparkshell"
+import type { SparkSummaryRequest } from "./sparkshell-spark"
 
 function __repoRootFrom(start: string): string {
   let dir = start
@@ -347,6 +348,7 @@ describe("sparkshell CLI", () => {
         firstUserRequest: "fix the `fable-fallback.ts` regression",
         latestUserRequest: "ship fable-fallback.ts after green tests",
       }),
+      sparkSummarize: null,
     })
 
     // then
@@ -422,6 +424,7 @@ describe("sparkshell CLI", () => {
       },
       writeStderr: () => {},
       loadSessionContext: () => null,
+      sparkSummarize: null,
     })
 
     // then
@@ -493,5 +496,179 @@ describe("sparkshell CLI", () => {
     // then
     expect(exitCode).toBe(7)
     expect(calls).toEqual([["/tmp/omo-sparkshell", "--json", "git", "status"]])
+  })
+
+  test("#given oversized output and a spark summarizer #when a command runs #then prints the spark summary with caption instead of raw output", async () => {
+    // given
+    const stdout: string[] = []
+    const requests: SparkSummaryRequest[] = []
+    const hugeLog = `${Array.from({ length: 2000 }, (_, index) => `worker ${index} idle and waiting for jobs`).join("\n")}\n`
+
+    // when
+    const exitCode = await runSparkShell(["--budget", "5000", "cat", "huge.log"], {
+      env: { CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeLog }),
+      loadSessionContext: () => ({
+        block: "CTX-BLOCK",
+        firstUserRequest: "fix the fable-fallback.ts regression",
+        latestUserRequest: "ship fable-fallback.ts after green tests",
+      }),
+      sparkSummarize: (request: SparkSummaryRequest) => {
+        requests.push(request)
+        return "worker 0 idle and waiting for jobs\n[sparkshell caption] ran `cat huge.log`; kept 1 of 2000 idle lines as-is; nothing redacted"
+      },
+    })
+
+    // then
+    const combined = stdout.join("")
+    expect(exitCode).toBe(0)
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.commandLine).toBe("cat huge.log")
+    expect(requests[0]?.budgetChars).toBe(5000)
+    expect(requests[0]?.sessionContext).toContain("CTX-BLOCK")
+    expect(requests[0]?.text).toBe(hugeLog)
+    expect(combined).toContain("[sparkshell] spark summary")
+    expect(combined).toContain("[sparkshell caption]")
+    expect(combined).not.toContain("worker 1999 idle")
+    expect(combined).toContain("CTX-BLOCK")
+    expect(combined.indexOf("[sparkshell] spark summary")).toBeLessThan(combined.indexOf("CTX-BLOCK"))
+  })
+
+  test("#given a failing spark summarizer #when oversized output flows #then falls back to deterministic condensation", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeLog = `${Array.from({ length: 2000 }, (_, index) => `request ${index} handled`).join("\n")}\n`
+
+    // when
+    const exitCode = await runSparkShell(["--budget", "4000", "cat", "huge.log"], {
+      env: {},
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeLog }),
+      loadSessionContext: () => null,
+      sparkSummarize: () => null,
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toContain("[sparkshell] condensed:")
+    expect(stdout.join("")).not.toContain("[sparkshell] spark summary")
+  })
+
+  test("#given the spark kill switch #when oversized output flows #then never invokes the summarizer", async () => {
+    // given
+    const stdout: string[] = []
+    let sparkCalls = 0
+    const hugeLog = `${Array.from({ length: 2000 }, (_, index) => `request ${index} handled`).join("\n")}\n`
+
+    // when
+    const exitCode = await runSparkShell(["--budget", "4000", "cat", "huge.log"], {
+      env: { OMO_SPARKSHELL_SPARK: "0" },
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeLog }),
+      loadSessionContext: () => null,
+      sparkSummarize: () => {
+        sparkCalls += 1
+        return "SPARK-SUMMARY"
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(sparkCalls).toBe(0)
+    expect(stdout.join("")).toContain("[sparkshell] condensed:")
+  })
+
+  test("#given the top-level --json flag #when oversized output flows #then never invokes spark", async () => {
+    // given
+    const stdout: string[] = []
+    let sparkCalls = 0
+    const hugeJson = `{"items":[${"1,".repeat(20_000)}1]}`
+
+    // when
+    const exitCode = await runSparkShell(["--json", "cat", "huge.json"], {
+      env: {},
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: hugeJson }),
+      loadSessionContext: () => null,
+      sparkSummarize: () => {
+        sparkCalls += 1
+        return "SPARK-SUMMARY"
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(sparkCalls).toBe(0)
+    expect(stdout.join("")).toBe(hugeJson)
+  })
+
+  test("#given output within the budget #when a command runs #then never invokes spark", async () => {
+    // given
+    const stdout: string[] = []
+    let sparkCalls = 0
+
+    // when
+    const exitCode = await runSparkShell(["echo", "ok"], {
+      env: {},
+      appServerClient: null,
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      spawn: (): SparkShellSpawnResult => ({ status: 0, stdout: "ok\n" }),
+      loadSessionContext: () => null,
+      sparkSummarize: () => {
+        sparkCalls += 1
+        return "SPARK-SUMMARY"
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(sparkCalls).toBe(0)
+    expect(stdout.join("")).toBe("ok\n")
+  })
+
+  test("#given the appserver path #when oversized output returns #then spark-summarizes it like the fallback path", async () => {
+    // given
+    const stdout: string[] = []
+    const hugeLog = Array.from({ length: 2000 }, (_, index) => `request ${index} handled`).join("\n")
+
+    // when
+    const exitCode = await runSparkShell(["--budget", "4000", "cat", "huge.log"], {
+      env: {},
+      appServerClient: {
+        getPlatform: async () => "darwin" as const,
+        exec: async () => ({ exitCode: 0, stdout: hugeLog, stderr: "" }),
+      },
+      writeStdout: (value: string) => {
+        stdout.push(value)
+      },
+      writeStderr: () => {},
+      loadSessionContext: () => null,
+      sparkSummarize: () => "APPSERVER-SPARK-SUMMARY\n[sparkshell caption] ran `cat huge.log`; trimmed idle lines",
+    })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stdout.join("")).toContain("APPSERVER-SPARK-SUMMARY")
+    expect(stdout.join("")).not.toContain("request 1999 handled")
   })
 })
