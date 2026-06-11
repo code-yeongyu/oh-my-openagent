@@ -53,29 +53,29 @@ describe("platform launcher runtime fallback (lazycodex#47)", () => {
     expect(result.stderr).toContain("node CLI");
   });
 
-  it("#given bun dies with SIGILL (unsupported CPU) #when launching #then explains the CPU limitation and falls back", async () => {
-    const fixture = await createLauncherFixture({ withNodeCli: true });
-    const sigillBun = join(fixture.root, "sigill-bun.sh");
-    await writeFile(sigillBun, "#!/bin/sh\nkill -ILL $$\n");
-    await chmod(sigillBun, 0o755);
+  it.skipIf(process.platform === "win32")(
+    "#given bun dies with SIGILL (unsupported CPU) #when launching #then explains the CPU limitation and falls back",
+    async () => {
+      const fixture = await createLauncherFixture({ withNodeCli: true });
+      const sigillBun = join(fixture.root, "sigill-bun.sh");
+      await writeFile(sigillBun, "#!/bin/sh\nkill -ILL $$\n");
+      await chmod(sigillBun, 0o755);
 
-    const result = runLauncher(fixture, { BUN_BINARY: sigillBun });
+      const result = runLauncher(fixture, { BUN_BINARY: sigillBun });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("OMO_NODE_OK --help");
-    expect(result.stderr.toLowerCase()).toContain("cpu");
-  });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("OMO_NODE_OK --help");
+      expect(result.stderr.toLowerCase()).toContain("cpu");
+    },
+  );
 
   it("#given a working bun #when launching #then bun stays the preferred runtime", async () => {
     const fixture = await createLauncherFixture({ withNodeCli: true });
-    const fakeBun = join(fixture.root, "fake-bun.sh");
-    await writeFile(fakeBun, '#!/bin/sh\necho "BUN_OK $2"\n');
-    await chmod(fakeBun, 0o755);
 
-    const result = runLauncher(fixture, { BUN_BINARY: fakeBun });
+    const result = runLauncher(fixture, { BUN_BINARY: process.execPath });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("BUN_OK");
+    expect(result.stdout).toContain("BUN_CLI_RAN");
     expect(result.stdout).not.toContain("OMO_NODE_OK");
   });
 
