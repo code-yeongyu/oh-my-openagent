@@ -49,6 +49,9 @@ export async function applyCommandConfig(params: {
       systemMcpNames: getSystemMcpServerNames(),
     }),
   );
+  for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
+    delete builtinSkillCommands[disabledCommand];
+  }
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
