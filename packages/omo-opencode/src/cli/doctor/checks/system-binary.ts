@@ -2,6 +2,7 @@ import { existsSync, accessSync, constants } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { extractSemverFromOutput } from "../../../shared/extract-semver"
+import { bunWhich } from "../../../shared/bun-which-shim"
 import { spawnWithTimeout } from "../spawn-with-timeout"
 
 import { OPENCODE_BINARIES } from "../constants"
@@ -114,9 +115,8 @@ export async function findOpenCodeBinary(
   platform: NodeJS.Platform = process.platform,
   checkExists: (path: string) => boolean = existsSync,
 ): Promise<OpenCodeBinaryInfo | null> {
-  // 1) Try Bun.which first
   for (const binary of OPENCODE_BINARIES) {
-    const path = Bun.which(binary)
+    const path = bunWhich(binary)
     if (path && checkExists(path)) {
       return { binary, path }
     }

@@ -20,7 +20,7 @@ describe("LazyCodex release version stamping workflow", () => {
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const buildStep = sliceWorkflowSection(
       workflow,
-      "      - name: Build Codex plugin components for lazycodex-ai",
+      "      - name: Build Codex plugin components",
       "      - name: Publish lazycodex-ai",
     )
 

@@ -2,17 +2,16 @@
 
 import { afterEach, describe, expect, it, mock } from "bun:test"
 
-const originalWhich = Bun.which
-
 afterEach(() => {
-  Bun.which = originalWhich
   mock.restore()
 })
 
 describe("getGhCliInfo", () => {
-  it("falls back to gh --version when Bun.which cannot find gh", async () => {
+  it("falls back to gh --version when the path resolver cannot find gh", async () => {
     // given
-    Bun.which = mock(() => null)
+    mock.module("../../../shared/bun-which-shim", () => ({
+      bunWhich: mock(() => null),
+    }))
     mock.module("../spawn-with-timeout", () => ({
       spawnWithTimeout: mock((command: string[]) => {
         if (command.join(" ") === "gh --version") {

@@ -1,4 +1,5 @@
 import { spawnWithTimeout } from "../spawn-with-timeout"
+import { bunWhich } from "../../../shared/bun-which-shim"
 
 export interface GhCliInfo {
   installed: boolean
@@ -12,7 +13,7 @@ export interface GhCliInfo {
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
-    const binaryPath = Bun.which(binary)
+    const binaryPath = bunWhich(binary)
     return { exists: Boolean(binaryPath), path: binaryPath ?? null }
   } catch (error) {
     if (!(error instanceof Error)) {

@@ -51,6 +51,24 @@ describe("node-target CLI build (lazycodex#47)", () => {
     expect(help.stdout).toContain("Usage:")
   }, 60_000)
 
+  test("doctor json runs under plain node without Bun globals", () => {
+    // #given
+    const build = spawnSync("bun", ["run", "build:cli-node"], { cwd: repoRoot, encoding: "utf8" })
+    expect(build.status, `build:cli-node failed:\n${build.stderr}`).toBe(0)
+
+    // #when
+    const doctor = spawnSync("node", ["dist/cli-node/index.js", "doctor", "--json"], { cwd: repoRoot, encoding: "utf8" })
+
+    // #then
+    expect(doctor.stderr).not.toContain("Bun is not defined")
+    expect(doctor.stderr).not.toContain("Doctor failed unexpectedly")
+    const doctorStatus = doctor.status
+    if (doctorStatus === null) throw new Error(`node doctor exited without a status:\n${doctor.stderr}`)
+    const report = JSON.parse(doctor.stdout) as { exitCode?: number; summary?: { total?: number } }
+    expect(report.exitCode).toBe(doctorStatus)
+    expect(report.summary?.total).toBeGreaterThan(0)
+  }, 120_000)
+
   test("the main build chain and the lazycodex-ai payload carry the node CLI", () => {
     // #given
     const packageJson = JSON.parse(readFileSync(rootPackageJsonPath, "utf8")) as {
