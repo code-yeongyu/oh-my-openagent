@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   isClaudeFable5Model,
+  isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
@@ -37,6 +38,14 @@ describe("model family detectors", () => {
     expect(isGlmModel("z-ai/glm-5.1")).toBe(true)
     expect(isGlmModel("opencode/glm-4.6v")).toBe(true)
     expect(isGlmModel("google/gemini-3.1-pro")).toBe(false)
+  })
+
+  test("#given Claude Opus 4.6 model ids #then detects Opus 4.6 only", () => {
+    expect(isClaudeOpus46Model("anthropic/claude-opus-4-6")).toBe(true)
+    expect(isClaudeOpus46Model("anthropic/claude-opus-4.6")).toBe(true)
+    expect(isClaudeOpus46Model("claude-opus-4-6")).toBe(true)
+    expect(isClaudeOpus46Model("anthropic/claude-opus-4-7")).toBe(false)
+    expect(isClaudeOpus46Model("anthropic/claude-sonnet-4-6")).toBe(false)
   })
 
   test("#given Claude Opus 4.7 model ids #then detects Opus 4.7 only", () => {
