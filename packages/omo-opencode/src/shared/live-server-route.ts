@@ -159,7 +159,7 @@ function getOrBuildLiveClient(registration: RouteRegistration): unknown {
   return registration.liveClient
 }
 
-export async function resolveDispatchClient(client: unknown, sessionID: string): Promise<RouteResult> {
+export function tryResolveDispatchClientSync(client: unknown, sessionID: string): RouteResult | undefined {
   const registration = registrations.get(client)
   if (!registration) {
     return { client, route: "in-process", reason: "identity" }
@@ -177,6 +177,29 @@ export async function resolveDispatchClient(client: unknown, sessionID: string):
     return { client, route: "in-process", reason: "unavailable" }
   }
 
+  if (!hasFreshProbe(registration)) {
+    return undefined
+  }
+
+  if (!registration.available) {
+    return { client, route: "in-process", reason: "unavailable" }
+  }
+
+  const resolvedLiveClient = getOrBuildLiveClient(registration)
+  if (!resolvedLiveClient) {
+    return { client, route: "in-process", reason: "unavailable" }
+  }
+
+  return { client: resolvedLiveClient, route: "live", reason: "live" }
+}
+
+export async function resolveDispatchClient(client: unknown, sessionID: string): Promise<RouteResult> {
+  const syncResult = tryResolveDispatchClientSync(client, sessionID)
+  if (syncResult) {
+    return syncResult
+  }
+
+  const registration = registrations.get(client)!
   const isAvailable = await resolveAvailability(registration)
   if (!isAvailable) {
     return { client, route: "in-process", reason: "unavailable" }
