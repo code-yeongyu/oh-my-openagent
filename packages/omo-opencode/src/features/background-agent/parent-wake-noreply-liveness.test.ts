@@ -4,11 +4,14 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 import { ParentWakePendingQueue } from "./parent-wake-pending-queue"
+import type { PendingParentWake } from "./parent-wake-dedupe"
+import { getParentWakeSessionHistoryDeferralDecision } from "./parent-wake-session-history"
 import type { BackgroundTask } from "./types"
 import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../../hooks/shared/prompt-async-gate"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 
 type PromptAsyncCall = {
   path: { id: string }
@@ -190,6 +193,80 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }
+  })
+
+  test("#given retained noReply wake is latest internal history message #then reply wake resumes once prior assistant turn is safe", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    let admittedWakeIsLatest = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => admittedWakeIsLatest
+        ? [
+          ...SAFE_MESSAGES,
+          {
+            info: { role: "user", time: { created: 100_100 } },
+            parts: [createInternalAgentTextPart(FINAL_WAKE)],
+          },
+        ]
+        : BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: the wake is first admitted as noReply while the parent turn is unsafe
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+
+      // when: the retained wake itself is now the latest internal user message after a safe assistant turn
+      admittedWakeIsLatest = true
+      releaseParentWakeHold("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the retained reply-required wake is not blocked by its own noReply history entry
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given older matching internal wake is latest #then it is not treated as the retained noReply admission", () => {
+    // given
+    const wake: PendingParentWake = {
+      promptContext: { agent: "sisyphus" },
+      notifications: [FINAL_WAKE],
+      shouldReply: true,
+      noReplyAdmittedAt: 100_000,
+    }
+    const messages: SessionMessageStub[] = [
+      ...SAFE_MESSAGES,
+      {
+        info: { role: "user", time: { created: 90_500 } },
+        parts: [createInternalAgentTextPart(FINAL_WAKE)],
+      },
+    ]
+
+    // when
+    const decision = getParentWakeSessionHistoryDeferralDecision({
+      sessionID: "parent-1",
+      messages,
+      wake,
+      toolCallDeferMaxMs: 5_000,
+      now: 101_000,
+    })
+
+    // then
+    expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })
   })
 
   test("#given noReply admission of a reply-required wake #then the dispatched tracker does not claim reply coverage", async () => {

@@ -112,13 +112,17 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     })
     return { defer: true, skipPromptGateToolStateCheck: false }
   }
-  const messages = [...input.messages]
+  const safetyState = getParentWakeSafetyMessages(input.messages, input.wake)
+  const messages = safetyState.messages
   const latestAssistantBlocksPrompt = latestAssistantTurnBlocksInternalPrompt(messages)
   const latestAssistantHasUnansweredQuestion = latestAssistantTurnHasUnansweredQuestion(messages)
   if (!latestAssistantBlocksPrompt) {
     delete input.wake.toolCallDeferralStartedAt
     delete input.wake.allowEmptyAssistantTurnRetry
-    return { defer: false, skipPromptGateToolStateCheck: false }
+    return {
+      defer: false,
+      skipPromptGateToolStateCheck: safetyState.skippedRetainedNoReplyAdmission,
+    }
   }
   const now = input.now ?? Date.now()
   input.wake.toolCallDeferralStartedAt ??= now
@@ -185,6 +189,45 @@ export function hasAssistantOrToolOutputAfterParentWake(input: {
       && createdAt >= dispatchedAt
       && parentWakeMessageHasOutput(message)
   })
+}
+
+function getParentWakeSafetyMessages(
+  messages: readonly ParentWakeSessionMessage[],
+  wake: PendingParentWake,
+): {
+  readonly messages: ParentWakeSessionMessage[]
+  readonly skippedRetainedNoReplyAdmission: boolean
+} {
+  if (wake.noReplyAdmittedAt === undefined) {
+    return { messages: [...messages], skippedRetainedNoReplyAdmission: false }
+  }
+
+  const safetyMessages = [...messages]
+  let skippedRetainedNoReplyAdmission = false
+  while (safetyMessages.length > 0) {
+    const latestMessage = safetyMessages[safetyMessages.length - 1]
+    if (!latestMessage || !parentWakeMessageIsRetainedNoReplyAdmission(latestMessage, wake)) {
+      break
+    }
+    safetyMessages.pop()
+    skippedRetainedNoReplyAdmission = true
+  }
+  return { messages: safetyMessages, skippedRetainedNoReplyAdmission }
+}
+
+function parentWakeMessageIsRetainedNoReplyAdmission(
+  message: ParentWakeSessionMessage,
+  wake: PendingParentWake,
+): boolean {
+  if (!isSyntheticOrInternalUserMessage(message) || !parentWakeMessageContainsNotification(message, wake)) {
+    return false
+  }
+  const noReplyAdmittedAt = wake.noReplyAdmittedAt
+  if (noReplyAdmittedAt === undefined) {
+    return false
+  }
+  const createdAt = getParentWakeMessageCreatedAt(message)
+  return createdAt === undefined || createdAt >= noReplyAdmittedAt
 }
 
 function getParentWakeMessageRole(message: ParentWakeSessionMessage): string | undefined {
