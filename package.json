@@ -58,8 +58,18 @@
     "./server": "./dist/index.js",
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
+  "omp": {
+    "extensions": [
+      "./dist/hosts/oh-my-pi/index.js"
+    ]
+  },
+  "pi": {
+    "extensions": [
+      "./dist/hosts/pi/index.js"
+    ]
+  },
   "scripts": {
-    "build": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun build src/index.ts src/hosts/oh-my-pi/index.ts src/hosts/pi/index.ts --root src --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
     "build:lsp-tools-mcp": "npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build",
     "build:lsp-daemon": "npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build",
     "build:node-require-shim": "bun run script/patch-node-require-shim.ts",

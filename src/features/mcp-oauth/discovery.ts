@@ -5,12 +5,23 @@ export interface OAuthServerMetadata {
   resource: string
 }
 
+export type OAuthDiscoveryFetch = (input: string, init?: RequestInit) => Promise<Response>
+
 const discoveryCache = new Map<string, OAuthServerMetadata>()
 const pendingDiscovery = new Map<string, Promise<OAuthServerMetadata>>()
 
+function isLoopbackHttpUrl(parsed: URL): boolean {
+  return parsed.protocol === "http:" && (
+    parsed.hostname === "127.0.0.1" ||
+    parsed.hostname === "localhost" ||
+    parsed.hostname === "::1" ||
+    parsed.hostname === "[::1]"
+  )
+}
+
 function parseHttpsUrl(value: string, label: string): URL {
   const parsed = new URL(value)
-  if (parsed.protocol !== "https:") {
+  if (parsed.protocol !== "https:" && !isLoopbackHttpUrl(parsed)) {
     throw new Error(`${label} must use https`)
   }
   return parsed
@@ -24,8 +35,11 @@ function readStringField(source: Record<string, unknown>, field: string): string
   return value
 }
 
-async function fetchMetadata(url: string): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; status: number }> {
-  const response = await fetch(url, { headers: { accept: "application/json" } })
+async function fetchMetadata(
+  url: string,
+  fetchImpl: OAuthDiscoveryFetch
+): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; status: number }> {
+  const response = await fetchImpl(url, { headers: { accept: "application/json" } })
   if (!response.ok) {
     return { ok: false, status: response.status }
   }
@@ -59,16 +73,20 @@ function parseMetadataFields(json: Record<string, unknown>, resource: string): O
   }
 }
 
-async function fetchAuthorizationServerMetadata(issuer: string, resource: string): Promise<OAuthServerMetadata> {
+async function fetchAuthorizationServerMetadata(
+  issuer: string,
+  resource: string,
+  fetchImpl: OAuthDiscoveryFetch
+): Promise<OAuthServerMetadata> {
   const issuerUrl = parseHttpsUrl(issuer, "Authorization server URL")
   const issuerPath = issuerUrl.pathname.replace(/\/+$/, "")
   const metadataUrl = new URL(`/.well-known/oauth-authorization-server${issuerPath}`, issuerUrl).toString()
-  const metadata = await fetchMetadata(metadataUrl)
+  const metadata = await fetchMetadata(metadataUrl, fetchImpl)
 
   if (!metadata.ok) {
     if (metadata.status === 404 && issuerPath !== "") {
       const rootMetadataUrl = new URL("/.well-known/oauth-authorization-server", issuerUrl).toString()
-      const rootMetadata = await fetchMetadata(rootMetadataUrl)
+      const rootMetadata = await fetchMetadata(rootMetadataUrl, fetchImpl)
       if (rootMetadata.ok) {
         return parseMetadataFields(rootMetadata.json, resource)
       }
@@ -88,9 +106,13 @@ function parseAuthorizationServers(metadata: Record<string, unknown>): string[] 
   return servers.filter((server): server is string => typeof server === "string" && server.length > 0)
 }
 
-export async function discoverOAuthServerMetadata(resource: string): Promise<OAuthServerMetadata> {
+export async function discoverOAuthServerMetadata(
+  resource: string,
+  options: { readonly fetch?: OAuthDiscoveryFetch } = {}
+): Promise<OAuthServerMetadata> {
   const resourceUrl = parseHttpsUrl(resource, "Resource server URL")
   const resourceKey = resourceUrl.toString()
+  const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis)
 
   const cached = discoveryCache.get(resourceKey)
   if (cached) return cached
@@ -100,21 +122,21 @@ export async function discoverOAuthServerMetadata(resource: string): Promise<OAu
 
   const discoveryPromise = (async () => {
     const prmUrl = new URL("/.well-known/oauth-protected-resource", resourceUrl).toString()
-    const prmResponse = await fetchMetadata(prmUrl)
+    const prmResponse = await fetchMetadata(prmUrl, fetchImpl)
 
     if (prmResponse.ok) {
       const authServers = parseAuthorizationServers(prmResponse.json)
       if (authServers.length === 0) {
         throw new Error("OAuth protected resource metadata missing authorization_servers")
       }
-      return fetchAuthorizationServerMetadata(authServers[0], resource)
+      return fetchAuthorizationServerMetadata(authServers[0], resource, fetchImpl)
     }
 
     if (prmResponse.status !== 404) {
       throw new Error(`OAuth protected resource metadata fetch failed (${prmResponse.status})`)
     }
 
-    return fetchAuthorizationServerMetadata(resourceKey, resource)
+    return fetchAuthorizationServerMetadata(resourceKey, resource, fetchImpl)
   })()
 
   pendingDiscovery.set(resourceKey, discoveryPromise)

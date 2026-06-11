@@ -44,13 +44,41 @@ export function buildAuthorizationUrl(
 
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
-export function startCallbackServer(port: number): Promise<OAuthCallbackResult> {
+type StartedCallbackServer = {
+  readonly callback: Promise<OAuthCallbackResult>
+  readonly close: () => Promise<void>
+}
+
+function closeServer(server: ReturnType<typeof createServer>): Promise<void> {
+  if (!server.listening) return Promise.resolve()
   return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+}
+
+function startCallbackServerWhenReady(port: number): Promise<StartedCallbackServer> {
+  return new Promise((resolveStart, rejectStart) => {
     let timeoutId: ReturnType<typeof setTimeout>
+    let callbackSettled = false
+
+    let resolveCallback: (result: OAuthCallbackResult) => void
+    let rejectCallback: (error: Error) => void
+    const callback = new Promise<OAuthCallbackResult>((resolve, reject) => {
+      resolveCallback = resolve
+      rejectCallback = reject
+    })
+
+    const settleCallback = (settle: () => void): void => {
+      if (callbackSettled) return
+      callbackSettled = true
+      clearTimeout(timeoutId)
+      settle()
+    }
 
     const server = createServer((request, response) => {
-      clearTimeout(timeoutId)
-
       const requestUrl = new URL(request.url ?? "/", `http://localhost:${port}`)
       const code = requestUrl.searchParams.get("code")
       const state = requestUrl.searchParams.get("state")
@@ -60,39 +88,58 @@ export function startCallbackServer(port: number): Promise<OAuthCallbackResult> 
         const errorDescription = requestUrl.searchParams.get("error_description") ?? error
         response.writeHead(400, { "content-type": "text/html" })
         response.end("<html><body><h1>Authorization failed</h1></body></html>")
-        server.close()
-        reject(new Error(`OAuth authorization error: ${errorDescription}`))
+        void closeServer(server)
+        settleCallback(() => rejectCallback(new Error(`OAuth authorization error: ${errorDescription}`)))
         return
       }
 
       if (!code || !state) {
         response.writeHead(400, { "content-type": "text/html" })
         response.end("<html><body><h1>Missing code or state</h1></body></html>")
-        server.close()
-        reject(new Error("OAuth callback missing code or state parameter"))
+        void closeServer(server)
+        settleCallback(() => rejectCallback(new Error("OAuth callback missing code or state parameter")))
         return
       }
 
       response.writeHead(200, { "content-type": "text/html" })
       response.end("<html><body><h1>Authorization successful. You can close this tab.</h1></body></html>")
-      server.close()
-      resolve({ code, state })
+      void closeServer(server)
+      settleCallback(() => resolveCallback({ code, state }))
     })
 
     timeoutId = setTimeout(() => {
-      server.close()
-      reject(new Error("OAuth callback timed out after 5 minutes"))
+      void closeServer(server)
+      settleCallback(() => rejectCallback(new Error("OAuth callback timed out after 5 minutes")))
     }, CALLBACK_TIMEOUT_MS)
 
-    server.listen(port, "127.0.0.1")
+    server.listen(port, "127.0.0.1", () => {
+      resolveStart({
+        callback,
+        close: async () => {
+          clearTimeout(timeoutId)
+          await closeServer(server)
+        },
+      })
+    })
     server.on("error", (err) => {
       clearTimeout(timeoutId)
-      reject(err)
+      if (!server.listening) {
+        rejectStart(err)
+        return
+      }
+      settleCallback(() => rejectCallback(err))
     })
   })
 }
 
-function openBrowser(url: string): void {
+export async function startCallbackServer(port: number): Promise<OAuthCallbackResult> {
+  const server = await startCallbackServerWhenReady(port)
+  return await server.callback
+}
+
+type OAuthBrowserOpener = (url: string) => void
+
+function defaultOpenBrowser(url: string): void {
   const platform = process.platform
   let command: string
   let args: string[]
@@ -117,6 +164,12 @@ function openBrowser(url: string): void {
   }
 }
 
+let openBrowser: OAuthBrowserOpener = defaultOpenBrowser
+
+export function setOAuthBrowserOpenerForTesting(opener?: OAuthBrowserOpener): void {
+  openBrowser = opener ?? defaultOpenBrowser
+}
+
 export async function runAuthorizationCodeRedirect(options: {
   authorizationEndpoint: string
   callbackPort: number
@@ -138,13 +191,18 @@ export async function runAuthorizationCodeRedirect(options: {
     resource: options.resource,
   })
 
-  const callbackPromise = startCallbackServer(options.callbackPort)
-  openBrowser(authorizationUrl)
+  const callbackServer = await startCallbackServerWhenReady(options.callbackPort)
+  try {
+    openBrowser(authorizationUrl)
 
-  const result = await callbackPromise
-  if (result.state !== state) {
-    throw new Error("OAuth state mismatch")
+    const result = await callbackServer.callback
+    if (result.state !== state) {
+      throw new Error("OAuth state mismatch")
+    }
+
+    return { code: result.code, verifier }
+  } catch (error) {
+    await callbackServer.close()
+    throw error
   }
-
-  return { code: result.code, verifier }
 }

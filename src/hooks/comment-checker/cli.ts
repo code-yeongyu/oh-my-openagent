@@ -1,4 +1,5 @@
 import { spawn } from "../../shared/bun-spawn-shim"
+import { bunWhich } from "../../shared/bun-which-shim"
 import { join } from "path"
 import { existsSync } from "fs"
 import * as fs from "fs"
@@ -25,7 +26,7 @@ function getBinaryName(): string {
   return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
 }
 
-export function resolveCommentCheckerPathFromPath(binaryName: string, which: (binary: string) => string | null = Bun.which): string | null {
+export function resolveCommentCheckerPathFromPath(binaryName: string, which: (binary: string) => string | null = bunWhich): string | null {
   try {
     return which(binaryName)
   } catch (error) {

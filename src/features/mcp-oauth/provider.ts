@@ -2,7 +2,7 @@ import type { OAuthTokenData } from "./storage"
 import { loadToken, saveToken } from "./storage"
 import { PLUGIN_NAME } from "../../shared/plugin-identity"
 import { discoverOAuthServerMetadata } from "./discovery"
-import type { OAuthServerMetadata } from "./discovery"
+import type { OAuthDiscoveryFetch, OAuthServerMetadata } from "./discovery"
 import { getOrRegisterClient } from "./dcr"
 import type { ClientCredentials, ClientRegistrationStorage } from "./dcr"
 import { findAvailablePort } from "./callback-server"
@@ -18,6 +18,7 @@ export type McpOAuthProviderOptions = {
   serverUrl: string
   clientId?: string
   scopes?: string[]
+  fetch?: OAuthDiscoveryFetch
 }
 
 async function parseTokenResponse(tokenResponse: Response): Promise<Record<string, unknown>> {
@@ -66,6 +67,7 @@ export class McpOAuthProvider {
   private readonly serverUrl: string
   private readonly configClientId: string | undefined
   private readonly scopes: string[]
+  private readonly fetchImpl: OAuthDiscoveryFetch
   private storedCodeVerifier: string | null = null
   private storedClientInfo: ClientCredentials | null = null
   private callbackPort: number | null = null
@@ -74,6 +76,7 @@ export class McpOAuthProvider {
     this.serverUrl = options.serverUrl
     this.configClientId = options.clientId
     this.scopes = options.scopes ?? []
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis)
   }
 
   tokens(): OAuthTokenData | null {
@@ -130,7 +133,10 @@ export class McpOAuthProvider {
   }
 
   async login(): Promise<OAuthTokenData> {
-    const metadata = await discoverOAuthServerMetadata(this.serverUrl)
+    const metadata = await discoverOAuthServerMetadata(this.serverUrl, { fetch: this.fetchImpl })
+    if (this.callbackPort === null) {
+      this.callbackPort = await findAvailablePort()
+    }
 
     const clientRegistrationStorage: ClientRegistrationStorage = {
       getClientRegistration: () => this.storedClientInfo,
@@ -147,6 +153,7 @@ export class McpOAuthProvider {
       tokenEndpointAuthMethod: "none",
       clientId: this.configClientId,
       storage: clientRegistrationStorage,
+      fetch: this.fetchImpl,
     })
 
     if (!clientInfo) {
@@ -161,7 +168,7 @@ export class McpOAuthProvider {
       throw new Error("Code verifier not found")
     }
 
-    const tokenResponse = await fetch(metadata.tokenEndpoint, {
+    const tokenResponse = await this.fetchImpl(metadata.tokenEndpoint, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -182,14 +189,14 @@ export class McpOAuthProvider {
   }
 
   async refresh(refreshToken: string): Promise<OAuthTokenData> {
-    const metadata = await discoverOAuthServerMetadata(this.serverUrl)
+    const metadata = await discoverOAuthServerMetadata(this.serverUrl, { fetch: this.fetchImpl })
     const clientInfo = this.clientInformation()
     const clientId = clientInfo?.clientId ?? this.configClientId
     if (!clientId) {
       throw new Error("No client information available. Run login() or register a client first.")
     }
 
-    const tokenResponse = await fetch(metadata.tokenEndpoint, {
+    const tokenResponse = await this.fetchImpl(metadata.tokenEndpoint, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({

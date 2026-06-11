@@ -3,7 +3,7 @@
 import { existsSync } from "node:fs"
 import { describe, expect, test } from "bun:test"
 
-const DIST_INDEX = "dist/index.js"
+const DIST_BUNDLES = ["dist/index.js", "dist/hosts/oh-my-pi/index.js", "dist/hosts/pi/index.js"]
 const GLOBAL_BUN_DESTRUCTURE = /^\s*(?:var|let|const)\s*\{[^}]*\}\s*=\s*globalThis\.Bun/gm
 const TOP_LEVEL_REQUIRE_CALL = "__require("
 const RAW_BUN_API_CALL = /(?<![.$\w])Bun\.[a-zA-Z_$][a-zA-Z_$0-9]*\s*[.(]/g
@@ -55,38 +55,50 @@ function formatOffendingLine(lineNumber: number, line: string): string {
 }
 
 describe("dist bundle Bun globals", () => {
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned #then no globalThis.Bun destructures remain", async () => {
-    const dist = await Bun.file(DIST_INDEX).text()
+  test.skipIf(!DIST_BUNDLES.every(path => existsSync(path)))(
+    "#given dist bundles #when scanned #then no globalThis.Bun destructures remain",
+    async () => {
+      const matchesByBundle: Record<string, string[]> = {}
 
-    const matches = dist.match(GLOBAL_BUN_DESTRUCTURE) ?? []
-
-    expect(matches).toEqual([])
-  })
-
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned #then no top-level __require call remains", async () => {
-    const dist = await Bun.file(DIST_INDEX).text()
-    const offending: string[] = []
-    let depth = 0
-
-    for (const [index, line] of dist.split("\n").entries()) {
-      if (depth === 0 && line.includes(TOP_LEVEL_REQUIRE_CALL)) {
-        offending.push(`${index + 1}: ${line.trim()}`)
+      for (const path of DIST_BUNDLES) {
+        const dist = await Bun.file(path).text()
+        matchesByBundle[path] = dist.match(GLOBAL_BUN_DESTRUCTURE) ?? []
       }
 
-      for (const char of line) {
-        if (char === "{") {
-          depth += 1
-        } else if (char === "}") {
-          depth -= 1
-          if (depth < 0) depth = 0
+      expect(matchesByBundle).toEqual(Object.fromEntries(DIST_BUNDLES.map(path => [path, []])))
+    },
+  )
+
+  test.skipIf(!DIST_BUNDLES.every(path => existsSync(path)))(
+    "#given dist bundles #when scanned #then no top-level __require call remains",
+    async () => {
+      const offending: string[] = []
+
+      for (const path of DIST_BUNDLES) {
+        const dist = await Bun.file(path).text()
+        let depth = 0
+
+        for (const [index, line] of dist.split("\n").entries()) {
+          if (depth === 0 && line.includes(TOP_LEVEL_REQUIRE_CALL)) {
+            offending.push(`${path}:${index + 1}: ${line.trim()}`)
+          }
+
+          for (const char of line) {
+            if (char === "{") {
+              depth += 1
+            } else if (char === "}") {
+              depth -= 1
+              if (depth < 0) depth = 0
+            }
+          }
         }
       }
-    }
 
-    expect(offending).toEqual([])
-  })
+      expect(offending).toEqual([])
+    },
+  )
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when imported under node --input-type=module #then it loads without error", async () => {
+  test.skipIf(!existsSync("dist/index.js"))("#given dist bundle #when imported under node --input-type=module #then it loads without error", async () => {
     const node = Bun.which("node")
     if (!node) return
 
@@ -112,7 +124,7 @@ describe("dist bundle Bun globals", () => {
     })
   }, 20_000)
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned for raw Bun runtime APIs #then no unshimmed Bun API calls remain", async () => {
+  test.skipIf(!DIST_BUNDLES.every(path => existsSync(path)))("#given dist bundles #when scanned for raw Bun runtime APIs #then no unshimmed Bun API calls remain", async () => {
     expect(hasRawBunApiCall("Bun.file('dist/index.js')")).toBe(true)
     expect(hasRawBunApiCall("runtime.Bun.file('dist/index.js')")).toBe(false)
     expect(hasRawBunApiCall(".Bun.file('dist/index.js')")).toBe(false)
@@ -120,39 +132,42 @@ describe("dist bundle Bun globals", () => {
     expect(hasRawBunApiCall("Bun.spawnSync.options")).toBe(true)
     expect(hasRawBunApiCall("Bun.readableStreamToText(stream)")).toBe(true)
 
-    const dist = await Bun.file(DIST_INDEX).text()
     const offending: string[] = []
-    let insideJSDoc = false
 
-    for (const [index, line] of dist.split("\n").entries()) {
-      const trimmed = line.trimStart()
+    for (const path of DIST_BUNDLES) {
+      const dist = await Bun.file(path).text()
+      let insideJSDoc = false
 
-      if (insideJSDoc || trimmed.startsWith("/**")) {
-        insideJSDoc = !trimmed.includes("*/")
-        continue
-      }
+      for (const [index, line] of dist.split("\n").entries()) {
+        const trimmed = line.trimStart()
 
-      if (line.includes("runtime.Bun") || line.includes("globalThis.Bun") || line.includes("typeof Bun")) {
-        continue
-      }
+        if (insideJSDoc || trimmed.startsWith("/**")) {
+          insideJSDoc = !trimmed.includes("*/")
+          continue
+        }
 
-      RAW_BUN_API_CALL.lastIndex = 0
-      const rawMatch = [...line.matchAll(RAW_BUN_API_CALL)].find(
-        (match) => match.index !== undefined && !isInsideStringLiteral(line, match.index),
-      )
+        if (line.includes("runtime.Bun") || line.includes("globalThis.Bun") || line.includes("typeof Bun")) {
+          continue
+        }
 
-      if (rawMatch) {
-        offending.push(formatOffendingLine(index + 1, line))
+        RAW_BUN_API_CALL.lastIndex = 0
+        const rawMatch = [...line.matchAll(RAW_BUN_API_CALL)].find(
+          (match) => match.index !== undefined && !isInsideStringLiteral(line, match.index),
+        )
+
+        if (rawMatch) {
+          offending.push(`${path}:${formatOffendingLine(index + 1, line)}`)
+        }
       }
     }
 
     expect(
       offending,
-      `Expected zero raw Bun API calls in dist/index.js but found ${offending.length}:\n${offending.join("\n")}`,
+      `Expected zero raw Bun API calls in dist bundles but found ${offending.length}:\n${offending.join("\n")}`,
     ).toEqual([])
   })
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when imported and inspected under node --input-type=module #then stderr has no Bun reference errors", async () => {
+  test.skipIf(!existsSync("dist/index.js"))("#given dist bundle #when imported and inspected under node --input-type=module #then stderr has no Bun reference errors", async () => {
     const node = Bun.which("node")
     if (!node) return
 

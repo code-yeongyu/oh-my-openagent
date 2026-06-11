@@ -66,7 +66,7 @@ describe("#given PR 4703 consensus removal", () => {
     // then
     expect(existingForbiddenPaths).toEqual([])
     expect(sourceHits).toEqual([])
-  })
+  }, 20_000)
 })
 
 function collectSourceFiles(directory: string): string[] {

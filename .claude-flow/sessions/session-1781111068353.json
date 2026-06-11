@@ -1,0 +1,14 @@
+{
+  "id": "session-1781111068353",
+  "startedAt": "2026-06-10T17:04:28.362Z",
+  "cwd": "/home/supreme/oh-my-openagent",
+  "context": {},
+  "metrics": {
+    "edits": 0,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  },
+  "endedAt": "2026-06-10T17:06:15.583Z",
+  "duration": 107248
+}

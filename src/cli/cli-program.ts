@@ -1,4 +1,5 @@
 import { Command, Option } from "commander"
+import { resolve } from "node:path"
 import { install } from "./install"
 import { configureCleanupCommand, resolveCleanupPlatform } from "./cleanup-command"
 import { run } from "./run"
@@ -11,6 +12,7 @@ import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
 import packageJson from "../../package.json" with { type: "json" }
+import { installTargetExtensions } from "./install-targets/install-target-extensions"
 
 const VERSION = packageJson.version
 
@@ -125,6 +127,14 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Baili
   })
 
 configureCleanupCommand(program)
+
+program
+  .command("install-targets")
+  .description("Link this package into Oh My Pi and Pi extension roots")
+  .action(() => {
+    const results = installTargetExtensions({ packageRoot: resolve(import.meta.dir, "../..") })
+    console.log(JSON.stringify(results, null, 2))
+  })
 
 program
    .command("run <message>")
