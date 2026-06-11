@@ -50,6 +50,7 @@ oauth-success.html
 # Non-code workspace residue (kept out of the code repo)
 Oh/
 .codex/
+slides/
 
 # Debugging / session artifacts (skill workspace residue)
 .debugging

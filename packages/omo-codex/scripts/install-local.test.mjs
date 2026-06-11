@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -64,6 +64,38 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 	assert.match(wrapper, /CODEX_HOME/);
 	assert.match(wrapper, /OMO_SPARKSHELL_APP_SERVER_SOCKET/);
 	assert.match(wrapper, /omo-ulw-loop/);
+});
+
+test("#given repoRoot without root CLI dist #when installing locally #then warns about the skipped omo runtime wrapper", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const homeDir = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const pluginRoot = join(codexPackageRoot, "plugin");
+
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
+		name: "sisyphuslabs",
+		plugins: [{ name: "omo", source: "./plugins/omo" }],
+	});
+	await writePluginAt(pluginRoot, "omo", "0.1.0");
+
+	const logs = [];
+	await installMarketplaceLocally({
+		repoRoot,
+		codexHome,
+		env: {},
+		homeDir,
+		platform: "linux",
+		runCommand: async () => {},
+		log: (line) => logs.push(String(line)),
+	});
+
+	const cliPath = join(repoRoot, "dist", "cli", "index.js");
+	assert.ok(
+		logs.some((line) => line.includes("omo runtime wrapper") && line.includes(cliPath)),
+		`expected a warning naming the missing ${cliPath}; got:\n${logs.join("\n")}`,
+	);
+	await assert.rejects(readFile(join(codexHome, "bin", "omo"), "utf8"));
 });
 
 test("#given explicit CODEX_LOCAL_BIN_DIR #when resolving local installer bin dir #then preserves installed omo precedence", () => {

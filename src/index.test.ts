@@ -9,7 +9,7 @@ const mockDetectDuplicateOmoPlugin = mock(() => ({
   allPlugins: [],
 }))
 const mockGetDuplicateOmoPluginWarning = mock(() => "")
-const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null }))
+const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null, allPlugins: [] }))
 const mockGetSkillPluginConflictWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})

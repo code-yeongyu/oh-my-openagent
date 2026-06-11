@@ -1,0 +1,17 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "openagent",
+    "openclaw",
+    "opencode",
+    "lazycodex",
+    "tmux"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    "dist/**",
+    "**/*.lock",
+    "bun.lock"
+  ]
+}
