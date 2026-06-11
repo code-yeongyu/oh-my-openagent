@@ -277,10 +277,12 @@ function rewriteMcpArg(arg: unknown): unknown {
   return rewrite?.[1] ?? arg
 }
 
+const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude"])
+
 function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative.length === 0) return true
-  return !relative.split(sep).some((part) => part === ".git" || part === "node_modules")
+  return !relative.split(sep).some((part) => PLUGIN_COPY_DENYLIST.has(part))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

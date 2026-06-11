@@ -72,6 +72,20 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "lsp-daemon", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "node_modules", "ignored"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "node_modules", "ignored", "file.txt"), "ignored\n")
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", ".ulw", "evidence"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", ".ulw", "evidence", "loop.json"), "{}\n")
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", ".claude"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", ".claude", "settings.local.json"), "{}\n")
+}
+
+async function expectPathMissing(path: string): Promise<void> {
+  let missing = false
+  try {
+    await stat(path)
+  } catch (error) {
+    missing = error instanceof Error
+  }
+  expect(missing).toBe(true)
 }
 
 describe("sync-lazycodex-marketplace", () => {
@@ -100,13 +114,9 @@ describe("sync-lazycodex-marketplace", () => {
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "git-bash-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-daemon", "dist", "cli.js"))).isFile()).toBe(true)
-    let nodeModulesMissing = false
-    try {
-      await stat(join(lazycodexRoot, "plugins", "omo", "node_modules"))
-    } catch (error) {
-      nodeModulesMissing = error instanceof Error
-    }
-    expect(nodeModulesMissing).toBe(true)
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "node_modules"))
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".ulw"))
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".claude"))
   })
 
   test("rejects a source tree without a Codex plugin manifest", async () => {
