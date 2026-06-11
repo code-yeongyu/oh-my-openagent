@@ -1,10 +1,10 @@
-# src/hooks/ — ~55 Lifecycle Hooks Across 61 Dirs
+# src/hooks/ — ~54 Lifecycle Hooks Across 60 Dirs
 
 **Generated:** 2026-06-08
 
 ## OVERVIEW
 
-54 base registered hooks (61 with team-mode), composed from 53 `index.ts` hook dirs (52 wired + `task-reminder/` unwired) plus 5 standalone hook `.ts` files at the `src/hooks/` top level (bash-file-read-guard, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator). The 61 directories = 53 with `index.ts` + 8 without (`shared/`, `team-session-events/`, `hashline-edit-diff-enhancer/` unwired, and 5 `zauc-mocks-*`/`zauc-sync-mocks`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) -> HookFunction` factory pattern.
+53 base registered hooks (60 with team-mode), composed from 52 `index.ts` hook dirs (51 wired + `task-reminder/` unwired) plus 5 standalone hook `.ts` files at the `src/hooks/` top level (bash-file-read-guard, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator). The 60 directories = 52 with `index.ts` + 8 without (`shared/`, `team-session-events/`, `hashline-edit-diff-enhancer/` unwired, and 5 `zauc-mocks-*`/`zauc-sync-mocks`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) -> HookFunction` factory pattern.
 
 **Unwired WIP (do not modify casually):** `task-reminder/` (has `index.ts` + `createTaskReminderHook` but NOT exported from barrel, NOT imported by any composer) and `hashline-edit-diff-enhancer/` (has only `hook.ts`, NOT registered). Treat as orphaned until wired in.
 
@@ -14,12 +14,12 @@
 |------|----------|------|----------------|-------|
 | **Session** | `create-session-hooks.ts` | 23 | 23 | OpenCode session lifecycle + chat.params + chat.message |
 | **Tool Guard** | `create-tool-guard-hooks.ts` | 17 | 18 | Pre/post tool execution (+1: `team-tool-gating`) |
-| **Transform** | `create-transform-hooks.ts` | 5 | 7 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`) |
+| **Transform** | `create-transform-hooks.ts` | 4 | 6 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`) |
 | **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
 | **Skill** | `create-skill-hooks.ts` | 2 | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
 | **Direct event handlers** | `src/plugin/event.ts` | 0 | +4 | `team-session-events/` sub-files: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 
-Total exposed hooks: **54 base, 61 with team-mode** (counts the 4 team-session-events handlers individually).
+Total exposed hooks: **53 base, 60 with team-mode** (counts the 4 team-session-events handlers individually).
 
 Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
 
@@ -80,7 +80,6 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `claudeCodeHooks` | messages.transform | Claude Code settings.json compatibility |
 | `keywordDetector` | messages.transform | Detect ultrawork/search/analyze/team modes; inject mode-specific prompt |
 | `contextInjectorMessagesTransform` | messages.transform | Inject AGENTS.md/README.md into context |
-| `thinkingBlockValidator` | messages.transform | Validate thinking block structure |
 | `toolPairValidator` | messages.transform | Validate tool call/result pairing |
 
 ### Tier 4: Continuation Hooks (7)

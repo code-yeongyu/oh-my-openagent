@@ -88,8 +88,8 @@ createHooks()
   │   │                             jsonErrorRecovery, readImageResizer, todoDescriptionOverride,
   │   │                             webfetchRedirectGuard, fsyncSkipWarning,
   │   │                             notepadWriteGuard, planFormatValidator [+ teamToolGating]
-  │   └─ createTransformHooks()   # 5 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
-  │                                  contextInjectorMessagesTransform, thinkingBlockValidator,
+  │   └─ createTransformHooks()   # 4 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
+  │                                  contextInjectorMessagesTransform,
   │                                  toolPairValidator [+ teamModeStatusInjector, teamMailboxInjector]
   ├─→ createContinuationHooks()   # 7: stopContinuationGuard, compactionContextInjector,
   │                                  compactionTodoPreserver, todoContinuationEnforcer (boulder),
@@ -101,14 +101,14 @@ createHooks()
     team-member-error-handler, team-member-status-handler
 ```
 
-Total: 54 base, 61 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
+Total: 53 base, 60 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 
 | Subdir | Files (.ts) | LOC | Purpose | Has AGENTS.md |
 |--------|-------------|-----|---------|---------------|
 | `agents/` | 104 | ~20k | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
-| `hooks/` | 596 | ~78k | ~55 lifecycle hooks across 61 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
+| `hooks/` | 596 | ~78k | ~54 lifecycle hooks across 60 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
 | `tools/` | 317 | ~45k | 13 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
 | `features/` | 404 | ~71k | 21 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
 | `shared/` | 297 | ~33k | Cross-cutting utilities (179 non-test), barrel-exported | yes |
