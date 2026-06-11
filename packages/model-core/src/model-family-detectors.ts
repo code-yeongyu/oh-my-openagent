@@ -53,7 +53,7 @@ export function isKimiK2Model(model: string): boolean {
 
 export function isMiniMaxModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
-  return modelName.includes("minimax")
+  return modelName.includes("minimax") || modelName.startsWith("mimo-")
 }
 
 export function isGlmModel(model: string): boolean {

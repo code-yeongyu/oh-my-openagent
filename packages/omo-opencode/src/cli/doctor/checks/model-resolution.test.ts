@@ -303,6 +303,8 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides({
         agents: {
           sisyphus: { model: "kimi-for-coding/k2pb" },
+          librarian: { model: "opencode-go/mimo-v2.5" },
+          oracle: { model: "opencode-go/mimo-v2.5-pro" },
           metis: { model: "github-copilot/claude-opus-4.7" },
         },
         categories: {

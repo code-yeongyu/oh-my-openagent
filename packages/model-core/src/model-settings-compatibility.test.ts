@@ -258,6 +258,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "Mimo", modelID: "mimo-v2.5-pro", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
