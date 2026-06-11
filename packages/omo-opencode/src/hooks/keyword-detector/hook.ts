@@ -235,14 +235,36 @@ export function createKeywordDetectorHook(
         return
       }
 
-      const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
+      // Skip keywords whose marker (first line of `message`, e.g. `[search-mode]`
+      // or `<hyperplan-mode>`) is already at the START of the message — that
+      // means the previous turn's banner is still there (the classic /undo +
+      // resend case from #4251). We deliberately don't use `includes()`: a user
+      // legitimately referencing `[search-mode]` mid-message must still get the
+      // banner injected. Issues #4251, plus #4274 cubic-dev-ai review feedback.
+      const trimmedOriginal = originalText.trimStart()
+      const keywordsToInject = detectedKeywords.filter((k) => {
+        const marker = k.message.split("\n", 1)[0]
+        if (!marker) return true
+        return !trimmedOriginal.startsWith(marker)
+      })
+
+      if (keywordsToInject.length === 0) {
+        log(`[keyword-detector] All detected markers already present in text, skipping re-injection`, {
+          sessionID: input.sessionID,
+          types: detectedKeywords.map((k) => k.type),
+        })
+        return
+      }
+
+      const allMessages = keywordsToInject.map((k) => k.message).join("\n\n")
       output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
 
-      log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
+      log(`[keyword-detector] Detected ${detectedKeywords.length} keywords (${keywordsToInject.length} injected)`, {
         sessionID: input.sessionID,
         types: detectedKeywords.map((k) => k.type),
+        injected: keywordsToInject.map((k) => k.type),
       })
     },
   }
