@@ -10,6 +10,15 @@ import { createLineDecoder, encodeJsonLine } from "./socket-jsonrpc.js";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const REQUEST_ID = 1;
 
+export class DaemonRequestError extends Error {
+	readonly requestWritten: boolean;
+	constructor(message: string, requestWritten: boolean) {
+		super(message);
+		this.name = "DaemonRequestError";
+		this.requestWritten = requestWritten;
+	}
+}
+
 export interface DaemonToolContext {
 	cwd?: string;
 	env?: Record<string, string>;
@@ -39,6 +48,7 @@ export async function callToolViaDaemon(
 			return await sendToolCall(paths.socket, name, requestArgs, timeoutMs);
 		} catch (error) {
 			lastError = error;
+			if (error instanceof DaemonRequestError && error.requestWritten) break;
 		}
 	}
 
@@ -92,6 +102,7 @@ function sendToolCall(
 	return new Promise((resolve, reject) => {
 		const socket = connect(socketPath);
 		let settled = false;
+		let requestWritten = false;
 		const finish = (run: () => void): void => {
 			if (settled) return;
 			settled = true;
@@ -99,21 +110,25 @@ function sendToolCall(
 			socket.destroy();
 			run();
 		};
-		const timer = setTimeout(() => finish(() => reject(new Error("daemon request timed out"))), timeoutMs);
+		const timer = setTimeout(
+			() => finish(() => reject(new DaemonRequestError("daemon request timed out", requestWritten))),
+			timeoutMs,
+		);
 		timer.unref();
 		const decoder = createLineDecoder((message) => {
 			const result = toToolResult(message);
 			if (result) finish(() => resolve(result));
-			else finish(() => reject(new Error("invalid daemon response")));
+			else finish(() => reject(new DaemonRequestError("invalid daemon response", requestWritten)));
 		});
 		socket.once("connect", () => {
+			requestWritten = true;
 			socket.write(
 				encodeJsonLine({ jsonrpc: "2.0", id: REQUEST_ID, method: "tools/call", params: { name, arguments: args } }),
 			);
 		});
 		socket.on("data", (chunk) => decoder.push(chunk));
-		socket.once("error", (error) => finish(() => reject(error)));
-		socket.once("close", () => finish(() => reject(new Error("daemon connection closed"))));
+		socket.once("error", (error) => finish(() => reject(new DaemonRequestError(error.message, requestWritten))));
+		socket.once("close", () => finish(() => reject(new DaemonRequestError("daemon connection closed", requestWritten))));
 	});
 }
 
