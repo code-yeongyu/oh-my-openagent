@@ -1,5 +1,6 @@
 import type { OpencodeClient } from "../../tools/delegate-task/types"
 import {
+  PLACEHOLDER_PANE_TIMEOUT_MS,
   POLL_INTERVAL_BACKGROUND_MS,
   SESSION_MISSING_GRACE_MS,
   SESSION_READY_TIMEOUT_MS,
@@ -81,11 +82,31 @@ export class TmuxPollingManager {
         const status = allStatuses[sessionId]
         const elapsedMs = now - tracked.createdAt.getTime()
         if (!tracked.attachActivated && !status) {
-          log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+          // Bounded grace: a placeholder pane the user never focuses + that
+          // never returns a server status would otherwise sit in the map
+          // forever, which is the primary source of pane accumulation across
+          // a long parent session. Fall through to the normal close path once
+          // it has clearly been a zombie for too long.
+          if (elapsedMs < PLACEHOLDER_PANE_TIMEOUT_MS) {
+            log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+              sessionId,
+              paneId: tracked.paneId,
+              elapsedMs,
+              graceMs: PLACEHOLDER_PANE_TIMEOUT_MS,
+            })
+            continue
+          }
+
+          log("[tmux-session-manager] placeholder pane exceeded grace; queuing for close", {
             sessionId,
             paneId: tracked.paneId,
             elapsedMs,
+            graceMs: PLACEHOLDER_PANE_TIMEOUT_MS,
           })
+          if (!tracked.closePending) {
+            tracked.closePending = true
+            sessionsToClose.push(sessionId)
+          }
           continue
         }
 

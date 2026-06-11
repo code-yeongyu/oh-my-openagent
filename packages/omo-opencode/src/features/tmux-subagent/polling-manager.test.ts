@@ -455,6 +455,91 @@ describe("TmuxPollingManager overlap", () => {
     }
   })
 
+  test("closes placeholder panes that exceed PLACEHOLDER_PANE_TIMEOUT_MS without ever activating or returning status", async () => {
+    //#given - a placeholder pane older than the grace cap (30 min) that has
+    // never been focused (attachActivated=false) and the server never replied
+    // with a status. Before this guard, polling skipped every close check
+    // indefinitely and the pane accumulated forever.
+    const { PLACEHOLDER_PANE_TIMEOUT_MS } = await import("../../shared/tmux")
+    const sessions = new Map<string, TrackedSession>()
+    sessions.set("ses-zombie", {
+      sessionId: "ses-zombie",
+      paneId: "%9",
+      description: "abandoned subagent pane",
+      attachActivated: false,
+      createdAt: new Date(Date.now() - (PLACEHOLDER_PANE_TIMEOUT_MS + 60_000)),
+      lastSeenAt: new Date(Date.now() - (PLACEHOLDER_PANE_TIMEOUT_MS + 60_000)),
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    })
+
+    const closedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: {} }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async (sessionId) => {
+        closedSessionIds.push(sessionId)
+      },
+    )
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+    //#when
+    await pollSessions.call(manager)
+
+    //#then
+    expect(closedSessionIds).toEqual(["ses-zombie"])
+    expect(sessions.get("ses-zombie")?.closePending).toBe(true)
+  })
+
+  test("still defers closure for placeholder panes within the grace window", async () => {
+    //#given - same pane shape, but only 5 minutes old (well under the 30 min cap).
+    // Existing behavior must be preserved: legitimate placeholder still gets time.
+    const { PLACEHOLDER_PANE_TIMEOUT_MS } = await import("../../shared/tmux")
+    const sessions = new Map<string, TrackedSession>()
+    sessions.set("ses-young", {
+      sessionId: "ses-young",
+      paneId: "%2",
+      description: "still setting up",
+      attachActivated: false,
+      createdAt: new Date(Date.now() - 5 * 60 * 1000),
+      lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    })
+
+    const closedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: {} }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async (sessionId) => {
+        closedSessionIds.push(sessionId)
+      },
+    )
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+    //#when
+    await pollSessions.call(manager)
+
+    //#then
+    expect(PLACEHOLDER_PANE_TIMEOUT_MS).toBeGreaterThan(5 * 60 * 1000)
+    expect(closedSessionIds).toEqual([])
+    expect(sessions.get("ses-young")?.closePending).toBe(false)
+  })
+
   test("can still close non-activated sessions once status is idle and stable", async () => {
     //#given
     const sessions = new Map<string, TrackedSession>()
