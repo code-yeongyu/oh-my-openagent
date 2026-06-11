@@ -13,8 +13,6 @@ This matches the package layering direction in [`ROADMAP.md`](file:///Users/yeon
 | Keyword | Pattern | Effect |
 |---------|---------|--------|
 | `ultrawork` / `ulw` | `/\b(ultrawork|ulw)\b/i` | Full orchestration mode: parallel agents, deep exploration, relentless execution |
-| Search mode | `SEARCH_PATTERN` (from `search/`) | Web/doc search focus prompt injection |
-| Analyze mode | `ANALYZE_PATTERN` (from `analyze/`) | Deep analysis mode prompt injection |
 | Team mode | `TEAM_PATTERN` (from `team/`) | Forces orchestration via `team_*` tools when user invokes `team mode` / `team-mode` / `team_mode` / `teammode`; instructs user to enable `team_mode.enabled` if tools are absent and reminds lead to run the closure sequence once every task is terminal |
 | Hyperplan mode | `HYPERPLAN_PATTERN` (from `hyperplan/`) | Loads the `hyperplan` skill and injects adversarial planning mode guidance |
 | Hyperplan-ultrawork combo | `HYPERPLAN_ULTRAWORK_PATTERN` (from `constants.ts`) | Prepends the combo banner, requires the `hyperplan` skill, then appends the routed ultrawork message |
@@ -35,12 +33,6 @@ keyword-detector/
 │   ├── gpt.ts         # thin loader for prompts-core/prompts/ultrawork/gpt.md
 │   ├── gemini.ts      # thin loader for prompts-core/prompts/ultrawork/gemini.md
 │   └── planner.ts     # thin loader for prompts-core/prompts/ultrawork/planner.md
-├── search/
-│   ├── index.ts
-│   └── default.ts     # SEARCH_PATTERN + SEARCH_MESSAGE from prompts-core mode prompt
-├── analyze/
-│   ├── index.ts
-│   └── default.ts     # ANALYZE_PATTERN + ANALYZE_MESSAGE from prompts-core mode prompt
 ├── team/
 │   ├── index.ts
 │   └── default.ts     # TEAM_PATTERN + TEAM_MESSAGE from prompts-core mode prompt
@@ -57,12 +49,10 @@ keyword-detector/
 | Ultrawork GPT | [`packages/prompts-core/prompts/ultrawork/gpt.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/gpt.md) |
 | Ultrawork Gemini | [`packages/prompts-core/prompts/ultrawork/gemini.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/gemini.md) |
 | Ultrawork planner | [`packages/prompts-core/prompts/ultrawork/planner.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/planner.md) |
-| Search mode | [`packages/prompts-core/prompts/mode/search.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/mode/search.md) |
-| Analyze mode | [`packages/prompts-core/prompts/mode/analyze.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/mode/analyze.md) |
 | Team mode | [`packages/prompts-core/prompts/mode/team.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/mode/team.md) |
 | Hyperplan mode | [`packages/prompts-core/prompts/mode/hyperplan.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/mode/hyperplan.md) |
 
-The `src/hooks/keyword-detector/{search,analyze,team,hyperplan}/default.ts` files keep the regex triggers in the hook layer and import the markdown-backed constants from `@oh-my-opencode/prompts-core`. The ultrawork files import markdown with Bun's `.md` text loader so the exact prompt bytes are bundled into `dist/index.js`.
+The `src/hooks/keyword-detector/{team,hyperplan}/default.ts` files keep the regex triggers in the hook layer and import the markdown-backed constants from `@oh-my-opencode/prompts-core`. The ultrawork files import markdown with Bun's `.md` text loader so the exact prompt bytes are bundled into `dist/index.js`.
 
 ## ULTRAWORK VARIANT ROUTING
 
@@ -94,8 +84,7 @@ chat.message (user input)
 {
   "keyword_detector": {
     // Skip injection for any keyword in this list.
-    // Allowed: "ultrawork", "search", "analyze", "team", "hyperplan", "hyperplan-ultrawork".
-    "disabled_keywords": ["search", "analyze"]
+    "disabled_keywords": ["team", "hyperplan"]
   }
 }
 ```
