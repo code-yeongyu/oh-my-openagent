@@ -80,7 +80,6 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Plugin i18n settings */
   i18n: I18nConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
-  /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.default({

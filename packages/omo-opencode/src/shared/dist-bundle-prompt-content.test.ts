@@ -62,16 +62,6 @@ const PROMPT_SIGNATURES = [
     signature: "YOU ARE A PLANNER. NOT AN IMPLEMENTER. NOT A CODE WRITER.",
   },
   {
-    path: "packages/prompts-core/prompts/mode/search.md",
-    label: "Search mode",
-    signature: "MAXIMIZE SEARCH EFFORT. Launch multiple background agents IN PARALLEL:",
-  },
-  {
-    path: "packages/prompts-core/prompts/mode/analyze.md",
-    label: "Analyze mode",
-    signature: "IF COMPLEX - DO NOT STRUGGLE ALONE. Consult specialists:",
-  },
-  {
     path: "packages/prompts-core/prompts/mode/team.md",
     label: "Team mode",
     signature: "Team-mode reference detected. Orchestrate via team_* tools",
