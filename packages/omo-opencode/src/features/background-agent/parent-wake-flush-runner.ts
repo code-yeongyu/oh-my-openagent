@@ -57,13 +57,8 @@ export class ParentWakeFlushRunner {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
       }
-      await this.sendParentWakePrompt(sessionID, latestWake, {
-        emptyAssistantTurnRetry: false,
-        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
-        forceNoReply: true,
-        retainPendingWake: latestWake.shouldReply,
-      })
-      log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred parent wake flush without admit-only dispatch (parent session activity still fresh):", {
         sessionID,
       })
       return
@@ -75,11 +70,9 @@ export class ParentWakeFlushRunner {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
       }
-      await this.sendParentWakePrompt(sessionID, latestWake, {
-        emptyAssistantTurnRetry,
-        toolWaitDecision: { ...toolWaitDecision, skipPromptGateToolStateCheck: true },
-        forceNoReply: true,
-        retainPendingWake: latestWake.shouldReply,
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred parent wake flush without admit-only dispatch (tool state suggests deferral):", {
+        sessionID,
       })
       return
     }
@@ -94,13 +87,8 @@ export class ParentWakeFlushRunner {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
       }
-      await this.sendParentWakePrompt(sessionID, latestWake, {
-        emptyAssistantTurnRetry,
-        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
-        forceNoReply: true,
-        retainPendingWake: latestWake.shouldReply,
-      })
-      log("[background-agent] Recorded admit-only parent wake because user message just arrived:", {
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred parent wake flush without admit-only dispatch (user message just arrived):", {
         sessionID,
       })
       return
