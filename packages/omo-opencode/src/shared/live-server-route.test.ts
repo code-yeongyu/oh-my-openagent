@@ -74,17 +74,17 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — identity passthrough", () => {
     test("#given different client object #when resolveDispatchClient called #then returns in-process without probing", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
       const differentClient = { _marker: "different" } as unknown
 
-      // when
+      //#when
       const result = await resolveDispatchClient(differentClient, "ses_identity")
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
       expect(result.client).toBe(differentClient)
       expect(callCount()).toBe(0)
@@ -93,16 +93,16 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — flag disabled passthrough", () => {
     test("#given live routing flag disabled #when resolveDispatchClient called with in-process client #then returns in-process without probing", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
       setLiveParentWakeRoutingDisabled(true)
 
-      // when
+      //#when
       const result = await resolveDispatchClient(fakeInProcessClient, "ses_flag")
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
       expect(callCount()).toBe(0)
     })
@@ -110,16 +110,16 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — child session passthrough", () => {
     test("#given sessionID in subagentSessions #when resolveDispatchClient called #then returns in-process without probing", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
       subagentSessions.add("ses_child_123")
 
-      // when
+      //#when
       const result = await resolveDispatchClient(fakeInProcessClient, "ses_child_123")
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
       expect(callCount()).toBe(0)
     })
@@ -127,17 +127,17 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — 200 probe → live + client cached", () => {
     test("#given probe returns 200 #when resolveDispatchClient called twice #then returns live route and caches same client object", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
       _setLiveClientForTesting(fakeLiveClient)
 
-      // when
+      //#when
       const result1 = await resolveDispatchClient(fakeInProcessClient, "ses_live1")
       const result2 = await resolveDispatchClient(fakeInProcessClient, "ses_live2")
 
-      // then
+      //#then
       expect(result1.route).toBe("live")
       expect(result1.client).toBe(fakeLiveClient)
       expect(result2.route).toBe("live")
@@ -148,47 +148,47 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — 401 → unavailable + warn-once", () => {
     test("#given probe returns 401 #when resolveDispatchClient called #then returns in-process and marks unavailable", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch } = makeFakeFetch([{ ok: false, status: 401 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       const result = await resolveDispatchClient(fakeInProcessClient, "ses_401")
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
     })
   })
 
   describe("resolveDispatchClient — 404 → unavailable", () => {
     test("#given probe returns 404 #when resolveDispatchClient called #then returns in-process", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch } = makeFakeFetch([{ ok: false, status: 404 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       const result = await resolveDispatchClient(fakeInProcessClient, "ses_404")
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
     })
   })
 
   describe("resolveDispatchClient — timeout → in-process bounded <2s", () => {
     test("#given probe never resolves #when resolveDispatchClient called #then returns in-process within 2500ms", async () => {
-      // given
+      //#given
       const { fetch: neverFetch, callCount } = makeNeverResolvingFetch()
       _setFetchImplementationForTesting(neverFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       const t0 = Date.now()
       const result = await resolveDispatchClient(fakeInProcessClient, "ses_timeout")
       const elapsed = Date.now() - t0
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
       expect(elapsed).toBeLessThan(2500)
       expect(callCount()).toBe(1)
@@ -197,25 +197,24 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — TTL: second resolve within 60s skips re-fetch", () => {
     test("#given two sequential resolves within TTL #when resolveDispatchClient called twice #then fetch is called only once", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }, { ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       _setLiveClientForTesting(fakeLiveClient)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       await resolveDispatchClient(fakeInProcessClient, "ses_ttl1")
       await resolveDispatchClient(fakeInProcessClient, "ses_ttl2")
 
-      // then
+      //#then
       expect(callCount()).toBe(1)
     })
   })
 
   describe("resolveDispatchClient — shared in-flight: concurrent resolves trigger ONE fetch", () => {
     test("#given two concurrent resolveDispatchClient calls #when both start simultaneously #then only one fetch is triggered", async () => {
-      // given
-      let resolveCount = 0
+      //#given
       let fetchCalls = 0
       const sharedFetch = async (_url: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
         fetchCalls++
@@ -226,15 +225,12 @@ describe("live-server-route", () => {
       _setLiveClientForTesting(fakeLiveClient)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       const [r1, r2] = await Promise.all([
         resolveDispatchClient(fakeInProcessClient, "ses_concurrent_a"),
         resolveDispatchClient(fakeInProcessClient, "ses_concurrent_b"),
       ])
-      resolveCount = 2
-
-      // then
-      expect(resolveCount).toBe(2)
+      //#then
       expect(fetchCalls).toBe(1)
       expect(r1.route).toBe("live")
       expect(r2.route).toBe("live")
@@ -292,15 +288,15 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — serverUrl undefined → permanently in-process", () => {
     test("#given serverUrl undefined #when initLiveServerRoute called and resolveDispatchClient invoked #then always returns in-process without probing", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: undefined, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       const result = await resolveDispatchClient(fakeInProcessClient, "ses_no_url")
 
-      // then
+      //#then
       expect(result.route).toBe("in-process")
       expect(callCount()).toBe(0)
     })
@@ -308,7 +304,7 @@ describe("live-server-route", () => {
 
   describe("resolveDispatchClient — multiple server() registrations (multi-instance serve)", () => {
     test("#given two registrations with different in-process clients #when resolveDispatchClient called with the first client #then it still routes live instead of identity passthrough", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }, { ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       const firstClient = { _marker: "first" } as unknown
@@ -317,11 +313,11 @@ describe("live-server-route", () => {
       _setLiveClientForTesting(fakeLiveClient)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/instance-two", inProcessClient: secondClient })
 
-      // when
+      //#when
       const first = await resolveDispatchClient(firstClient, "ses_instance_one")
       const second = await resolveDispatchClient(secondClient, "ses_instance_two")
 
-      // then
+      //#then
       expect(first.route).toBe("live")
       expect(second.route).toBe("live")
     })
@@ -329,39 +325,39 @@ describe("live-server-route", () => {
 
   describe("tryResolveDispatchClientSync — synchronous fast path", () => {
     test("#given an unregistered client #when tryResolveDispatchClientSync called #then it returns identity passthrough without awaiting", () => {
-      // given
+      //#given
       const unregistered = { _marker: "unregistered" } as unknown
 
-      // when
+      //#when
       const result = tryResolveDispatchClientSync(unregistered, "ses_sync_identity")
 
-      // then
+      //#then
       expect(result).toEqual({ client: unregistered, route: "in-process", reason: "identity" })
     })
 
     test("#given a registered client with no probe yet #when tryResolveDispatchClientSync called #then it returns undefined (async probe required)", () => {
-      // given
+      //#given
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/sync", inProcessClient: fakeInProcessClient })
 
-      // when
+      //#when
       const result = tryResolveDispatchClientSync(fakeInProcessClient, "ses_sync_stale")
 
-      // then
+      //#then
       expect(result).toBeUndefined()
     })
 
     test("#given a registered client with a fresh available probe #when tryResolveDispatchClientSync called #then it returns the live route synchronously", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/sync", inProcessClient: fakeInProcessClient })
       _setLiveClientForTesting(fakeLiveClient)
       await resolveDispatchClient(fakeInProcessClient, "ses_sync_warm")
 
-      // when
+      //#when
       const result = tryResolveDispatchClientSync(fakeInProcessClient, "ses_sync_fresh")
 
-      // then
+      //#then
       expect(result?.route).toBe("live")
       expect(result?.client).toBe(fakeLiveClient)
     })
@@ -369,7 +365,7 @@ describe("live-server-route", () => {
 
   describe("markLiveRouteUnavailable", () => {
     test("#given available route #when markLiveRouteUnavailable called #then subsequent resolve returns in-process", async () => {
-      // given
+      //#given
       const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       _setLiveClientForTesting(fakeLiveClient)
@@ -378,10 +374,10 @@ describe("live-server-route", () => {
       const before = await resolveDispatchClient(fakeInProcessClient, "ses_before")
       expect(before.route).toBe("live")
 
-      // when
+      //#when
       markLiveRouteUnavailable("test-reason")
 
-      // then — unavailable mark holds for the TTL window: no re-probe on the next resolve
+      //#then — unavailable mark holds for the TTL window: no re-probe on the next resolve
       const { fetch: fakeFetch2, callCount: callCount2 } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch2)
       const after = await resolveDispatchClient(fakeInProcessClient, "ses_after")
@@ -404,10 +400,10 @@ describe("live-server-route", () => {
 
   describe("warmLiveServerProbe", () => {
     test("#given initialized route #when warmLiveServerProbe called #then returns void synchronously (fire-and-forget)", () => {
-      // given
+      //#given
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
 
-      // when / then — must not throw, must not return a promise that callers must await
+      //#when / then — must not throw, must not return a promise that callers must await
       const result = warmLiveServerProbe()
       expect(result).toBeUndefined()
     })

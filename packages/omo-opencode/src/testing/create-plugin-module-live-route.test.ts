@@ -135,7 +135,7 @@ describe("createPluginModule() — live-server-route wiring", () => {
 
   describe("#given a never-resolving probe fetch injected via warmLiveServerProbe dep", () => {
     it("#when server(input) is called #then it resolves in under 3s and returns hooks (fire-and-forget / 409-readiness)", async () => {
-      // given
+      //#given
       const neverResolving = mock(async () => {
         await new Promise<never>(() => {})
       }) as ReturnType<typeof mock>
@@ -147,12 +147,12 @@ describe("createPluginModule() — live-server-route wiring", () => {
         serverUrl: new URL("http://127.0.0.1:1"),
       } as Parameters<typeof pluginModule.server>[0]
 
-      // when
+      //#when
       const start = Date.now()
       const result = await pluginModule.server(input, {})
       const elapsed = Date.now() - start
 
-      // then
+      //#then
       expect(elapsed).toBeLessThan(3000)
       expect(result).toBeDefined()
     })
@@ -160,7 +160,7 @@ describe("createPluginModule() — live-server-route wiring", () => {
 
   describe("#given standard plugin input with serverUrl and client", () => {
     it("#when server(input) completes #then initLiveServerRoute received inProcessClient === input.client (reference equality)", async () => {
-      // given
+      //#given
       const capturedOpts: InitLiveServerRouteOpts[] = []
       const mockInitLiveServerRoute = mock((opts: InitLiveServerRouteOpts) => {
         capturedOpts.push(opts)
@@ -176,10 +176,10 @@ describe("createPluginModule() — live-server-route wiring", () => {
         serverUrl,
       } as Parameters<typeof pluginModule.server>[0]
 
-      // when
+      //#when
       await pluginModule.server(input, {})
 
-      // then
+      //#then
       expect(capturedOpts).toHaveLength(1)
       expect(capturedOpts[0]?.inProcessClient).toBe(client)
       expect(capturedOpts[0]?.serverUrl).toBe(serverUrl)
@@ -189,7 +189,7 @@ describe("createPluginModule() — live-server-route wiring", () => {
 
   describe("#given config with experimental.disable_live_parent_wake_routing: true", () => {
     it("#when server(input) completes #then setLiveParentWakeRoutingDisabled(true) is called", async () => {
-      // given
+      //#given
       const calls: boolean[] = []
       const mockSetDisabled = mock((v: boolean) => {
         calls.push(v)
@@ -203,14 +203,14 @@ describe("createPluginModule() — live-server-route wiring", () => {
         setLiveParentWakeRoutingDisabled: mockSetDisabled,
       })
 
-      // when
+      //#when
       await pluginModule.server({
         directory: "/tmp/live-flag-test",
         client: {},
         serverUrl: new URL("http://127.0.0.1:4000"),
       } as Parameters<typeof pluginModule.server>[0])
 
-      // then
+      //#then
       expect(calls).toHaveLength(1)
       expect(calls[0]).toBe(true)
     })
@@ -218,7 +218,7 @@ describe("createPluginModule() — live-server-route wiring", () => {
 
   describe("#given config without experimental block", () => {
     it("#when server(input) completes #then setLiveParentWakeRoutingDisabled(false) is called", async () => {
-      // given
+      //#given
       const calls: boolean[] = []
       const mockSetDisabled = mock((v: boolean) => {
         calls.push(v)
@@ -230,14 +230,14 @@ describe("createPluginModule() — live-server-route wiring", () => {
         setLiveParentWakeRoutingDisabled: mockSetDisabled,
       })
 
-      // when
+      //#when
       await pluginModule.server({
         directory: "/tmp/live-flag-absent-test",
         client: {},
         serverUrl: new URL("http://127.0.0.1:4000"),
       } as Parameters<typeof pluginModule.server>[0])
 
-      // then
+      //#then
       expect(calls).toHaveLength(1)
       expect(calls[0]).toBe(false)
     })
@@ -245,7 +245,7 @@ describe("createPluginModule() — live-server-route wiring", () => {
 
   describe("#given duplicate OMO plugin detected", () => {
     it("#when server(input) early-returns #then initLiveServerRoute is not called", async () => {
-      // given
+      //#given
       const mockInitLiveServerRoute = mock(() => {})
       mockDetectDuplicateOmoPlugin.mockReturnValue({
         detected: true,
@@ -261,13 +261,13 @@ describe("createPluginModule() — live-server-route wiring", () => {
       try {
         const pluginModule = createTestPluginModule({ initLiveServerRoute: mockInitLiveServerRoute })
 
-        // when
+        //#when
         const hooks = await pluginModule.server({
           directory: "/tmp/live-dup-test",
           client: {},
         } as Parameters<typeof pluginModule.server>[0])
 
-        // then
+        //#then
         expect(hooks).toEqual({})
         expect(mockInitLiveServerRoute).not.toHaveBeenCalled()
       } finally {

@@ -94,20 +94,18 @@ swsp_start_fake_llm() {
   disown "$FAKE_SERVER_PID" 2>/dev/null || true
 
   # Poll for the port line (fake-openai listening on <port>)
-  local deadline i=0
+  local deadline
   deadline=$(( $(date +%s) + 10 ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if grep -q "^fake-openai listening on " "$port_file.stdout" 2>/dev/null; then
       FAKE_SERVER_PORT="$(grep "^fake-openai listening on " "$port_file.stdout" | head -1 | awk '{print $NF}')"
       break
     fi
-    # Check if process died
     if ! kill -0 "$FAKE_SERVER_PID" 2>/dev/null; then
       swsp_log "FAIL: fake-openai server process died immediately"
       cat "$port_file.stdout" >&2 2>/dev/null || true
       return 1
     fi
-    i=$((i+1))
     sleep 0.3
   done
   OQA_TMPDIRS+=("$port_file.stdout")
@@ -170,7 +168,8 @@ swsp_write_omo_config() {
 swsp_write_opencode_config() {
   local cfg_dir="$1"
   local fake_port="$2"
-  local repo_root="/Users/yeongyu/local-workspaces/omo"
+  local repo_root
+  repo_root="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
   mkdir -p "$cfg_dir/opencode"
   cat >"$cfg_dir/opencode/opencode.jsonc" <<JSONC
@@ -211,17 +210,8 @@ swsp_poll_db_metrics() {
   local db="$1"
   local like_pat="$2"
   local timeout_s="${3:-90}"
-  local deadline i=0
-
-  deadline=$(( $(date +%s) + timeout_s ))
-  while [ "$(date +%s)" -lt "$deadline" ]; do
-    if [ ! -f "$db" ]; then
-      sleep 0.5
-      i=$((i+1))
-      continue
-    fi
-    local result
-    result="$(sqlite3 "$db" "
+  local deadline
+  local metrics_query="
       WITH target AS (
         SELECT m.id AS user_id, m.session_id
         FROM message m
@@ -244,7 +234,16 @@ swsp_poll_db_metrics() {
         coalesce((SELECT max(children) FROM counts), 0),
         coalesce((SELECT max(stops) FROM counts), 0)
       );
-    " 2>/dev/null)" || true
+  "
+
+  deadline=$(( $(date +%s) + timeout_s ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if [ ! -f "$db" ]; then
+      sleep 0.5
+      continue
+    fi
+    local result
+    result="$(sqlite3 "$db" "$metrics_query" 2>/dev/null)" || true
 
     local children stops
     children="$(printf '%s' "$result" | awk '{print $1}')"
@@ -256,35 +255,11 @@ swsp_poll_db_metrics() {
       return 0
     fi
     sleep 0.5
-    i=$((i+1))
   done
 
   # Return whatever we have on timeout
   local result
-  result="$(sqlite3 "$db" "
-    WITH target AS (
-      SELECT m.id AS user_id, m.session_id
-      FROM message m
-      JOIN part p ON p.message_id = m.id
-      WHERE json_extract(m.data, '\$.role') = 'user'
-        AND json_extract(p.data, '\$.type') = 'text'
-        AND json_extract(p.data, '\$.text') LIKE '${like_pat}'
-    ),
-    counts AS (
-      SELECT
-        count(a.id) AS children,
-        sum(CASE WHEN json_extract(a.data, '\$.finish') = 'stop' THEN 1 ELSE 0 END) AS stops
-      FROM target t
-      LEFT JOIN message a
-        ON a.session_id = t.session_id
-        AND json_extract(a.data, '\$.parentID') = t.user_id
-      GROUP BY t.user_id
-    )
-    SELECT printf('%d %d',
-      coalesce((SELECT max(children) FROM counts), 0),
-      coalesce((SELECT max(stops) FROM counts), 0)
-    );
-  " 2>/dev/null)" || true
+  result="$(sqlite3 "$db" "$metrics_query" 2>/dev/null)" || true
   printf '%s' "${result:-0 0}"
 }
 

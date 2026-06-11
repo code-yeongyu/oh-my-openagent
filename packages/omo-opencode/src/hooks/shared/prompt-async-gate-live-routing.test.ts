@@ -59,13 +59,13 @@ function makeBaseDispatchArgs(sessionID: string, client: unknown) {
 
 describe("dispatchInternalPrompt live-server-route routing", () => {
   afterEach(() => {
-    // then
+    //#then
     releaseAllPromptAsyncReservationsForTesting()
     resetLiveServerRouteForTesting()
   })
 
   test("#given registered inProcessClient and live route available #when dispatchInternalPrompt runs #then promptAsync is called on the live client not the original", async () => {
-    // given
+    //#given
     const origSession = makeRecordingSession()
     const liveSession = makeRecordingSession()
     const orig = makeClient(origSession.session)
@@ -74,17 +74,17 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: orig })
     _setLiveClientForTesting(live)
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt(makeBaseDispatchArgs("ses_live_dispatch", orig))
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     expect(liveSession.calls).toContain("promptAsync")
     expect(origSession.calls).not.toContain("promptAsync")
   })
 
   test("#given registered inProcessClient and live route available #when dispatchInternalPrompt runs #then status and messages are read on the live client", async () => {
-    // given
+    //#given
     const origSession = makeRecordingSession()
     const liveSession = makeRecordingSession()
     const orig = makeClient(origSession.session)
@@ -93,20 +93,20 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: orig })
     _setLiveClientForTesting(live)
 
-    // when
+    //#when
     await dispatchInternalPrompt({
       ...makeBaseDispatchArgs("ses_live_reads", orig),
       checkStatus: true,
       checkToolState: true,
     })
 
-    // then
+    //#then
     expect(origSession.calls).not.toContain("status")
     expect(origSession.calls).not.toContain("messages")
   })
 
   test("#given a child session in subagentSessions #when dispatchInternalPrompt runs #then the original client is used and live client is untouched", async () => {
-    // given
+    //#given
     const origSession = makeRecordingSession()
     const liveSession = makeRecordingSession()
     const orig = makeClient(origSession.session)
@@ -116,17 +116,17 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     _setLiveClientForTesting(live)
     subagentSessions.add("ses_child")
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt(makeBaseDispatchArgs("ses_child", orig))
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     expect(origSession.calls).toContain("promptAsync")
     expect(liveSession.calls).not.toContain("promptAsync")
   })
 
   test("#given an unregistered client #when dispatchInternalPrompt runs #then the original client is used and no probe fetch is made", async () => {
-    // given
+    //#given
     const origSession = makeRecordingSession()
     const unregisteredSession = makeRecordingSession()
     const unregistered = makeClient(unregisteredSession.session)
@@ -137,17 +137,17 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     }) as typeof fetch)
     initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: makeClient(origSession.session) })
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt(makeBaseDispatchArgs("ses_unregistered", unregistered))
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     expect(unregisteredSession.calls).toContain("promptAsync")
     expect(fetchCallCount).toBe(0)
   })
 
   test("#given live routing is disabled via setLiveParentWakeRoutingDisabled #when dispatchInternalPrompt runs #then the original client is used", async () => {
-    // given
+    //#given
     const origSession = makeRecordingSession()
     const liveSession = makeRecordingSession()
     const orig = makeClient(origSession.session)
@@ -157,17 +157,17 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     _setLiveClientForTesting(live)
     setLiveParentWakeRoutingDisabled(true)
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt(makeBaseDispatchArgs("ses_flag_disabled", orig))
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     expect(origSession.calls).toContain("promptAsync")
     expect(liveSession.calls).not.toContain("promptAsync")
   })
 
   test("#given live dispatch rejects with a pre-send connection failure #when dispatchInternalPrompt runs #then fallback dispatches exactly once on original client and route is marked unavailable", async () => {
-    // given
+    //#given
     let liveCalls = 0
     let origCalls = 0
     const connError = Object.assign(new TypeError("fetch failed"), { code: "ECONNREFUSED" })
@@ -189,17 +189,17 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: orig })
     _setLiveClientForTesting(live)
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt(makeBaseDispatchArgs("ses_fallback_conn", orig))
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     expect(liveCalls).toBe(1)
     expect(origCalls).toBe(1)
   })
 
   test("#given live dispatch hangs past dispatchTimeoutMs #when dispatchInternalPrompt runs #then result is failed with timeout error original client is not called and route is marked unavailable", async () => {
-    // given
+    //#given
     let liveCalls = 0
     let origCalls = 0
     const neverSettles = new Promise<never>(() => {})
@@ -222,13 +222,13 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: orig })
     _setLiveClientForTesting(live)
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt({
       ...makeBaseDispatchArgs("ses_timeout_live", orig),
       dispatchTimeoutMs: 50,
     })
 
-    // then
+    //#then
     expect(result.status).toBe("failed")
     expect(liveCalls).toBe(1)
     expect(origCalls).toBe(0)
@@ -239,7 +239,7 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
   }, 5_000)
 
   test("#given live route active and queueBehavior enqueue #when session is initially busy then becomes idle #then queued entry dispatches via live client", async () => {
-    // given
+    //#given
     let status = "busy"
     let liveCalls = 0
     let origCalls = 0
@@ -272,7 +272,7 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: orig })
     _setLiveClientForTesting(live)
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt({
       ...makeBaseDispatchArgs("ses_queue_live", orig),
       checkStatus: true,
@@ -289,7 +289,7 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
       }).catch(reject)
     })
 
-    // then
+    //#then
     expect(result.status).toBe("queued")
     expect(liveCalls).toBe(1)
     expect(origCalls).toBe(0)

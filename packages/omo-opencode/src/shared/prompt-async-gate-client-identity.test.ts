@@ -38,17 +38,16 @@ function makeRecordingClient() {
 
 describe("prompt-async-gate client-identity characterization", () => {
   afterEach(() => {
-    // then
+    //#then
     _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  // (a) busy-check, tool-state check, and dispatch all use the SAME client object
   test("#given a recording fake client #when the gate dispatches #then status messages and promptAsync are all called on the same session object", async () => {
-    // given
+    //#given
     const { client, callRecords } = makeRecordingClient()
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -61,7 +60,7 @@ describe("prompt-async-gate client-identity characterization", () => {
       checkToolState: true,
     })
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     const methodsCalled = callRecords.map((r) => r.method)
     expect(methodsCalled).toContain("promptAsync")
@@ -70,12 +69,11 @@ describe("prompt-async-gate client-identity characterization", () => {
     }
   })
 
-  // (b) checkStatus: false skips status; checkToolState: false skips messages
   test("#given checkStatus false and checkToolState false #when the gate dispatches #then status and messages are never invoked", async () => {
-    // given
+    //#given
     const { client, callRecords } = makeRecordingClient()
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -88,7 +86,7 @@ describe("prompt-async-gate client-identity characterization", () => {
       checkToolState: false,
     })
 
-    // then
+    //#then
     expect(result.status).toBe("dispatched")
     const methodsCalled = callRecords.map((r) => r.method)
     expect(methodsCalled).not.toContain("status")
@@ -96,9 +94,8 @@ describe("prompt-async-gate client-identity characterization", () => {
     expect(methodsCalled).toContain("promptAsync")
   })
 
-  // (c) status map showing session busy → result {status:"active"} and promptAsync NOT called
   test("#given session.status reports the session as busy #when the gate checks activity #then result is active and promptAsync is not called", async () => {
-    // given
+    //#given
     let promptCalled = false
     const client = {
       session: {
@@ -111,7 +108,7 @@ describe("prompt-async-gate client-identity characterization", () => {
       },
     }
 
-    // when — queueBehavior "defer" is the path that returns "active" when session is busy
+    //#when — queueBehavior "defer" is the path that returns "active" when session is busy
     const result = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -124,14 +121,13 @@ describe("prompt-async-gate client-identity characterization", () => {
       queueBehavior: "defer",
     })
 
-    // then
+    //#then
     expect(result).toEqual({ status: "active" })
     expect(promptCalled).toBe(false)
   })
 
-  // (d) reservation hold: second dispatch during postDispatchHoldMs returns reserved/coalesced
   test("#given a dispatch hold is active #when a second dispatch arrives before the hold expires #then it is coalesced and reports reserved or queued", async () => {
-    // given
+    //#given
     let promptCalls = 0
     const client = {
       session: {
@@ -146,7 +142,7 @@ describe("prompt-async-gate client-identity characterization", () => {
     Date.now = () => currentNow
 
     try {
-      // when
+      //#when
       const first = await dispatchInternalPrompt({
         mode: "async",
         client,
@@ -167,7 +163,7 @@ describe("prompt-async-gate client-identity characterization", () => {
         postDispatchHoldMs: 10_000,
       })
 
-      // then
+      //#then
       expect(first.status).toBe("dispatched")
       expect(second.status).toSatisfy((s: string) => s === "queued" || s === "reserved")
       expect(promptCalls).toBe(1)
@@ -176,9 +172,8 @@ describe("prompt-async-gate client-identity characterization", () => {
     }
   })
 
-  // (e) isAmbiguousPostDispatchPromptFailure admission path: dispatch rejecting AFTER dispatchAttempted=true
   test("#given promptAsync rejects after dispatch was attempted #when the result is classified #then status is failed dispatchAttempted is true and isAmbiguousPostDispatchPromptFailure is true", async () => {
-    // given
+    //#given
     const client = {
       session: {
         promptAsync: async () => {
@@ -187,7 +182,7 @@ describe("prompt-async-gate client-identity characterization", () => {
       },
     }
 
-    // when
+    //#when
     const result = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -200,7 +195,7 @@ describe("prompt-async-gate client-identity characterization", () => {
       checkToolState: false,
     })
 
-    // then
+    //#then
     expect(result.status).toBe("failed")
     if (result.status === "failed") {
       expect(result.dispatchAttempted).toBe(true)

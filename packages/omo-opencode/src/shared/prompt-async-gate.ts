@@ -43,8 +43,10 @@ import {
 import type {
   InternalPromptDispatchArgs,
   InternalPromptDispatchResult,
+  PromptAsyncClient,
   PromptAsyncInput,
   PromptAsyncReservationReleaseOptions,
+  PromptClient,
 } from "./prompt-async-gate/types"
 
 export {
@@ -124,18 +126,16 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   const sessionName = args.mode === "async" ? "promptAsync" : "prompt"
   const resolved = tryResolveDispatchClientSync(args.client, sessionID)
     ?? await resolveDispatchClient(args.client, sessionID)
-  type AsyncClient = { session?: { promptAsync?: (input: TInput) => Promise<unknown>; status?: () => Promise<unknown>; messages?: (...args: unknown[]) => Promise<unknown> } }
-  type SyncClient = { session?: { prompt?: (input: TInput) => Promise<unknown>; status?: () => Promise<unknown>; messages?: (...args: unknown[]) => Promise<unknown> } }
   const dispatch = (() => {
     if (args.mode === "async") {
-      const resolvedAsAsync = resolved.client as AsyncClient
+      const resolvedAsAsync = resolved.client as PromptAsyncClient<TInput>
       const session = resolvedAsAsync.session
       if (typeof session?.promptAsync !== "function") {
         return undefined
       }
       const dispatchPromptAsync = session.promptAsync.bind(session)
       if (resolved.route === "live") {
-        const originalSession = (args.client as AsyncClient).session
+        const originalSession = (args.client as PromptAsyncClient<TInput>).session
         return async (dispatchInput: TInput) => {
           log(LIVE_ROUTE_DISPATCH_LOG, { sessionID, source })
           try {
@@ -158,14 +158,14 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       return (dispatchInput: TInput) => dispatchPromptAsync(dispatchInput)
     }
 
-    const resolvedAsSync = resolved.client as SyncClient
+    const resolvedAsSync = resolved.client as PromptClient<TInput>
     const session = resolvedAsSync.session
     if (typeof session?.prompt !== "function") {
       return undefined
     }
     const dispatchPrompt = session.prompt.bind(session)
     if (resolved.route === "live") {
-      const originalSession = (args.client as SyncClient).session
+      const originalSession = (args.client as PromptClient<TInput>).session
       return async (dispatchInput: TInput) => {
         log(LIVE_ROUTE_DISPATCH_LOG, { sessionID, source })
         try {
