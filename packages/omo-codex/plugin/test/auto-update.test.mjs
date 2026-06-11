@@ -162,6 +162,11 @@ test("#given test command override #when running check #then records state and l
 		lastCheckedAt: 123_456,
 		lastAttemptedAt: 123_456,
 		lastStatus: "success",
+		pendingNotice: {
+			fromVersion: "1.0.0",
+			toVersion: "1.0.1",
+			startedAt: 123_456,
+		},
 	});
 	assert.equal(await readFile(logPath, "utf8"), "ok");
 	const updateLog = (await readFile(env.LAZYCODEX_AUTO_UPDATE_LOG_PATH, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
@@ -176,6 +181,13 @@ test("#given test command override #when running check #then records state and l
 			timestamp: "1970-01-01T00:02:03.456Z",
 			event: "finished",
 			status: 0,
+		},
+		{
+			timestamp: "1970-01-01T00:02:03.456Z",
+			event: "notified",
+			kind: "update-started",
+			fromVersion: "1.0.0",
+			toVersion: "1.0.1",
 		},
 	]);
 	assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
@@ -262,6 +274,11 @@ test("#given stale lock #when running check #then removes lock and runs update",
 		lastCheckedAt: 1_000_000,
 		lastAttemptedAt: 1_000_000,
 		lastStatus: "success",
+		pendingNotice: {
+			fromVersion: "1.0.0",
+			toVersion: "1.0.1",
+			startedAt: 1_000_000,
+		},
 	});
 });
 
