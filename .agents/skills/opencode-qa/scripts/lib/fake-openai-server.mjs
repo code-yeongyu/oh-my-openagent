@@ -89,6 +89,10 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  if (inputStr.includes("say exactly: TUI_NOREG_OK")) {
+    sendSse(res, textEvents(callCount, "TUI_NOREG_OK"))
+    return
+  }
   sendSse(res, textEvents(callCount, `fake response ${callCount}`))
 })
 
