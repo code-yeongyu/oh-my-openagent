@@ -5919,6 +5919,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
+        },
+        "disable_live_parent_wake_routing": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

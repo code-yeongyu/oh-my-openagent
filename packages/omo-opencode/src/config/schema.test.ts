@@ -964,6 +964,59 @@ describe("ExperimentalConfigSchema feature flags", () => {
     expect(result.success).toBe(false)
   })
 
+  test("accepts disable_live_parent_wake_routing as true", () => {
+    //#given
+    const config = { disable_live_parent_wake_routing: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_live_parent_wake_routing).toBe(true)
+    }
+  })
+
+  test("accepts disable_live_parent_wake_routing as false", () => {
+    //#given
+    const config = { disable_live_parent_wake_routing: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_live_parent_wake_routing).toBe(false)
+    }
+  })
+
+  test("disable_live_parent_wake_routing is optional (absent = routing enabled)", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_live_parent_wake_routing).toBeUndefined()
+    }
+  })
+
+  test("rejects non-boolean disable_live_parent_wake_routing", () => {
+    //#given
+    const config = { disable_live_parent_wake_routing: "yes" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
 })
 
 describe("GitMasterConfigSchema", () => {
