@@ -94,10 +94,11 @@ describe("LazyCodex publish workflow", () => {
       lazycodexReleaseStateStep.includes("PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}")
     const comparesAgainstPreviousLazycodexVersion =
       lazycodexReleaseStateStep.includes("npm pack \"lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}\"") &&
-      lazycodexReleaseStateStep.includes("bun run script/sync-lazycodex-marketplace.ts \"$PREVIOUS_PACKAGE_ROOT\" \"$PREVIOUS_MARKETPLACE_ROOT\"") &&
+      lazycodexReleaseStateStep.includes("bun run script/sync-lazycodex-marketplace.ts \"$PREVIOUS_PACKAGE_ROOT\" \"$PREVIOUS_MARKETPLACE_ROOT\" --previous-payload") &&
       lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json\" \"$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json\"") &&
       lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml\" \"$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml\"") &&
-      lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/plugins/omo\" \"$CURRENT_MARKETPLACE_ROOT/plugins/omo\"")
+      lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/plugins/omo\" \"$CURRENT_MARKETPLACE_ROOT/plugins/omo\"") &&
+      !syncMarketplaceStep.includes("--previous-payload")
     const exposesChangedOutput =
       lazycodexReleaseStateStep.includes("lazycodex_changed=true") &&
       lazycodexReleaseStateStep.includes("lazycodex_changed=false") &&

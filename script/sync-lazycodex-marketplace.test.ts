@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { syncLazycodexMarketplace } from "./sync-lazycodex-marketplace"
@@ -253,5 +253,37 @@ describe("sync-lazycodex-marketplace", () => {
     // then
     expect(message).toContain("missing hook command target")
     expect(message).toContain("components/rules/dist/cli.js")
+  })
+
+  test("#given a previous payload without lsp-daemon dist #when syncing with allowMissingBundledDists #then reconstructs and skips the missing dist", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-prev-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-prev-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await rm(join(sourceRoot, "packages", "lsp-daemon", "dist"), { recursive: true, force: true })
+
+    // when
+    await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot, allowMissingBundledDists: true })
+
+    // then
+    let daemonDistMissing = false
+    try {
+      await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-daemon", "dist"))
+    } catch (error) {
+      daemonDistMissing = error instanceof Error
+    }
+    expect(daemonDistMissing).toBe(true)
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
+  })
+
+  test("#given a missing lsp-daemon dist without the flag #then still hard-throws", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-strict-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-strict-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await rm(join(sourceRoot, "packages", "lsp-daemon", "dist"), { recursive: true, force: true })
+
+    // when/then
+    await expect(syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })).rejects.toThrow(/missing built LSP daemon dist/)
   })
 })
