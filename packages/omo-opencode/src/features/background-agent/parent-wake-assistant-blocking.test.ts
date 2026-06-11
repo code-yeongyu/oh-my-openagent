@@ -2,6 +2,10 @@
 
 import { describe, expect, test } from "bun:test"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
+import {
+  OMO_INTERNAL_INITIATOR_MARKER,
+  OMO_INTERNAL_NOREPLY_MARKER,
+} from "../../shared/internal-initiator-marker"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 
@@ -244,6 +248,76 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(true)
     } finally {
       Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a completed assistant followed by stacked noReply notification tails #when flushing a shouldReply wake #then it dispatches immediately instead of deadlocking", async () => {
+    // given
+    const noReplyTailText = `task done\n${OMO_INTERNAL_INITIATOR_MARKER}\n${OMO_INTERNAL_NOREPLY_MARKER}`
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "assistant",
+                finish: "stop",
+                time: { created: 1_000, completed: 2_000 },
+              },
+              parts: [{ type: "text", text: "fired the background tasks" }],
+            },
+            {
+              info: { role: "user", time: { created: 3_000 } },
+              parts: [{ type: "text", text: noReplyTailText, synthetic: true }],
+            },
+            {
+              info: { role: "user", time: { created: 4_000 } },
+              parts: [{ type: "text", text: noReplyTailText, synthetic: true }],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-noreply-tail": { type: "idle" } } }),
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-noreply-tail",
+      "[ALL BACKGROUND TASKS COMPLETE]",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-noreply-tail")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBeFalsy()
+      expect(notifier.getPendingParentWakes().has("parent-noreply-tail")).toBe(false)
+    } finally {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }
