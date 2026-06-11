@@ -28,7 +28,7 @@ export async function findMissingHookCommandTargets(pluginRoot) {
 export async function assertHookCommandTargets(pluginRoot) {
 	const missing = await findMissingHookCommandTargets(pluginRoot);
 	if (missing.length === 0) return;
-	const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join(""));
+	const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"));
 	throw new Error(
 		`Plugin payload is missing ${missing.length} hook command target(s) referenced by hooks.json: ${relativeMissing.join(", ")}. ` +
 			"The previous plugin cache was left untouched; this payload was not activated.",
