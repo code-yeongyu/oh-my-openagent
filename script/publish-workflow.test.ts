@@ -348,6 +348,20 @@ describe("test workflows", () => {
     expect(darwinVerifyStep).not.toContain("codesign")
   })
 
+  test("regenerates and commits bun.lock in the release version bump", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+
+    // #when
+    const applyStep = sliceWorkflowSection(workflow, "      - name: Apply release version to source tree", "      - name: Commit version bump")
+    const commitStep = sliceWorkflowSection(workflow, "      - name: Commit version bump", "      - name: Create release tag")
+
+    // #then
+    expect(applyStep).toContain("bun install --lockfile-only")
+    expect(applyStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(applyStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
+    expect(commitStep).toContain(" bun.lock")
+  })
+
   test("keeps the release tail safe to rerun after a tag exists", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
