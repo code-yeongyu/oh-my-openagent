@@ -1,7 +1,7 @@
 // postinstall.mjs
 // Runs after npm install to verify platform binary is available
 
-import { readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import {
   getBinaryPath,
   resolvePlatformPackageBaseName,
 } from "./bin/platform.js";
+import { refreshOpenCodePluginCache } from "./bin/opencode-cache.js";
 import { detectPlatformBinaryMismatch } from "./bin/version-mismatch.js";
 
 const require = createRequire(import.meta.url);
@@ -103,21 +104,20 @@ function getMainPackageVersion() {
   return packageJson?.version ?? null;
 }
 
-function invalidateOpenCodePluginCache() {
+// Refresh (not just delete) the OpenCode plugin cache. Deleting alone leaves
+// the cache cold, and OpenCode's cold-cache plugin install can deadlock under
+// Bun, hanging OpenCode at startup (issue #5050). Best-effort: postinstall
+// must never fail the package install.
+function refreshPluginCache() {
   const cacheDir = join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "opencode");
-  const parentDirs = [cacheDir, join(cacheDir, "packages")];
-  const prefixes = OPENCODE_PLUGIN_PACKAGES.map((packageName) => `${packageName}@`);
-
-  for (const parentDir of parentDirs) {
-    try {
-      for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
-        if (entry.isDirectory() && prefixes.some((prefix) => entry.name.startsWith(prefix))) {
-          rmSync(join(parentDir, entry.name), { recursive: true, force: true });
-        }
-      }
-    } catch {
-      // Cache invalidation is best-effort; postinstall should not fail package installs.
-    }
+  try {
+    return refreshOpenCodePluginCache({
+      cacheDir,
+      packageNames: OPENCODE_PLUGIN_PACKAGES,
+      installedVersion: getMainPackageVersion(),
+    });
+  } catch {
+    return { refreshed: [], removed: [] };
   }
 }
 
@@ -136,7 +136,11 @@ function main() {
   const libcFamily = getLibcFamily();
   const packageBaseName = getPackageBaseName();
 
-  invalidateOpenCodePluginCache();
+  const cacheRefresh = refreshPluginCache();
+  for (const specPath of cacheRefresh.removed) {
+    console.warn(`oh-my-opencode: could not refresh OpenCode plugin cache at ${specPath}`);
+    console.warn(`  OpenCode will reinstall the plugin on next startup.`);
+  }
 
   // Check opencode version requirement
   const versionCheck = checkOpenCodeVersion();
