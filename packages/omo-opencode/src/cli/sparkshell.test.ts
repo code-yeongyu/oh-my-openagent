@@ -520,7 +520,7 @@ describe("sparkshell CLI", () => {
       }),
       sparkSummarize: (request: SparkSummaryRequest) => {
         requests.push(request)
-        return "worker 0 idle and waiting for jobs\n[sparkshell caption] ran `cat huge.log`; kept 1 of 2000 idle lines as-is; nothing redacted"
+        return "worker 0 idle and waiting for jobs\n[sparkshell caption] ran `cat huge.log`; kept 1 of 2000 idle lines as-is; dropped the rest"
       },
     })
 

@@ -12,8 +12,8 @@ export const SPARKSHELL_USAGE = [
   "OMO_SPARKSHELL_CONDENSE_BUDGET overrides) preserving error signatures, repeated patterns,",
   "session-goal matches, and head/tail. OMO_SPARKSHELL_CONDENSE=0 disables condensation.",
   "Before that deterministic condensation, oversized output is summarized by the spark model",
-  "(codex exec; default gpt-5.5-codex-spark) fed with the session context: the summary reproduces",
-  "the output as-is, masks secrets with [REDACTED], and ends with a [sparkshell caption] line.",
+  "(codex exec; default gpt-5.3-codex-spark) fed with the session context: the summary reproduces",
+  "the output as-is, unmasked, and ends with a [sparkshell caption] line stating what was omitted.",
   "OMO_SPARKSHELL_SPARK=0 disables it; OMO_SPARKSHELL_SPARK_MODEL / OMO_SPARKSHELL_SPARK_TIMEOUT_MS /",
   "OMO_SPARKSHELL_SPARK_BIN tune the invocation. Condensation is the automatic fallback.",
 ].join("\n")

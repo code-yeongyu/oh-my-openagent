@@ -459,7 +459,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **Grok Code Fast 1**       | github-copilot, xai | Very fast      | Optimized for code grep/search. Default for Explore.                          |
 | **Claude Haiku 4.5**       | anthropic, vercel   | Fast           | Good balance of speed and intelligence.                                       |
 | **MiniMax M2.7 Highspeed** | vercel, opencode    | Very fast      | High-speed MiniMax utility fallback used by runtime chains.                   |
-| **GPT-5.5-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |
+| **GPT-5.3-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |
 
 #### What each agent does and which model it got
 

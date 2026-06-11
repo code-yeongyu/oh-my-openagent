@@ -1016,8 +1016,8 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `OMO_SPARKSHELL_CONDENSE` | Set to `0` to disable sparkshell's oversized-output condensation and always print raw output |
 | `OMO_SPARKSHELL_CONDENSE_BUDGET` | Character budget before sparkshell condenses command output (default `20000`) |
 | `OMO_SPARKSHELL_SESSION_CONTEXT` | Set to `0` to stop sparkshell from appending Codex session context (first/latest user request and recent messages) to command output |
-| `OMO_SPARKSHELL_SPARK` | Set to `0` to skip the spark-model summarization of oversized sparkshell output and go straight to deterministic condensation. The spark summary is generated via `codex exec` from the shell output plus session context, reproduces the output as-is, masks secrets with `[REDACTED]`, and appends a `[sparkshell caption]` line at the bottom |
-| `OMO_SPARKSHELL_SPARK_MODEL` | Model used for the sparkshell spark summary (default `gpt-5.5-codex-spark`) |
+| `OMO_SPARKSHELL_SPARK` | Set to `0` to skip the spark-model summarization of oversized sparkshell output and go straight to deterministic condensation. The spark summary is generated via `codex exec` from the shell output plus session context, reproduces the output as-is without masking anything, and appends a `[sparkshell caption]` line at the bottom stating what was omitted |
+| `OMO_SPARKSHELL_SPARK_MODEL` | Model used for the sparkshell spark summary (default `gpt-5.3-codex-spark`) |
 | `OMO_SPARKSHELL_SPARK_TIMEOUT_MS` | Timeout for the spark summary `codex exec` invocation in milliseconds (default `30000`) |
 | `OMO_SPARKSHELL_SPARK_BIN` | Binary used to invoke the spark model (default `codex`) |
 | `OMO_SPARKSHELL_SPARK_PROFILE` | Codex config profile passed as `--profile` to the spark summary invocation. Set this when the default Codex auth cannot use the spark model (for example a gateway profile) |

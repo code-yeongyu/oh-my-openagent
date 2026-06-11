@@ -38,7 +38,7 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env): st
     "- When no native sidecar or appserver is available, Sparkshell silently falls back to raw command execution. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
     "- When `CODEX_THREAD_ID` identifies a Codex session, Sparkshell appends recent session context (first/latest user request + last 5 conversation messages) after the shell result so output consumers stay aligned with the session goals. `OMO_SPARKSHELL_SESSION_CONTEXT=0` disables it.",
     "- Route potentially huge output (full log files, big diffs, `cat`/`grep` over large artifacts) through Sparkshell instead of reading it raw: oversized output is condensed to a budget while preserving error signatures, repeated patterns, session-goal-relevant lines, and head/tail. Tune with `--budget <chars>`; disable with `OMO_SPARKSHELL_CONDENSE=0`.",
-    "- Oversized output is first summarized by the spark model (`codex exec`, default `gpt-5.5-codex-spark`) fed with the session context: the summary reproduces the output as-is, masks secrets with `[REDACTED]`, and ends with a `[sparkshell caption]` line describing what ran and what was omitted or redacted. `OMO_SPARKSHELL_SPARK=0` skips the model and uses deterministic condensation directly.",
+    "- Oversized output is first summarized by the spark model (`codex exec`, default `gpt-5.3-codex-spark`) fed with the session context: the summary reproduces the output as-is (no masking) and ends with a `[sparkshell caption]` line describing what ran and which lines were omitted. `OMO_SPARKSHELL_SPARK=0` skips the model and uses deterministic condensation directly.",
   ].join("\n")
 }
 

@@ -37,8 +37,8 @@ describe("sparkshell spark prompt", () => {
     expect(prompt).toMatch(/never paraphrase|do not paraphrase/i)
     expect(prompt).toContain("[sparkshell caption]")
     expect(prompt).toMatch(/very bottom|at the bottom/i)
-    expect(prompt).toContain("[REDACTED]")
-    expect(prompt).toMatch(/secret|credential/i)
+    expect(prompt).not.toContain("[REDACTED]")
+    expect(prompt).toMatch(/do not (mask|redact|censor)/i)
     expect(prompt).toContain("Command: cat huge.log")
     expect(prompt).toContain("5000")
     expect(prompt).toContain("fix the fable-fallback.ts regression")
@@ -85,6 +85,7 @@ describe("sparkshell spark gating", () => {
   })
 
   test("#given model env overrides #when resolving the model #then falls back to the spark default", () => {
+    expect(DEFAULT_SPARK_MODEL).toBe("gpt-5.3-codex-spark")
     expect(resolveSparkModel({})).toBe(DEFAULT_SPARK_MODEL)
     expect(resolveSparkModel({ OMO_SPARKSHELL_SPARK_MODEL: "  " })).toBe(DEFAULT_SPARK_MODEL)
     expect(resolveSparkModel({ OMO_SPARKSHELL_SPARK_MODEL: "gpt-5.4-mini" })).toBe("gpt-5.4-mini")

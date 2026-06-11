@@ -195,7 +195,7 @@ function formatSparkSummary(summary: string, model: string, originalText: string
   const totalLines = originalText.split("\n").length
   const header = [
     `[sparkshell] spark summary (model: ${model}; original output: ${totalLines} lines, ${originalText.length} chars);`,
-    `as-is excerpt with [REDACTED] censorship and a bottom [sparkshell caption]. Set ${SPARKSHELL_SPARK_ENV}=0 to disable.`,
+    `as-is excerpt with a bottom [sparkshell caption]. Set ${SPARKSHELL_SPARK_ENV}=0 to disable.`,
   ].join(" ")
   return `${header}\n${summary.trim()}\n`
 }

@@ -90,6 +90,7 @@ describe("Codex Sparkshell awareness", () => {
 		expect(parseAdditionalContext(output)).toContain("OMO_SPARKSHELL_CONDENSE");
 		expect(parseAdditionalContext(output)).toContain("OMO_SPARKSHELL_SPARK");
 		expect(parseAdditionalContext(output)).toContain("[sparkshell caption]");
+		expect(parseAdditionalContext(output)).not.toContain("[REDACTED]");
 	});
 
 	it("#given inactive env #when SessionStart runs #then emits no Sparkshell guidance", async () => {

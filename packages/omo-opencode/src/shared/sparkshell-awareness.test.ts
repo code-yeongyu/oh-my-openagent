@@ -82,7 +82,7 @@ describe("sparkshell runtime awareness", () => {
     expect(context).toContain("OMO_SPARKSHELL_CONDENSE")
     expect(context).toContain("OMO_SPARKSHELL_SPARK")
     expect(context).toContain("[sparkshell caption]")
-    expect(context).toContain("[REDACTED]")
+    expect(context).not.toContain("[REDACTED]")
     expect(context).toContain("log")
   })
 })
