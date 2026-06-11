@@ -282,6 +282,78 @@
       "readTheDocs": "문서 보기"
     }
   },
+  "onboarding": {
+    "form": {
+      "emailLabel": "업무용 이메일",
+      "emailPlaceholder": "founder@company.com",
+      "submit": "결제 단계로 이동"
+    },
+    "landing": {
+      "badge": "런치 파이프라인",
+      "title": "이메일을 받고, 결제를 확인한 뒤, 후속 자동화를 켭니다",
+      "description": "유료 랜딩 플로우의 뼈대입니다. 이메일을 수집하고, 방문자를 결제 확인 단계로 보낸 다음, 결과 페이지에서 랜딩 반복 작업과 라이프사이클 이메일을 토글로 켤 수 있습니다.",
+      "finePrint": "현재 checkout은 데모 라우트입니다. 오퍼가 준비되면 Stripe, Toss Payments 같은 실제 결제사를 연결하세요.",
+      "steps": {
+        "capture": "이메일 리드 수집",
+        "checkout": "결제 상태 확인",
+        "configure": "랜딩 및 이메일 자동화 켜기"
+      },
+      "preview": {
+        "label": "워크스페이스 미리보기",
+        "status": "결제 후 준비",
+        "landing": "랜딩페이지 반복 개선",
+        "email": "라이프사이클 이메일 시퀀스",
+        "analytics": "전환 분석"
+      }
+    },
+    "checkout": {
+      "badge": "결제 단계",
+      "title": "런치 파이프라인 확인",
+      "description": "랜딩 폼과 자동화 워크스페이스 사이에 놓이는 자리표시자 페이지입니다. 실제 결제 세션은 나중에 여기에서 생성하면 됩니다.",
+      "missingEmail": "아직 이메일이 없습니다",
+      "summaryTitle": "주문 요약",
+      "summary": {
+        "product": "상품",
+        "productValue": "랜딩 및 이메일 자동화",
+        "payment": "결제",
+        "paymentValue": "데모 checkout",
+        "delivery": "제공 방식",
+        "deliveryValue": "즉시 워크스페이스"
+      },
+      "confirmPayment": "결제 확인",
+      "stubNotice": "이 버튼은 성공 결제를 시뮬레이션하고 결과 페이지로 이동합니다."
+    },
+    "result": {
+      "badge": "결제 확인됨",
+      "title": "자동화 워크스페이스 준비 완료",
+      "description": "이 확인 페이지를 프로젝트의 컨트롤 표면으로 사용하세요. 각 토글은 이후 붙일 자동화 모듈과 연결됩니다.",
+      "workspaceLabel": "워크스페이스 소유자",
+      "fallbackEmail": "이메일 대기 중",
+      "status": "활성",
+      "metrics": {
+        "checkout": "Checkout",
+        "checkoutValue": "Paid",
+        "email": "Email",
+        "emailValue": "Captured",
+        "iteration": "Iteration",
+        "iterationValue": "Queued"
+      },
+      "toggles": {
+        "landing": {
+          "title": "랜딩페이지 반복 개선",
+          "description": "결제 의도에 맞춰 카피, 섹션 변형, 전환 테스트 아이디어를 생성합니다."
+        },
+        "email": {
+          "title": "라이프사이클 이메일 시퀀스",
+          "description": "수집된 이메일 주소로 환영, 증거, 리마인더, 활성화 이메일을 준비합니다."
+        },
+        "analytics": {
+          "title": "전환 분석",
+          "description": "실제 이벤트가 연결되면 유입 경로, 결제 상태, 후속 반응을 추적합니다."
+        }
+      }
+    }
+  },
   "docs": {
     "mobileHeader": "Oh My OpenAgent Docs",
     "searchPlaceholder": "문서 검색..."

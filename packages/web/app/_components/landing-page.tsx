@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import type { JSX } from "react"
 import { ArchitectureSection } from "@/components/landing/sections/architecture"
 import { CtaSection } from "@/components/landing/sections/cta"
+import { CheckoutPipelineSection } from "@/components/landing/sections/checkout-pipeline"
 import { HephaestusSection } from "@/components/landing/sections/hephaestus"
 import { HeroSection } from "@/components/landing/sections/hero"
 import { PrometheusAtlasSection } from "@/components/landing/sections/prometheus-atlas"
@@ -27,6 +28,7 @@ export async function LandingPage(): Promise<JSX.Element> {
       <PrometheusAtlasSection />
       <HephaestusSection />
       <TeamModeSection />
+      <CheckoutPipelineSection />
       <SubAgentsSection />
       <ArchitectureSection />
       <ReviewsSection />

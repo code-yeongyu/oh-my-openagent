@@ -282,6 +282,78 @@
       "readTheDocs": "Read the Docs"
     }
   },
+  "onboarding": {
+    "form": {
+      "emailLabel": "Work email",
+      "emailPlaceholder": "founder@company.com",
+      "submit": "Continue to checkout"
+    },
+    "landing": {
+      "badge": "Launch pipeline",
+      "title": "Capture the buyer, confirm payment, then automate the follow-up",
+      "description": "A project skeleton for a paid landing flow: collect the email, send the visitor through checkout, and open a confirmation workspace where landing iterations and lifecycle emails can be toggled on.",
+      "finePrint": "Checkout is scaffolded as a demo route. Connect Stripe, Toss Payments, or another provider when the offer is ready.",
+      "steps": {
+        "capture": "Capture the email lead",
+        "checkout": "Confirm checkout status",
+        "configure": "Turn on landing and email automation"
+      },
+      "preview": {
+        "label": "Workspace preview",
+        "status": "Ready after payment",
+        "landing": "Landing page iterations",
+        "email": "Lifecycle email sequence",
+        "analytics": "Conversion analytics"
+      }
+    },
+    "checkout": {
+      "badge": "Checkout step",
+      "title": "Confirm the launch pipeline",
+      "description": "This page is the placeholder between the landing form and the automation workspace. The real payment session can be created here later.",
+      "missingEmail": "No email provided yet",
+      "summaryTitle": "Order summary",
+      "summary": {
+        "product": "Product",
+        "productValue": "Landing and email automation",
+        "payment": "Payment",
+        "paymentValue": "Demo checkout",
+        "delivery": "Delivery",
+        "deliveryValue": "Instant workspace"
+      },
+      "confirmPayment": "Confirm payment",
+      "stubNotice": "This button simulates a successful payment and routes to the result page."
+    },
+    "result": {
+      "badge": "Payment confirmed",
+      "title": "Automation workspace ready",
+      "description": "Use this confirmation page as the control surface for the project. Each toggle maps to a future automation module.",
+      "workspaceLabel": "Workspace owner",
+      "fallbackEmail": "email pending",
+      "status": "Active",
+      "metrics": {
+        "checkout": "Checkout",
+        "checkoutValue": "Paid",
+        "email": "Email",
+        "emailValue": "Captured",
+        "iteration": "Iteration",
+        "iterationValue": "Queued"
+      },
+      "toggles": {
+        "landing": {
+          "title": "Landing page iterations",
+          "description": "Generate copy, section variants, and conversion test ideas from checkout intent."
+        },
+        "email": {
+          "title": "Lifecycle email sequence",
+          "description": "Prepare welcome, proof, reminder, and activation emails for the captured address."
+        },
+        "analytics": {
+          "title": "Conversion analytics",
+          "description": "Track source, checkout status, and follow-up engagement once real events are wired."
+        }
+      }
+    }
+  },
   "docs": {
     "mobileHeader": "Oh My OpenAgent Docs",
     "searchPlaceholder": "Search docs..."

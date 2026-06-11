@@ -282,6 +282,78 @@
       "readTheDocs": "ドキュメントを読む"
     }
   },
+  "onboarding": {
+    "form": {
+      "emailLabel": "Work email",
+      "emailPlaceholder": "founder@company.com",
+      "submit": "Continue to checkout"
+    },
+    "landing": {
+      "badge": "Launch pipeline",
+      "title": "メールを取得し、決済を確認し、フォローアップを自動化",
+      "description": "有料ランディングフローの骨組みです。メールを収集し、checkout に進め、確認ページでランディング改善とライフサイクルメールをトグルできます。",
+      "finePrint": "checkout はデモルートです。オファーが固まったら Stripe、Toss Payments、または他の決済プロバイダーを接続してください。",
+      "steps": {
+        "capture": "メールリードを取得",
+        "checkout": "checkout 状態を確認",
+        "configure": "ランディングとメール自動化を有効化"
+      },
+      "preview": {
+        "label": "Workspace preview",
+        "status": "Ready after payment",
+        "landing": "Landing page iterations",
+        "email": "Lifecycle email sequence",
+        "analytics": "Conversion analytics"
+      }
+    },
+    "checkout": {
+      "badge": "Checkout step",
+      "title": "Confirm the launch pipeline",
+      "description": "ランディングフォームと自動化ワークスペースの間に置くプレースホルダーです。実際の決済セッションは後でここに接続できます。",
+      "missingEmail": "No email provided yet",
+      "summaryTitle": "Order summary",
+      "summary": {
+        "product": "Product",
+        "productValue": "Landing and email automation",
+        "payment": "Payment",
+        "paymentValue": "Demo checkout",
+        "delivery": "Delivery",
+        "deliveryValue": "Instant workspace"
+      },
+      "confirmPayment": "Confirm payment",
+      "stubNotice": "このボタンは成功した決済をシミュレーションして結果ページへ移動します。"
+    },
+    "result": {
+      "badge": "Payment confirmed",
+      "title": "Automation workspace ready",
+      "description": "この確認ページをプロジェクトの操作画面として使います。各トグルは今後の自動化モジュールに対応します。",
+      "workspaceLabel": "Workspace owner",
+      "fallbackEmail": "email pending",
+      "status": "Active",
+      "metrics": {
+        "checkout": "Checkout",
+        "checkoutValue": "Paid",
+        "email": "Email",
+        "emailValue": "Captured",
+        "iteration": "Iteration",
+        "iterationValue": "Queued"
+      },
+      "toggles": {
+        "landing": {
+          "title": "Landing page iterations",
+          "description": "checkout の意図に合わせてコピー、セクション案、転換テスト案を生成します。"
+        },
+        "email": {
+          "title": "Lifecycle email sequence",
+          "description": "取得したメールアドレス向けにウェルカム、証拠、リマインダー、活性化メールを準備します。"
+        },
+        "analytics": {
+          "title": "Conversion analytics",
+          "description": "実イベントを接続した後、流入元、決済状態、フォローアップ反応を追跡します。"
+        }
+      }
+    }
+  },
   "docs": {
     "mobileHeader": "Oh My OpenAgentドキュメント",
     "searchPlaceholder": "ドキュメントを検索..."

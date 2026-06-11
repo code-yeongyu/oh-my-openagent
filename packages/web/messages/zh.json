@@ -282,6 +282,78 @@
       "readTheDocs": "阅读文档"
     }
   },
+  "onboarding": {
+    "form": {
+      "emailLabel": "Work email",
+      "emailPlaceholder": "founder@company.com",
+      "submit": "Continue to checkout"
+    },
+    "landing": {
+      "badge": "Launch pipeline",
+      "title": "收集邮箱，确认支付，然后启动后续自动化",
+      "description": "这是付费落地页流程的骨架。先收集邮箱，再进入 checkout，最后在确认页用开关管理落地页迭代和生命周期邮件。",
+      "finePrint": "checkout 目前是演示路由。产品报价确定后，可以接入 Stripe、Toss Payments 或其他支付服务。",
+      "steps": {
+        "capture": "收集邮箱线索",
+        "checkout": "确认 checkout 状态",
+        "configure": "开启落地页和邮件自动化"
+      },
+      "preview": {
+        "label": "Workspace preview",
+        "status": "Ready after payment",
+        "landing": "Landing page iterations",
+        "email": "Lifecycle email sequence",
+        "analytics": "Conversion analytics"
+      }
+    },
+    "checkout": {
+      "badge": "Checkout step",
+      "title": "Confirm the launch pipeline",
+      "description": "这个页面位于落地页表单和自动化工作区之间。后续可以在这里创建真实支付会话。",
+      "missingEmail": "No email provided yet",
+      "summaryTitle": "Order summary",
+      "summary": {
+        "product": "Product",
+        "productValue": "Landing and email automation",
+        "payment": "Payment",
+        "paymentValue": "Demo checkout",
+        "delivery": "Delivery",
+        "deliveryValue": "Instant workspace"
+      },
+      "confirmPayment": "Confirm payment",
+      "stubNotice": "此按钮会模拟支付成功并跳转到结果页面。"
+    },
+    "result": {
+      "badge": "Payment confirmed",
+      "title": "Automation workspace ready",
+      "description": "把这个确认页作为项目控制台。每个开关都对应未来要接入的自动化模块。",
+      "workspaceLabel": "Workspace owner",
+      "fallbackEmail": "email pending",
+      "status": "Active",
+      "metrics": {
+        "checkout": "Checkout",
+        "checkoutValue": "Paid",
+        "email": "Email",
+        "emailValue": "Captured",
+        "iteration": "Iteration",
+        "iterationValue": "Queued"
+      },
+      "toggles": {
+        "landing": {
+          "title": "Landing page iterations",
+          "description": "根据 checkout 意图生成文案、区块变体和转化测试想法。"
+        },
+        "email": {
+          "title": "Lifecycle email sequence",
+          "description": "为收集到的邮箱准备欢迎、证明、提醒和激活邮件。"
+        },
+        "analytics": {
+          "title": "Conversion analytics",
+          "description": "接入真实事件后，追踪来源、支付状态和后续互动。"
+        }
+      }
+    }
+  },
   "docs": {
     "mobileHeader": "Oh My OpenAgent 文档",
     "searchPlaceholder": "搜索文档..."
