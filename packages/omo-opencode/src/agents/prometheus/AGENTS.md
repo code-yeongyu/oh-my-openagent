@@ -20,7 +20,6 @@ This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users
 | `index.ts` | Barrel exports |
 | `system-prompt.ts` | Thin loader using `loadPromptSync()` and `prometheusPromptVariants` from `@oh-my-opencode/prompts-core`; exports prompt source routing and disabled-tool filtering |
 | `system-prompt.test.ts` | Runtime behavior tests for Question tool filtering |
-| `prometheus-byte-exactness.test.ts` | Byte-exact sha256 characterization tests for all variants and Question disabled state |
 | `packages/prompts-core/prompts/prometheus/default.md` | Default/Claude markdown prompt variant |
 | `packages/prompts-core/prompts/prometheus/claude-fable-5.md` | Claude Fable 5 variant (default + Fable `<self_knowledge>` tuning block) |
 | `packages/prompts-core/prompts/prometheus/claude-opus-4-8.md` | Claude Opus 4.8 variant (default + 4.8 `<self_knowledge>` tuning block) |
@@ -54,7 +53,7 @@ The four Claude variants are byte-copies of `default.md` plus ONE inserted `<sel
 | `claude-opus-4-8` | 4.7 set, plus capability under-reach (dispatch NOW, no "worth it" debate), over-asking the user (research first, then ask the informed question), narration (lean interview turns) |
 | `claude-fable-5` | DELEGATED DISCOVERY MANDATE (Fable never greps/reads source itself — every discovery question becomes an explore/librarian dispatch), wide fan-out (3-6 agents per wave, one angle each), follow-up waves on gaps, stay async (never block on a wave), grounded claims only, no overplanning |
 
-When editing `default.md`, replicate content changes into the four Claude variants (only the `<self_knowledge>` block may differ), then refresh the sha256 baselines in `prometheus-byte-exactness.test.ts`.
+When editing `default.md`, replicate content changes into the four Claude variants (only the `<self_knowledge>` block may differ). Behavior coverage (variant routing, tuning-block inclusion/exclusion, Question-tool stripping) lives in `system-prompt.test.ts`.
 
 ## DISABLED TOOL HANDLING
 

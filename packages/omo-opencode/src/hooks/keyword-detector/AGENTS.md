@@ -109,4 +109,4 @@ Default: empty/missing means every detector is active. Schema lives at [`src/con
 - **Non-OMO agent filter**: OpenCode built-in Builder/Plan agents do not receive keyword injection
 - **Session agent tracking**: Uses `getSessionAgent()` to get actual agent (not just input hint)
 - **Model-aware messages**: `getUltraworkMessage(agentName, modelID)` adapts message to active model
-- **Prompt byte baselines**: `mode-prompt-baseline.test.ts` pins mode prompt hashes; `ultrawork/ultrawork-byte-exactness.test.ts` pins ultrawork prompt hashes
+- **Ultrawork source routing**: `ultrawork/ultrawork-source-routing.test.ts` pins agent/model-to-prompt-source routing for `getUltraworkSource`
