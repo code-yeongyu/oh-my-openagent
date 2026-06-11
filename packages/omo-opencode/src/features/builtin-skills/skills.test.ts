@@ -243,6 +243,23 @@ describe("createBuiltinSkills", () => {
 		expect(skills.length).toBe(10)
 	})
 
+	test("#given disabled_skills with debugging and visual-qa #when creating builtin skills #then both are filtered out", () => {
+		// #given
+		const options = { disabledSkills: new Set(["debugging", "visual-qa"]) }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+		const names = skills.map((s) => s.name)
+
+		// #then
+		expect(names).not.toContain("debugging")
+		expect(names).not.toContain("visual-qa")
+
+		const allSkills = createBuiltinSkills()
+		expect(allSkills.map((s) => s.name)).toContain("debugging")
+		expect(allSkills.map((s) => s.name)).toContain("visual-qa")
+	})
+
 	test("init-deep skill has correct structure", () => {
 		// #given - default options
 
