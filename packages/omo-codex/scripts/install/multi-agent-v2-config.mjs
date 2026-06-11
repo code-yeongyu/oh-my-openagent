@@ -20,11 +20,21 @@ export function ensureCodexMultiAgentV2Config(config) {
 	if (!section) {
 		return appendBlock(
 			normalizedConfig,
-			`[${CODEX_MULTI_AGENT_V2_HEADER}]\nmax_concurrent_threads_per_session = ${maxThreadsValue}\n`,
+			`[${CODEX_MULTI_AGENT_V2_HEADER}]\nmax_concurrent_threads_per_session = ${maxThreadsValue}\nhide_spawn_agent_metadata = false\n`,
 		);
 	}
 
-	return replaceOrInsertSetting(normalizedConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+	// Codex defaults hide_spawn_agent_metadata to true on V2, which strips the
+	// agent_type parameter from spawn_agent and makes the role TOMLs this
+	// installer ships unselectable.
+	const withMaxThreads = replaceOrInsertSetting(
+		normalizedConfig,
+		section,
+		"max_concurrent_threads_per_session",
+		maxThreadsValue,
+	);
+	const updatedSection = findTomlSection(withMaxThreads, CODEX_MULTI_AGENT_V2_HEADER);
+	return replaceOrInsertSetting(withMaxThreads, updatedSection, "hide_spawn_agent_metadata", "false");
 }
 
 function removeFeatureFlagSetting(config, featureName) {
