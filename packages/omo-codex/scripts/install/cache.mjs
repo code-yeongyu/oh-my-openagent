@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 
 import { stampGitBashMcpEnv } from "./git-bash-mcp-env.mjs";
+import { assertHookCommandTargets } from "./hook-targets.mjs";
 import { createCachedMcpRuntimeArgRewriter } from "./mcp-runtime-cache.mjs";
 import { exists, isRecord } from "./utils.mjs";
 export { linkCachedPluginBins, linkRootRuntimeBin } from "./bin-links.mjs";
@@ -23,6 +24,7 @@ export async function installCachedPlugin({ buildSource = true, codexHome, marke
 		await rewriteCachedMcpManifest(tempPath, sourcePath);
 		await stampGitBashMcpEnv({ pluginRoot: tempPath });
 		await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
+		await assertHookCommandTargets(tempPath);
 		await promoteDirectory(tempPath, targetPath, renameDirectory);
 	} catch (error) {
 		await rm(tempPath, { recursive: true, force: true });

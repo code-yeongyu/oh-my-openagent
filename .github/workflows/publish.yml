@@ -374,6 +374,23 @@ jobs:
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build
 
+      # Must run before every publish below: all three packages ship the plugin tree (lazycodex#45).
+      - name: Build Codex plugin components
+        if: >-
+          steps.check.outputs.skip != 'true' ||
+          steps.check-openagent.outputs.skip != 'true' ||
+          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/package.json
+          npm --prefix packages/omo-codex/plugin ci
+          bun run --cwd packages/omo-codex/plugin build
+
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
@@ -428,19 +445,6 @@ jobs:
         if: always() && steps.check-openagent.outputs.skip != 'true'
         run: |
           git checkout -- package.json
-
-      - name: Build Codex plugin components for lazycodex-ai
-        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
-        run: |
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
-          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
-          mv tmp.json packages/omo-codex/plugin/package.json
-          npm --prefix packages/omo-codex/plugin ci
-          bun run --cwd packages/omo-codex/plugin build
 
       - name: Publish lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
