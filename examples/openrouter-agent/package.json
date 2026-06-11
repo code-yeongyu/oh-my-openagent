@@ -1,0 +1,22 @@
+{
+  "name": "openrouter-agent-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Modular OpenRouter agent example with hookable lifecycle events.",
+  "scripts": {
+    "start:headless": "bun run src/headless.ts",
+    "test": "bun test",
+    "typecheck": "tsgo --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@openrouter/agent": "^0.7.1",
+    "@openrouter/sdk": "^0.12.79",
+    "eventemitter3": "^5.0.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260518.1",
+    "bun-types": "1.3.14"
+  }
+}
