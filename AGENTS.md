@@ -4,6 +4,40 @@
 
 **Generated:** 2026-06-11 | **Commit:** 6bb284503 | **Branch:** dev | **Release:** v4.8.1
 
+## STOP. QA IS MANDATORY. NON-NEGOTIABLE. EVERY SINGLE TIME YOU TOUCH AN OPENCODE- OR CODEX-CONNECTED COMPONENT.
+
+> **IF YOUR CHANGE TOUCHES ANYTHING WIRED INTO OPENCODE OR INTO THE CODEX LIGHT EDITION, YOU MUST QA IT. ALWAYS. EVERY SINGLE TIME. NO EXCEPTIONS. THERE IS NO "TOO SMALL TO SKIP". THERE IS NO "IT OBVIOUSLY WORKS".**
+
+**"It typechecks" is NOT QA. "`bun test` is green" is NOT QA.** YOU MUST DRIVE THE REAL HARNESS, and then **YOU MUST WRITE THE EVIDENCE TO DISK.** If there is no evidence file, **the QA DID NOT HAPPEN**, and **YOU ARE NOT ALLOWED TO COMMIT OR PUSH.**
+
+This is repeated on purpose, because it is the single most ignored rule in this repo. **CHANGE A HOOK, A TOOL, AN AGENT, A FEATURE, A CONFIG SCHEMA, AN MCP, A CLI COMMAND, AN INSTALLER, A PROMPT, OR ANYTHING ELSE THAT REACHES OPENCODE OR CODEX, THEN: RUN QA, THEN RECORD EVIDENCE.** Always. Every time. No exceptions.
+
+### OPENCODE side (`packages/omo-opencode/`): ALWAYS run the `opencode-qa` skill
+
+1. **ALWAYS RUN THE `opencode-qa` SKILL** (`.agents/skills/opencode-qa/`) to map the EXPECTED IMPACT and the FULL CHANGE SCOPE of your edit BEFORE and AFTER. Pick the right case: CLI (`opencode run --format json`), server + SSE hook proof, TUI smoke, or DB inspection.
+2. **ISOLATE EVERYTHING.** Any QA that SPAWNS opencode MUST run in an isolated XDG sandbox (`XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_STATE_HOME` / `XDG_CACHE_HOME` pointed at temp dirs). The bundled scripts already do this. **NEVER pollute the real `~/.local/share/opencode/opencode.db`.** PROVE isolation by comparing `SELECT count(*) FROM session` before and after.
+3. **USE tmux** for the TUI smoke (`scripts/tui-smoke.sh`) and for any interactive driving. tmux is for SMOKE (did it boot, render, accept a key); assert REAL behavior via `opencode run --format json` or the server API + SSE.
+4. **PROVE THE HOOK FIRED.** If you changed a lifecycle hook, prove the matching event hit the wire (`scripts/sse-hook-probe.sh --event <name>`). Seeing the event proves the hook would fire.
+
+### CODEX side (`packages/omo-codex/`): ALWAYS install the LOCAL build into an ISOLATED `CODEX_HOME`
+
+1. **NEVER QA AGAINST YOUR REAL `~/.codex`.** Point `CODEX_HOME` at a throwaway dir and install THIS repo's LOCAL build into it. LOCAL build. ISOLATED home. NEVER the published package. NEVER the real home.
+   ```bash
+   export CODEX_HOME="$(mktemp -d)/codex"
+   node packages/omo-codex/scripts/install-local.mjs install   # installs the LOCAL repo build into the isolated CODEX_HOME
+   ```
+2. **RUN THE CODEX GATE:** `bun run test:codex` (installer + config migration + plugin component suite; the canonical Codex compatibility gate).
+3. **DRIVE CODEX UNDER tmux** in that isolated `CODEX_HOME`: confirm the plugin loads, the hooks actually fire (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse` / `PostCompact` / `Stop` / `SubagentStop`), and `omo@sisyphuslabs` is enabled. **CONFIRM THE REAL `~/.codex/config.toml` WAS NOT TOUCHED.**
+
+### EVIDENCE: record it under `.omo/evidence/` or it DID NOT HAPPEN
+
+**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). For EVERY change you MUST record, in plain files:
+- **WHY THERE IS NO REGRESSION:** before/after, the isolation proof (session-count unchanged), and the EXACT commands you ran with their output.
+- **PROOF THAT EVERY INTENDED CHANGE LANDED:** the new behavior OBSERVED on the real harness, not merely asserted.
+- The QA case(s) run, the tmux capture(s), and the isolation receipts.
+
+**NO EVIDENCE FILE == NO QA == NO COMMIT == NO PUSH.** ALWAYS. EVERY TIME. NO EXCEPTIONS.
+
 ## OVERVIEW
 
 OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 55-62 lifecycle hooks (base / +team-mode) across 61 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
