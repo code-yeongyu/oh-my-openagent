@@ -49,6 +49,8 @@
     "packages/omo-codex/lazycodex-repository",
     "packages/omo-codex/plugin",
     "packages/omo-codex/plugin/.codex-plugin",
+    "!packages/omo-codex/plugin/node_modules",
+    "!packages/omo-codex/plugin/**/node_modules",
     "packages/omo-codex/scripts"
   ],
   "exports": {
