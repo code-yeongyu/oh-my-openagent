@@ -5,7 +5,7 @@ import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxPlaceholderCommand, buildPaneAuthEnvironmentArgs } from "./pane-command"
 
 type SpawnTmuxPaneDeps = {
 	log: (message: string, data?: unknown) => void
@@ -77,6 +77,7 @@ export async function spawnTmuxPane(
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const args = [
 		"split-window",
@@ -86,6 +87,7 @@ export async function spawnTmuxPane(
 		"-F",
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
+		...authEnvArgs,
 		placeholderCmd,
 	]
 

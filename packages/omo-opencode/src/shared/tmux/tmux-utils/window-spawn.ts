@@ -4,7 +4,7 @@ import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxPlaceholderCommand, buildPaneAuthEnvironmentArgs } from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -74,6 +74,7 @@ export async function spawnTmuxWindow(
 	log("[spawnTmuxWindow] all checks passed, creating isolated window...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const args = [
 		"new-window",
@@ -81,6 +82,7 @@ export async function spawnTmuxWindow(
 		"-n", ISOLATED_WINDOW_NAME,
 		"-P",
 		"-F", "#{pane_id}",
+		...authEnvArgs,
 		placeholderCmd,
 	]
 

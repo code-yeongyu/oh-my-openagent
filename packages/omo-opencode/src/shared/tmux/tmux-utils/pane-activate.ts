@@ -2,7 +2,7 @@ import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../../logger"
 import { runTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
-import { buildTmuxAttachCommand } from "./pane-command"
+import { buildTmuxAttachCommand, buildPaneAuthEnvironmentArgs } from "./pane-command"
 
 export async function activateTmuxPane(
   paneId: string,
@@ -22,7 +22,8 @@ export async function activateTmuxPane(
   }
 
   const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory)
-  const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, opencodeCmd])
+  const authEnvArgs = buildPaneAuthEnvironmentArgs()
+  const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, opencodeCmd])
   if (result.exitCode !== 0) {
     log("[activateTmuxPane] FAILED", { paneId, sessionId, exitCode: result.exitCode, stderr: result.stderr.trim() })
     return false
