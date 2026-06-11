@@ -305,6 +305,27 @@ describe("live-server-route", () => {
     })
   })
 
+  describe("resolveDispatchClient — multiple server() registrations (multi-instance serve)", () => {
+    test("#given two registrations with different in-process clients #when resolveDispatchClient called with the first client #then it still routes live instead of identity passthrough", async () => {
+      // given
+      const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }, { ok: true, status: 200 }])
+      _setFetchImplementationForTesting(fakeFetch)
+      const firstClient = { _marker: "first" } as unknown
+      const secondClient = { _marker: "second" } as unknown
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/instance-one", inProcessClient: firstClient })
+      _setLiveClientForTesting(fakeLiveClient)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/instance-two", inProcessClient: secondClient })
+
+      // when
+      const first = await resolveDispatchClient(firstClient, "ses_instance_one")
+      const second = await resolveDispatchClient(secondClient, "ses_instance_two")
+
+      // then
+      expect(first.route).toBe("live")
+      expect(second.route).toBe("live")
+    })
+  })
+
   describe("markLiveRouteUnavailable", () => {
     test("#given available route #when markLiveRouteUnavailable called #then subsequent resolve returns in-process", async () => {
       // given

@@ -15,15 +15,17 @@ type RouteResult = {
   reason: "identity" | "flag" | "child" | "unavailable" | "live"
 }
 
-let serverUrl: URL | undefined
-let inProcessClient: unknown
-let liveClient: unknown
-let initialized = false
+type RouteRegistration = {
+  serverUrl: URL | undefined
+  liveClient: unknown
+  available: boolean | undefined
+  probeTimestamp: number
+  inFlightProbe: Promise<boolean> | undefined
+  warnedOnce: boolean
+}
 
-let available: boolean | undefined
-let probeTimestamp = 0
-let inFlightProbe: Promise<boolean> | undefined
-let warnedOnce = false
+const registrations = new Map<unknown, RouteRegistration>()
+let lastRegistration: RouteRegistration | undefined
 
 let liveParentWakeRoutingDisabled = false
 
@@ -39,7 +41,9 @@ function getFetch(): FetchImpl {
 }
 
 export function _setLiveClientForTesting(client: unknown): void {
-  liveClient = client
+  if (lastRegistration) {
+    lastRegistration.liveClient = client
+  }
 }
 
 export function setLiveParentWakeRoutingDisabled(disabled: boolean): void {
@@ -55,28 +59,36 @@ export function initLiveServerRoute(opts: {
   directory: string
   inProcessClient: unknown
 }): void {
-  serverUrl = opts.serverUrl
-  inProcessClient = opts.inProcessClient
-  initialized = true
-  available = undefined
-  probeTimestamp = 0
-  inFlightProbe = undefined
-  warnedOnce = false
-  liveClient = undefined
-  log("[live-server-route] registered", { directory: opts.directory, hasServerUrl: !!opts.serverUrl })
+  const registration: RouteRegistration = {
+    serverUrl: opts.serverUrl,
+    liveClient: undefined,
+    available: undefined,
+    probeTimestamp: 0,
+    inFlightProbe: undefined,
+    warnedOnce: false,
+  }
+  registrations.set(opts.inProcessClient, registration)
+  lastRegistration = registration
+  log("[live-server-route] registered", {
+    directory: opts.directory,
+    hasServerUrl: !!opts.serverUrl,
+    registrationCount: registrations.size,
+  })
 }
 
 export function warmLiveServerProbe(): void {
-  void probe()
+  if (lastRegistration) {
+    void probe(lastRegistration)
+  }
 }
 
-async function probe(): Promise<boolean> {
-  if (!serverUrl) {
-    available = false
+async function probe(registration: RouteRegistration): Promise<boolean> {
+  if (!registration.serverUrl) {
+    registration.available = false
     return false
   }
 
-  const probeUrl = new URL("/session", serverUrl)
+  const probeUrl = new URL("/session", registration.serverUrl)
   const authHeader = getServerBasicAuthHeader()
   const headers: Record<string, string> = authHeader ? { Authorization: authHeader } : {}
 
@@ -97,58 +109,59 @@ async function probe(): Promise<boolean> {
     }
 
     if (response.status === 401 || response.status === 403) {
-      if (!warnedOnce) {
-        warnedOnce = true
+      if (!registration.warnedOnce) {
+        registration.warnedOnce = true
         log("[live-server-route] listener requires auth we cannot satisfy; live wake routing disabled")
       }
-      available = false
-      probeTimestamp = Date.now()
+      registration.available = false
+      registration.probeTimestamp = Date.now()
       return false
     }
 
-    available = response.ok
-    probeTimestamp = Date.now()
-    return available
+    registration.available = response.ok
+    registration.probeTimestamp = Date.now()
+    return registration.available
   } catch {
-    available = false
-    probeTimestamp = Date.now()
+    registration.available = false
+    registration.probeTimestamp = Date.now()
     return false
   }
 }
 
-function hasFreshProbe(): boolean {
-  return available !== undefined && Date.now() - probeTimestamp < PROBE_TTL_MS
+function hasFreshProbe(registration: RouteRegistration): boolean {
+  return registration.available !== undefined && Date.now() - registration.probeTimestamp < PROBE_TTL_MS
 }
 
-async function resolveAvailability(): Promise<boolean> {
-  if (hasFreshProbe()) {
-    return available!
+async function resolveAvailability(registration: RouteRegistration): Promise<boolean> {
+  if (hasFreshProbe(registration)) {
+    return registration.available!
   }
 
-  if (!inFlightProbe) {
-    inFlightProbe = probe().finally(() => {
-      inFlightProbe = undefined
+  if (!registration.inFlightProbe) {
+    registration.inFlightProbe = probe(registration).finally(() => {
+      registration.inFlightProbe = undefined
     })
   }
 
-  return inFlightProbe
+  return registration.inFlightProbe
 }
 
-function getOrBuildLiveClient(): unknown {
-  if (liveClient) {
-    return liveClient
+function getOrBuildLiveClient(registration: RouteRegistration): unknown {
+  if (registration.liveClient) {
+    return registration.liveClient
   }
-  if (!serverUrl) {
+  if (!registration.serverUrl) {
     return undefined
   }
-  const client = createOpencodeClientSdk({ baseUrl: serverUrl.toString() })
+  const client = createOpencodeClientSdk({ baseUrl: registration.serverUrl.toString() })
   injectServerAuthIntoClient(client)
-  liveClient = client
-  return liveClient
+  registration.liveClient = client
+  return registration.liveClient
 }
 
 export async function resolveDispatchClient(client: unknown, sessionID: string): Promise<RouteResult> {
-  if (!initialized || client !== inProcessClient) {
+  const registration = registrations.get(client)
+  if (!registration) {
     return { client, route: "in-process", reason: "identity" }
   }
 
@@ -160,16 +173,16 @@ export async function resolveDispatchClient(client: unknown, sessionID: string):
     return { client, route: "in-process", reason: "child" }
   }
 
-  if (!serverUrl) {
+  if (!registration.serverUrl) {
     return { client, route: "in-process", reason: "unavailable" }
   }
 
-  const isAvailable = await resolveAvailability()
+  const isAvailable = await resolveAvailability(registration)
   if (!isAvailable) {
     return { client, route: "in-process", reason: "unavailable" }
   }
 
-  const resolvedLiveClient = getOrBuildLiveClient()
+  const resolvedLiveClient = getOrBuildLiveClient(registration)
   if (!resolvedLiveClient) {
     return { client, route: "in-process", reason: "unavailable" }
   }
@@ -212,20 +225,16 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
 }
 
 export function markLiveRouteUnavailable(reason: string): void {
-  available = false
-  probeTimestamp = Date.now()
+  for (const registration of registrations.values()) {
+    registration.available = false
+    registration.probeTimestamp = Date.now()
+  }
   log(`[live-server-route] marked unavailable: ${reason}`)
 }
 
 export function resetLiveServerRouteForTesting(): void {
-  serverUrl = undefined
-  inProcessClient = undefined
-  liveClient = undefined
-  initialized = false
-  available = undefined
-  probeTimestamp = 0
-  inFlightProbe = undefined
-  warnedOnce = false
+  registrations.clear()
+  lastRegistration = undefined
   liveParentWakeRoutingDisabled = false
   fetchImplementationForTesting = undefined
 }
