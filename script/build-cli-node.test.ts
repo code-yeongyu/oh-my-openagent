@@ -3,6 +3,9 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
+import { cp, mkdtemp } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url))
@@ -31,6 +34,22 @@ describe("node-target CLI build (lazycodex#47)", () => {
     expect(help.stdout).toContain("Usage:")
     expect(version.status).toBe(0)
   }, 120_000)
+
+  test("the node CLI bundle runs from an isolated payload with no node_modules in reach", async () => {
+    // #given the published lazycodex-ai payload ships dist/cli-node with .dependencies = {}
+    // and no node_modules, so nothing may resolve from outside the bundle at load time
+    const isolated = await mkdtemp(join(tmpdir(), "cli-node-isolated-"))
+    await cp(`${repoRoot}dist/cli-node/index.js`, join(isolated, "index.js"))
+
+    // #when
+    const version = spawnSync("node", [join(isolated, "index.js"), "--version"], { encoding: "utf8" })
+    const help = spawnSync("node", [join(isolated, "index.js"), "--help"], { encoding: "utf8" })
+
+    // #then
+    expect(version.status, `isolated node CLI --version failed:\n${version.stderr}`).toBe(0)
+    expect(help.status, `isolated node CLI --help failed:\n${help.stderr}`).toBe(0)
+    expect(help.stdout).toContain("Usage:")
+  }, 60_000)
 
   test("the main build chain and the lazycodex-ai payload carry the node CLI", () => {
     // #given
