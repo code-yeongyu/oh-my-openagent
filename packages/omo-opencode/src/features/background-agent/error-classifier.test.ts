@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test"
 import {
   isRecord,
   isAbortedSessionError,
+  isTransportDisconnectError,
   getErrorText,
   extractErrorName,
   extractErrorMessage,
@@ -104,6 +105,50 @@ describe("isAbortedSessionError", () => {
 
     test("returns false for object without message", () => {
       expect(isAbortedSessionError({ code: "ABORTED" })).toBe(false)
+    })
+  })
+})
+
+describe("isTransportDisconnectError", () => {
+  describe("#given SDK transport-teardown errors", () => {
+    test("returns true for the this._client TypeError", () => {
+      expect(isTransportDisconnectError(new TypeError("undefined is not an object (evaluating 'this._client')"))).toBe(true)
+    })
+
+    test("returns true for a Not connected error", () => {
+      expect(isTransportDisconnectError(new Error("Not connected"))).toBe(true)
+    })
+
+    test("returns true for a connection closed message object", () => {
+      expect(isTransportDisconnectError({ message: "The connection closed unexpectedly" })).toBe(true)
+    })
+  })
+
+  describe("#given transient or unrelated errors", () => {
+    test("returns false for a transient 500", () => {
+      expect(isTransportDisconnectError({ message: "Network timeout", status: 500 })).toBe(false)
+    })
+
+    test("returns false for a generic error", () => {
+      expect(isTransportDisconnectError(new Error("Something went wrong"))).toBe(false)
+    })
+
+    test("returns false for an aborted error", () => {
+      expect(isTransportDisconnectError(new Error("Session aborted"))).toBe(false)
+    })
+  })
+
+  describe("#given invalid inputs", () => {
+    test("returns false for null", () => {
+      expect(isTransportDisconnectError(null)).toBe(false)
+    })
+
+    test("returns false for undefined", () => {
+      expect(isTransportDisconnectError(undefined)).toBe(false)
+    })
+
+    test("returns false for empty string", () => {
+      expect(isTransportDisconnectError("")).toBe(false)
     })
   })
 })

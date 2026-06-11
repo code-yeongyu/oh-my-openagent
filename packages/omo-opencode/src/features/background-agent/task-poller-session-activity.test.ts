@@ -129,6 +129,42 @@ describe("checkAndInterruptStaleTasks persisted session activity", () => {
     expect(mockNotify).toHaveBeenCalledWith(task)
   })
 
+  test("finalizes a stale task and wakes the parent when the session transport is gone", async () => {
+    //#given - the status registry still reports the child as busy, but its SDK transport is gone
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    const staleActivity = new Date(Date.now() - 45 * 60 * 1000)
+    const transportError = new TypeError("undefined is not an object (evaluating 'this._client')")
+    const disconnectedClient = unsafeTestValue<Parameters<typeof checkAndInterruptStaleTasks>[0]["client"]>({
+      session: {
+        abort: mock(() => Promise.reject(transportError)),
+        get: mock(() => Promise.reject(transportError)),
+      },
+    })
+    const task = createRunningTask({
+      startedAt: staleActivity,
+      progress: {
+        toolCalls: 2,
+        lastUpdate: staleActivity,
+      },
+    })
+
+    //#when - both the activity probe and the abort fail because the transport is disconnected
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: disconnectedClient,
+      directory: "/project/root",
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+    })
+
+    //#then - the task is finalized instead of stranded as running, so the parent is notified
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Stale timeout")
+    expect(mockNotify).toHaveBeenCalledWith(task)
+  })
+
   test("keeps a busy task running when persisted session activity lookup is unavailable", async () => {
     //#given - the child session is active, but session.get returned an error response during confirmation
     spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)

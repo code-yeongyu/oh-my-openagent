@@ -40,4 +40,35 @@ describe("verifySessionExists", () => {
 
     expect(result).toBe("unknown")
   })
+
+  test("classifies a thrown transport-disconnect error as missing", async () => {
+    const get = mock(async () => {
+      throw new TypeError("undefined is not an object (evaluating 'this._client')")
+    })
+    const client = unsafeTestValue<OpencodeClient>({
+      session: {
+        get,
+      },
+    })
+
+    const result = await checkSessionExistence(client, "session-123")
+
+    expect(result).toBe("missing")
+  })
+
+  test("classifies a transport-disconnect error response as missing", async () => {
+    const get = mock(async () => ({
+      error: { message: "Not connected" },
+      data: undefined,
+    }))
+    const client = unsafeTestValue<OpencodeClient>({
+      session: {
+        get,
+      },
+    })
+
+    const result = await checkSessionExistence(client, "session-123")
+
+    expect(result).toBe("missing")
+  })
 })

@@ -1,4 +1,5 @@
 import { isRecord, log } from "../../shared"
+import { isTransportDisconnectError } from "./error-classifier"
 import type { OpencodeClient } from "./opencode-client"
 
 export type SessionActivityLookup =
@@ -39,6 +40,10 @@ export async function getSessionActivityFromClient(
       ...(directory ? { query: { directory } } : {}),
     })
     if (isRecord(response) && response.error !== undefined && response.error !== null) {
+      if (isTransportDisconnectError(response.error)) {
+        log("[background-agent] Session transport disconnected while reading activity:", { sessionID, error: response.error })
+        return { type: "missing" }
+      }
       log("[background-agent] Failed to read session activity:", { sessionID, error: response.error })
       return { type: "unavailable" }
     }
@@ -46,6 +51,10 @@ export async function getSessionActivityFromClient(
     const sessionInfo = isRecord(response) && "data" in response ? response.data : response
     return sessionActivityLookupFromInfo(sessionInfo)
   } catch (error) {
+    if (isTransportDisconnectError(error)) {
+      log("[background-agent] Session transport disconnected while reading activity:", { sessionID, error: error instanceof Error ? error.message : error })
+      return { type: "missing" }
+    }
     if (error instanceof Error) {
       log("[background-agent] Failed to read session activity:", { sessionID, error: error.message })
       return { type: "unavailable" }

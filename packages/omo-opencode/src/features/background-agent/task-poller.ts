@@ -116,6 +116,7 @@ export type SessionStatusMap = Record<string, { type: string }>
 async function interruptStaleTask(args: {
   task: BackgroundTask
   client: OpencodeClient
+  directory?: string
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
   onTaskInterrupted: (task: BackgroundTask) => void
@@ -129,6 +130,7 @@ async function interruptStaleTask(args: {
   const {
     task,
     client,
+    directory,
     concurrencyManager,
     notifyParentSession,
     onTaskInterrupted,
@@ -142,12 +144,23 @@ async function interruptStaleTask(args: {
 
   const aborted = await abortWithTimeout(client, sessionID)
   if (!aborted) {
-    log("[background-agent] Task stale interruption skipped because session abort failed:", {
+    // A dead SDK transport can never abort, so backing off forever strands the
+    // task as "running" and the parent waits indefinitely (#5104). Finalize only
+    // once the session is confirmed gone; a live session keeps the retry path.
+    const existence = await checkSessionExistence(client, sessionID, directory)
+    if (existence !== "missing") {
+      log("[background-agent] Task stale interruption skipped because session abort failed:", {
+        taskId: task.id,
+        sessionID,
+        reason,
+      })
+      return
+    }
+    log("[background-agent] Session unreachable during stale interruption; finalizing without a clean abort:", {
       taskId: task.id,
       sessionID,
       reason,
     })
-    return
   }
 
   if (task.status !== "running" || task.sessionId !== sessionID) return
@@ -251,6 +264,7 @@ export async function checkAndInterruptStaleTasks(args: {
         interruptStaleTask({
           task,
           client,
+          directory,
           concurrencyManager,
           notifyParentSession,
           onTaskInterrupted,

@@ -1,3 +1,4 @@
+import { isTransportDisconnectError } from "./error-classifier"
 import type { OpencodeClient } from "./opencode-client"
 
 export const MIN_SESSION_GONE_POLLS = 3
@@ -48,11 +49,13 @@ export async function checkSessionExistence(
     })
 
     if (response.error !== undefined && response.error !== null) {
+      if (isTransportDisconnectError(response.error)) return "missing"
       return isSessionNotFoundError(response.error) ? "missing" : "unknown"
     }
 
     return response.data != null ? "exists" : "missing"
   } catch (error) {
+    if (isTransportDisconnectError(error)) return "missing"
     return isSessionNotFoundError(error) ? "missing" : "unknown"
   }
 }

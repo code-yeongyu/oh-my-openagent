@@ -7,6 +7,21 @@ export function isAbortedSessionError(error: unknown): boolean {
   return message.toLowerCase().includes("aborted")
 }
 
+const TRANSPORT_DISCONNECT_MARKERS = [
+  "_client",
+  "not connected",
+  "connection closed",
+  "connection is closed",
+]
+
+// Matches SDK transport-teardown errors (e.g. `this._client` undefined, "Not
+// connected") which are unrecoverable, unlike transient 4xx/5xx/timeouts. #5104
+export function isTransportDisconnectError(error: unknown): boolean {
+  const text = getErrorText(error).toLowerCase()
+  if (!text) return false
+  return TRANSPORT_DISCONNECT_MARKERS.some((marker) => text.includes(marker))
+}
+
 export function getErrorText(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error
