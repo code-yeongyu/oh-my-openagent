@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import * as deps from "./dependencies"
@@ -31,6 +32,26 @@ describe("dependencies check", () => {
       const info = await deps.checkAstGrepNapi()
 
       //#then should return valid DependencyInfo
+      expect(info.name).toBe("AST-Grep NAPI")
+      expect(info.required).toBe(false)
+      expect(typeof info.installed).toBe("boolean")
+    })
+
+    it("#given a zero-dependency install where the import probe throws Bun's non-Error ResolveMessage #when checking #then resolves to a report instead of crashing", async () => {
+      //#given a real ResolveMessage captured from a genuinely failing import (lazycodex-ai ships no node_modules)
+      const missingSpecifier = "definitely-not-a-real-package-omo-doctor-test"
+      const resolveMessage: unknown = await import(missingSpecifier).then(
+        () => {
+          throw new Error("expected the import probe to fail")
+        },
+        (error: unknown) => error,
+      )
+      expect(resolveMessage instanceof Error).toBe(false)
+
+      //#when checking with the failing probe injected
+      const info = await deps.checkAstGrepNapi(() => Promise.reject(resolveMessage))
+
+      //#then the probe failure degrades to a normal report (fallback paths may legitimately find a local install)
       expect(info.name).toBe("AST-Grep NAPI")
       expect(info.required).toBe(false)
       expect(typeof info.installed).toBe("boolean")
@@ -109,6 +130,27 @@ describe("dependencies check", () => {
 
       //#then returns the bin path
       expect(result).toBe(expected)
+    })
+
+    it("#given a zero-dependency install where require.resolve throws Bun's non-Error ResolveMessage #when resolving package binary #then returns null instead of crashing", () => {
+      //#given a real ResolveMessage captured from a genuinely failing require.resolve (lazycodex-ai ships no node_modules)
+      const requireFromHere = createRequire(import.meta.url)
+      let resolveMessage: unknown
+      try {
+        requireFromHere.resolve("definitely-not-a-real-package-omo-doctor-test/package.json")
+        throw new Error("expected the require.resolve probe to fail")
+      } catch (error) {
+        resolveMessage = error
+      }
+      expect(resolveMessage instanceof Error).toBe(false)
+
+      //#when resolving without an override so the failing resolver is exercised
+      const result = deps.findCommentCheckerPackageBinary(undefined, () => {
+        throw resolveMessage
+      })
+
+      //#then degrades to null instead of rethrowing
+      expect(result).toBeNull()
     })
   })
 })
