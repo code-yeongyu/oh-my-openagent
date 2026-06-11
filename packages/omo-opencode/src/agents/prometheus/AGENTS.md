@@ -30,7 +30,7 @@ This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users
 
 ## MODEL VARIANT ROUTING
 
-[`system-prompt.ts`](file:///Users/yeongyu/local-workspaces/omo/src/agents/prometheus/system-prompt.ts) exposes `getPrometheusPromptSource(model)` (checked in this order):
+[`system-prompt.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/agents/prometheus/system-prompt.ts) exposes `getPrometheusPromptSource(model)` (checked in this order):
 
 - Claude Fable 5 (`isClaudeFable5Model`) routes to `"claude-fable-5"`.
 - Claude Opus 4.8 (`isClaudeOpus48Model`) routes to `"claude-opus-4-8"`.

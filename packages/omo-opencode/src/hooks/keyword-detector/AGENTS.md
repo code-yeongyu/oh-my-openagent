@@ -66,14 +66,14 @@ The `src/hooks/keyword-detector/{search,analyze,team,hyperplan}/default.ts` file
 
 ## ULTRAWORK VARIANT ROUTING
 
-[`ultrawork/source-detector.ts`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/keyword-detector/ultrawork/source-detector.ts) decides the ultrawork source in priority order:
+[`ultrawork/source-detector.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/keyword-detector/ultrawork/source-detector.ts) decides the ultrawork source in priority order:
 
 1. Planner agents (`prometheus`, `planner`, or normalized `plan`) route to `planner.md`.
 2. GPT family models, as detected by `isGptModel(modelID)`, route to `gpt.md`.
 3. Gemini family models, as detected by `isGeminiModel(modelID)`, route to `gemini.md`.
 4. Everything else routes to `default.md`.
 
-[`ultrawork/index.ts`](file:///Users/yeongyu/local-workspaces/omo/src/hooks/keyword-detector/ultrawork/index.ts) exposes `getUltraworkMessage(agentName, modelID)`, switches on that source, and returns the loaded markdown body.
+[`ultrawork/index.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/keyword-detector/ultrawork/index.ts) exposes `getUltraworkMessage(agentName, modelID)`, switches on that source, and returns the loaded markdown body.
 
 ## DETECTION LOGIC
 
@@ -100,7 +100,7 @@ chat.message (user input)
 }
 ```
 
-Default: empty/missing means every detector is active. Schema lives at [`src/config/schema/keyword-detector.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/keyword-detector.ts).
+Default: empty/missing means every detector is active. Schema lives at [`src/config/schema/keyword-detector.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/config/schema/keyword-detector.ts).
 
 ## GUARDS
 
