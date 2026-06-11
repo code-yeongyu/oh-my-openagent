@@ -261,6 +261,12 @@ describe("sync-lazycodex-marketplace", () => {
     const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-prev-lazycodex-"))
     await writePluginFixture(sourceRoot)
     await rm(join(sourceRoot, "packages", "lsp-daemon", "dist"), { recursive: true, force: true })
+    await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
+      mcpServers: {
+        ast_grep: { command: "node", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"], cwd: "." },
+        git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"], cwd: "." },
+      },
+    })
 
     // when
     await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot, allowMissingBundledDists: true })
