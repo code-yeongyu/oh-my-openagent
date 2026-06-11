@@ -1,0 +1,31 @@
+{
+  "name": "@sisyphuslabs/omo-meta-governor",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Self-judging agent orchestration layer for OpenCode. Reads memory, scores sessions, dispatches decisions.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src/*.test.ts"
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sisyphuslabs/omo-meta-governor.git"
+  }
+}
