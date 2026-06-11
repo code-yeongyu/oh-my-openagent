@@ -98,9 +98,29 @@ describe("createMessagesTransformHandler", () => {
       "context-injector",
       "team-mode-status-injector",
       "team-mailbox-injector",
-      "thinking-block-validator",
       "tool-pair-validator",
     ])
+  })
+
+  it("#given a legacy thinking-block-validator hook #when messages transform runs #then it is not invoked", async () => {
+    //#given
+    let thinkingBlockRan = false
+    let toolPairRan = false
+    const hooks = makeHooks({
+      thinkingBlock: async () => {
+        thinkingBlockRan = true
+      },
+      toolPair: async () => {
+        toolPairRan = true
+      },
+    })
+
+    //#when
+    await runHandler(hooks, [])
+
+    //#then
+    expect(thinkingBlockRan).toBe(false)
+    expect(toolPairRan).toBe(true)
   })
 
   it("runs tool-pair-validator even when context-injector throws", async () => {

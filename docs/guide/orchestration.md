@@ -75,7 +75,7 @@ flowchart TB
     Frontend -->|"UI code"| Orchestrator
 ```
 
-Model labels above show the current fallback stacks from `src/shared/model-requirements.ts`, not marketing names.
+Model labels above show the current fallback stacks from `packages/omo-opencode/src/shared/model-requirements.ts`, not marketing names.
 
 ### Agent Inventory and Modes (Current)
 
@@ -324,7 +324,7 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 Notes:
 
-- Built-in defaults are defined in `src/tools/delegate-task/*-categories.ts` and `src/shared/model-requirements.ts`
+- Built-in defaults are defined in `packages/omo-opencode/src/tools/delegate-task/*-categories.ts` and `packages/omo-opencode/src/shared/model-requirements.ts`
 - Projects/users can extend categories via config; additional category names may appear in your session prompt
 - Regardless of category name, category dispatch goes through Sisyphus-Junior
 

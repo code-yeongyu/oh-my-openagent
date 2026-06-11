@@ -545,7 +545,7 @@ describe("pollSyncSession", () => {
       const { isSessionComplete } = require("./sync-session-poller")
 
       // given: empty messages array
-      const messages: any[] = []
+      const messages: unknown[] = []
 
       // when: calling isSessionComplete
       const result = isSessionComplete(messages)

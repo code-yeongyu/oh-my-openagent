@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 import type { DependencyInfo } from "../types"
 import { spawnWithTimeout } from "../spawn-with-timeout"
 import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
+import { bunWhich } from "../../../shared/bun-which-shim"
 
 type BinaryCheck =
   | { exists: true; path: string }
@@ -12,7 +13,7 @@ type BinaryCheck =
 
 async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
   try {
-    const path = Bun.which(binary)
+    const path = bunWhich(binary)
     if (path) {
       return { exists: true, path }
     }

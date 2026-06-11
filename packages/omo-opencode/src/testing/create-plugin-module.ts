@@ -117,10 +117,10 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
     const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
-    let runtimeSkillSource: ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]> | undefined
+    let runtimeSkillSource: Awaited<ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]>> | undefined
     if (runtimeSecuritySkills.length > 0) {
       try {
-        runtimeSkillSource = deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
+        runtimeSkillSource = await deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         console.warn(`[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: ${detail}`)

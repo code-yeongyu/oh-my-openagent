@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -53,6 +53,8 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
 			],
 		},
 	});
+	await mkdir(join(pluginRoot, "components", "comment-checker", "dist"), { recursive: true });
+	await writeFile(join(pluginRoot, "components", "comment-checker", "dist", "cli.js"), "console.log('comment checker cli')\n");
 
 	const result = await installMarketplaceLocally({
 		repoRoot,

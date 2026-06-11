@@ -374,6 +374,23 @@ jobs:
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build
 
+      # Must run before every publish below: all three packages ship the plugin tree (lazycodex#45).
+      - name: Build Codex plugin components
+        if: >-
+          steps.check.outputs.skip != 'true' ||
+          steps.check-openagent.outputs.skip != 'true' ||
+          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/package.json
+          npm --prefix packages/omo-codex/plugin ci
+          bun run --cwd packages/omo-codex/plugin build
+
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
@@ -429,19 +446,6 @@ jobs:
         run: |
           git checkout -- package.json
 
-      - name: Build Codex plugin components for lazycodex-ai
-        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
-        run: |
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
-          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
-          mv tmp.json packages/omo-codex/plugin/package.json
-          npm --prefix packages/omo-codex/plugin ci
-          bun run --cwd packages/omo-codex/plugin build
-
       - name: Publish lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:
@@ -453,7 +457,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
+            .files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |
@@ -614,6 +618,7 @@ jobs:
 
           node packages/omo-codex/plugin/scripts/sync-version.mjs
           node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          bun install --lockfile-only
 
       - name: Commit version bump
         if: steps.release-state.outputs.release_commit_exists != 'true'
@@ -622,7 +627,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/hooks.json packages/omo-codex/plugin/components/*/hooks/hooks.json
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/hooks.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
@@ -720,7 +725,7 @@ jobs:
           PREVIOUS_PACKAGE_ROOT="$STATE_DIR/package"
           PREVIOUS_MARKETPLACE_ROOT="$STATE_DIR/previous-lazycodex"
           CURRENT_MARKETPLACE_ROOT="$GITHUB_WORKSPACE/lazycodex-marketplace"
-          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT"
+          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT" --previous-payload
 
           if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
              diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" "$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" &&

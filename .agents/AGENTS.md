@@ -6,7 +6,7 @@
 
 Project-scope skills + slash commands under the new `.agents/` directory name. During the `oh-my-opencode` → `oh-my-openagent` rename transition, this directory is the **target** of the migration from `.opencode/`. It is a strict SUPERSET of `.opencode/` (5 -> 10 skills; 5 commands).
 
-Loaded alongside `.opencode/` by [`src/features/opencode-skill-loader/`](file:///Users/yeongyu/local-workspaces/omo/src/features/opencode-skill-loader/). When both directories declare the same skill or command name, the higher-priority scope wins per the loader's deduplication rules.
+Loaded alongside `.opencode/` by [`packages/omo-opencode/src/features/opencode-skill-loader/`](packages/omo-opencode/src/features/opencode-skill-loader/). When both directories declare the same skill or command name, the higher-priority scope wins per the loader's deduplication rules.
 
 ## SKILLS (10, superset of `.opencode/`)
 

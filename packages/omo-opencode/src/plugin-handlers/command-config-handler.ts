@@ -1,13 +1,15 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { loadBuiltinCommands } from "../features/builtin-commands";
-import { createBuiltinSkills } from "../features/builtin-skills";
+import { resolveActiveBuiltinSkills } from "../features/builtin-skills";
 import {
   loadOpencodeGlobalCommands,
   loadOpencodeProjectCommands,
   loadProjectCommands,
   loadUserCommands,
 } from "../features/claude-code-command-loader";
+import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader";
 import {
+  builtinSkillsToCommandDefinitionRecord,
   discoverConfigSourceSkills,
   loadGlobalAgentsSkills,
   loadOpencodeGlobalSkills,
@@ -17,7 +19,6 @@ import {
   loadUserSkills,
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
-import { builtinToLoadedSkill } from "../features/opencode-skill-loader/merger/builtin-skill-converter";
 import {
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
@@ -40,13 +41,17 @@ export async function applyCommandConfig(params: {
     useRegisteredAgents: true,
     teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
   });
-  const builtinSkillCommands = skillsToCommandDefinitionRecord(
-    createBuiltinSkills({
+  const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
+    resolveActiveBuiltinSkills({
       browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
       disabledSkills: new Set(params.pluginConfig.disabled_skills ?? []),
       teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
-    }).map(builtinToLoadedSkill),
+      systemMcpNames: getSystemMcpServerNames(),
+    }),
   );
+  for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
+    delete builtinSkillCommands[disabledCommand];
+  }
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;

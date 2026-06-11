@@ -51,6 +51,28 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
+  it("returns GA 1M for Anthropic claude-opus-4-8 without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for Anthropic claude-opus-4-8-high without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8-high", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
   it("returns GA 1M for Antigravity Claude models served by google", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]

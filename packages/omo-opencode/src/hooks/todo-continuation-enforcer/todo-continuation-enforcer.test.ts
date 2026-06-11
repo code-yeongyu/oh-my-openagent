@@ -12,7 +12,7 @@ import {
   MAX_STAGNATION_COUNT,
 } from "./constants"
 
-type TimerCallback = (...args: any[]) => void
+type TimerCallback = (...args: unknown[]) => void
 type FakeTimerID = number & ReturnType<typeof setTimeout> & ReturnType<typeof setInterval>
 
 interface FakeTimers {
@@ -27,7 +27,7 @@ function createFakeTimers(): FakeTimers {
   let clockNow = originalNow
   let timerNow = 0
   let nextId = 1
-  const timers = new Map<number, { id: number; time: number; interval: number | null; callback: TimerCallback; args: any[] }>()
+  const timers = new Map<number, { id: number; time: number; interval: number | null; callback: TimerCallback; args: unknown[] }>()
   const cleared = new Set<number>()
 
   const original = {
@@ -49,7 +49,7 @@ function createFakeTimers(): FakeTimers {
     }
   }
 
-  const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: any[]) => {
+  const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: unknown[]) => {
     const id = nextId++
     timers.set(id, {
       id,
@@ -67,7 +67,7 @@ function createFakeTimers(): FakeTimers {
     timers.delete(id)
   }
 
-  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
     const normalized = normalizeDelay(delay)
     if (normalized < FAKE_MIN_DELAY_MS) {
       return original.setTimeout(callback, delay, ...args)
@@ -78,7 +78,7 @@ function createFakeTimers(): FakeTimers {
     return schedule(callback, normalized, null, args)
   }) as typeof setTimeout
 
-  globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+  globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
     const interval = normalizeDelay(delay)
     if (interval < FAKE_MIN_DELAY_MS) {
       return original.setInterval(callback, delay, ...args)
@@ -114,7 +114,7 @@ function createFakeTimers(): FakeTimers {
       clockNow += clamped
     }
     while (true) {
-      let next: { id: number; time: number; interval: number | null; callback: TimerCallback; args: any[] } | undefined
+      let next: { id: number; time: number; interval: number | null; callback: TimerCallback; args: unknown[] } | undefined
       for (const timer of timers.values()) {
         if (timer.time <= target && (!next || timer.time < next.time)) {
           next = timer
@@ -262,7 +262,7 @@ describe("todo-continuation-enforcer", () => {
     // given
     const originalSetInterval = globalThis.setInterval
     let setIntervalCalls = 0
-    globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+    globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
       setIntervalCalls += 1
       return originalSetInterval(callback, delay, ...args)
     }) as typeof setInterval

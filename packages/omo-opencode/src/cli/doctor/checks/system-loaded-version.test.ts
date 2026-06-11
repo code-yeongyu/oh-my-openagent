@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { PACKAGE_NAME } from "../constants"
-import { PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { ACCEPTED_PACKAGE_NAMES, PLUGIN_NAME } from "../../../shared/plugin-identity"
 import { resolveSymlink } from "../../../shared/file-utils"
 
 const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
@@ -191,6 +191,25 @@ describe("system loaded version", () => {
       expect(loadedVersion.installedPackagePath).toBe(expectedPath(installedPackagePath))
       expect(loadedVersion.expectedVersion).toBeNull()
       expect(loadedVersion.loadedVersion).toBeNull()
+    })
+
+    it("#given no config or cache install #when resolving the loaded version #then the resolved manifest path is package.json-shaped and any existing manifest carries an accepted name", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      //#when
+      const info = getLoadedPluginVersion()
+
+      //#then
+      expect(info.installedPackagePath.endsWith("package.json")).toBe(true)
+      if (existsSync(info.installedPackagePath)) {
+        const pkg = JSON.parse(readFileSync(info.installedPackagePath, "utf-8")) as { name?: string }
+        expect(ACCEPTED_PACKAGE_NAMES as readonly string[]).toContain(pkg.name)
+      }
     })
 
     it("resolves symlinked config directories before selecting install path", () => {

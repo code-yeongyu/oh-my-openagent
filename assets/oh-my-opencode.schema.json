@@ -55,8 +55,10 @@
           "review-work",
           "remove-ai-slops",
           "init-deep",
+          "debugging",
           "security-research",
           "security-review",
+          "visual-qa",
           "team-mode"
         ]
       }
@@ -6454,8 +6456,6 @@
             "type": "string",
             "enum": [
               "ultrawork",
-              "search",
-              "analyze",
               "team",
               "hyperplan",
               "hyperplan-ultrawork"
@@ -6468,8 +6468,6 @@
             "type": "string",
             "enum": [
               "ultrawork",
-              "search",
-              "analyze",
               "team",
               "hyperplan",
               "hyperplan-ultrawork"

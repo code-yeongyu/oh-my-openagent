@@ -434,6 +434,42 @@ test("#given [features] boolean shorthand multi_agent_v2 = true #when forcing di
 	assert.match(result, /plugins = true/);
 });
 
+test("#given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = true",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.match(result, /openai\/codex#26753/);
+	assert.match(result, /LAZYCODEX_CONFIG_MIGRATION_DISABLED=1/);
+	assert.match(result, /^#[^\n]*\n(?:#[^\n]*\n)*\[features\.multi_agent_v2\]/m);
+});
+
+test("#given no multi_agent_v2 section #when forcing disable #then annotates the appended section", () => {
+	const config = ['model = "gpt-5.5"', ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.match(result, /openai\/codex#26753/);
+	assert.match(result, /^#[^\n]*\n(?:#[^\n]*\n)*\[features\.multi_agent_v2\]\nenabled = false\n/m);
+});
+
+test("#given an annotated managed section #when forcing disable runs again #then does not duplicate the comment", () => {
+	const config = ['model = "gpt-5.5"', "", "[features.multi_agent_v2]", "enabled = true", ""].join("\n");
+
+	const annotated = forceDisableMultiAgentV2(config);
+	const rerun = forceDisableMultiAgentV2(`${annotated.replace("enabled = false", "enabled = true")}`);
+
+	const markers = rerun.match(/openai\/codex#26753/g) ?? [];
+	assert.equal(markers.length, 1);
+	assert.match(rerun, /enabled = false/);
+});
+
 test("#given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then returns config unchanged", () => {
 	const config = [
 		'model = "gpt-5.5"',
@@ -515,6 +551,75 @@ test("#given global config with forced multi_agent_v2 #when full migration runs 
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /enabled = false/);
 	assert.doesNotMatch(content, /enabled = true/);
+});
+
+test("#given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment", () => {
+	const config = ["[features.multi_agent_v2]", "enabled = true # tuned by me", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.match(result, /^enabled = false # tuned by me$/m);
+	assert.doesNotMatch(result, /enabled = true/);
+	assert.equal((result.match(/^\s*enabled\s*=/gm) ?? []).length, 1);
+	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
+});
+
+test("#given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table", () => {
+	const config = ["[features.multi_agent_v2] # pinned by me", "enabled = true", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
+	assert.match(result, /enabled = false/);
+	assert.doesNotMatch(result, /enabled = true/);
+	assert.match(result, /# pinned by me/);
+});
+
+test("#given an already-guarded commented config #when re-running #then output is byte-identical", () => {
+	const configA = ["[features.multi_agent_v2]", "enabled = true # tuned by me", ""].join("\n");
+	const configB = ["[features.multi_agent_v2] # pinned by me", "enabled = true", ""].join("\n");
+
+	const firstA = forceDisableMultiAgentV2(configA);
+	const rerunA = forceDisableMultiAgentV2(firstA);
+	assert.equal(rerunA, firstA);
+
+	const firstB = forceDisableMultiAgentV2(configB);
+	const rerunB = forceDisableMultiAgentV2(firstB);
+	assert.equal(rerunB, firstB);
+});
+
+test("#given user-disabled with an inline comment #when forcing disable #then returns config unchanged", () => {
+	const config = ["[features.multi_agent_v2]", "enabled = false # I turned this off myself", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.equal(result, config);
+});
+
+test("#given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table", () => {
+	const config = ["[features]", "plugins = true", "multi_agent_v2 = true # legacy", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.doesNotMatch(result, /^\s*multi_agent_v2\s*=/m);
+	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
+	assert.match(result, /\[features\.multi_agent_v2\]\nenabled = false\n/);
+	assert.match(result, /plugins = true/);
+});
+
+test("#given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section", () => {
+	const config = [
+		"[features.multi_agent_v2]",
+		"max_concurrent_threads_per_session = 2",
+		"[mcp_servers.x] # note",
+		"enabled = true",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config);
+
+	assert.match(result, /\[features\.multi_agent_v2\]\nenabled = false\n/);
+	assert.match(result, /\[mcp_servers\.x\][^\n]*\nenabled = true/);
 });
 
 async function canCreateSymlink(type) {

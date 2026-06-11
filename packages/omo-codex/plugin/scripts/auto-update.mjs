@@ -37,9 +37,11 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 		return { shouldRun: false, reason: "retry-throttled" };
 	}
 
+	const currentVersion = resolveCurrentVersion(env);
+	const latestVersion = resolveLatestVersion(env);
 	const updatePlan = resolveLazyCodexUpdatePlan({
-		currentVersion: resolveCurrentVersion(env),
-		latestVersion: resolveLatestVersion(env),
+		currentVersion,
+		latestVersion,
 		command: resolveCommand(env),
 		args: resolveArgs(env),
 	});
@@ -49,6 +51,8 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 		shouldRun: true,
 		command: updatePlan.command,
 		args: updatePlan.args,
+		currentVersion,
+		latestVersion,
 		env: {
 			...env,
 			LAZYCODEX_AUTO_UPDATE_DISABLED: "1",
@@ -94,7 +98,8 @@ export async function runLazyCodexManualUpdate({ env = process.env, dryRun = fal
 export async function runAutoUpdateCheck({ env = process.env, now = Date.now() } = {}) {
 	await runConfigMigration({ env });
 	const statePath = resolveStatePath(env);
-	const state = await readState(statePath);
+	const notices = [];
+	const state = await settlePendingNotice({ env, now, statePath, state: await readState(statePath), notices });
 	const plan = resolveAutoUpdatePlan({
 		env,
 		now,
@@ -107,17 +112,18 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		if (plan.reason === "up-to-date") {
 			await writeState(statePath, { ...state, lastCheckedAt: now, lastStatus: "success" });
 		}
-		return { started: false, reason: plan.reason };
+		return { started: false, reason: plan.reason, notices };
 	}
 
 	const lockStaleMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS, DEFAULT_LOCK_STALE_MS);
 	const lock = await acquireLock(resolveLockPath(env, statePath), now, lockStaleMs);
 	if (lock === null) {
 		await appendUpdateLog(env, now, "locked");
-		return { started: false, reason: "locked" };
+		return { started: false, reason: "locked", notices };
 	}
 	try {
 		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
+		const pendingNotice = { fromVersion: plan.currentVersion, toVersion: plan.latestVersion, startedAt: now };
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
 			const invocation = resolveSpawnInvocation(plan.command, plan.args);
 			const result = spawnSync(invocation.command, invocation.args, {
@@ -126,10 +132,13 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			});
 			const status = result.status ?? (result.error === undefined ? 0 : 1);
 			await appendUpdateLog(env, now, "finished", { status });
-			await writeState(statePath, status === 0
-				? { lastCheckedAt: now, lastAttemptedAt: now, lastStatus: "success" }
-				: { lastAttemptedAt: now, lastStatus: "failed" });
-			return { started: true, status };
+			if (status === 0) {
+				await writeState(statePath, { lastCheckedAt: now, lastAttemptedAt: now, lastStatus: "success", pendingNotice });
+				await recordUpdateStartedNotice({ env, now, notices, pendingNotice });
+			} else {
+				await writeState(statePath, { lastAttemptedAt: now, lastStatus: "failed" });
+			}
+			return { started: true, status, notices };
 		}
 
 		const invocation = resolveSpawnInvocation(plan.command, plan.args);
@@ -138,12 +147,42 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			stdio: "ignore",
 			detached: true,
 		});
-		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started" });
+		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started", pendingNotice });
+		await recordUpdateStartedNotice({ env, now, notices, pendingNotice });
 		child.unref();
-		return { started: true };
+		return { started: true, notices };
 	} finally {
 		await lock.release();
 	}
+}
+
+async function settlePendingNotice({ env, now, statePath, state, notices }) {
+	const pendingNotice = state.pendingNotice;
+	if (pendingNotice === undefined) return state;
+	const current = parseVersion(resolveCurrentVersion(env));
+	const target = parseVersion(pendingNotice.toVersion);
+	if (current !== null && target !== null && compareVersions(current, target) < 0) return state;
+	const nextState = { ...state };
+	delete nextState.pendingNotice;
+	await writeState(statePath, nextState);
+	if (current !== null && target !== null) {
+		notices.push(`[LazyCodex] Auto-update completed: v${pendingNotice.fromVersion} -> v${pendingNotice.toVersion}. This session is already running the new version. Tell the user the auto-update was applied.`);
+		await appendUpdateLog(env, now, "notified", {
+			kind: "update-completed",
+			fromVersion: pendingNotice.fromVersion,
+			toVersion: pendingNotice.toVersion,
+		});
+	}
+	return nextState;
+}
+
+async function recordUpdateStartedNotice({ env, now, notices, pendingNotice }) {
+	notices.push(`[LazyCodex] Auto-update started in the background: v${pendingNotice.fromVersion} -> v${pendingNotice.toVersion}. Tell the user a new LazyCodex version is installing and that they should start a new Codex session after it completes to apply it.`);
+	await appendUpdateLog(env, now, "notified", {
+		kind: "update-started",
+		fromVersion: pendingNotice.fromVersion,
+		toVersion: pendingNotice.toVersion,
+	});
 }
 
 async function runConfigMigration({ env }) {
@@ -264,8 +303,18 @@ function parsePositiveInteger(value, fallback) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-	runAutoUpdateCheck().catch((error) => {
-		console.error(error instanceof Error ? error.message : String(error));
-		process.exit(0);
-	});
+	runAutoUpdateCheck()
+		.then(({ notices }) => {
+			if (notices.length === 0) return;
+			console.log(JSON.stringify({
+				hookSpecificOutput: {
+					hookEventName: "SessionStart",
+					additionalContext: notices.join("\n\n"),
+				},
+			}));
+		})
+		.catch((error) => {
+			console.error(error instanceof Error ? error.message : String(error));
+			process.exit(0);
+		});
 }

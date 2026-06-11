@@ -15,9 +15,11 @@ const TEAM_TOOL_DENIALS = {
   team_list: false,
 }
 
+type AddTaskArg = Parameters<import("../../features/task-toast-manager/manager").TaskToastManager["addTask"]>[0]
+
 describe("executeSyncContinuation - toast cleanup error paths", () => {
   let removeTaskCalls: string[] = []
-  let addTaskCalls: any[] = []
+  let addTaskCalls: AddTaskArg[] = []
   let resetToastManager: (() => void) | null = null
 
   beforeEach(() => {
@@ -43,7 +45,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       tui: { showToast: mock(() => Promise.resolve()) },
     })
 
-    spyOn(toastManager, "addTask").mockImplementation((task: any) => {
+    spyOn(toastManager, "addTask").mockImplementation((task: AddTaskArg) => {
       addTaskCalls.push(task)
     })
     spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
@@ -110,7 +112,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with fetchSyncResult throwing
-    let error: any = null
+    let error: unknown = null
     let result: string | null = null
     try {
       result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
@@ -120,7 +122,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#then - error should be thrown but toast should still be removed
     expect(error).not.toBeNull()
-    expect(error.message).toBe("Network error")
+    expect((error as Error).message).toBe("Network error")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
@@ -173,7 +175,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with pollSyncSession throwing
-    let error: any = null
+    let error: unknown = null
     let result: string | null = null
     try {
       result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
@@ -183,7 +185,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#then - error should be thrown but toast should still be removed
     expect(error).not.toBeNull()
-    expect(error.message).toBe("Poll error")
+    expect((error as Error).message).toBe("Poll error")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
@@ -505,7 +507,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async (_ctx: any, _client: any, input: any) => {
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { toastManager?: { removeTask: (id: string) => void } | null; taskId?: string }) => {
         if (input.toastManager && input.taskId) {
           input.toastManager.removeTask(input.taskId)
         }
@@ -592,7 +594,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with null toastManager
-    let error: any = null
+    let error: unknown = null
     let result: string | null = null
     try {
       result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)

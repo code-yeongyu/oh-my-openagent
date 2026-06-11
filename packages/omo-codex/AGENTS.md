@@ -2,6 +2,27 @@
 
 **Generated:** 2026-05-31
 
+## STOP. THIS IS THE CODEX EDITION. QA IS MANDATORY. EVERY SINGLE TIME. INSTALL THE LOCAL BUILD INTO AN ISOLATED `CODEX_HOME`.
+
+> **IF YOU CHANGE ANY CODEX-CONNECTED COMPONENT (the vendored `plugin/`, a component under `plugin/components/`, the installer in `scripts/` or `src/install/`, config migration, telemetry, or hook wiring), YOU MUST QA IT AGAINST A REAL, LOCALLY-INSTALLED, ISOLATED CODEX. ALWAYS. EVERY SINGLE TIME. NO EXCEPTIONS.**
+
+**"It typechecks" is NOT QA. "`bun test` is green" is NOT QA.** YOU MUST INSTALL THE LOCAL BUILD AND DRIVE REAL CODEX, then RECORD THE EVIDENCE TO DISK. NO EVIDENCE == NO QA == NO COMMIT == NO PUSH.
+
+### ISOLATE THE INSTALL. USE THE LOCAL BUILD. NEVER THE PUBLISHED PACKAGE. NEVER YOUR REAL `~/.codex`.
+
+1. **POINT `CODEX_HOME` AT A THROWAWAY DIR AND INSTALL THIS REPO'S LOCAL BUILD INTO IT.** LOCAL build. ISOLATED home. Every time.
+   ```bash
+   export CODEX_HOME="$(mktemp -d)/codex"
+   node packages/omo-codex/scripts/install-local.mjs install   # installs the LOCAL repo build into the isolated CODEX_HOME
+   ```
+   The installer reads `CODEX_HOME` (and `OMO_CODEX_PROJECT` for project scope), so an isolated home keeps the real `~/.codex/{config.toml,plugins,agents}` UNTOUCHED.
+2. **RUN THE CODEX GATE:** `bun run test:codex` (installer + config migration + plugin component suite; the canonical Codex compatibility gate, ubuntu/macos/windows in CI).
+3. **DRIVE CODEX UNDER tmux** in that isolated `CODEX_HOME`: confirm the plugin loads, `omo@sisyphuslabs` is enabled in the sandbox `config.toml`, and the hooks actually fire (`SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse` / `PostCompact` / `Stop` / `SubagentStop`). **CONFIRM YOUR REAL `~/.codex/config.toml` WAS NOT TOUCHED.**
+
+**RECORD THE EVIDENCE UNDER `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (one organized subfolder per change): WHY THERE IS NO REGRESSION (the isolated-install transcript, before/after of the real `~/.codex` proving it is untouched, exact commands and output) and PROOF THAT EVERY INTENDED CHANGE LANDED (the new behavior observed inside the isolated Codex). See the root [`AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/AGENTS.md) "STOP. QA IS MANDATORY" section for the full cross-harness mandate.
+
+**ALWAYS. EVERY TIME. NO EXCEPTIONS.**
+
 ## OVERVIEW
 
 `@oh-my-opencode/omo-codex` (private, v0.1.0): the Codex harness adapter = the **Light Edition** (omo for the OpenAI Codex CLI). Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the `lazycodex` bin/npm alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) marketplace repo. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`); `lazycodex` is the alias only. Full identity + the publish/deploy pipeline live in the root [`AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/AGENTS.md) "CODEX LIGHT EDITION" section.
@@ -29,7 +50,7 @@ Entry: `src/cli/install-codex/` (`install-codex.ts`, `codex-config-toml.ts`, laz
 
 ## CONFIG MIGRATION (SessionStart)
 
-The plugin `SessionStart` hook (matcher `^startup$`) runs `plugin/scripts/auto-update.mjs` → `migrateCodexConfig()` over `~/.codex/config.toml` + any project `.codex/config.toml`, before the update throttle. Beyond syncing the managed reasoning profile from `plugin/model-catalog.json`, it enforces a policy decision (2026-06-10): **multi_agent_v2 is force-disabled on every startup** via `forceDisableMultiAgentV2()` (`plugin/scripts/migrate-codex-config/multi-agent-v2-guard.mjs`). Basis: [openai/codex#26753](https://github.com/openai/codex/issues/26753) — the flag alone makes every turn 400 ("encrypted parameters … not configured for encrypted tool use"), and OpenAI closed it NOT_PLANNED stating V2 is under development, not recommended, and bug reports are not accepted (same failure class still reported in [#27205](https://github.com/openai/codex/issues/27205)). The guard writes `[features.multi_agent_v2]` with `enabled = false` even when the section or key is absent, flips `enabled = true`, and removes the `[features]` boolean shorthand `multi_agent_v2 = true` (a boolean key and a sub-table of the same name are conflicting TOML). The installer (`scripts/install/multi-agent-v2-config.mjs`) stays orthogonal: it only sets `max_concurrent_threads_per_session` and never writes `enabled`. Opt-out: `LAZYCODEX_CONFIG_MIGRATION_DISABLED=1` / `OMO_CODEX_CONFIG_MIGRATION_DISABLED=1`. Pinned by `plugin/test/migrate-codex-config.test.mjs` (part of `bun run test:codex`).
+The plugin `SessionStart` hook (matcher `^startup$`) runs `plugin/scripts/auto-update.mjs` → `migrateCodexConfig()` over `~/.codex/config.toml` + any project `.codex/config.toml`, before the update throttle. Beyond syncing the managed reasoning profile from `plugin/model-catalog.json`, it enforces a policy decision (2026-06-10): **multi_agent_v2 is force-disabled on every startup** via `forceDisableMultiAgentV2()` (`plugin/scripts/migrate-codex-config/multi-agent-v2-guard.mjs`). Basis: [openai/codex#26753](https://github.com/openai/codex/issues/26753) — the flag alone makes every turn 400 ("encrypted parameters … not configured for encrypted tool use"), and OpenAI closed it NOT_PLANNED stating V2 is under development, not recommended, and bug reports are not accepted (same failure class still reported in [#27205](https://github.com/openai/codex/issues/27205)). The guard writes `[features.multi_agent_v2]` with `enabled = false` even when the section or key is absent, flips `enabled = true`, and removes the `[features]` boolean shorthand `multi_agent_v2 = true` (a boolean key and a sub-table of the same name are conflicting TOML). The installer (`scripts/install/multi-agent-v2-config.mjs`) stays orthogonal: it only sets `max_concurrent_threads_per_session` and never writes `enabled`. Opt-out: `LAZYCODEX_CONFIG_MIGRATION_DISABLED=1` / `OMO_CODEX_CONFIG_MIGRATION_DISABLED=1`. The hook also emits restart notifications: when an update starts it persists `pendingNotice` ({fromVersion, toVersion, startedAt}) in the auto-update state, and once a later startup runs at >= toVersion it emits an update-completed notice (checked before the throttle, so throttled startups still notify). Non-empty notices are printed as a single stdout JSON line (`hookSpecificOutput.additionalContext`, SessionStart) and audited as `notified` events in the update log; pinned by `plugin/test/auto-update-restart-notice.test.mjs`. Pinned by `plugin/test/migrate-codex-config.test.mjs` (part of `bun run test:codex`).
 
 ## TELEMETRY
 

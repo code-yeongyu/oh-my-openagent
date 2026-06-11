@@ -63,10 +63,13 @@ export function isUnavailableLspDiagnostics(diagnostics: string): boolean {
 	return (
 		normalized.includes("LSP request timeout (method: initialize)") ||
 		normalized.includes("LSP server is still initializing") ||
-		normalized.includes("LSP daemon unreachable") ||
 		normalized.includes("NOT INSTALLED") ||
 		normalized.includes("Command not found:")
 	);
+}
+
+export function isLspDaemonUnreachableDiagnostics(diagnostics: string): boolean {
+	return diagnostics.includes("LSP daemon unreachable");
 }
 
 function sessionStatePath(sessionId: string): string {

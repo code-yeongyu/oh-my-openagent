@@ -11,7 +11,8 @@ const { describe, test, expect, mock, beforeEach } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
 const { clearCallableAgentsCache } = require("./agent-resolver")
 
-type PluginInput = { client: any; directory: string }
+type OpencodeClient = import("@opencode-ai/plugin").PluginInput["client"]
+type PluginInput = { client: OpencodeClient; directory: string }
 
 function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): PluginInput {
   return {
@@ -19,7 +20,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       app: {
         agents: mock(() => Promise.resolve({ data: agents })),
       },
-    },
+    } as unknown as OpencodeClient,
     directory: "/test",
     }
 }

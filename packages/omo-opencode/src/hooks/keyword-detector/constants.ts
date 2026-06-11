@@ -3,14 +3,10 @@ export const INLINE_CODE_PATTERN = /`[^`]+`/g
 
 import type { KeywordType } from "../../config/schema/keyword-detector"
 import { getUltraworkMessage, isPlannerAgent, isNonOmoAgent } from "./ultrawork"
-import { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
-import { ANALYZE_PATTERN, ANALYZE_MESSAGE } from "./analyze"
 import { TEAM_PATTERN, TEAM_MESSAGE } from "./team"
 import { HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE } from "./hyperplan"
 
 export { isPlannerAgent, isNonOmoAgent, getUltraworkMessage }
-export { SEARCH_PATTERN, SEARCH_MESSAGE }
-export { ANALYZE_PATTERN, ANALYZE_MESSAGE }
 export { TEAM_PATTERN, TEAM_MESSAGE }
 export { HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE }
 
@@ -39,16 +35,6 @@ export const KEYWORD_DETECTORS: KeywordDetector[] = [
     type: "ultrawork",
     pattern: /\b(ultrawork|ulw)\b/i,
     message: getUltraworkMessage,
-  },
-  {
-    type: "search",
-    pattern: SEARCH_PATTERN,
-    message: SEARCH_MESSAGE,
-  },
-  {
-    type: "analyze",
-    pattern: ANALYZE_PATTERN,
-    message: ANALYZE_MESSAGE,
   },
   {
     type: "team",

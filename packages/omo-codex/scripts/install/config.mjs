@@ -29,6 +29,7 @@ export async function updateCodexConfig({
 	trustedHookStates = [],
 	agentConfigs = [],
 	autonomousPermissions = false,
+	gitBashEnabled = false,
 }) {
 	await mkdir(dirname(configPath), { recursive: true });
 	let config = "";
@@ -53,7 +54,7 @@ export async function updateCodexConfig({
 	for (const pluginName of pluginNames) {
 		config = ensurePluginEnabled(config, `${pluginName}@${marketplaceName}`);
 	}
-	config = ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform });
+	config = ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform, gitBashEnabled });
 	for (const state of trustedHookStates) {
 		config = ensureHookTrusted(config, state.key, state.trustedHash);
 	}
@@ -154,10 +155,10 @@ function ensurePluginMcpEnabled(config, pluginKey, serverName, enabled) {
 	return replaceOrInsertSetting(config, section, "enabled", enabledValue);
 }
 
-function ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform }) {
+function ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform, gitBashEnabled }) {
 	if (marketplaceName !== "sisyphuslabs" || !pluginNames.includes("omo")) return config;
 	let nextConfig = ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "context7", true);
-	nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", platform === "win32");
+	nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", platform === "win32" && gitBashEnabled === true);
 	return nextConfig;
 }
 
@@ -253,5 +254,4 @@ function parseJsonString(value) {
 		return null;
 	}
 }
-
 

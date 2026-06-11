@@ -14,7 +14,7 @@ This skill is intentionally compact. The full planning workflow lives in `refere
 ## Required First Steps
 
 1. Open `references/full-workflow.md`.
-2. Read **Phase 0 - Classify**, **Phase 1 - Ground**, and the **Approval gate** before you ask the user anything or draft a plan.
+2. Read **Phase 0 - Classify**, **Phase 1 - Ground**, **Phase 2 - Interview**, and the **Approval gate** before you ask the user anything or draft a plan.
 3. Internalize the loop: explore exhaustively, surface the genuine unknowns, ask, then wait for approval before planning.
 
 ## The Gate (non-negotiable behavior)
@@ -23,6 +23,15 @@ This skill is intentionally compact. The full planning workflow lives in `refere
 - **Surface, then ask.** After exhausting exploration, present what you found, the genuine remaining ambiguities (with a recommended option for each), and the approach you intend to plan.
 - **Wait for the user's explicit okay before generating the plan.** Never auto-transition from interview to plan generation. No plan file, no Metis gap-analysis, no execution until the user approves the approach.
 - **Planner scope only.** Write only `.omo/plans/<slug>.md` and `.omo/drafts/*.md`. Never edit source. If asked to "just do it", decline: you plan; a worker executes.
+
+## Interview Discipline (how to ask)
+
+Exploration answers facts; the user decides preferences, tradeoffs, and safety. Bring those decisions to the user EARLY and well-formed:
+
+- Every question must materially change the plan, confirm a load-bearing assumption, or choose between real tradeoffs. If a read-only search could answer it, asking is a failure.
+- Ask 1-3 narrow questions per turn, each with 2-4 concrete options and your recommended default first, grounded in a file path or finding you cite. A skipped question resolves to that default, recorded in the draft as an assumption.
+- Always ask test strategy (TDD / tests-after / none); agent-executed QA scenarios are included regardless.
+- Record every answer and decision in `.omo/drafts/<slug>.md` immediately; run the Phase 2 clearance check after every turn; never end a turn passively — end with the question or the explicit next step.
 
 ## Dynamic Adversarial Planning
 

@@ -122,10 +122,27 @@ if (shouldRunLazyCodexInstaller()) {
 }
 
 const cliPath = join(wrapperPackageRoot, "dist", "cli", "index.js");
+const nodeCliPath = join(wrapperPackageRoot, "dist", "cli-node", "index.js");
 
 if (!existsSync(cliPath)) {
   console.error(\`oh-my-opencode: packaged CLI not found at \${cliPath}\`);
   process.exit(2);
+}
+
+function runNodeCli(reason) {
+  if (!existsSync(nodeCliPath)) return;
+  if (reason) {
+    console.error(\`oh-my-opencode: \${reason}; falling back to the node CLI at \${nodeCliPath}\`);
+  }
+  const result = spawnSync(process.execPath, [nodeCliPath, ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  exitFromResult(result, "failed to execute the node CLI");
+}
+
+if (process.env.OMO_RUNTIME === "node") {
+  runNodeCli();
 }
 
 const bunBinary = process.env.BUN_BINARY || "bun";
@@ -133,6 +150,14 @@ const result = spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)], {
   stdio: "inherit",
   env: process.env,
 });
+
+if (result.error) {
+  runNodeCli(\`bun is not available (\${result.error.message})\`);
+}
+
+if (result.signal === "SIGILL") {
+  runNodeCli("bun crashed with SIGILL - this CPU lacks the instruction set bun requires (x86-64-v2/SSE4.2 or newer)");
+}
 
 exitFromResult(result, "failed to execute Bun");
 `;

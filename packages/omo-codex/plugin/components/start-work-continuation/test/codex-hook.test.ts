@@ -119,6 +119,29 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toMatch(/WORKING:/);
 	});
 
+	it("#given active codex work #when continuation directive is emitted #then QA weight is tier-scoped without echo bloat", () => {
+		// given
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+			}),
+			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		});
+
+		// when
+		const output = runStopHook(createStopInput(), fs);
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toMatch(/LIGHT/);
+		expect(parsed.reason).toMatch(/HEAVY/);
+		expect(parsed.reason).toMatch(/When unsure[^.]{0,30}HEAVY/);
+		expect(parsed.reason).toMatch(/mirrors its implementation/);
+		expect((parsed.reason.match(/malformed input, prompt injection/g) ?? []).length).toBe(1);
+		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1100);
+	});
+
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {
 		// given
 		const fs = createMemoryFs({

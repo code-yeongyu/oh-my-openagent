@@ -38,6 +38,16 @@ describe("plain test script policy", () => {
     expect(workflow).not.toContain("run: bun test --max-concurrency")
   })
 
+  test("#given the vendored lsp-daemon suite excluded from bun test #then CI runs it as its own gate", async () => {
+    // given
+    const workflow = await Bun.file(".github/workflows/ci.yml").text()
+
+    // then
+    expect(workflow).toMatch(
+      /- name: Run vendored lsp-daemon tests\s+run: npm test\s+working-directory: packages\/lsp-daemon/,
+    )
+  })
+
   test("#given platform optional dependency versions #when CI runs frozen install #then bun lock stays in sync", async () => {
     // given
     const packageJson: unknown = await Bun.file("package.json").json()
