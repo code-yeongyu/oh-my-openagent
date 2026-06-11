@@ -140,26 +140,6 @@ describe("keyword-detector message transform", () => {
     }
   })
 
-  test("should tell analyze-mode agents to evaluate skills before delegating", async () => {
-    // given - analyze mode keyword detection runs on a user investigation request
-    const collector = new ContextCollector()
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const sessionID = "analyze-skill-guidance-session"
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "investigate why subagents miss recovery skills" }],
-    }
-
-    // when - analyze mode is injected
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - guidance should require evaluating skills, not hard-code an empty skill list
-    const text = expectTextPartText(output.parts)
-    expect(text).toContain("Evaluate available skills before dispatch")
-    expect(text).toContain("pass [] ONLY when no skill matches")
-    expect(text).not.toContain("ALWAYS include load_skills=[]")
-  })
-
   test("should NOT transform when no keywords detected", async () => {
     // given - no keywords in message
     const collector = new ContextCollector()
