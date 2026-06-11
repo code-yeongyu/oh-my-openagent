@@ -19,7 +19,7 @@ description: Developer reference for the Atlas todo-list orchestrator agent -- m
 | `index.ts` | Barrel exports |
 | `prompt-section-builder.ts` | Composes category, agent, skills, and decision matrix sections |
 | `atlas-prompt.test.ts` | Prompt composition tests |
-| `prompt-byte-preservation.test.ts` | Byte-exact prompt baseline and runtime placeholder regression tests |
+| `prompt-runtime-injection.test.ts` | Runtime placeholder-resolution regression tests |
 | `prompt-checkbox-enforcement.test.ts` | Checkbox enforcement behavior tests |
 | `prompt-routing.test.ts` | Model-variant routing tests |
 | `packages/prompts-core/prompts/atlas/default.md` | Default/Claude markdown prompt variant |

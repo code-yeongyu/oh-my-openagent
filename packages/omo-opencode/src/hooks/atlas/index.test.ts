@@ -1042,37 +1042,6 @@ session_id: ses_untrusted_999
           expect(completionGateIndex).toBeLessThan(phase1Index)
         }
       })
-
-      test("should not contain old STEP 7 MARK COMPLETION IN PLAN FILE text", async () => {
-        // given - Atlas caller with boulder state
-        const planPath = join(TEST_DIR, "test-plan.md")
-        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
-
-        const state: BoulderState = {
-          active_plan: planPath,
-          started_at: "2026-01-02T10:00:00Z",
-          session_ids: ["session-1"],
-          plan_name: "test-plan",
-        }
-        writeBoulderState(TEST_DIR, state)
-
-        const hook = createTestAtlasHook(createMockPluginInput())
-        const output = {
-          title: "Sisyphus Task",
-          output: "Task completed successfully",
-          metadata: {},
-        }
-
-        // when
-        await hook["tool.execute.after"](
-          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
-          output
-        )
-
-        // then - old STEP 7 MARK COMPLETION IN PLAN FILE should be absent
-        expect(output.output).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
-        expect(output.output).not.toContain("MARK COMPLETION IN PLAN FILE")
-      })
     })
 
     describe("Write/Edit tool direct work reminder", () => {

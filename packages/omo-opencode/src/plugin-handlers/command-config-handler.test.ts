@@ -248,6 +248,68 @@ describe("applyCommandConfig", () => {
     expect(commandConfig["init-deep"]?.template).toContain("<skill-instruction>");
   });
 
+  test("#given disabled_commands contains remove-ai-slops #when applying command config #then the skill-backed command does not resurrect", async () => {
+    // given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      ...createPluginConfig(),
+      disabled_commands: ["remove-ai-slops"],
+    };
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, unknown>;
+    expect(commandConfig["remove-ai-slops"]).toBeUndefined();
+
+    const controlConfig: Record<string, unknown> = { command: {} };
+    await applyCommandConfig({
+      config: controlConfig,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+    const controlCommandConfig = controlConfig.command as Record<string, unknown>;
+    expect(controlCommandConfig["remove-ai-slops"]).toBeDefined();
+  });
+
+  test("#given disabled_skills contains debugging #then no /debugging command registers", async () => {
+    // given
+    const pluginConfig = {
+      ...createPluginConfig(),
+      disabled_skills: ["debugging"],
+    };
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, unknown>;
+    expect(commandConfig["debugging"]).toBeUndefined();
+
+    const controlConfig: Record<string, unknown> = { command: {} };
+    await applyCommandConfig({
+      config: controlConfig,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+    const controlCommandConfig = controlConfig.command as Record<string, unknown>;
+    expect(controlCommandConfig["debugging"]).toBeDefined();
+  });
+
   test("includes host config skills declared in config.skills.paths by other plugins", async () => {
     // given - second call to discoverConfigSourceSkills returns host config skills
     discoverConfigSourceSkillsSpy

@@ -32,7 +32,6 @@ type MessagesTransformHooks = {
   contextInjectorMessagesTransform?: CreatedHooks["contextInjectorMessagesTransform"]
   teamModeStatusInjector?: CreatedHooks["teamModeStatusInjector"]
   teamMailboxInjector?: CreatedHooks["teamMailboxInjector"]
-  thinkingBlockValidator?: CreatedHooks["thinkingBlockValidator"]
   toolPairValidator?: CreatedHooks["toolPairValidator"]
 }
 type MessagesTransformHookKey = keyof MessagesTransformHooks
@@ -50,7 +49,6 @@ const MESSAGES_TRANSFORM_HOOKS = [
   { key: "contextInjectorMessagesTransform", name: "contextInjectorMessagesTransform" },
   { key: "teamModeStatusInjector", name: "teamModeStatusInjector" },
   { key: "teamMailboxInjector", name: "teamMailboxInjector" },
-  { key: "thinkingBlockValidator", name: "thinkingBlockValidator" },
   { key: "toolPairValidator", name: "toolPairValidator" },
 ] satisfies readonly MessagesTransformHookEntry[]
 

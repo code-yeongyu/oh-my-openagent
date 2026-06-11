@@ -8,6 +8,8 @@ import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag 
 import { parseJsonc } from "../../../shared/jsonc-parser"
 import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
 
+const runtime = globalThis as typeof globalThis & { Bun?: { version?: string } }
+
 interface SystemCheckDeps {
   findOpenCodeBinary: typeof findOpenCodeBinary
   getOpenCodeVersion: typeof getOpenCodeVersion
@@ -77,7 +79,7 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
     opencodePath: binaryInfo?.path ?? null,
     pluginVersion,
     loadedVersion: loadedInfo.loadedVersion,
-    bunVersion: Bun.version,
+    bunVersion: runtime.Bun?.version ?? "unavailable",
     configPath: pluginInfo.configPath,
     configValid: isConfigValid(pluginInfo.configPath, deps),
     isLocalDev: pluginInfo.isLocalDev,

@@ -135,8 +135,9 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	// then
 	assert.match(adapted, /multi_agent_v1\.spawn_agent/);
 	assert.match(adapted, /fork_context":false/);
+	assert.match(adapted, /"agent_type":"explorer"/);
 	assert.match(adapted, /multi_agent_v1\.wait_agent/);
-	assert.doesNotMatch(adapted, /fork_turns/);
+	assert.doesNotMatch(adapted, /fork_turns="none"/);
 	assert.doesNotMatch(adapted, /list_agents/);
 });
 

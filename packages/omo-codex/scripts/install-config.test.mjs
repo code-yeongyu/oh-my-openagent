@@ -184,6 +184,56 @@ test("#given existing MultiAgentV2 table #when script installer updates config #
 	assert.doesNotMatch(config, /max_concurrent_threads_per_session = 4/);
 });
 
+test("#given empty Codex config #when script installer updates config #then exposes spawn_agent agent_type for installed roles", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-roles-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const v2Section = config.slice(config.indexOf("[features.multi_agent_v2]"));
+	assert.match(v2Section, /hide_spawn_agent_metadata = false/);
+});
+
+test("#given user config hiding spawn_agent metadata #when script installer updates config #then re-exposes agent_type so role TOMLs stay selectable", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-hide-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features.multi_agent_v2]",
+			"usage_hint_enabled = false",
+			"hide_spawn_agent_metadata = true",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /hide_spawn_agent_metadata = false/);
+	assert.doesNotMatch(config, /hide_spawn_agent_metadata = true/);
+	assert.match(config, /usage_hint_enabled = false/);
+});
+
 test("#given legacy boolean MultiAgentV2 flag and table #when script installer updates config #then normalizes to table config", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-legacy-"));

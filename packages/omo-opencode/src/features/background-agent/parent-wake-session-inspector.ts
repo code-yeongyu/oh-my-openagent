@@ -6,6 +6,7 @@ import type { PendingParentWake } from "./parent-wake-dedupe"
 import {
   getParentWakeSessionHistoryDeferralDecision,
   hasAssistantOrToolOutputAfterParentWake,
+  hasAssistantOutputAfterParentWakeAdmission,
   hasRecordedParentWakePromptMessage,
   parentWakeUserMessageIsInProgress,
   type ParentWakeSessionMessage,
@@ -81,6 +82,14 @@ export class ParentWakeSessionInspector {
       messages,
       wake,
       acceptedMessageSkewMs: this.options.acceptedMessageSkewMs,
+    })
+  }
+
+  async hasAssistantOutputAfterAdmittedWake(sessionID: string, wake: PendingParentWake): Promise<boolean> {
+    const messages = await this.loadMessages(sessionID)
+    return hasAssistantOutputAfterParentWakeAdmission({
+      messages,
+      wake,
     })
   }
 

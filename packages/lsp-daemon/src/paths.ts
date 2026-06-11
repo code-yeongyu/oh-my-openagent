@@ -16,13 +16,14 @@ export interface DaemonPaths {
 	log: string;
 }
 
-export function resolveDaemonVersion(): string {
-	try {
-		const pkg = requireFromHere("../package.json") as { version?: unknown };
-		return typeof pkg.version === "string" && pkg.version.length > 0 ? pkg.version : "0";
-	} catch {
-		return "0";
+export function resolveDaemonVersion(requireFn: (id: string) => unknown = requireFromHere): string {
+	for (const candidate of ["./package.json", "../package.json"]) {
+		try {
+			const pkg = requireFn(candidate) as { version?: unknown };
+			if (typeof pkg.version === "string" && pkg.version.length > 0) return pkg.version;
+		} catch {}
 	}
+	return "0";
 }
 
 export function daemonBaseDir(env: NodeJS.ProcessEnv = process.env): string {

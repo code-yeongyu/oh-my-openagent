@@ -6,6 +6,8 @@
   "description": "OpenCode harness adapter (Ultimate edition plugin).",
   "scripts": { "typecheck": "tsgo --noEmit -p tsconfig.json" },
   "dependencies": {
+    "@clack/prompts": "^1.4.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -15,6 +17,15 @@
     "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/shared-skills": "workspace:*",
-    "@oh-my-opencode/utils": "workspace:*"
+    "@oh-my-opencode/utils": "workspace:*",
+    "@opencode-ai/plugin": "^1.15.4",
+    "@opencode-ai/sdk": "^1.15.4",
+    "commander": "^14.0.3",
+    "js-yaml": "^4.1.1",
+    "jsonc-parser": "^3.3.1",
+    "picocolors": "^1.1.1",
+    "picomatch": "^4.0.4",
+    "posthog-node": "^5.34.3",
+    "zod": "^4.4.3"
   }
 }

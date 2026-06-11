@@ -13,6 +13,7 @@ export type GitBashResolution =
       readonly found: true;
       readonly path: string | null;
       readonly source: GitBashSource;
+      readonly checkedPaths: readonly string[];
     }
   | {
       readonly found: false;
@@ -28,13 +29,13 @@ export interface GitBashResolverInput {
 }
 
 export function resolveGitBash(input: GitBashResolverInput): GitBashResolution {
-  if (input.platform !== "win32") return { found: true, path: null, source: "not-required" };
+  if (input.platform !== "win32") return { found: true, path: null, source: "not-required", checkedPaths: [] };
 
   const checkedPaths: string[] = [];
   const envPath = nonEmptyEnvValue(input.env, GIT_BASH_ENV_KEY);
   if (envPath !== undefined) {
     checkedPaths.push(envPath);
-    if (isBashExePath(envPath) && input.exists(envPath)) return { found: true, path: envPath, source: "env" };
+    if (isBashExePath(envPath) && input.exists(envPath)) return { found: true, path: envPath, source: "env", checkedPaths };
     return missingGitBash(checkedPaths);
   }
 
@@ -43,14 +44,15 @@ export function resolveGitBash(input: GitBashResolverInput): GitBashResolution {
     { path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" },
   ] as const) {
     checkedPaths.push(candidate.path);
-    if (input.exists(candidate.path)) return { found: true, path: candidate.path, source: candidate.source };
+    if (input.exists(candidate.path)) return { found: true, path: candidate.path, source: candidate.source, checkedPaths };
   }
 
   for (const pathCandidate of input.where("bash")) {
     const candidate = pathCandidate.trim();
     if (candidate.length === 0) continue;
     checkedPaths.push(candidate);
-    if (isBashExePath(candidate) && input.exists(candidate)) return { found: true, path: candidate, source: "path" };
+    if (isKnownNonGitBashLauncher(candidate)) continue;
+    if (isBashExePath(candidate) && input.exists(candidate)) return { found: true, path: candidate, source: "path", checkedPaths };
   }
 
   return missingGitBash(checkedPaths);
@@ -89,6 +91,13 @@ function nonEmptyEnvValue(env: { readonly [key: string]: string | undefined }, k
 
 function isBashExePath(path: string): boolean {
   return path.toLowerCase().endsWith("bash.exe");
+}
+
+const NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS = ["\\windows\\system32\\", "\\microsoft\\windowsapps\\"] as const;
+
+function isKnownNonGitBashLauncher(path: string): boolean {
+  const normalized = path.replaceAll("/", "\\").toLowerCase();
+  return NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS.some((segment) => normalized.includes(segment));
 }
 
 function whereCommand(command: "bash"): readonly string[] {

@@ -153,6 +153,7 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 	});
 	const pluginRoot = join(codexPackageRoot, "plugin");
 	await writePluginAt(pluginRoot, "alpha", "1.2.3");
+	await writeFile(join(pluginRoot, "dist", "cli.js"), "console.log('plugin cli')\n");
 	await writeJson(join(pluginRoot, "hooks", "hooks.json"), {
 		hooks: {
 			UserPromptSubmit: [
