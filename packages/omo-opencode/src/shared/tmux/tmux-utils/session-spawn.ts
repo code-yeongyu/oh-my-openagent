@@ -4,7 +4,7 @@ import type { SpawnPaneResult } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxPlaceholderCommand, buildPaneAuthEnvironmentArgs } from "./pane-command"
 
 const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
 
@@ -102,6 +102,7 @@ export async function spawnTmuxSession(
 	log("[spawnTmuxSession] all checks passed, creating isolated session...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const sizeArgs: string[] = []
 	if (sourcePaneId) {
@@ -120,6 +121,7 @@ export async function spawnTmuxSession(
 			"-t", isolatedSessionName,
 			"-P",
 			"-F", "#{pane_id}",
+			...authEnvArgs,
 			placeholderCmd,
 		]
 		: [
@@ -129,6 +131,7 @@ export async function spawnTmuxSession(
 			...sizeArgs,
 			"-P",
 			"-F", "#{pane_id}",
+			...authEnvArgs,
 			placeholderCmd,
 		]
 
