@@ -614,6 +614,7 @@ jobs:
 
           node packages/omo-codex/plugin/scripts/sync-version.mjs
           node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          bun install --lockfile-only
 
       - name: Commit version bump
         if: steps.release-state.outputs.release_commit_exists != 'true'
@@ -622,7 +623,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/hooks.json packages/omo-codex/plugin/components/*/hooks/hooks.json
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/hooks.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
