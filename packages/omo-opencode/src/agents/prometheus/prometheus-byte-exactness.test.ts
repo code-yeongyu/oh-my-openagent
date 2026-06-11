@@ -59,14 +59,14 @@ const PROMETHEUS_PROMPT_BASELINES: readonly PrometheusPromptBaseline[] = [
     name: "claude-fable-5-enabled",
     model: "anthropic/claude-fable-5",
     disabledTools: [],
-    sha256: "e2eddb507144bfc58077f7b639e637ea10b0233fe4c527550e3cccb3a3e84a8d",
+    sha256: "892d6201e8be3b439416225f069b728d02f4d244c3fefa5d1d5adc1481ed239e",
     shouldContainQuestionTool: true,
   },
   {
     name: "claude-fable-5-question-disabled",
     model: "anthropic/claude-fable-5",
     disabledTools: ["question"],
-    sha256: "cedb503c5e12d36ece93182125eceacc570431581b2bab6c3d391e1a9a0eeafe",
+    sha256: "ff7c51af68e6ab5cd3f5c914a04aa74fbb5ace928a112c7dcecc3b7a96a4dfae",
     shouldContainQuestionTool: false,
   },
   {
