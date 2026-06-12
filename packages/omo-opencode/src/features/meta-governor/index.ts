@@ -47,3 +47,10 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 7: post-repair-recorder (bridge recovery hooks → closed-loop learning)
+export {
+  recordRecovery,
+  defaultClosedLoopConfig,
+} from "./post-repair-recorder"
+export type { RecoveryOutcome } from "./post-repair-recorder"
