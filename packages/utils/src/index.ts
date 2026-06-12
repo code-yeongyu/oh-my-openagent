@@ -1,4 +1,7 @@
 export * from "./deep-merge"
+export * from "./config-merge"
+export * from "./config-section-parser"
+export * from "./env-expansion"
 export * from "./snake-case"
 export * from "./record-type-guard"
 export * from "./extract-semver"
