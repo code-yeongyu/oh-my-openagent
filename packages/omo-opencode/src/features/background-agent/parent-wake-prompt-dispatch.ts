@@ -5,11 +5,12 @@ import {
   withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptQueueBehavior, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
+import type { SessionExistenceStatus } from "./session-existence"
 
 type ParentWakePromptDispatchInput = {
   readonly client: PromptDispatchClient
@@ -25,6 +26,9 @@ type ParentWakePromptDispatchInput = {
   readonly trackDispatchedWake: (wake: PendingParentWake, dispatchedAt: number) => void
   readonly requeueWake: (wake: PendingParentWake) => void
   readonly scheduleFlush: (delayMs?: number) => void
+  readonly queueBehavior?: InternalPromptQueueBehavior
+  readonly checkSessionExists?: (sessionID: string) => Promise<SessionExistenceStatus>
+  readonly dropWake?: () => void
 }
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
@@ -41,7 +45,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
         : {}),
       settleMs: 0,
-      queueBehavior: "defer",
+      queueBehavior: input.queueBehavior ?? "defer",
       checkStatus: input.forceNoReply !== true,
       checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
       input: {
@@ -104,6 +108,17 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
   } catch (error) {
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
+    if (input.checkSessionExists !== undefined) {
+      const existence = await input.checkSessionExists(input.sessionID)
+      if (existence === "missing") {
+        input.dropWake?.()
+        log("[background-agent] Dropped parent wake because parent session no longer exists:", {
+          sessionID: input.sessionID,
+          error: errorText,
+        })
+        return
+      }
+    }
     input.requeueWake(input.latestWake)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })

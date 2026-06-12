@@ -1,0 +1,353 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { ParentWakeNotifier } from "./parent-wake-notifier"
+import type { SessionExistenceStatus } from "./session-existence"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../hooks/shared/prompt-async-gate"
+
+type PromptAsyncCall = {
+  path: { id: string }
+  body: {
+    noReply?: boolean
+    parts?: unknown[]
+  }
+  query?: {
+    directory: string
+  }
+}
+
+type SessionMessageStub = {
+  info?: {
+    role?: string
+    finish?: string
+    time?: { created?: number; completed?: number }
+    error?: { name?: string }
+  }
+  parts?: Array<{ type?: string; text?: string; synthetic?: boolean; state?: { status?: string } }>
+}
+
+const FINAL_WAKE = [
+  "<system-reminder>",
+  "[BACKGROUND TASK COMPLETED]",
+  "[ALL BACKGROUND TASKS COMPLETE]",
+  "",
+  "**Completed:**",
+  "- `task-a`: task A",
+  "",
+  'Use `background_output(task_id="<id>")` to retrieve each result.',
+  "</system-reminder>",
+].join("\n")
+
+// An assistant turn that is still busy (running tool) so history-based and
+// activity-based defers keep firing while the parent stays unsafe.
+const BLOCKED_MESSAGES: SessionMessageStub[] = [
+  {
+    info: { role: "user", time: { created: 80_000 } },
+    parts: [{ type: "text", text: "start work" }],
+  },
+  {
+    info: { role: "assistant", finish: "tool-calls", time: { created: 99_500 } },
+    parts: [{ type: "tool", state: { status: "running" } }],
+  },
+]
+
+// A settled assistant turn whose only output predates the wake, so the parent
+// is "safe" but no assistant output exists after a dispatch.
+const SAFE_MESSAGES: SessionMessageStub[] = [
+  {
+    info: { role: "user", time: { created: 80_000 } },
+    parts: [{ type: "text", text: "start work" }],
+  },
+  {
+    info: { role: "assistant", finish: "stop", time: { created: 90_000 } },
+    parts: [{ type: "text", text: "delegated to background" }],
+  },
+]
+
+function createNotifier(args: {
+  sessionStatuses?: Record<string, { type: string }>
+  messagesProvider: () => SessionMessageStub[]
+  promptAsyncImpl?: (call: PromptAsyncCall) => Promise<unknown>
+  checkParentSessionExistence?: (sessionID: string) => Promise<SessionExistenceStatus>
+  maxDeferMs?: number
+  maxWindowRefreshes?: number
+  failureRequeueWindowMs?: number
+}): {
+  notifier: ParentWakeNotifier
+  promptAsyncCalls: PromptAsyncCall[]
+} {
+  const promptAsyncCalls: PromptAsyncCall[] = []
+  const client = {
+    session: {
+      messages: async () => ({ data: args.messagesProvider() }),
+      status: async () => ({ data: args.sessionStatuses ?? {} }),
+      promptAsync: async (call: PromptAsyncCall) => {
+        promptAsyncCalls.push(call)
+        return (await args.promptAsyncImpl?.(call)) ?? { data: {} }
+      },
+      abort: async () => ({ data: {} }),
+    },
+  } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+
+  const notifier = new ParentWakeNotifier(
+    {
+      client,
+      directory: "/tmp/test-omo",
+      enqueueNotificationForParent: async (_sessionID, operation) => {
+        await operation()
+      },
+      ...(args.checkParentSessionExistence
+        ? { checkParentSessionExistence: args.checkParentSessionExistence }
+        : {}),
+    },
+    {
+      pendingRetryMs: 1_000,
+      acceptedMessageSkewMs: 5_000,
+      toolCallDeferMaxMs: 5_000,
+      failureRequeueWindowMs: args.failureRequeueWindowMs ?? 5_000,
+      userMessageInProgressWindowMs: 2_000,
+      ...(args.maxDeferMs !== undefined ? { maxDeferMs: args.maxDeferMs } : {}),
+      ...(args.maxWindowRefreshes !== undefined ? { maxWindowRefreshes: args.maxWindowRefreshes } : {}),
+    },
+  )
+
+  return { notifier, promptAsyncCalls }
+}
+
+function releaseParentWakeHold(sessionID: string): void {
+  releasePromptAsyncReservation(sessionID, "test:simulate-expired-parent-wake-hold", {
+    reservedBy: "background-agent-parent-wake",
+  })
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) {
+      return
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 5))
+  }
+  expect(predicate()).toBe(true)
+}
+
+afterEach(() => {
+  releaseAllPromptAsyncReservationsForTesting()
+})
+
+describe("BUG B1: unbounded parent-wake deferral starvation (upstream #5089)", () => {
+  test("#given a perpetually busy parent #when the wake is deferred past the max #then it is force-dispatched as a noReply admission", async () => {
+    // given: the parent session is continuously active (ultrawork / todo loop),
+    // so the active-session defer path reschedules at 1s forever.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+      maxDeferMs: 5_000,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: the first flush only defers because the parent is active
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.firstDeferredAt).toBe(100_000)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+
+      // when: the deferral budget is exceeded while the parent stays busy
+      now = 100_000 + 5_001
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the wake is force-dispatched as a noReply admission despite the
+      // parent still being active (content lands at the next turn boundary)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+      // the reply-required wake is retained for a later reply-producing resume
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})
+
+describe("BUG B2: retained reply-wake never re-flushed (upstream #5189)", () => {
+  test("#given a reply-required wake admitted as noReply while the parent is busy #then a re-flush stays scheduled and the wake force-delivers even if the parent never goes safe", async () => {
+    // given: the parent keeps a tool turn running, so every flush defers the
+    // retained reply wake (recent-activity / history defers).
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+      maxDeferMs: 5_000,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: the wake is admitted as noReply and retained
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      // then: it is retained AND a re-flush timer is scheduled (never abandoned)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+
+      // when: the parent stays unsafe across another flush
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      // then: still retained, still re-flush-scheduled, no duplicate admission
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+
+      // when: the parent NEVER goes safe but the deferral budget is exceeded
+      now = 100_000 + 5_001
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: B1 force-path re-delivers the retained completion as noReply
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(true)
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a retained reply wake #when the parent finally goes safe #then it dispatches with a reply", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let blocked = true
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => (blocked ? BLOCKED_MESSAGES : SAFE_MESSAGES),
+      maxDeferMs: 5_000,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: admitted as noReply while busy, then the parent goes safe
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      blocked = false
+      now = 110_000
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: a reply-producing resume fires exactly once and the wake clears
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})
+
+describe("BUG B3: dispatched-wake silent loss requeues after repeated empty windows", () => {
+  test("#given a dispatched wake with no assistant output #when the failure window refreshes maxWindowRefreshes times #then the wake is requeued into the pending queue", async () => {
+    // given: the parent is safe so the wake dispatches normally, but no
+    // assistant/tool output ever appears after the dispatch (silent drop).
+    const sessionStatuses: Record<string, { type: string }> = { "parent-1": { type: "idle" } }
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses,
+      messagesProvider: () => SAFE_MESSAGES,
+      failureRequeueWindowMs: 5,
+      maxWindowRefreshes: 3,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: the wake dispatches and is tracked
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(true)
+      // keep the parent busy from now so any re-flush after requeue just defers
+      sessionStatuses["parent-1"] = { type: "busy" }
+
+      // then: after the failure window refreshes 3x (~15ms) with no output, the
+      // wake is requeued into the pending queue and the dispatched record cleared
+      await waitUntil(() => notifier.getPendingParentWakes().has("parent-1"), 600)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.notifications).toEqual([FINAL_WAKE])
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})
+
+describe("BUG B4: deleted parent session drops the wake instead of retrying forever", () => {
+  test("#given the parent session is missing #when a dispatch fails #then the wake is dropped with no reschedule", async () => {
+    // given: every dispatch throws and the parent session no longer exists
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => SAFE_MESSAGES,
+      promptAsyncImpl: async () => {
+        throw new Error("session not found")
+      },
+      checkParentSessionExistence: async () => "missing",
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the dispatch was attempted, then the wake is dropped permanently
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given the parent existence is unknown #when a dispatch fails #then the wake is requeued and retried", async () => {
+    // given: dispatch throws but existence cannot be confirmed as missing
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => SAFE_MESSAGES,
+      promptAsyncImpl: async () => {
+        throw new Error("transient network error")
+      },
+      checkParentSessionExistence: async () => "unknown",
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the wake stays pending and a retry flush is scheduled
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.notifications).toEqual([FINAL_WAKE])
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})

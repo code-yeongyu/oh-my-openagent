@@ -82,6 +82,8 @@ export class ParentWakePendingQueue {
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
+      pendingWake.firstDeferredAt ??= latestWake.firstDeferredAt
+      pendingWake.deferCount ??= latestWake.deferCount
       return
     }
     this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))

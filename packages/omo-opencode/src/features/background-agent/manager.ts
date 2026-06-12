@@ -86,6 +86,7 @@ import type { PendingParentWake } from "./parent-wake-dedupe"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
+  checkSessionExistence,
   MIN_SESSION_GONE_POLLS,
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
@@ -228,6 +229,19 @@ export type OnSubagentSessionDeleted = (event: SubagentSessionDeletedEvent) => P
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
 const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
+/**
+ * Upper bound on how long a single parent-wake may stay deferred before it is
+ * force-dispatched as an admit-only noReply. Without this bound a parent kept
+ * continuously busy (ultrawork / todo-continuation loops re-prompting at every
+ * turn end) starves the wake forever (8267x deferral incident, upstream #5089).
+ */
+const PARENT_WAKE_MAX_DEFER_MS = 120_000
+/**
+ * Number of consecutive 5s failure-requeue windows (each refreshing with zero
+ * assistant/tool output after the wake) tolerated before a silently-dropped
+ * dispatched wake is requeued into the pending queue (~15s total).
+ */
+const PARENT_WAKE_MAX_WINDOW_REFRESHES = 3
 
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
@@ -306,6 +320,8 @@ export class BackgroundManager {
         client: this.client,
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
+        checkParentSessionExistence: (sessionID: string) =>
+          checkSessionExistence(this.client, sessionID, this.directory),
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,
@@ -314,6 +330,8 @@ export class BackgroundManager {
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
         parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
+        maxDeferMs: PARENT_WAKE_MAX_DEFER_MS,
+        maxWindowRefreshes: PARENT_WAKE_MAX_WINDOW_REFRESHES,
       },
     )
     this.registerProcessCleanup()

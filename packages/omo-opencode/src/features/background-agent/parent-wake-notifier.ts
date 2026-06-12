@@ -15,6 +15,9 @@ import {
 
 export type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
 
+const DEFAULT_PARENT_WAKE_MAX_DEFER_MS = 120_000
+const DEFAULT_PARENT_WAKE_MAX_WINDOW_REFRESHES = 3
+
 export class ParentWakeNotifier {
   private readonly pendingQueue: ParentWakePendingQueue
   private readonly dispatchedTracker: ParentWakeDispatchedTracker
@@ -37,6 +40,9 @@ export class ParentWakeNotifier {
           wake,
           dispatchedTracker: this.dispatchedTracker,
           sessionInspector: this.sessionInspector,
+          pendingQueue: this.pendingQueue,
+          scheduleFlush: (id) => this.flushRunner.schedulePendingParentWakeFlush(id),
+          maxWindowRefreshes: options.maxWindowRefreshes ?? DEFAULT_PARENT_WAKE_MAX_WINDOW_REFRESHES,
         }).catch((error: unknown) => {
           logParentWakeWindowRecoveryError(
             sessionID,
@@ -62,6 +68,7 @@ export class ParentWakeNotifier {
       pendingQueue: this.pendingQueue,
       dispatchedTracker: this.dispatchedTracker,
       sessionInspector: this.sessionInspector,
+      maxDeferMs: options.maxDeferMs ?? DEFAULT_PARENT_WAKE_MAX_DEFER_MS,
     })
   }
 

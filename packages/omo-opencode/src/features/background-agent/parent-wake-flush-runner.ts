@@ -1,5 +1,6 @@
 import { log } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
+import type { InternalPromptQueueBehavior } from "../../shared/prompt-async-gate/types"
 import { isFailureParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakePendingQueue } from "./parent-wake-pending-queue"
@@ -13,14 +14,28 @@ type ParentWakeFlushRunnerDeps = {
   readonly pendingQueue: ParentWakePendingQueue
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
+  readonly maxDeferMs: number
 }
 
 export class ParentWakeFlushRunner {
   constructor(private readonly deps: ParentWakeFlushRunnerDeps) {}
 
   async flushPendingParentWake(sessionID: string): Promise<void> {
-    if (!this.deps.pendingQueue.hasWake(sessionID)) {
+    const initialWake = this.deps.pendingQueue.getWake(sessionID)
+    if (!initialWake) {
       this.clearPendingParentWakeTimer(sessionID)
+      return
+    }
+
+    // BUG B1: bound deferral. A parent kept continuously busy (ultrawork /
+    // todo-continuation loops re-prompting at every turn end) would otherwise
+    // reschedule this flush at 1s intervals forever (8267x deferral incident,
+    // upstream #5089). Once the wake has been deferred past the max, force it
+    // through as an admit-only noReply so the content lands at the next turn
+    // boundary even while the parent stays busy.
+    if (this.hasExceededMaxDeferral(initialWake)) {
+      this.clearPendingParentWakeTimer(sessionID)
+      await this.forceDispatchAfterMaxDeferral(sessionID, initialWake)
       return
     }
 
@@ -30,6 +45,7 @@ export class ParentWakeFlushRunner {
       await settleAfterSessionIdle()
 
       if (await this.isSessionActive(sessionID)) {
+        this.recordDeferral(sessionID, initialWake)
         this.schedulePendingParentWakeFlush(sessionID)
         log("[background-agent] Deferred parent wake because parent session became active after idle settle:", {
           sessionID,
@@ -46,6 +62,7 @@ export class ParentWakeFlushRunner {
       return
     }
     if (sessionActive) {
+      this.recordDeferral(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
         sessionID,
@@ -63,6 +80,7 @@ export class ParentWakeFlushRunner {
         forceNoReply: true,
         retainPendingWake: latestWake.shouldReply,
       })
+      this.ensureRetainedReplyReflush(sessionID, latestWake)
       log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
       })
@@ -81,6 +99,7 @@ export class ParentWakeFlushRunner {
         forceNoReply: true,
         retainPendingWake: latestWake.shouldReply,
       })
+      this.ensureRetainedReplyReflush(sessionID, latestWake)
       return
     }
 
@@ -100,6 +119,7 @@ export class ParentWakeFlushRunner {
         forceNoReply: true,
         retainPendingWake: latestWake.shouldReply,
       })
+      this.ensureRetainedReplyReflush(sessionID, latestWake)
       log("[background-agent] Recorded admit-only parent wake because user message just arrived:", {
         sessionID,
       })
@@ -129,11 +149,13 @@ export class ParentWakeFlushRunner {
   // parent remains unsafe.
   private deferReplyWakeWhileUnsafe(sessionID: string, latestWake: PendingParentWake): boolean {
     if (isFailureParentWake(latestWake)) {
+      this.recordDeferral(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred failure parent wake until parent session is safe:", { sessionID })
       return true
     }
     if (latestWake.shouldReply && latestWake.noReplyAdmittedAt !== undefined) {
+      this.recordDeferral(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred retained reply-required parent wake until parent session is safe:", { sessionID })
       return true
@@ -170,11 +192,14 @@ export class ParentWakeFlushRunner {
       readonly toolWaitDecision: ToolWaitDeferralDecision
       readonly forceNoReply?: boolean
       readonly retainPendingWake?: boolean
+      readonly queueBehavior?: InternalPromptQueueBehavior
     },
   ): Promise<void> {
     if (options.retainPendingWake !== true) {
       this.deps.pendingQueue.deleteWake(sessionID)
     }
+
+    const checkParentSessionExistence = this.deps.notifierDeps.checkParentSessionExistence
 
     await sendParentWakePrompt({
       client: this.deps.notifierDeps.client,
@@ -183,6 +208,15 @@ export class ParentWakeFlushRunner {
       latestWake,
       ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
       ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
+      ...(options.queueBehavior !== undefined ? { queueBehavior: options.queueBehavior } : {}),
+      ...(checkParentSessionExistence
+        ? { checkSessionExists: (id: string) => checkParentSessionExistence(id) }
+        : {}),
+      dropWake: () => {
+        this.deps.pendingQueue.deleteWake(sessionID)
+        this.deps.pendingQueue.clearTimer(sessionID)
+        this.deps.dispatchedTracker.clearWake(sessionID)
+      },
       emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
       toolWaitDecision: options.toolWaitDecision,
       getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
@@ -215,5 +249,55 @@ export class ParentWakeFlushRunner {
 
   private requeueWake(sessionID: string, latestWake: PendingParentWake): void {
     this.deps.pendingQueue.requeueWake(sessionID, latestWake)
+  }
+
+  private recordDeferral(sessionID: string, wake: PendingParentWake): void {
+    wake.firstDeferredAt ??= Date.now()
+    wake.deferCount = (wake.deferCount ?? 0) + 1
+    if (wake.deferCount % 60 === 0) {
+      log("[background-agent] Parent wake deferred repeatedly without delivery:", {
+        sessionID,
+        deferCount: wake.deferCount,
+      })
+    }
+  }
+
+  private hasExceededMaxDeferral(wake: PendingParentWake): boolean {
+    return wake.firstDeferredAt !== undefined && Date.now() - wake.firstDeferredAt >= this.deps.maxDeferMs
+  }
+
+  // BUG B1 force path: deliver the long-deferred wake as an admit-only noReply.
+  // queueBehavior "enqueue" makes the gate queue the prompt at a live/reserved
+  // turn boundary instead of skipping it, so a perpetually busy parent still
+  // receives the content. Reset the deferral budget afterwards so a retained
+  // reply wake cannot re-force every second.
+  private async forceDispatchAfterMaxDeferral(sessionID: string, wake: PendingParentWake): Promise<void> {
+    log("[background-agent] Force-dispatching parent wake after max deferral", {
+      sessionID,
+      deferCount: wake.deferCount,
+      deferredForMs: wake.firstDeferredAt !== undefined ? Date.now() - wake.firstDeferredAt : undefined,
+    })
+    await this.sendParentWakePrompt(sessionID, wake, {
+      emptyAssistantTurnRetry: false,
+      toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+      forceNoReply: true,
+      retainPendingWake: wake.shouldReply,
+      queueBehavior: "enqueue",
+    })
+    const stillPending = this.deps.pendingQueue.getWake(sessionID)
+    if (stillPending) {
+      delete stillPending.firstDeferredAt
+      stillPending.deferCount = 0
+      this.schedulePendingParentWakeFlush(sessionID)
+    }
+  }
+
+  // BUG B2: a retained reply-required wake must always have a re-flush pending
+  // so it eventually dispatches with a reply once the parent goes safe (and via
+  // the B1 force path if it never does). scheduleFlush is idempotent.
+  private ensureRetainedReplyReflush(sessionID: string, latestWake: PendingParentWake): void {
+    if (latestWake.shouldReply && this.deps.pendingQueue.hasWake(sessionID)) {
+      this.schedulePendingParentWakeFlush(sessionID)
+    }
   }
 }
