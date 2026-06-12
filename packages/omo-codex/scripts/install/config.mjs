@@ -24,6 +24,7 @@ export async function updateCodexConfig({
 	repoRoot,
 	marketplaceName,
 	marketplaceSource = defaultMarketplaceSource(repoRoot),
+	preserveMarketplaceSource = false,
 	pluginNames,
 	platform = process.platform,
 	trustedHookStates = [],
@@ -50,7 +51,14 @@ export async function updateCodexConfig({
 	config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(repoRoot));
 	config = ensureCodexMultiAgentV2Config(config);
 	if (autonomousPermissions === true) config = ensureAutonomousPermissions(config);
-	config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);
+	// Marketplace-flow bootstrap (preserveMarketplaceSource) must keep the
+	// Codex-managed [marketplaces.<name>] block byte-identical: rewriting it
+	// would replace the git source with a local one and bump last_updated on
+	// every worker run. When the block is absent we write nothing rather than
+	// invent a source.
+	if (preserveMarketplaceSource !== true) {
+		config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);
+	}
 	for (const pluginName of pluginNames) {
 		config = ensurePluginEnabled(config, `${pluginName}@${marketplaceName}`);
 	}
