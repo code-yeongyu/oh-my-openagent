@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import { readState, writeState } from "../../../scripts/auto-update-state.mjs";
 import { bootstrapLocks, resolveBootstrapStatePath, resolveCodexHome } from "./environment.ts";
+import { runSgProvision } from "./provision.ts";
+import type { SgProvisionSeams } from "./provision.ts";
 import { runWorkerSetup } from "./setup.ts";
 
 export const BOOTSTRAP_DOCTOR_HINT = "npx lazycodex-ai doctor";
@@ -142,9 +144,11 @@ export function parseBootstrapState(raw: Record<string, unknown>): BootstrapStat
 	};
 }
 
-// The default step list is the seam downstream plan tasks fill in:
-// Task 10 replaces the "sg" stub body with provisioning from ./provision.ts.
-export function defaultWorkerSteps(): readonly BootstrapWorkerStep[] {
+export interface DefaultWorkerStepsSeams {
+	readonly sg?: SgProvisionSeams;
+}
+
+export function defaultWorkerSteps(seams: DefaultWorkerStepsSeams = {}): readonly BootstrapWorkerStep[] {
 	return [
 		{
 			name: "setup",
@@ -152,7 +156,7 @@ export function defaultWorkerSteps(): readonly BootstrapWorkerStep[] {
 		},
 		{
 			name: "sg",
-			run: async () => ({ degraded: [] }),
+			run: (context) => runSgProvision(context, seams.sg),
 		},
 	];
 }
@@ -235,7 +239,7 @@ function resolvePluginRoot(env: Record<string, string | undefined>): string {
 	return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
 
-async function appendBootstrapLog(
+export async function appendBootstrapLog(
 	pluginData: string,
 	now: number,
 	event: string,

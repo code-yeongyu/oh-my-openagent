@@ -30,6 +30,13 @@ export type {
 	ResolveCodexHomeOptions,
 } from "./environment.ts";
 export { BOOTSTRAP_RESTART_NOTICE, executeSessionStartHook, runSessionStartHook } from "./hook.ts";
+export {
+	runSgProvision,
+	SG_FORCE_PROVISION_ENV_KEY,
+	SG_PROVISION_COMPONENT,
+	sgProvisionDestination,
+} from "./provision.ts";
+export type { ResolvePreexistingSgOptions, SgProvisionSeams } from "./provision.ts";
 export { GIT_BASH_INSTALL_HINT, runWorkerSetup, SETUP_MARKETPLACE_NAME, SETUP_PLUGIN_NAME } from "./setup.ts";
 export type { SetupRunCommand, WorkerSetupOptions } from "./setup.ts";
 export type {
@@ -39,6 +46,7 @@ export type {
 	WorkerSpawnInvocation,
 } from "./hook.ts";
 export {
+	appendBootstrapLog,
 	BOOTSTRAP_DOCTOR_HINT,
 	defaultWorkerSteps,
 	parseBootstrapState,
@@ -49,6 +57,7 @@ export {
 	runBootstrapWorker,
 } from "./worker.ts";
 export type {
+	DefaultWorkerStepsSeams,
 	BootstrapDegradedEntry,
 	BootstrapRunStatus,
 	BootstrapState,
