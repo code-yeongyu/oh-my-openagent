@@ -16,6 +16,7 @@ import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, bu
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
+  migrateAgentConfig,
   type PermissionValue,
 } from "../../shared/permission-compat"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
@@ -93,21 +94,21 @@ export function createSisyphusJuniorAgentWithOverrides(
   systemDefaultModel?: string,
   useTaskSystem = false
 ): AgentConfig {
-  if (override?.disable) {
-    override = undefined
-  }
+  const activeOverride = override?.disable
+    ? undefined
+    : migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
 
-  const overrideModel = (override as { model?: string } | undefined)?.model
+  const overrideModel = activeOverride?.model
   const model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
-  const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
+  const temperature = activeOverride?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
-  const promptAppend = override?.prompt_append
+  const promptAppend = activeOverride?.prompt_append
   const prompt = buildSisyphusJuniorPrompt(model, useTaskSystem, promptAppend)
   const blockedTools = isGptModel(model) ? GPT_BLOCKED_TOOLS : BLOCKED_TOOLS
 
   const baseRestrictions = createAgentToolRestrictions(blockedTools)
 
-  const userPermission = (override?.permission ?? {}) as Record<string, PermissionValue>
+  const userPermission = (activeOverride?.permission ?? {}) as Record<string, PermissionValue>
   const basePermission = baseRestrictions.permission
   const merged: Record<string, PermissionValue> = { ...userPermission }
   for (const tool of blockedTools) {
@@ -121,19 +122,19 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   const base: AgentConfig = {
-    description: override?.description ??
+    description: activeOverride?.description ??
       "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
     mode: MODE,
     model,
     temperature,
     maxTokens: 64000,
     prompt,
-    color: override?.color ?? "#20B2AA",
+    color: activeOverride?.color ?? "#20B2AA",
     permission,
   }
 
-  if (override?.top_p !== undefined) {
-    base.top_p = override.top_p
+  if (activeOverride?.top_p !== undefined) {
+    base.top_p = activeOverride.top_p
   }
 
   if (isGptModel(model)) {
