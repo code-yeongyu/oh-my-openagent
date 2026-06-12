@@ -1,14 +1,15 @@
 import { describe, expect, it } from "bun:test"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { resolveCodexInstallerBinDir as tsResolveBinDir } from "../../../omo-opencode/src/cli/install-codex/codex-installer-bin-dir"
+import { resolveCodexInstallerBinDir as tsResolveBinDir } from "../install/codex-installer-bin-dir"
+import { ensureAutonomousPermissions as tsEnsureAutonomousPermissions } from "../install/codex-config-permissions"
 import {
   resolvePluginSource as tsResolvePluginSource,
   validatePathSegment as tsValidatePathSegment,
-} from "../../../omo-opencode/src/cli/install-codex/codex-marketplace"
-import { installedMarketplaceRoot as tsInstalledMarketplaceRoot } from "../../../omo-opencode/src/cli/install-codex/codex-marketplace-snapshot"
-import { repairProjectLocalCodexConfigText as tsRepairProjectLocalConfig } from "../../../omo-opencode/src/cli/install-codex/codex-project-local-cleanup"
-import { resolveLazyCodexPluginVersion as tsResolveLazyCodexPluginVersion } from "../../../omo-opencode/src/cli/install-codex/lazycodex-version-stamp"
+} from "../install/codex-marketplace"
+import { installedMarketplaceRoot as tsInstalledMarketplaceRoot } from "../install/codex-marketplace-snapshot"
+import { repairProjectLocalCodexConfigText as tsRepairProjectLocalConfig } from "../install/codex-project-local-cleanup"
+import { resolveLazyCodexPluginVersion as tsResolveLazyCodexPluginVersion } from "../install/lazycodex-version-stamp"
 import { runMjsScript, type JsonValue } from "./mjs-runner"
 
 const scriptInstallUrl = pathToFileURL(`${import.meta.dir}/../../scripts/install/`).href
@@ -31,6 +32,8 @@ try {
     result = module.resolveCodexInstallerBinDir(input.args);
   } else if (input.operation === "repairProjectLocalCodexConfigText") {
     result = module.repairProjectLocalCodexConfigText(input.args.config);
+  } else if (input.operation === "ensureAutonomousPermissions") {
+    result = module.ensureAutonomousPermissions(input.args.config);
   } else {
     throw new Error("unknown operation " + input.operation);
   }
@@ -123,6 +126,32 @@ describe("installer pure function TS to mjs parity", () => {
 
     // then
     expect(requireOk(output)).toEqual(tsRepairProjectLocalConfig(config))
+  })
+
+  it("#given autonomous permission config text #when enabling full autonomy #then outputs match", async () => {
+    // given
+    const config = [
+      'approval_policy = "on-request"',
+      "",
+      "[features]",
+      "multi_agent = false",
+      "child_agents_md = false",
+      "unified_exec = false",
+      "goals = false",
+      "",
+      "[windows]",
+      'sandbox = "workspace-write"',
+      "",
+      "[notice]",
+      "hide_full_access_warning = false",
+      "",
+    ].join("\n")
+
+    // when
+    const output = await runMjsOperation("permissions.mjs", "ensureAutonomousPermissions", { config })
+
+    // then
+    expect(requireOk(output)).toBe(tsEnsureAutonomousPermissions(config))
   })
 })
 

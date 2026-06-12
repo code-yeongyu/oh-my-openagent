@@ -13,6 +13,14 @@
 			"types": "./src/telemetry/index.ts",
 			"import": "./src/telemetry/index.ts"
 		},
+		"./install": {
+			"types": "./src/install/index.ts",
+			"import": "./src/install/index.ts"
+		},
+		"./install/*": {
+			"types": "./src/install/*.ts",
+			"import": "./src/install/*.ts"
+		},
 		"./marketplace.json": "./marketplace.json"
 	},
 	"types": "./index.d.ts",

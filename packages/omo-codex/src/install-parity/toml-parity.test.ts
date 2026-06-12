@@ -6,7 +6,7 @@ import {
   removeSetting,
   replaceOrInsertRootSetting,
   replaceOrInsertSetting,
-} from "../../../omo-opencode/src/cli/install-codex/toml-section-editor"
+} from "../install/toml-section-editor"
 import { expectString, runMjsScript, type JsonValue } from "./mjs-runner"
 
 type TomlStep =

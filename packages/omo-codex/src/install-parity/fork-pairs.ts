@@ -15,7 +15,7 @@ export const forkPairs = [
   {
     id: "agents-linking",
     family: "agents",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/link-cached-plugin-agents.ts",
+    tsPath: "packages/omo-codex/src/install/link-cached-plugin-agents.ts",
     mjsPath: "packages/omo-codex/scripts/install/agents.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -24,7 +24,7 @@ export const forkPairs = [
   {
     id: "agents-source-roots",
     family: "agents",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/install-codex.ts",
+    tsPath: "packages/omo-codex/src/install/install-codex.ts",
     mjsPath: "packages/omo-codex/scripts/install/agent-source-roots.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -34,7 +34,7 @@ export const forkPairs = [
   {
     id: "bin-links",
     family: "bin-links",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-cache-bins.ts",
+    tsPath: "packages/omo-codex/src/install/codex-cache-bins.ts",
     mjsPath: "packages/omo-codex/scripts/install/bin-links.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -43,7 +43,7 @@ export const forkPairs = [
   {
     id: "git-bash",
     family: "git-bash",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/git-bash.ts",
+    tsPath: "packages/omo-codex/src/install/git-bash.ts",
     mjsPath: "packages/omo-codex/scripts/install/git-bash.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -53,7 +53,7 @@ export const forkPairs = [
   {
     id: "marketplace",
     family: "marketplace",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-marketplace.ts",
+    tsPath: "packages/omo-codex/src/install/codex-marketplace.ts",
     mjsPath: "packages/omo-codex/scripts/install/marketplace.mjs",
     mode: "pure-output",
     coveredBy: ["install-parity-inventory", "install-function-parity"],
@@ -63,7 +63,7 @@ export const forkPairs = [
   {
     id: "model-catalog",
     family: "model-catalog",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-model-catalog.ts",
+    tsPath: "packages/omo-codex/src/install/codex-model-catalog.ts",
     mjsPath: "packages/omo-codex/scripts/install/model-catalog.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -72,16 +72,25 @@ export const forkPairs = [
   {
     id: "reasoning-config",
     family: "model-catalog",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-config-reasoning.ts",
+    tsPath: "packages/omo-codex/src/install/codex-config-reasoning.ts",
     mjsPath: "packages/omo-codex/scripts/install/reasoning-config.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
     exports: ["ensureCodexReasoningConfig"],
   },
   {
+    id: "permissions-config",
+    family: "config",
+    tsPath: "packages/omo-codex/src/install/codex-config-permissions.ts",
+    mjsPath: "packages/omo-codex/scripts/install/permissions.mjs",
+    mode: "pure-output",
+    coveredBy: ["install-parity-inventory", "install-function-parity"],
+    exports: ["ensureAutonomousPermissions"],
+  },
+  {
     id: "project-local-cleanup",
     family: "project-local-cleanup",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-project-local-cleanup.ts",
+    tsPath: "packages/omo-codex/src/install/codex-project-local-cleanup.ts",
     mjsPath: "packages/omo-codex/scripts/install/project-local-cleanup.mjs",
     mode: "pure-output",
     coveredBy: ["install-parity-inventory", "install-function-parity"],
@@ -90,7 +99,7 @@ export const forkPairs = [
   {
     id: "snapshot",
     family: "snapshot",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-marketplace-snapshot.ts",
+    tsPath: "packages/omo-codex/src/install/codex-marketplace-snapshot.ts",
     mjsPath: "packages/omo-codex/scripts/install/snapshot.mjs",
     mode: "pure-output",
     coveredBy: ["install-parity-inventory", "install-function-parity"],
@@ -100,7 +109,7 @@ export const forkPairs = [
   {
     id: "cached-marketplace-manifest",
     family: "snapshot",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-cached-marketplace-manifest.ts",
+    tsPath: "packages/omo-codex/src/install/codex-cached-marketplace-manifest.ts",
     mjsPath: "packages/omo-codex/scripts/install/cached-marketplace-manifest.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -109,7 +118,7 @@ export const forkPairs = [
   {
     id: "lazycodex-version-stamp",
     family: "lazycodex-version-stamp",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/lazycodex-version-stamp.ts",
+    tsPath: "packages/omo-codex/src/install/lazycodex-version-stamp.ts",
     mjsPath: "packages/omo-codex/scripts/install/lazycodex-version-stamp.mjs",
     mode: "pure-output",
     coveredBy: ["install-parity-inventory", "install-function-parity"],
@@ -118,7 +127,7 @@ export const forkPairs = [
   {
     id: "toml-editor",
     family: "toml",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/toml-section-editor.ts",
+    tsPath: "packages/omo-codex/src/install/toml-section-editor.ts",
     mjsPath: "packages/omo-codex/scripts/install/toml-editor.mjs",
     mode: "byte-output",
     coveredBy: ["install-parity-inventory", "install-toml-parity"],
@@ -127,7 +136,7 @@ export const forkPairs = [
   {
     id: "cache-install",
     family: "cache",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-cache.ts",
+    tsPath: "packages/omo-codex/src/install/codex-cache.ts",
     mjsPath: "packages/omo-codex/scripts/install/cache.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -136,7 +145,7 @@ export const forkPairs = [
   {
     id: "cache-runtime-path",
     family: "cache",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-cache-paths.ts",
+    tsPath: "packages/omo-codex/src/install/codex-cache-paths.ts",
     mjsPath: "packages/omo-codex/scripts/install/mcp-runtime-cache.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],
@@ -146,7 +155,7 @@ export const forkPairs = [
   {
     id: "bin-dir",
     family: "bin-dir",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-installer-bin-dir.ts",
+    tsPath: "packages/omo-codex/src/install/codex-installer-bin-dir.ts",
     mjsPath: "packages/omo-codex/scripts/install/bin-dir.mjs",
     mode: "pure-output",
     coveredBy: ["install-parity-inventory", "install-function-parity"],
@@ -156,7 +165,7 @@ export const forkPairs = [
   {
     id: "process",
     family: "process",
-    tsPath: "packages/omo-opencode/src/cli/install-codex/codex-process.ts",
+    tsPath: "packages/omo-codex/src/install/codex-process.ts",
     mjsPath: "packages/omo-codex/scripts/install/process.mjs",
     mode: "surface-only",
     coveredBy: ["install-parity-inventory"],

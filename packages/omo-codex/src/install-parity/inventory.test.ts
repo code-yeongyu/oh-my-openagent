@@ -17,7 +17,6 @@ const knownUnpairedScriptInstallFiles = [
   "legacy-bins.mjs",
   "multi-agent-v2-config.mjs",
   "permissions.d.mts",
-  "permissions.mjs",
   "source-package-build.mjs",
   "utils.mjs",
 ] as const
@@ -58,7 +57,7 @@ describe("installer fork parity inventory", () => {
     const malformed = {
       id: "",
       family: "toml",
-      tsPath: "packages/omo-opencode/src/cli/install-codex/toml-section-editor.ts",
+      tsPath: "packages/omo-codex/src/install/toml-section-editor.ts",
       mjsPath: "packages/omo-codex/scripts/install/toml-editor.mjs",
       coveredBy: [],
       exports: [],
