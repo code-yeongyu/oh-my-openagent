@@ -15,6 +15,7 @@ import {
 } from "./auto-update-state.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
+import { maybeTrustBunPostinstallScripts, resolveBunGlobalUpdateInvocation } from "./bun-postinstall-trust.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
@@ -74,11 +75,12 @@ export async function runLazyCodexManualUpdate({ env = process.env, dryRun = fal
 	const commandRunner = runCommand ?? defaultRunCommandForManualUpdate;
 	const currentVersion = resolveCurrentVersion(env);
 	const latestVersion = resolveLatestVersion(env);
+	const manualUpdateInvocation = resolveManualUpdateInvocation(env);
 	const plan = resolveLazyCodexUpdatePlan({
 		currentVersion,
 		latestVersion,
-		command: resolveCommand(env),
-		args: resolveArgs(env),
+		command: manualUpdateInvocation.command,
+		args: manualUpdateInvocation.args,
 	});
 	if (!plan.shouldUpdate) {
 		const printableVersion = currentVersion ?? "unknown";
@@ -92,6 +94,13 @@ export async function runLazyCodexManualUpdate({ env = process.env, dryRun = fal
 		return 0;
 	}
 	await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env });
+	await maybeTrustBunPostinstallScripts({
+		command: plan.command,
+		args: plan.args,
+		env,
+		log,
+		runCommand: commandRunner,
+	});
 	return 0;
 }
 
@@ -197,6 +206,13 @@ async function runConfigMigration({ env }) {
 
 function resolveCommand(env) {
 	return env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
+}
+
+function resolveManualUpdateInvocation(env) {
+	if (env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || env.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
+		return { command: resolveCommand(env), args: resolveArgs(env) };
+	}
+	return resolveBunGlobalUpdateInvocation(env) ?? { command: DEFAULT_UPDATE_COMMAND, args: DEFAULT_UPDATE_ARGS };
 }
 
 function resolveArgs(env) {

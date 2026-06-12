@@ -148,6 +148,26 @@ test("#given stale lazycodex version #when running update dry-run #then prints t
 	assert.equal(output, "npx --yes lazycodex-ai@latest install --no-tui --codex-autonomous");
 });
 
+test("#given Bun global lazycodex install #when running update dry-run #then prints Bun global package update", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+	const bunGlobalPackageRoot = join(tmpdir(), ".bun", "install", "global", "node_modules", "oh-my-openagent");
+
+	// when
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "update"], {
+		encoding: "utf8",
+		env: {
+			...process.env,
+			LAZYCODEX_CURRENT_VERSION: "1.0.0",
+			LAZYCODEX_LATEST_VERSION: "1.0.1",
+			OMO_WRAPPER_PACKAGE_ROOT: bunGlobalPackageRoot,
+		},
+	}).trim();
+
+	// then
+	assert.equal(output, "bun add -g oh-my-openagent@latest");
+});
+
 test("#given current lazycodex version #when running update dry-run #then reports already current", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
