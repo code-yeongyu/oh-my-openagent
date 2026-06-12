@@ -16,6 +16,7 @@ import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, bu
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
+  migrateAgentConfig,
   type PermissionValue,
 } from "../../shared/permission-compat"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
@@ -93,21 +94,24 @@ export function createSisyphusJuniorAgentWithOverrides(
   systemDefaultModel?: string,
   useTaskSystem = false
 ): AgentConfig {
-  if (override?.disable) {
-    override = undefined
-  }
+  // tools→permission migration: AgentPermissionSchema strips MCP tool keys,
+  // but z.record tools survive. migrateAgentConfig rescues them — same as mergeAgentConfig.
+  const migrated = override
+    ? (migrateAgentConfig(override as Record<string, unknown>) as typeof override)
+    : undefined
+  const ov = migrated?.disable ? undefined : migrated
 
-  const overrideModel = (override as { model?: string } | undefined)?.model
+  const overrideModel = (ov as { model?: string } | undefined)?.model
   const model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
-  const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
+  const temperature = ov?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
-  const promptAppend = override?.prompt_append
+  const promptAppend = ov?.prompt_append
   const prompt = buildSisyphusJuniorPrompt(model, useTaskSystem, promptAppend)
   const blockedTools = isGptModel(model) ? GPT_BLOCKED_TOOLS : BLOCKED_TOOLS
 
   const baseRestrictions = createAgentToolRestrictions(blockedTools)
 
-  const userPermission = (override?.permission ?? {}) as Record<string, PermissionValue>
+  const userPermission = (ov?.permission ?? {}) as Record<string, PermissionValue>
   const basePermission = baseRestrictions.permission
   const merged: Record<string, PermissionValue> = { ...userPermission }
   for (const tool of blockedTools) {
@@ -121,19 +125,19 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   const base: AgentConfig = {
-    description: override?.description ??
+    description: ov?.description ??
       "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
     mode: MODE,
     model,
     temperature,
     maxTokens: 64000,
     prompt,
-    color: override?.color ?? "#20B2AA",
+    color: ov?.color ?? "#20B2AA",
     permission,
   }
 
-  if (override?.top_p !== undefined) {
-    base.top_p = override.top_p
+  if (ov?.top_p !== undefined) {
+    base.top_p = ov.top_p
   }
 
   if (isGptModel(model)) {
