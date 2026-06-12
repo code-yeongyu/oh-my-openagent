@@ -38,7 +38,7 @@ async function fetchSessionMessages(
 }
 
 function getTerminalSessionError(messages: SessionMessage[]): string | null {
-  const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
+  const lastAssistant = getLastAssistant(messages)
   const lastUser = [...messages].reverse().find((msg) => msg.info?.role === "user")
   if (lastUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastUser.info.id) {
     return null
@@ -248,7 +248,7 @@ export async function pollSyncSession(
     }
 
     if (isSessionComplete(messages)) {
-      const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
+      const currentAssistantId = getLastAssistant(messages)?.info?.id
       if (shouldWaitForChildTasks(currentAssistantId)) {
         continue
       }
@@ -257,7 +257,7 @@ export async function pollSyncSession(
     }
 
     // Count new assistant turns to circuit-break infinite loops
-    const lastAssistant = [...messages].reverse().find((m) => m.info?.role === "assistant")
+    const lastAssistant = getLastAssistant(messages)
     if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
       lastSeenAssistantId = lastAssistant.info.id
       assistantTurnCount++
