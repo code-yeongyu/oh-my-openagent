@@ -106,7 +106,7 @@ export function archiveBackgroundTask(task: BackgroundTask): void {
   const registry = getRegistry()
   registry.activeTasks.delete(task.id)
   registry.completedTasks.delete(task.id)
-  if (!task.sessionId || !TERMINAL_TASK_STATUSES.has(task.status)) {
+  if (!TERMINAL_TASK_STATUSES.has(task.status)) {
     return
   }
   registry.completedTasks.set(task.id, cloneRegisteredTask(task))

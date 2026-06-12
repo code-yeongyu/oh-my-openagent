@@ -301,4 +301,148 @@ describe("recoverPersistedTasks", () => {
 			expect(allowed.has(call)).toBe(true);
 		}
 	});
+
+	test("#given stale live-owner snapshot #when recovering #then gc fencing keeps it on disk and recovery skips it", async () => {
+		// given a stale snapshot (8 days old) whose owner is reported alive
+		const stale = new Date(Date.now() - 8 * DAY_MS).toISOString();
+		store.persistSnapshot(
+			makeSnapshot({ id: "stale-live", status: "running", updatedAt: stale }),
+		);
+		const { client, calls } = createRecordingClient(okGet);
+
+		// when recovery runs with the owner reported alive
+		const recovered = await recoverPersistedTasks({
+			store,
+			client,
+			isPidAlive: () => true,
+		});
+
+		// then gc did not delete the live sibling's snapshot and recovery skipped it
+		expect(existsSync(snapshotPath("stale-live"))).toBe(true);
+		expect(recovered).toHaveLength(0);
+		expect(calls).toHaveLength(0);
+	});
+
+	test("#given a directory option #when reconciling a non-terminal snapshot #then session.get is scoped by query.directory", async () => {
+		// given a running snapshot whose owner is dead
+		store.persistSnapshot(
+			makeSnapshot({ id: "dir-task", status: "running", sessionId: "ses_dir" }),
+		);
+		const seenArgs: Array<{
+			path: { id: string };
+			query?: { directory: string };
+		}> = [];
+		const client: RecoveryClient = {
+			session: {
+				get: async (args) => {
+					seenArgs.push(args);
+					return { data: { id: args.path.id, directory: "/proj" } };
+				},
+				messages: async () => [],
+			},
+		};
+
+		// when recovery runs with a directory option
+		await recoverPersistedTasks({
+			store,
+			client,
+			isPidAlive: () => false,
+			directory: "/proj",
+		});
+
+		// then session.get received the directory in its query (matches session-existence.ts)
+		expect(seenArgs).toHaveLength(1);
+		expect(seenArgs[0]?.path).toEqual({ id: "ses_dir" });
+		expect(seenArgs[0]?.query).toEqual({ directory: "/proj" });
+	});
+
+	test("#given a response whose directory mismatches the option #when recovering #then reconciles to session-lost error", async () => {
+		// given a running snapshot whose session resolves to a different directory
+		store.persistSnapshot(
+			makeSnapshot({
+				id: "mismatch-task",
+				status: "running",
+				sessionId: "ses_x",
+			}),
+		);
+		const client: RecoveryClient = {
+			session: {
+				get: async (args) => ({
+					data: { id: args.path.id, directory: "/other-project" },
+				}),
+				messages: async () => [],
+			},
+		};
+
+		// when recovery runs scoped to a different directory
+		const recovered = await recoverPersistedTasks({
+			store,
+			client,
+			isPidAlive: () => false,
+			directory: "/my-project",
+		});
+
+		// then the cross-directory session is treated as lost across restart
+		expect(recovered).toHaveLength(1);
+		expect(recovered[0]?.kind).toBe("reconciled-error");
+		expect(recovered[0]?.task.status).toBe("error");
+		expect(recovered[0]?.task.error).toBe("session lost across restart");
+	});
+
+	test("#given dead-owner terminal interrupt snapshot with sessionId #when recovering #then the restored task carries session_read guidance", async () => {
+		// given a terminal interrupt snapshot (already reconciled on a prior restart),
+		// whose guidance text was never written to disk (no snapshot.result field)
+		store.persistSnapshot(
+			makeSnapshot({
+				id: "second-restart-interrupt",
+				status: "interrupt",
+				sessionId: "ses_survivor",
+			}),
+		);
+		const { client, calls } = createRecordingClient(okGet);
+
+		// when recovery runs with the owner dead
+		const recovered = await recoverPersistedTasks({
+			store,
+			client,
+			isPidAlive: () => false,
+		});
+
+		// then the terminal interrupt is restored with guidance reconstructed from sessionId
+		expect(recovered).toHaveLength(1);
+		expect(recovered[0]?.kind).toBe("terminal");
+		expect(recovered[0]?.task.status).toBe("interrupt");
+		const result = recovered[0]?.task.result ?? "";
+		expect(result).toContain('session_read(session_id="ses_survivor")');
+		expect(calls).toHaveLength(0);
+	});
+
+	test("#given dead-owner terminal interrupt snapshot carrying an error #when recovering #then no restart guidance is reconstructed", async () => {
+		// given an ordinary persisted interrupt (e.g. a prompt failure) that already
+		// recorded an error - NOT a restart-recovery reconcile
+		store.persistSnapshot(
+			makeSnapshot({
+				id: "prompt-failure-interrupt",
+				status: "interrupt",
+				sessionId: "ses_prompt_failure",
+				error: "agent not found",
+			}),
+		);
+		const { client, calls } = createRecordingClient(okGet);
+
+		// when recovery runs with the owner dead
+		const recovered = await recoverPersistedTasks({
+			store,
+			client,
+			isPidAlive: () => false,
+		});
+
+		// then the interrupt is restored as-is without restart-recovery guidance
+		expect(recovered).toHaveLength(1);
+		expect(recovered[0]?.kind).toBe("terminal");
+		expect(recovered[0]?.task.status).toBe("interrupt");
+		expect(recovered[0]?.task.error).toBe("agent not found");
+		expect(recovered[0]?.task.result).toBeUndefined();
+		expect(calls).toHaveLength(0);
+	});
 });

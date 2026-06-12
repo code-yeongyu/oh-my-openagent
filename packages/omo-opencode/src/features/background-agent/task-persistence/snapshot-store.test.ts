@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { BackgroundTask } from "../types"
@@ -163,20 +163,54 @@ describe("createTaskPersistenceStore listSnapshots", () => {
 })
 
 describe("createTaskPersistenceStore gcOlderThan", () => {
-  it("deletes only entries whose updatedAt is older than the cutoff", () => {
-    // #given one stale and one fresh snapshot
+  it("deletes stale entries whose owner is dead", () => {
+    // #given one stale and one fresh snapshot, both owned by a dead process
     const directory = makeTempDir()
     const store = createTaskPersistenceStore({ directory })
     const now = new Date("2026-06-12T12:00:00.000Z")
     store.persistSnapshot(buildSnapshot("task-stale", "2026-06-12T09:00:00.000Z"))
     store.persistSnapshot(buildSnapshot("task-fresh", "2026-06-12T11:59:00.000Z"))
 
-    // #when running gc with a one-hour max age
-    store.gcOlderThan(60 * 60 * 1000, now)
+    // #when running gc with a one-hour max age and the owner reported dead
+    store.gcOlderThan(60 * 60 * 1000, now, () => false)
 
-    // #then only the stale entry is removed
+    // #then only the stale dead-owner entry is removed
     const remaining = store.listSnapshots().map((snapshot) => snapshot.id)
     expect(remaining).toEqual(["task-fresh"])
+  })
+
+  it("keeps a stale snapshot whose owner is still alive", () => {
+    // #given a stale snapshot whose owner pid is reported alive
+    const directory = makeTempDir()
+    const store = createTaskPersistenceStore({ directory })
+    const now = new Date("2026-06-12T12:00:00.000Z")
+    store.persistSnapshot(buildSnapshot("task-stale", "2026-06-12T09:00:00.000Z"))
+
+    // #when running gc with a one-hour max age and the owner reported alive
+    store.gcOlderThan(60 * 60 * 1000, now, () => true)
+
+    // #then the live sibling's snapshot survives regardless of age
+    const remaining = store.listSnapshots().map((snapshot) => snapshot.id)
+    expect(remaining).toEqual(["task-stale"])
+  })
+
+  it("deletes an unparseable file older than maxAge by mtime regardless of owner liveness", () => {
+    // #given a fresh valid snapshot and an old unparseable file
+    const directory = makeTempDir()
+    const store = createTaskPersistenceStore({ directory })
+    store.persistSnapshot(buildSnapshot("task-keep", "2026-06-12T11:59:00.000Z"))
+    const garbage = join(tasksDir(directory), "garbage.json")
+    writeFileSync(garbage, "{ not valid json", "utf-8")
+    const oldTime = new Date("2020-01-01T00:00:00.000Z")
+    utimesSync(garbage, oldTime, oldTime)
+    const now = new Date("2026-06-12T12:00:00.000Z")
+
+    // #when running gc with the owner reported alive (cannot fence unparseable files)
+    store.gcOlderThan(60 * 60 * 1000, now, () => true)
+
+    // #then the old unparseable file is deleted and the fresh snapshot is kept
+    expect(existsSync(garbage)).toBe(false)
+    expect(store.listSnapshots().map((snapshot) => snapshot.id)).toEqual(["task-keep"])
   })
 })
 

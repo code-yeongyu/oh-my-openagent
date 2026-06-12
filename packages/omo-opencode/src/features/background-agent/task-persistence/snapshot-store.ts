@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { log as defaultLog } from "../../../shared/logger";
 import { writeFileAtomically } from "../../../shared/write-file-atomically";
 import type { BackgroundTask } from "../types";
-import { stampOwner } from "./owner-fencing";
+import { isPidAlive as defaultIsPidAlive, stampOwner } from "./owner-fencing";
 import {
 	type PersistedTaskSnapshot,
 	parseSnapshotFile,
@@ -47,7 +47,11 @@ export interface TaskPersistenceStore {
 	persistSnapshot(snapshot: PersistedTaskSnapshot): void;
 	delete(taskId: string): void;
 	listSnapshots(): PersistedTaskSnapshot[];
-	gcOlderThan(maxAgeMs: number, now?: Date): void;
+	gcOlderThan(
+		maxAgeMs: number,
+		now?: Date,
+		isPidAlive?: (pid: number) => boolean,
+	): void;
 }
 
 export function createTaskPersistenceStore(
@@ -152,7 +156,11 @@ export function createTaskPersistenceStore(
 			return snapshots;
 		},
 
-		gcOlderThan(maxAgeMs: number, now: Date = new Date()): void {
+		gcOlderThan(
+			maxAgeMs: number,
+			now: Date = new Date(),
+			isPidAlive: (pid: number) => boolean = defaultIsPidAlive,
+		): void {
 			try {
 				if (!existsSync(tasksDir)) {
 					return;
@@ -164,6 +172,12 @@ export function createTaskPersistenceStore(
 					try {
 						const snapshot = readSnapshot(filePath);
 						if (snapshot) {
+							// Owner-aware fencing: a live owner means another OpenCode
+							// instance still owns this task. Never delete a live sibling's
+							// snapshot, regardless of how stale its updatedAt looks.
+							if (isPidAlive(snapshot.owner.pid)) {
+								continue;
+							}
 							const updatedAt = Date.parse(snapshot.updatedAt);
 							if (!Number.isNaN(updatedAt) && updatedAt < cutoff) {
 								unlinkSync(filePath);

@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import type { PersistedTaskSnapshot } from "./task-persistence"
+import { createTaskPersistenceStore, type PersistedTaskSnapshot, type TaskPersistenceStore } from "./task-persistence"
 import { BackgroundManager } from "./manager"
 import { clearBackgroundTaskRegistryForTesting, getRegisteredBackgroundTask } from "./task-registry"
 import type { BackgroundTask, BackgroundTaskStatus } from "./types"
@@ -16,8 +16,14 @@ function cast<T>(value: unknown): T {
 type ManagerInternals = {
   tasks: Map<string, BackgroundTask>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
+  tryFallbackRetry: (
+    task: BackgroundTask,
+    errorInfo: { name?: string; message?: string; statusCode?: number },
+    source: string,
+  ) => Promise<boolean>
   scheduleTaskRemoval: (taskId: string) => void
   removeTask: (task: BackgroundTask) => void
+  checkAndInterruptStaleTasks: (statuses?: Record<string, { type: string }>) => Promise<void>
 }
 
 function internals(manager: BackgroundManager): ManagerInternals {
@@ -60,16 +66,51 @@ function createManager(args: {
   directory: string
   client: unknown
   persistence?: boolean
+  persistenceStore?: TaskPersistenceStore
 }): BackgroundManager {
   const manager = new BackgroundManager({
     pluginContext: cast<PluginInput>({ client: args.client, directory: args.directory }),
     config: args.persistence === undefined ? undefined : { persistence: args.persistence },
+    persistenceStore: args.persistenceStore,
     // Disabled so notifyParentSession takes the no-op branch yet still funnels
     // terminal tasks into scheduleTaskRemoval (where the snapshot is persisted).
     enableParentSessionNotifications: false,
   })
   createdManagers.push(manager)
   return manager
+}
+
+type PersistRecord = { status: BackgroundTaskStatus; sessionId: string | undefined }
+
+// A TaskPersistenceStore double that records the status/sessionId of every
+// persist call (preserving order against external markers like "abort") while
+// delegating to a real disk store so on-disk assertions still hold.
+function createRecordingStore(
+  directory: string,
+  events: string[],
+  records: PersistRecord[],
+): TaskPersistenceStore {
+  const real = createTaskPersistenceStore({ directory })
+  return {
+    persist(task) {
+      events.push(`persist:${task.status}`)
+      records.push({ status: task.status, sessionId: task.sessionId })
+      real.persist(task)
+    },
+    persistSnapshot(snapshot) {
+      real.persistSnapshot(snapshot)
+    },
+    delete(taskId) {
+      events.push("delete")
+      real.delete(taskId)
+    },
+    listSnapshots() {
+      return real.listSnapshots()
+    },
+    gcOlderThan(maxAgeMs, now) {
+      real.gcOlderThan(maxAgeMs, now)
+    },
+  }
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
@@ -128,6 +169,161 @@ describe("BackgroundManager snapshot persistence", () => {
       const snapshot = readSnapshot(directory, task.id)
       expect(snapshot.status).toBe("running")
       expect(snapshot.sessionId).toBe("ses_launch")
+    })
+  })
+
+  describe("#given a task is launched but its session has not yet bound (F2)", () => {
+    test("#when launch returns #then a pending snapshot is persisted without a sessionId", async () => {
+      // given a client whose session.create never resolves, so the task is
+      // persisted while still pending and never reaches the running/bound state.
+      const neverResolves = new Promise<never>(() => {})
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: () => neverResolves,
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          abort: async () => ({ data: {} }),
+        },
+      }
+      const manager = createManager({ directory, client })
+
+      // when
+      const launched = await manager.launch({
+        description: "queued persist test",
+        prompt: "do work",
+        agent: "general",
+        parentSessionId: "ses_parent",
+        parentMessageId: "msg_parent",
+      })
+      await waitFor(() => existsSync(snapshotPathFor(directory, launched.id)))
+
+      // then
+      expect(existsSync(snapshotPathFor(directory, launched.id))).toBe(true)
+      const snapshot = readSnapshot(directory, launched.id)
+      expect(snapshot.status).toBe("pending")
+      expect(snapshot.sessionId).toBeUndefined()
+    })
+  })
+
+  describe("#given a running task with a recording persistence store (F3)", () => {
+    test("#when it completes #then the terminal snapshot is persisted before the session-abort side effect", async () => {
+      // given a recording store and a client whose abort records its ordering
+      const events: string[] = []
+      const records: PersistRecord[] = []
+      const store = createRecordingStore(directory, events, records)
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: async () => ({ data: { id: "ses_order" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          abort: async () => {
+            events.push("abort")
+            return { data: {} }
+          },
+        },
+      }
+      const manager = createManager({ directory, client, persistenceStore: store })
+      const task = await launchAndAwaitRunning(manager, directory)
+
+      // when
+      await internals(manager).tryCompleteTask(task, "test")
+
+      // then the completed status must be persisted before the abort await runs
+      const completedIndex = events.indexOf("persist:completed")
+      const abortIndex = events.indexOf("abort")
+      expect(completedIndex).toBeGreaterThanOrEqual(0)
+      expect(abortIndex).toBeGreaterThanOrEqual(0)
+      expect(completedIndex).toBeLessThan(abortIndex)
+    })
+  })
+
+  describe("#given a running task that hits a retryable error (F4)", () => {
+    test("#when a fallback retry is scheduled #then the pending snapshot is persisted before the session-abort await resolves", async () => {
+      // given a recording store and a client whose abort resolves only after a delay
+      const events: string[] = []
+      const records: PersistRecord[] = []
+      const store = createRecordingStore(directory, events, records)
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: async () => ({ data: { id: "ses_retry" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          abort: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50))
+            events.push("abort-resolved")
+            return { data: {} }
+          },
+        },
+      }
+      const manager = createManager({ directory, client, persistenceStore: store })
+      const task = await launchAndAwaitRunning(manager, directory)
+      task.model = { providerID: "provider-a", modelID: "original-model" }
+      task.fallbackChain = [
+        { model: "fallback-model-1", providers: ["provider-b"], variant: undefined },
+      ]
+      task.attemptCount = 0
+      const recordsBefore = records.length
+      const eventsBefore = events.length
+
+      // when
+      const retried = await internals(manager).tryFallbackRetry(
+        task,
+        { message: "model overloaded" },
+        "test",
+      )
+
+      // then a pending snapshot with no sessionId is persisted
+      expect(retried).toBe(true)
+      const pendingPersist = records
+        .slice(recordsBefore)
+        .find((record) => record.status === "pending")
+      expect(pendingPersist).toBeDefined()
+      expect(pendingPersist?.sessionId).toBeUndefined()
+
+      // and that persist landed before the abort await resolved
+      const tail = events.slice(eventsBefore)
+      const pendingIndex = tail.indexOf("persist:pending")
+      const abortIndex = tail.indexOf("abort-resolved")
+      expect(pendingIndex).toBeGreaterThanOrEqual(0)
+      expect(abortIndex).toBeGreaterThanOrEqual(0)
+      expect(pendingIndex).toBeLessThan(abortIndex)
+    })
+  })
+
+  describe("#given a stale running task with a recording persistence store (F3)", () => {
+    test("#when checkAndInterruptStaleTasks cancels it #then the cancelled status is persisted", async () => {
+      // given a recording store and a running task far past the staleness timeout
+      const events: string[] = []
+      const records: PersistRecord[] = []
+      const store = createRecordingStore(directory, events, records)
+      const manager = createManager({
+        directory,
+        client: createFakeClient("ses_stale"),
+        persistenceStore: store,
+      })
+      const task = await launchAndAwaitRunning(manager, directory)
+      task.startedAt = new Date(0)
+      task.progress = undefined
+      // Stub the parent-notification path so the cancellation can only be
+      // persisted by the poller's onTaskInterrupted callback, not by the
+      // incidental scheduleTaskRemoval persist inside notifyParentSession.
+      cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(
+        manager,
+      ).notifyParentSession = async () => {}
+      const recordsBefore = records.length
+
+      // when the stale sweep runs with no live session status registry
+      await internals(manager).checkAndInterruptStaleTasks(undefined)
+
+      // then the cancellation was persisted via onTaskInterrupted
+      const cancelledPersist = records
+        .slice(recordsBefore)
+        .find((record) => record.status === "cancelled")
+      expect(cancelledPersist).toBeDefined()
+      expect(task.status).toBe("cancelled")
     })
   })
 
@@ -499,6 +695,32 @@ describe("BackgroundManager.restorePersistedTasks", () => {
         }
       }
       expect(retrievable).toBe(100)
+    })
+  })
+
+  describe("#given a pending no-session snapshot owned by a dead process (F2)", () => {
+    test("#when manager B restores #then getTask resolves an error task 'session lost across restart'", async () => {
+      // given a pending snapshot that never bound a session, owned by a dead process
+      const id = "bg_f2_no_session"
+      writeSnapshotToDisk(
+        directory,
+        makeSnapshot({
+          id,
+          status: "pending",
+          sessionId: undefined,
+          parentSessionId: "ses_parent",
+        }),
+      )
+      clearBackgroundTaskRegistryForTesting()
+
+      // when
+      const manager = createManager({ directory, client: createFakeClient("ses_f2") })
+      await manager.restorePersistedTasks({ isPidAlive: () => false })
+
+      // then the recovered terminal error task is reachable via getTask
+      const restored = manager.getTask(id)
+      expect(restored?.status).toBe("error")
+      expect(restored?.error).toContain("session lost across restart")
     })
   })
 })

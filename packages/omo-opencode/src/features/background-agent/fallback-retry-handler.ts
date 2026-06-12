@@ -63,9 +63,10 @@ export async function tryFallbackRetry(args: {
     failedError?: string
     nextModel: string
   }) => void
+  persistTask?: (task: BackgroundTask) => void
   deps?: Partial<FallbackRetryHandlerDeps>
 }): Promise<boolean> {
-  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
+  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying, persistTask } = args
   const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
   const fallbackChain = task.fallbackChain
   const canRetry =
@@ -223,6 +224,9 @@ export async function tryFallbackRetry(args: {
     onSessionCreated: task.onSessionCreated,
   }
 
+  // Persist the re-queued pending task (sessionId cleared by startAttempt) before
+  // the abort await so a crash during abort cannot lose the pending state (F4).
+  persistTask?.(task)
   if (previousSessionID) {
     await abortWithTimeout(client, previousSessionID).catch(() => {})
   }

@@ -30,7 +30,11 @@ export function stampOwner(): { pid: number; startedAt: string } {
  * **Limitations:**
  * 1. **PID Recycling:** PID recycling is not fully detectable. If a process dies and its PID is reassigned
  *    to a new process before this check, it will incorrectly report the process as alive. This is an accepted
- *    limitation of PID-based fencing.
+ *    limitation of PID-based fencing. The owning snapshot records `owner.startedAt` precisely so a future
+ *    refinement can compare the recorded start time against the live process start time and reject a recycled
+ *    pid; today fencing is pid-liveness only and does not yet consult `owner.startedAt`. The direction is
+ *    deliberately conservative: a falsely-"alive" owner only causes recovery to skip adoption, never to corrupt
+ *    or steal a task another process may legitimately own.
  * 2. **Windows Semantics:** On Windows, `process.kill(pid, 0)` semantics differ from POSIX systems. Specifically,
  *    sending signal 0 is not supported in the same way and may throw or behave differently.
  *    Using dependency injection (`deps.kill`) keeps the policy unit-testable and cross-platform.

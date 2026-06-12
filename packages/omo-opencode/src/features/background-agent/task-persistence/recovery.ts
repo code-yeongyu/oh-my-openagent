@@ -10,7 +10,10 @@ import type { TaskPersistenceStore } from "./snapshot-store";
  */
 export type RecoveryClient = {
 	session: {
-		get(args: { path: { id: string } }): Promise<unknown>;
+		get(args: {
+			path: { id: string };
+			query?: { directory: string };
+		}): Promise<unknown>;
 		messages(args: { path: { id: string } }): Promise<unknown>;
 	};
 };
@@ -23,6 +26,7 @@ export type RecoveredTask = {
 export interface RecoverPersistedTasksOptions {
 	store: TaskPersistenceStore;
 	client: RecoveryClient;
+	directory?: string;
 	isPidAlive?: (pid: number) => boolean;
 	now?: Date;
 	logger?: (message: string, data?: unknown) => void;
@@ -51,6 +55,25 @@ function isErrorResponse(response: unknown): boolean {
 	);
 }
 
+/**
+ * True when a `session.get` response exposes a `data.directory` that does not
+ * match the directory recovery is scoped to. The OpenCode SDK returns the
+ * owning project directory on `response.data.directory` (see manager parent
+ * session lookup); a mismatch means a same-ID session belongs to another
+ * project and must not reconcile this task to "interrupt".
+ */
+function isDirectoryMismatch(
+	response: unknown,
+	directory: string | undefined,
+): boolean {
+	if (!directory) return false;
+	if (!isRecord(response)) return false;
+	const data = response.data;
+	if (!isRecord(data)) return false;
+	const responseDirectory = data.directory;
+	if (typeof responseDirectory !== "string") return false;
+	return responseDirectory !== directory;
+}
 function interruptGuidance(sessionId: string): string {
 	return (
 		`Task interrupted by OpenCode restart. The subagent session ${sessionId} ` +
@@ -78,6 +101,7 @@ function reconciledSnapshot(
 interface ReconcileDeps {
 	store: TaskPersistenceStore;
 	client: RecoveryClient;
+	directory?: string;
 	isPidAlive: (pid: number) => boolean;
 	now: Date;
 	logger: (message: string, data?: unknown) => void;
@@ -95,7 +119,21 @@ async function recoverSnapshot(
 
 	// Terminal tasks are restored as-is without ever consulting the client.
 	if (TERMINAL_STATUSES.has(snapshot.status)) {
-		return { task: snapshotToTask(snapshot), kind: "terminal" };
+		const task = snapshotToTask(snapshot);
+		// The interrupt guidance text lives only in memory (the snapshot schema has
+		// no result field), so a terminal interrupt restored on a later restart would
+		// otherwise lose it. Reconstruct it from the surviving sessionId (F8). Gated
+		// on !task.error so ordinary persisted interrupts (e.g. prompt failures that
+		// recorded an error) are never mislabeled as restart-recovered.
+		if (
+			task.status === "interrupt" &&
+			task.sessionId &&
+			!task.result &&
+			!task.error
+		) {
+			task.result = interruptGuidance(task.sessionId);
+		}
+		return { task, kind: "terminal" };
 	}
 
 	const sessionId = snapshot.sessionId;
@@ -112,8 +150,13 @@ async function recoverSnapshot(
 
 	let sessionSurvived = false;
 	try {
-		const response = await deps.client.session.get({ path: { id: sessionId } });
-		sessionSurvived = !isErrorResponse(response);
+		const response = await deps.client.session.get({
+			path: { id: sessionId },
+			...(deps.directory ? { query: { directory: deps.directory } } : {}),
+		});
+		sessionSurvived =
+			!isErrorResponse(response) &&
+			!isDirectoryMismatch(response, deps.directory);
 	} catch (error) {
 		deps.logger("task-recovery: session.get threw during reconcile", {
 			id: snapshot.id,
@@ -149,6 +192,12 @@ async function recoverSnapshot(
  * non-terminal survivors against the OpenCode session API, and returns the
  * recovered tasks for the manager to apply. Never rejects on a single bad
  * snapshot: each is wrapped in its own try/catch and logged.
+ *
+ * Owner fencing is pid-liveness only: `owner.startedAt` is persisted to enable a
+ * future start-time comparison but is not yet consulted. A recycled pid that
+ * happens to be alive is treated as a live owner, so recovery conservatively
+ * skips adoption rather than risk corrupting a task another process may own.
+ * See {@link isPidAlive} for the underlying accepted limitation.
  */
 export async function recoverPersistedTasks(
 	options: RecoverPersistedTasksOptions,
@@ -160,9 +209,14 @@ export async function recoverPersistedTasks(
 		isPidAlive: options.isPidAlive ?? ((pid) => defaultIsPidAlive(pid)),
 		now: options.now ?? new Date(),
 		logger,
+		directory: options.directory,
 	};
 
-	deps.store.gcOlderThan(options.gcMaxAgeMs ?? DEFAULT_GC_MAX_AGE_MS);
+	deps.store.gcOlderThan(
+		options.gcMaxAgeMs ?? DEFAULT_GC_MAX_AGE_MS,
+		deps.now,
+		deps.isPidAlive,
+	);
 
 	const recovered: RecoveredTask[] = [];
 	for (const snapshot of deps.store.listSnapshots()) {
