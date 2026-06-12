@@ -1,7 +1,7 @@
-import { createRequire } from "module"
-import { homedir as defaultHomedir } from "os"
-import { dirname, join } from "path"
-import { existsSync, statSync } from "fs"
+import { createRequire } from "node:module"
+import { homedir as defaultHomedir } from "node:os"
+import { dirname, join } from "node:path"
+import { existsSync, statSync } from "node:fs"
 
 export const SG_PATH_ENV_KEY = "OMO_AST_GREP_SG_PATH"
 
@@ -103,7 +103,7 @@ function findRuntimeDirSgPath(
 	arch: string,
 	homedir: () => string,
 ): string | null {
-	const codexHome = nonEmptyValue(env.CODEX_HOME) ?? join(homedir(), ".codex")
+	const codexHome = nonEmptyValue(env["CODEX_HOME"]) ?? join(homedir(), ".codex")
 	const binaryName = platform === "win32" ? "sg.exe" : "sg"
 	const runtimePath = join(codexHome, "runtime", "ast-grep", `${platform}-${arch}`, binaryName)
 	return findValidExecutable(runtimePath, platform)
