@@ -536,6 +536,26 @@ describe("promptWithModelSuggestionRetry", () => {
     // and should call promptAsync only once
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
+
+  it("#given promptAsync fails with a dispatch timeout after dispatch was attempted #when the non-verifying caller classifies it #then it throws instead of silently assuming acceptance", async () => {
+    // given
+    const promptMock = mock().mockRejectedValueOnce(new Error("promptAsync timed out after 30000ms"))
+    const client = { session: { promptAsync: promptMock } }
+
+    // when
+    // then
+    await expect(
+      promptWithModelSuggestionRetry(unsafeTestValue(client), {
+        path: { id: "session-dispatch-timeout" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        },
+      })
+    ).rejects.toThrow("timed out")
+
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("promptSyncWithModelSuggestionRetry", () => {

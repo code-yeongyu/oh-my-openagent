@@ -274,6 +274,31 @@ describe("first-prompt-watchdog", () => {
 
     watchdog.dispose()
   })
+
+  it("#given a subagent silent past the threshold with no fallback configured #when the watchdog fires #then it surfaces the exhaustion via onWatchdogExhausted", async () => {
+    // given
+    const sessionID = "session-no-fallback-exhausted"
+    subagentSessions.add(sessionID)
+    const deps = createDeps()
+    const exhausted: Array<{ sessionID: string; model?: string; agent?: string }> = []
+    deps.onWatchdogExhausted = (id, info) => {
+      exhausted.push({ sessionID: id, model: info.model, agent: info.agent })
+    }
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+    expect(exhausted).toEqual([{ sessionID, model: PRIMARY_MODEL, agent: AGENT }])
+
+    watchdog.dispose()
+  })
 })
 
 interface RecordedWatchdogCalls {

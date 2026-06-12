@@ -1,6 +1,6 @@
 import {
   createInternalAgentTextPart,
-  isAmbiguousPostDispatchPromptFailure,
+  isVerifiableAmbiguousPromptFailure,
   log,
   withInternalNoReplyMarker,
 } from "../../shared"
@@ -63,7 +63,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       },
     })
     if (promptResult.status === "failed") {
-      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+      if (isVerifiableAmbiguousPromptFailure(promptResult)) {
         const dispatchedWake = cloneParentWake(input.latestWake)
         dispatchedWake.dispatchedAt = dispatchStartedAt
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {

@@ -56,6 +56,8 @@ import {
 } from "./compaction-aware-message-resolver"
 import { ConcurrencyManager } from "./concurrency"
 import {
+  MIN_RUNTIME_BEFORE_STALE_MS,
+  MIN_STABILITY_TIME_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
   SESSION_ERROR_TRANSIENT_THRESHOLD,
@@ -123,6 +125,19 @@ import type {
 } from "./types"
 
 type OpencodeClient = PluginInput["client"]
+
+function isCompletionMarker(value: unknown): boolean {
+  if (typeof value === "boolean") return value
+  return value !== undefined && value !== null
+}
+
+function isAssistantMessageFinished(info: { finish?: unknown; finished?: unknown; completed?: unknown; time?: { completed?: unknown } } | undefined): boolean {
+  if (!info) return false
+  return isCompletionMarker(info.finish)
+    || isCompletionMarker(info.finished)
+    || isCompletionMarker(info.completed)
+    || isCompletionMarker(info.time?.completed)
+}
 
 type ResumeTaskSnapshot = {
   status: BackgroundTask["status"]
@@ -2888,6 +2903,24 @@ The task was re-queued on a fallback model after a retryable failure.
     return verifySessionStillExists(this.client, sessionID, this.directory)
   }
 
+  /**
+   * Surface a first-prompt-watchdog give-up (no fallback chain configured) for a
+   * background task. Locates the task by session and fails it through the same
+   * machinery as a crash so the parent is notified. No-op when the session is not
+   * a background task (e.g. a main session), preserving the watchdog's silent
+   * give-up for non-task sessions.
+   */
+  async failWatchdogExhaustedTask(sessionID: string, info: { model?: string; agent?: string } = {}): Promise<void> {
+    const task = this.findBySession(sessionID)
+    if (!task) return
+    if (task.status !== "running") return
+    const modelLabel = info.model ? ` on model ${info.model}` : ""
+    log("[background-agent] First-prompt watchdog exhausted with no fallback, failing task:", { taskId: task.id, sessionID, model: info.model, agent: info.agent })
+    await this.failCrashedTask(
+      task,
+      `Subagent produced no progress${modelLabel} and the first-prompt watchdog exhausted its same-model retries with no fallback model configured.`,
+    )
+  }
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "error", errorMessage)
@@ -2935,6 +2968,61 @@ The task was re-queued on a fallback model after a retryable failure.
       log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
     })
   }
+
+  /**
+   * Completion fallback for the polling path when SSE idle events are missed.
+   * When a running task's session status is unavailable or stuck-busy, the
+   * idle SSE event can be dropped and the task wedges until the stale timeout.
+   * This detects completion from message stability: if the message count has
+   * been unchanged for MIN_STABILITY_TIME_MS AND the last assistant message is
+   * finished, the task is completed. It can NEVER complete a session that is
+   * still generating, because a growing message count resets the stability
+   * window and an unfinished last assistant message blocks completion.
+   */
+  private async tryMessageStabilityCompletion(task: BackgroundTask, sessionID: string, source: string): Promise<boolean> {
+    if (task.status !== "running") return false
+
+    // Throttle: only consider the fallback once the task has been running a while.
+    const startedAt = task.startedAt?.getTime()
+    if (startedAt === undefined || Date.now() - startedAt < MIN_RUNTIME_BEFORE_STALE_MS) {
+      return false
+    }
+
+    let messages: Array<{ info?: { role?: string; finish?: unknown; finished?: unknown; completed?: unknown; time?: { completed?: unknown } } }>
+    try {
+      const response = await messagesInDirectory(this.client, { path: { id: sessionID } }, this.directory)
+      messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
+    } catch (error) {
+      log("[background-agent] Message-stability fallback failed to read messages:", { taskId: task.id, error })
+      return false
+    }
+
+    const count = messages.length
+    if (task.lastMsgCount !== count) {
+      task.lastMsgCount = count
+      task.lastMessageCountChangedAt = new Date()
+      return false
+    }
+    if (!task.lastMessageCountChangedAt) {
+      task.lastMessageCountChangedAt = new Date()
+      return false
+    }
+    if (Date.now() - task.lastMessageCountChangedAt.getTime() < MIN_STABILITY_TIME_MS) {
+      return false
+    }
+
+    // Stable, but never complete a session that has not finished its turn.
+    const lastAssistant = [...messages].reverse().find((message) => message.info?.role === "assistant")
+    if (!lastAssistant || !isAssistantMessageFinished(lastAssistant.info)) {
+      return false
+    }
+
+    // Re-check after async work to avoid racing with another completion path.
+    if (task.status !== "running") return false
+
+    return await this.tryCompleteTask(task, source)
+  }
+
 
   private async pollRunningTasks(): Promise<void> {
     if (this.pollingInFlight) return
@@ -2993,6 +3081,7 @@ The task was re-queued on a fallback model after a retryable failure.
               sessionStatus: sessionStatus.type,
               toolCalls: task.progress?.toolCalls ?? 0,
             })
+            await this.tryMessageStabilityCompletion(task, sessionID, "polling (message stability, status busy)")
             continue
           }
 
@@ -3010,6 +3099,7 @@ The task was re-queued on a fallback model after a retryable failure.
           }
 
           if (allStatuses === undefined) {
+            await this.tryMessageStabilityCompletion(task, sessionID, "polling (message stability, status unavailable)")
             continue
           }
 

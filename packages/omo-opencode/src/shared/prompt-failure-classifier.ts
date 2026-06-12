@@ -14,14 +14,32 @@ export function extractPromptFailureMessage(error: unknown): string {
   return String(error)
 }
 
-export function isAmbiguousPromptDispatchFailure(error: unknown): boolean {
+const VERIFICATION_INDEPENDENT_AMBIGUOUS_PATTERNS = [
+  "unexpected eof",
+  "json parse error",
+  "unexpected end of json input",
+] as const
+
+const VERIFICATION_DEPENDENT_AMBIGUOUS_PATTERNS = [
+  "timed out",
+] as const
+
+function promptFailureMessageMatches(error: unknown, patterns: readonly string[]): boolean {
   const message = extractPromptFailureMessage(error).toLowerCase()
-  return (
-    message.includes("unexpected eof")
-    || message.includes("json parse error")
-    || message.includes("unexpected end of json input")
-    || message.includes("timed out")
-  )
+  return patterns.some((pattern) => message.includes(pattern))
+}
+
+export function isAmbiguousPromptDispatchFailure(error: unknown): boolean {
+  return promptFailureMessageMatches(error, [
+    ...VERIFICATION_INDEPENDENT_AMBIGUOUS_PATTERNS,
+    ...VERIFICATION_DEPENDENT_AMBIGUOUS_PATTERNS,
+  ])
+}
+
+// Excludes timeouts: a dispatch timeout almost always means the prompt was NOT
+// accepted, so callers that cannot verify acceptance must treat it as a failure.
+export function isVerificationIndependentAmbiguousPromptDispatchFailure(error: unknown): boolean {
+  return promptFailureMessageMatches(error, VERIFICATION_INDEPENDENT_AMBIGUOUS_PATTERNS)
 }
 
 type PromptDispatchFailureResultLike = {
@@ -30,6 +48,17 @@ type PromptDispatchFailureResultLike = {
   dispatchAttempted?: boolean
 }
 
+// Default classification for callers WITHOUT post-dispatch verification: a
+// timeout is treated as a real failure, only genuinely indeterminate errors
+// (EOF / JSON parse) are considered possibly-accepted.
 export function isAmbiguousPostDispatchPromptFailure(result: PromptDispatchFailureResultLike): boolean {
+  return result.dispatchAttempted === true
+    && isVerificationIndependentAmbiguousPromptDispatchFailure(result.error)
+}
+
+// For callers that verify post-dispatch acceptance (e.g. parent-wake via
+// hasRecordedPromptAfterDispatch): timeouts remain ambiguous so the caller can
+// confirm delivery before retrying instead of risking a duplicate dispatch.
+export function isVerifiableAmbiguousPromptFailure(result: PromptDispatchFailureResultLike): boolean {
   return result.dispatchAttempted === true && isAmbiguousPromptDispatchFailure(result.error)
 }

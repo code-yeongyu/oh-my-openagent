@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
 import {
-  isAmbiguousPostDispatchPromptFailure,
+isAmbiguousPostDispatchPromptFailure,
   isAmbiguousPromptDispatchFailure,
+  isVerifiableAmbiguousPromptFailure,
 } from "./prompt-failure-classifier"
 
 describe("prompt failure classifier", () => {
@@ -87,5 +88,65 @@ describe("prompt failure classifier", () => {
 
     // then
     expect(ambiguous).toBe(true)
+  })
+
+  test("#given a post-dispatch timeout failure #when a non-verifying caller classifies it #then it is NOT treated as accepted (timeout means not delivered)", () => {
+    // given
+    const result = {
+      status: "failed" as const,
+      dispatchAttempted: true,
+      error: new Error("promptAsync timed out after 30000ms"),
+    }
+
+    // when
+    const ambiguous = isAmbiguousPostDispatchPromptFailure(result)
+
+    // then
+    expect(ambiguous).toBe(false)
+  })
+
+  test("#given a post-dispatch timeout failure #when a verifying caller classifies it #then it stays ambiguous so the caller can verify acceptance", () => {
+    // given
+    const result = {
+      status: "failed" as const,
+      dispatchAttempted: true,
+      error: new Error("promptAsync timed out after 30000ms"),
+    }
+
+    // when
+    const ambiguous = isVerifiableAmbiguousPromptFailure(result)
+
+    // then
+    expect(ambiguous).toBe(true)
+  })
+
+  test("#given a non-timeout ambiguous failure after dispatch #when a verifying caller classifies it #then it is still ambiguous", () => {
+    // given
+    const result = {
+      status: "failed" as const,
+      dispatchAttempted: true,
+      error: new Error("JSON Parse error: Unexpected EOF"),
+    }
+
+    // when
+    const ambiguous = isVerifiableAmbiguousPromptFailure(result)
+
+    // then
+    expect(ambiguous).toBe(true)
+  })
+
+  test("#given a timeout ambiguous failure before dispatch #when a verifying caller classifies it #then it is not treated as ambiguous", () => {
+    // given
+    const result = {
+      status: "failed" as const,
+      dispatchAttempted: false,
+      error: new Error("promptAsync timed out after 30000ms"),
+    }
+
+    // when
+    const ambiguous = isVerifiableAmbiguousPromptFailure(result)
+
+    // then
+    expect(ambiguous).toBe(false)
   })
 })

@@ -93,10 +93,12 @@ export interface BackgroundTask {
   /** ID of the currently active attempt */
   currentAttemptID?: string
 
-  /** Last message count for stability detection */
+  /** Last message count observed by the polling message-stability fallback */
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Timestamp when lastMsgCount last changed; drives the 10s message-stability completion fallback */
+  lastMessageCountChangedAt?: Date
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
   /** Number of transient session.error events seen while the session was still alive, within the rolling window */
