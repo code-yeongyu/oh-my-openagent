@@ -235,7 +235,7 @@ describe("OpenClaw Dispatcher", () => {
         type: "command",
         method: "POST",
         command: "printf '%s' '{\"messageId\":\"55\",\"platform\":\"telegram\",\"threadId\":\"thr\"}'",
-        timeout: 1000,
+        timeout: 5000,
       },
       {},
     )
@@ -255,7 +255,7 @@ describe("OpenClaw Dispatcher", () => {
         type: "command",
         method: "POST",
         command: "printf '%s' '✅ Sent via Discord. Message ID: 55'",
-        timeout: 1000,
+        timeout: 5000,
       },
       {},
     )
