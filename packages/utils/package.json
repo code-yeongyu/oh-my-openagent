@@ -8,6 +8,10 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./src/index.ts"
+    },
+    "./runtime": {
+      "types": "./runtime.d.ts",
+      "import": "./src/runtime/index.ts"
     }
   },
   "types": "./index.d.ts",
