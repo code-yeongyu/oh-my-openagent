@@ -9,6 +9,7 @@ const corePackages = [
   "packages/rules-engine",
   "packages/agents-md-core",
   "packages/ast-grep-core",
+  "packages/lsp-core",
   "packages/comment-checker-core",
   "packages/hashline-core",
   "packages/boulder-state",

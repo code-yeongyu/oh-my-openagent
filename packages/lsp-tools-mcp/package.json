@@ -32,7 +32,7 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm",
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
@@ -41,6 +41,7 @@
 		"check": "tsc --noEmit && biome check . && npm run build"
 	},
 	"devDependencies": {
+		"@oh-my-opencode/lsp-core": "file:../lsp-core",
 		"@biomejs/biome": "2.4.16",
 		"@types/node": "^25.9.2",
 		"typescript": "^6.0.3",
