@@ -110,6 +110,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
       since_message_id: tool.schema.string().optional().describe("Return messages after this message ID (exclusive)"),
       include_tool_results: tool.schema.boolean().optional().describe("Include tool results in full_session output (default: false)"),
       thinking_max_chars: tool.schema.number().optional().describe("Max characters for thinking content (default: 2000)"),
+      from_end: tool.schema.boolean().optional().describe("Read messages from the END of the session (default: false). Pass true to get the most-recent / final assistant message in the output. Recommended when you want the result of a completed task."),
     },
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
@@ -180,6 +181,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             sinceMessageId: args.since_message_id,
             includeToolResults,
             thinkingMaxChars: args.thinking_max_chars,
+            fromEnd: args.from_end,
           })
 
           return didTimeoutWhileActive ? appendTimeoutNote(output, timeoutMs) : output
