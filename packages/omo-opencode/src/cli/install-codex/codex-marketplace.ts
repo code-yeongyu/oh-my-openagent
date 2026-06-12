@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type {
@@ -16,7 +17,7 @@ export async function readMarketplace(
   const marketplacePath = options?.marketplacePath ?? join(repoRoot, DEFAULT_MARKETPLACE_PATH)
   const raw = await readFile(marketplacePath, "utf8")
   const parsed: unknown = JSON.parse(raw)
-  if (!isRecord(parsed)) throw new Error("marketplace.json must be an object")
+  if (!isPlainRecord(parsed)) throw new Error("marketplace.json must be an object")
   if (typeof parsed.name !== "string" || parsed.name.trim() === "") {
     throw new Error("marketplace.json name must be a non-empty string")
   }
@@ -41,7 +42,7 @@ export function resolvePluginSource(
 export async function readPluginManifest(pluginRoot: string): Promise<PluginManifest> {
   const raw = await readFile(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8")
   const parsed: unknown = JSON.parse(raw)
-  if (!isRecord(parsed)) throw new Error(`${pluginRoot} plugin.json must be an object`)
+  if (!isPlainRecord(parsed)) throw new Error(`${pluginRoot} plugin.json must be an object`)
   if (typeof parsed.name !== "string" || parsed.name.trim() === "") {
     throw new Error(`${pluginRoot} plugin.json name must be a non-empty string`)
   }
@@ -68,7 +69,7 @@ export function validatePathSegment(value: string, label: string): void {
 }
 
 function normalizeMarketplacePlugin(plugin: unknown, index: number): MarketplacePluginEntry {
-  if (!isRecord(plugin)) throw new Error(`marketplace plugin ${index} must be an object`)
+  if (!isPlainRecord(plugin)) throw new Error(`marketplace plugin ${index} must be an object`)
   if (typeof plugin.name !== "string" || plugin.name.trim() === "") {
     throw new Error(`marketplace plugin ${index} name must be a non-empty string`)
   }
@@ -79,7 +80,7 @@ function normalizeMarketplacePlugin(plugin: unknown, index: number): Marketplace
     }
     return { name: plugin.name, source: plugin.source }
   }
-  if (isRecord(plugin.source) && plugin.source.source === "local" && typeof plugin.source.path === "string") {
+  if (isPlainRecord(plugin.source) && plugin.source.source === "local" && typeof plugin.source.path === "string") {
     validateLocalSourcePath(plugin.source.path)
     const local: MarketplacePluginSourceLocal = { source: "local", path: plugin.source.path }
     return { name: plugin.name, source: local }
@@ -103,8 +104,4 @@ function validateLocalSourcePath(path: string): string {
     }
   }
   return path
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

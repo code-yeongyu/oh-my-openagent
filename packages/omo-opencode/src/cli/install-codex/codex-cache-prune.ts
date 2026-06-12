@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs"
 import { lstat, readdir, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
-import { exists, isNodeErrorWithCode } from "./codex-cache-fs"
+import { fileExistsStrict, isNodeErrorWithCode } from "./codex-cache-fs"
 
 export async function pruneMarketplaceCache(input: {
   readonly codexHome: string
@@ -9,7 +9,7 @@ export async function pruneMarketplaceCache(input: {
   readonly keepPluginNames: readonly string[]
 }): Promise<void> {
   const cacheRoot = join(input.codexHome, "plugins", "cache", input.marketplaceName)
-  if (!(await exists(cacheRoot))) return
+  if (!(await fileExistsStrict(cacheRoot))) return
   const keep = new Set(input.keepPluginNames)
   const entries = await readCacheEntries(cacheRoot)
   for (const entry of entries) {
@@ -24,7 +24,7 @@ export async function pruneMarketplacePluginCaches(input: {
   readonly pluginNames: readonly string[]
 }): Promise<void> {
   const cacheRoot = join(input.codexHome, "plugins", "cache", input.marketplaceName)
-  if (!(await exists(cacheRoot))) return
+  if (!(await fileExistsStrict(cacheRoot))) return
   for (const pluginName of input.pluginNames) {
     await rm(join(cacheRoot, pluginName), { recursive: true, force: true })
   }

@@ -1,19 +1,5 @@
-import { lstat } from "node:fs/promises"
-
-export async function exists(path: string): Promise<boolean> {
-  try {
-    await lstat(path)
-    return true
-  } catch (error) {
-    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return false
-    throw error
-  }
-}
+export { fileExistsStrict, isPlainRecord } from "@oh-my-opencode/utils"
 
 export function isNodeErrorWithCode(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

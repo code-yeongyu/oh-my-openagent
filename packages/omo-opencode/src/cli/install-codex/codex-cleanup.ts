@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { lstat, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
@@ -184,7 +185,7 @@ async function readManagedAgentPathsFromConfig(codexHome: string, configPath: st
 async function readInstalledAgentManifest(manifestPath: string): Promise<readonly string[]> {
   if (!(await exists(manifestPath))) return []
   const parsed: unknown = JSON.parse(await readFile(manifestPath, "utf8"))
-  if (!isRecord(parsed) || !Array.isArray(parsed.agents)) return []
+  if (!isPlainRecord(parsed) || !Array.isArray(parsed.agents)) return []
   return parsed.agents.filter((path): path is string => typeof path === "string")
 }
 
@@ -241,8 +242,4 @@ async function maybeLstat(path: string): Promise<Awaited<ReturnType<typeof lstat
 function nodeErrorCode(error: unknown): string | null {
   if (!(error instanceof Error) || !("code" in error)) return null
   return typeof error.code === "string" ? error.code : null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

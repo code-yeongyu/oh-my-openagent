@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import type { OhMyOpenCodeConfig } from "../../config"
 import { securityResearchSkill, securityReviewSkill } from "../builtin-skills/skills/index"
 import { createOpenCodeSkillMarkdown, type OpenCodeSkillMarkdown } from "./skill-markdown"
@@ -14,9 +15,7 @@ export type OpenCodeSkillHostConfig = Record<string, unknown> & {
   skills?: OpenCodeSkillsHostConfig
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
+
 
 function toStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -54,7 +53,7 @@ export function applyRuntimeSkillSourceConfig(params: {
 }): void {
   if (selectRuntimeSecuritySkills(params.pluginConfig).length === 0) return
 
-  const existingSkills = isRecord(params.config.skills) ? params.config.skills : {}
+  const existingSkills = isPlainRecord(params.config.skills) ? params.config.skills : {}
   const existingUrls = toStringList(existingSkills.urls)
   const nextUrls = appendUnique(existingUrls, params.sourceUrl)
 

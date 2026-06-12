@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { log } from "../../../shared/logger"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
@@ -6,9 +7,7 @@ import { reclaimStaleReservations } from "../team-mailbox/reservation"
 import type { RuntimeStateMember } from "../types"
 import { transitionRuntimeState } from "./store"
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function getMessagesData(response: unknown): unknown[] {
   if (isRecord(response) && Array.isArray(response.data)) {

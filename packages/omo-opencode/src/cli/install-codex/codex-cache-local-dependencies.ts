@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { realpathSync } from "node:fs"
 import { readFile, readdir, writeFile } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
@@ -10,13 +11,13 @@ export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: stri
   for (const packageJsonPath of packageJsonPaths) {
     const raw = await readFile(packageJsonPath, "utf8")
     const parsed: unknown = JSON.parse(raw)
-    if (!isRecord(parsed)) continue
+    if (!isPlainRecord(parsed)) continue
     const packageDir = dirname(packageJsonPath)
     const sourcePackageDir = join(sourceRoot, relative(pluginRoot, packageDir))
     let changed = false
     for (const field of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
       const dependencies = parsed[field]
-      if (!isRecord(dependencies)) continue
+      if (!isPlainRecord(dependencies)) continue
       for (const [name, specifier] of Object.entries(dependencies)) {
         if (typeof specifier !== "string" || !specifier.startsWith("file:")) continue
         const filePath = specifier.slice("file:".length)
@@ -52,7 +53,7 @@ async function readPackageLock(pluginRoot: string): Promise<PackageLockState> {
   const path = join(pluginRoot, "package-lock.json")
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
-    return { path, value: isRecord(parsed) ? parsed : null, changed: false }
+    return { path, value: isPlainRecord(parsed) ? parsed : null, changed: false }
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return { path, value: null, changed: false }
@@ -80,15 +81,15 @@ function rewritePackageLockFileDependency(input: {
   const newSpecifier = `file:${input.sourceTargetPath}`
 
   const packageEntry = packages[packageKey]
-  if (isRecord(packageEntry)) {
+  if (isPlainRecord(packageEntry)) {
     const dependencyRecord = packageEntry[input.field]
-    if (isRecord(dependencyRecord) && dependencyRecord[input.dependencyName] !== newSpecifier) {
+    if (isPlainRecord(dependencyRecord) && dependencyRecord[input.dependencyName] !== newSpecifier) {
       dependencyRecord[input.dependencyName] = newSpecifier
       input.packageLock.changed = true
     }
   }
 
-  if (oldTargetKey !== newTargetKey && isRecord(packages[oldTargetKey])) {
+  if (oldTargetKey !== newTargetKey && isPlainRecord(packages[oldTargetKey])) {
     packages[newTargetKey] = packages[oldTargetKey]
     delete packages[oldTargetKey]
     input.packageLock.changed = true
@@ -96,7 +97,7 @@ function rewritePackageLockFileDependency(input: {
 
   const nodeModulesKey = `node_modules/${input.dependencyName}`
   const nodeModulesEntry = packages[nodeModulesKey]
-  if (isRecord(nodeModulesEntry) && nodeModulesEntry.resolved !== newTargetKey) {
+  if (isPlainRecord(nodeModulesEntry) && nodeModulesEntry.resolved !== newTargetKey) {
     nodeModulesEntry.resolved = newTargetKey
     input.packageLock.changed = true
   }
@@ -105,7 +106,7 @@ function rewritePackageLockFileDependency(input: {
 function getPackageLockPackages(packageLock: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!packageLock) return null
   const packages = packageLock.packages
-  return isRecord(packages) ? packages : null
+  return isPlainRecord(packages) ? packages : null
 }
 
 function toPackageLockPath(path: string): string {
@@ -133,8 +134,4 @@ async function collectPackageJsonPaths(directory: string, root: string, paths: s
     if (!isPathInside(childPath, root)) continue
     await collectPackageJsonPaths(childPath, root, paths)
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

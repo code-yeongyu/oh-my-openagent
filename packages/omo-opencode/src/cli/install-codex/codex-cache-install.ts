@@ -1,7 +1,7 @@
 import { cp, mkdir, readFile, rename, rm } from "node:fs/promises"
 import { basename, dirname, join, sep } from "node:path"
 import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
-import { exists, isRecord } from "./codex-cache-fs"
+import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
 import type { InstalledPlugin, RunCommand } from "./types"
@@ -42,16 +42,16 @@ export async function installCachedPlugin(input: {
 }
 
 async function maybeRunNpmInstall(cwd: string, runCommand: RunCommand, args: readonly string[] = ["install"]): Promise<void> {
-  if (!(await exists(join(cwd, "package.json")))) return
+  if (!(await fileExistsStrict(join(cwd, "package.json")))) return
   await runCommand("npm", args, { cwd })
 }
 
 async function maybeRunNpmBuild(cwd: string, runCommand: RunCommand): Promise<void> {
-  if (!(await exists(join(cwd, "package.json")))) return
+  if (!(await fileExistsStrict(join(cwd, "package.json")))) return
   const packageJson: unknown = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"))
-  if (!isRecord(packageJson)) return
+  if (!isPlainRecord(packageJson)) return
   const scripts = packageJson.scripts
-  if (!isRecord(scripts) || typeof scripts.build !== "string") return
+  if (!isPlainRecord(scripts) || typeof scripts.build !== "string") return
   await runCommand("npm", ["run", "build"], { cwd })
 }
 
@@ -73,7 +73,7 @@ async function promoteDirectory(tempPath: string, targetPath: string, renameDire
   await rm(backupPath, { recursive: true, force: true })
   let backupMoved = false
   try {
-    if (await exists(targetPath)) {
+    if (await fileExistsStrict(targetPath)) {
       await renameDirectory(targetPath, backupPath)
       backupMoved = true
     }
@@ -86,7 +86,7 @@ async function promoteDirectory(tempPath: string, targetPath: string, renameDire
 }
 
 async function restoreBackupDirectory(backupPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
-  if (!(await exists(backupPath))) return
+  if (!(await fileExistsStrict(backupPath))) return
   await rm(targetPath, { recursive: true, force: true })
   await renameDirectory(backupPath, targetPath)
 }

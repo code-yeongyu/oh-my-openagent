@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 export const DEFAULT_SESSION_IDLE_SETTLE_MS = 150
 export const DEFAULT_SESSION_STATUS_TIMEOUT_MS = 5_000
 
@@ -27,9 +28,7 @@ type SessionStatusClient = {
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function getSessionStatusPayload(response: unknown): Record<string, unknown> {
   if (isRecord(response) && isRecord(response.data)) {

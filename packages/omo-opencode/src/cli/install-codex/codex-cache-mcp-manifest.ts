@@ -1,18 +1,18 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { join, sep } from "node:path"
 import { resolveBundledMcpRuntimeArg } from "./codex-cache-bundled-mcps"
-import { exists, isRecord } from "./codex-cache-fs"
+import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { resolveCachedRuntimePath } from "./codex-cache-paths"
 
 export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = pluginRoot): Promise<void> {
   const manifestPath = join(pluginRoot, ".mcp.json")
-  if (!(await exists(manifestPath))) return
+  if (!(await fileExistsStrict(manifestPath))) return
   const raw = await readFile(manifestPath, "utf8")
   const parsed: unknown = JSON.parse(raw)
-  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return
+  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.mcpServers)) return
   let changed = false
   for (const server of Object.values(parsed.mcpServers)) {
-    if (!isRecord(server)) continue
+    if (!isPlainRecord(server)) continue
     if (server.cwd === "." || server.cwd === "./") {
       delete server.cwd
       changed = true
@@ -36,13 +36,13 @@ export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = 
 
 export async function rewriteCachedManifestRoot(pluginRoot: string, fromRoot: string, toRoot: string): Promise<void> {
   const manifestPath = join(pluginRoot, ".mcp.json")
-  if (!(await exists(manifestPath))) return
+  if (!(await fileExistsStrict(manifestPath))) return
   const raw = await readFile(manifestPath, "utf8")
   const parsed: unknown = JSON.parse(raw)
-  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return
+  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.mcpServers)) return
   let changed = false
   for (const server of Object.values(parsed.mcpServers)) {
-    if (!isRecord(server)) continue
+    if (!isPlainRecord(server)) continue
     const currentArgs = server.args
     if (!Array.isArray(currentArgs)) continue
     const nextArgs = currentArgs.map((arg) => {
