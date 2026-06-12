@@ -1,63 +1,187 @@
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { getPlanChecklist } from "@oh-my-opencode/boulder-state";
+import { afterEach, describe, expect, it } from "vitest";
+import { readContinuationState } from "../src/boulder-reader.js";
 
-import { parsePlanChecklist } from "../src/boulder-reader.js";
+const cleanupRoots: string[] = [];
 
-describe("start-work plan checklist parser", () => {
+afterEach(() => {
+	for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+describe("start-work plan checklist consumption", () => {
 	it("#given top-level completed and incomplete checkboxes #when parsed #then counts remaining and total", () => {
 		// given
-		const markdown = ["# Plan", "", "## TODOs", "- [ ] First", "- [x] Done", "- [X] Also done", "- [ ] Second"].join(
-			"\n",
+		const planPath = createPlan(
+			["# Plan", "", "## TODOs", "- [ ] First", "- [x] Done", "- [X] Also done", "- [ ] Second"].join("\n"),
 		);
 
 		// when
-		const checklist = parsePlanChecklist(markdown);
+		const checklist = getPlanChecklist(planPath);
 
 		// then
-		expect(checklist).toEqual({ remaining: 2, total: 4, nextTaskLabel: "First" });
+		expect(checklist).toEqual({ completed: 2, remaining: 2, total: 4, nextTaskLabel: "First" });
 	});
 
 	it("#given nested checkboxes #when parsed #then ignores non-column-zero items", () => {
 		// given
-		const markdown = ["## TODOs", "- [ ] Top-level", "  - [ ] Nested", "\t- [ ] Tab nested", "- [x] Complete"].join(
-			"\n",
+		const planPath = createPlan(
+			["## TODOs", "- [ ] Top-level", "  - [ ] Nested", "\t- [ ] Tab nested", "- [x] Complete"].join("\n"),
 		);
 
 		// when
-		const checklist = parsePlanChecklist(markdown);
+		const checklist = getPlanChecklist(planPath);
 
 		// then
-		expect(checklist).toEqual({ remaining: 1, total: 2, nextTaskLabel: "Top-level" });
+		expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "Top-level" });
 	});
 
 	it("#given checkboxes outside counted sections #when parsed #then ignores unrelated top-level tasks", () => {
 		// given
-		const markdown = [
-			"# Plan",
-			"- [ ] Preamble task",
-			"## TODOs",
-			"- [ ] Build hook",
-			"## Acceptance Criteria",
-			"- [ ] Acceptance item",
-			"## Final Verification Wave",
-			"- [x] Run tests",
-			"- [ ] Run smoke",
-		].join("\n");
+		const planPath = createPlan(
+			[
+				"# Plan",
+				"- [ ] Preamble task",
+				"## TODOs",
+				"- [ ] Build hook",
+				"## Acceptance Criteria",
+				"- [ ] Acceptance item",
+				"## Final Verification Wave",
+				"- [x] Run tests",
+				"- [ ] Run smoke",
+			].join("\n"),
+		);
 
 		// when
-		const checklist = parsePlanChecklist(markdown);
+		const checklist = getPlanChecklist(planPath);
 
 		// then
-		expect(checklist).toEqual({ remaining: 2, total: 3, nextTaskLabel: "Build hook" });
+		expect(checklist).toEqual({ completed: 1, remaining: 2, total: 3, nextTaskLabel: "Build hook" });
 	});
 
 	it("#given all top-level tasks complete #when parsed #then next task is null", () => {
 		// given
-		const markdown = ["## TODOs", "- [x] First", "- [X] Second"].join("\n");
+		const planPath = createPlan(["## TODOs", "- [x] First", "- [X] Second"].join("\n"));
 
 		// when
-		const checklist = parsePlanChecklist(markdown);
+		const checklist = getPlanChecklist(planPath);
 
 		// then
-		expect(checklist).toEqual({ remaining: 0, total: 2, nextTaskLabel: null });
+		expect(checklist).toEqual({ completed: 2, remaining: 0, total: 2, nextTaskLabel: null });
 	});
 });
+
+describe("start-work boulder state reader", () => {
+	it("#given active codex work with remaining checklist #when state is read #then continuation fields match baseline", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ status: "active", sessionIds: ["codex:sess_abc"] }),
+			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n- [x] Done\n- [ ] Second\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state).toEqual({
+			planName: "launch-plan",
+			planPath: join(workspace, ".omo", "plans", "plan.md"),
+			boulderPath: join(workspace, ".omo", "boulder.json"),
+			ledgerPath: join(workspace, ".omo", "start-work", "ledger.jsonl"),
+			worktreePath: null,
+			checklist: { completed: 1, remaining: 2, total: 3, nextTaskLabel: "First" },
+		});
+	});
+
+	it("#given completed codex work #when state is read #then continuation is absent", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ status: "completed", sessionIds: ["codex:sess_abc"] }),
+			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state).toBeNull();
+	});
+
+	it("#given no remaining top-level checklist items #when state is read #then continuation is absent", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ status: "active", sessionIds: ["codex:sess_abc"] }),
+			planMarkdown: "# Plan\n\n## TODOs\n- [x] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state).toBeNull();
+	});
+
+	it("#given corrupt boulder JSON #when state is read #then continuation is absent", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: "{",
+			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state).toBeNull();
+	});
+});
+
+type WorkspaceInput = {
+	readonly boulderJson: string;
+	readonly planMarkdown: string;
+};
+
+type BoulderInput = {
+	readonly status: "active" | "completed" | "paused" | "abandoned";
+	readonly sessionIds: readonly string[];
+};
+
+function createPlan(markdown: string): string {
+	const root = mkdtempSync(join(tmpdir(), "codex-continuation-plan-"));
+	cleanupRoots.push(root);
+	const planPath = join(root, "plan.md");
+	writeFileSync(planPath, markdown);
+	return planPath;
+}
+
+function createWorkspace(input: WorkspaceInput): string {
+	const root = mkdtempSync(join(tmpdir(), "codex-continuation-reader-"));
+	cleanupRoots.push(root);
+	mkdirSync(join(root, ".omo", "plans"), { recursive: true });
+	writeFileSync(join(root, ".omo", "plans", "plan.md"), input.planMarkdown);
+	writeFileSync(join(root, ".omo", "boulder.json"), input.boulderJson);
+	return root;
+}
+
+function createBoulderJson(input: BoulderInput): string {
+	const work = {
+		work_id: "work_1",
+		active_plan: ".omo/plans/plan.md",
+		plan_name: "launch-plan",
+		status: input.status,
+		started_at: "2026-06-13T00:00:00.000Z",
+		session_ids: input.sessionIds,
+	};
+	return JSON.stringify({
+		schema_version: 2,
+		active_work_id: "work_1",
+		works: { work_1: work },
+		active_plan: ".omo/plans/plan.md",
+		plan_name: "legacy-launch-plan",
+		started_at: "2026-06-13T00:00:00.000Z",
+		status: input.status,
+		session_ids: input.sessionIds,
+	});
+}

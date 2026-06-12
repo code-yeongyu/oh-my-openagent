@@ -42,6 +42,13 @@ export interface PlanProgress {
   isComplete: boolean
 }
 
+export interface PlanChecklist {
+  total: number
+  completed: number
+  remaining: number
+  nextTaskLabel: string | null
+}
+
 export interface TaskSessionState {
   task_key: string
   task_label: string
