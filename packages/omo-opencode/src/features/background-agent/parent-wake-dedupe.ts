@@ -19,6 +19,7 @@ export type PendingParentWake = {
   deferCount?: number
   windowRefreshCount?: number
   forcedQueuedAt?: number
+  forceQueueToken?: number
 }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
@@ -49,6 +50,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.deferCount !== undefined ? { deferCount: wake.deferCount } : {}),
     ...(wake.windowRefreshCount !== undefined ? { windowRefreshCount: wake.windowRefreshCount } : {}),
     ...(wake.forcedQueuedAt !== undefined ? { forcedQueuedAt: wake.forcedQueuedAt } : {}),
+    ...(wake.forceQueueToken !== undefined ? { forceQueueToken: wake.forceQueueToken } : {}),
   }
 }
 

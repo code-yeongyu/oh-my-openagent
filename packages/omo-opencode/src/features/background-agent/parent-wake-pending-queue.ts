@@ -61,10 +61,13 @@ export class ParentWakePendingQueue {
         delete pendingWake.noReplyAdmittedAt
         // HOLE 3 (Oracle): a force-queued gate entry holds the OLD notification
         // snapshot. New content must be free to dispatch, so clear the
-        // force-queued marker too. The stale gate entry may still deliver, but
+        // force-queued marker AND rotate the force-queue token so any stale
+        // onDispatched/onExpiredOrFailed callback from the old entry no-ops
+        // (ITEM 1 identity binding). The stale gate entry may still deliver, but
         // semantic-dedupe plus the superseding (now-merged) wake make any
         // residual duplicate tolerable.
         delete pendingWake.forcedQueuedAt
+        delete pendingWake.forceQueueToken
       }
       return
     }
@@ -91,6 +94,7 @@ export class ParentWakePendingQueue {
       pendingWake.firstDeferredAt ??= latestWake.firstDeferredAt
       pendingWake.deferCount ??= latestWake.deferCount
       pendingWake.forcedQueuedAt ??= latestWake.forcedQueuedAt
+      pendingWake.forceQueueToken ??= latestWake.forceQueueToken
       return
     }
     this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))

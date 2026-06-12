@@ -20,6 +20,11 @@ type ParentWakeFlushRunnerDeps = {
 export class ParentWakeFlushRunner {
   constructor(private readonly deps: ParentWakeFlushRunnerDeps) {}
 
+  // ITEM 1 (Oracle): monotonic token bound to each force-queue attempt so stale
+  // gate callbacks (onDispatched / onExpiredOrFailed) only mutate the wake they
+  // actually belong to.
+  private forceQueueTokenSeq = 0
+
   async flushPendingParentWake(sessionID: string): Promise<void> {
     const initialWake = this.deps.pendingQueue.getWake(sessionID)
     if (!initialWake) {
@@ -296,16 +301,17 @@ export class ParentWakeFlushRunner {
       deferCount: wake.deferCount,
       deferredForMs: wake.firstDeferredAt !== undefined ? Date.now() - wake.firstDeferredAt : undefined,
     })
+    const forceQueueToken = ++this.forceQueueTokenSeq
     await this.sendParentWakePrompt(sessionID, wake, {
       emptyAssistantTurnRetry: false,
       toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
       forceNoReply: true,
       retainPendingWake: wake.shouldReply,
       queueBehavior: "enqueue",
-      markForceQueued: (queuedAt) => this.markForceQueued(sessionID, queuedAt),
-      onForceQueueResolved: () => this.handleForceQueueResolved(sessionID),
+      markForceQueued: (queuedAt) => this.markForceQueued(sessionID, queuedAt, forceQueueToken),
+      onForceQueueResolved: () => this.handleForceQueueResolved(sessionID, forceQueueToken),
       forceQueueTtlMs: this.deps.maxDeferMs,
-      onForceDispatched: () => this.handleForceDispatched(sessionID),
+      onForceDispatched: () => this.handleForceDispatched(sessionID, forceQueueToken),
     })
     const stillPending = this.deps.pendingQueue.getWake(sessionID)
     if (stillPending) {
@@ -333,19 +339,21 @@ export class ParentWakeFlushRunner {
   // BUG B1 follow-up (Oracle): a force-dispatch can be QUEUED at the gate rather
   // than dispatched. While queued, the wake stays pending and is neither tracked
   // as dispatched nor re-forced (forcedQueuedAt suppresses hasExceededMaxDeferral).
-  private markForceQueued(sessionID: string, queuedAt: number): void {
+  private markForceQueued(sessionID: string, queuedAt: number, token: number): void {
     const wake = this.deps.pendingQueue.getWake(sessionID)
     if (wake) {
       wake.forcedQueuedAt = queuedAt
+      wake.forceQueueToken = token
     }
   }
 
   // The gate dropped/expired/failed the queued force entry: clear the marker and
   // re-flush so the force path can re-arm (firstDeferredAt is still in the past).
-  private handleForceQueueResolved(sessionID: string): void {
+  private handleForceQueueResolved(sessionID: string, token: number): void {
     const wake = this.deps.pendingQueue.getWake(sessionID)
-    if (wake) {
+    if (wake && wake.forceQueueToken === token) {
       delete wake.forcedQueuedAt
+      delete wake.forceQueueToken
     }
     this.schedulePendingParentWakeFlush(sessionID)
   }
@@ -357,13 +365,18 @@ export class ParentWakeFlushRunner {
   // retained-reply lifecycle: consume-drop once the parent responds, or a
   // reply-producing resume once the parent is safe. This is what prevents the
   // "delivered but no parent output" deadlock (HOLE 2).
-  private handleForceDispatched(sessionID: string): void {
+  private handleForceDispatched(sessionID: string, token: number): void {
     const wake = this.deps.pendingQueue.getWake(sessionID)
-    if (wake) {
+    // ITEM 1 (Oracle): only honor this callback if the wake is STILL the one we
+    // force-queued under this token. A newer notification merge rotates the token
+    // (clearing it), so a stale entry's onDispatched can never admit content the
+    // queued entry did not actually contain.
+    if (wake && wake.forceQueueToken === token) {
       // The deferral is over: the content actually reached parent history. Clear
       // the force-queued marker and the B1 deferral budget, and record the real
       // noReply admission so the wake follows the standard retained-reply path.
       delete wake.forcedQueuedAt
+      delete wake.forceQueueToken
       delete wake.firstDeferredAt
       wake.deferCount = 0
       if (wake.shouldReply) {

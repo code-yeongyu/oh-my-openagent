@@ -38,11 +38,17 @@ function setPromptQueue(sessionID: string, queue: QueuedInternalPrompt[]): void 
   promptQueues.set(sessionID, queue)
 }
 
-function queuedResult(entry: QueuedInternalPrompt, position: number, queuedBy = entry.source): InternalPromptDispatchResult {
+function queuedResult(
+  entry: QueuedInternalPrompt,
+  position: number,
+  queuedBy = entry.source,
+  queuedEntryCreated = true,
+): InternalPromptDispatchResult {
   return {
     status: "queued",
     queuedBy,
     position,
+    queuedEntryCreated,
   }
 }
 
@@ -259,7 +265,7 @@ export async function enqueueInternalPrompt(entry: QueuedInternalPrompt): Promis
       source: entry.source,
       queuedBy: activeReservation.source,
     })
-    return queuedResult(entry, 0, activeReservation.source)
+    return queuedResult(entry, 0, activeReservation.source, false)
   }
 
   const queue = getPromptQueue(entry.sessionID)
@@ -273,7 +279,7 @@ export async function enqueueInternalPrompt(entry: QueuedInternalPrompt): Promis
         queuedBy: existing.source,
         position: existingIndex + 1,
       })
-      return queuedResult(existing, existingIndex + 1)
+      return queuedResult(existing, existingIndex + 1, existing.source, false)
     }
   }
 

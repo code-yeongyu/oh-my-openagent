@@ -326,7 +326,7 @@ describe("promptWithModelSuggestionRetry", () => {
     })
 
     // then
-    expect(third).toEqual({ status: "queued", queuedBy: "model-suggestion-retry", position: 1 })
+    expect(third).toEqual({ status: "queued", queuedBy: "model-suggestion-retry", position: 1, queuedEntryCreated: true })
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
@@ -427,7 +427,7 @@ describe("promptWithModelSuggestionRetry", () => {
     })
 
     // then
-    expect(second).toEqual({ status: "queued", queuedBy: "model-suggestion-retry", position: 1 })
+    expect(second).toEqual({ status: "queued", queuedBy: "model-suggestion-retry", position: 1, queuedEntryCreated: true })
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 

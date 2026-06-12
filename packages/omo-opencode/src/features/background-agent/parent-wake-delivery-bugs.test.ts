@@ -593,3 +593,115 @@ describe("BUG B1 follow-up round-2 (Oracle): force-queued lifecycle is gate-trut
     }
   })
 })
+
+describe("BUG B1 follow-up round-3 (Oracle): force-queue callbacks are identity-bound", () => {
+  const SECOND_WAKE = [
+    "<system-reminder>",
+    "[BACKGROUND TASK COMPLETED]",
+    "[ALL BACKGROUND TASKS COMPLETE]",
+    "",
+    "**Completed:**",
+    "- `task-z`: task Z",
+    "</system-reminder>",
+  ].join("\n")
+
+  function reserveForeignGate(sessionID: string, now: number): void {
+    setPromptReservation(sessionID, {
+      source: "some-other-live-turn",
+      dedupeKey: "foreign-reservation-key",
+      reservedAt: now,
+      token: Symbol("foreign"),
+      expiresAt: now + 60_000,
+    })
+  }
+
+  test("#given a force-queued wake (ITEM 1) #when a new notification rotates the token before the stale gate entry dispatches #then the stale onDispatched does NOT admit and the new content still dispatches", async () => {
+    // given: wake A is force-queued (token T1) behind a reservation
+    const originalDateNow = Date.now
+    const now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => SAFE_MESSAGES,
+      maxDeferMs: 5_000,
+    })
+    reserveForeignGate("parent-1", now)
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    const wake = notifier.getPendingParentWakes().get("parent-1")
+    if (!wake) throw new Error("missing wake")
+    wake.firstDeferredAt = now - 5_001
+
+    try {
+      await notifier.flushPendingParentWake("parent-1")
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeDefined()
+      const tokenBeforeMerge = notifier.getPendingParentWakes().get("parent-1")?.forceQueueToken
+      expect(tokenBeforeMerge).toBeDefined()
+
+      // when: a new notification B merges, rotating (clearing) the token
+      notifier.queuePendingParentWake("parent-1", SECOND_WAKE, { agent: "sisyphus" }, true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeUndefined()
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forceQueueToken).toBeUndefined()
+
+      // when: the STALE entry A finally dispatches (its onDispatched carries T1)
+      deletePromptReservation("parent-1")
+      schedulePromptQueueDrain("parent-1", 0)
+      await waitUntil(() => promptAsyncCalls.length === 1, 600)
+
+      // then: the stale callback is a no-op — the A+B wake is NOT marked admitted
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeUndefined()
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+
+      // when: the gate is cleared and the unblocked wake force-dispatches the new content
+      releaseAllPromptAsyncReservationsForTesting()
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the new content (task-z) is dispatched
+      expect(promptAsyncCalls.some((call) => JSON.stringify(call.body.parts).includes("task-z"))).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given an identical dispatch is already in flight (ITEM 2) #when the force dispatch coalesces (queued without a real entry) #then forcedQueuedAt is NOT set", async () => {
+    // given: a first force dispatch actually dispatches and records a recent
+    // dispatch + a same-dedupe post-dispatch hold (no foreign reservation).
+    const originalDateNow = Date.now
+    const now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => SAFE_MESSAGES,
+      maxDeferMs: 5_000,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    const wake = notifier.getPendingParentWakes().get("parent-1")
+    if (!wake) throw new Error("missing wake")
+    wake.firstDeferredAt = now - 5_001
+
+    try {
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeUndefined()
+
+      // when: the budget is exhausted again and a second force dispatch fires
+      // while the identical dispatch is still in flight -> coalesced "queued"
+      const stillPending = notifier.getPendingParentWakes().get("parent-1")
+      if (!stillPending) throw new Error("missing retained wake")
+      stillPending.firstDeferredAt = now - 5_001
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the coalesced queued result did NOT mark force-queued (which would
+      // never resolve), and no duplicate dispatch was issued
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeUndefined()
+      expect(promptAsyncCalls).toHaveLength(1)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})

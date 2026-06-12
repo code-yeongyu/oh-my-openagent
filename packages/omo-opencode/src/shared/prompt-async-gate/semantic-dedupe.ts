@@ -128,5 +128,5 @@ export function coalesceRecentSemanticPromptDispatch(args: {
     source: args.source,
     queuedBy: recentDispatch.source,
   })
-  return { status: "queued", queuedBy: recentDispatch.source, position: 0 }
+  return { status: "queued", queuedBy: recentDispatch.source, position: 0, queuedEntryCreated: false }
 }

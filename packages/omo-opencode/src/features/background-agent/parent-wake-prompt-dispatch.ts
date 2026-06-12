@@ -109,11 +109,24 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       // gate (blocked by an existing reservation) is NOT yet in parent history.
       // It must not be tracked as dispatched (that would start the B3 silent-loss
       // window on a wake that hasn't dispatched and let unrelated assistant output
-      // clear the tracker) nor recorded as a noReply admission. Mark it
-      // force-queued so the force path is suppressed until the gate delivers it
-      // (consume-detected via forcedQueuedAt) or drops it (onExpiredOrFailed).
-      input.markForceQueued(dispatchStartedAt)
-      log("[background-agent] Parent wake force-queued at promptAsync gate; awaiting gate delivery:", {
+      // clear the tracker) nor recorded as a noReply admission.
+      if (promptResult.queuedEntryCreated) {
+        // A real queue entry now carries our onDispatched/onExpiredOrFailed
+        // callbacks: mark force-queued so the force path is suppressed until the
+        // gate delivers it (then onDispatched admits) or drops it (onExpiredOrFailed).
+        input.markForceQueued(dispatchStartedAt)
+        log("[background-agent] Parent wake force-queued at promptAsync gate; awaiting gate delivery:", {
+          sessionID: input.sessionID,
+          queuedBy: promptResult.queuedBy,
+        })
+        return
+      }
+      // ITEM 2 (Oracle): a coalesced "queued" result has NO entry carrying our
+      // callbacks (semantic-dedupe / same-dedupe reservation). An equivalent
+      // dispatch is already in flight, so do NOT mark force-queued (that marker
+      // would never resolve). Leave the wake pending to retry normally; the
+      // recent-dispatch redundancy checks govern duplication.
+      log("[background-agent] Force parent wake coalesced with an in-flight identical dispatch; not marking force-queued:", {
         sessionID: input.sessionID,
         queuedBy: promptResult.queuedBy,
       })

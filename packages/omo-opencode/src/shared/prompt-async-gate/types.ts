@@ -67,7 +67,7 @@ export type PromptAsyncReservation = {
 
 export type InternalPromptDispatchResult =
   | { readonly status: "dispatched"; readonly response: unknown }
-  | { readonly status: "queued"; readonly queuedBy: string; readonly position: number }
+  | { readonly status: "queued"; readonly queuedBy: string; readonly position: number; readonly queuedEntryCreated: boolean }
   | { readonly status: "active" }
   | { readonly status: "reserved"; readonly reservedBy: string }
   | { readonly status: "unavailable" }
