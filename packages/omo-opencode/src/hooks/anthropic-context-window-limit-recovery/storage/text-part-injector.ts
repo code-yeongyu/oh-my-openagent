@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { PART_STORAGE } from "../constants"
-import type { StoredTextPart } from "../types"
+import { PART_STORAGE } from "./constants"
+import type { StoredTextPart } from "./types"
 import { generatePartId } from "./part-id"
 import { log, isSqliteBackend, patchPart } from "../../../shared"
 
@@ -10,7 +10,7 @@ type OpencodeClient = PluginInput["client"]
 
 export function injectTextPart(sessionID: string, messageID: string, text: string): boolean {
   if (isSqliteBackend()) {
-    log("[session-recovery] Disabled on SQLite backend: injectTextPart (use async variant)")
+    log("[auto-compact] Disabled on SQLite backend: injectTextPart (use async variant)")
     return false
   }
 
@@ -63,7 +63,7 @@ export async function injectTextPartAsync(
     if (!(error instanceof Error)) {
       throw error
     }
-    log("[session-recovery] injectTextPartAsync failed", { error: String(error) })
+    log("[auto-compact] injectTextPartAsync failed", { error: String(error) })
     return false
   }
 }

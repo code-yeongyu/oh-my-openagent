@@ -224,7 +224,7 @@ describe("migrateHookNames", () => {
     const hooks = [
       "anthropic-context-window-limit-recovery",
       "todo-continuation-enforcer",
-      "session-recovery",
+      "model-fallback",
     ]
 
     // when: Migrate hook names
@@ -314,6 +314,19 @@ describe("migrateHookNames", () => {
     expect(changed).toBe(true)
     expect(migrated).toEqual(["comment-checker"])
     expect(removed).toEqual(["thinking-block-validator"])
+  })
+
+  test("removes session-recovery from disabled hooks", () => {
+    //#given
+    const hooks = ["session-recovery", "comment-checker"]
+
+    //#when
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    //#then
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toEqual(["session-recovery"])
   })
 
   test("handles mixed migration and removal", () => {

@@ -1,5 +1,5 @@
-import { THINKING_TYPES, META_TYPES } from "../constants"
-import type { StoredPart, StoredTextPart } from "../types"
+import { THINKING_TYPES, META_TYPES } from "./constants"
+import type { StoredPart, StoredTextPart } from "./types"
 import { readParts } from "./parts-reader"
 
 export function hasContent(part: StoredPart): boolean {

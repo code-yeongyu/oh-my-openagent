@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { PART_STORAGE } from "../constants"
-import type { StoredPart, StoredTextPart, MessageData } from "../types"
+import { PART_STORAGE } from "./constants"
+import type { StoredPart, StoredTextPart, MessageData } from "./types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
 import { log, isSqliteBackend, patchPart } from "../../../shared"
@@ -12,7 +12,7 @@ type OpencodeClient = PluginInput["client"]
 
 export function replaceEmptyTextParts(messageID: string, replacementText: string): boolean {
   if (isSqliteBackend()) {
-    log("[session-recovery] Disabled on SQLite backend: replaceEmptyTextParts (use async variant)")
+    log("[auto-compact] Disabled on SQLite backend: replaceEmptyTextParts (use async variant)")
     return false
   }
 
@@ -77,7 +77,7 @@ export async function replaceEmptyTextPartsAsync(
     if (!(error instanceof Error)) {
       throw error
     }
-    log("[session-recovery] replaceEmptyTextPartsAsync failed", { error: String(error) })
+    log("[auto-compact] replaceEmptyTextPartsAsync failed", { error: String(error) })
     return false
   }
 }

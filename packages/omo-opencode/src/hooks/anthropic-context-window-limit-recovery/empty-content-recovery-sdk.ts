@@ -1,5 +1,5 @@
-import { replaceEmptyTextPartsAsync, findMessagesWithEmptyTextPartsFromSDK } from "../session-recovery/storage/empty-text"
-import { injectTextPartAsync } from "../session-recovery/storage/text-part-injector"
+import { replaceEmptyTextPartsAsync, findMessagesWithEmptyTextPartsFromSDK } from "./storage/empty-text"
+import { injectTextPartAsync } from "./storage/text-part-injector"
 import type { Client } from "./client"
 
 interface SDKPart {

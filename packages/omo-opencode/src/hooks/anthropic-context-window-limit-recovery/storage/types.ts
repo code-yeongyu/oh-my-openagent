@@ -1,7 +1,3 @@
-export type ThinkingPartType = "thinking" | "redacted_thinking" | "reasoning"
-export type MetaPartType = "step-start" | "step-finish"
-export type ContentPartType = "text" | "tool" | "tool_use" | "tool_result"
-
 export interface StoredMessageMeta {
   id: string
   sessionID: string
@@ -99,15 +95,4 @@ export interface MessageData {
       error?: unknown
     }
   }>
-}
-
-export interface ResumeConfig {
-  sessionID: string
-  agent?: string
-  model?: {
-    providerID: string
-    modelID: string
-    variant?: string
-  }
-  tools?: Record<string, boolean>
 }

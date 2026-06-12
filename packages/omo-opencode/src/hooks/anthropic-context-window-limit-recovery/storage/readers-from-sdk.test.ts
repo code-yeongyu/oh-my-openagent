@@ -32,7 +32,7 @@ function createMockClient(handlers: {
   })
 }
 
-describe("session-recovery storage SDK readers", () => {
+describe("auto-compact storage SDK readers", () => {
   it("readPartsFromSDK returns empty array when fetch fails", async () => {
     //#given a client that throws on request
     const { readPartsFromSDK } = await importFreshReaders()

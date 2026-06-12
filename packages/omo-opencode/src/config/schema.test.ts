@@ -554,6 +554,17 @@ describe("HookNameSchema", () => {
     //#then
     expect(result.success).toBe(false)
   })
+
+  test("rejects removed session-recovery hook name", () => {
+    //#given
+    const input = "session-recovery"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("Sisyphus-Junior agent override", () => {
