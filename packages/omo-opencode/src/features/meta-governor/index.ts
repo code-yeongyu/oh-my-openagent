@@ -47,3 +47,11 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 6: decision-handler (map score → action + message)
+export {
+  handleDecision,
+  defaultDecisionHandlerConfig,
+  trimHistory,
+  countConsecutiveStops,
+} from "./decision-handler"
