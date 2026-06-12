@@ -31,6 +31,7 @@
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/lsp-core": "workspace:*",
+        "@oh-my-opencode/mcp-stdio-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
@@ -83,6 +84,7 @@
       "dependencies": {
         "@ast-grep/cli": "^0.42.2",
         "@oh-my-opencode/ast-grep-core": "workspace:*",
+        "@oh-my-opencode/mcp-stdio-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
       },
       "devDependencies": {
@@ -107,6 +109,7 @@
         "omo-git-bash": "dist/cli.js",
       },
       "dependencies": {
+        "@oh-my-opencode/mcp-stdio-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
       },
       "devDependencies": {
@@ -123,6 +126,16 @@
     "packages/lsp-core": {
       "name": "@oh-my-opencode/lsp-core",
       "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/mcp-stdio-core": "workspace:*",
+      },
+    },
+    "packages/mcp-stdio-core": {
+      "name": "@oh-my-opencode/mcp-stdio-core",
+      "version": "0.1.0",
+      "devDependencies": {
+        "bun-types": "1.3.12",
+      },
     },
     "packages/model-core": {
       "name": "@oh-my-opencode/model-core",
@@ -288,6 +301,8 @@
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
     "@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@workspace:packages/lsp-core"],
+
+    "@oh-my-opencode/mcp-stdio-core": ["@oh-my-opencode/mcp-stdio-core@workspace:packages/mcp-stdio-core"],
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
 
@@ -602,6 +617,8 @@
     "@oh-my-opencode/ast-grep-mcp/bun-types": ["bun-types@1.3.12", "", { "dependencies": { "@types/node": "*" } }, "sha512-HqOLj5PoFajAQciOMRiIZGNoKxDJSr6qigAttOX40vJuSp6DN/CxWp9s3C1Xwm4oH7ybueITwiaOcWXoYVoRkA=="],
 
     "@oh-my-opencode/git-bash-mcp/bun-types": ["bun-types@1.3.12", "", { "dependencies": { "@types/node": "*" } }, "sha512-HqOLj5PoFajAQciOMRiIZGNoKxDJSr6qigAttOX40vJuSp6DN/CxWp9s3C1Xwm4oH7ybueITwiaOcWXoYVoRkA=="],
+
+    "@oh-my-opencode/mcp-stdio-core/bun-types": ["bun-types@1.3.12", "", { "dependencies": { "@types/node": "*" } }, "sha512-HqOLj5PoFajAQciOMRiIZGNoKxDJSr6qigAttOX40vJuSp6DN/CxWp9s3C1Xwm4oH7ybueITwiaOcWXoYVoRkA=="],
 
     "@opencode-ai/plugin/zod": ["zod@4.1.8", "", {}, "sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ=="],
 

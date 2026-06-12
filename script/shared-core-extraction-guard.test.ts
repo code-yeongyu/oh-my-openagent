@@ -10,6 +10,7 @@ const corePackages = [
   "packages/agents-md-core",
   "packages/ast-grep-core",
   "packages/lsp-core",
+  "packages/mcp-stdio-core",
   "packages/comment-checker-core",
   "packages/hashline-core",
   "packages/boulder-state",

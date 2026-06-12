@@ -18,6 +18,7 @@
     "test": "bun test src/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/mcp-stdio-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*"
   },
   "devDependencies": {

@@ -1,44 +1,26 @@
-import { createInterface } from "node:readline";
+import type { Readable, Writable } from "node:stream";
+import {
+	errorResponse,
+	isPlainRecord,
+	jsonRpcId,
+	messageFromError,
+	runJsonRpcStdioServer,
+	successResponse,
+	type JsonRpcError,
+	type JsonRpcId,
+	type JsonRpcResponse,
+	type JsonRpcResult,
+	type McpToolDescriptor,
+} from "@oh-my-opencode/mcp-stdio-core";
+import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS } from "./tools.js";
 
-import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS, type TextContent } from "./tools.js";
-
-export type JsonRpcId = string | number | null;
-
-export interface McpToolDescriptor {
-	name: string;
-	title: string;
-	description: string;
-	inputSchema: unknown;
-}
-
-export interface JsonRpcError {
-	code: number;
-	message: string;
-	data?: unknown;
-}
-
-export interface JsonRpcResult {
-	capabilities?: Record<string, unknown>;
-	serverInfo?: Record<string, unknown>;
-	protocolVersion?: string;
-	tools?: McpToolDescriptor[];
-	content?: TextContent[];
-	isError?: boolean;
-	[key: string]: unknown;
-}
-
-export interface JsonRpcResponse {
-	jsonrpc: "2.0";
-	id: JsonRpcId;
-	result?: JsonRpcResult;
-	error?: JsonRpcError;
-}
+export type { JsonRpcError, JsonRpcId, JsonRpcResponse, JsonRpcResult, McpToolDescriptor };
 
 const SERVER_NAME = "lsp";
 const SERVER_VERSION = "0.1.0";
 
 export async function handleLspMcpRequest(input: unknown): Promise<JsonRpcResponse | undefined> {
-	if (!isRecord(input)) {
+	if (!isPlainRecord(input)) {
 		return errorResponse(null, -32600, "Invalid Request");
 	}
 
@@ -67,27 +49,19 @@ export async function handleLspMcpRequest(input: unknown): Promise<JsonRpcRespon
 }
 
 export async function runMcpStdioServer(
-	input: NodeJS.ReadableStream = process.stdin,
-	output: NodeJS.WritableStream = process.stdout,
+	input: Readable = process.stdin,
+	output: Writable = process.stdout,
 ): Promise<void> {
-	const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
-	for await (const line of lines) {
-		if (!line.trim()) continue;
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(line);
-		} catch (error) {
-			output.write(`${JSON.stringify(errorResponse(null, -32700, "Parse error", messageFromError(error)))}\n`);
-			continue;
-		}
-
-		const response = await handleLspMcpRequest(parsed);
-		if (response) output.write(`${JSON.stringify(response)}\n`);
-	}
+	await runJsonRpcStdioServer({
+		input,
+		output,
+		handler: handleLspMcpRequest,
+		handlerOptions: undefined,
+	});
 }
 
 async function handleToolCall(id: JsonRpcId, params: unknown): Promise<JsonRpcResponse> {
-	if (!isRecord(params) || typeof params["name"] !== "string") {
+	if (!isPlainRecord(params) || typeof params["name"] !== "string") {
 		return errorResponse(id, -32602, "tools/call requires params.name");
 	}
 
@@ -115,27 +89,7 @@ function describeTool(tool: (typeof LSP_MCP_TOOLS)[number]): McpToolDescriptor {
 	};
 }
 
-function successResponse(id: JsonRpcId, result: JsonRpcResult): JsonRpcResponse {
-	return { jsonrpc: "2.0", id, result };
-}
-
-function errorResponse(id: JsonRpcId, code: number, message: string, data?: unknown): JsonRpcResponse {
-	return { jsonrpc: "2.0", id, error: data === undefined ? { code, message } : { code, message, data } };
-}
-
 function requestedProtocolVersion(params: unknown): string {
-	if (!isRecord(params) || typeof params["protocolVersion"] !== "string") return "2024-11-05";
+	if (!isPlainRecord(params) || typeof params["protocolVersion"] !== "string") return "2024-11-05";
 	return params["protocolVersion"];
-}
-
-function jsonRpcId(value: unknown): JsonRpcId {
-	return typeof value === "string" || typeof value === "number" || value === null ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function messageFromError(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

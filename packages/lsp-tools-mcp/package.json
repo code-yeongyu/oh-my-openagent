@@ -42,6 +42,7 @@
 	},
 	"devDependencies": {
 		"@oh-my-opencode/lsp-core": "file:../lsp-core",
+		"@oh-my-opencode/mcp-stdio-core": "file:../mcp-stdio-core",
 		"@biomejs/biome": "2.4.16",
 		"@types/node": "^25.9.2",
 		"typescript": "^6.0.3",
