@@ -47,3 +47,10 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 4: token-predictor (burn-rate + recommendation)
+export {
+  predict,
+  defaultTokenPredictorConfig,
+  calculateBurnRate,
+} from "./token-predictor"
