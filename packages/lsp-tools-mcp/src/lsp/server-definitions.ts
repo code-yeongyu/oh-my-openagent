@@ -140,7 +140,7 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 		command: ["haskell-language-server-wrapper", "--lsp"],
 		extensions: [".hs", ".lhs"],
 	},
-	"kotlin-ls": { command: ["kotlin-lsp"], extensions: [".kt", ".kts"] },
+	"kotlin-ls": { command: ["kotlin-lsp", "--stdio"], extensions: [".kt", ".kts"] },
 	julials: {
 		command: ["julia", "--startup-file=no", "--history-file=no", "-e", "using LanguageServer; runserver()"],
 		extensions: [".jl"],
