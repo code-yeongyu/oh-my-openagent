@@ -11,6 +11,7 @@ const corePackages = [
   "packages/ast-grep-core",
   "packages/lsp-core",
   "packages/mcp-stdio-core",
+  "packages/mcp-client-core",
   "packages/comment-checker-core",
   "packages/hashline-core",
   "packages/tmux-core",
