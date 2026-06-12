@@ -14,11 +14,19 @@ type LauncherFixture = {
   readonly root: string;
 };
 
-async function createLauncherFixture({ withNodeCli }: { readonly withNodeCli: boolean }): Promise<LauncherFixture> {
+async function createLauncherFixture(
+  { withNodeCli, bunOutput }: {
+    readonly withNodeCli: boolean;
+    readonly bunOutput?: string;
+  },
+): Promise<LauncherFixture> {
   const root = await mkdtemp(join(tmpdir(), "launcher-fixture-"));
   const wrapperPackageRoot = join(root, "pkg");
   await mkdir(join(wrapperPackageRoot, "dist", "cli"), { recursive: true });
-  await writeFile(join(wrapperPackageRoot, "dist", "cli", "index.js"), 'console.log("BUN_CLI_RAN");\n');
+  await writeFile(
+    join(wrapperPackageRoot, "dist", "cli", "index.js"),
+    bunOutput ? `console.log(${JSON.stringify(bunOutput)})\n` : 'console.log("BUN_CLI_RAN");\n',
+  );
   if (withNodeCli) {
     await mkdir(join(wrapperPackageRoot, "dist", "cli-node"), { recursive: true });
     await writeFile(
@@ -97,13 +105,23 @@ describe("platform launcher runtime fallback (lazycodex#47)", () => {
   });
 
   it("#given a working bun #when launching #then bun stays the preferred runtime", async () => {
-    const fixture = await createLauncherFixture({ withNodeCli: true });
-    const fakeBun = await writeFakeBun(
-      fixture.root,
-      "fake-bun",
-      'echo "BUN_OK $2"',
-      "echo BUN_OK %2",
-    );
+    if (process.platform === "win32") {
+      // given: Windows spawnSync without shell:true cannot run .sh or .cmd as a bun stand-in;
+      // use node (process.execPath) as the fake bun binary, which the launcher invokes as
+      // spawnSync(node, [cliPath, ...args]) — effectively running the CLI with node instead of bun
+      const fixture = await createLauncherFixture({ withNodeCli: true, bunOutput: "BUN_OK" });
+
+      const result = runLauncher(fixture, { BUN_BINARY: process.execPath });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("BUN_OK");
+      expect(result.stdout).not.toContain("OMO_NODE_OK");
+      return;
+    }
+
+    // given: POSIX — use a shell script fake bun
+    const fixture = await createLauncherFixture({ withNodeCli: true, bunOutput: "BUN_OK" });
+    const fakeBun = await writeFakeBun(fixture.root, "fake-bun", 'echo "BUN_OK $2"', "echo BUN_OK %2");
 
     const result = runLauncher(fixture, { BUN_BINARY: fakeBun });
 
