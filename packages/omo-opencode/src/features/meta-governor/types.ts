@@ -470,6 +470,12 @@ export interface OrchestratorConfig {
   readonly decision: Partial<DecisionHandlerConfig>
   /** Closed-loop learning config overrides. */
   readonly closedLoop: Partial<ClosedLoopConfig>
+  /** Model override — when set, use a different model than the session. */
+  readonly modelOverride?: {
+    readonly providerID?: string
+    readonly modelID?: string
+    readonly modelLimit?: number
+  }
 }
 
 /**

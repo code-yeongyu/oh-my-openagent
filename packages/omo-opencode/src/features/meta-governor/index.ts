@@ -47,3 +47,10 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 8: orchestrator (wire memory → predictor → scorer → decision → learner)
+export {
+  runMetaGovernor,
+  defaultOrchestratorConfig,
+  buildDecisionContext,
+} from "./orchestrator"
