@@ -16,6 +16,7 @@
     "test": "bun test src/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/utils": "workspace:*",
     "picomatch": "^4.0.4"
   }
 }
