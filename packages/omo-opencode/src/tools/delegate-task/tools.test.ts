@@ -3465,7 +3465,7 @@ describe("sisyphus-task", () => {
 			const tool = createDelegateTask({
 				manager: mockManager,
 				client: mockClient,
-			})
+  })
 
 			const toolContext = {
 				sessionID: "parent-session",
@@ -4718,5 +4718,27 @@ describe("sisyphus-task", () => {
       expect(result).toContain("session_id: ses_bg_metadata")
       expect(result).toContain("</task_metadata>")
     }, { timeout: 10000 })
+  })
+})
+
+describe("buildSyncPromptTools (issue #5182)", () => {
+  test("ignores user permission denials — RED test proving permission is not merged into tools", () => {
+    // #given - user configured agents.sisyphus-junior.permission with tool denials
+    const { buildSyncPromptTools } = require("./sync-prompt-sender")
+    const userPermission = { grep: "deny", glob: "deny" }
+
+    // #when - buildSyncPromptTools currently ignores the extra argument;
+    //          the fix should accept permission and merge denials
+    const result = buildSyncPromptTools("sisyphus-junior", userPermission)
+
+    // #then - user denials MUST propagate to false, but DON'T because the
+    //          function never reads permission from config (bug #5182)
+    expect(result.grep).toBe(false)
+    expect(result.glob).toBe(false)
+    // hardcoded restriction (task: false) still applies
+    expect(result.task).toBe(false)
+    // unconditionally allowed tools remain unchanged
+    expect(result.call_omo_agent).toBe(true)
+    expect(result.question).toBe(false)
   })
 })

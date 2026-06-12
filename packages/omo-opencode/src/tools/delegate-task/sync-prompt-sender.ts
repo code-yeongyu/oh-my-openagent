@@ -49,11 +49,21 @@ function isUnexpectedEofError(error: unknown): boolean {
   return lowered.includes("unexpected eof") || lowered.includes("json parse error")
 }
 
-export function buildSyncPromptTools(agentToUse: string): Record<string, boolean> {
+export function buildSyncPromptTools(
+  agentToUse: string,
+  permission?: Record<string, "ask" | "allow" | "deny">,
+): Record<string, boolean> {
+  const userDenied: Record<string, boolean> = {}
+  if (permission) {
+    for (const [tool, value] of Object.entries(permission)) {
+      if (value === "deny") userDenied[tool] = false
+    }
+  }
   return {
     task: isPlanFamily(agentToUse),
     call_omo_agent: true,
     question: false,
+    ...userDenied,
     ...getAgentToolRestrictions(agentToUse),
   }
 }

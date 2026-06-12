@@ -18,13 +18,15 @@ import type { CategoryConfig } from "../../config/schema"
 import type { DelegatedModelConfig } from "./types"
 
 function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig): DelegatedModelConfig {
-  const result = { ...base }
-  if (config.temperature !== undefined) result.temperature = config.temperature
-  if (config.top_p !== undefined) result.top_p = config.top_p
-  if (config.maxTokens !== undefined) result.maxTokens = config.maxTokens
-  if (config.reasoningEffort !== undefined) result.reasoningEffort = config.reasoningEffort
-  if (config.thinking !== undefined) result.thinking = config.thinking
-  return result
+  return {
+    ...base,
+    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
+    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
+    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
+    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
+    ...(config.tools !== undefined ? { tools: config.tools } : {}),
+  }
 }
 
 function resolveCategoryPromptAppendForModel(
