@@ -1,4 +1,4 @@
-import { lstat, readFile, readdir, rm } from "node:fs/promises"
+import { lstat, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
 import { cleanupCodexConfig, MANAGED_CODEX_AGENT_NAMES } from "./codex-cleanup-config"
@@ -35,9 +35,14 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
   const agentCleanup = await removeManifestListedAgentLinks(codexHome, agentPaths)
 
   const removedPaths: string[] = []
-  for (const path of managedGlobalStatePaths(codexHome)) {
-    if (await removePathIfExists(path)) removedPaths.push(path)
+  const managedStatePaths = new Set([
+    ...managedGlobalStatePaths(codexHome),
+    ...(await collectBootstrapDataDirsByGlob(codexHome)),
+  ])
+  for (const path of managedStatePaths) {
+    if (await removeManagedPathBestEffort(path)) removedPaths.push(path)
   }
+  await pruneEmptyRuntimeDirBestEffort(codexHome)
 
   const projectDirectory = input.projectDirectory ?? env.OMO_CODEX_PROJECT ?? process.cwd()
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
@@ -65,7 +70,83 @@ function managedGlobalStatePaths(codexHome: string): readonly string[] {
   return [
     join(codexHome, "plugins", "cache", "sisyphuslabs"),
     join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"),
+    // Deletion-safety invariant: runtime/ast-grep and runtime/node are the
+    // only managed runtime subtrees — never remove `runtime/` wholesale.
+    join(codexHome, "runtime", "ast-grep"),
+    join(codexHome, "runtime", "node"),
+    // codex core-plugins store convention: plugins/data/<plugin>-<marketplace>/
+    join(codexHome, "plugins", "data", "omo-sisyphuslabs", "bootstrap"),
   ]
+}
+
+const BOOTSTRAP_DATA_GLOB_MAX_DEPTH = 5
+
+// Defensive fallback for plugin-data layout drift, mirroring the glob
+// `<codexHome>/plugins/**/omo*sisyphuslabs*/bootstrap`; symlinks are never
+// followed and non-matching (non-omo) plugin data is never touched.
+async function collectBootstrapDataDirsByGlob(codexHome: string): Promise<readonly string[]> {
+  const results: string[] = []
+  await walkForManagedBootstrapDirs(join(codexHome, "plugins"), 0, results)
+  return results
+}
+
+async function walkForManagedBootstrapDirs(directory: string, depth: number, results: string[]): Promise<void> {
+  if (depth > BOOTSTRAP_DATA_GLOB_MAX_DEPTH) return
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => null)
+  if (entries === null) return
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const childPath = join(directory, entry.name)
+    if (isManagedBootstrapOwnerName(entry.name)) {
+      const bootstrapDir = join(childPath, "bootstrap")
+      if (await exists(bootstrapDir)) results.push(bootstrapDir)
+      continue
+    }
+    await walkForManagedBootstrapDirs(childPath, depth + 1, results)
+  }
+}
+
+function isManagedBootstrapOwnerName(name: string): boolean {
+  return name.startsWith("omo") && name.slice("omo".length).includes("sisyphuslabs")
+}
+
+export interface RemoveManagedPathSeams {
+  readonly afterFirstAttempt?: () => Promise<void> | void
+}
+
+// Removal is best-effort with a single retry: a mid-flight bootstrap worker
+// may recreate state between the first removal and the re-check. If the
+// artifact reappears after the retry as well, the cleanup still exits 0 and a
+// second `lazycodex-ai uninstall` run clears it.
+export async function removeManagedPathBestEffort(
+  path: string,
+  seams: RemoveManagedPathSeams = {},
+): Promise<boolean> {
+  const removedOnFirstAttempt = await attemptRemove(path)
+  await seams.afterFirstAttempt?.()
+  const removedOnRetry = await attemptRemove(path)
+  return removedOnFirstAttempt || removedOnRetry
+}
+
+async function attemptRemove(path: string): Promise<boolean> {
+  try {
+    if ((await lstat(path).catch(() => null)) === null) return false
+    await rm(path, { recursive: true, force: true })
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Drops `<codexHome>/runtime` only when removing the managed subtrees left it
+// empty: rmdir is non-recursive, so a runtime dir holding any other owner's
+// content stays untouched.
+async function pruneEmptyRuntimeDirBestEffort(codexHome: string): Promise<void> {
+  try {
+    await rmdir(join(codexHome, "runtime"))
+  } catch {
+    // best-effort: missing, non-empty, or locked runtime dirs are left as-is
+  }
 }
 
 async function collectInstalledAgentPaths(codexHome: string, configPath: string): Promise<readonly string[]> {
@@ -142,12 +223,6 @@ function isSafeManagedAgentPath(agentsDir: string, path: string): boolean {
   const fileName = relativePath.split(/[\\/]/).pop()
   if (fileName === undefined) return false
   return MANAGED_CODEX_AGENT_NAMES.some((agentName) => fileName === `${agentName}.toml`)
-}
-
-async function removePathIfExists(path: string): Promise<boolean> {
-  if (!(await exists(path))) return false
-  await rm(path, { recursive: true, force: true })
-  return true
 }
 
 async function exists(path: string): Promise<boolean> {
