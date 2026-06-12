@@ -1,22 +1,22 @@
 ---
 name: lcx-contribute-bug-fix
-description: "Contribute a verified bug-fix PR for LazyCodex, lazycodex-ai, omo-codex, bundled Codex skills, or upstream Codex CLI bugs. Use when the user asks to fix a bug, contribute a bug fix, contribute to fix bug, open a PR for a bug, or debug and PR a LazyCodex/Codex defect."
+description: "Contribute a verified bug fix for LazyCodex, lazycodex-ai, omo-codex, bundled Codex skills, or upstream Codex CLI bugs. Opens a fork PR only for upstream openai/codex; LazyCodex-owned defects become a verified-fix issue on code-yeongyu/lazycodex (never a PR — that repo is a generated distribution mirror). Use when the user asks to fix a bug, contribute a bug fix, contribute to fix bug, open a PR for a bug, or debug and PR a LazyCodex/Codex defect."
 metadata:
-  short-description: Contribute verified LazyCodex or Codex bug-fix PRs
+  short-description: Contribute verified LazyCodex or Codex bug fixes
 ---
 
 # lcx-contribute-bug-fix
 
-Use this skill to debug a concrete LazyCodex or Codex defect, implement the smallest correct fix in a fresh temporary workspace, and open a GitHub PR. Work in English, keep the PR body short, and support every claim with runtime or source evidence.
+Use this skill to debug a concrete LazyCodex or Codex defect, implement the smallest correct fix in a fresh temporary workspace, and deliver it. Work in English, keep the body short, and support every claim with runtime or source evidence.
 
-Route ownership the same way as `$lcx-report-bug`:
+Route ownership the same way as `$lcx-report-bug`, but the deliverable differs by target:
 
-- `code-yeongyu/lazycodex` for LazyCodex, lazycodex-ai, omo-codex, bundled skills, hooks, MCP wiring, installer behavior, marketplace sync, docs, or packaging.
-- `openai/codex` for upstream Codex CLI bugs that reproduce without LazyCodex or come from Codex core behavior.
+- `code-yeongyu/lazycodex` for LazyCodex, lazycodex-ai, omo-codex, bundled skills, hooks, MCP wiring, installer behavior, marketplace sync, docs, or packaging. Deliverable: a verified-fix issue with the patch embedded. NEVER open a PR or push a branch against this repo — its contents are regenerated from the source tree on every release, so PRs there cannot be merged and will be closed.
+- `openai/codex` for upstream Codex CLI bugs that reproduce without LazyCodex or come from Codex core behavior. Deliverable: a PR from a fork.
 
 ## Required Outcome
 
-Create a PR that includes:
+For `openai/codex`, create a fork PR that includes:
 
 - a focused branch from a fresh `/tmp` clone/worktree
 - reproduction logs from before the fix
@@ -24,6 +24,15 @@ Create a PR that includes:
 - verification logs from after the fix
 - apply `lazycodex-generated` when label management is available
 - the required LazyCodex footer tag `Tag: lazycodex-generated`
+- cleanup of temporary worktrees and clones
+
+For `code-yeongyu/lazycodex`, create an issue (never a PR) that includes:
+
+- reproduction logs from before the fix
+- the root cause with source evidence
+- the verified patch as a unified diff, produced and tested in a fresh `/tmp` clone/worktree
+- verification logs from after the fix
+- the `lazycodex-generated` label and the footer tag `Tag: lazycodex-generated`
 - cleanup of temporary worktrees and clones
 
 ## Required Workflow
@@ -66,7 +75,7 @@ If `gh` cannot clone, use `git clone --depth=1 "https://github.com/$TARGET_REPO"
 6. Write or update a failing regression test before production changes. Confirm it fails for the bug, not for a missing fixture or typo.
 7. Implement the smallest correct fix. Avoid refactors unless the fix cannot be made safely without one.
 8. Run the regression test, adjacent tests, and the smallest real-surface QA command that proves the user-visible behavior changed.
-9. Commit the verified fix before pushing. Inspect the status first so the PR cannot be empty or stale:
+9. Commit the verified fix in the worktree. Inspect the status first so the delivered diff cannot be empty or stale:
 
 ```bash
 git status --short
@@ -75,7 +84,15 @@ git commit -m "fix: <short bug-fix summary>"
 git log --oneline "origin/$BASE_BRANCH..HEAD"
 ```
 
-10. Generate the PR body with `scripts/create-pr-body.mjs`.
+10. Build the delivery body for the target:
+   - `openai/codex`: generate the PR body with `scripts/create-pr-body.mjs`.
+   - `code-yeongyu/lazycodex`: export the verified patch and write the issue body from the Verified-Fix Issue Template below:
+
+```bash
+PATCH_FILE="/tmp/lazycodex-fix-<short-slug>.patch"
+git diff "origin/$BASE_BRANCH"..HEAD > "$PATCH_FILE"
+```
+
 11. Ensure the generated label exists when the target repo allows label management. Keep the footer tag even when label creation is unavailable:
 
 ```bash
@@ -87,20 +104,21 @@ else
 fi
 ```
 
-12. Push to a writable remote, then create the PR. For upstream `openai/codex`, fork first and use the fork as the head repository:
+12. Deliver the fix.
+   - `code-yeongyu/lazycodex`: create the verified-fix issue. Never push a branch to this repo and never run `gh pr create` against it:
 
 ```bash
-PUSH_REMOTE="origin"
-PR_HEAD="$BRANCH_NAME"
-if [ "$TARGET_REPO" = "openai/codex" ]; then
-  gh repo fork "$TARGET_REPO" --remote --remote-name fork
-  PUSH_REMOTE="fork"
-  GH_USER="$(gh api user --jq .login)"
-  PR_HEAD="$GH_USER:$BRANCH_NAME"
-fi
+ISSUE_BODY="/tmp/lazycodex-fix-<short-slug>-issue.md"
+gh issue create --repo code-yeongyu/lazycodex --title "<short fix title>" "${LABEL_ARGS[@]}" --body-file "$ISSUE_BODY"
+```
 
-git push -u "$PUSH_REMOTE" "$BRANCH_NAME"
-gh pr create --repo "$TARGET_REPO" --base "$BASE_BRANCH" --head "$PR_HEAD" --title "<short fix title>" "${LABEL_ARGS[@]}" --body-file "$PR_BODY"
+   - `openai/codex`: fork, push the branch to the fork, and create the PR:
+
+```bash
+gh repo fork openai/codex --remote --remote-name fork
+GH_USER="$(gh api user --jq .login)"
+git push -u fork "$BRANCH_NAME"
+gh pr create --repo openai/codex --base "$BASE_BRANCH" --head "$GH_USER:$BRANCH_NAME" --title "<short fix title>" "${LABEL_ARGS[@]}" --body-file "$PR_BODY"
 ```
 
 13. Clean up:
@@ -112,16 +130,47 @@ find "$WORK_ROOT" -mindepth 1 -maxdepth 1 -exec rm -r -- {} +
 rmdir "$WORK_ROOT"
 ```
 
-Return the PR URL, the reproduction command, the verification command, and the cleanup receipt.
+Return the PR or issue URL, the reproduction command, the verification command, and the cleanup receipt.
 
-## PR Body Generator
+## Verified-Fix Issue Template (code-yeongyu/lazycodex)
+
+Write the issue body in English. Embed the patch verbatim so a maintainer can apply it to the source tree:
+
+````markdown
+## Problem Situation
+[What failed for the user.]
+
+## Reproduction Logs
+[Exact failing command and relevant log excerpt.]
+
+## Root Cause
+[Confirmed cause with runtime and source evidence.]
+
+## Verified Fix
+[What changed and why this is the smallest correct fix.]
+
+```diff
+[Contents of $PATCH_FILE.]
+```
+
+## Verification
+- [RED test output or repro before the fix]
+- [GREEN test output after the fix]
+- [Manual QA command and result]
+
+---
+This fix was debugged, implemented, and verified with [LazyCodex](https://github.com/code-yeongyu/lazycodex).
+Tag: lazycodex-generated
+````
+
+## PR Body Generator (openai/codex)
 
 Use the bundled script to generate the PR body. Create a JSON file with this shape:
 
 ```json
 {
   "title": "Fix short user-visible failure",
-  "targetRepository": "code-yeongyu/lazycodex",
+  "targetRepository": "openai/codex",
   "problem": "What is broken for the user.",
   "reproductionLogs": "Exact failing command, log excerpt, or trace.",
   "approach": "What changed and why this is the smallest correct fix.",
@@ -140,7 +189,7 @@ PR_BODY="/tmp/lazycodex-fix-<short-slug>-pr.md"
 node "<skill-root>/scripts/create-pr-body.mjs" "$PR_INPUT" "$PR_BODY"
 ```
 
-## PR Body Template
+## PR Body Template (openai/codex)
 
 The generated body must follow this structure:
 
@@ -179,13 +228,15 @@ Stop and ask one narrow question only when:
 
 - the bug cannot be reproduced from available information
 - target repository ownership remains ambiguous after comparing LazyCodex and upstream Codex evidence
-- authentication is missing for pushing or creating the PR
+- authentication is missing for creating the issue or pushing and creating the PR
 - the fix requires a product decision rather than a technical correction
 
 Do not open:
 
-- a PR without a failing-before and passing-after test
-- a PR without a real-surface QA command
-- a PR without the `Tag: lazycodex-generated` footer
+- a PR or pushed branch targeting `code-yeongyu/lazycodex` — deliver the verified-fix issue instead, always
+- a PR or verified-fix issue without a failing-before and passing-after test
+- a PR or verified-fix issue without a real-surface QA command
+- a PR or issue without the `Tag: lazycodex-generated` footer
+- a verified-fix issue without the patch embedded in a `diff` block
 - a vague fix that does not identify the root cause
 - a broad refactor disguised as a bug fix
