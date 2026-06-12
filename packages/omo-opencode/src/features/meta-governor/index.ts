@@ -47,3 +47,14 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 2: memory-aggregator (parallel reads from 3 memory systems)
+export { aggregateRead } from "./memory-aggregator"
+export type {
+  AgentmemoryBackend,
+  MagicContextBackend,
+  BoulderStateBackend,
+  AggregateReadInput,
+  AggregateReadResult,
+  Backends,
+} from "./memory-aggregator"
