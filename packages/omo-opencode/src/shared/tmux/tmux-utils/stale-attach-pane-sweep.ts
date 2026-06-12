@@ -1,9 +1,11 @@
 const ATTACH_SERVER_URL_PATTERN = /\bopencode\s+attach\s+(?:"([^"]+)"|'([^']+)'|(\S+))/
 const OMO_ATTACH_PANE_TITLE_PREFIXES = ["omo-subagent-", "omo-team-"]
+const OMO_ATTACH_SERVER_URL_OPTION = "@omo_attach_server_url"
 
 export type TmuxAttachPane = {
 	readonly paneId: string
 	readonly title: string
+	readonly attachServerUrl: string
 	readonly commandLine: string
 }
 
@@ -30,7 +32,7 @@ async function listTmuxPanesViaTmux(tmux: string): Promise<TmuxAttachPane[]> {
 		"list-panes",
 		"-a",
 		"-F",
-		"#{pane_id}\t#{pane_title}\t#{pane_current_command} #{pane_start_command}",
+		`#{pane_id}\t#{pane_title}\t#{${OMO_ATTACH_SERVER_URL_OPTION}}\t#{pane_current_command} #{pane_start_command}`,
 	])
 
 	if (result.exitCode !== 0) {
@@ -40,9 +42,14 @@ async function listTmuxPanesViaTmux(tmux: string): Promise<TmuxAttachPane[]> {
 	return result.output
 		.split("\n")
 		.map((line): TmuxAttachPane | null => {
-			const [paneId, title, ...commandParts] = line.split("\t")
+			const [paneId, title, attachServerUrl, ...commandParts] = line.split("\t")
 			if (paneId === undefined || paneId.length === 0) return null
-			return { paneId, title: title ?? "", commandLine: commandParts.join("\t").trim() }
+			return {
+				paneId,
+				title: title ?? "",
+				attachServerUrl: attachServerUrl ?? "",
+				commandLine: commandParts.join("\t").trim(),
+			}
 		})
 		.filter((pane): pane is TmuxAttachPane => pane !== null)
 }
@@ -76,7 +83,7 @@ function extractAttachServerUrl(commandLine: string): string | null {
 }
 
 function isOmoAttachPane(pane: TmuxAttachPane): boolean {
-	return OMO_ATTACH_PANE_TITLE_PREFIXES.some((prefix) => pane.title.startsWith(prefix))
+	return pane.attachServerUrl.length > 0 || OMO_ATTACH_PANE_TITLE_PREFIXES.some((prefix) => pane.title.startsWith(prefix))
 }
 
 export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): Promise<number> {
@@ -103,7 +110,7 @@ export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): P
 	for (const pane of candidatePanes) {
 		if (!isOmoAttachPane(pane)) continue
 
-		const serverUrl = extractAttachServerUrl(pane.commandLine)
+		const serverUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine)
 		if (serverUrl === null) continue
 
 		let serverRunning: boolean

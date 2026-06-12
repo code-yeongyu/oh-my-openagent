@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 import {
 	sweepStaleOmoAgentSessionsWith,
@@ -204,26 +206,31 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 				{
 					paneId: "%dead",
 					title: "omo-subagent-dead",
+					attachServerUrl: "",
 					commandLine: `/bin/sh -c "opencode attach http://127.0.0.1:4101 --session ses_dead --dir /tmp/project"`,
 				},
 				{
 					paneId: "%live",
 					title: "omo-subagent-live",
+					attachServerUrl: "",
 					commandLine: `opencode attach 'http://127.0.0.1:4102/' --session 'ses_live' --dir '/tmp/project'`,
 				},
 				{
 					paneId: "%team",
 					title: "omo-team-member",
+					attachServerUrl: "",
 					commandLine: `opencode attach 'http://127.0.0.1:4104/' --session 'ses_team' --dir '/tmp/project'`,
 				},
 				{
 					paneId: "%manual",
 					title: "manual-shell",
+					attachServerUrl: "",
 					commandLine: "opencode attach http://127.0.0.1:4105 --session ses_manual",
 				},
 				{
 					paneId: "%other",
 					title: "",
+					attachServerUrl: "",
 					commandLine: "vim README.md",
 				},
 			],
@@ -253,6 +260,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 				{
 					paneId: "%manual",
 					title: "manual-opencode",
+					attachServerUrl: "",
 					commandLine: "opencode attach http://127.0.0.1:4105 --session ses_manual",
 				},
 			],
@@ -281,6 +289,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 				{
 					paneId: "%stubborn",
 					title: "omo-subagent-stubborn",
+					attachServerUrl: "",
 					commandLine: "opencode attach http://127.0.0.1:4103 --session ses_dead",
 				},
 			],
@@ -307,11 +316,13 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 				{
 					paneId: "%bad-health",
 					title: "omo-subagent-bad-health",
+					attachServerUrl: "",
 					commandLine: "opencode attach http://127.0.0.1:4106 --session ses_bad",
 				},
 				{
 					paneId: "%dead",
 					title: "omo-subagent-dead",
+					attachServerUrl: "",
 					commandLine: "opencode attach http://127.0.0.1:4107 --session ses_dead",
 				},
 			],
@@ -337,5 +348,40 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 		expect(result).toBe(1)
 		expect(closed).toEqual(["%dead"])
 		expect(logged).toContain("[sweepStaleOmoAttachPanesWith] failed to check pane server health")
+	})
+
+	it("#given team pane metadata with overwritten title and shell command line #when sweep called #then metadata server url is used", async () => {
+		// given
+		const checkedUrls: string[] = []
+		const closed: string[] = []
+		const deps: SweepAttachPaneDeps = {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [
+				{
+					paneId: "%team",
+					title: "sleep 300",
+					attachServerUrl: "http://127.0.0.1:4108",
+					commandLine: "fish fish",
+				},
+			],
+			isServerRunning: async (serverUrl: string) => {
+				checkedUrls.push(serverUrl)
+				return false
+			},
+			closePane: async (paneId: string) => {
+				closed.push(paneId)
+				return true
+			},
+			log: () => undefined,
+		}
+
+		// when
+		const result = await sweepStaleOmoAttachPanesWith(deps)
+
+		// then
+		expect(result).toBe(1)
+		expect(checkedUrls).toEqual(["http://127.0.0.1:4108"])
+		expect(closed).toEqual(["%team"])
 	})
 })
