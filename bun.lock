@@ -120,9 +120,12 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
+    "packages/model-presets": {
+      "name": "@oh-my-opencode/model-presets",
+    },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "0.1.0",
+      "version": "4.8.1",
       "dependencies": {
         "@oh-my-opencode/utils": "workspace:*",
         "posthog-node": "^5.34.3",
@@ -261,6 +264,8 @@
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
+
+    "@oh-my-opencode/model-presets": ["@oh-my-opencode/model-presets@workspace:packages/model-presets"],
 
     "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
 

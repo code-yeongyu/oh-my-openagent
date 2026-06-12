@@ -1,28 +1,17 @@
 ---
 name: tech-debt-audit
-description: "Thorough, file-cited technical debt audit across 9 dimensions using AST-grep (tree-sitter), grep, language-native tooling, and optionally GitNexus knowledge graph. Produces TECH_DEBT_AUDIT.md with severity, effort estimates, and prioritized fixes. Use when asked for codebase health check, tech debt audit, architecture review, code quality assessment, or cleanup planning. Triggers: 'tech debt', 'technical debt', 'debt audit', 'code health', 'technical debt audit', 'codebase health check', 'find tech debt', 'debt analysis', 'audit code quality'."
+description: "Thorough, file-cited technical debt audit across 9 dimensions using AST-grep (tree-sitter), grep, language-native tooling, and optionally CodeGraph knowledge graph. Produces TECH_DEBT_AUDIT.md with severity, effort estimates, and prioritized fixes. Use when asked for codebase health check, tech debt audit, architecture review, code quality assessment, or cleanup planning. Triggers: 'tech debt', 'technical debt', 'debt audit', 'code health', 'technical debt audit', 'codebase health check', 'find tech debt', 'debt analysis', 'audit code quality'."
 ---
 
 # Tech Debt Audit Protocol
 
-Model-agnostic technical debt audit for oh-my-openagent (OMO). Uses OMO's built-in tools (`ast_grep_search`, `grep`, `glob`, `bash`, `read`, `lsp_diagnostics`, `task`) plus **optional GitNexus knowledge graph** (`gitnexus_list_repos`, `gitnexus_query`, `gitnexus_cypher`, `gitnexus_context`, `gitnexus_impact`) when available. Produces a grounded, citable `TECH_DEBT_AUDIT.md` artifact.
+Model-agnostic technical debt audit for oh-my-openagent (OMO). Uses OMO's built-in tools (`ast_grep_search`, `grep`, `glob`, `bash`, `read`, `lsp_diagnostics`, `task`) plus **optional CodeGraph MCP** for enhanced code graph analysis when available. Produces a grounded, citable `TECH_DEBT_AUDIT.md` artifact.
 
-## GitNexus Enhancement (Optional)
+## CodeGraph Enhancement (Optional)
 
 When running as the lead orchestrator (not a sub-agent), check if GitNexus tools are available AND whether the current repo is indexed:
 
-```
-gitnexus_list_repos()
-```
-
-If the current repo appears in the results, GitNexus is available. Use it to **supersede or augment** the standard tool searches in the dimensions marked below. GitNexus gives you:
-- **Dead code detection** — Cypher query for functions/classes with zero callers
-- **Architecture communities** — Leiden algorithm clusters showing actual module boundaries
-- **Circular dependency tracing** — Graph cycles via Cypher path queries
-- **Blast radius analysis** — Impact of changing any symbol
-- **Execution flow traces** — Full call chains from entry point to terminal
-
-When GitNexus is available, run GitNexus queries directly. Sub-agents spawned via `task()` cannot use GitNexus — they use the standard tool fallback.
+To use CodeGraph, ensure the `codegraph` MCP server is configured in your project's `.mcp.json` or global MCP config. The skill will auto-detect CodeGraph by checking if `codegraph` MCP tools are available. Sub-agents spawned via `task()` cannot use CodeGraph — they use the standard tool fallback.
 
 ---
 
@@ -48,18 +37,18 @@ Write results to `TECH_DEBT_AUDIT.md` in the repo root with:
 5. Cross-reference high-churn + large = debt hot zones
 6. Write the mental model paragraph in your own working context
 
-### GitNexus Enhancement (if available)
-Instead of guessing module boundaries from file paths, query the actual architecture:
+### CodeGraph Enhancement (if available)
+Instead of guessing module boundaries, query the code graph:
 
 ```
-gitnexus_query(query="current repo architecture and module structure", repo="<repo-name>")
+codegraph_explore(query="architecture overview and main modules")
 ```
-This returns communities (functional areas) detected by the Leiden algorithm. Use the community structure as your architectural mental model instead of hand-inferring it from directory names.
+This returns symbol relationships and source grouped by file. Use the structure as your architectural mental model instead of hand-inferring it from directory names.
 
 ```
-gitnexus_query(query="execution flows and entry points", repo="<repo-name>")
+codegraph_explore(query="main entry points and execution flow")
 ```
-This returns processes (execution traces from entry to terminal). Use these to understand how the code actually flows vs how the directory layout suggests it flows.
+This surfaces entry points and call chains. Use these to understand how the code actually flows vs how the directory layout suggests it flows.
 
 ## Phase 1: Audit Across 9 Dimensions
 
@@ -74,38 +63,34 @@ Use OMO tools for each dimension. Run parallel tool calls within each dimension.
 - `grep("async|await")` on sync-looking files — misplaced async boundaries
 - `bash("wc -l <file>")` on each large file found in Phase 0
 
-#### GitNexus Enhancement (if available)
+#### CodeGraph Enhancement (if available)
 
 **Dead code detection:**
 ```
-gitnexus_cypher(query="MATCH (f:Function) WHERE NOT (f)<-[:CodeRelation {type: 'CALLS'}]-(:Function) RETURN f.name, f.filePath, f.startLine", repo="<repo-name>")
-gitnexus_cypher(query="MATCH (c:Class) WHERE NOT (c)<-[:CodeRelation {type: 'EXTENDS'}]-(:Class) AND NOT (c)<-[:CodeRelation {type: 'IMPLEMENTS'}]-(:Class) AND NOT (c)<-[:CodeRelation {type: 'HAS_METHOD'}]-(:Method) RETURN c.name, c.filePath", repo="<repo-name>")
+codegraph_callers(symbol="<suspected-dead-function>")
+codegraph_callers(symbol="<suspected-dead-class>")
 ```
-These find functions that nothing calls and classes that nothing extends/implements/has-methods-on. Cross-reference with test files — if they're only used in tests, they're test utilities, not dead code.
+Run `codegraph_callers` on suspected dead exports found via grep/glob. If the result shows zero callers (excluding test files), it's dead code.
 
 **Circular dependency detection:**
 ```
-gitnexus_cypher(query="MATCH p=(a)-[:CodeRelation {type: 'IMPORTS'}]->(b)-[:CodeRelation {type: 'IMPORTS'}]->(a) RETURN a.name, a.filePath, b.name, b.filePath LIMIT 20", repo="<repo-name>")
+codegraph_impact(target="<module-or-file>", direction="upstream")
 ```
-For deeper cycles:
-```
-gitnexus_cypher(query="MATCH p=(a)-[:CodeRelation {type: 'IMPORTS'}]->(b)-[:CodeRelation {type: 'IMPORTS'}]->(c)-[:CodeRelation {type: 'IMPORTS'}]->(a) RETURN a.filePath, b.filePath, c.filePath LIMIT 20", repo="<repo-name>")
-```
+Use `codegraph_impact` on key modules to trace their dependents. If A depends on B and B depends on A, that's a cycle.
 
-**God module detection via community cohesion:**
+**Architecture boundaries:**
 ```
-gitnexus_query(query="communities with low cohesion indicating misplaced code", repo="<repo-name>", goal="find architectural decay", task_context="tech debt audit")
+codegraph_explore(query="module dependencies and architecture boundaries")
 ```
-Communities with low cohesion scores suggest code that's in the wrong module — a strong architectural decay signal.
+Use `codegraph_explore` to survey actual module structure.
 
 #### What to flag
 - Files > 500 LOC (god files)
 - Functions > 80 LOC or > 4 nesting levels
 - Classes with > 15 methods or > 400 LOC
 - Import cycles (A → B → A)
-- Dead exports: function/class defined but never imported elsewhere (GitNexus: Cypher query)
+- Dead exports: function/class defined but never imported elsewhere (CodeGraph: `codegraph_callers`)
 - Commented-out code blocks (>3 consecutive consecutive lines)
-- Code in unexpected communities (GitNexus: low-cohesion communities)
 
 ### 2. Consistency Rot
 
@@ -158,11 +143,11 @@ Communities with low cohesion scores suggest code that's in the wrong module —
 - `grep(".env|process.env|Bun.env")` — env var usage
 - `grep("API_KEY|SECRET|PASSWORD|TOKEN")` in non-config files — hardcoded config
 
-#### GitNexus Enhancement (if available)
+#### CodeGraph Enhancement (if available)
 
 **Blast radius of core dependencies:**
 ```
-gitnexus_impact(target="<core-utility-function>", direction="upstream", repo="<repo-name>")
+codegraph_impact(target="<core-utility-function>", direction="upstream")
 ```
 Run this on a few key internal modules (logger, config loader, HTTP client) to see how widely they're used. A widely-depended-on module with poor error handling or type safety is a high-priority refactor target because changes to it ripple everywhere.
 
@@ -194,17 +179,18 @@ Run this on a few key internal modules (logger, config loader, HTTP client) to s
 - `grep("console.error|logger\\.error|log\\.error")` — actual error logging
 - `ast_grep_search(pattern="throw new $ERR(", lang="typescript")` — error types used
 
-#### GitNexus Enhancement (if available)
+#### CodeGraph Enhancement (if available)
 
 **Trace error propagation through call chains:**
 ```
-gitnexus_context(name="<key-error-handler-or-middleware>", repo="<repo-name>", kind="Function")
+codegraph_callers(symbol="<key-error-handler-or-middleware>")
+codegraph_explore(query="how errors propagate through <key-error-handler>")
 ```
-Use `gitnexus_context` on error handlers, middleware, and fallback functions to trace how errors propagate. If errors are caught and swallowed at multiple levels, that's a finding.
+Use `codegraph_callers` to find who calls your error handlers. If errors are caught and swallowed at multiple levels, that's a finding.
 
 **Impact of changing error types:**
 ```
-gitnexus_impact(target="<error-class-or-interface>", direction="upstream", repo="<repo-name>")
+codegraph_impact(target="<error-class-or-interface>", direction="upstream")
 ```
 Check the blast radius of custom error classes. If changing an error type would break 20+ consumers, the error contract is too tight.
 
@@ -246,18 +232,18 @@ Check the blast radius of custom error classes. If changing an error type would 
 
 ## Phase 2: Deeper Dives (Parallel Sub-Agents)
 
-For large codebases (>50k LOC), delegate heavy dimensions to parallel sub-agents. Sub-agents CANNOT use GitNexus — they use standard tools only:
+For large codebases (>50k LOC), delegate heavy dimensions to parallel sub-agents. Sub-agents CANNOT use CodeGraph — they use standard tools only:
 
 ```
 task(category="unspecified-low", run_in_background=true, load_skills=[], prompt="[CONTEXT] Tech debt audit. [GOAL] Audit dimensions 1 (Architecture) and 2 (Consistency). [REQUEST] Run ast_grep and grep searches for dimensions 1-2 from the tech-debt-audit skill. Report every finding with file:line:col. Tag severity: Critical/High/Medium/Low.")
 task(category="unspecified-low", run_in_background=true, load_skills=[], prompt="[CONTEXT] Tech debt audit. [GOAL] Audit dimensions 3 (Type debt) and 7 (Error handling). [REQUEST] Run searches for dimensions 3 and 7 from the tech-debt-audit skill. Report every finding with file:line:col. Tag severity.")
 ```
 
-Spawn 2-3 sub-agents for the heaviest dimensions, collect results in parallel, then synthesize. The main agent handles GitNexus queries itself while sub-agents run the standard tool passes.
+Spawn 2-3 sub-agents for the heaviest dimensions, collect results in parallel, then synthesize. The main agent handles CodeGraph queries itself while sub-agents run the standard tool passes.
 
 ## Phase 3: Synthesize & Deliver
 
-1. Collect all findings from direct tool calls, GitNexus queries (if available), and sub-agent results
+1. Collect all findings from direct tool calls, CodeGraph queries (if available), and sub-agent results
 2. Deduplicate — same issue mentioned by multiple dimensions
 3. Classify severity:
    - **Critical** — Causes incorrect behavior, data loss, or security vulnerability
