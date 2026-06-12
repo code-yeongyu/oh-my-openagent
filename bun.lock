@@ -27,6 +27,7 @@
         "@oh-my-opencode/ast-grep-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
+        "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
@@ -96,6 +97,14 @@
       "name": "@oh-my-opencode/boulder-state",
       "version": "0.1.0",
     },
+    "packages/claude-code-compat-core": {
+      "name": "@oh-my-opencode/claude-code-compat-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/model-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+    },
     "packages/comment-checker-core": {
       "name": "@oh-my-opencode/comment-checker-core",
       "version": "0.1.0",
@@ -160,6 +169,7 @@
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
+        "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
@@ -302,6 +312,8 @@
     "@oh-my-opencode/ast-grep-mcp": ["@oh-my-opencode/ast-grep-mcp@workspace:packages/ast-grep-mcp"],
 
     "@oh-my-opencode/boulder-state": ["@oh-my-opencode/boulder-state@workspace:packages/boulder-state"],
+
+    "@oh-my-opencode/claude-code-compat-core": ["@oh-my-opencode/claude-code-compat-core@workspace:packages/claude-code-compat-core"],
 
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
 

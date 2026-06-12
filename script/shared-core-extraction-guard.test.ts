@@ -16,14 +16,23 @@ const corePackages = [
   "packages/tmux-core",
   "packages/boulder-state",
   "packages/telemetry-core",
+  "packages/claude-code-compat-core",
 ] as const
 
-const forbiddenSourcePatterns = [
-  /@opencode-ai\//,
-  /packages\/omo-codex\/plugin/,
-  /plugin\/components/,
-  /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
-  /\bsession\.prompt(?:Async)?\s*\(/,
+type ForbiddenSourcePattern = {
+  readonly pattern: RegExp
+  readonly allowPackagePaths?: readonly string[]
+}
+
+const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
+  { pattern: /@opencode-ai\// },
+  { pattern: /packages\/omo-codex\/plugin/ },
+  { pattern: /plugin\/components/ },
+  {
+    pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
+    allowPackagePaths: ["packages/claude-code-compat-core"],
+  },
+  { pattern: /\bsession\.prompt(?:Async)?\s*\(/ },
 ] as const
 
 const requiredPlanKeys = ["F", "1", "2", "3", "4", "5", "6", "7"] as const
@@ -62,9 +71,13 @@ describe("shared core extraction guardrails", () => {
     const offenders: string[] = []
     for (const file of files) {
       const source = await readFile(file, "utf8")
-      for (const pattern of forbiddenSourcePatterns) {
-        if (pattern.test(source)) {
-          offenders.push(`${relative(process.cwd(), file)} matches ${pattern}`)
+      const relativeFilePath = relative(process.cwd(), file)
+      for (const forbidden of forbiddenSourcePatterns) {
+        const allowedByPackage = forbidden.allowPackagePaths?.some((packagePath) =>
+          relativeFilePath.startsWith(`${packagePath}/`),
+        ) ?? false
+        if (!allowedByPackage && forbidden.pattern.test(source)) {
+          offenders.push(`${relativeFilePath} matches ${forbidden.pattern}`)
         }
       }
     }
