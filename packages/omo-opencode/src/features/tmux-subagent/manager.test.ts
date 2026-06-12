@@ -661,6 +661,32 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
     })
 
+    test('#given skipped team-mode session #when onSessionCreated runs #then stale attach panes are still swept once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 1)
+      mockIsInsideTmux.mockReturnValue(true)
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'inline',
+      }), mockTmuxDeps, {
+        shouldSkipSession: (sessionId) => sessionId.startsWith('ses_team_member'),
+      })
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_team_member', 'ses_parent', 'team member task'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_team_member_two', 'ses_parent', 'team member task 2'))
+
+      // then
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockQueryWindowState).not.toHaveBeenCalled()
+      expect(mockExecuteActions).not.toHaveBeenCalled()
+    })
+
     test('second agent spawns with correct split direction', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)

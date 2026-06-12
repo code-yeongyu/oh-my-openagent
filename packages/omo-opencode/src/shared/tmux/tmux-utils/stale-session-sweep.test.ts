@@ -203,14 +203,27 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 			listCandidatePanes: async () => [
 				{
 					paneId: "%dead",
+					title: "omo-subagent-dead",
 					commandLine: `/bin/sh -c "opencode attach http://127.0.0.1:4101 --session ses_dead --dir /tmp/project"`,
 				},
 				{
 					paneId: "%live",
+					title: "omo-subagent-live",
 					commandLine: `opencode attach 'http://127.0.0.1:4102/' --session 'ses_live' --dir '/tmp/project'`,
 				},
 				{
+					paneId: "%team",
+					title: "omo-team-member",
+					commandLine: `opencode attach 'http://127.0.0.1:4104/' --session 'ses_team' --dir '/tmp/project'`,
+				},
+				{
+					paneId: "%manual",
+					title: "manual-shell",
+					commandLine: "opencode attach http://127.0.0.1:4105 --session ses_manual",
+				},
+				{
 					paneId: "%other",
+					title: "",
 					commandLine: "vim README.md",
 				},
 			],
@@ -226,8 +239,37 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 		const result = await sweepStaleOmoAttachPanesWith(deps)
 
 		// then
-		expect(result).toBe(1)
-		expect(closed).toEqual(["%dead"])
+		expect(result).toBe(2)
+		expect(closed).toEqual(["%dead", "%team"])
+	})
+
+	it("#given manual attach pane with dead server #when sweep called #then manual pane is not closed", async () => {
+		// given
+		const closed: string[] = []
+		const deps: SweepAttachPaneDeps = {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [
+				{
+					paneId: "%manual",
+					title: "manual-opencode",
+					commandLine: "opencode attach http://127.0.0.1:4105 --session ses_manual",
+				},
+			],
+			isServerRunning: async () => false,
+			closePane: async (paneId: string) => {
+				closed.push(paneId)
+				return true
+			},
+			log: () => undefined,
+		}
+
+		// when
+		const result = await sweepStaleOmoAttachPanesWith(deps)
+
+		// then
+		expect(result).toBe(0)
+		expect(closed).toEqual([])
 	})
 
 	it("#given OMO attach pane close fails #when sweep called #then failed close is not counted", async () => {
@@ -238,6 +280,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 			listCandidatePanes: async () => [
 				{
 					paneId: "%stubborn",
+					title: "omo-subagent-stubborn",
 					commandLine: "opencode attach http://127.0.0.1:4103 --session ses_dead",
 				},
 			],
@@ -251,5 +294,48 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 
 		// then
 		expect(result).toBe(0)
+	})
+
+	it("#given server health check throws for one pane #when sweep called #then later stale panes are still closed", async () => {
+		// given
+		const closed: string[] = []
+		const logged: string[] = []
+		const deps: SweepAttachPaneDeps = {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [
+				{
+					paneId: "%bad-health",
+					title: "omo-subagent-bad-health",
+					commandLine: "opencode attach http://127.0.0.1:4106 --session ses_bad",
+				},
+				{
+					paneId: "%dead",
+					title: "omo-subagent-dead",
+					commandLine: "opencode attach http://127.0.0.1:4107 --session ses_dead",
+				},
+			],
+			isServerRunning: async (serverUrl: string) => {
+				if (serverUrl === "http://127.0.0.1:4106") {
+					throw new Error("bad health check")
+				}
+				return false
+			},
+			closePane: async (paneId: string) => {
+				closed.push(paneId)
+				return true
+			},
+			log: (message: string) => {
+				logged.push(message)
+			},
+		}
+
+		// when
+		const result = await sweepStaleOmoAttachPanesWith(deps)
+
+		// then
+		expect(result).toBe(1)
+		expect(closed).toEqual(["%dead"])
+		expect(logged).toContain("[sweepStaleOmoAttachPanesWith] failed to check pane server health")
 	})
 })

@@ -1115,6 +1115,8 @@ export class TmuxSessionManager {
     const sessionId = resolveSessionEventID(event.properties)
     if (!sessionId || !info?.parentID) return
 
+    await this.sweepStaleIsolatedSessionsOnce()
+
     // Team-mode members live in `team-layout-tmux` (which owns the pane
     // lifecycle via runtimeState.tmuxLayout). Tracking them here as well
     // produces two managers fighting over the same pane: polling can close a
@@ -1140,7 +1142,6 @@ export class TmuxSessionManager {
     }
 
     try {
-      await this.sweepStaleIsolatedSessionsOnce()
       await this.retryPendingCloses()
 
       const session = { sessionId, title }

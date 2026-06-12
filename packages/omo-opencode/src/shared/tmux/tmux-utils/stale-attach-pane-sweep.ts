@@ -1,7 +1,9 @@
 const ATTACH_SERVER_URL_PATTERN = /\bopencode\s+attach\s+(?:"([^"]+)"|'([^']+)'|(\S+))/
+const OMO_ATTACH_PANE_TITLE_PREFIXES = ["omo-subagent-", "omo-team-"]
 
 export type TmuxAttachPane = {
 	readonly paneId: string
+	readonly title: string
 	readonly commandLine: string
 }
 
@@ -28,7 +30,7 @@ async function listTmuxPanesViaTmux(tmux: string): Promise<TmuxAttachPane[]> {
 		"list-panes",
 		"-a",
 		"-F",
-		"#{pane_id}\t#{pane_current_command} #{pane_start_command}",
+		"#{pane_id}\t#{pane_title}\t#{pane_current_command} #{pane_start_command}",
 	])
 
 	if (result.exitCode !== 0) {
@@ -38,9 +40,9 @@ async function listTmuxPanesViaTmux(tmux: string): Promise<TmuxAttachPane[]> {
 	return result.output
 		.split("\n")
 		.map((line): TmuxAttachPane | null => {
-			const [paneId, ...commandParts] = line.split("\t")
+			const [paneId, title, ...commandParts] = line.split("\t")
 			if (paneId === undefined || paneId.length === 0) return null
-			return { paneId, commandLine: commandParts.join("\t").trim() }
+			return { paneId, title: title ?? "", commandLine: commandParts.join("\t").trim() }
 		})
 		.filter((pane): pane is TmuxAttachPane => pane !== null)
 }
@@ -73,6 +75,10 @@ function extractAttachServerUrl(commandLine: string): string | null {
 	return match[1] ?? match[2] ?? match[3] ?? null
 }
 
+function isOmoAttachPane(pane: TmuxAttachPane): boolean {
+	return OMO_ATTACH_PANE_TITLE_PREFIXES.some((prefix) => pane.title.startsWith(prefix))
+}
+
 export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): Promise<number> {
 	if (!deps.isInsideTmux()) {
 		return 0
@@ -95,10 +101,22 @@ export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): P
 
 	let closedCount = 0
 	for (const pane of candidatePanes) {
+		if (!isOmoAttachPane(pane)) continue
+
 		const serverUrl = extractAttachServerUrl(pane.commandLine)
 		if (serverUrl === null) continue
 
-		const serverRunning = await deps.isServerRunning(serverUrl)
+		let serverRunning: boolean
+		try {
+			serverRunning = await deps.isServerRunning(serverUrl)
+		} catch (error) {
+			deps.log("[sweepStaleOmoAttachPanesWith] failed to check pane server health", {
+				error: getErrorMessage(error),
+				paneId: pane.paneId,
+				serverUrl,
+			})
+			continue
+		}
 		if (serverRunning) continue
 
 		try {
