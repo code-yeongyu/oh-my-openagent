@@ -29,6 +29,7 @@
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
+        "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/lsp-core": "workspace:*",
@@ -115,6 +116,13 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
+    "packages/delegate-core": {
+      "name": "@oh-my-opencode/delegate-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/model-core": "workspace:*",
+      },
+    },
     "packages/git-bash-mcp": {
       "name": "@oh-my-opencode/git-bash-mcp",
       "version": "0.0.0",
@@ -187,6 +195,7 @@
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
+        "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/mcp-client-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
@@ -356,6 +365,8 @@
     "@oh-my-opencode/claude-code-compat-core": ["@oh-my-opencode/claude-code-compat-core@workspace:packages/claude-code-compat-core"],
 
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
+
+    "@oh-my-opencode/delegate-core": ["@oh-my-opencode/delegate-core@workspace:packages/delegate-core"],
 
     "@oh-my-opencode/git-bash-mcp": ["@oh-my-opencode/git-bash-mcp@workspace:packages/git-bash-mcp"],
 
