@@ -12,6 +12,7 @@ import {
   killTmuxSessionIfExists,
   getIsolatedSessionName,
   sweepStaleOmoAgentSessions,
+  sweepStaleOmoAttachPanes,
   activateTmuxPane,
 } from "../../shared/tmux"
 import { queryWindowState as defaultQueryWindowState } from "./pane-state-querier"
@@ -24,6 +25,7 @@ import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusResponse } from "./session-status-parser"
 import { FailedReadinessCache, type FailedReadinessSessionSeed } from "./failed-readiness-cache"
 import { resolveServerUrl } from "./resolve-server-url"
+import { sweepStaleTmuxResources } from "./stale-tmux-resource-sweeper"
 type OpencodeClient = PluginInput["client"]
 
 type SpawnStage =
@@ -1352,16 +1354,20 @@ export class TmuxSessionManager {
   private async sweepStaleIsolatedSessionsOnce(): Promise<void> {
     if (this.staleSweepCompleted) return
     if (this.staleSweepInProgress) return
-    if (this.tmuxConfig.isolation !== "session") {
-      this.staleSweepCompleted = true
-      return
-    }
 
     this.staleSweepInProgress = true
     try {
-      const killed = await sweepStaleOmoAgentSessions()
-      if (killed > 0) {
-        this.deps.log("[tmux-session-manager] stale isolated sessions swept", { killed })
+      const report = await sweepStaleTmuxResources({
+        isolation: this.tmuxConfig.isolation,
+        sweepStaleOmoAgentSessions,
+        sweepStaleOmoAttachPanes,
+      })
+      if (report.killed > 0) {
+        this.deps.log("[tmux-session-manager] stale tmux resources swept", {
+          killed: report.killed,
+          killedAttachPanes: report.killedAttachPanes,
+          killedIsolatedSessions: report.killedIsolatedSessions,
+        })
       }
       this.staleSweepCompleted = true
     } catch (error) {
