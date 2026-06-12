@@ -99,6 +99,7 @@ export async function executeSyncContinuation(
 ): Promise<string> {
   const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
+  const hasActiveChildBackgroundTasks = executorCtx.manager?.hasActiveChildTasks?.bind(executorCtx.manager)
   const continuationID = getTaskID(args)
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
@@ -190,6 +191,7 @@ export async function executeSyncContinuation(
         toastManager,
         taskId,
         anchorMessageCount,
+        hasActiveChildBackgroundTasks,
       }, syncPollTimeoutMs)
       if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
         if (anchorMessageCount === undefined) {
