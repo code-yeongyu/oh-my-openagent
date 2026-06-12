@@ -5425,6 +5425,7 @@ var init_package = __esm(() => {
       "sync:skills": "node plugin/scripts/sync-skills.mjs"
     },
     dependencies: {
+      "@oh-my-opencode/utils": "workspace:*",
       "posthog-node": "^5.34.3"
     },
     devDependencies: {
@@ -6038,6 +6039,89 @@ function spawn(cmdOrOpts, opts) {
   if (!bin)
     throw new Error("spawn requires a command");
   return wrapNodeProcess(nodeSpawn(bin, args, createNodeSpawnOptions(options)));
+}
+// packages/utils/src/runtime/git-bash.ts
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+var GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH";
+var WINGET_INSTALL_ARGS = ["install", "--id", "Git.Git", "-e", "--source", "winget"];
+var PROGRAM_FILES_GIT_BASH = "C:\\Program Files\\Git\\bin\\bash.exe";
+var PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe";
+var NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS = ["\\windows\\system32\\", "\\microsoft\\windowsapps\\"];
+function resolveGitBash(input) {
+  if (input.platform !== "win32")
+    return { found: true, path: null, source: "not-required", checkedPaths: [] };
+  const checkedPaths = [];
+  const envPath = nonEmptyEnvValue(input.env, GIT_BASH_ENV_KEY);
+  if (envPath !== undefined) {
+    checkedPaths.push(envPath);
+    if (isBashExePath(envPath) && input.exists(envPath)) {
+      return { found: true, path: envPath, source: "env", checkedPaths };
+    }
+    return missingGitBash(checkedPaths);
+  }
+  for (const candidate of [
+    { path: PROGRAM_FILES_GIT_BASH, source: "program-files" },
+    { path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" }
+  ]) {
+    checkedPaths.push(candidate.path);
+    if (input.exists(candidate.path))
+      return { found: true, path: candidate.path, source: candidate.source, checkedPaths };
+  }
+  for (const pathCandidate of input.where("bash")) {
+    const candidate = pathCandidate.trim();
+    if (candidate.length === 0)
+      continue;
+    checkedPaths.push(candidate);
+    if (isKnownNonGitBashLauncher(candidate))
+      continue;
+    if (isBashExePath(candidate) && input.exists(candidate))
+      return { found: true, path: candidate, source: "path", checkedPaths };
+  }
+  return missingGitBash(checkedPaths);
+}
+var resolveGitBashForCurrentProcess = (input = {}) => {
+  return resolveGitBash({
+    platform: input.platform ?? process.platform,
+    env: input.env ?? process.env,
+    exists: existsSync,
+    where: whereCommand
+  });
+};
+function missingGitBash(checkedPaths) {
+  return {
+    found: false,
+    checkedPaths,
+    installHint: [
+      "Git Bash is required on native Windows.",
+      "Install it with: winget install --id Git.Git -e --source winget",
+      `For a custom install, set ${GIT_BASH_ENV_KEY}=C:\\path\\to\\bash.exe`
+    ].join(`
+`)
+  };
+}
+function nonEmptyEnvValue(env, key) {
+  const value = env[key];
+  if (value === undefined)
+    return;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+function isBashExePath(path) {
+  return path.toLowerCase().endsWith("bash.exe");
+}
+function isKnownNonGitBashLauncher(path) {
+  const normalized = path.replaceAll("/", "\\").toLowerCase();
+  return NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS.some((segment) => normalized.includes(segment));
+}
+function whereCommand(command) {
+  try {
+    return execFileSync("where", [command], { encoding: "utf8" }).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+  } catch (error) {
+    if (error instanceof Error)
+      return [];
+    throw error;
+  }
 }
 // packages/omo-codex/src/install/codex-process.ts
 var WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"]);
@@ -6882,7 +6966,7 @@ async function writeCachedMarketplaceManifest(input) {
 }
 
 // packages/omo-codex/src/install/codex-package-layout.ts
-import { existsSync } from "node:fs";
+import { existsSync as existsSync2 } from "node:fs";
 import { readFile as readFile7 } from "node:fs/promises";
 import { join as join10 } from "node:path";
 var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
@@ -6894,10 +6978,10 @@ var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
   "oh-my-openagent"
 ]);
 async function shouldBuildSourcePackages(repoRoot) {
-  if (existsSync(join10(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
+  if (existsSync2(join10(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
     return true;
   const packageJsonPath = join10(repoRoot, "package.json");
-  if (!existsSync(packageJsonPath))
+  if (!existsSync2(packageJsonPath))
     return true;
   const packageJson = JSON.parse(await readFile7(packageJsonPath, "utf8"));
   if (!isPlainRecord(packageJson) || typeof packageJson.name !== "string")
@@ -7542,52 +7626,12 @@ async function exists2(path) {
 }
 
 // packages/omo-codex/src/install/git-bash.ts
-import { execFileSync } from "node:child_process";
-import { existsSync as existsSync2 } from "node:fs";
-var GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH";
 var SKIP_GIT_BASH_AUTO_INSTALL_ENV_KEY = "OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL";
-var PROGRAM_FILES_GIT_BASH = "C:\\Program Files\\Git\\bin\\bash.exe";
-var PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe";
-var WINGET_INSTALL_ARGS = ["install", "--id", "Git.Git", "-e", "--source", "winget"];
-function resolveGitBash(input) {
-  if (input.platform !== "win32")
-    return { found: true, path: null, source: "not-required" };
-  const checkedPaths = [];
-  const envPath = nonEmptyEnvValue(input.env, GIT_BASH_ENV_KEY);
-  if (envPath !== undefined) {
-    checkedPaths.push(envPath);
-    if (isBashExePath(envPath) && input.exists(envPath))
-      return { found: true, path: envPath, source: "env" };
-    return missingGitBash(checkedPaths);
-  }
-  for (const candidate of [
-    { path: PROGRAM_FILES_GIT_BASH, source: "program-files" },
-    { path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" }
-  ]) {
-    checkedPaths.push(candidate.path);
-    if (input.exists(candidate.path))
-      return { found: true, path: candidate.path, source: candidate.source };
-  }
-  for (const pathCandidate of input.where("bash")) {
-    const candidate = pathCandidate.trim();
-    if (candidate.length === 0)
-      continue;
-    checkedPaths.push(candidate);
-    if (isBashExePath(candidate) && input.exists(candidate))
-      return { found: true, path: candidate, source: "path" };
-  }
-  return missingGitBash(checkedPaths);
-}
-function resolveGitBashForCurrentProcess(input = {}) {
-  return resolveGitBash({
-    platform: input.platform ?? process.platform,
-    env: input.env ?? process.env,
-    exists: existsSync2,
-    where: whereCommand
-  });
-}
+var resolveGitBashForCurrentProcess2 = (input = {}) => {
+  return toCodexResolution(resolveGitBashForCurrentProcess(input));
+};
 async function prepareGitBashForInstall(input) {
-  const resolve5 = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess({ platform: input.platform, env: input.env }));
+  const resolve5 = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess2({ platform: input.platform, env: input.env }));
   const initialResolution = resolve5();
   if (input.platform !== "win32" || initialResolution.found)
     return initialResolution;
@@ -7602,10 +7646,16 @@ async function prepareGitBashForInstall(input) {
   }
   return resolve5();
 }
-function missingGitBash(checkedPaths) {
+function toCodexResolution(resolution) {
+  if (resolution.found) {
+    return {
+      found: true,
+      path: resolution.path,
+      source: resolution.source
+    };
+  }
   return {
-    found: false,
-    checkedPaths,
+    ...resolution,
     installHint: [
       "Git Bash is required for native Windows Codex profile installs.",
       "Install it with: winget install --id Git.Git -e --source winget",
@@ -7614,25 +7664,6 @@ function missingGitBash(checkedPaths) {
     ].join(`
 `)
   };
-}
-function nonEmptyEnvValue(env, key) {
-  const value = env[key];
-  if (value === undefined)
-    return;
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? undefined : trimmed;
-}
-function isBashExePath(path) {
-  return path.toLowerCase().endsWith("bash.exe");
-}
-function whereCommand(command) {
-  try {
-    return execFileSync("where", [command], { encoding: "utf8" }).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
-  } catch (error) {
-    if (error instanceof Error)
-      return [];
-    throw error;
-  }
 }
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
@@ -8461,7 +8492,7 @@ async function runCodexInstaller(options = {}) {
     env,
     cwd: repoRoot,
     runCommand,
-    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })) : undefined
+    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env })) : undefined
   });
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);

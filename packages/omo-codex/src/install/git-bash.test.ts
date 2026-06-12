@@ -84,14 +84,15 @@ describe("git-bash", () => {
 
   test("#given Windows bash on PATH #when standard paths are missing #then uses where bash candidate", () => {
     // given
+    const launcherPath = "C:\\Windows\\System32\\bash.exe"
     const pathCandidate = "E:\\Git\\bin\\bash.exe"
 
     // when
     const result = resolveGitBash({
       platform: "win32",
       env: {},
-      exists: (path: string) => path === pathCandidate,
-      where: () => ["C:\\Windows\\System32\\bash.exe", pathCandidate],
+      exists: (path: string) => path === launcherPath || path === pathCandidate,
+      where: () => [launcherPath, pathCandidate],
     })
 
     // then
