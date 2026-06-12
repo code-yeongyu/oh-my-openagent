@@ -156,7 +156,7 @@ task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here
 task(category="visual-engineering", load_skills=["frontend-ui-ux"], run_in_background=true)
 
 // Complex logic
-task(category="ultrabrain", load_skills=["typescript-programmer"], run_in_background=true)
+task(category="ultrabrain", load_skills=[...], run_in_background=true)
 
 // Quick fixes
 task(category="quick", load_skills=["git-master"], run_in_background=true)
@@ -173,7 +173,7 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 ## EXECUTION RULES
 - **TODO format**: `path: <action> for <scenario-id> — verify by <check>` encoding WHERE / WHY (which scenario it advances) / HOW / VERIFY. Exactly ONE in_progress at a time. Mark completed IMMEDIATELY — never batch.
-  - GOOD pair (test-first, ordered): `foo.test.ts: Write FAILING case invalid-email→ValidationError for S2 — verify by RED with assertion msg` → `src/foo/bar.ts: Implement validateEmail() for S2 — verify by foo.test.ts GREEN + curl 400 body`
+  - GOOD pair (test-first, ordered): `module.test: Write FAILING case invalid-email→ValidationError for S2 - verify by RED with assertion msg` → `src/module: Implement validateEmail() for S2 - verify by module.test GREEN + curl 400 body`
   - BAD: "Implement feature" / "Fix bug" / "Add tests later" / production code before its failing test → rewrite.
 - **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) — NEVER wait sequentially. But NEVER parallelise RED and GREEN of the same scenario.
 - **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).

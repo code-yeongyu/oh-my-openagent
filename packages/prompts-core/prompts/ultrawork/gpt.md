@@ -88,7 +88,7 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNO
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
-read_file(filePath="known/important/file.ts")
+read_file(filePath="known/important/file")
 
 // Collect background results when ready
 deep_context = background_output(task_id=...)
