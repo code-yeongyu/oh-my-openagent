@@ -25,6 +25,11 @@ async function withSetupFixture(run) {
 		await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
 		await mkdir(join(pluginRoot, "hooks"), { recursive: true });
 		await mkdir(join(pluginRoot, "components", "ultrawork", "agents"), { recursive: true });
+		// A complete npx-style payload ships dist/cli; the marketplace-payload
+		// (no dist/cli -> degraded omo-cli) path is covered by
+		// bootstrap-binlinks.test.mjs.
+		await mkdir(join(pluginRoot, "dist", "cli"), { recursive: true });
+		await writeFile(join(pluginRoot, "dist", "cli", "index.js"), "");
 		await mkdir(pluginData, { recursive: true });
 		await mkdir(codexHome, { recursive: true });
 		await writeFile(
