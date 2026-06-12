@@ -213,6 +213,12 @@ describe("team-layout-tmux", () => {
     const literals = sendKeysCalls.map((args) => args.join(" "))
     expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+
+    const paneOptionCalls = commands.filter((args) => args[0] === "set-option" && args[1] === "-p")
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%1", "@omo_attach_server_url", "http://127.0.0.1:12345"])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%1", "@omo_attach_session_id", "s-m1"])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%2", "@omo_attach_server_url", "http://127.0.0.1:12345"])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%2", "@omo_attach_session_id", "s-m2"])
   })
 
   test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
@@ -334,7 +340,7 @@ describe("team-layout-tmux", () => {
     // then
     const commands = getCommands()
     expect(commands.some((args) => args[0] === "select-pane" && !args.includes("-T"))).toBe(false)
-    expect(commands.some((args) => args[0] === "set-option")).toBe(false)
+    expect(commands.some((args) => args[0] === "set-option" && args[1] !== "-p")).toBe(false)
   })
 
   test("#given delegated pane startup #when split-window is called #then -d flag is always present to prevent terminal probe replies leaking into caller pane (fix #2887)", async () => {
