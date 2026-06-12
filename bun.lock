@@ -32,6 +32,7 @@
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/lsp-core": "workspace:*",
+        "@oh-my-opencode/mcp-client-core": "workspace:*",
         "@oh-my-opencode/mcp-stdio-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
@@ -141,6 +142,19 @@
         "@oh-my-opencode/mcp-stdio-core": "workspace:*",
       },
     },
+    "packages/mcp-client-core": {
+      "name": "@oh-my-opencode/mcp-client-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "@oh-my-opencode/claude-code-compat-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+      },
+    },
     "packages/mcp-stdio-core": {
       "name": "@oh-my-opencode/mcp-stdio-core",
       "version": "0.1.0",
@@ -173,6 +187,7 @@
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
+        "@oh-my-opencode/mcp-client-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
@@ -337,6 +352,8 @@
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
     "@oh-my-opencode/lsp-core": ["@oh-my-opencode/lsp-core@workspace:packages/lsp-core"],
+
+    "@oh-my-opencode/mcp-client-core": ["@oh-my-opencode/mcp-client-core@workspace:packages/mcp-client-core"],
 
     "@oh-my-opencode/mcp-stdio-core": ["@oh-my-opencode/mcp-stdio-core@workspace:packages/mcp-stdio-core"],
 

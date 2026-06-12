@@ -13,6 +13,7 @@
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/hashline-core": "workspace:*",
+    "@oh-my-opencode/mcp-client-core": "workspace:*",
     "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/omo-codex": "workspace:*",
     "@oh-my-opencode/prompts-core": "workspace:*",
