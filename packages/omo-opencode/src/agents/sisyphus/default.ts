@@ -46,6 +46,7 @@ export function buildTaskManagementSection(useTaskSystem: boolean): string {
 2. **Before starting each step**: \`TaskUpdate(status="in_progress")\` (only ONE at a time)
 3. **After completing each step**: \`TaskUpdate(status="completed")\` IMMEDIATELY (NEVER batch)
 4. **If scope changes**: Update tasks before proceeding
+5. **Waiting for user input/approval**: Mark the task \`blocked\`. Set back to \`in_progress\` when you resume.
 
 ### Why This Is Non-Negotiable
 
@@ -100,6 +101,7 @@ Should I proceed with [recommendation], or would you prefer differently?
 2. **Before starting each step**: Mark \`in_progress\` (only ONE at a time)
 3. **After completing each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
 4. **If scope changes**: Update todos before proceeding
+5. **Waiting for user input/approval**: Mark the todo \`blocked\`. Set back to \`in_progress\` when you resume.
 
 ### Why This Is Non-Negotiable
 

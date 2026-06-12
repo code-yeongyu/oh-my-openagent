@@ -56,6 +56,7 @@ Workflow:
 2. Before each step: \`TaskUpdate(status="in_progress")\` - one at a time.
 3. After each step: \`TaskUpdate(status="completed")\` immediately. Never batch.
 4. Scope change: update tasks before proceeding.
+5. Waiting for user input/approval? Mark the task \`blocked\`. Set back to \`in_progress\` when you resume.
 
 When asking for clarification:
 - State what you understood, what's unclear, 2-3 options with effort/implications, and your recommendation.
@@ -72,6 +73,7 @@ Workflow:
 2. Before each step: mark \`in_progress\` - one at a time.
 3. After each step: mark \`completed\` immediately. Never batch.
 4. Scope change: update todos before proceeding.
+5. Waiting for user input/approval? Mark the todo \`blocked\`. Set back to \`in_progress\` when you resume.
 
 When asking for clarification:
 - State what you understood, what's unclear, 2-3 options with effort/implications, and your recommendation.

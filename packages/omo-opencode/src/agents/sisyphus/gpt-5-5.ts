@@ -27,6 +27,7 @@ Workflow:
 2. Before each step, call \`task_update(status="in_progress")\`. One step in progress at a time.
 3. After each step, call \`task_update(status="completed")\` immediately. Never batch completions.
 4. If scope changes, update the task list before proceeding.
+5. When waiting for user input, approval, or a human decision, mark the current task \`blocked\`. Set it back to \`in_progress\` when you resume.
 
 Your task creations are tracked by the harness; the system will nudge you if you go idle with open tasks.`
   }
@@ -38,6 +39,7 @@ Workflow:
 2. Before each step, mark the item \`in_progress\`. One step in progress at a time.
 3. After each step, mark it \`completed\` immediately. Never batch completions.
 4. If scope changes, update the todo list before proceeding.
+5. When waiting for user input, approval, or a human decision, mark the current todo \`blocked\`. Set it back to \`in_progress\` when you resume.
 
 Your todo creations are tracked by the harness; the system will nudge you if you go idle with open items.`
 }

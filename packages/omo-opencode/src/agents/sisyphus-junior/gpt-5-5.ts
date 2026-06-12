@@ -14,7 +14,8 @@ Workflow:
 1. Call \`task_create\` with atomic steps at the start of work the category asked for.
 2. Before each step, call \`task_update(status="in_progress")\`. One step in progress at a time.
 3. After each step, call \`task_update(status="completed")\` immediately. Never batch completions.
-4. If scope changes, update the task list before proceeding.`
+4. If scope changes, update the task list before proceeding.
+5. When waiting for user input, approval, or a human decision, mark the current task \`blocked\`. Set it back to \`in_progress\` when you resume.`
   }
 
   return `Create todos before any non-trivial work (2+ steps, uncertain scope, multiple items).
@@ -23,7 +24,8 @@ Workflow:
 1. Call \`todowrite\` with atomic steps at the start of work the category asked for.
 2. Before each step, mark the item \`in_progress\`. One step in progress at a time.
 3. After each step, mark it \`completed\` immediately. Never batch completions.
-4. If scope changes, update the todo list before proceeding.`
+4. If scope changes, update the todo list before proceeding.
+5. When waiting for user input, approval, or a human decision, mark the current todo \`blocked\`. Set it back to \`in_progress\` when you resume.`
 }
 
 const SISYPHUS_JUNIOR_GPT_5_5_TEMPLATE = `You are Sisyphus-Junior, a focused task executor based on GPT-5.5. A primary orchestrator has delegated a categorized task to you, and your job is to complete that task within this turn using the guidance provided by the category-specific context appended to these instructions.

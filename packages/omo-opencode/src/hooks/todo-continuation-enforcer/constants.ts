@@ -8,9 +8,9 @@ export const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes
 
 Incomplete tasks remain in your todo list. Continue working on the next pending task.
 
-- Proceed without asking for permission
-- Mark each task complete when finished
-- Do not stop until all tasks are done
+- If you are currently waiting for user input, approval, or a human decision, STOP. Do not proceed past approval gates. Wait for the user's response.
+- Otherwise, proceed with the next pending task without asking for permission.
+- Mark each task complete when finished.
 - If you believe all work is already complete, the system is questioning your completion claim. Critically re-examine each todo item from a skeptical perspective, verify the work was actually done correctly, and update the todo list accordingly.`
 
 export const COUNTDOWN_SECONDS = 2
