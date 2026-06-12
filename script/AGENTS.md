@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Build and publish automation scripts. Run via `bun run <script>` from root package.json. 13 files total (10 source + 3 test). Singular directory name (not "scripts/").
+Build and publish automation scripts. Run via `bun run <script>` from root package.json. Singular directory name (not "scripts/").
 
 ## SCRIPTS
 
@@ -17,7 +17,6 @@ Build and publish automation scripts. Run via `bun run <script>` from root packa
 | `patch-node-require-shim.ts` | Patches `dist/index.js` for Node/Electron require compatibility |
 | `publish.ts` | Local multi-package publish alternative (platform packages + npm) |
 | `generate-changelog.ts` | Release notes from git log, filters bot commits |
-| `run-ci-tests.ts` | Test isolation: separates `mock.module()` users from shared tests |
 
 ## TESTS
 
@@ -26,7 +25,6 @@ Build and publish automation scripts. Run via `bun run <script>` from root packa
 | `build-binaries.test.ts` | Platform target validation |
 | `build-schema.test.ts` | JSON Schema generation |
 | `publish-workflow.test.ts` | Publish logic |
-| `run-ci-tests.test.ts` | Isolation runner |
 
 ## RUN VIA PACKAGE.JSON
 
@@ -40,4 +38,4 @@ Build and publish automation scripts. Run via `bun run <script>` from root packa
 
 ## NOTE
 
-`run-ci-tests.ts` is referenced by `ci.yml` but CI now uses plain `bun test` (no sharding or split isolation runner). The isolation logic remains for local use.
+CI uses plain `bun test`; there is no sharding or split isolation runner.

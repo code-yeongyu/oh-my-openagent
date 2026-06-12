@@ -25,13 +25,6 @@ const BUNDLED_MCP_RUNTIMES = [
     destinationDistFromPlugin: "components/git-bash-mcp/dist",
   },
   {
-    label: "LSP MCP",
-    sourceArg: "../../lsp-tools-mcp/dist/cli.js",
-    sourceDistFromPlugin: "../../lsp-tools-mcp/dist",
-    destinationArg: "./components/lsp-tools-mcp/dist/cli.js",
-    destinationDistFromPlugin: "components/lsp-tools-mcp/dist",
-  },
-  {
     label: "LSP daemon",
     sourceArg: "../../lsp-daemon/dist/cli.js",
     sourceDistFromPlugin: "../../lsp-daemon/dist",

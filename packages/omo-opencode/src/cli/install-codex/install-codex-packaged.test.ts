@@ -14,7 +14,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   const binDir = await mkdtemp(join(tmpdir(), "omo-codex-packaged-bin-"))
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
-  const lspRuntimeRoot = join(repoRoot, "packages", "lsp-tools-mcp")
+  const lspRuntimeRoot = join(repoRoot, "packages", "lsp-daemon")
   const commands: Array<readonly [string, string, string]> = []
 
   await writeFile(join(repoRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "4.5.12" }))
@@ -79,7 +79,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   )
   await writeFile(
     join(pluginRoot, ".mcp.json"),
-    JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"], cwd: "." } } }),
+    JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." } } }),
   )
   await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
@@ -109,7 +109,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   const cachedMcp = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
     readonly mcpServers: { readonly lsp: { readonly args: readonly string[]; readonly cwd?: string } }
   }
-  const cachedLspCli = join(pluginPath, "components", "lsp-tools-mcp", "dist", "cli.js")
+  const cachedLspCli = join(pluginPath, "components", "lsp-daemon", "dist", "cli.js")
 
   expect(result.installed.map((plugin) => `${plugin.name}@${plugin.version}`)).toEqual(["omo@4.5.12"])
   expect(pluginPath).toBe(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "4.5.12"))
@@ -138,7 +138,7 @@ test("#given packaged lazycodex tarball layout #when simulating Windows install 
   const binDir = await mkdtemp(join(tmpdir(), "omo-codex-packaged-bin-win-"))
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
-  const lspRuntimeRoot = join(repoRoot, "packages", "lsp-tools-mcp")
+  const lspRuntimeRoot = join(repoRoot, "packages", "lsp-daemon")
 
   await writeFile(join(repoRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "4.5.12" }))
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
@@ -162,7 +162,7 @@ test("#given packaged lazycodex tarball layout #when simulating Windows install 
   )
   await writeFile(
     join(pluginRoot, ".mcp.json"),
-    JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"], cwd: "." } } }),
+    JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." } } }),
   )
   await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")

@@ -23,7 +23,6 @@
 		"sync:skills": "node plugin/scripts/sync-skills.mjs"
 	},
 	"dependencies": {
-		"@oh-my-opencode/utils": "workspace:*",
 		"posthog-node": "^5.34.3"
 	},
 	"devDependencies": {
