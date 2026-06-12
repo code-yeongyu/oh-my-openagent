@@ -51,6 +51,26 @@ ${truncated}
 > **Interrupted**: The task was interrupted by a prompt error. The session may contain partial results.`
    }
 
+  let errorSection = ""
+  if (task.error) {
+    errorSection = `
+
+## Error
+
+\`\`\`
+${truncateText(task.error, 500)}
+\`\`\``
+  }
+
+  let recoverySection = ""
+  if (task.result && (task.status === "interrupt" || task.status === "error")) {
+    recoverySection = `
+
+## Recovery
+
+${truncateText(task.result, 500)}`
+  }
+
   const durationLabel = task.status === "pending" ? "Queued for" : "Duration"
 
   return `# Task Status
@@ -63,7 +83,7 @@ ${truncated}
 | Status | **${task.status}** |
 | ${durationLabel} | ${duration} |
 | Session ID | \`${task.sessionId}\` |${progressSection}
-${statusNote}
+${statusNote}${errorSection}${recoverySection}
 ## Original Prompt
 
 \`\`\`
