@@ -11,13 +11,15 @@ import {
 	capturePreservedAgentServiceTier,
 	linkCachedPluginAgents,
 } from "../../../../scripts/install/agents.mjs";
+import { resolveCodexInstallerBinDir } from "../../../../scripts/install/bin-dir.mjs";
+import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../scripts/install/bin-links.mjs";
 import { updateCodexConfig } from "../../../../scripts/install/config.mjs";
 import type { CodexAgentConfig } from "../../../../scripts/install/config.mjs";
 import { stampGitBashMcpEnv } from "../../../../scripts/install/git-bash-mcp-env.mjs";
 import { prepareGitBashForInstall } from "../../../../scripts/install/git-bash.mjs";
 import type { GitBashResolution } from "../../../../scripts/install/git-bash.mjs";
 import { trustedHookStatesForPlugin } from "../../../../scripts/install/hook-trust.mjs";
-import { BOOTSTRAP_DOCTOR_HINT } from "./worker.ts";
+import { appendBootstrapLog, BOOTSTRAP_DOCTOR_HINT } from "./worker.ts";
 import type { BootstrapDegradedEntry, BootstrapStepOutcome } from "./worker.ts";
 
 export const SETUP_MARKETPLACE_NAME = "sisyphuslabs";
@@ -32,6 +34,8 @@ export interface WorkerSetupOptions {
 	readonly pluginData: string;
 	readonly pluginRoot: string;
 	readonly platform: NodeJS.Platform;
+	/** Timestamp used for bootstrap.log entries; the worker passes its run time. */
+	readonly now?: number;
 	/** Test seam: command runner for the win32 Git Bash auto-install. */
 	readonly runCommand?: SetupRunCommand;
 	/** Test seam: overrides Git Bash discovery (win32 only). */
@@ -45,7 +49,11 @@ interface AgentLinkOutcome {
 
 // Worker setup sequence (every sub-step is idempotent and degraded-not-fatal,
 // unlike the npx installer which throws): Git Bash preflight -> bundled agent
-// TOML linking -> config blocks + hook trust re-stamp -> git_bash MCP env.
+// TOML linking -> config blocks + hook trust re-stamp -> git_bash MCP env ->
+// version-aware bin links. Bin linking re-runs whenever the worker re-runs,
+// and the worker re-runs whenever completedForVersion changes (Task 7 marker
+// semantics), so links always point at the CURRENT versioned PLUGIN_ROOT even
+// though Codex deletes old version dirs on upgrade (core-plugins store.rs).
 export async function runWorkerSetup(options: WorkerSetupOptions): Promise<BootstrapStepOutcome> {
 	const degraded: BootstrapDegradedEntry[] = [];
 	const gitBashEnabled = await resolveGitBashStep(options, degraded);
@@ -53,6 +61,7 @@ export async function runWorkerSetup(options: WorkerSetupOptions): Promise<Boots
 	degraded.push(...agents.degraded);
 	await updateConfigStep(options, { agentConfigs: agents.agentConfigs, gitBashEnabled }, degraded);
 	await stampGitBashEnvStep(options, degraded);
+	await linkComponentBinsStep(options, degraded);
 	return { degraded };
 }
 
@@ -170,6 +179,55 @@ async function updateConfigStep(
 			component: "config",
 			hint: BOOTSTRAP_DOCTOR_HINT,
 			reason: `failed to update ${configPath}: ${errorMessage(error)}`,
+		});
+	}
+}
+
+async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: BootstrapDegradedEntry[]): Promise<void> {
+	const binDir = resolveCodexInstallerBinDir({ codexHome: options.codexHome, env: options.env });
+	try {
+		await linkCachedPluginBins({ binDir, pluginRoot: options.pluginRoot, platform: options.platform });
+	} catch (error) {
+		degraded.push({
+			component: "bin-links",
+			hint: BOOTSTRAP_DOCTOR_HINT,
+			reason: `failed to link component bins into ${binDir}: ${errorMessage(error)}`,
+		});
+	}
+	await linkRuntimeWrapperStep(options, binDir, degraded);
+}
+
+// The marketplace payload intentionally ships without <pluginRoot>/dist/cli
+// (thin payload), so linkRootRuntimeBin returning null is the expected
+// degraded mode there: record the omo-cli ledger entry and log the same
+// warning install-local.mjs prints instead of leaving a broken `omo` link.
+async function linkRuntimeWrapperStep(
+	options: WorkerSetupOptions,
+	binDir: string,
+	degraded: BootstrapDegradedEntry[],
+): Promise<void> {
+	const cliPath = join(options.pluginRoot, "dist", "cli", "index.js");
+	try {
+		const linked = await linkRootRuntimeBin({
+			binDir,
+			codexHome: options.codexHome,
+			platform: options.platform,
+			repoRoot: options.pluginRoot,
+		});
+		if (linked !== null) return;
+		degraded.push({
+			component: "omo-cli",
+			hint: "use npx lazycodex-ai for the omo CLI",
+			reason: "marketplace payload has no dist/cli",
+		});
+		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "omo-cli-degraded", {
+			warning: `Warning: skipped the omo runtime wrapper because ${cliPath} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+		});
+	} catch (error) {
+		degraded.push({
+			component: "omo-cli",
+			hint: BOOTSTRAP_DOCTOR_HINT,
+			reason: `failed to link the omo runtime wrapper into ${binDir}: ${errorMessage(error)}`,
 		});
 	}
 }
