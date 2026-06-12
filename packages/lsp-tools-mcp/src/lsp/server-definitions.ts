@@ -102,7 +102,7 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	zls: { command: ["zls"], extensions: [".zig", ".zon"] },
 	csharp: { command: ["csharp-ls"], extensions: [".cs"] },
 	fsharp: { command: ["fsautocomplete"], extensions: [".fs", ".fsi", ".fsx", ".fsscript"] },
-	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".objc", ".objcpp"] },
+	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".m", ".mm"] },
 	rust: { command: ["rust-analyzer"], extensions: [".rs"] },
 	clangd: {
 		command: ["clangd", "--background-index", "--clang-tidy"],
