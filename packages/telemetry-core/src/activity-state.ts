@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { basename, join } from "node:path"
-import { resolveXdgDataDir, writeFileAtomically } from "@oh-my-opencode/utils"
-import type { XdgOsProvider } from "@oh-my-opencode/utils"
+import { writeFileAtomically } from "@oh-my-opencode/utils/atomic-write"
+import { resolveXdgDataDir } from "@oh-my-opencode/utils/xdg-data-dir"
+import type { XdgOsProvider } from "@oh-my-opencode/utils/xdg-data-dir"
 
 import type { TelemetryDiagnosticInput, TelemetryProductConfig } from "./types"
 
