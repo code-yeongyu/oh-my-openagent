@@ -9,8 +9,10 @@ import type { BackgroundTask } from "./types"
 
 type SessionStatus = { type: string }
 type SessionStatusResponse = { data: Record<string, SessionStatus> }
+type SessionGetResponse = { data: Record<string, unknown> | null; error?: { status?: number } | null }
 type SessionOverrides = {
   status?: (() => Promise<SessionStatusResponse>) | undefined
+  get?: (() => Promise<SessionGetResponse>) | undefined
   abort?: () => Promise<object>
 }
 
@@ -32,7 +34,7 @@ function createRunningTask(sessionId: string): BackgroundTask {
 function createManager(overrides: SessionOverrides): BackgroundManager {
   const session = {
     ...(overrides.status === undefined ? {} : { status: overrides.status }),
-    get: async () => ({ data: { id: "session" } }),
+    get: overrides.get ?? (async () => ({ data: { id: "session" } })),
     prompt: async () => ({}),
     promptAsync: async () => ({}),
     abort: overrides.abort ?? (async () => ({})),
@@ -63,7 +65,7 @@ function injectTask(manager: BackgroundManager, task: BackgroundTask): void {
 }
 
 describe("BackgroundManager pollRunningTasks when session status registry is unavailable", () => {
-  test("keeps running tasks active and does not increment missed polls when status is unavailable or throws", async () => {
+  test("keeps running tasks active and checks session existence when status is unavailable or throws", async () => {
     const cases: Array<{ name: string; status?: () => Promise<SessionStatusResponse> }> = [
       { name: "missing status method" },
       { name: "throwing status method", status: async () => { throw new Error("status unavailable") } },
@@ -74,6 +76,7 @@ describe("BackgroundManager pollRunningTasks when session status registry is una
       let abortCallCount = 0
       const manager = createManager({
         status: testCase.status,
+        get: async () => ({ data: { id: "session" } }),
         abort: async () => {
           abortCallCount += 1
           return {}
@@ -85,11 +88,11 @@ describe("BackgroundManager pollRunningTasks when session status registry is una
       // when
       await poll(manager, MIN_SESSION_GONE_POLLS + 1)
 
-      // then
+      // then: status unavailable but session still exists → task stays running
+      // consecutiveMissedPolls is reset after session existence is verified
       expect(task.status).toBe("running")
       expect(task.completedAt).toBeUndefined()
       expect(task.error).toBeUndefined()
-      expect(task.consecutiveMissedPolls ?? 0).toBe(0)
       expect(abortCallCount).toBe(0)
 
       await manager.shutdown()
@@ -111,5 +114,42 @@ describe("BackgroundManager pollRunningTasks when session status registry is una
     // then
     expect(task.status).toBe("completed")
     expect(task.completedAt).toBeDefined()
+  })
+
+  test("marks task as error when session status is unavailable and session no longer exists after threshold polls", async () => {
+    // given
+    const manager = createManager({
+      get: async () => ({ data: null }),
+    })
+    const task = createRunningTask("ses-gone-no-status-available")
+    injectTask(manager, task)
+
+    // when
+    await poll(manager, MIN_SESSION_GONE_POLLS + 1)
+
+    // then
+    expect(task.status).toBe("error")
+    expect(task.error).toContain("no longer exists")
+    expect(task.completedAt).toBeDefined()
+
+    await manager.shutdown()
+  })
+
+  test("keeps task running when session status is unavailable but session still exists after threshold polls", async () => {
+    // given
+    const manager = createManager({
+      get: async () => ({ data: { id: "session" } }),
+    })
+    const task = createRunningTask("ses-alive-no-status-available")
+    injectTask(manager, task)
+
+    // when
+    await poll(manager, MIN_SESSION_GONE_POLLS + 1)
+
+    // then
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+
+    await manager.shutdown()
   })
 })

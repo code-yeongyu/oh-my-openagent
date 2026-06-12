@@ -201,7 +201,7 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(getSession).not.toHaveBeenCalled()
     })
 
-    test("#when status polling is unavailable #then it does not complete or increment missed polls", async () => {
+    test("#when status polling is unavailable #then it increments missed polls and checks session existence", async () => {
       const cases: Array<{ name: string; status?: (() => Promise<{ data: Record<string, { type: string }> }>) | undefined }> = [
         { name: "missing status method", status: undefined },
         { name: "throwing status method", status: async () => { throw new Error("status unavailable") } },
@@ -212,6 +212,7 @@ describe("BackgroundManager pollRunningTasks", () => {
         let abortCallCount = 0
         const manager = createManagerWithClient({
           status: testCase.status,
+          get: async () => ({ data: { id: "ses-default" } }),
           abort: async () => {
             abortCallCount += 1
             return {}
@@ -226,11 +227,11 @@ describe("BackgroundManager pollRunningTasks", () => {
           await poll.call(manager)
         }
 
-        //#then
+        //#then: status unavailable but session still exists → task stays running
+        // consecutiveMissedPolls is incremented and reset after session existence check
         expect(task.status).toBe("running")
         expect(task.completedAt).toBeUndefined()
         expect(task.error).toBeUndefined()
-        expect(task.consecutiveMissedPolls ?? 0).toBe(0)
         expect(abortCallCount).toBe(0)
 
         await manager.shutdown()

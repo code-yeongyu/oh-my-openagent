@@ -2910,6 +2910,21 @@ The task was re-queued on a fallback model after a retryable failure.
           }
 
           if (allStatuses === undefined) {
+            // Status registry unavailable — increment missed-poll counter.
+            // After MIN_SESSION_GONE_POLLS consecutive misses, attempt a
+            // direct session existence check.  If the session no longer
+            // exists (e.g., SDK transport disconnected), mark the task as
+            // crashed so it doesn't stay "running" forever.
+            task.consecutiveMissedPolls = (task.consecutiveMissedPolls ?? 0) + 1
+            if ((task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS) {
+              const sessionExists = await this.verifySessionExists(sessionID)
+              if (!sessionExists) {
+                log("[background-agent] Session status unavailable and session no longer exists, marking task as error:", task.id)
+                await this.failCrashedTask(task, "Session status unavailable and session no longer exists. The SDK transport may have disconnected before the polling loop could detect completion.")
+                continue
+              }
+              task.consecutiveMissedPolls = 0
+            }
             continue
           }
 

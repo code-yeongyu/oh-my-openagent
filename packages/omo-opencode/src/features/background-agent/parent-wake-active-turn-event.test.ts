@@ -108,7 +108,7 @@ async function flushPendingParentWakeForTest(manager: BackgroundManager, session
 }
 
 describe("BackgroundManager parent wake active turn events", () => {
-  test("#when background task completes during active parent turn #then parent wake stays queued without prompt injection", async () => {
+  test("#when background task completes during active parent turn #then completion wake is admitted as noReply", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -130,11 +130,12 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
-  test("#when duplicate background completions overlap an active parent turn #then one coalesced wake stays queued", async () => {
+  test("#when duplicate background completions overlap an active parent turn #then coalesced wake is admitted as noReply", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -168,10 +169,40 @@ describe("BackgroundManager parent wake active turn events", () => {
     ])
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
+    expect(promptAsyncCalls.length).toBeGreaterThanOrEqual(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
     const pendingWake = getPendingParentWakes(manager).get("parent-1")
     expect(pendingWake).toBeDefined()
     expect(JSON.stringify(pendingWake?.notifications)).toContain("ALL BACKGROUND TASKS COMPLETE")
+  })
+
+  test("#when completion wake arrives during active parent turn #then notification is deposited as noReply and reply liveness is retained", async () => {
+    // given
+    const sessionStatuses: Record<string, { type: string }> = {
+      "parent-1": { type: "busy" },
+    }
+    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
+    managerUnderTest = manager
+    const task = createTask({
+      id: "task-a",
+      parentSessionId: "parent-1",
+      description: "task A",
+      status: "completed",
+      completedAt: new Date("2026-05-20T14:19:14.625Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, task)
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    const pendingWake = getPendingParentWakes(manager).get("parent-1")
+    expect(pendingWake).toBeDefined()
+    expect(pendingWake?.shouldReply).toBe(true)
   })
 
   test("#when background task fails during active parent turn #then parent wake stays queued without prompt injection", async () => {

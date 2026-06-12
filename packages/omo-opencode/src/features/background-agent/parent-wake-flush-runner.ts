@@ -46,8 +46,20 @@ export class ParentWakeFlushRunner {
       return
     }
     if (sessionActive) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred parent wake because parent session is active:", {
+      // Failure wakes must be deferred until the parent is safe (see
+      // deferReplyWakeWhileUnsafe), but completion wakes can be admitted
+      // as noReply during active turns so the parent's current turn can
+      // consume the notification without forking a new assistant turn.
+      if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+        return
+      }
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry: false,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+        retainPendingWake: latestWake.shouldReply,
+      })
+      log("[background-agent] Admitted completion parent wake as noReply during active turn:", {
         sessionID,
       })
       return
