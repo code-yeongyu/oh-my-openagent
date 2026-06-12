@@ -18,6 +18,7 @@
     "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/shared-skills": "workspace:*",
+    "@oh-my-opencode/skills-loader-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",

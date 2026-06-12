@@ -38,6 +38,7 @@
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
+        "@oh-my-opencode/skills-loader-core": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
         "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
@@ -177,6 +178,7 @@
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
+        "@oh-my-opencode/skills-loader-core": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
         "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
@@ -209,6 +211,19 @@
     "packages/shared-skills": {
       "name": "@oh-my-opencode/shared-skills",
       "version": "0.1.0",
+    },
+    "packages/skills-loader-core": {
+      "name": "@oh-my-opencode/skills-loader-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/claude-code-compat-core": "workspace:*",
+        "@oh-my-opencode/model-core": "workspace:*",
+        "@oh-my-opencode/shared-skills": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+        "js-yaml": "^4.1.1",
+        "picomatch": "^4.0.4",
+        "zod": "^4.4.3",
+      },
     },
     "packages/telemetry-core": {
       "name": "@oh-my-opencode/telemetry-core",
@@ -336,6 +351,8 @@
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
 
     "@oh-my-opencode/shared-skills": ["@oh-my-opencode/shared-skills@workspace:packages/shared-skills"],
+
+    "@oh-my-opencode/skills-loader-core": ["@oh-my-opencode/skills-loader-core@workspace:packages/skills-loader-core"],
 
     "@oh-my-opencode/telemetry-core": ["@oh-my-opencode/telemetry-core@workspace:packages/telemetry-core"],
 

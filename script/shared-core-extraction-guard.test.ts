@@ -17,6 +17,7 @@ const corePackages = [
   "packages/boulder-state",
   "packages/telemetry-core",
   "packages/claude-code-compat-core",
+  "packages/skills-loader-core",
 ] as const
 
 type ForbiddenSourcePattern = {
