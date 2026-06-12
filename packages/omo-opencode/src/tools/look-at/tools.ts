@@ -42,7 +42,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           ctx,
           toolContext,
           goal: args.goal,
-          fileParts: preparedInput.fileParts,
+          inputParts: preparedInput.inputParts,
         })
       } catch (error) {
         const missingFilePath = getMissingLookAtFilePath(error, args)
