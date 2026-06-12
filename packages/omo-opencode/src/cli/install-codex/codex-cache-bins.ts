@@ -174,16 +174,19 @@ async function existingNonRuntimeWrapper(path: string): Promise<boolean> {
 }
 
 function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: string, nodeCliPath: string): string {
-  const ulwLoopBin = join(binDir, "omo-ulw-loop")
-  const nodeCli = escapePosixDoubleQuoted(nodeCliPath)
+  const ulwLoopBin = toPosixPath(join(binDir, "omo-ulw-loop"))
+  const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath))
+  const escapedCliPath = escapePosixDoubleQuoted(toPosixPath(cliPath))
+  const escapedCodexHome = escapePosixDoubleQuoted(toPosixPath(codexHome))
+  const escapedUlwLoopBin = escapePosixDoubleQuoted(ulwLoopBin)
   return [
     "#!/bin/sh",
     `# ${RUNTIME_WRAPPER_MARKER}`,
-    `export CODEX_HOME="\${CODEX_HOME:-${escapePosixDoubleQuoted(codexHome)}}"`,
+    `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
     'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
-    'if [ "$1" = "ulw-loop" ] && [ -x "' + escapePosixDoubleQuoted(ulwLoopBin) + '" ]; then',
+    'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
     "  shift",
-    '  exec "' + escapePosixDoubleQuoted(ulwLoopBin) + '" "$@"',
+    '  exec "' + escapedUlwLoopBin + '" "$@"',
     "fi",
     `if [ "\${OMO_RUNTIME:-}" = "node" ] && [ -f "${nodeCli}" ]; then`,
     `  exec node "${nodeCli}" "$@"`,
@@ -207,7 +210,7 @@ function posixRuntimeWrapper(cliPath: string, codexHome: string, binDir: string,
     `  echo "omo: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall omo and force the fallback with OMO_RUNTIME=node" >&2`,
     "  exit 127",
     "fi",
-    `exec "$BUN_BINARY" "${escapePosixDoubleQuoted(cliPath)}" "$@"`,
+    `exec "$BUN_BINARY" "${escapedCliPath}" "$@"`,
     "",
   ].join("\n")
 }
@@ -241,6 +244,10 @@ function windowsRuntimeWrapper(cliPath: string, codexHome: string, binDir: strin
     `"%BUN_BINARY%" "${cliPath}" %*`,
     "",
   ].join("\r\n")
+}
+
+function toPosixPath(p: string): string {
+  return p.replaceAll("\\", "/")
 }
 
 function escapePosixDoubleQuoted(value: string): string {
