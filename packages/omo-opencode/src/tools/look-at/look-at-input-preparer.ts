@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { LookAtArgs } from "./types"
@@ -21,8 +22,15 @@ export interface LookAtFilePart {
   filename: string
 }
 
+export interface LookAtTextPart {
+  type: "text"
+  text: string
+}
+
+export type LookAtInputPart = LookAtFilePart | LookAtTextPart
+
 export interface PreparedLookAtInput {
-  readonly fileParts: LookAtFilePart[]
+  readonly inputParts: LookAtInputPart[]
   readonly sourceDescription: string
   cleanup(): void
 }
@@ -49,6 +57,14 @@ function getTemporaryConversionPath(error: unknown): string | null {
   return null
 }
 
+function createJsonTextPart(filePath: string): LookAtTextPart {
+  const fileContent = readFileSync(filePath, "utf-8")
+  return {
+    type: "text",
+    text: `Attached JSON file (${basename(filePath)}):\n\n${fileContent}`,
+  }
+}
+
 export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
   const filePaths = args.file_paths ?? (args.file_path ? [args.file_path] : [])
   const imageDataList = args.image_data_list ?? (args.image_data ? [args.image_data] : [])
@@ -61,13 +77,18 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
     }
   }
 
-  const fileParts: LookAtFilePart[] = []
+  const inputParts: LookAtInputPart[] = []
   const tempFilesToCleanup: string[] = []
 
   for (const filePath of filePaths) {
     let mimeType = inferMimeTypeFromFilePath(filePath)
     let actualFilePath = filePath
     let tempConversionPath: string | null = null
+
+    if (mimeType === "application/json") {
+      inputParts.push(createJsonTextPart(filePath))
+      continue
+    }
 
     if (needsConversion(mimeType)) {
       log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
@@ -94,7 +115,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
       tempFilesToCleanup.push(tempConversionPath)
     }
 
-    fileParts.push({
+    inputParts.push({
       type: "file",
       mime: mimeType,
       url: pathToFileURL(actualFilePath).href,
@@ -125,7 +146,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
       }
     }
 
-    fileParts.push({
+    inputParts.push({
       type: "file",
       mime: finalMimeType,
       url: `data:${finalMimeType};base64,${finalBase64Data}`,
@@ -142,7 +163,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
   return {
     ok: true,
     value: {
-      fileParts,
+      inputParts,
       sourceDescription,
       cleanup() {
         for (const temporaryFile of tempFilesToCleanup) {

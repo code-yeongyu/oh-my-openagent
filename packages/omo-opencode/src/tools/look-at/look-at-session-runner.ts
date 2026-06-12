@@ -4,7 +4,7 @@ import { isAmbiguousPromptDispatchFailure, log, promptSyncWithModelSuggestionRet
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
 import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"
-import type { LookAtFilePart } from "./look-at-input-preparer"
+import type { LookAtFilePart, LookAtInputPart } from "./look-at-input-preparer"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
 import { waitForLookAtSessionResult } from "./session-poller"
 
@@ -12,15 +12,16 @@ interface RunLookAtSessionInput {
   ctx: PluginInput
   toolContext: ToolContext
   goal: string
-  fileParts: LookAtFilePart[]
+  inputParts: LookAtInputPart[]
 }
 
 export async function runLookAtSession({
   ctx,
   toolContext,
   goal,
-  fileParts,
+  inputParts,
 }: RunLookAtSessionInput): Promise<string> {
+  const fileParts = inputParts.filter((part): part is LookAtFilePart => part.type === "file")
   const prompt = buildLookAtPrompt(goal, fileParts)
   const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
@@ -73,7 +74,7 @@ Original error: ${createResult.error}`
         },
         parts: [
           { type: "text", text: prompt },
-          ...fileParts,
+          ...inputParts,
         ],
         ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
         ...(agentVariant ? { variant: agentVariant } : {}),
