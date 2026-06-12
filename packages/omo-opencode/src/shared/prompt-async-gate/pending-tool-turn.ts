@@ -7,6 +7,7 @@ import {
   messageHasUnresolvedTool,
   messageHasWaitingTool,
   messageIsSyntheticOrInternalUser,
+  messageIsTerminalNoReplyUser,
   messageRole,
 } from "./prompt-message-state"
 import { isRecord } from "../record-type-guard"
@@ -95,6 +96,9 @@ export function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): bo
     }
     if (role === "user") {
       if (messageIsSyntheticOrInternalUser(message)) {
+        if (messageIsTerminalNoReplyUser(message)) {
+          continue
+        }
         if (!sawAssistantAfterLatestUser) {
           return true
         }

@@ -8,6 +8,7 @@ import {
   type PromptAsyncGateResult,
 } from "../../hooks/shared/prompt-async-gate"
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
+import { resolveDispatchClient } from "../../shared/live-server-route"
 import {
   createInternalAgentTextPart,
   getAgentToolRestrictions,
@@ -2687,7 +2688,8 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
-    return isOpenCodeSessionActive(this.client, sessionID)
+    const resolved = await resolveDispatchClient(this.client, sessionID)
+    return isOpenCodeSessionActive(resolved.client as Parameters<typeof isOpenCodeSessionActive>[0], sessionID)
   }
 
   private queuePendingParentWake(
