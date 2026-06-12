@@ -231,8 +231,7 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
@@ -267,8 +266,7 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 })

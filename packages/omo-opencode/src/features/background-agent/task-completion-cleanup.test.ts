@@ -508,8 +508,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         await waitForCoalescedFlush()
 
         // then
-        expect(promptAsyncCalls).toHaveLength(1)
-        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(0)
         expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
@@ -554,8 +553,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         await waitForCoalescedFlush()
 
         // then
-        expect(promptAsyncCalls).toHaveLength(1)
-        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(0)
         expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow
@@ -606,10 +604,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await waitForDeferredWake(promptAsyncCalls)
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
-      expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     })
 
@@ -657,10 +652,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await waitForDeferredWake(promptAsyncCalls)
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
-      expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     })
 
@@ -699,8 +691,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         await waitForCoalescedFlush()
 
         // then
-        expect(promptAsyncCalls).toHaveLength(1)
-        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(promptAsyncCalls).toHaveLength(0)
         expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
       } finally {
         Date.now = originalDateNow

@@ -161,8 +161,7 @@ describe("ParentWakeNotifier non-Error retry recovery", () => {
       await notifier.flushPendingParentWake(sessionID)
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(0)
       expect(notifier.getPendingParentWakes().has(sessionID)).toBe(true)
     } finally {
       notifier.shutdown()
