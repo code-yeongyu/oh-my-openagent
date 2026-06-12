@@ -3,6 +3,12 @@ export {
 	stampOwner,
 } from "./owner-fencing";
 export {
+	type RecoveredTask,
+	type RecoverPersistedTasksOptions,
+	type RecoveryClient,
+	recoverPersistedTasks,
+} from "./recovery";
+export {
 	type PersistedModelConfig,
 	type PersistedTaskSnapshot,
 	parseSnapshotFile,
