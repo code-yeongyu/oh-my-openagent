@@ -1,7 +1,7 @@
 import { chmod, lstat, mkdir, readFile, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
-import { isNodeErrorWithCode, isRecord } from "./codex-cache-fs"
+import { isNodeErrorWithCode, isPlainRecord } from "./codex-cache-fs"
 import { removeLegacyCodexComponentBins } from "./codex-cache-legacy-bins"
 
 type LinkPlatform = NodeJS.Platform
@@ -102,7 +102,7 @@ async function appendPackageBinLinks(
   links: Array<{ name: string; target: string }>,
 ): Promise<void> {
   const packageJson: unknown = JSON.parse(await readFile(packageJsonPath, "utf8"))
-  if (!isRecord(packageJson)) return
+  if (!isPlainRecord(packageJson)) return
   const packageName = packageJson.name
   const packageBin = packageJson.bin
   if (typeof packageBin === "string" && typeof packageName === "string") {
@@ -112,7 +112,7 @@ async function appendPackageBinLinks(
     }
     return
   }
-  if (!isRecord(packageBin)) return
+  if (!isPlainRecord(packageBin)) return
   for (const [name, target] of Object.entries(packageBin)) {
     if (typeof target !== "string") continue
     const commandName = assertSafeCommandName(name)

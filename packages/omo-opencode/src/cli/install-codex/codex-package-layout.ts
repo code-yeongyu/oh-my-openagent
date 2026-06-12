@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -16,10 +17,6 @@ export async function shouldBuildSourcePackages(repoRoot: string): Promise<boole
   const packageJsonPath = join(repoRoot, "package.json")
   if (!existsSync(packageJsonPath)) return true
   const packageJson: unknown = JSON.parse(await readFile(packageJsonPath, "utf8"))
-  if (!isRecord(packageJson) || typeof packageJson.name !== "string") return true
+  if (!isPlainRecord(packageJson) || typeof packageJson.name !== "string") return true
   return !PACKAGED_CODEX_INSTALLER_NAMES.has(packageJson.name)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

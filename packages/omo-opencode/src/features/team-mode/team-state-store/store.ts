@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import path from "node:path"
@@ -72,12 +73,10 @@ function serializeRuntimeState(runtimeState: RuntimeState): string {
   return `${JSON.stringify(parsedRuntimeState, null, 2)}\n`
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
+
 
 function stripLegacyRuntimeStateMemberFields(member: unknown): unknown {
-  if (!isRecord(member)) {
+  if (!isPlainRecord(member)) {
     return member
   }
 
@@ -86,7 +85,7 @@ function stripLegacyRuntimeStateMemberFields(member: unknown): unknown {
 }
 
 function stripLegacyRuntimeStateFields(rawState: unknown): unknown {
-  if (!isRecord(rawState)) {
+  if (!isPlainRecord(rawState)) {
     return rawState
   }
 

@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 export type ClientRegistrationRequest = {
   redirect_uris: string[]
   client_name: string
@@ -92,8 +93,4 @@ function parseRegistrationResponse(data: unknown): ClientCredentials | null {
   }
 
   return { clientId }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
 }

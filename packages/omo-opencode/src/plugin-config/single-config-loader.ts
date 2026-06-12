@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import * as fs from "fs";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../config";
 import {
@@ -8,9 +9,7 @@ import {
 } from "../shared";
 import { addAgentOrderWarnings } from "./agent-order-warnings";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
+
 
 export function loadExplicitGitMasterOverrides(configPath: string): Record<string, unknown> | undefined {
   try {
@@ -22,7 +21,7 @@ export function loadExplicitGitMasterOverrides(configPath: string): Record<strin
     const rawConfig = parseJsonc<Record<string, unknown>>(content);
     const gitMaster = rawConfig.git_master;
 
-    if (isRecord(gitMaster)) {
+    if (isPlainRecord(gitMaster)) {
       return gitMaster;
     }
   } catch (error) {

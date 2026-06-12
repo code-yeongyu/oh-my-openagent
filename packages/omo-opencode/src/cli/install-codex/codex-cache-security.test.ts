@@ -6,15 +6,26 @@ import { mkdir, mkdtemp, readlink, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
-import { exists } from "./codex-cache-fs"
+import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 
 describe("codex-cache security boundaries", () => {
+  test("#given an array input #when using the cache record guard #then arrays remain rejected", () => {
+    // given
+    const value: unknown = []
+
+    // when
+    const result = isPlainRecord(value)
+
+    // then
+    expect(result).toBe(false)
+  })
+
   test("#given a malformed path #when checking existence #then non-missing filesystem errors propagate", async () => {
     // given
     const malformedPath = "\0"
 
     // when
-    const checked = exists(malformedPath)
+    const checked = fileExistsStrict(malformedPath)
 
     // then
     await expect(checked).rejects.toThrow()

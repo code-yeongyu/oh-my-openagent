@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
 import type { PluginContext } from "./types"
 
@@ -17,9 +18,7 @@ type ChatHeadersOutput = {
 const INTERNAL_MARKER_CACHE_LIMIT = 1000
 const internalMarkerCache = new Map<string, boolean>()
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function buildChatHeadersInput(raw: unknown): ChatHeadersInput | null {
   if (!isRecord(raw)) return null

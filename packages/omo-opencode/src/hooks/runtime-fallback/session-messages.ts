@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 export type SessionMessagePart = {
   type?: string
   text?: string
@@ -8,9 +9,7 @@ export type SessionMessage = {
   parts?: SessionMessagePart[]
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function isSessionMessage(value: unknown): value is SessionMessage {
   return isRecord(value)

@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { cp, mkdir, readFile, stat } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 
@@ -73,9 +74,9 @@ async function readSourceMcpArgs(path: string): Promise<ReadonlySet<string>> {
   }
 
   const args = new Set<string>()
-  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return args
+  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.mcpServers)) return args
   for (const server of Object.values(parsed.mcpServers)) {
-    if (!isRecord(server) || !Array.isArray(server.args)) continue
+    if (!isPlainRecord(server) || !Array.isArray(server.args)) continue
     for (const arg of server.args) {
       if (typeof arg === "string") args.add(arg)
     }
@@ -90,8 +91,4 @@ async function isDirectory(path: string): Promise<boolean> {
     if (error instanceof Error) return false
     return false
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

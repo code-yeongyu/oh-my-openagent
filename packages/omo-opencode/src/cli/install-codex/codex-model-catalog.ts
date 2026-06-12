@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -49,10 +50,10 @@ export async function readCodexReasoningProfile(codexPackageRoot: string): Promi
 }
 
 function parseCodexModelCatalog(value: unknown): CodexModelCatalog | null {
-  if (!isRecord(value)) return null
+  if (!isPlainRecord(value)) return null
   const current = value["current"]
   const managedProfiles = value["managedProfiles"]
-  if (!isRecord(current) || !Array.isArray(managedProfiles)) return null
+  if (!isPlainRecord(current) || !Array.isArray(managedProfiles)) return null
   const model = current["model"]
   const modelContextWindow = current["model_context_window"]
   const modelReasoningEffort = current["model_reasoning_effort"]
@@ -67,9 +68,9 @@ function parseCodexModelCatalog(value: unknown): CodexModelCatalog | null {
   }
   const parsedManagedProfiles: CodexReasoningProfileMatch[] = []
   for (const profile of managedProfiles) {
-    if (!isRecord(profile)) return null
+    if (!isPlainRecord(profile)) return null
     const match = profile["match"]
-    if (!isRecord(match)) return null
+    if (!isPlainRecord(match)) return null
     parsedManagedProfiles.push(parseProfileMatch(match))
   }
   return {
@@ -90,8 +91,4 @@ function parseProfileMatch(match: Record<string, unknown>): CodexReasoningProfil
   if (typeof match["model_reasoning_effort"] === "string") profile.modelReasoningEffort = match["model_reasoning_effort"]
   if (typeof match["plan_mode_reasoning_effort"] === "string") profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
   return profile
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

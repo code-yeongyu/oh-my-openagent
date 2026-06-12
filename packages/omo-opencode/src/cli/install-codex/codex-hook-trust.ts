@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -24,12 +25,12 @@ export async function trustedHookStatesForPlugin(input: {
   const manifestPath = join(input.pluginRoot, ".codex-plugin", "plugin.json")
   if (!(await exists(manifestPath))) return []
   const manifest: unknown = JSON.parse(await readFile(manifestPath, "utf8"))
-  if (!isRecord(manifest) || typeof manifest.hooks !== "string") return []
+  if (!isPlainRecord(manifest) || typeof manifest.hooks !== "string") return []
 
   const hooksPath = join(input.pluginRoot, manifest.hooks)
   if (!(await exists(hooksPath))) return []
   const parsed: unknown = JSON.parse(await readFile(hooksPath, "utf8"))
-  if (!isRecord(parsed) || !isRecord(parsed.hooks)) return []
+  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.hooks)) return []
 
   const keySource = `${input.pluginName}@${input.marketplaceName}:${stripDotSlash(manifest.hooks)}`
   const states: TrustedHookState[] = []
@@ -38,9 +39,9 @@ export async function trustedHookStatesForPlugin(input: {
     const eventLabel = EVENT_LABELS.get(eventName)
     if (eventLabel === undefined) continue
     for (const [groupIndex, group] of groups.entries()) {
-      if (!isRecord(group) || !Array.isArray(group.hooks)) continue
+      if (!isPlainRecord(group) || !Array.isArray(group.hooks)) continue
       for (const [handlerIndex, handler] of group.hooks.entries()) {
-        if (!isRecord(handler) || handler.type !== "command") continue
+        if (!isPlainRecord(handler) || handler.type !== "command") continue
         if (handler.async === true) continue
         if (typeof handler.command !== "string" || handler.command.trim() === "") continue
         const key = `${keySource}:${eventLabel}:${groupIndex}:${handlerIndex}`
@@ -69,7 +70,7 @@ function commandHookHash(eventName: string, matcher: unknown, handler: Record<st
 
 function canonicalJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalJson)
-  if (!isRecord(value)) return value
+  if (!isPlainRecord(value)) return value
   const result: Record<string, unknown> = {}
   for (const key of Object.keys(value).sort()) {
     result[key] = canonicalJson(value[key])
@@ -89,8 +90,4 @@ async function exists(path: string): Promise<boolean> {
     if (error instanceof Error) return false
     return false
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

@@ -1,3 +1,4 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -9,7 +10,7 @@ export interface DistributionManifest {
 export async function readDistributionManifest(repoRoot: string): Promise<DistributionManifest | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"))
-    if (!isRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0) return undefined
+    if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0) return undefined
     return {
       name: typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name.trim() : "lazycodex-ai",
       version: parsed.version.trim(),
@@ -60,7 +61,7 @@ export async function writeLazyCodexInstallSnapshot(input: {
 async function stampJsonVersion(path: string, version: string): Promise<void> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
-    if (!isRecord(parsed)) return
+    if (!isPlainRecord(parsed)) return
     parsed.version = version
     await writeFile(path, `${JSON.stringify(parsed, null, "\t")}\n`)
   } catch (error) {
@@ -72,7 +73,7 @@ async function stampJsonVersion(path: string, version: string): Promise<void> {
 async function stampHookStatusMessages(path: string, version: string): Promise<void> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
-    if (!isRecord(parsed)) return
+    if (!isPlainRecord(parsed)) return
     stampHookGroups(parsed.hooks, version)
     await writeFile(path, `${JSON.stringify(parsed, null, "\t")}\n`)
   } catch (error) {
@@ -97,11 +98,11 @@ async function stampComponentVersions(input: { readonly pluginRoot: string; read
 }
 
 function stampHookGroups(hooks: unknown, version: string): void {
-  if (!isRecord(hooks)) return
+  if (!isPlainRecord(hooks)) return
   for (const groups of Object.values(hooks)) {
     if (!Array.isArray(groups)) continue
     for (const group of groups) {
-      if (!isRecord(group) || !Array.isArray(group.hooks)) continue
+      if (!isPlainRecord(group) || !Array.isArray(group.hooks)) continue
       for (const hook of group.hooks) {
         stampHookStatusMessage(hook, version)
       }
@@ -110,10 +111,6 @@ function stampHookGroups(hooks: unknown, version: string): void {
 }
 
 function stampHookStatusMessage(hook: unknown, version: string): void {
-  if (!isRecord(hook) || typeof hook.statusMessage !== "string") return
+  if (!isPlainRecord(hook) || typeof hook.statusMessage !== "string") return
   hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):/, `LazyCodex(${version}):`)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
