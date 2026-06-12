@@ -420,3 +420,69 @@ describe("#given PowerShell shell detection in injectGitMasterConfig", () => {
 		})
 	})
 })
+
+const TEMPLATE_WITH_ATOMIC_PLANNING = [
+	"# Git Master Agent",
+	"",
+	"## MODE DETECTION (FIRST STEP)",
+	"",
+	"## PHASE 3: Atomic Unit Planning (BLOCKING - MUST OUTPUT BEFORE PROCEEDING)",
+	"",
+	"<atomic_planning>",
+	"**THIS PHASE HAS MANDATORY OUTPUT**",
+	"FORMULA: min_commits = ceil(file_count / 3)",
+	"**If your planned commit count < min_commits -> WRONG. SPLIT MORE.**",
+	"</atomic_planning>",
+	"",
+	"## PHASE 4: Commit Strategy Decision",
+	"",
+	"```",
+	"</execution>",
+].join("\n")
+
+describe("#given enforce_atomic_commits config", () => {
+	describe("#when enforce_atomic_commits is omitted (default)", () => {
+		it("#then keeps the blocking atomic-planning enforcement", () => {
+			const result = injectGitMasterConfig(TEMPLATE_WITH_ATOMIC_PLANNING, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "",
+			})
+
+			expect(result).toContain("FORMULA: min_commits = ceil(file_count / 3)")
+			expect(result).toContain("SPLIT MORE")
+			expect(result).not.toContain("Atomic commit splitting is RELAXED")
+		})
+	})
+
+	describe("#when enforce_atomic_commits is true explicitly", () => {
+		it("#then keeps the blocking atomic-planning enforcement", () => {
+			const result = injectGitMasterConfig(TEMPLATE_WITH_ATOMIC_PLANNING, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "",
+				enforce_atomic_commits: true,
+			})
+
+			expect(result).toContain("FORMULA: min_commits = ceil(file_count / 3)")
+			expect(result).not.toContain("Atomic commit splitting is RELAXED")
+		})
+	})
+
+	describe("#when enforce_atomic_commits is false", () => {
+		it("#then replaces the blocking enforcement with a relaxed section", () => {
+			const result = injectGitMasterConfig(TEMPLATE_WITH_ATOMIC_PLANNING, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "",
+				enforce_atomic_commits: false,
+			})
+
+			expect(result).toContain("Atomic commit splitting is RELAXED")
+			expect(result).not.toContain("FORMULA: min_commits = ceil(file_count / 3)")
+			expect(result).not.toContain("SPLIT MORE")
+			expect(result).toContain("</atomic_planning>")
+			expect(result).toContain("## PHASE 4: Commit Strategy Decision")
+		})
+	})
+})
