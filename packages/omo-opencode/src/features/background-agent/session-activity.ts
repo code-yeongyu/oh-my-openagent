@@ -8,6 +8,12 @@ export type SessionActivityLookup =
 
 export type SessionActivityResolver = (sessionID: string) => Promise<SessionActivityLookup>
 
+function isTransportDisconnectError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return message.includes("undefined is not an object") && message.includes("_client")
+}
+
 function dateFromMillis(value: unknown): Date | undefined {
   if (typeof value !== "number") return undefined
   if (!Number.isFinite(value) || value < 0) return undefined
@@ -40,6 +46,10 @@ export async function getSessionActivityFromClient(
     })
     if (isRecord(response) && response.error !== undefined && response.error !== null) {
       log("[background-agent] Failed to read session activity:", { sessionID, error: response.error })
+      // Not found (404) means the session is gone
+      if (isRecord(response.error) && response.error.status === 404) {
+        return { type: "missing" }
+      }
       return { type: "unavailable" }
     }
 
@@ -48,6 +58,10 @@ export async function getSessionActivityFromClient(
   } catch (error) {
     if (error instanceof Error) {
       log("[background-agent] Failed to read session activity:", { sessionID, error: error.message })
+      // Transport disconnect (this._client undefined) means the session is gone
+      if (isTransportDisconnectError(error)) {
+        return { type: "missing" }
+      }
       return { type: "unavailable" }
     }
     log("[background-agent] Failed to read session activity:", { sessionID, error })

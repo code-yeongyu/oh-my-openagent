@@ -40,4 +40,22 @@ describe("verifySessionExists", () => {
 
     expect(result).toBe("unknown")
   })
+
+  test("classifies transport disconnect errors as missing", async () => {
+    // given - this._client is undefined, causing TypeError
+    const get = mock(async () => {
+      throw new TypeError("undefined is not an object (evaluating 'this._client')")
+    })
+    const client = unsafeTestValue<OpencodeClient>({
+      session: {
+        get,
+      },
+    })
+
+    // when
+    const result = await checkSessionExistence(client, "session-123")
+
+    // then - transport disconnect should be treated as session gone
+    expect(result).toBe("missing")
+  })
 })

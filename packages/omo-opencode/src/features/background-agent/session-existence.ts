@@ -3,6 +3,12 @@ import type { OpencodeClient } from "./opencode-client"
 export const MIN_SESSION_GONE_POLLS = 3
 export type SessionExistenceStatus = "exists" | "missing" | "unknown"
 
+function isTransportDisconnectError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return message.includes("undefined is not an object") && message.includes("_client")
+}
+
 function extractErrorMessage(error: unknown): string | undefined {
   if (typeof error === "string") {
     return error
@@ -53,6 +59,10 @@ export async function checkSessionExistence(
 
     return response.data != null ? "exists" : "missing"
   } catch (error) {
+    // Transport disconnect (this._client undefined) means the session is gone
+    if (isTransportDisconnectError(error)) {
+      return "missing"
+    }
     return isSessionNotFoundError(error) ? "missing" : "unknown"
   }
 }
