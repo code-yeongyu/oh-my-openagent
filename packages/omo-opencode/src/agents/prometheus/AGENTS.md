@@ -9,9 +9,9 @@ description: Developer reference for the Prometheus strategic planner agent prom
 
 ## OVERVIEW
 
-3 TypeScript files plus 7 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` routes model variants and applies runtime tool gating.
+3 TypeScript files plus 7 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](../../../../prompts-core/prompts/prometheus). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` routes model variants and applies runtime tool gating.
 
-This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users/yeongyu/local-workspaces/omo/ROADMAP.md): prompts are harness-neutral core assets, while the OpenCode adapter keeps only model routing and runtime integration.
+This shape follows the package layering refactor in [`ROADMAP.md`](../../../../../ROADMAP.md): prompts are harness-neutral core assets, while the OpenCode adapter keeps only model routing and runtime integration.
 
 ## FILES
 
@@ -30,7 +30,7 @@ This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users
 
 ## MODEL VARIANT ROUTING
 
-[`system-prompt.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/agents/prometheus/system-prompt.ts) exposes `getPrometheusPromptSource(model)` (checked in this order):
+[`system-prompt.ts`](system-prompt.ts) exposes `getPrometheusPromptSource(model)` (checked in this order):
 
 - Claude Fable 5 (`isClaudeFable5Model`) routes to `"claude-fable-5"`.
 - Claude Opus 4.8 (`isClaudeOpus48Model`) routes to `"claude-opus-4-8"`.
@@ -44,7 +44,7 @@ This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users
 
 ## CLAUDE PER-MODEL TUNING (design principles)
 
-The four Claude variants are byte-copies of `default.md` plus ONE inserted `<self_knowledge>` block after the Prometheus identity paragraph (same pattern as the Sisyphus per-model variants in [`src/agents/sisyphus/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/agents/sisyphus/)). Principles are distilled from the Anthropic per-model prompting guides:
+The four Claude variants are byte-copies of `default.md` plus ONE inserted `<self_knowledge>` block after the Prometheus identity paragraph (same pattern as the Sisyphus per-model variants in [`src/agents/sisyphus/`](../sisyphus)). Principles are distilled from the Anthropic per-model prompting guides:
 
 | Variant | Defaults countered |
 |---------|--------------------|
@@ -68,7 +68,7 @@ This filtering is runtime adapter behavior. Do not duplicate stripped markdown v
 - Must explore codebase before planning (NEVER plan blind)
 - Plans saved to `.omo/plans/`
 - Acceptance criteria requiring "user manually tests" are FORBIDDEN
-- Prompt edits belong in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/), not in TypeScript section files
+- Prompt edits belong in [`packages/prompts-core/prompts/prometheus/`](../../../../prompts-core/prompts/prometheus), not in TypeScript section files
 
 ## PLAN OUTPUT FORMAT
 
