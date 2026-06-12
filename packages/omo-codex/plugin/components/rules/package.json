@@ -37,8 +37,8 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "vitest --run",
+		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
+		"test": "npm run build --silent && vitest --run --no-file-parallelism",
 		"test:watch": "vitest",
 		"bench": "npm run build --silent && node scripts/bench-codex-rules.mjs",
 		"typecheck": "tsc --noEmit",
@@ -50,6 +50,7 @@
 		"picomatch": "^4.0.3"
 	},
 	"devDependencies": {
+		"@oh-my-opencode/rules-engine": "file:../../../../rules-engine",
 		"@biomejs/biome": "2.4.16",
 		"@types/node": "^25.9.3",
 		"@types/picomatch": "^4.0.0",

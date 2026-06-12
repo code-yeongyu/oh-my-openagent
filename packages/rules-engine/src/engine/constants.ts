@@ -88,7 +88,7 @@ export const DEFAULT_POST_COMPACT_MAX_RULE_CHARS = 3500;
 export const DEFAULT_POST_COMPACT_MAX_RESULT_CHARS = 4000;
 
 /**
- * Per-rule / total caps for dynamic (PostToolUse) injection. Kept far below the
+ * Per-rule / total caps for dynamic injection. Kept far below the
  * static defaults so mid-session rule matches stay lightweight.
  */
 export const DEFAULT_DYNAMIC_MAX_RULE_CHARS = 4000;
@@ -96,7 +96,7 @@ export const DEFAULT_DYNAMIC_MAX_RULE_CHARS = 4000;
 export const DEFAULT_DYNAMIC_MAX_RESULT_CHARS = 10000;
 
 /**
- * Per-rule / total caps for UserPromptSubmit static injection. SessionStart
+ * Per-rule / total caps for prompt-time static injection. Startup injection
  * keeps the full budget; prompt-time stragglers inject at a reduced size.
  */
 export const DEFAULT_PROMPT_MAX_RULE_CHARS = 6000;
