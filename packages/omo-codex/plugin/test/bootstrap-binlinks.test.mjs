@@ -195,17 +195,17 @@ test("#given a marketplace payload without dist/cli #when the worker setup runs 
 	await withBinLinkFixture(async (fixture) => {
 		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0");
 
-		const outcome = await runWorkerSetup(setupOptions(fixture, pluginRoot, { now: 7_000 }));
+		const outcome = await runWorkerSetup(setupOptions(fixture, pluginRoot, { now: 7_000, platform: process.platform }));
 
 		assert.deepEqual(outcome.degraded, [OMO_CLI_DEGRADED_ENTRY]);
 		await assert.rejects(() => lstat(join(fixture.binDir, "omo")), "no omo wrapper may be written without dist/cli");
+		await assert.rejects(() => lstat(join(fixture.binDir, "omo.cmd")), "no Windows omo wrapper may be written without dist/cli");
 		await assertNoDanglingEntries(fixture.binDir);
 		const log = await readFile(join(fixture.pluginData, "bootstrap", "bootstrap.log"), "utf8");
 		assert.ok(
-			log.includes(
-				`skipped the omo runtime wrapper because ${join(pluginRoot, "dist", "cli", "index.js")} is missing; ` +
-					"omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed",
-			),
+			log.includes("skipped the omo runtime wrapper because ") &&
+				log.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
+				log.includes("omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
 			`bootstrap.log must carry the install-local warning text, got: ${log}`,
 		);
 	});
@@ -215,16 +215,22 @@ test("#given a payload shipping dist/cli #when the worker setup runs with no bin
 	await withBinLinkFixture(async (fixture) => {
 		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0", { withRuntimeCli: true });
 
-		const outcome = await runWorkerSetup(setupOptions(fixture, pluginRoot, { env: {} }));
+		const outcome = await runWorkerSetup(setupOptions(fixture, pluginRoot, { env: {}, platform: process.platform }));
 
 		assert.deepEqual(outcome.degraded, []);
 		const defaultBinDir = join(fixture.codexHome, "bin");
-		const wrapper = await readFile(join(defaultBinDir, "omo"), "utf8");
+		const wrapperName = process.platform === "win32" ? "omo.cmd" : "omo";
+		const wrapper = await readFile(join(defaultBinDir, wrapperName), "utf8");
 		assert.ok(wrapper.includes(join(pluginRoot, "dist", "cli", "index.js")));
-		assert.ok((await stat(join(defaultBinDir, "omo"))).mode & 0o111, "the posix omo wrapper must be executable");
-		assert.equal(
-			await readlink(join(defaultBinDir, COMPONENT_BIN_NAME)),
-			join(pluginRoot, "components", "toolbox", "dist", "cli.js"),
-		);
+		if (process.platform !== "win32") {
+			assert.ok((await stat(join(defaultBinDir, "omo"))).mode & 0o111, "the posix omo wrapper must be executable");
+			assert.equal(
+				await readlink(join(defaultBinDir, COMPONENT_BIN_NAME)),
+				join(pluginRoot, "components", "toolbox", "dist", "cli.js"),
+			);
+		} else {
+			const shim = await readFile(join(defaultBinDir, `${COMPONENT_BIN_NAME}.cmd`), "utf8");
+			assert.ok(shim.includes(join(pluginRoot, "components", "toolbox", "dist", "cli.js")));
+		}
 	});
 });
