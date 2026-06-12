@@ -14,24 +14,31 @@ This skill is intentionally compact. The full planning workflow lives in `refere
 ## Required First Steps
 
 1. Open `references/full-workflow.md`.
-2. Read **Phase 0 - Classify**, **Phase 1 - Ground**, **Phase 2 - Interview**, and the **Approval gate** before you ask the user anything or draft a plan.
-3. Internalize the loop: explore exhaustively, surface the genuine unknowns, ask, then wait for approval before planning.
+2. Read **Phase 0 - Classify**, **Phase 1 - Ground**, **Phase 2 - Interview**, the **Approval gate**, and **Phase 4 - Deliver, then ask** before you ask the user anything or draft a plan.
+3. Internalize the loop: explore exhaustively, surface the genuine unknowns, ask, wait for approval before planning, and after the plan stop for the start-or-high-accuracy decision.
 
 ## The Gate (non-negotiable behavior)
 
-- **Explore before asking.** Most "questions" are discoverable facts. Ground yourself in the repo with read-only tools and parallel research subagents FIRST; ask the user ONLY what exploration cannot resolve.
+- **Plan mode is sticky.** While this skill is active, "do X" / "fix X" / "build X" means "plan X". You NEVER start implementation — not for small, obvious, or urgent work. Execution begins only when the user explicitly says start (e.g. `$start-work`).
+- **Explore before asking.** Most "questions" are discoverable facts. Ground yourself in the repo with read-only tools and parallel research subagents FIRST; ask the user ONLY what neither exploration nor their stated intent can resolve.
 - **Surface, then ask.** After exhausting exploration, present what you found, the genuine remaining ambiguities (with a recommended option for each), and the approach you intend to plan.
-- **Wait for the user's explicit okay before generating the plan.** Never auto-transition from interview to plan generation. No plan file, no Metis gap-analysis, no execution until the user approves the approach.
-- **Planner scope only.** Write only `.omo/plans/<slug>.md` and `.omo/drafts/*.md`. Never edit source. If asked to "just do it", decline: you plan; a worker executes.
+- **Wait for the user's explicit okay before generating the plan.** Never auto-transition from interview to plan generation. No plan file, no Metis gap-analysis until the user approves the approach.
+- **After the plan is written, stop and ask.** Present the summary, then ask ONE question: start work now, or run a high-accuracy Momus review first? Never skip the question, never pick either path yourself.
+- **Planner scope only.** Write only `.omo/plans/<slug>.md` and `.omo/drafts/*.md`. Never edit source.
 
 ## Interview Discipline (how to ask)
 
-Exploration answers facts; the user decides preferences, tradeoffs, and safety. Bring those decisions to the user EARLY and well-formed:
+Exploration answers facts; the user decides preferences, tradeoffs, and safety. Run every candidate question through two filters, in order:
 
-- Every question must materially change the plan, confirm a load-bearing assumption, or choose between real tradeoffs. If a read-only search could answer it, asking is a failure.
-- Ask 1-3 narrow questions per turn, each with 2-4 concrete options and your recommended default first, grounded in a file path or finding you cite. A skipped question resolves to that default, recorded in the draft as an assumption.
+1. Could collected evidence answer it? Then asking is a failure — explore instead.
+2. Could the user's stated intent plus a defensible default answer it? Then adopt the default, record it in the draft as an assumption, and do not ask.
+
+Only what survives both filters earns the user's time: a real fork that materially changes the plan, a load-bearing assumption, or a tradeoff the user must own. For those:
+
+- State WHY you are asking: what you explored, why it did not resolve, which part of the plan forks on the answer.
+- Ask 1-3 narrow questions per turn, each with 2-4 concrete options and your recommended default first, grounded in a file path or finding you cite. A skipped question resolves to that default.
 - Always ask test strategy (TDD / tests-after / none); agent-executed QA scenarios are included regardless.
-- Record every answer and decision in `.omo/drafts/<slug>.md` immediately; run the Phase 2 clearance check after every turn; never end a turn passively — end with the question or the explicit next step.
+- Record every answer in `.omo/drafts/<slug>.md` immediately; run the Phase 2 clearance check after every turn; never end a turn passively — end with the question or the explicit next step.
 
 ## Dynamic Adversarial Planning
 
@@ -67,7 +74,7 @@ You explore a LOT - fan out parallel read-only research before interviewing - bu
 | Internal codebase research | `multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","fork_context":false})` |
 | External docs / library research | `multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","fork_context":false})` |
 | Pre-plan gap analysis (after approval) | `multi_agent_v1.spawn_agent({"message":"TASK: act as a Metis gap-analysis reviewer. ...","fork_context":false})` |
-| High-accuracy plan review (optional) | `multi_agent_v1.spawn_agent({"message":"TASK: act as a Momus plan reviewer. ...","fork_context":false})` |
+| High-accuracy plan review (when the user opts in) | `multi_agent_v1.spawn_agent({"message":"TASK: act as a Momus plan reviewer. ...","fork_context":false})` |
 | Wait for a research result | `multi_agent_v1.wait_agent(...)` |
 | Release a finished subagent | `multi_agent_v1.close_agent(...)` |
 
