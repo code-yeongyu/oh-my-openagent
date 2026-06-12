@@ -30,11 +30,10 @@ export async function getSessionActivityFromClient(
   sessionID: string,
   directory?: string,
 ): Promise<SessionActivityLookup> {
-  const sessionGet = client.session.get
-  if (typeof sessionGet !== "function") return { type: "missing" }
+  if (typeof client.session.get !== "function") return { type: "missing" }
 
   try {
-    const response = await sessionGet({
+    const response = await client.session.get({
       path: { id: sessionID },
       ...(directory ? { query: { directory } } : {}),
     })
