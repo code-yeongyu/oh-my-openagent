@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-import { sweepStaleOmoAgentSessionsWith, sweepTmuxSessionsWith, type SweepDeps } from "./stale-session-sweep"
+import {
+	sweepStaleOmoAgentSessionsWith,
+	sweepTmuxSessionsWith,
+	type SweepDeps,
+} from "./stale-session-sweep"
+import { sweepStaleOmoAttachPanesWith, type SweepAttachPaneDeps } from "./stale-attach-pane-sweep"
 
 type SweepFixture = {
 	deps: SweepDeps
@@ -185,5 +190,66 @@ describe("sweepTmuxSessionsWith", () => {
 		// then
 		expect(result).toEqual(["omo-team-A", "omo-team-B"])
 		expect(fixture.killed).toEqual(["omo-team-A", "omo-team-B"])
+	})
+})
+
+describe("sweepStaleOmoAttachPanesWith", () => {
+	it("#given stale and live OMO attach panes #when sweep called #then only panes with dead servers are closed", async () => {
+		// given
+		const closed: string[] = []
+		const deps: SweepAttachPaneDeps = {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [
+				{
+					paneId: "%dead",
+					commandLine: `/bin/sh -c "opencode attach http://127.0.0.1:4101 --session ses_dead --dir /tmp/project"`,
+				},
+				{
+					paneId: "%live",
+					commandLine: `opencode attach 'http://127.0.0.1:4102/' --session 'ses_live' --dir '/tmp/project'`,
+				},
+				{
+					paneId: "%other",
+					commandLine: "vim README.md",
+				},
+			],
+			isServerRunning: async (serverUrl: string) => serverUrl === "http://127.0.0.1:4102/",
+			closePane: async (paneId: string) => {
+				closed.push(paneId)
+				return true
+			},
+			log: () => undefined,
+		}
+
+		// when
+		const result = await sweepStaleOmoAttachPanesWith(deps)
+
+		// then
+		expect(result).toBe(1)
+		expect(closed).toEqual(["%dead"])
+	})
+
+	it("#given OMO attach pane close fails #when sweep called #then failed close is not counted", async () => {
+		// given
+		const deps: SweepAttachPaneDeps = {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [
+				{
+					paneId: "%stubborn",
+					commandLine: "opencode attach http://127.0.0.1:4103 --session ses_dead",
+				},
+			],
+			isServerRunning: async () => false,
+			closePane: async () => false,
+			log: () => undefined,
+		}
+
+		// when
+		const result = await sweepStaleOmoAttachPanesWith(deps)
+
+		// then
+		expect(result).toBe(0)
 	})
 })

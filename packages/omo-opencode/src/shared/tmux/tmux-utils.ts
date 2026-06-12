@@ -14,6 +14,7 @@ export { spawnTmuxWindow } from "./tmux-utils/window-spawn"
 export { spawnTmuxSession, getIsolatedSessionName } from "./tmux-utils/session-spawn"
 export { killTmuxSessionIfExists } from "./tmux-utils/session-kill"
 export { sweepStaleOmoAgentSessions, sweepTmuxSessionsWith } from "./tmux-utils/stale-session-sweep"
+export { sweepStaleOmoAttachPanes } from "./tmux-utils/stale-attach-pane-sweep"
 export { buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./tmux-utils/pane-command"
 
 export { applyLayout, enforceMainPaneWidth } from "./tmux-utils/layout"
