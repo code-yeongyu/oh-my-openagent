@@ -551,6 +551,33 @@ export class BackgroundManager {
       this.scheduleTaskRemoval(task.id)
     }
     this.updateBackgroundTaskMarker(task.parentSessionId)
+    this.notifyResumePromptNotDelivered(task, skippedStatus)
+  }
+
+  private notifyResumePromptNotDelivered(task: BackgroundTask, reason: string): void {
+    const parentSessionId = task.parentSessionId
+    if (!parentSessionId) {
+      return
+    }
+    const revertedStatus = task.status
+    const notification = `<system-reminder>
+[BACKGROUND TASK MESSAGE NOT DELIVERED]
+**ID:** \`${task.id}\`
+**Description:** ${task.description}
+
+Your message to this background task was NOT delivered (reason: ${reason}). The task was reverted to "${revertedStatus}". Retry with task(task_id="${task.id}", prompt="...").
+</system-reminder>`
+    void this.resolveParentWakePromptContext(task)
+      .then((promptContext) => {
+        this.queuePendingParentWake(parentSessionId, notification, promptContext, false, PENDING_PARENT_WAKE_DEBOUNCE_MS)
+      })
+      .catch((error) => {
+        log("[background-agent] Failed to resolve prompt context for undelivered-resume notification:", {
+          taskId: task.id,
+          error: String(error),
+        })
+        this.queuePendingParentWake(parentSessionId, notification, {}, false, PENDING_PARENT_WAKE_DEBOUNCE_MS)
+      })
   }
 
   private removeTaskFromParentIndex(taskID: string, parentSessionID: string | undefined): void {

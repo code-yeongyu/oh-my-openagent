@@ -805,6 +805,69 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
   })
 })
 
+describe("BackgroundManager.resume undelivered notification", () => {
+  test("notifies the parent and reverts the task when a resume prompt cannot be delivered", async () => {
+    //#given - client exposes no promptAsync so the resume dispatch resolves as unavailable
+    const client = {
+      session: {
+        messages: async () => [],
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task: BackgroundTask = {
+      id: "bg_resume_undelivered",
+      sessionId: "ses_resume_undelivered",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "undelivered resume test",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      concurrencyGroup: "anthropic/claude-haiku-4-5",
+    }
+    getTaskMap(manager).set(task.id, task)
+    const queuePendingParentWake = mock(() => {})
+    ;(cast<{
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
+
+    //#when
+    await manager.resume({
+      sessionId: "ses_resume_undelivered",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message-2",
+    })
+    await waitUntil(() => queuePendingParentWake.mock.calls.length > 0, 1_000)
+
+    //#then
+    const storedTask = getTaskMap(manager).get(task.id)
+    expect(storedTask?.status).toBe("completed")
+    expect(queuePendingParentWake).toHaveBeenCalledTimes(1)
+    const wakeCall = cast<Array<[string, string, Record<string, unknown>, boolean]>>(
+      queuePendingParentWake.mock.calls,
+    )[0]
+    if (!wakeCall) {
+      throw new Error("Expected an undelivered-resume parent wake call")
+    }
+    const [sessionID, notification] = wakeCall
+    expect(sessionID).toBe("parent-session")
+    expect(notification).toContain("NOT delivered")
+    expect(notification).toContain("bg_resume_undelivered")
+    expect(notification).toContain("task_id")
+  })
+})
+
 describe("BackgroundManager retry observability", () => {
   test("queues a parent-visible retry notification when fallback retry is scheduled", async () => {
     //#given
