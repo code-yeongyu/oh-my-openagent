@@ -22,6 +22,7 @@ export * from "./lsp/transport.js";
 export * from "./lsp/types.js";
 export * from "./lsp/utils.js";
 export * from "./lsp/workspace-edit.js";
+export * from "./mcp.js";
 export * from "./missing-dependency-result.js";
 export * from "./request-context.js";
 export * from "./tools.js";

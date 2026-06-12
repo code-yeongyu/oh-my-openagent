@@ -27,7 +27,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.16",
-		"@code-yeongyu/lsp-tools-mcp": "file:../lsp-tools-mcp",
+		"@oh-my-opencode/lsp-core": "file:../lsp-core",
 		"@types/node": "^25.9.2",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"

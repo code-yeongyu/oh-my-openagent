@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline";
 
-import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@code-yeongyu/lsp-tools-mcp/dist/mcp.js";
+import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 
 import {
 	type CallToolOptions,
