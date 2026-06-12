@@ -80,4 +80,14 @@ describe("BUILTIN_SERVERS", () => {
 		expect(kotlin?.command).toEqual(["kotlin-lsp", "--stdio"]);
 		expect(kotlin?.extensions).toEqual([".kt", ".kts"]);
 	});
+
+	it("#given sourcekit-lsp #when looking it up #then binds Swift and Objective-C file extensions", () => {
+		// given
+		const sourcekit = BUILTIN_SERVERS["sourcekit-lsp"];
+
+		// when / then
+		expect(sourcekit).toBeDefined();
+		expect(sourcekit?.command[0]).toBe("sourcekit-lsp");
+		expect(sourcekit?.extensions).toEqual([".swift", ".m", ".mm"]);
+	});
 });
