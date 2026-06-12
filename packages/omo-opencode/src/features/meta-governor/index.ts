@@ -47,3 +47,10 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 3: closed-loop-learning (observe/record to agentmemory)
+export {
+  observeAndLearn,
+  defaultClosedLoopConfig,
+  SEVERITY_ORDER,
+} from "./closed-loop-learning"
