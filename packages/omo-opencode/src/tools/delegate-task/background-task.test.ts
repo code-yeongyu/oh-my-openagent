@@ -252,6 +252,57 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     ])
   })
 
+  testFn("passes category tool permissions and prompt tools when launching delegate task", async () => {
+    //#given - category tool overrides should reach the background child session
+    const launchCalls: Array<{ sessionPermission: unknown; categoryTools: unknown }> = []
+    const manager = {
+      launch: async (input: { sessionPermission: unknown; categoryTools: unknown }) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_category_tools",
+          sessionId: "ses_category_tools_123",
+          description: "Category tools session",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionId: "ses_category_tools_123" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Category tools session",
+        prompt: "check",
+        category: "visual-engineering",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_category_tools",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_category_tools" },
+      "sisyphus-junior",
+      undefined,
+      undefined,
+      undefined,
+      { grep: false, glob: true },
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn(launchCalls[0].categoryTools).toEqual({ grep: false, glob: true })
+    expectFn(launchCalls[0].sessionPermission).toEqual([
+      { permission: "grep", action: "deny", pattern: "*" },
+      { permission: "glob", action: "allow", pattern: "*" },
+      { permission: "question", action: "deny", pattern: "*" },
+    ])
+  })
+
   testFn("strips leading zwsp from agent name before launching background task", async () => {
     //#given - display-sorted agent names should be normalized before manager launch
     const launchCalls: unknown[] = []

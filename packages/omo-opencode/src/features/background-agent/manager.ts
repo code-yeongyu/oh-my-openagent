@@ -25,6 +25,7 @@ import {
   clearDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
+import { mergeDelegatePromptTools } from "../../shared/delegate-tool-overrides"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import {
   hasMoreFallbacks,
@@ -599,6 +600,7 @@ export class BackgroundManager {
         fallbackChain: input.fallbackChain,
         skillContent: input.skillContent,
         sessionPermission: input.sessionPermission,
+        categoryTools: input.categoryTools,
         attemptCount: 0,
         category: input.category,
         onSessionCreated: input.onSessionCreated,
@@ -879,14 +881,17 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(sessionID, input.model)
     }
 
-    const launchTools = {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(input.agent, {
+    const launchTools = mergeDelegatePromptTools({
+      defaults: {
+        task: false,
+        call_omo_agent: true,
+        question: false,
+      },
+      configuredTools: input.categoryTools,
+      hardRestrictions: getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
-    }
+    })
     setSessionTools(sessionID, launchTools)
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })

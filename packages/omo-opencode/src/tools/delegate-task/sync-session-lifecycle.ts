@@ -18,6 +18,7 @@ export async function registerSyncSessionSideEffects(input: {
   readonly agentToUse: string
   readonly fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
   readonly systemContent: string | undefined
+  readonly categoryTools?: Record<string, boolean>
 }): Promise<void> {
   subagentSessions.add(input.sessionID)
   syncSubagentSessions.add(input.sessionID)
@@ -29,7 +30,7 @@ export async function registerSyncSessionSideEffects(input: {
     fallbackChain: input.fallbackChain,
     category: input.args.category,
     system: input.systemContent,
-    tools: buildSyncPromptTools(input.agentToUse),
+    tools: buildSyncPromptTools(input.agentToUse, input.categoryTools),
     modelFallbackControllerAccessor: input.executorCtx.modelFallbackControllerAccessor,
   })
 

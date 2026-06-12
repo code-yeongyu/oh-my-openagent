@@ -111,6 +111,7 @@ export async function startTask(
     system: input.skillContent,
     model: input.model,
     prompt: input.prompt,
+    categoryTools: input.categoryTools,
     includeTeamToolDenylist: input.teamRunId === undefined,
   })
   setSessionTools(sessionID, promptBody.tools)

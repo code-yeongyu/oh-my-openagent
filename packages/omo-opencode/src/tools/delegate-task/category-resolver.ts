@@ -47,6 +47,7 @@ function resolveCategoryPromptAppendForModel(
 export interface CategoryResolutionResult {
   agentToUse: string
   categoryModel: DelegatedModelConfig | undefined
+  categoryTools?: Record<string, boolean>
   categoryPromptAppend: string | undefined
   maxPromptTokens?: number
   modelInfo: ModelFallbackInfo | undefined
@@ -261,6 +262,7 @@ Available categories: ${categoryNames.join(", ")}`)
   return {
     agentToUse: SISYPHUS_JUNIOR_AGENT,
     categoryModel,
+    categoryTools: resolved.config.tools,
     categoryPromptAppend,
     maxPromptTokens: resolved.config.max_prompt_tokens,
     modelInfo,

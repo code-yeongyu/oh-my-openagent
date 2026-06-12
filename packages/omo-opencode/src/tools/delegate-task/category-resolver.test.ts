@@ -62,6 +62,32 @@ describe("resolveCategoryExecution", () => {
 		expect(result.agentToUse).toBeDefined()
 	})
 
+	test("returns category tools for delegate session restrictions", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
+				tools: { grep: false, glob: true },
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.categoryTools).toEqual({ grep: false, glob: true })
+	})
+
 	test("returns 'unknown category' error for truly unknown categories", async () => {
 		//#given
 		const args = {

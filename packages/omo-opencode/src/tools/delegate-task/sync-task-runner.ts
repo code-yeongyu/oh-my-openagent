@@ -27,6 +27,7 @@ type SyncTaskRunnerInput = {
   readonly systemContent: string | undefined
   readonly toastManager: TaskToastManager | undefined
   readonly modelInfo: ModelFallbackInfo | undefined
+  readonly categoryTools?: Record<string, boolean>
   readonly registerSyncSession: (newSessionID: string) => Promise<void>
   readonly publishSyncMetadata: (
     currentSessionID: string,
@@ -74,6 +75,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
     systemContent,
     toastManager,
     modelInfo,
+    categoryTools,
     registerSyncSession,
     publishSyncMetadata,
     cleanupRetrySession,
@@ -104,6 +106,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       taskId,
       sisyphusAgentConfig,
       categoryModel: effectiveCategoryModel,
+      categoryTools,
     })
     if (promptError) {
       const promptResult = await retrySyncPromptWithFallbacks({
@@ -122,6 +125,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
             taskId,
             sisyphusAgentConfig,
             categoryModel: fallbackModel,
+            categoryTools,
           })
         },
       })
@@ -175,6 +179,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
         description: args.description,
         defaultDirectory: directory,
         categoryModel: nextFallbackModel,
+        categoryTools,
       })
       if (!retrySessionResult.ok) {
         return retrySessionResult.error
