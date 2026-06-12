@@ -19,18 +19,15 @@ async function runHookCli(
 	try {
 		const raw = await readStdin(stdin);
 		if (!raw.trim()) return;
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(raw);
-		} catch (error) {
-			if (error instanceof SyntaxError) return;
-			throw error;
-		}
+		const parsed: unknown = JSON.parse(raw);
 		const input = isRecord(parsed) ? parsed : {};
 		const output = await runHook(input);
 		if (output) process.stdout.write(output);
+	} catch {
+		// LSP feedback is best-effort: stderr or a non-zero exit here surfaces as harness noise on every edit.
+		return;
 	} finally {
-		await disposeDefaultLspManager();
+		await disposeDefaultLspManager().catch(() => undefined);
 	}
 }
 
