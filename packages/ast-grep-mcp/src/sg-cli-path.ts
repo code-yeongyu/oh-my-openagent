@@ -1,10 +1,19 @@
 import { createRequire } from "module"
+import { homedir as defaultHomedir } from "os"
 import { dirname, join } from "path"
 import { existsSync, statSync } from "fs"
 
-type Platform = "darwin" | "linux" | "win32" | "unsupported"
+export const SG_PATH_ENV_KEY = "OMO_AST_GREP_SG_PATH"
 
 const WINDOWS_EXECUTABLE_EXTENSIONS = [".exe", ".cmd", ".bat"] as const
+
+export interface FindSgCliPathOptions {
+	readonly env?: Record<string, string | undefined>
+	readonly platform?: NodeJS.Platform
+	readonly arch?: string
+	readonly homedir?: () => string
+	readonly resolveModulePath?: (specifier: string) => string
+}
 
 export function isValidBinary(filePath: string): boolean {
 	try {
@@ -38,8 +47,8 @@ export function executableCandidates(filePath: string, platform: NodeJS.Platform
 	return candidates
 }
 
-function findValidExecutable(filePath: string): string | null {
-	for (const candidate of executableCandidates(filePath)) {
+function findValidExecutable(filePath: string, platform: NodeJS.Platform = process.platform): string | null {
+	for (const candidate of executableCandidates(filePath, platform)) {
 		if (existsSync(candidate) && isValidBinary(candidate)) {
 			return candidate
 		}
@@ -47,10 +56,7 @@ function findValidExecutable(filePath: string): string | null {
 	return null
 }
 
-function getPlatformPackageName(): string | null {
-	const platform = process.platform as Platform
-	const arch = process.arch
-
+function getPlatformPackageName(platform: NodeJS.Platform, arch: string): string | null {
 	const platformMap: Record<string, string> = {
 		"darwin-arm64": "@ast-grep/cli-darwin-arm64",
 		"darwin-x64": "@ast-grep/cli-darwin-x64",
@@ -71,15 +77,62 @@ function isModuleResolutionFailure(error: unknown): boolean {
 	)
 }
 
-export function findSgCliPathSync(): string | null {
+function defaultResolveModulePath(specifier: string): string {
+	const require = createRequire(import.meta.url)
+	return require.resolve(specifier)
+}
+
+function nonEmptyValue(value: string | undefined): string | undefined {
+	if (value === undefined) return undefined
+	const trimmed = value.trim()
+	return trimmed.length === 0 ? undefined : trimmed
+}
+
+function findEnvOverrideSgPath(
+	env: Record<string, string | undefined>,
+	platform: NodeJS.Platform,
+): string | null {
+	const overridePath = nonEmptyValue(env[SG_PATH_ENV_KEY])
+	if (overridePath === undefined) return null
+	return findValidExecutable(overridePath, platform)
+}
+
+function findRuntimeDirSgPath(
+	env: Record<string, string | undefined>,
+	platform: NodeJS.Platform,
+	arch: string,
+	homedir: () => string,
+): string | null {
+	const codexHome = nonEmptyValue(env.CODEX_HOME) ?? join(homedir(), ".codex")
+	const binaryName = platform === "win32" ? "sg.exe" : "sg"
+	const runtimePath = join(codexHome, "runtime", "ast-grep", `${platform}-${arch}`, binaryName)
+	return findValidExecutable(runtimePath, platform)
+}
+
+export function findSgCliPathSync(options: FindSgCliPathOptions = {}): string | null {
+	const env = options.env ?? process.env
+	const platform = options.platform ?? process.platform
+	const arch = options.arch ?? process.arch
+	const homedir = options.homedir ?? defaultHomedir
+	const resolveModulePath = options.resolveModulePath ?? defaultResolveModulePath
+
+	const envOverridePath = findEnvOverrideSgPath(env, platform)
+	if (envOverridePath) {
+		return envOverridePath
+	}
+
+	const runtimeDirPath = findRuntimeDirSgPath(env, platform, arch, homedir)
+	if (runtimeDirPath) {
+		return runtimeDirPath
+	}
+
 	const binaryName = "sg"
 
 	try {
-		const require = createRequire(import.meta.url)
-		const cliPackageJsonPath = require.resolve("@ast-grep/cli/package.json")
+		const cliPackageJsonPath = resolveModulePath("@ast-grep/cli/package.json")
 		const cliDirectory = dirname(cliPackageJsonPath)
 		const sgPath = join(cliDirectory, binaryName)
-		const validSgPath = findValidExecutable(sgPath)
+		const validSgPath = findValidExecutable(sgPath, platform)
 
 		if (validSgPath) {
 			return validSgPath
@@ -90,15 +143,14 @@ export function findSgCliPathSync(): string | null {
 		}
 	}
 
-	const platformPackage = getPlatformPackageName()
+	const platformPackage = getPlatformPackageName(platform, arch)
 	if (platformPackage) {
 		try {
-			const require = createRequire(import.meta.url)
-			const packageJsonPath = require.resolve(`${platformPackage}/package.json`)
+			const packageJsonPath = resolveModulePath(`${platformPackage}/package.json`)
 			const packageDirectory = dirname(packageJsonPath)
 			const astGrepBinaryName = "ast-grep"
 			const binaryPath = join(packageDirectory, astGrepBinaryName)
-			const validBinaryPath = findValidExecutable(binaryPath)
+			const validBinaryPath = findValidExecutable(binaryPath, platform)
 
 			if (validBinaryPath) {
 				return validBinaryPath
@@ -110,7 +162,7 @@ export function findSgCliPathSync(): string | null {
 		}
 	}
 
-	if (process.platform === "darwin") {
+	if (platform === "darwin") {
 		const homebrewPaths = ["/opt/homebrew/bin/sg", "/usr/local/bin/sg"]
 		for (const path of homebrewPaths) {
 			if (existsSync(path) && isValidBinary(path)) {
