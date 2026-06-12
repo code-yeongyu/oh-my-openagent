@@ -66,7 +66,9 @@ describe("tui-plugin-config check", () => {
   })
 
   it("passes when both server and TUI entries are registered", async () => {
-    //#given opencode.json has the server entry and tui.json has the TUI entry
+    //#given opencode.json has the server entry, tui.json has the TUI entry,
+    //#       and the installed package exports ./tui
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
     writeOpenCodeConfig([PLUGIN_NAME])
     writeTuiConfig([`${PLUGIN_NAME}/tui`])
 
@@ -77,6 +79,21 @@ describe("tui-plugin-config check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toHaveLength(0)
     expect(result.name).toBe("TUI Plugin")
+  })
+
+  it("warns when a named TUI entry points at a missing installed package", async () => {
+    //#given opencode.json has the server entry, tui.json has the TUI entry,
+    //#       but the installed package cannot be resolved from the config node_modules path
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then doctor flags the named TUI entry as unresolvable instead of falsely passing
+    expect(result.status).toBe("warn")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].title).toContain("unresolvable")
   })
 
   it("warns when server is registered but TUI entry is missing", async () => {

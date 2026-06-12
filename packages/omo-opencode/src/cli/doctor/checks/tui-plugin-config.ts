@@ -34,6 +34,7 @@ interface TuiPluginInfo {
   configPath: string | null
   exists: boolean
   hasNamedTuiEntry: boolean
+  hasCanonicalNamedTuiEntry: boolean
 }
 
 function fileEntryPackageJsonPath(entry: string): string {
@@ -115,6 +116,11 @@ function isNamedTuiPluginEntry(entry: string): boolean {
   return false
 }
 
+function isCanonicalNamedTuiPluginEntry(entry: string): boolean {
+  const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
+  return entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)
+}
+
 export function detectServerPluginRegistration(): ServerPluginInfo {
   const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
   const configPath = existsSync(paths.configJsonc)
@@ -145,7 +151,13 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
 export function detectTuiPluginRegistration(): TuiPluginInfo {
   const tuiJsonPath = join(getOpenCodeConfigDir({ binary: "opencode" }), "tui.json")
   if (!existsSync(tuiJsonPath)) {
-    return { registered: false, configPath: tuiJsonPath, exists: false, hasNamedTuiEntry: false }
+    return {
+      registered: false,
+      configPath: tuiJsonPath,
+      exists: false,
+      hasNamedTuiEntry: false,
+      hasCanonicalNamedTuiEntry: false,
+    }
   }
 
   try {
@@ -156,10 +168,17 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       configPath: tuiJsonPath,
       exists: true,
       hasNamedTuiEntry: plugins.some(isNamedTuiPluginEntry),
+      hasCanonicalNamedTuiEntry: plugins.some(isCanonicalNamedTuiPluginEntry),
     }
   } catch (error) {
     void error
-    return { registered: false, configPath: tuiJsonPath, exists: true, hasNamedTuiEntry: false }
+    return {
+      registered: false,
+      configPath: tuiJsonPath,
+      exists: true,
+      hasNamedTuiEntry: false,
+      hasCanonicalNamedTuiEntry: false,
+    }
   }
 }
 
@@ -183,7 +202,7 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
     }
   }
 
-  if (server.registered && server.packageExportsTui === false && tui.hasNamedTuiEntry) {
+  if (server.registered && server.packageExportsTui !== true && tui.hasCanonicalNamedTuiEntry) {
     issues.push({
       title: "TUI plugin entry in tui.json is unresolvable",
       description:
