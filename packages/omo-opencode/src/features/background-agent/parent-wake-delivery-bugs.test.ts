@@ -5,6 +5,8 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../../hooks/shared/prompt-async-gate"
+import { schedulePromptQueueDrain } from "../../shared/prompt-async-gate/queue"
+import { deletePromptReservation, setPromptReservation } from "../../shared/prompt-async-gate/reservations"
 
 type PromptAsyncCall = {
   path: { id: string }
@@ -346,6 +348,87 @@ describe("BUG B4: deleted parent session drops the wake instead of retrying fore
       expect(notifier.getPendingParentWakes().get("parent-1")?.notifications).toEqual([FINAL_WAKE])
       expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
     } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})
+
+describe("BUG B1 follow-up (Oracle): force-dispatch that QUEUES at the gate is not tracked as dispatched", () => {
+  test("#given an active reservation on the parent #when a wake exceeds max deferral and force-dispatch queues at the gate #then it is not tracked dispatched, starts no B3 window, and the gate delivers it exactly once", async () => {
+    // given: a foreign reservation holds the gate, so an enqueue force-dispatch
+    // returns "queued" (blocked) rather than "dispatched".
+    const originalDateNow = Date.now
+    const now = 100_000
+    Date.now = () => now
+    let delivered = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () =>
+        delivered
+          ? [
+              ...SAFE_MESSAGES,
+              {
+                info: { role: "assistant", finish: "stop", time: { created: 100_500 } },
+                parts: [{ type: "text", text: "acknowledged background completion" }],
+              },
+            ]
+          : SAFE_MESSAGES,
+      maxDeferMs: 5_000,
+    })
+    setPromptReservation("parent-1", {
+      source: "some-other-live-turn",
+      dedupeKey: "foreign-reservation-key",
+      reservedAt: now,
+      token: Symbol("foreign"),
+      expiresAt: now + 60_000,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    const queuedWake = notifier.getPendingParentWakes().get("parent-1")
+    if (!queuedWake) throw new Error("missing wake")
+    queuedWake.firstDeferredAt = now - 5_001
+
+    try {
+      // when: the force dispatch runs but the gate queues it behind the reservation
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: nothing was actually dispatched to the parent yet…
+      expect(promptAsyncCalls).toHaveLength(0)
+      // …the wake is NOT tracked as dispatched (no premature B3 state)…
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getDispatchedParentWakeTimers().has("parent-1")).toBe(false)
+      // …and the pending wake is retained and marked force-queued
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeDefined()
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeUndefined()
+
+      // when: another flush runs while still queued at the gate
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      // then: no re-force, no second dispatch, still queued (no duplicate entry)
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeDefined()
+
+      // when: the reservation clears and the gate drains the queued entry
+      deletePromptReservation("parent-1")
+      schedulePromptQueueDrain("parent-1", 0)
+      await waitUntil(() => promptAsyncCalls.length === 1, 600)
+
+      // then: the gate delivered the queued entry exactly once as a noReply admission
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when: the parent shows output after the deposit and the wake re-flushes
+      delivered = true
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the wake is dropped exactly once, with no duplicate dispatch
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }

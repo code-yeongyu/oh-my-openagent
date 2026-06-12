@@ -61,6 +61,14 @@ export class ParentWakeFlushRunner {
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
       return
     }
+    // BUG B1 follow-up (Oracle): while a forced wake is still queued at the gate
+    // it is neither lost nor re-dispatched. Suppress all new dispatch paths and
+    // just re-flush; it clears via consume-detection above (gate delivered it)
+    // or via the onExpiredOrFailed re-arm (gate dropped it).
+    if (latestWake.forcedQueuedAt !== undefined) {
+      this.schedulePendingParentWakeFlush(sessionID)
+      return
+    }
     if (sessionActive) {
       this.recordDeferral(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
@@ -172,7 +180,7 @@ export class ParentWakeFlushRunner {
   // the live turn consumed the deposit — re-dispatching it would inject a
   // duplicate notification and fork a concurrent assistant chain.
   private async dropAdmittedWakeConsumedByParent(sessionID: string, latestWake: PendingParentWake): Promise<boolean> {
-    if (latestWake.noReplyAdmittedAt === undefined) {
+    if (latestWake.noReplyAdmittedAt === undefined && latestWake.forcedQueuedAt === undefined) {
       return false
     }
     if (!(await this.deps.sessionInspector.hasAssistantOutputAfterAdmittedWake(sessionID, latestWake))) {
@@ -193,6 +201,9 @@ export class ParentWakeFlushRunner {
       readonly forceNoReply?: boolean
       readonly retainPendingWake?: boolean
       readonly queueBehavior?: InternalPromptQueueBehavior
+      readonly markForceQueued?: (queuedAt: number) => void
+      readonly onForceQueueResolved?: () => void
+      readonly forceQueueTtlMs?: number
     },
   ): Promise<void> {
     if (options.retainPendingWake !== true) {
@@ -217,6 +228,9 @@ export class ParentWakeFlushRunner {
         this.deps.pendingQueue.clearTimer(sessionID)
         this.deps.dispatchedTracker.clearWake(sessionID)
       },
+      ...(options.markForceQueued !== undefined ? { markForceQueued: options.markForceQueued } : {}),
+      ...(options.onForceQueueResolved !== undefined ? { onForceQueueResolved: options.onForceQueueResolved } : {}),
+      ...(options.forceQueueTtlMs !== undefined ? { forceQueueTtlMs: options.forceQueueTtlMs } : {}),
       emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
       toolWaitDecision: options.toolWaitDecision,
       getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
@@ -263,6 +277,9 @@ export class ParentWakeFlushRunner {
   }
 
   private hasExceededMaxDeferral(wake: PendingParentWake): boolean {
+    if (wake.forcedQueuedAt !== undefined) {
+      return false
+    }
     return wake.firstDeferredAt !== undefined && Date.now() - wake.firstDeferredAt >= this.deps.maxDeferMs
   }
 
@@ -283,11 +300,20 @@ export class ParentWakeFlushRunner {
       forceNoReply: true,
       retainPendingWake: wake.shouldReply,
       queueBehavior: "enqueue",
+      markForceQueued: (queuedAt) => this.markForceQueued(sessionID, queuedAt),
+      onForceQueueResolved: () => this.handleForceQueueResolved(sessionID),
+      forceQueueTtlMs: this.deps.maxDeferMs,
     })
     const stillPending = this.deps.pendingQueue.getWake(sessionID)
     if (stillPending) {
-      delete stillPending.firstDeferredAt
-      stillPending.deferCount = 0
+      // If the force attempt only QUEUED at the gate, leave the deferral budget
+      // intact (so an onExpiredOrFailed re-arm re-forces immediately) and let the
+      // forcedQueuedAt guard manage it. Otherwise it actually dispatched: reset the
+      // budget so a retained reply wake cannot re-force every second.
+      if (stillPending.forcedQueuedAt === undefined) {
+        delete stillPending.firstDeferredAt
+        stillPending.deferCount = 0
+      }
       this.schedulePendingParentWakeFlush(sessionID)
     }
   }
@@ -299,5 +325,25 @@ export class ParentWakeFlushRunner {
     if (latestWake.shouldReply && this.deps.pendingQueue.hasWake(sessionID)) {
       this.schedulePendingParentWakeFlush(sessionID)
     }
+  }
+
+  // BUG B1 follow-up (Oracle): a force-dispatch can be QUEUED at the gate rather
+  // than dispatched. While queued, the wake stays pending and is neither tracked
+  // as dispatched nor re-forced (forcedQueuedAt suppresses hasExceededMaxDeferral).
+  private markForceQueued(sessionID: string, queuedAt: number): void {
+    const wake = this.deps.pendingQueue.getWake(sessionID)
+    if (wake) {
+      wake.forcedQueuedAt = queuedAt
+    }
+  }
+
+  // The gate dropped/expired/failed the queued force entry: clear the marker and
+  // re-flush so the force path can re-arm (firstDeferredAt is still in the past).
+  private handleForceQueueResolved(sessionID: string): void {
+    const wake = this.deps.pendingQueue.getWake(sessionID)
+    if (wake) {
+      delete wake.forcedQueuedAt
+    }
+    this.schedulePendingParentWakeFlush(sessionID)
   }
 }

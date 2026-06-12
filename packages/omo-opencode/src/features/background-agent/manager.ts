@@ -126,17 +126,41 @@ import type {
 
 type OpencodeClient = PluginInput["client"]
 
-function isCompletionMarker(value: unknown): boolean {
-  if (typeof value === "boolean") return value
-  return value !== undefined && value !== null
+// Finish reasons that do NOT mean the assistant turn is done (mid tool-loop / unknown).
+// Mirrored from tools/delegate-task/sync-session-poller.ts.
+const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
+const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
+
+type StabilityMessage = {
+  info?: { role?: string; finish?: unknown; id?: string }
+  parts?: Array<{ type?: string }>
 }
 
-function isAssistantMessageFinished(info: { finish?: unknown; finished?: unknown; completed?: unknown; time?: { completed?: unknown } } | undefined): boolean {
-  if (!info) return false
-  return isCompletionMarker(info.finish)
-    || isCompletionMarker(info.finished)
-    || isCompletionMarker(info.completed)
-    || isCompletionMarker(info.time?.completed)
+/**
+ * Terminal-completion check mirrored from
+ * tools/delegate-task/sync-session-poller.ts `isSessionComplete`. A session turn is
+ * complete only when the latest assistant message has a terminal finish reason, has
+ * no pending tool-call parts, and comes strictly AFTER the latest user message (so an
+ * old finished turn cannot complete a task that just received a new prompt/resume).
+ */
+function isSessionMessageComplete(messages: StabilityMessage[]): boolean {
+  let lastUser: StabilityMessage | undefined
+  let lastAssistant: StabilityMessage | undefined
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (!lastAssistant && message.info?.role === "assistant") lastAssistant = message
+    if (!lastUser && message.info?.role === "user") lastUser = message
+    if (lastUser && lastAssistant) break
+  }
+
+  const finish = lastAssistant?.info?.finish
+  if (typeof finish !== "string" || finish.length === 0) return false
+  if (NON_TERMINAL_FINISH_REASONS.has(finish)) return false
+  if (lastAssistant?.parts?.some((part) => typeof part.type === "string" && PENDING_TOOL_PART_TYPES.has(part.type))) return false
+  const userId = lastUser?.info?.id
+  const assistantId = lastAssistant?.info?.id
+  if (!userId || !assistantId) return false
+  return userId < assistantId
 }
 
 type ResumeTaskSnapshot = {
@@ -584,14 +608,14 @@ Your message to this background task was NOT delivered (reason: ${reason}). The 
 </system-reminder>`
     void this.resolveParentWakePromptContext(task)
       .then((promptContext) => {
-        this.queuePendingParentWake(parentSessionId, notification, promptContext, false, PENDING_PARENT_WAKE_DEBOUNCE_MS)
+        this.queuePendingParentWake(parentSessionId, notification, promptContext, true, PENDING_PARENT_WAKE_DEBOUNCE_MS)
       })
       .catch((error) => {
         log("[background-agent] Failed to resolve prompt context for undelivered-resume notification:", {
           taskId: task.id,
           error: String(error),
         })
-        this.queuePendingParentWake(parentSessionId, notification, {}, false, PENDING_PARENT_WAKE_DEBOUNCE_MS)
+        this.queuePendingParentWake(parentSessionId, notification, {}, true, PENDING_PARENT_WAKE_DEBOUNCE_MS)
       })
   }
 
@@ -2988,10 +3012,10 @@ The task was re-queued on a fallback model after a retryable failure.
       return false
     }
 
-    let messages: Array<{ info?: { role?: string; finish?: unknown; finished?: unknown; completed?: unknown; time?: { completed?: unknown } } }>
+    let messages: StabilityMessage[]
     try {
       const response = await messagesInDirectory(this.client, { path: { id: sessionID } }, this.directory)
-      messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
+      messages = normalizeSDKResponse(response, [] as StabilityMessage[], { preferResponseOnMissingData: true })
     } catch (error) {
       log("[background-agent] Message-stability fallback failed to read messages:", { taskId: task.id, error })
       return false
@@ -3011,11 +3035,19 @@ The task was re-queued on a fallback model after a retryable failure.
       return false
     }
 
-    // Stable, but never complete a session that has not finished its turn.
-    const lastAssistant = [...messages].reverse().find((message) => message.info?.role === "assistant")
-    if (!lastAssistant || !isAssistantMessageFinished(lastAssistant.info)) {
+    // Stable, but never complete a session whose turn is not terminally finished.
+    // Rejects finish:"tool-calls"/"unknown", pending tool-call parts, and old finished
+    // turns superseded by a newer user/resume message.
+    if (!isSessionMessageComplete(messages)) {
       return false
     }
+
+    // Mirror the session.idle completion gates: require real output and no incomplete todos.
+    const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+    if (!hasValidOutput) return false
+    if (task.status !== "running") return false
+    const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
+    if (hasIncompleteTodos) return false
 
     // Re-check after async work to avoid racing with another completion path.
     if (task.status !== "running") return false

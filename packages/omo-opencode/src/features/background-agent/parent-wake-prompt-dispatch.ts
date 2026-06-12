@@ -29,6 +29,9 @@ type ParentWakePromptDispatchInput = {
   readonly queueBehavior?: InternalPromptQueueBehavior
   readonly checkSessionExists?: (sessionID: string) => Promise<SessionExistenceStatus>
   readonly dropWake?: () => void
+  readonly markForceQueued?: (queuedAt: number) => void
+  readonly onForceQueueResolved?: () => void
+  readonly forceQueueTtlMs?: number
 }
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
@@ -48,6 +51,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       queueBehavior: input.queueBehavior ?? "defer",
       checkStatus: input.forceNoReply !== true,
       checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
+      ...(input.onForceQueueResolved !== undefined
+        ? { onExpiredOrFailed: () => input.onForceQueueResolved?.() }
+        : {}),
+      ...(input.forceQueueTtlMs !== undefined ? { ttlMs: input.forceQueueTtlMs } : {}),
       input: {
         path: { id: input.sessionID },
         body: {
@@ -90,6 +97,21 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       input.scheduleFlush(2_000)
       log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", {
         sessionID: input.sessionID,
+      })
+      return
+    }
+    if (promptResult.status === "queued" && input.markForceQueued !== undefined) {
+      // BUG B1 follow-up (Oracle): a force-dispatch that merely QUEUED at the
+      // gate (blocked by an existing reservation) is NOT yet in parent history.
+      // It must not be tracked as dispatched (that would start the B3 silent-loss
+      // window on a wake that hasn't dispatched and let unrelated assistant output
+      // clear the tracker) nor recorded as a noReply admission. Mark it
+      // force-queued so the force path is suppressed until the gate delivers it
+      // (consume-detected via forcedQueuedAt) or drops it (onExpiredOrFailed).
+      input.markForceQueued(dispatchStartedAt)
+      log("[background-agent] Parent wake force-queued at promptAsync gate; awaiting gate delivery:", {
+        sessionID: input.sessionID,
+        queuedBy: promptResult.queuedBy,
       })
       return
     }

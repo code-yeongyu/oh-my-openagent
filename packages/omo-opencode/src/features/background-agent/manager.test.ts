@@ -860,11 +860,12 @@ describe("BackgroundManager.resume undelivered notification", () => {
     if (!wakeCall) {
       throw new Error("Expected an undelivered-resume parent wake call")
     }
-    const [sessionID, notification] = wakeCall
+    const [sessionID, notification, , shouldReply] = wakeCall
     expect(sessionID).toBe("parent-session")
     expect(notification).toContain("NOT delivered")
     expect(notification).toContain("bg_resume_undelivered")
     expect(notification).toContain("task_id")
+    expect(shouldReply).toBe(true)
   })
 })
 
