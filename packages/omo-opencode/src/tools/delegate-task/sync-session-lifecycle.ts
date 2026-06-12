@@ -1,4 +1,4 @@
-import { setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import { handedBackSyncSessions, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import {
   clearDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
@@ -21,6 +21,7 @@ export async function registerSyncSessionSideEffects(input: {
 }): Promise<void> {
   subagentSessions.add(input.sessionID)
   syncSubagentSessions.add(input.sessionID)
+  handedBackSyncSessions.delete(input.sessionID)
   setSessionAgent(input.sessionID, input.agentToUse)
   registerDelegatedChildSessionBootstrap({
     sessionID: input.sessionID,
