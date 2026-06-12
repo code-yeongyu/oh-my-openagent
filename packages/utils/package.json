@@ -20,6 +20,10 @@
     "./xdg-data-dir": {
       "types": "./src/xdg-data-dir.ts",
       "import": "./src/xdg-data-dir.ts"
+    },
+    "./record-type-guard": {
+      "types": "./src/record-type-guard.ts",
+      "import": "./src/record-type-guard.ts"
     }
   },
   "types": "./index.d.ts",
