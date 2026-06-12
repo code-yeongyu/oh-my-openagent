@@ -9,9 +9,17 @@
       "types": "./index.d.ts",
       "import": "./src/index.ts"
     },
+    "./atomic-write": {
+      "types": "./src/atomic-write.ts",
+      "import": "./src/atomic-write.ts"
+    },
     "./runtime": {
       "types": "./runtime.d.ts",
       "import": "./src/runtime/index.ts"
+    },
+    "./xdg-data-dir": {
+      "types": "./src/xdg-data-dir.ts",
+      "import": "./src/xdg-data-dir.ts"
     }
   },
   "types": "./index.d.ts",

@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { writeFileAtomically } from "@oh-my-opencode/utils"
+import { writeFileAtomically } from "@oh-my-opencode/utils/atomic-write"
 
 import type { TelemetryDiagnosticErrorKind, TelemetryDiagnosticInput } from "./types"
 

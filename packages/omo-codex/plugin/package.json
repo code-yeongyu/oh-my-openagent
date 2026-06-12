@@ -19,7 +19,7 @@
 		"@oh-my-opencode/shared-skills": "file:../../shared-skills"
 	},
 	"scripts": {
-		"build": "node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"build": "node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node scripts/build-components.mjs",
 		"sync:version": "node scripts/sync-version.mjs",
 		"check": "npm run build && npm test",
 		"sync:hooks": "node scripts/sync-hook-status-messages.mjs",

@@ -15,6 +15,303 @@ var __export = (target, all) => {
 };
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 
+// packages/utils/src/atomic-write.ts
+import { renameSync, unlinkSync, writeFileSync } from "node:fs";
+function writeFileAtomically(filePath, content, options = {}) {
+  const tempPath = `${filePath}.tmp`;
+  writeFileSync(tempPath, content, "utf-8");
+  try {
+    renameSync(tempPath, filePath);
+  } catch (error) {
+    const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
+    if ((options.platform ?? process.platform) === "win32" && isPermissionError) {
+      unlinkSync(filePath);
+      renameSync(tempPath, filePath);
+      return;
+    }
+    throw error;
+  }
+}
+var init_atomic_write = () => {};
+
+// packages/utils/src/xdg-data-dir.ts
+import { accessSync, constants, mkdirSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+function resolveXdgDataDir(appName, options = {}) {
+  const osProvider = options.osProvider ?? os;
+  const env = options.env ?? process.env;
+  const preferredDir = env.XDG_DATA_HOME ?? path.join(osProvider.homedir(), ".local", "share");
+  return resolveWritableDirectory(preferredDir, `${appName}-data`, osProvider);
+}
+function resolveWritableDirectory(preferredDir, fallbackSuffix, osProvider) {
+  try {
+    mkdirSync(preferredDir, { recursive: true });
+    accessSync(preferredDir, constants.W_OK);
+    return preferredDir;
+  } catch (error) {
+    if (!(error instanceof Error))
+      throw error;
+    const fallbackDir = path.join(osProvider.tmpdir(), fallbackSuffix);
+    mkdirSync(fallbackDir, { recursive: true });
+    return fallbackDir;
+  }
+}
+var init_xdg_data_dir = () => {};
+
+// packages/telemetry-core/src/activity-state.ts
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
+import { basename as basename4, join as join20 } from "node:path";
+function resolveTelemetryStateDir(product, options = {}) {
+  const dataDir = resolveXdgDataDir(product.cacheDirName, {
+    env: options.env,
+    osProvider: options.osProvider
+  });
+  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join20(options.env.XDG_DATA_HOME, product.cacheDirName);
+  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename4(dataDir) === product.cacheDirName) {
+    return dataDir;
+  }
+  return join20(dataDir, product.cacheDirName);
+}
+function getTelemetryActivityStateFilePath(stateDir) {
+  return join20(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
+}
+function getDailyActiveCaptureState(input) {
+  const state = readPostHogActivityState(input.stateDir, input.diagnostics);
+  const dayUTC = getUtcDayString(input.now ?? new Date);
+  const captureDaily = state.lastActiveDayUTC !== dayUTC;
+  if (captureDaily) {
+    writePostHogActivityState(input.stateDir, {
+      ...state,
+      lastActiveDayUTC: dayUTC
+    }, input.diagnostics);
+  }
+  return {
+    dayUTC,
+    captureDaily
+  };
+}
+function getUtcDayString(date) {
+  return date.toISOString().slice(0, 10);
+}
+function isPostHogActivityState(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function readPostHogActivityState(stateDir, diagnostics) {
+  const stateFilePath = getTelemetryActivityStateFilePath(stateDir);
+  if (!existsSync3(stateFilePath)) {
+    return {};
+  }
+  try {
+    const stateContent = readFileSync(stateFilePath, "utf-8");
+    const stateJson = JSON.parse(stateContent);
+    if (!isPostHogActivityState(stateJson)) {
+      return {};
+    }
+    return stateJson;
+  } catch (error) {
+    diagnostics?.({
+      event: "telemetry_activity_state_read_failed",
+      source: "shared",
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error"
+    });
+    return {};
+  }
+}
+function writePostHogActivityState(stateDir, nextState, diagnostics) {
+  const stateFilePath = getTelemetryActivityStateFilePath(stateDir);
+  try {
+    mkdirSync2(stateDir, { recursive: true });
+    writeFileAtomically(stateFilePath, `${JSON.stringify(nextState, null, 2)}
+`);
+  } catch (error) {
+    diagnostics?.({
+      event: "telemetry_activity_state_write_failed",
+      source: "shared",
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error"
+    });
+  }
+}
+var POSTHOG_ACTIVITY_STATE_FILE = "posthog-activity.json";
+var init_activity_state = __esm(() => {
+  init_atomic_write();
+  init_xdg_data_dir();
+});
+
+// packages/telemetry-core/src/constants.ts
+var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
+
+// packages/telemetry-core/src/diagnostics.ts
+import { appendFileSync, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
+import { join as join21 } from "node:path";
+function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
+  return join21(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
+}
+function writeTelemetryDiagnostic(input, options) {
+  const now = options.now ?? new Date;
+  try {
+    cleanupTelemetryDiagnostics({ diagnosticsDir: options.diagnosticsDir, now });
+    mkdirSync3(options.diagnosticsDir, { recursive: true });
+    appendFileSync(getTelemetryDiagnosticsFilePath(options.diagnosticsDir), `${JSON.stringify(toDiagnosticRecord(input, now))}
+`, "utf-8");
+  } catch (error) {
+    if (error instanceof Error) {
+      return;
+    }
+    return;
+  }
+}
+function cleanupTelemetryDiagnostics(options) {
+  const diagnosticsFilePath = getTelemetryDiagnosticsFilePath(options.diagnosticsDir);
+  if (!existsSync4(diagnosticsFilePath)) {
+    return;
+  }
+  try {
+    const cutoffMs = (options.now ?? new Date).getTime() - DIAGNOSTICS_RETENTION_MS;
+    const retainedLines = trimToMaxBytes(readFileSync2(diagnosticsFilePath, "utf-8").split(`
+`).filter((line) => shouldRetainLine(line, cutoffMs)));
+    writeFileAtomically(diagnosticsFilePath, retainedLines.length === 0 ? "" : `${retainedLines.join(`
+`)}
+`);
+  } catch (error) {
+    if (error instanceof Error) {
+      return;
+    }
+    return;
+  }
+}
+function toDiagnosticRecord(input, now) {
+  return {
+    timestamp: now.toISOString(),
+    event: input.event,
+    source: input.source,
+    ...serializeError(input.error, input.errorKind)
+  };
+}
+function serializeError(error, errorKind) {
+  if (error instanceof Error) {
+    return {
+      error_kind: errorKind ?? "error",
+      error_name: error.name,
+      error_message: error.message
+    };
+  }
+  if (error === undefined) {
+    return {};
+  }
+  return {
+    error_kind: errorKind ?? "non_error",
+    error_name: typeof error,
+    error_message: String(error)
+  };
+}
+function shouldRetainLine(line, cutoffMs) {
+  if (line.length === 0) {
+    return false;
+  }
+  const parsed = parseDiagnosticLine(line);
+  const timestamp = parsed?.["timestamp"];
+  if (typeof timestamp !== "string") {
+    return false;
+  }
+  const timestampMs = Date.parse(timestamp);
+  return Number.isFinite(timestampMs) && timestampMs >= cutoffMs;
+}
+function parseDiagnosticLine(line) {
+  try {
+    const parsed = JSON.parse(line);
+    if (!isRecord(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return null;
+    }
+    throw error;
+  }
+}
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function trimToMaxBytes(lines) {
+  const retained = [];
+  let totalBytes = 0;
+  for (let index = lines.length - 1;index >= 0; index -= 1) {
+    const line = lines[index];
+    if (line === undefined) {
+      continue;
+    }
+    const lineBytes = Buffer.byteLength(`${line}
+`, "utf-8");
+    if (totalBytes + lineBytes > DIAGNOSTICS_MAX_BYTES) {
+      break;
+    }
+    retained.unshift(line);
+    totalBytes += lineBytes;
+  }
+  return retained;
+}
+var DIAGNOSTICS_FILE_NAME = "telemetry-diagnostics.jsonl", DIAGNOSTICS_RETENTION_MS, DIAGNOSTICS_MAX_BYTES;
+var init_diagnostics = __esm(() => {
+  init_atomic_write();
+  DIAGNOSTICS_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+  DIAGNOSTICS_MAX_BYTES = 256 * 1024;
+});
+
+// packages/telemetry-core/src/env.ts
+function normalizeEnvValue(value) {
+  return value?.trim().toLowerCase();
+}
+function includesValue(values, value) {
+  const normalized = normalizeEnvValue(value);
+  return normalized !== undefined && values.includes(normalized);
+}
+function isDisableFlag(value) {
+  return includesValue(TRUTHY_DISABLE_VALUES, value);
+}
+function isSendOptOutFlag(value) {
+  return includesValue(SEND_OPT_OUT_VALUES, value);
+}
+function shouldDisableTelemetry(input) {
+  const env = input.env ?? process.env;
+  const globalPrefix = input.globalEnvPrefix ?? "OMO";
+  const prefixes = Array.from(new Set([globalPrefix, input.productEnvPrefix]));
+  for (const prefix of prefixes) {
+    if (isDisableFlag(env[`${prefix}_DISABLE_POSTHOG`])) {
+      return true;
+    }
+    if (isSendOptOutFlag(env[`${prefix}_SEND_ANONYMOUS_TELEMETRY`])) {
+      return true;
+    }
+  }
+  return false;
+}
+function getTelemetryApiKey(env = process.env, defaultApiKey = DEFAULT_POSTHOG_API_KEY) {
+  return env["POSTHOG_API_KEY"]?.trim() ?? defaultApiKey;
+}
+function getTelemetryHost(env = process.env, defaultHost = DEFAULT_POSTHOG_HOST) {
+  return env["POSTHOG_HOST"]?.trim() || defaultHost;
+}
+var TRUTHY_DISABLE_VALUES, SEND_OPT_OUT_VALUES;
+var init_env = __esm(() => {
+  TRUTHY_DISABLE_VALUES = ["1", "true", "yes"];
+  SEND_OPT_OUT_VALUES = ["0", "false", "no", "yes"];
+});
+
+// packages/telemetry-core/src/machine-id.ts
+import { createHash as createHash2 } from "node:crypto";
+import os2 from "node:os";
+function getDefaultTelemetryOsProvider() {
+  return os2;
+}
+function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
+  return createHash2("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
+}
+var init_machine_id = () => {};
+
 // node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
 import { dirname as dirname6, posix, sep as sep6 } from "node:path";
 function createModulerModifier() {
@@ -47,8 +344,8 @@ function createGetModuleFromFilename(basePath = process.argv[1] ? dirname6(proce
     return decodedFile;
   };
 }
-function normalizeWindowsPath(path) {
-  return path.replace(/^[A-Z]:/, "").replace(/\\/g, "/");
+function normalizeWindowsPath(path2) {
+  return path2.replace(/^[A-Z]:/, "").replace(/\\/g, "/");
 }
 var init_module_node = () => {};
 
@@ -2864,9 +3161,9 @@ async function addSourceContext(frames) {
   LRU_FILE_CONTENTS_CACHE.reduce();
   return frames;
 }
-function getContextLinesFromFile(path, ranges, output) {
+function getContextLinesFromFile(path2, ranges, output) {
   return new Promise((resolve7) => {
-    const stream = createReadStream(path);
+    const stream = createReadStream(path2);
     const lineReaded = createInterface({
       input: stream
     });
@@ -2882,7 +3179,7 @@ function getContextLinesFromFile(path, ranges, output) {
     let rangeStart = range[0];
     let rangeEnd = range[1];
     function onStreamError() {
-      LRU_FILE_CONTENTS_FS_READ_FAILED.set(path, 1);
+      LRU_FILE_CONTENTS_FS_READ_FAILED.set(path2, 1);
       lineReaded.close();
       lineReaded.removeAllListeners();
       destroyStreamAndResolve();
@@ -2950,8 +3247,8 @@ function clearLineContext(frame) {
   delete frame.context_line;
   delete frame.post_context;
 }
-function shouldSkipContextLinesForFile(path) {
-  return path.startsWith("node:") || path.endsWith(".min.js") || path.endsWith(".min.cjs") || path.endsWith(".min.mjs") || path.startsWith("data:");
+function shouldSkipContextLinesForFile(path2) {
+  return path2.startsWith("node:") || path2.endsWith(".min.js") || path2.endsWith(".min.cjs") || path2.endsWith(".min.mjs") || path2.startsWith("data:");
 }
 function shouldSkipContextLinesForFrame(frame) {
   if (frame.lineno !== undefined && frame.lineno > MAX_CONTEXTLINES_LINENO)
@@ -5389,6 +5686,187 @@ var init_index_node = __esm(() => {
   };
 });
 
+// packages/telemetry-core/src/posthog-client.ts
+class PostHogTelemetryTransport {
+  #client;
+  constructor(apiKey, options) {
+    this.#client = new PostHog(apiKey, options);
+  }
+  capture(message) {
+    this.#client.capture(message);
+  }
+  async flush() {
+    await this.#client.flush();
+  }
+  async shutdown() {
+    await this.#client.shutdown();
+  }
+}
+function createDefaultPostHogTransport(apiKey, options) {
+  return new PostHogTelemetryTransport(apiKey, options);
+}
+function isTelemetryClientEnabled(input) {
+  const env = input.env ?? process.env;
+  return !shouldDisableTelemetry({ env, productEnvPrefix: input.product.productEnvPrefix }) && getTelemetryApiKey(env, input.product.defaultApiKey).length > 0;
+}
+function createTelemetryClient(input) {
+  if (!isTelemetryClientEnabled(input)) {
+    return NO_OP_CLIENT;
+  }
+  const transport = createTransport(input);
+  if (transport === null) {
+    return NO_OP_CLIENT;
+  }
+  const sharedProperties = getSharedProperties(input);
+  return {
+    enabled: true,
+    trackActive: ({ dayUTC, distinctId, reason }) => {
+      try {
+        transport.capture({
+          distinctId,
+          event: input.product.eventName,
+          properties: {
+            ...sharedProperties,
+            $process_person_profile: false,
+            day_utc: dayUTC,
+            reason
+          }
+        });
+      } catch (error) {
+        input.diagnostics?.({
+          event: "telemetry_capture_failed",
+          source: input.source,
+          error,
+          errorKind: error instanceof Error ? "error" : "non_error"
+        });
+      }
+    },
+    flush: async () => {
+      if (transport.flush === undefined) {
+        return;
+      }
+      await transport.flush();
+    },
+    shutdown: async () => {
+      try {
+        await transport.shutdown();
+      } catch (error) {
+        input.diagnostics?.({
+          event: "telemetry_shutdown_failed",
+          source: input.source,
+          error,
+          errorKind: error instanceof Error ? "error" : "non_error"
+        });
+      }
+    }
+  };
+}
+function createTransport(input) {
+  const env = input.env ?? process.env;
+  const factory = input.transportFactory ?? createDefaultPostHogTransport;
+  try {
+    return factory(getTelemetryApiKey(env, input.product.defaultApiKey), {
+      enableExceptionAutocapture: false,
+      enableLocalEvaluation: false,
+      strictLocalEvaluation: true,
+      disableRemoteConfig: true,
+      flushAt: 1,
+      flushInterval: 0,
+      host: getTelemetryHost(env, input.product.defaultHost),
+      disableGeoip: false
+    });
+  } catch (error) {
+    input.diagnostics?.({
+      event: "telemetry_posthog_init_failed",
+      source: input.source,
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error"
+    });
+    return null;
+  }
+}
+function getSharedProperties(input) {
+  const osProvider = input.osProvider ?? getDefaultTelemetryOsProvider();
+  const cpuInfo = getSafeCpuInfo(osProvider, input);
+  return {
+    platform: input.product.platform,
+    product_name: input.product.productName,
+    package_name: input.product.packageName,
+    package_version: input.product.packageVersion,
+    runtime: "bun",
+    runtime_version: process.versions.bun ?? process.version,
+    source: input.source,
+    $os: osProvider.platform(),
+    $os_version: osProvider.release(),
+    os_arch: osProvider.arch(),
+    os_type: osProvider.type(),
+    cpu_count: cpuInfo.count,
+    cpu_model: cpuInfo.model,
+    total_memory_gb: Math.round(osProvider.totalmem() / 1024 / 1024 / 1024),
+    locale: Intl.DateTimeFormat().resolvedOptions().locale,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    shell: process.env.SHELL,
+    ci: Boolean(process.env.CI),
+    terminal: process.env.TERM_PROGRAM,
+    ...input.product.additionalProperties
+  };
+}
+function getSafeCpuInfo(osProvider, input) {
+  try {
+    const cpuInfo = osProvider.cpus();
+    return {
+      count: cpuInfo.length,
+      model: cpuInfo[0]?.model
+    };
+  } catch (error) {
+    input.diagnostics?.({
+      event: "telemetry_cpu_info_unavailable",
+      source: "shared",
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error"
+    });
+    return {
+      count: 0,
+      model: undefined
+    };
+  }
+}
+var NO_OP_CLIENT;
+var init_posthog_client = __esm(() => {
+  init_index_node();
+  init_env();
+  init_machine_id();
+  NO_OP_CLIENT = {
+    enabled: false,
+    trackActive: () => {
+      return;
+    },
+    flush: async () => {
+      return;
+    },
+    shutdown: async () => {
+      return;
+    }
+  };
+});
+
+// packages/telemetry-core/src/record-daily-active.ts
+var init_record_daily_active = __esm(() => {
+  init_activity_state();
+  init_posthog_client();
+  init_machine_id();
+});
+
+// packages/telemetry-core/src/index.ts
+var init_src = __esm(() => {
+  init_activity_state();
+  init_diagnostics();
+  init_env();
+  init_machine_id();
+  init_posthog_client();
+  init_record_daily_active();
+});
+
 // packages/omo-codex/package.json
 var package_default;
 var init_package = __esm(() => {
@@ -5425,8 +5903,7 @@ var init_package = __esm(() => {
       "sync:skills": "node plugin/scripts/sync-skills.mjs"
     },
     dependencies: {
-      "@oh-my-opencode/utils": "workspace:*",
-      "posthog-node": "^5.34.3"
+      "@oh-my-opencode/utils": "workspace:*"
     },
     devDependencies: {
       "bun-types": "1.3.14"
@@ -5434,406 +5911,140 @@ var init_package = __esm(() => {
   };
 });
 
-// packages/omo-codex/src/telemetry/atomic-write.ts
-import { renameSync, unlinkSync, writeFileSync } from "node:fs";
-function writeFileAtomically(filePath, content) {
-  const tempPath = `${filePath}.tmp`;
-  writeFileSync(tempPath, content, "utf-8");
-  try {
-    renameSync(tempPath, filePath);
-  } catch (error) {
-    const isPermissionError = error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"));
-    if (process.platform === "win32" && isPermissionError) {
-      unlinkSync(filePath);
-      renameSync(tempPath, filePath);
-      return;
-    }
-    throw error;
-  }
-}
-var init_atomic_write = () => {};
-
 // packages/omo-codex/src/telemetry/product-identity.ts
-var PRODUCT_NAME = "omo-codex", PACKAGE_NAME = "@oh-my-opencode/omo-codex", CACHE_DIR_NAME = "omo-codex", EVENT_NAME = "omo_codex_daily_active", DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
+function getProductVersion() {
+  return package_default.version;
+}
+function createCodexTelemetryProductConfig(packageVersion = getProductVersion(), additionalProperties) {
+  const product = {
+    cacheDirName: CACHE_DIR_NAME,
+    defaultApiKey: DEFAULT_POSTHOG_API_KEY,
+    defaultHost: DEFAULT_POSTHOG_HOST,
+    eventName: EVENT_NAME,
+    machineIdPrefix: MACHINE_ID_PREFIX,
+    packageName: PACKAGE_NAME,
+    packageVersion,
+    platform: "omo-codex",
+    productEnvPrefix: PRODUCT_ENV_PREFIX,
+    productName: PRODUCT_NAME
+  };
+  if (additionalProperties === undefined) {
+    return product;
+  }
+  return {
+    ...product,
+    additionalProperties
+  };
+}
+var PRODUCT_NAME = "omo-codex", PACKAGE_NAME = "@oh-my-opencode/omo-codex", CACHE_DIR_NAME = "omo-codex", EVENT_NAME = "omo_codex_daily_active", PRODUCT_ENV_PREFIX = "OMO_CODEX", MACHINE_ID_PREFIX = "omo-codex:";
 var init_product_identity = __esm(() => {
+  init_src();
   init_package();
 });
 
 // packages/omo-codex/src/telemetry/data-path.ts
-import { accessSync, constants, mkdirSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
 function getOsProvider() {
-  return osProviderOverride ?? os;
-}
-function resolveWritableDirectory(preferredDir, fallbackSuffix) {
-  try {
-    mkdirSync(preferredDir, { recursive: true });
-    accessSync(preferredDir, constants.W_OK);
-    return preferredDir;
-  } catch {
-    const fallbackDir = path.join(getOsProvider().tmpdir(), fallbackSuffix);
-    mkdirSync(fallbackDir, { recursive: true });
-    return fallbackDir;
-  }
-}
-function getDataDir() {
-  const preferredDataDir = process.env.XDG_DATA_HOME ?? path.join(getOsProvider().homedir(), ".local", "share");
-  return resolveWritableDirectory(preferredDataDir, "omo-codex-data");
+  return osProviderOverride ?? undefined;
 }
 function getActivityStateDir() {
-  return path.join(getDataDir(), CACHE_DIR_NAME);
+  return resolveTelemetryStateDir(createCodexTelemetryProductConfig(), {
+    env: process.env,
+    osProvider: getOsProvider()
+  });
 }
 var osProviderOverride = null;
 var init_data_path = __esm(() => {
+  init_src();
   init_product_identity();
 });
 
 // packages/omo-codex/src/telemetry/diagnostics.ts
-import { appendFileSync, existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
-import { join as join20 } from "node:path";
-function getTelemetryDiagnosticsFilePath() {
-  return join20(getActivityStateDir(), DIAGNOSTICS_FILE_NAME);
+function writeTelemetryDiagnostic2(input, now = new Date) {
+  writeTelemetryDiagnostic(input, {
+    diagnosticsDir: getActivityStateDir(),
+    now
+  });
 }
-function writeTelemetryDiagnostic(input, now = new Date) {
-  try {
-    cleanupTelemetryDiagnostics(now);
-    mkdirSync2(getActivityStateDir(), { recursive: true });
-    appendFileSync(getTelemetryDiagnosticsFilePath(), `${JSON.stringify(toDiagnosticRecord(input, now))}
-`, "utf-8");
-  } catch {
-    return;
-  }
-}
-function cleanupTelemetryDiagnostics(now = new Date) {
-  const diagnosticsFilePath = getTelemetryDiagnosticsFilePath();
-  if (!existsSync3(diagnosticsFilePath)) {
-    return;
-  }
-  try {
-    const cutoffMs = now.getTime() - DIAGNOSTICS_RETENTION_MS;
-    const retainedLines = trimToMaxBytes(readFileSync(diagnosticsFilePath, "utf-8").split(`
-`).filter((line) => shouldRetainLine(line, cutoffMs)));
-    writeFileAtomically(diagnosticsFilePath, retainedLines.length === 0 ? "" : `${retainedLines.join(`
-`)}
-`);
-  } catch {
-    return;
-  }
-}
-function toDiagnosticRecord(input, now) {
-  return {
-    timestamp: now.toISOString(),
-    event: input.event,
-    source: input.source,
-    ...serializeError(input.error, input.errorKind)
-  };
-}
-function serializeError(error, errorKind) {
-  if (error instanceof Error) {
-    return {
-      error_kind: errorKind ?? "error",
-      error_name: error.name,
-      error_message: error.message
-    };
-  }
-  if (error === undefined) {
-    return {};
-  }
-  return {
-    error_kind: errorKind ?? "non_error",
-    error_name: typeof error,
-    error_message: String(error)
-  };
-}
-function shouldRetainLine(line, cutoffMs) {
-  if (line.length === 0) {
-    return false;
-  }
-  const parsed = parseDiagnosticLine(line);
-  if (parsed === null) {
-    return false;
-  }
-  const timestamp = parsed["timestamp"];
-  if (typeof timestamp !== "string") {
-    return false;
-  }
-  const timestampMs = Date.parse(timestamp);
-  return Number.isFinite(timestampMs) && timestampMs >= cutoffMs;
-}
-function parseDiagnosticLine(line) {
-  try {
-    const parsed = JSON.parse(line);
-    if (!isRecord(parsed)) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-function trimToMaxBytes(lines) {
-  const retained = [];
-  let totalBytes = 0;
-  for (let index = lines.length - 1;index >= 0; index -= 1) {
-    const line = lines[index];
-    if (line === undefined) {
-      continue;
-    }
-    const lineBytes = Buffer.byteLength(`${line}
-`, "utf-8");
-    if (totalBytes + lineBytes > DIAGNOSTICS_MAX_BYTES) {
-      break;
-    }
-    retained.unshift(line);
-    totalBytes += lineBytes;
-  }
-  return retained;
-}
-var DIAGNOSTICS_FILE_NAME = "telemetry-diagnostics.jsonl", DIAGNOSTICS_RETENTION_MS, DIAGNOSTICS_MAX_BYTES;
-var init_diagnostics = __esm(() => {
-  init_atomic_write();
+var init_diagnostics2 = __esm(() => {
+  init_src();
   init_data_path();
-  DIAGNOSTICS_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-  DIAGNOSTICS_MAX_BYTES = 256 * 1024;
-});
-
-// packages/omo-codex/src/telemetry/env-flags.ts
-function normalizeEnvValue(value) {
-  return value?.trim().toLowerCase();
-}
-function isDisableFlag(value) {
-  const normalized = normalizeEnvValue(value);
-  return normalized === "1" || normalized === "true";
-}
-function isTelemetryOptOutFlag(value) {
-  const normalized = normalizeEnvValue(value);
-  return normalized === "0" || normalized === "false" || normalized === "no";
-}
-function shouldDisablePostHog() {
-  return isDisableFlag(process.env.OMO_DISABLE_POSTHOG) || isTelemetryOptOutFlag(process.env.OMO_SEND_ANONYMOUS_TELEMETRY) || isDisableFlag(process.env.OMO_CODEX_DISABLE_POSTHOG) || isTelemetryOptOutFlag(process.env.OMO_CODEX_SEND_ANONYMOUS_TELEMETRY);
-}
-function getPostHogApiKey() {
-  const explicit = process.env.POSTHOG_API_KEY;
-  if (explicit === undefined) {
-    return DEFAULT_POSTHOG_API_KEY;
-  }
-  return explicit.trim();
-}
-function hasPostHogApiKey() {
-  return getPostHogApiKey().length > 0;
-}
-function getPostHogHost() {
-  return process.env.POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST;
-}
-var init_env_flags = __esm(() => {
-  init_product_identity();
 });
 
 // packages/omo-codex/src/telemetry/posthog-activity-state.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { join as join21 } from "node:path";
-function getPostHogActivityStateFilePath() {
-  return join21(getActivityStateDir(), POSTHOG_ACTIVITY_STATE_FILE);
-}
-function getUtcDayString(date) {
-  return date.toISOString().slice(0, 10);
-}
-function isPostHogActivityState(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-function writeActivityStateDiagnostic(event, error, errorKind) {
-  writeTelemetryDiagnostic({
-    event,
-    source: "shared",
-    error,
-    errorKind
+function getPostHogActivityCaptureState(now = new Date) {
+  return getDailyActiveCaptureState({
+    diagnostics: writeTelemetryDiagnostic2,
+    now,
+    stateDir: getActivityStateDir()
   });
 }
-function readPostHogActivityState() {
-  const stateFilePath = getPostHogActivityStateFilePath();
-  if (!existsSync4(stateFilePath)) {
-    return {};
-  }
-  try {
-    const stateContent = readFileSync2(stateFilePath, "utf-8");
-    const stateJson = JSON.parse(stateContent);
-    if (!isPostHogActivityState(stateJson)) {
-      return {};
-    }
-    return stateJson;
-  } catch (error) {
-    writeActivityStateDiagnostic("telemetry_activity_state_read_failed", error, error instanceof Error ? "error" : "non_error");
-    return {};
-  }
-}
-function writePostHogActivityState(nextState) {
-  const stateDir = getActivityStateDir();
-  const stateFilePath = getPostHogActivityStateFilePath();
-  try {
-    mkdirSync3(stateDir, { recursive: true });
-    writeFileAtomically(stateFilePath, `${JSON.stringify(nextState, null, 2)}
-`);
-  } catch (error) {
-    writeActivityStateDiagnostic("telemetry_activity_state_write_failed", error, error instanceof Error ? "error" : "non_error");
-    return;
-  }
-}
-function getPostHogActivityCaptureState(now = new Date) {
-  const state = readPostHogActivityState();
-  const dayUTC = getUtcDayString(now);
-  const captureDaily = state.lastActiveDayUTC !== dayUTC;
-  if (captureDaily) {
-    writePostHogActivityState({
-      ...state,
-      lastActiveDayUTC: dayUTC
-    });
-  }
-  return {
-    dayUTC,
-    captureDaily
-  };
-}
-var POSTHOG_ACTIVITY_STATE_FILE = "posthog-activity.json";
 var init_posthog_activity_state = __esm(() => {
-  init_atomic_write();
+  init_src();
   init_data_path();
-  init_diagnostics();
+  init_diagnostics2();
 });
 
 // packages/omo-codex/src/telemetry/posthog.ts
-import { createHash as createHash2 } from "node:crypto";
-import os2 from "node:os";
 function resolveOsProvider() {
-  return osProviderOverride2 ?? os2;
+  return osProviderOverride2 ?? getDefaultTelemetryOsProvider();
 }
-function resolveActivityStateProvider() {
-  return activityStateProviderOverride ?? getPostHogActivityCaptureState;
-}
-function writePostHogDiagnostic(event, source, error, errorKind) {
-  writeTelemetryDiagnostic({ event, source, error, errorKind });
-}
-function getSafeCpuInfo() {
-  try {
-    const cpuInfo = resolveOsProvider().cpus();
-    return {
-      count: cpuInfo.length,
-      model: cpuInfo[0]?.model
-    };
-  } catch (error) {
-    writePostHogDiagnostic("telemetry_cpu_info_unavailable", "shared", error, error instanceof Error ? "error" : "non_error");
-    return {
-      count: 0,
-      model: undefined
-    };
+function resolveActivityStateProvider(options) {
+  if (options.activityStateProvider !== undefined) {
+    return options.activityStateProvider;
   }
+  if (activityStateProviderOverride !== null) {
+    return activityStateProviderOverride;
+  }
+  if (options.now === undefined && options.stateDir === undefined) {
+    return getPostHogActivityCaptureState;
+  }
+  return () => getPostHogActivityCaptureState(options.now ?? new Date);
 }
-function getSharedProperties(source) {
-  const osProvider = resolveOsProvider();
-  const cpuInfo = getSafeCpuInfo();
-  return {
-    platform: "omo-codex",
-    product_name: PRODUCT_NAME,
-    package_name: PACKAGE_NAME,
-    package_version: package_default.version,
-    runtime: "bun",
-    runtime_version: process.versions.bun ?? process.version,
+function createPostHogClient(source, options = {}) {
+  const client = createTelemetryClient({
+    diagnostics: writeTelemetryDiagnostic2,
+    env: options.env ?? process.env,
+    osProvider: options.osProvider ?? resolveOsProvider(),
+    product: createCodexTelemetryProductConfig(),
     source,
-    $os: osProvider.platform(),
-    $os_version: osProvider.release(),
-    os_arch: osProvider.arch(),
-    os_type: osProvider.type(),
-    cpu_count: cpuInfo.count,
-    cpu_model: cpuInfo.model,
-    total_memory_gb: Math.round(osProvider.totalmem() / 1024 / 1024 / 1024),
-    locale: Intl.DateTimeFormat().resolvedOptions().locale,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    shell: process.env.SHELL,
-    ci: Boolean(process.env.CI),
-    terminal: process.env.TERM_PROGRAM
-  };
-}
-function createPostHogClient(source, options) {
-  if (shouldDisablePostHog() || !hasPostHogApiKey()) {
+    transportFactory: options.transportFactory
+  });
+  if (!client.enabled) {
     return NO_OP_POSTHOG;
   }
-  let client;
-  try {
-    client = new PostHog(getPostHogApiKey(), {
-      ...options,
-      host: getPostHogHost(),
-      disableGeoip: false
-    });
-  } catch (error) {
-    writePostHogDiagnostic("telemetry_posthog_init_failed", source, error, error instanceof Error ? "error" : "non_error");
-    return NO_OP_POSTHOG;
-  }
-  const sharedProperties = getSharedProperties(source);
+  const activityStateProvider = resolveActivityStateProvider(options);
   return {
     trackActive: (distinctId, reason) => {
-      const activityState = resolveActivityStateProvider()();
+      const activityState = options.stateDir === undefined ? activityStateProvider() : getDailyActiveCaptureState({
+        diagnostics: writeTelemetryDiagnostic2,
+        now: options.now,
+        stateDir: options.stateDir
+      });
       if (!activityState.captureDaily) {
         return;
       }
-      try {
-        client.capture({
-          distinctId,
-          event: EVENT_NAME,
-          properties: {
-            ...sharedProperties,
-            $process_person_profile: false,
-            day_utc: activityState.dayUTC,
-            reason
-          }
-        });
-      } catch (error) {
-        writePostHogDiagnostic("telemetry_capture_failed", source, error, error instanceof Error ? "error" : "non_error");
-      }
+      client.trackActive({
+        dayUTC: activityState.dayUTC,
+        distinctId,
+        reason
+      });
     },
     shutdown: async () => {
-      try {
-        await client.shutdown();
-      } catch (error) {
-        writePostHogDiagnostic("telemetry_shutdown_failed", source, error, error instanceof Error ? "error" : "non_error");
-      }
+      await client.shutdown();
     }
   };
 }
 function getPostHogDistinctId() {
-  return createHash2("sha256").update(`omo-codex:${resolveOsProvider().hostname()}`).digest("hex");
+  return getTelemetryDistinctId(MACHINE_ID_PREFIX, resolveOsProvider());
 }
 function createCliPostHog() {
-  return createPostHogClient("cli", {
-    enableExceptionAutocapture: false,
-    enableLocalEvaluation: false,
-    strictLocalEvaluation: true,
-    disableRemoteConfig: true,
-    flushAt: 1,
-    flushInterval: 0
-  });
+  return createPostHogClient("cli");
 }
 function createInstallPostHog() {
-  return createPostHogClient("install", {
-    enableExceptionAutocapture: false,
-    enableLocalEvaluation: false,
-    strictLocalEvaluation: true,
-    disableRemoteConfig: true,
-    flushAt: 1,
-    flushInterval: 0
-  });
+  return createPostHogClient("install");
 }
 function createPluginPostHog() {
-  return createPostHogClient("plugin", {
-    enableExceptionAutocapture: false,
-    enableLocalEvaluation: false,
-    strictLocalEvaluation: true,
-    disableRemoteConfig: true,
-    flushAt: 1,
-    flushInterval: 0
-  });
+  return createPostHogClient("plugin");
 }
 function __setOsProviderForTesting(provider) {
   osProviderOverride2 = provider;
@@ -5849,10 +6060,8 @@ function __resetActivityStateProviderForTesting() {
 }
 var osProviderOverride2 = null, activityStateProviderOverride = null, NO_OP_POSTHOG;
 var init_posthog = __esm(() => {
-  init_index_node();
-  init_package();
-  init_diagnostics();
-  init_env_flags();
+  init_src();
+  init_diagnostics2();
   init_posthog_activity_state();
   init_product_identity();
   NO_OP_POSTHOG = {
@@ -8476,12 +8685,12 @@ function resolveCodexInstallerBinDir(input) {
 // packages/omo-codex/src/install/install-codex.ts
 var SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
 async function runCodexInstaller(options = {}) {
-  const env = options.env ?? process.env;
+  const env2 = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
-  const repoRoot = resolve7(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env }));
-  const codexHome = resolve7(options.codexHome ?? env.CODEX_HOME ?? join22(homedir2(), ".codex"));
-  const projectDirectory = resolve7(options.projectDirectory ?? env.OMO_CODEX_PROJECT ?? process.cwd());
-  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env });
+  const repoRoot = resolve7(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env2 }));
+  const codexHome = resolve7(options.codexHome ?? env2.CODEX_HOME ?? join22(homedir2(), ".codex"));
+  const projectDirectory = resolve7(options.projectDirectory ?? env2.OMO_CODEX_PROJECT ?? process.cwd());
+  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env2 });
   const runCommand = options.runCommand ?? defaultRunCommand;
   const log = options.log ?? (() => {
     return;
@@ -8489,10 +8698,10 @@ async function runCodexInstaller(options = {}) {
   const buildSource = await shouldBuildSourcePackages(repoRoot);
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
-    env,
+    env: env2,
     cwd: repoRoot,
     runCommand,
-    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env })) : undefined
+    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env: env2 })) : undefined
   });
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
@@ -8863,8 +9072,8 @@ async function runDelegatedOmoCommand(parsed, options) {
     options.log(`${invocation.command} ${invocation.args.join(" ")}`);
     return;
   }
-  const env = { ...process.env, OMO_INVOCATION_NAME: "omo" };
-  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env });
+  const env2 = { ...process.env, OMO_INVOCATION_NAME: "omo" };
+  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env2 });
 }
 function buildDelegatedOmoInvocation(parsed) {
   const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
@@ -8897,16 +9106,16 @@ var DEFAULT_UPDATE_COMMAND = "npx";
 var DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
 var INSTALLED_VERSION_FILE = "lazycodex-install.json";
 async function runLazyCodexManualUpdate(input = {}) {
-  const env = input.env ?? process.env;
+  const env2 = input.env ?? process.env;
   const log = input.log ?? console.log;
   const commandRunner = input.runCommand ?? defaultRunCommandForManualUpdate;
-  const currentVersion = resolveCurrentVersion(env);
-  const latestVersion = resolveLatestVersion(env);
+  const currentVersion = resolveCurrentVersion(env2);
+  const latestVersion = resolveLatestVersion(env2);
   const plan = resolveLazyCodexUpdatePlan({
     currentVersion,
     latestVersion,
-    command: resolveCommand2(env),
-    args: resolveArgs(env)
+    command: resolveCommand2(env2),
+    args: resolveArgs(env2)
   });
   if (!plan.shouldUpdate) {
     const printableVersion = currentVersion ?? "unknown";
@@ -8917,7 +9126,7 @@ async function runLazyCodexManualUpdate(input = {}) {
     log(`${plan.command} ${plan.args.join(" ")}`);
     return 0;
   }
-  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env });
+  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env2 });
   return 0;
 }
 function resolveLazyCodexUpdatePlan(input = {}) {
@@ -8931,12 +9140,12 @@ function resolveLazyCodexUpdatePlan(input = {}) {
     return { shouldUpdate: false, reason: "up-to-date" };
   return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS };
 }
-function resolveCommand2(env) {
-  return env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
+function resolveCommand2(env2) {
+  return env2.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
 }
-function resolveArgs(env) {
-  if (env.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
-    const parsed = JSON.parse(env.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
+function resolveArgs(env2) {
+  if (env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
+    const parsed = JSON.parse(env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
     if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
       throw new TypeError("LAZYCODEX_AUTO_UPDATE_ARGS_JSON must be a JSON string array");
     }
@@ -8944,15 +9153,15 @@ function resolveArgs(env) {
   }
   return DEFAULT_UPDATE_ARGS;
 }
-function resolveCurrentVersion(env) {
-  if (env.LAZYCODEX_CURRENT_VERSION?.trim())
-    return env.LAZYCODEX_CURRENT_VERSION.trim();
+function resolveCurrentVersion(env2) {
+  if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
+    return env2.LAZYCODEX_CURRENT_VERSION.trim();
   const pluginRoot = dirname7(dirname7(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env, pluginRoot)) ?? readVersionManifest(join23(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join23(pluginRoot, ".codex-plugin", "plugin.json"));
+  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join23(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join23(pluginRoot, ".codex-plugin", "plugin.json"));
 }
-function resolveLatestVersion(env) {
-  if (env.LAZYCODEX_LATEST_VERSION?.trim())
-    return env.LAZYCODEX_LATEST_VERSION.trim();
+function resolveLatestVersion(env2) {
+  if (env2.LAZYCODEX_LATEST_VERSION?.trim())
+    return env2.LAZYCODEX_LATEST_VERSION.trim();
   const result = spawnSync2("npm", ["view", "lazycodex-ai", "version", "--silent"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"]
@@ -9010,9 +9219,9 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-function resolveInstalledVersionPath(env, pluginRoot) {
-  if (env.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
-    return env.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
+function resolveInstalledVersionPath(env2, pluginRoot) {
+  if (env2.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
+    return env2.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
   return join23(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path2) {
