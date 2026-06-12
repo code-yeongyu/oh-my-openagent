@@ -106,6 +106,7 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import { createTaskPersistenceStore, type TaskPersistenceStore } from "./task-persistence"
 import {
   archiveBackgroundTask,
   forgetBackgroundTask,
@@ -278,6 +279,7 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private persistenceStore?: TaskPersistenceStore
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -299,6 +301,10 @@ export class BackgroundManager {
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
+    const persistenceEnabled = options?.config?.persistence ?? true
+    this.persistenceStore = persistenceEnabled
+      ? createTaskPersistenceStore({ directory: this.directory })
+      : undefined
     this.parentWakeNotifier = new ParentWakeNotifier(
       {
         client: this.client,
@@ -424,10 +430,15 @@ export class BackgroundManager {
     this.tasksByParentSession.set(task.parentSessionId, taskIDs)
   }
 
+  private persistTask(task: BackgroundTask): void {
+    if (task.sessionId) this.persistenceStore?.persist(task)
+  }
+
   private removeTask(task: BackgroundTask): void {
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
     this.tasks.delete(task.id)
+    this.persistenceStore?.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
 
@@ -823,6 +834,7 @@ export class BackgroundManager {
     }
     task.concurrencyKey = concurrencyKey
     task.concurrencyGroup = concurrencyKey
+    this.persistTask(task)
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
@@ -1232,6 +1244,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.addTask(task)
+    this.persistTask(task)
     subagentSessions.add(input.sessionId)
     this.startPolling()
     this.taskHistory.record(input.parentSessionId, { id: task.id, sessionID: input.sessionId, agent: input.agent || "task", description: input.description, status: "running", startedAt: task.startedAt })
@@ -1303,6 +1316,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.startPolling()
+    this.persistTask(existingTask)
     if (existingTask.sessionId) {
       subagentSessions.add(existingTask.sessionId)
     }
@@ -2260,6 +2274,8 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private scheduleTaskRemoval(taskId: string, rescheduleCount = 0): void {
+    const taskToPersist = this.tasks.get(taskId)
+    if (taskToPersist) this.persistTask(taskToPersist)
     const existingTimer = this.completionTimers.get(taskId)
     if (existingTimer) {
       clearTimeout(existingTimer)
@@ -2735,6 +2751,7 @@ The task was re-queued on a fallback model after a retryable failure.
       notifications: this.notifications,
       taskTtlMs: this.config?.taskTtlMs,
       sessionStatuses: allStatuses,
+      onTaskRemoved: (taskId) => this.persistenceStore?.delete(taskId),
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
