@@ -66,6 +66,69 @@ Codex may still start Windows shell calls through its own defaults. The Light ed
 > To remove the Light edition after migration, run `npx lazycodex-ai uninstall`. It removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` with a backup, and removes managed agent TOML files from `~/.codex/agents/`. `cleanup` remains available as a backward-compatible alias.
 > If Codex still fails only inside one project with `agents.max_threads cannot be set when multi_agent_v2 is enabled`, run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers from the project root to the current directory, removes conflicting legacy `[agents] max_threads` only when MultiAgentV2 is enabled, and writes timestamped backups next to changed files.
 
+### Install from the Codex marketplace (in-app)
+
+> **Experimental, additive path.** `npx lazycodex-ai install` above remains the primary, fully supported route. The marketplace bundle is hosted in this project's own [lazycodex](https://github.com/code-yeongyu/lazycodex) repository — it is not an OpenAI curated listing.
+
+The same Light edition can be installed entirely from inside Codex through its plugin marketplace, with no npx step.
+
+**TUI route.** In a Codex session, type `/plugins`, open the **Add Marketplace** tab ("Add a marketplace from a Git repo or local root."), and enter the marketplace source:
+
+```
+https://github.com/code-yeongyu/lazycodex
+```
+
+Then pick `omo` from the `sisyphuslabs` marketplace in the same `/plugins` menu and install it.
+
+**CLI route** — the equivalent two-liner:
+
+```bash
+codex plugin marketplace add https://github.com/code-yeongyu/lazycodex
+codex plugin add omo@sisyphuslabs
+```
+
+**First session: approve the hooks.** On the next `codex` launch the startup hooks review lists every omo hook as new. Review and approve them — no omo hook runs before you approve, and the bootstrap below cannot start until the hooks are trusted.
+
+**Bootstrap notice + restart.** The first approved session prints this status line:
+
+```
+LazyCodex bootstrap running in background — restart the session when it completes
+```
+
+A detached worker finishes the install in the background (the `sg` download is the slowest part). Restart the Codex session once it completes — the next session starts fully wired and the notice no longer appears.
+
+**What bootstrap does:**
+
+- writes the managed `~/.codex/config.toml` blocks: marketplace source preserved, `omo@sisyphuslabs` plugin enabled, managed `[agents.*]` entries, and re-stamped SHA256 `[hooks.state."omo@sisyphuslabs:..."]` trust hashes
+- copies bundled Codex agent TOMLs into `~/.codex/agents/`
+- links component CLIs (`omo-rules`, `omo-lsp`, …) into `~/.local/bin` (or `$CODEX_LOCAL_BIN_DIR`; isolated `CODEX_HOME` installs use `<CODEX_HOME>/bin`)
+- provisions a checksum-pinned standalone `sg` (ast-grep) binary into `<CODEX_HOME>/runtime/ast-grep/<platform>-<arch>/` for the `ast_grep` MCP server
+- on native Windows, provisions a pinned Node LTS runtime into `<CODEX_HOME>/runtime/node/` when `node` is missing (see the Windows status below)
+- records every run in the plugin data dir: `<CODEX_HOME>/plugins/data/omo-sisyphuslabs/bootstrap/state.json` plus a JSONL `bootstrap.log` (Windows adds a `ps-bootstrap.log` transcript)
+
+**What bootstrap does NOT do:**
+
+- It **never writes Codex permission settings.** `approval_policy`, `sandbox_mode`, and `network_access` are left untouched. Autonomous mode stays an explicit npx installer choice — `npx lazycodex-ai install --no-tui --codex-autonomous` (see [the one-liner section](#light-codex-cli--one-line-no-agent-needed)).
+- It never runs the npx self-update for marketplace-managed installs. The auto-update hook logs the skip and surfaces this guidance instead: "Auto-update skipped: this LazyCodex install is managed by the Codex plugin marketplace, so the npx self-update was not started. Tell the user to upgrade with `codex plugin marketplace upgrade sisyphuslabs`, and that Codex will ask them to re-approve hooks after the upgrade."
+- It never persists anything under the Codex-managed plugin cache directory itself; all bootstrap state lives in the plugin data dir above.
+
+**Upgrading — and recovering hook approval:**
+
+1. Run `codex plugin marketplace upgrade sisyphuslabs`.
+2. Relaunch `codex`. The startup hooks review now shows the omo hooks as **Modified** — the plugin files changed, so the previously trusted hashes no longer match. This is expected after every upgrade, not a sign of tampering.
+3. Re-approve the hooks in that review. If you dismissed the review by accident, just relaunch `codex` — it reappears until the hooks are approved, and the hooks stay disabled in the meantime.
+4. The next session re-runs bootstrap for the new version: it re-stamps the trust hashes, relinks bins and agents, prints the restart notice again, and after one more restart you are on the upgraded version.
+
+**Degraded modes.** Bootstrap is degraded-not-fatal: a failed step is recorded in `state.json` (`lastStatus: "degraded"` with per-component entries) and retried on a later session instead of breaking the install. The ones you may actually notice:
+
+| Mode | What you see | What to do |
+|---|---|---|
+| `omo-cli` absent | The top-level `omo` command is not linked. The marketplace payload intentionally ships without `dist/cli`, so bootstrap records an `omo-cli` degraded entry ("marketplace payload has no dist/cli"). Component CLIs still link normally. | Use `npx lazycodex-ai <command>` wherever you would run `omo`. Verify with `npx lazycodex-ai doctor`. |
+| `sg` pending / offline | `ast_grep` appears in the degraded list and the `ast_grep` MCP server cannot find `sg` yet — the first download is still running, or it failed while offline. | Start another session (bootstrap retries automatically), or install ast-grep yourself and/or set `OMO_AST_GREP_SG_PATH=/path/to/sg`. Verify with `npx lazycodex-ai doctor`. |
+| Proxy limitation | Binary downloads fail behind an HTTP(S) proxy. The logged error says it plainly: the bootstrap downloader "does not tunnel through HTTP(S) proxies in v1; the download was attempted directly." | Run one session on a direct connection, or provide `sg` via `OMO_AST_GREP_SG_PATH`/`PATH`. Verify with `npx lazycodex-ai doctor`. |
+
+**Windows status.** On native Windows the marketplace bootstrap runs through a PowerShell 5.1-compatible `bootstrap.ps1`: it provisions the pinned Node LTS zip when `node` is absent, prepares Git Bash the same way the npx installer does, and writes its transcript to `ps-bootstrap.log` in the plugin data dir (degraded lines look like `degraded component=node reason=... hint=npx lazycodex-ai doctor`). Windows provisioning is shipped with static test coverage; real-device validation is tracked in [code-yeongyu/lazycodex — Windows real-device bootstrap QA](https://github.com/code-yeongyu/lazycodex/issues?q=is%3Aissue+Windows+real-device+bootstrap+QA).
+
 ### A note on direct install
 
 If you insist on running the Ultimate installer yourself:
