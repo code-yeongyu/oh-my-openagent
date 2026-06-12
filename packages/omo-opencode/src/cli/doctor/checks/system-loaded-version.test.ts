@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { PACKAGE_NAME } from "../constants"
+import { PACKAGE_NAME } from "../framework/constants"
 import { ACCEPTED_PACKAGE_NAMES, PLUGIN_NAME } from "../../../shared/plugin-identity"
 import { resolveSymlink } from "../../../shared/file-utils"
 

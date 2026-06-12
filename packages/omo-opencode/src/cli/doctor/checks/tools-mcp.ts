@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import type { McpServerInfo } from "../types"
+import type { McpServerInfo } from "../framework/types"
 import { parseJsonc } from "../../../shared"
 
 const BUILTIN_MCP_SERVERS = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]

@@ -5,8 +5,8 @@ import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import { detectCodexInstallation, type CodexInstallationDetection } from "../../install-codex"
 import { resolveCodexInstallerBinDir } from "../../install-codex/install-codex"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, CodexConfigSummary, CodexDoctorSummary, DoctorIssue } from "../types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, CodexConfigSummary, CodexDoctorSummary, DoctorIssue } from "../framework/types"
 import packageJson from "../../../../package.json" with { type: "json" }
 
 type DetectCodexInstallation = () => Promise<CodexInstallationDetection>

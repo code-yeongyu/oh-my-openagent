@@ -1,5 +1,5 @@
-import type { SpawnOptions } from "../../shared/spawn-with-windows-hide"
-import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
+import type { SpawnOptions } from "../../../shared/spawn-with-windows-hide"
+import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 10_000
 const MISSING_EXECUTABLE_ERROR_CODE = "ENOENT"

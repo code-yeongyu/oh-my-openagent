@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test"
-import type { CheckDefinition, CheckResult, DoctorResult, SystemInfo, ToolsSummary } from "./types"
+import type { CheckDefinition, CheckResult, DoctorResult, SystemInfo, ToolsSummary } from "./framework/types"
 
 function createSystemInfo(): SystemInfo {
   return {
@@ -199,7 +199,7 @@ describe("runner", () => {
         gatherSystemInfo: async () => expectedResult.systemInfo,
         gatherToolsSummary: async () => expectedResult.tools,
       }))
-      mock.module("./formatter", () => ({
+      mock.module("./framework/formatter", () => ({
         formatDoctorOutput: formatDoctorOutputMock,
         formatJsonOutput: formatJsonOutputMock,
       }))

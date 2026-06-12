@@ -1,5 +1,5 @@
 import color from "picocolors"
-import { PUBLISHED_PACKAGE_NAME } from "../../shared"
+import { PUBLISHED_PACKAGE_NAME } from "../../../shared"
 
 export const SYMBOLS = {
   check: color.green("\u2713"),
