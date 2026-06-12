@@ -24,6 +24,8 @@ export async function processFilePathForAgentsInjection(input: {
   readonly filePath: string;
   readonly sessionID: string;
   readonly output: AgentsMdContextOutput;
+  /** External dedup set: directories already injected by other hooks (e.g. hephaestus-agents-md-injector). */
+  readonly alreadyInjected?: ReadonlySet<string>;
 }): Promise<void> {
   if (typeof input.output.output !== "string") return;
 
@@ -48,6 +50,7 @@ export async function processFilePathForAgentsInjection(input: {
   for (const agentsPath of agentsPaths) {
     const agentsDir = dirname(agentsPath);
     if (cache.has(agentsDir)) continue;
+    if (input.alreadyInjected?.has(agentsDir)) continue;
 
     const content = await fsPromises.readFile(agentsPath, "utf-8").catch(() => null);
     if (content === null) continue;

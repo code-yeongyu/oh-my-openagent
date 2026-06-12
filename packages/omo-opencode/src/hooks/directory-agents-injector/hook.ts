@@ -1,6 +1,7 @@
 import { createAgentsMdCache } from "@oh-my-opencode/rules-engine";
 import type { PluginInput } from "@opencode-ai/plugin";
 
+import { getAgentsMdInjectionRegistry } from "../../shared/agents-md-injection-registry";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
 import { processFilePathForAgentsInjection } from "./injector";
@@ -47,6 +48,7 @@ export function createDirectoryAgentsInjectorHook(
     const toolName = input.tool.toLowerCase();
 
     if (toolName === "read") {
+      const registry = getAgentsMdInjectionRegistry()
       await processFilePathForAgentsInjection({
         rootDirectory: ctx.directory,
         truncator,
@@ -56,6 +58,7 @@ export function createDirectoryAgentsInjectorHook(
         filePath: output.title,
         sessionID: input.sessionID,
         output,
+        alreadyInjected: registry.getSessionDirs(input.sessionID),
       });
       return;
     }
@@ -68,6 +71,7 @@ export function createDirectoryAgentsInjectorHook(
         sessionCaches.delete(sessionID);
         clearInjectedPaths(sessionID);
         agentsMdCache.clear();
+        getAgentsMdInjectionRegistry().clearSession(sessionID);
       }
     }
 
@@ -77,6 +81,7 @@ export function createDirectoryAgentsInjectorHook(
         sessionCaches.delete(sessionID);
         clearInjectedPaths(sessionID);
         agentsMdCache.clear();
+        getAgentsMdInjectionRegistry().clearSession(sessionID);
       }
     }
   };

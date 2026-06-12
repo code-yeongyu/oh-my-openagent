@@ -1,8 +1,10 @@
 import { promises as fsPromises } from "node:fs"
+import { dirname } from "node:path"
 import { createAgentsMdCache, findAgentsMdUp } from "@oh-my-opencode/rules-engine"
 import type { AgentsMdCache } from "@oh-my-opencode/rules-engine"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { formatAgentsMdContextBlock } from "@oh-my-opencode/agents-md-core"
+import { getAgentsMdInjectionRegistry } from "../../shared/agents-md-injection-registry"
 import { createDynamicTruncator } from "../../shared/dynamic-truncator"
 import type { ContextLimitModelCacheState } from "../../shared/context-limit-resolver"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
@@ -90,11 +92,17 @@ export function createHephaestusAgentsMdInjectorHook(
 
     textPart.text = `${contextBlocks.join("")}\n\n---\n\n${textPart.text ?? ""}`
     injectedSessions.add(input.sessionID)
+
+    const registry = getAgentsMdInjectionRegistry()
+    for (const agentsPath of agentsPaths) {
+      registry.mark(input.sessionID, dirname(agentsPath))
+    }
   }
 
   function clearSession(sessionID: string): void {
     injectedSessions.delete(sessionID)
     agentsMdCache.clear()
+    getAgentsMdInjectionRegistry().clearSession(sessionID)
   }
 
   async function eventHandler({ event }: EventInput): Promise<void> {
