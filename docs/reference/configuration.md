@@ -530,7 +530,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-recovery`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
 
 Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, `tool-pair-validator`, and `thinking-block-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
@@ -539,7 +539,6 @@ Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-
 - `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
 - `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 and GPT-5.5 prompt paths.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
-- `session-recovery` - automatically recovers from recoverable session errors (missing tool results, unavailable tools, thinking block violations). Shows toast notifications during recovery. Enable `experimental.auto_resume` for automatic retry after recovery.
 
 ### Commands
 
@@ -955,7 +954,6 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
   "experimental": {
     "truncate_all_tool_outputs": false,
     "aggressive_truncation": false,
-    "auto_resume": false,
     "disable_omo_env": false,
     "task_system": true,
     "dynamic_context_pruning": {
@@ -985,7 +983,6 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | ---------------------------------------- | ---------- | ------------------------------------------------------------------------------------ |
 | `truncate_all_tool_outputs`              | `false`    | Truncate all tool outputs (not just whitelisted)                                     |
 | `aggressive_truncation`                  | `false`    | Aggressively truncate when token limit exceeded                                      |
-| `auto_resume`                            | `false`    | Auto-resume after thinking block recovery                                            |
 | `disable_omo_env`                        | `false`    | Disable auto-injected `<omo-env>` block (date/time/locale). Improves cache hit rate. |
 | `task_system`                            | `false`    | Enable Sisyphus task system                                                          |
 | `dynamic_context_pruning.enabled`        | `false`    | Auto-prune old tool outputs to manage context window                                 |
