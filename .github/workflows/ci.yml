@@ -34,20 +34,19 @@ jobs:
 
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 
@@ -64,6 +63,14 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
+
+      - name: Run vendored lsp-daemon tests
+        run: npm test
+        working-directory: packages/lsp-daemon
 
       - name: Run tests
         run: bun test
@@ -76,14 +83,12 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 
@@ -100,6 +105,10 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
 
       - name: Type check
         run: bun run typecheck
@@ -115,12 +124,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -135,6 +146,10 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
 
       - name: Run Codex compatibility tests
         run: bun run test:codex
@@ -184,9 +199,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          submodules: recursive
 
-      - name: Build lsp-tools-mcp submodule
+      - name: Build vendored lsp-tools-mcp package
         run: npm ci && npm run build
         working-directory: packages/lsp-tools-mcp
 
@@ -204,6 +218,10 @@ jobs:
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
+
       - name: Build
         run: bun run build
 
@@ -213,7 +231,7 @@ jobs:
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
 
       - name: Verify dist bundle tests
-        run: bun test src/shared/dist-bundle-bun-globals.test.ts src/shared/dist-bundle-prompt-content.test.ts
+        run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
 
       - name: Auto-commit schema changes
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'

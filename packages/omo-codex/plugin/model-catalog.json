@@ -1,0 +1,43 @@
+{
+	"version": "2026-06-04.gpt-5.5-400k-reviewer-high",
+	"current": {
+		"model": "gpt-5.5",
+		"model_context_window": 400000,
+		"model_reasoning_effort": "high",
+		"plan_mode_reasoning_effort": "xhigh"
+	},
+	"roles": {
+		"default": {
+			"model": "gpt-5.5",
+			"model_context_window": 400000,
+			"model_reasoning_effort": "high",
+			"plan_mode_reasoning_effort": "xhigh"
+		},
+		"verifier": {
+			"model": "gpt-5.5",
+			"model_reasoning_effort": "high"
+		},
+		"worker": {
+			"model": "gpt-5.5",
+			"model_reasoning_effort": "high"
+		}
+	},
+	"managedProfiles": [
+		{
+			"version": "legacy.gpt-5.5-1m",
+			"match": {
+				"model": "gpt-5.5",
+				"model_context_window": 1000000,
+				"model_reasoning_effort": "high",
+				"plan_mode_reasoning_effort": "xhigh"
+			}
+		},
+		{
+			"version": "legacy.gpt-5.5-272k",
+			"match": {
+				"model": "gpt-5.5",
+				"model_context_window": 272000
+			}
+		}
+	]
+}

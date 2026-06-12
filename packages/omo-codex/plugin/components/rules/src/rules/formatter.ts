@@ -1,4 +1,4 @@
-import { truncateBudget, truncateRule } from "./truncator.js";
+import { isNeverTruncatedRule, truncateBudget, truncateRule } from "./truncator.js";
 import type { LoadedRule } from "./types.js";
 
 export interface FormatOptions {
@@ -35,13 +35,12 @@ function truncateRules(rules: ReadonlyArray<LoadedRule>, options: FormatOptions)
 	const perRuleBudgeted = perRuleNormalized.map((rule) => ({
 		path: rule.path,
 		relativePath: rule.relativePath,
-		body:
-			rule.source === "plugin-bundled"
-				? truncateRule(rule.body, { maxChars: perRuleResultChars, relativePath: rule.relativePath }).body
-				: truncateRule(rule.body, {
-						maxChars: Math.min(options.maxRuleChars, perRuleResultChars),
-						relativePath: rule.relativePath,
-					}).body,
+		body: isNeverTruncatedRule(rule.relativePath)
+			? rule.body
+			: truncateRule(rule.body, {
+					maxChars: Math.min(options.maxRuleChars, perRuleResultChars),
+					relativePath: rule.relativePath,
+				}).body,
 	}));
 	const budgetedRules = truncateBudget({
 		rules: perRuleBudgeted.map((rule) => ({ body: rule.body, relativePath: rule.relativePath })),
@@ -70,12 +69,39 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 	if (rules.length === 0) {
 		return "";
 	}
+	if (options.maxResultChars <= 0) {
+		return "";
+	}
 
-	return [
-		"## Project Instructions",
-		"",
-		truncateRules(uniqueRulesByBody(rules), options).map(formatRule).join("\n\n"),
-	].join("\n");
+	const orderedRules = orderStaticRules(uniqueRulesByBody(rules));
+
+	return ["## Project Instructions", "", truncateRules(orderedRules, options).map(formatRule).join("\n\n")].join("\n");
+}
+
+function orderStaticRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
+	const hephaestusRules: LoadedRule[] = [];
+	const otherRules: LoadedRule[] = [];
+	for (const rule of rules) {
+		if (isHephaestusRule(rule)) {
+			hephaestusRules.push(rule);
+			continue;
+		}
+		otherRules.push(rule);
+	}
+	return [...hephaestusRules, ...otherRules];
+}
+
+function isHephaestusRule(rule: LoadedRule): boolean {
+	return displayFilename(rule).toLowerCase() === "hephaestus.md";
+}
+
+function displayFilename(rule: LoadedRule): string {
+	const normalizedPath = rule.relativePath.length > 0 ? rule.relativePath : rule.path;
+	const segments = normalizedPath
+		.replace(/\\/g, "/")
+		.split("/")
+		.filter((segment) => segment.length > 0);
+	return segments.at(-1) ?? normalizedPath;
 }
 
 function uniqueRulesByBody(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {

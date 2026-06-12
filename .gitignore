@@ -31,6 +31,8 @@ npm-debug.log*
 
 # Lock files (use bun.lockb instead)
 package-lock.json
+!packages/lsp-tools-mcp/package-lock.json
+!packages/lsp-daemon/package-lock.json
 !packages/omo-codex/plugin/package-lock.json
 yarn.lock
 
@@ -50,3 +52,5 @@ oauth-success.html
 .debug-journal*.md
 session-ses_*.md
 plans/
+.ulw/
+.claude/

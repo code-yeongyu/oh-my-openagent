@@ -35,6 +35,18 @@
 	},
 	"overrides": [
 		{
+			"includes": [
+				"src/atomic-write.ts",
+				"src/data-path.ts",
+				"src/diagnostics.ts",
+				"src/env-flags.ts",
+				"src/posthog-activity-state.ts"
+			],
+			"formatter": {
+				"enabled": false
+			}
+		},
+		{
 			"includes": ["vitest.config.ts"],
 			"linter": {
 				"rules": {

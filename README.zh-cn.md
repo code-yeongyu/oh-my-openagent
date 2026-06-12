@@ -1,11 +1,11 @@
 > [!NOTE]
-> **🚀 首个 Codex 版本发布：omo 现已支持 Codex CLI**
+> **OmO for Codex 已发布。试试 LazyCodex**
 >
-> 无需再配置复杂的 JSON。直接运行：
+> 因为太爱 Anthropic 模型而被封禁之后，我们决定站到 Codex 这一边。
+> 如果你是 OmO 粉丝，但觉得配置太麻烦，请使用 LazyCodex。OmO for Codex 已经发布:
 > ```bash
 > npx lazycodex-ai install
 > ```
-> 您的 Codex 将清晰编码，并通过内置 computer-use QA 完成任务。
 > 了解更多请访问 [lazycodex.ai](https://lazycodex.ai)。
 
 > [!NOTE]
@@ -133,7 +133,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
-**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`bunx oh-my-openagent install --platform=codex`）仅提供能够干净地移植到 OpenAI Codex CLI 插件系统的 5 个组件（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）。`bunx lazycodex-ai install` 是 `--platform=codex` 的快捷别名。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`npx lazycodex-ai install` 或 `bunx oh-my-openagent install --platform=codex`）提供能够干净地移植到 OpenAI Codex CLI 插件系统的 8 个组件（`rules`、`comment-checker`、`git-bash`、`lsp`、`ultrawork`、`ulw-loop`、`start-work-continuation`、`telemetry`）。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
 
 ---
 
@@ -171,14 +171,14 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 特性                                                            | Editions | 功能说明                                                                                                                                                                        |
 | :---: | :-------------------------------------------------------------- | :------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 |   🤖   | **自律军团 (Discipline Agents)**                                | Ultimate | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的 5 个可移植组件 (rules, comment-checker, LSP, ultrawork, ulw-loop)。安装: `bunx oh-my-openagent install --platform=codex`。                              |
+|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的 8 个可移植组件 (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry)。安装: `npx lazycodex-ai install`。                    |
 |   👥   | **Team Mode** (v4.0, 选择性启用)                                 | Ultimate | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                         | Both     | 一键触发，所有智能体(Ultimate)或 Codex `ultrawork` 组件(Light)出动。任务完成前绝不罢休。                                                                                          |
 |   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | Ultimate | 真正行动前，先分析用户的真实意图。触发 `search` / `analyze` / `team` / `hyperplan`。(Light 仅 hook `ulw` / `ultrawork`。)                                                       |
 |   🔗   | **基于哈希的编辑工具**                                          | Ultimate | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex 使用其原生 `apply_patch`。) |
-|   🛠️   | **LSP + AST-Grep**                                              | Ultimate | 工作区级别的重命名、构建前诊断、基于 AST 的重写。为 Agent 提供 IDE 级别的精度。(LSP 在 Light 中也通过 `lsp` 组件提供; AST-Grep 仅 Ultimate。)                                   |
+|   🛠️   | **LSP + AST-Grep**                                              | Both     | 工作区级别的重命名、构建前诊断、基于 AST 的重写。Ultimate 以内置工具提供，Light 通过 plugin-scoped `lsp` / `ast_grep` MCP 提供。                                   |
 |   🧠   | **后台智能体**                                                  | Ultimate | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                                                                                      |
-|   📚   | **内置 MCP**                                                    | Ultimate | Exa（网络搜索）、Context7（官方文档）、Grep.app（GitHub 源码搜索）。默认开启。(Light 仅 LSP MCP。)                                                                              |
+|   📚   | **内置 MCP**                                                    | Both     | Ultimate 运行时注入 Exa（网络搜索）、Context7（官方文档）、Grep.app（GitHub 源码搜索）。Light 通过 plugin-scoped MCP 提供 `ast_grep`、`grep_app`、`context7`、`git_bash`、`lsp`。                                                                              |
 |   🔁   | **Ralph Loop / `/ulw-loop`**                                    | Ultimate | 自我引用闭环。达不到 100% 完成度绝不停止。                                                                                                                                      |
 |   ✅   | **Todo 强制执行** (Boulder)                                     | Ultimate | Agent 想要摸鱼？系统直接揪着领子拽回来。你的任务，必须完成。                                                                                                                    |
 |   💬   | **注释审查员**                                                  | Both     | 剔除带有浓烈 AI 味的冗余注释。同一个 `@code-yeongyu/comment-checker` 二进制在两个版本中运行。                                                                                    |

@@ -8,39 +8,63 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 | OpenCode example | Codex tool to use |
 | --- | --- |
-| `call_omo_agent(subagent_type="explore", ...)` | `spawn_agent(agent_type="explorer", task_name="...", message="...", fork_turns="none")` |
-| `call_omo_agent(subagent_type="librarian", ...)` | `spawn_agent(agent_type="librarian", task_name="...", message="...", fork_turns="none")` |
-| `task(subagent_type="plan", ...)` | `spawn_agent(agent_type="plan", task_name="...", message="...", fork_turns="none")` |
-| `task(subagent_type="oracle", ...)` for final verification | `spawn_agent(agent_type="codex-ultrawork-reviewer", task_name="...", message="...", fork_turns="none")` |
-| `task(category="...", ...)` for implementation or QA | `spawn_agent(agent_type="worker", task_name="...", message="...", fork_turns="none")` |
-| `background_output(task_id="...")` | `wait_agent(...)` to wait for subagent completion and mailbox updates |
-| `team_*(...)` | Use Codex native subagents plus `send_message`, `followup_task`, `wait_agent`, and `close_agent` |
+| `call_omo_agent(subagent_type="explore", ...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","agent_type":"explorer","fork_context":false})` |
+| `call_omo_agent(subagent_type="librarian", ...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","agent_type":"librarian","fork_context":false})` |
+| `task(subagent_type="plan", ...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a planning agent. ...","agent_type":"plan","fork_context":false})` |
+| `task(subagent_type="oracle", ...)` for final verification | `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"codex-ultrawork-reviewer","fork_context":false})` |
+| `task(category="...", ...)` for implementation or QA | `multi_agent_v1.spawn_agent({"message":"TASK: act as an implementation or QA worker. ...","fork_context":false})` |
+| `background_output(task_id="...")` | `multi_agent_v1.wait_agent(...)` for mailbox signals |
+| `team_*(...)` | Use Codex native subagents via `multi_agent_v1.spawn_agent`, `multi_agent_v1.send_input`, `multi_agent_v1.wait_agent`, and `multi_agent_v1.close_agent` |
 
-Codex full-history forks inherit the parent agent type, model, and reasoning effort, so role-specific spawns with `agent_type` must use a non-full-history fork mode such as `fork_turns="none"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
+Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. OMO installs these selectable agent roles into `~/.codex/agents/`: `explorer`, `librarian`, `plan`, `momus`, `metis`, and `codex-ultrawork-reviewer` — pass the matching name as `agent_type` so the child gets that role's model and instructions. On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If the spawn tool exposes no `agent_type` parameter, omit it and describe the role inside `message`. If a code block below conflicts with this section, this section wins.
+
+For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.
 
 ## Codex Subagent Reliability
 
-Every `spawn_agent` message must be self-contained. Start with
+Every `multi_agent_v1.spawn_agent` message must be self-contained. Start with
 `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and
 `VERIFY`. State that it is an executable assignment, not a context
-handoff. Role selection requires `agent_type`; `model` +
-`reasoning_effort` alone creates a default agent, not a reviewer or
-worker. Prefer `fork_turns: "none"` unless full history is truly
+handoff. Role or specialty instructions belong inside `message`.
+Use `fork_context: false` unless full history is truly
 required; paste only the review context that worker needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them. While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
 
-Use `wait_agent` for completion signals, but treat `wait_agent` as a
-mailbox signal, not proof of completion, content, or errors. After two
-waits with no substantive result, send one targeted followup:
-`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If the
-child stays silent or ack-only, mark that review lane inconclusive, do
-not count it as PASS or approval, close if safe, and respawn a smaller
-`fork_turns: "none"` reviewer with the missing deliverable.
+Treat child status as a progress signal, not a timeout counter. For
+work likely to exceed one wait cycle, require the child to send
+`WORKING: <task> - <current phase>` before long reading, testing, or
+review passes, and `BLOCKED: <reason>` only when it cannot progress.
+While any child is active, keep the parent visibly alive with active
+subagent count, agent names, latest `WORKING:` phase, and whether the
+parent is waiting for mailbox updates. Track spawned agent names
+locally. Use `multi_agent_v1.wait_agent` for mailbox signals, not proof of completion.
+A timeout only means no new mailbox update arrived. Treat a running child as alive.
+Fallback only when the child is
+completed without the deliverable, ack-only after followup, explicitly
+`BLOCKED:`, or no longer running. Then mark that review lane
+`INCONCLUSIVE`, do not count it as PASS or approval, close if safe, and
+respawn a smaller `fork_context: false` reviewer with the missing
+deliverable. Preserve completed lane results immediately. If the retry
+budget is exhausted, keep the lane `INCONCLUSIVE` and still emit a final
+aggregate result.
 
 # Review Work - 5-Agent Parallel Review Orchestrator
 
 Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.
+
+When `review-work` is used as a final implementation, PR, or `$start-work`
+gate, it is blocking. A timeout, missing deliverable, ack-only response,
+explicit `BLOCKED:`, or inconclusive lane is not a pass. Treat that lane as
+failed, investigate the underlying uncertainty with the `debugging` skill when
+runtime behavior may be wrong, fix with evidence, and rerun the affected lane
+before claiming completion or handing off a PR.
+
+Review evidence must be safe to share. Redact or mask secrets and sensitive
+user data before including evidence in logs, PR bodies, or handoffs. Never
+include raw tokens, credentials, auth headers, cookies, API keys, env dumps,
+private logs, or PII; summarize with lengths, hashes, and short non-sensitive
+prefixes when identity is needed.
 
 The 5 agents cover complementary concerns - together they form a comprehensive review that no single reviewer could match:
 
@@ -517,20 +541,28 @@ After launching all 5 agents in one turn, wait for completions in bounded
 cycles. Do not treat a timeout, ack-only reply, or empty child result as
 a PASS.
 
-As each completes, collect via the Codex mapping above (`wait_agent`,
-then the child's substantive final result). Store each verdict:
+As each completes, collect via the Codex mapping above (`multi_agent_v1.wait_agent`,
+then the child's substantive final result). Preserve completed lane
+results immediately; never lose a PASS/FAIL because another lane is
+still running. Store each verdict independently:
 
 | Agent | Verdict | Notes |
 |-------|---------|-------|
-| 1. Goal Verification | pending | - |
-| 2. QA Execution | pending | - |
-| 3. Code Quality | pending | - |
-| 4. Security | pending | - |
-| 5. Context Mining | pending | - |
+| 1. Goal Verification | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 2. QA Execution | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 3. Code Quality | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 4. Security | pending/PASS/FAIL/INCONCLUSIVE | - |
+| 5. Context Mining | pending/PASS/FAIL/INCONCLUSIVE | - |
 
-Do NOT deliver the final report until ALL 5 have completed.
+Do NOT deliver the final report until ALL 5 lanes have a terminal state:
+PASS, FAIL, or INCONCLUSIVE.
 If a lane remains silent after the reliability followup, record it as
 inconclusive and respawn a smaller reviewer/worker for that exact lane.
+If it still remains unfinished after that retry, close the still-running
+agent if safe, keep the lane INCONCLUSIVE, and emit the final aggregate
+review result with the incomplete lane named. Do not spin in repeated
+wait/followup cycles. Do not use `multi_agent_v1.send_input` as an interrupt; queued
+followups are not cancellation.
 
 ---
 
@@ -540,6 +572,7 @@ inconclusive and respawn a smaller reviewer/worker for that exact lane.
 
 ALL 5 agents returned PASS → **REVIEW PASSED**
 ANY agent returned FAIL → **REVIEW FAILED - criteria not met**
+ANY lane is INCONCLUSIVE and none failed → **REVIEW INCONCLUSIVE - not approved**
 
 </verdict_logic>
 
@@ -548,15 +581,15 @@ Compile the final report in this format:
 ```markdown
 # Review Work - Final Report
 
-## Overall Verdict: PASSED / FAILED
+## Overall Verdict: PASSED / FAILED / INCONCLUSIVE
 
 | # | Review Area | Agent Type | Verdict | Confidence |
 |---|------------|------------|---------|------------|
-| 1 | Goal & Constraint Verification | Oracle | PASS/FAIL | HIGH/MED/LOW |
-| 2 | QA Execution | unspecified-high | PASS/FAIL | HIGH/MED/LOW |
-| 3 | Code Quality | Oracle | PASS/FAIL | HIGH/MED/LOW |
-| 4 | Security (supplementary) | Oracle | PASS/FAIL | Severity |
-| 5 | Context Mining | unspecified-high | PASS/FAIL | HIGH/MED/LOW |
+| 1 | Goal & Constraint Verification | Oracle | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 2 | QA Execution | unspecified-high | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 3 | Code Quality | Oracle | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 4 | Security (supplementary) | Oracle | PASS/FAIL/INCONCLUSIVE | Severity |
+| 5 | Context Mining | unspecified-high | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
 
 ## Blocking Issues
 [Aggregated from all agents - deduplicated, prioritized]

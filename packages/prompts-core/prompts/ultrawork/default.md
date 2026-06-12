@@ -156,7 +156,7 @@ task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here
 task(category="visual-engineering", load_skills=["frontend-ui-ux"], run_in_background=true)
 
 // Complex logic
-task(category="ultrabrain", load_skills=["typescript-programmer"], run_in_background=true)
+task(category="ultrabrain", load_skills=[...], run_in_background=true)
 
 // Quick fixes
 task(category="quick", load_skills=["git-master"], run_in_background=true)
@@ -173,7 +173,7 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 ## EXECUTION RULES
 - **TODO format**: `path: <action> for <scenario-id> — verify by <check>` encoding WHERE / WHY (which scenario it advances) / HOW / VERIFY. Exactly ONE in_progress at a time. Mark completed IMMEDIATELY — never batch.
-  - GOOD pair (test-first, ordered): `foo.test.ts: Write FAILING case invalid-email→ValidationError for S2 — verify by RED with assertion msg` → `src/foo/bar.ts: Implement validateEmail() for S2 — verify by foo.test.ts GREEN + curl 400 body`
+  - GOOD pair (test-first, ordered): `module.test: Write FAILING case invalid-email→ValidationError for S2 - verify by RED with assertion msg` → `src/module: Implement validateEmail() for S2 - verify by module.test GREEN + curl 400 body`
   - BAD: "Implement feature" / "Fix bug" / "Add tests later" / production code before its failing test → rewrite.
 - **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) — NEVER wait sequentially. But NEVER parallelise RED and GREEN of the same scenario.
 - **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).
@@ -251,6 +251,7 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 | Changes build output | Run the build. Verify the output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
 | Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. |
+| Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or `tmux capture-pane` (TUI), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Changes a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
 | Modifies config handling | Load the config. Verify it parses correctly. |
@@ -326,4 +327,3 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 NOW.
 
 </ultrawork-mode>
-

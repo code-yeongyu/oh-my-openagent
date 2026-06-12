@@ -13,8 +13,8 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 | **Sisyphus**          | `claude-opus-4-7`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `opencode-go/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `zai-coding-plan\|opencode/glm-5` → `opencode/big-pickle`. |
 | **Hephaestus**        | `gpt-5.5`          | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires a GPT-capable provider. |
 | **Oracle**            | `gpt-5.5`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1`.                                                                                                                                 |
-| **Librarian**         | `gpt-5.4-mini-fast` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
-| **Explore**           | `gpt-5.4-mini-fast` | Fast codebase exploration and contextual grep. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
+| **Librarian**         | `gpt-5.4-mini-fast` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
+| **Explore**           | `gpt-5.4-mini-fast` | Fast codebase exploration and contextual grep. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
 | **Multimodal-Looker** | `gpt-5.5`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `opencode-go/kimi-k2.6` → `zai-coding-plan/glm-4.6v` → `openai\|github-copilot\|opencode/gpt-5-nano`.                                                                                                                                                                                                   |
 ### Planning Agents
 
@@ -28,8 +28,8 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 
 | Agent               | Model                  | Purpose                                                                                                                                                                                     |
 | ------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Atlas**           | `claude-sonnet-4-6`    | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7`. |
-| **Sisyphus-Junior** | _(category-dependent)_ | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Its built-in general fallback chain is `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`. |
+| **Atlas**           | `claude-sonnet-4-6`    | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7`. |
+| **Sisyphus-Junior** | _(category-dependent)_ | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Its built-in general fallback chain is `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`. |
 
 ### Invoking Agents
 
@@ -104,8 +104,8 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 
 ### Architecture Snapshot (current)
 
-- **Feature modules**: `src/features/` has 20 modules.
-- **Tool system**: `src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
+- **Feature modules**: `packages/omo-opencode/src/features/` has 20 modules.
+- **Tool system**: `packages/omo-opencode/src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
 - **Hook system**: 5-tier composition is **54 base hooks**. With team mode it becomes **61** (extra tool guard + transforms + direct team session event handlers).
 - **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
@@ -496,11 +496,11 @@ Creates directory-specific context files that agents automatically read:
 
 ```
 project/
-├── AGENTS.md              # Project-wide context
-├── src/
-│   ├── AGENTS.md          # src-specific context
+├── AGENTS.md                        # Project-wide context
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # src-specific context
 │   └── components/
-│       └── AGENTS.md      # Component-specific context
+│       └── AGENTS.md                # Component-specific context
 ```
 
 ### /ralph-loop
@@ -584,7 +584,7 @@ Load custom commands from:
 
 ## Tools
 
-Tool registration is config-gated. `src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
+Tool registration is config-gated. `packages/omo-opencode/src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
 
 ### Code Search Tools
 
@@ -762,7 +762,7 @@ Current composition counts:
 - Continuation: 7
 - Skill: 2
 - Total base: 54
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 61
+- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `packages/omo-opencode/src/plugin/event.ts` = 61
 
 ### Hook Events
 
@@ -798,7 +798,6 @@ Current composition counts:
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |
 | **category-skill-reminder** | Event + PostToolUse | Reminds agents about available category skills for delegation.                                                                                              |
-| **anthropic-effort**        | Params              | Adjusts Anthropic API effort level based on context.                                                                                                        |
 
 #### Quality & Safety
 
@@ -814,7 +813,6 @@ Current composition counts:
 
 | Hook                                        | Event           | Description                                                                                                                                                                                                                                                 |
 | ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **session-recovery**                        | Event           | Recovers from session errors — missing tool results, thinking block issues, empty messages.                                                                                                                                                                 |
 | **anthropic-context-window-limit-recovery** | Event           | Handles Claude context window limits gracefully.                                                                                                                                                                                                            |
 | **runtime-fallback**                        | Event + Message | Automatically switches to backup models on retryable API errors (e.g., 429, 500, 502, 503, 504), provider key misconfiguration errors (e.g., missing API key), and provider retry signals. `message.updated` retry-signal detection requires `timeout_seconds > 0`; structured `session.status` retry events can still trigger fallback. |
 | **model-fallback**                          | Event + Message | Manages model fallback chain when primary model is unavailable.                                                                                                                                                                                             |
@@ -908,7 +906,7 @@ Disable specific hooks in config:
 
 The plugin uses a three-tier MCP architecture:
 
-1. Built-in MCPs from `src/mcp/` (remote plus local stdio)
+1. Built-in MCPs from `packages/omo-opencode/src/mcp/` (remote plus local stdio)
 2. Claude Code `.mcp.json` loader with `${VAR}` expansion
 3. Skill-embedded MCP servers declared in `SKILL.md` frontmatter
 
@@ -1047,12 +1045,12 @@ Auto-injects AGENTS.md when reading files. Walks from file directory to project 
 
 ```
 project/
-├── AGENTS.md              # Injected first
-├── src/
-│   ├── AGENTS.md          # Injected second
+├── AGENTS.md                        # Injected first
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # Injected second
 │   └── components/
-│       ├── AGENTS.md      # Injected third
-│       └── Button.tsx     # Reading this injects all 3
+│       ├── AGENTS.md                # Injected third
+│       └── Button.tsx               # Reading this injects all 3
 ```
 
 ### Conditional Rules

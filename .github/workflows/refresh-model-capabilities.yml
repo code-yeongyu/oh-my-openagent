@@ -37,7 +37,7 @@ jobs:
           commit-message: "chore: refresh model capabilities snapshot"
           title: "chore: refresh model capabilities snapshot"
           body: |
-            Automated refresh of `src/generated/model-capabilities.generated.json` from `https://models.dev/api.json`.
+            Automated refresh of `packages/omo-opencode/src/generated/model-capabilities.generated.json` from `https://models.dev/api.json`.
 
             This keeps the bundled capability snapshot aligned with upstream model metadata without relying on manual refreshes.
           branch: automation/refresh-model-capabilities

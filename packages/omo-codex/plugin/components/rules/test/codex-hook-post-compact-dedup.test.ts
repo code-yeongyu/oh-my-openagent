@@ -15,7 +15,7 @@ import {
 
 const tempDirectories: string[] = [];
 const PROJECT_ONLY_ENV = {
-	CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,.omo/rules",
+	CODEX_RULES_ENABLED_SOURCES: "CONTEXT.md,.omo/rules",
 };
 
 afterEach(() => {
@@ -93,7 +93,7 @@ describe("codex rules PostCompact deduplication", () => {
 		expect(output).toBe("");
 	});
 
-	it("#given startup already injected static context #when UserPromptSubmit runs after PostCompact #then it emits no duplicate static context", async () => {
+	it("#given startup static context dropped by compaction #when UserPromptSubmit runs after PostCompact #then it emits a mandatory read directive without rule bodies", async () => {
 		// given
 		const { root, pluginData } = makeTempProject();
 		await runSessionStartHook(sessionStartInput(root), {
@@ -113,10 +113,13 @@ describe("codex rules PostCompact deduplication", () => {
 		});
 
 		// then
-		expect(output).toBe("");
+		const context = readAdditionalContext(output);
+		expect(context).toContain("MUST READ");
+		expect(context).toContain("CONTEXT.md");
+		expect(context).not.toContain("Instructions from:");
 	});
 
-	it("#given startup already injected static context #when compact SessionStart runs after PostCompact #then it emits no duplicate static context", async () => {
+	it("#given startup static context dropped by compaction #when compact SessionStart runs after PostCompact #then it emits a mandatory read directive without rule bodies", async () => {
 		// given
 		const { root, pluginData } = makeTempProject();
 		await runSessionStartHook(sessionStartInput(root), {
@@ -136,7 +139,10 @@ describe("codex rules PostCompact deduplication", () => {
 		});
 
 		// then
-		expect(output).toBe("");
+		const context = readAdditionalContext(output);
+		expect(context).toContain("MUST READ");
+		expect(context).toContain("CONTEXT.md");
+		expect(context).not.toContain("Instructions from:");
 	});
 });
 
@@ -145,7 +151,9 @@ function makeTempProject(): { root: string; pluginData: string } {
 	const pluginData = mkdtempSync(path.join(tmpdir(), "codex-rules-compact-dedup-data-"));
 	tempDirectories.push(root, pluginData);
 	writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fixture" }));
-	writeFileSync(path.join(root, "AGENTS.md"), "Always wear safety goggles when refactoring.");
+	writeFileSync(path.join(root, "AGENTS.md"), "Project AGENTS.md should stay Codex-native.");
+	writeFileSync(path.join(root, "CLAUDE.md"), "Project CLAUDE.md should stay outside rules hook context.");
+	writeFileSync(path.join(root, "CONTEXT.md"), "Always wear safety goggles when refactoring.");
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),

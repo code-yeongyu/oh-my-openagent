@@ -45,8 +45,7 @@ oqa_db_path() {
 
 # Escape a value for safe embedding inside a single-quoted SQL literal.
 oqa_sql_escape() {
-  local s="${1//\'/\'\'}"
-  printf '%s' "$s"
+  printf '%s' "$1" | sed "s/'/''/g"
 }
 
 # Run a read-only SQL query against the active DB; emit JSON rows.
@@ -67,8 +66,10 @@ oqa_mk_isolated_xdg() {
   local root
   root="$(mktemp -d -t oqa-xdg.XXXXXX)" || return 1
   OQA_TMPDIRS+=("$root")
-  mkdir -p "$root/data" "$root/config" "$root/cache" "$root/state" "$root/proj"
+  mkdir -p "$root/data" "$root/config" "$root/cache" "$root/state" "$root/home" "$root/proj"
   export OQA_XDG_ROOT="$root"
+  export HOME="$root/home"
+  export OPENCODE_TEST_HOME="$root/home"
   export XDG_DATA_HOME="$root/data"
   export XDG_CONFIG_HOME="$root/config"
   export XDG_CACHE_HOME="$root/cache"
@@ -123,6 +124,7 @@ oqa_start_server() {
   OPENCODE_SERVER_PASSWORD="$pass" opencode serve --port "$port" --hostname 127.0.0.1 \
     >"$XDG_STATE_HOME/serve.log" 2>&1 &
   OQA_SERVER_PID=$!
+  disown "$OQA_SERVER_PID" 2>/dev/null || true
   export OQA_SERVER_PORT="$port"
   export OQA_SERVER_PASS="$pass"
   export OQA_SERVER_URL="http://127.0.0.1:$port"
@@ -138,7 +140,7 @@ oqa_cleanup() {
   if [ -n "${OQA_SERVER_PID:-}" ]; then
     kill "$OQA_SERVER_PID" 2>/dev/null || true
     sleep 0.3
-    kill -9 "$OQA_SERVER_PID" 2>/dev/null || true
+    kill -0 "$OQA_SERVER_PID" 2>/dev/null && kill -9 "$OQA_SERVER_PID" 2>/dev/null || true
     OQA_SERVER_PID=""
   fi
   local s p d
@@ -147,6 +149,8 @@ oqa_cleanup() {
   done
   for p in "${OQA_CURL_PIDS[@]:-}"; do
     [ -n "$p" ] && kill "$p" 2>/dev/null || true
+    [ -n "$p" ] && sleep 0.1
+    [ -n "$p" ] && kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null || true
   done
   for d in "${OQA_TMPDIRS[@]:-}"; do
     [ -n "$d" ] && rm -rf "$d" 2>/dev/null || true
@@ -192,14 +196,22 @@ oqa__self_check() {
   # isolation + trap teardown: an inner shell creates a sandbox (calling the
   # helper DIRECTLY so the cleanup registration survives) and exits; the EXIT
   # trap must remove it. We pass the sandbox path out via a marker file.
-  local marker isodir
+  local marker isodir home test_home
   marker="$(mktemp -t oqa-marker.XXXXXX)"
-  bash -c '. "'"${BASH_SOURCE[0]}"'"; oqa_mk_isolated_xdg; printf "%s" "$OQA_XDG_ROOT" > "'"$marker"'"'
-  isodir="$(cat "$marker" 2>/dev/null)"; rm -f "$marker"
+  bash -c '. "'"${BASH_SOURCE[0]}"'"; oqa_mk_isolated_xdg; printf "%s\n%s\n%s\n" "$OQA_XDG_ROOT" "$HOME" "$OPENCODE_TEST_HOME" > "'"$marker"'"'
+  isodir="$(sed -n '1p' "$marker" 2>/dev/null)"
+  home="$(sed -n '2p' "$marker" 2>/dev/null)"
+  test_home="$(sed -n '3p' "$marker" 2>/dev/null)"
+  rm -f "$marker"
   if [ -n "$isodir" ] && [ ! -d "$isodir" ]; then
     oqa_pass "isolated XDG sandbox auto-removed on exit ($isodir)"
   else
     oqa_log "FAIL: sandbox not cleaned: '$isodir' (exists=$([ -d "$isodir" ] && echo yes || echo no))"; fails=$((fails+1))
+  fi
+  if [ -n "$isodir" ] && [ "$home" = "$isodir/home" ] && [ "$test_home" = "$isodir/home" ]; then
+    oqa_pass "isolated HOME points inside sandbox"
+  else
+    oqa_log "FAIL: sandbox HOME not isolated (HOME='$home' OPENCODE_TEST_HOME='$test_home' root='$isodir')"; fails=$((fails+1))
   fi
 
   if [ "$fails" -eq 0 ]; then

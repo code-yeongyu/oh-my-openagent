@@ -368,13 +368,13 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 | **Sisyphus**          | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `zai-coding-plan\|opencode/glm-5` → `opencode/big-pickle` |
 | **Hephaestus**        | `gpt-5.5`           | `gpt-5.5 (medium)`                                                           |
 | **oracle**            | `gpt-5.5`           | `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1` |
-| **librarian**         | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **explore**           | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **librarian**         | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
+| **explore**           | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **multimodal-looker** | `gpt-5.5`           | `openai\|opencode/gpt-5.5 (medium)` → `opencode-go/kimi-k2.6` → `zai-coding-plan/glm-4.6v` → `openai\|github-copilot\|opencode/gpt-5-nano` |
 | **Prometheus**        | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `google\|github-copilot\|opencode/gemini-3.1-pro` |
 | **Metis**             | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
 | **Momus**             | `gpt-5.5`           | `openai\|github-copilot\|opencode/gpt-5.5 (xhigh)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.1` |
-| **Atlas**             | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7` |
+| **Atlas**             | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 
 #### Category Provider Chains
 
@@ -386,10 +386,10 @@ This table documents the first entry of each hardcoded provider fallback chain, 
 | **ultrabrain**         | `gpt-5.5`           | `openai\|opencode/gpt-5.5 (xhigh)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1` |
 | **deep**               | `gpt-5.5`           | `openai\|github-copilot\|venice\|opencode/gpt-5.5 (medium)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` |
 | **artistry**           | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5` |
-| **quick**              | `gpt-5.4-mini`      | `openai\|github-copilot\|opencode/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
-| **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.3-codex (medium)` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` |
+| **quick**              | `gpt-5.4-mini`      | `openai\|github-copilot\|opencode/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
+| **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.5-codex (medium)` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 | **unspecified-high**   | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `zai-coding-plan\|opencode/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` |
-| **writing**            | `gemini-3-flash`    | `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/minimax-m2.7` |
+| **writing**            | `gemini-3-flash`    | `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
 
@@ -530,7 +530,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-recovery`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `anthropic-effort`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
 
 Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, `tool-pair-validator`, and `thinking-block-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
@@ -539,7 +539,6 @@ Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-
 - `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
 - `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 and GPT-5.5 prompt paths.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
-- `session-recovery` - automatically recovers from recoverable session errors (missing tool results, unavailable tools, thinking block violations). Shows toast notifications during recovery. Enable `experimental.auto_resume` for automatic retry after recovery.
 
 ### Commands
 
@@ -631,12 +630,12 @@ Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library do
 LSP tools are served by the built-in `lsp` MCP server (see [MCPs](#mcps)). The
 previous top-level `"lsp"` block in the plugin config is no longer read and is
 automatically stripped on next startup; existing configs containing it are
-silently migrated (see `src/shared/migration/config-migration.ts`).
+silently migrated (see `packages/omo-opencode/src/shared/migration/config-migration.ts`).
 
 To configure custom language servers, create `.opencode/lsp.json` at the project
 root. The MCP server is launched with `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json`
 and reads the server map from that file. The schema lives in the
-`packages/lsp-tools-mcp` submodule (upstream:
+`packages/lsp-tools-mcp` vendored package (upstream:
 [code-yeongyu/lsp-tools-mcp](https://github.com/code-yeongyu/lsp-tools-mcp)).
 
 To disable the LSP MCP entirely:
@@ -738,7 +737,7 @@ Define `fallback_models` per agent or category:
           "thinking": { "type": "enabled", "budgetTokens": 12000 }
         },
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5-codex",
           "reasoningEffort": "high",
           "temperature": 0.2,
           "top_p": 0.95,
@@ -810,7 +809,7 @@ If the primary model already establishes the provider, fallback entries can omit
       "fallback_models": [
         "gpt-5.4-mini",
         {
-          "model": "gpt-5.3-codex",
+          "model": "gpt-5.5-codex",
           "reasoningEffort": "medium",
           "maxTokens": 4096
         }
@@ -820,7 +819,7 @@ If the primary model already establishes the provider, fallback entries can omit
 }
 ```
 
-In this example OmO treats `gpt-5.4-mini` and `gpt-5.3-codex` as OpenAI fallback entries because the current/default provider is already `openai`.
+In this example OmO treats `gpt-5.4-mini` and `gpt-5.5-codex` as OpenAI fallback entries because the current/default provider is already `openai`.
 
 **3. Mixed cross-provider chain**
 
@@ -856,7 +855,7 @@ Mix string entries and object entries when only some fallback models need specia
 {
   "categories": {
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.5-codex",
       "fallback_models": [
         {
           "model": "openai/gpt-5.5",
@@ -886,7 +885,7 @@ This shows every supported object-style parameter in one place:
       "model": "openai/gpt-5.5",
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex(low)",
+          "model": "openai/gpt-5.5-codex(low)",
           "variant": "xhigh",
           "reasoningEffort": "high",
           "temperature": 0.3,
@@ -955,7 +954,6 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
   "experimental": {
     "truncate_all_tool_outputs": false,
     "aggressive_truncation": false,
-    "auto_resume": false,
     "disable_omo_env": false,
     "task_system": true,
     "dynamic_context_pruning": {
@@ -985,7 +983,6 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | ---------------------------------------- | ---------- | ------------------------------------------------------------------------------------ |
 | `truncate_all_tool_outputs`              | `false`    | Truncate all tool outputs (not just whitelisted)                                     |
 | `aggressive_truncation`                  | `false`    | Aggressively truncate when token limit exceeded                                      |
-| `auto_resume`                            | `false`    | Auto-resume after thinking block recovery                                            |
 | `disable_omo_env`                        | `false`    | Disable auto-injected `<omo-env>` block (date/time/locale). Improves cache hit rate. |
 | `task_system`                            | `false`    | Enable Sisyphus task system                                                          |
 | `dynamic_context_pruning.enabled`        | `false`    | Auto-prune old tool outputs to manage context window                                 |
@@ -1011,8 +1008,23 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry for `omo-codex` only |
 | `OMO_CODEX_GIT_BASH_PATH` | Native Windows Codex installs only. Absolute path to Git Bash, for example `C:\Program Files\Git\bin\bash.exe`, when `where bash` cannot find it |
 | `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL` | Set to `1` to skip the best-effort `winget install --id Git.Git -e --source winget` attempt during native Windows Codex installs |
+| `LAZYCODEX_CONFIG_MIGRATION_DISABLED` | Set to `1` to skip the Codex config migration that runs on every session start (including the `multi_agent_v2` force-disable and managed reasoning-profile sync), leaving `config.toml` untouched |
+| `OMO_CODEX_CONFIG_MIGRATION_DISABLED` | Alias of `LAZYCODEX_CONFIG_MIGRATION_DISABLED` |
+| `OMO_SPARKSHELL_CONDENSE` | Set to `0` to disable sparkshell's oversized-output condensation and always print raw output |
+| `OMO_SPARKSHELL_CONDENSE_BUDGET` | Character budget before sparkshell condenses command output (default `20000`) |
+| `OMO_SPARKSHELL_SESSION_CONTEXT` | Set to `0` to stop sparkshell from appending Codex session context (first/latest user request and recent messages) to command output |
+| `OMO_SPARKSHELL_SPARK` | Set to `0` to skip the spark-model summarization of oversized sparkshell output and go straight to deterministic condensation. The spark summary is generated via `codex exec` from the shell output plus session context, reproduces the output as-is without masking anything, and appends a `[sparkshell caption]` line at the bottom stating what was omitted |
+| `OMO_SPARKSHELL_SPARK_MODEL` | Model used for the sparkshell spark summary (default `gpt-5.3-codex-spark`) |
+| `OMO_SPARKSHELL_SPARK_TIMEOUT_MS` | Timeout for the spark summary `codex exec` invocation in milliseconds (default `30000`) |
+| `OMO_SPARKSHELL_SPARK_BIN` | Binary used to invoke the spark model (default `codex`) |
+| `OMO_SPARKSHELL_SPARK_PROFILE` | Codex config profile passed as `--profile` to the spark summary invocation. Set this when the default Codex auth cannot use the spark model (for example a gateway profile) |
+| `LSP_TOOLS_MCP_INSTALL_DECISIONS` | Override the path of the LSP install-decisions file (default `~/.codex/lsp-install-decisions.json`) |
 | `POSTHOG_API_KEY` | Optional override for the built-in PostHog project API key |
 | `POSTHOG_HOST` | Override the PostHog ingestion host. Defaults to `https://us.i.posthog.com` |
+
+### LSP Install Decisions
+
+When an LSP tool hits a language server that is not installed, it asks once per server and persists the answer to `~/.codex/lsp-install-decisions.json` (override with `LSP_TOOLS_MCP_INSTALL_DECISIONS`). A `declined` entry collapses all future diagnostics for that server to a one-line note. To get prompted again — or to re-enable a server that an agent declined on your behalf — delete the file (or the server's entry in it).
 
 ### Codex Light Git Bash MCP
 

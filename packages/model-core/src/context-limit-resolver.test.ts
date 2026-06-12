@@ -51,6 +51,51 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
+  it("returns GA 1M for Anthropic claude-opus-4-8 without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for Anthropic claude-opus-4-8-high without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8-high", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for Antigravity Claude models served by google", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("google", "claude-sonnet-4-6", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns cached limit for Gemini models served by google", () => {
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("google/gemini-3.1-pro", 1_048_576)
+
+    const actualLimit = resolveActualContextLimit("google", "gemini-3.1-pro", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    expect(actualLimit).toBe(1_048_576)
+  })
+
   it("uses cached limit for GA Anthropic models when cache exists", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]

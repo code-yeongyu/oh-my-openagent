@@ -31,6 +31,29 @@ function makeGate(overrides: Record<string, unknown> = {}): Record<string, unkno
 	return { ...VALID_GATE, ...overrides };
 }
 
+describe("validateQualityGate LIGHT-tier shape", () => {
+	it("#given a light-tier gate with none-applicable classes and self-review approval evidence #when validated #then it passes without reviewer fields", () => {
+		// given
+		const gate = makeGate({
+			codeReview: {
+				evidence: "UNCONDITIONAL APPROVAL — LIGHT tier: single-file copy change, self-reviewed diff + diagnostics",
+			},
+			criteriaCoverage: {
+				totalCriteria: 1,
+				passCount: 1,
+				adversarialClassesCovered: ["none-applicable: prompt-file-only change, no input parsing or state"],
+			},
+		});
+
+		// when
+		const validated = validateQualityGate(gate);
+
+		// then
+		expect(validated.codeReview.recommendation).toBe("APPROVE");
+		expect(validated.codeReview.architectStatus).toBe("CLEAR");
+	});
+});
+
 function getQualityGateError(input: unknown): UlwLoopError {
 	try {
 		validateQualityGate(input);
@@ -79,6 +102,57 @@ describe("validateQualityGate", () => {
 		// then
 		expect(gate.aiSlopCleaner.status).toBe("passed");
 		expect(gate).toMatchObject({ criteriaCoverage: { totalCriteria: 9, passCount: 9 } });
+	});
+
+	it("infers APPROVE/CLEAR when clean reviewer evidence omits structured fields", () => {
+		// given
+		const input = makeGate({
+			codeReview: {
+				evidence: "UNCONDITIONAL APPROVAL\nAll criteria and QA evidence are complete.",
+			},
+		});
+
+		// when
+		const gate = validateQualityGate(input);
+
+		// then
+		expect(gate.codeReview.recommendation).toBe("APPROVE");
+		expect(gate.codeReview.architectStatus).toBe("CLEAR");
+		expect(gate.codeReview.evidence).toBe("UNCONDITIONAL APPROVAL\nAll criteria and QA evidence are complete.");
+	});
+
+	it("infers APPROVE/CLEAR when clean reviewer evidence has blank structured fields", () => {
+		// given
+		const input = makeGate({
+			codeReview: {
+				recommendation: "",
+				architectStatus: "   ",
+				evidence: "UNCONDITIONAL APPROVAL\nAll criteria and QA evidence are complete.",
+			},
+		});
+
+		// when
+		const gate = validateQualityGate(input);
+
+		// then
+		expect(gate.codeReview.recommendation).toBe("APPROVE");
+		expect(gate.codeReview.architectStatus).toBe("CLEAR");
+	});
+
+	it("throws when reviewer fields are omitted and evidence has no approval verdict", () => {
+		// given
+		const input = makeGate({
+			codeReview: {
+				evidence: "review completed without an explicit verdict",
+			},
+		});
+
+		// when
+		const error = getQualityGateError(input);
+
+		// then
+		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
+		expect(error.message).toContain("UNCONDITIONAL APPROVAL");
 	});
 
 	it("throws UlwLoopError when aiSlopCleaner missing", () => {

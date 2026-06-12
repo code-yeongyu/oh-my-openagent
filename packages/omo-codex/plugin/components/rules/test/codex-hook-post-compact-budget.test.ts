@@ -13,7 +13,7 @@ import {
 
 const tempDirectories: string[] = [];
 const PROJECT_RULES_ENV = {
-	CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,.omo/rules",
+	CODEX_RULES_ENABLED_SOURCES: "CONTEXT.md,.omo/rules",
 	CODEX_RULES_MAX_RESULT_CHARS: "50000",
 	CODEX_RULES_MAX_RULE_CHARS: "30000",
 };
@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("codex rules post-compaction context budget", () => {
-	it("#given oversized project rules already injected #when static recovery runs after compaction #then it emits no duplicate budget block", async () => {
+	it("#given oversized project rules already injected #when static recovery runs after compaction #then it emits a mandatory read directive instead of rule bodies", async () => {
 		// given
 		const { root, pluginData } = makeOversizedProject();
 		const firstOutput = await runSessionStartHook(sessionStartInput(root), {
@@ -46,8 +46,16 @@ describe("codex rules post-compaction context budget", () => {
 		});
 
 		// then
-		expect(firstContext.length).toBeGreaterThan(20_000);
-		expect(output).toBe("");
+		expect(firstContext).toContain(`Instructions from: ${path.join(root, "CONTEXT.md")}`);
+		expect(firstContext).toContain("Project rule");
+		expect(firstContext).toContain("[Truncated. Full:");
+		expect(firstContext.length).toBeLessThan(31_000);
+		const recoveryContext = readAdditionalContext(output);
+		expect(recoveryContext).toContain("MUST READ");
+		expect(recoveryContext).toContain("NO EXCUSES");
+		expect(recoveryContext).toContain(path.join(root, "CONTEXT.md"));
+		expect(recoveryContext).not.toContain("Project rule");
+		expect(recoveryContext.length).toBeLessThan(2_000);
 	});
 });
 
@@ -56,7 +64,9 @@ function makeOversizedProject(): { root: string; pluginData: string } {
 	const pluginData = mkdtempSync(path.join(tmpdir(), "codex-rules-post-compact-budget-data-"));
 	tempDirectories.push(root, pluginData);
 	writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fixture" }));
-	writeFileSync(path.join(root, "AGENTS.md"), `Project rule\n${"A".repeat(30_000)}`);
+	writeFileSync(path.join(root, "AGENTS.md"), "Project AGENTS.md should stay Codex-native.");
+	writeFileSync(path.join(root, "CLAUDE.md"), "Project CLAUDE.md should stay outside rules hook context.");
+	writeFileSync(path.join(root, "CONTEXT.md"), `Project rule\n${"A".repeat(30_000)}`);
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),

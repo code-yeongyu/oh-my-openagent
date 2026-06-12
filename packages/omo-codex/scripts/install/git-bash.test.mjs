@@ -14,7 +14,7 @@ test("#given non-Windows platform #when resolving Git Bash #then no preflight is
 		where: () => [],
 	});
 
-	assert.deepEqual(result, { found: true, path: null, source: "not-required" });
+	assert.deepEqual(result, { found: true, path: null, source: "not-required", checkedPaths: [] });
 });
 
 test("#given Windows env override to bash.exe #when the file exists #then env path wins", () => {
@@ -26,7 +26,7 @@ test("#given Windows env override to bash.exe #when the file exists #then env pa
 		where: () => [programFilesGitBash],
 	});
 
-	assert.deepEqual(result, { found: true, path: overridePath, source: "env" });
+	assert.deepEqual(result, { found: true, path: overridePath, source: "env", checkedPaths: [overridePath] });
 });
 
 test("#given Windows standard paths are absent and PATH contains bash #when resolving #then uses where bash candidate", () => {
@@ -38,7 +38,42 @@ test("#given Windows standard paths are absent and PATH contains bash #when reso
 		where: () => ["C:\\Windows\\System32\\bash.exe", pathCandidate],
 	});
 
-	assert.deepEqual(result, { found: true, path: pathCandidate, source: "path" });
+	assert.deepEqual(result, {
+		found: true,
+		path: pathCandidate,
+		source: "path",
+		checkedPaths: [programFilesGitBash, programFilesX86GitBash, "C:\\Windows\\System32\\bash.exe", pathCandidate],
+	});
+});
+
+test("#given PATH bash is only the System32 WSL launcher #when resolving #then launcher is skipped and install guidance returned", () => {
+	const system32Bash = "C:\\Windows\\System32\\bash.exe";
+	const result = resolveGitBash({
+		platform: "win32",
+		env: {},
+		exists: (path) => path === system32Bash,
+		where: () => [system32Bash],
+	});
+
+	assert.equal(result.found, false);
+	assert.deepEqual(result.checkedPaths, [programFilesGitBash, programFilesX86GitBash, system32Bash]);
+	assert.match(result.installHint, /winget install --id Git\.Git -e --source winget/);
+});
+
+test("#given PATH lists the WindowsApps alias before a real Git Bash #when resolving #then alias is skipped and Git Bash wins", () => {
+	const windowsAppsBash = "C:/Users/dev/AppData/Local/Microsoft/WindowsApps/bash.exe";
+	const gitBash = "D:\\Tools\\Git\\bin\\bash.exe";
+	const result = resolveGitBash({
+		platform: "win32",
+		env: {},
+		exists: (path) => path === windowsAppsBash || path === gitBash,
+		where: () => [windowsAppsBash, gitBash],
+	});
+
+	assert.equal(result.found, true);
+	assert.equal(result.path, gitBash);
+	assert.equal(result.source, "path");
+	assert.deepEqual(result.checkedPaths, [programFilesGitBash, programFilesX86GitBash, windowsAppsBash, gitBash]);
 });
 
 test("#given Windows invalid env override #when resolving #then returns guidance without falling through", () => {
@@ -127,7 +162,7 @@ test("#given non-Windows platform #when preparing #then winget is never called",
 	});
 
 	assert.deepEqual(runCalls, []);
-	assert.deepEqual(result, { found: true, path: null, source: "not-required" });
+	assert.deepEqual(result, { found: true, path: null, source: "not-required", checkedPaths: [] });
 });
 
 test("#given Windows without Git Bash and winget fails #when preparing #then original install hint is preserved", async () => {

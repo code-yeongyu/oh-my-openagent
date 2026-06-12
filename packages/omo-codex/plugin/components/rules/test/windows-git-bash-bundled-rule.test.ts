@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runSessionStartHook, type CodexSessionStartInput } from "../src/codex-hook.js";
+import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 import { findPluginBundledCandidates } from "../src/rules/finder.js";
 
 const WINDOWS_RULE_DESCRIPTION = "Windows Git Bash guidance for Codex";
@@ -61,36 +61,62 @@ function occurrenceCount(value: string, search: string): number {
 
 describe("Windows Git Bash bundled rule", () => {
 	it("#given packaged bundled rules #when discovering plugin-bundled candidates #then Windows Git Bash rule is included", () => {
-		const candidates = findPluginBundledCandidates({ pluginRoot: process.cwd() });
+		const candidates = findPluginBundledCandidates({ pluginRoot: process.cwd(), platform: "win32" });
 
 		expect(candidates.map((candidate) => candidate.relativePath)).toContain(WINDOWS_RULE_PATH);
 	});
 
-	it("#given bundled rules enabled #when SessionStart runs #then Windows Git Bash guidance is injected once", async () => {
+	it("#given packaged bundled rules off Windows #when discovering plugin-bundled candidates #then Windows Git Bash rule is excluded", () => {
+		const candidates = findPluginBundledCandidates({ pluginRoot: process.cwd(), platform: "darwin" });
+
+		expect(candidates.map((candidate) => candidate.relativePath)).not.toContain(WINDOWS_RULE_PATH);
+	});
+
+	it("#given bundled rules enabled on Windows #when SessionStart runs #then Windows Git Bash guidance is injected once", async () => {
 		const { root, pluginData } = makeProject();
 
 		const output = await runSessionStartHook(sessionStartInput(root), {
 			pluginDataRoot: pluginData,
 			env: BUNDLED_ONLY_ENV,
+			platform: "win32",
 		});
 
-		expect(occurrenceCount(output, WINDOWS_GUIDANCE)).toBe(1);
+		expect(occurrenceCount(output, `Instructions from: ${join(process.cwd(), WINDOWS_RULE_PATH)}`)).toBe(1);
+		expect(output).toContain(WINDOWS_GUIDANCE);
 	});
 
-	it("#given project rule with same description #when static rules load #then project guidance overrides bundled guidance", async () => {
+	it("#given bundled rules enabled off Windows #when SessionStart runs #then Windows Git Bash guidance is not injected", async () => {
+		const { root, pluginData } = makeProject();
+
+		const output = await runSessionStartHook(sessionStartInput(root), {
+			pluginDataRoot: pluginData,
+			env: BUNDLED_ONLY_ENV,
+			platform: "darwin",
+		});
+
+		expect(output).not.toContain(WINDOWS_GUIDANCE);
+		expect(output).not.toContain(WINDOWS_RULE_PATH);
+	});
+
+	it("#given project rule with same description on Windows #when static rules load #then project guidance file overrides bundled guidance", async () => {
 		const { root, pluginData } = makeProject();
 		const projectGuidance = "Project-specific Windows shell policy.";
+		const projectRulePath = join(root, ".omo", "rules", "windows-git-bash.md");
 		mkdirSync(join(root, ".omo", "rules"), { recursive: true });
 		writeFileSync(
-			join(root, ".omo", "rules", "windows-git-bash.md"),
-			["---", `description: ${WINDOWS_RULE_DESCRIPTION}`, "alwaysApply: true", "---", "", projectGuidance].join("\n"),
+			projectRulePath,
+			["---", `description: ${WINDOWS_RULE_DESCRIPTION}`, "alwaysApply: true", "---", "", projectGuidance].join(
+				"\n",
+			),
 		);
 
 		const output = await runSessionStartHook(sessionStartInput(root), {
 			pluginDataRoot: pluginData,
 			env: PROJECT_AND_BUNDLED_ENV,
+			platform: "win32",
 		});
 
+		expect(output).toContain(`Instructions from: ${projectRulePath}`);
 		expect(output).toContain(projectGuidance);
 		expect(output).not.toContain(WINDOWS_GUIDANCE);
 	});

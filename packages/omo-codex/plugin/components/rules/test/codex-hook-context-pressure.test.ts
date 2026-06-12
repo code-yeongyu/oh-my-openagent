@@ -9,6 +9,35 @@ const tempDirectories: string[] = [];
 const PROJECT_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,.omo/rules",
 };
+const PROMPT_CONTEXT_PRESSURE_CASES = [
+	[
+		"#given context-pressure recovery prompt and empty static cache #when UserPromptSubmit runs #then it emits no static context",
+		[
+			"Context compacted",
+			"error context_too_large: Your input exceeds the context window of this model.",
+			"Please adjust your input and try again.",
+		].join("\n"),
+	],
+	[
+		"#given Codex canonical context-window prompt and empty static cache #when UserPromptSubmit runs #then it emits no static context",
+		[
+			"error context_length_exceeded",
+			"Codex ran out of room in the model's context window. Start a new thread before retrying.",
+		].join("\n"),
+	],
+] as const;
+const TRANSCRIPT_CONTEXT_PRESSURE_CASES = [
+	[
+		"#given context-pressure transcript and empty static cache #when UserPromptSubmit runs #then it emits no static context",
+		"#given context-pressure transcript and empty dynamic cache #when PostToolUse runs #then it emits no dynamic context",
+		writeContextPressureTranscript,
+	],
+	[
+		"#given Codex canonical context-window transcript and empty static cache #when UserPromptSubmit runs #then it emits no static context",
+		"#given Codex canonical context-window transcript and empty dynamic cache #when PostToolUse runs #then it emits no dynamic context",
+		writeCodexContextWindowTranscript,
+	],
+] as const;
 
 afterEach(() => {
 	for (const directory of tempDirectories.splice(0)) {
@@ -17,144 +46,54 @@ afterEach(() => {
 });
 
 describe("codex rules context-pressure recovery", () => {
-	it("#given context-pressure recovery prompt and empty static cache #when UserPromptSubmit runs #then it emits no static context", async () => {
-		// given
-		const { root, pluginData } = makeTempProject();
+	for (const [name, prompt] of PROMPT_CONTEXT_PRESSURE_CASES) {
+		it(name, async () => {
+			// given
+			const { root, pluginData } = makeTempProject();
 
-		// when
-		const output = await runUserPromptSubmitHook(
-			{
-				...userPromptSubmitInput(root),
-				prompt: [
-					"Context compacted",
-					"error context_too_large: Your input exceeds the context window of this model.",
-					"Please adjust your input and try again.",
-				].join("\n"),
-			},
-			{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
-		);
+			// when
+			const output = await runUserPromptSubmitHook(
+				{ ...userPromptSubmitInput(root), prompt },
+				{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
+			);
 
-		// then
-		expect(output).toBe("");
-	});
+			// then
+			expect(output).toBe("");
+		});
+	}
 
-	it("#given Codex canonical context-window prompt and empty static cache #when UserPromptSubmit runs #then it emits no static context", async () => {
-		// given
-		const { root, pluginData } = makeTempProject();
+	for (const [userPromptName, postToolName, writeTranscript] of TRANSCRIPT_CONTEXT_PRESSURE_CASES) {
+		it(userPromptName, async () => {
+			// given
+			const { root, pluginData } = makeTempProject();
+			const transcriptPath = writeTranscript(root);
 
-		// when
-		const output = await runUserPromptSubmitHook(
-			{
-				...userPromptSubmitInput(root),
-				prompt: [
-					"error context_length_exceeded",
-					"Codex ran out of room in the model's context window. Start a new thread before retrying.",
-				].join("\n"),
-			},
-			{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
-		);
+			// when
+			const output = await runUserPromptSubmitHook(
+				{ ...userPromptSubmitInput(root), transcript_path: transcriptPath, prompt: "continue" },
+				{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
+			);
 
-		// then
-		expect(output).toBe("");
-	});
+			// then
+			expect(output).toBe("");
+		});
 
-	it("#given context-pressure transcript and empty static cache #when UserPromptSubmit runs #then it emits no static context", async () => {
-		// given
-		const { root, pluginData } = makeTempProject();
-		const transcriptPath = writeContextPressureTranscript(root);
+		it(postToolName, async () => {
+			// given
+			const { root, pluginData } = makeTempProject();
+			const transcriptPath = writeTranscript(root);
+			const filePath = writeAppFile(root);
 
-		// when
-		const output = await runUserPromptSubmitHook(
-			{
-				...userPromptSubmitInput(root),
-				transcript_path: transcriptPath,
-				prompt: "continue",
-			},
-			{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
-		);
+			// when
+			const output = await runPostToolUseHook(postToolUseInput(root, transcriptPath, filePath), {
+				pluginDataRoot: pluginData,
+				env: PROJECT_ONLY_ENV,
+			});
 
-		// then
-		expect(output).toBe("");
-	});
-
-	it("#given Codex canonical context-window transcript and empty static cache #when UserPromptSubmit runs #then it emits no static context", async () => {
-		// given
-		const { root, pluginData } = makeTempProject();
-		const transcriptPath = writeCodexContextWindowTranscript(root);
-
-		// when
-		const output = await runUserPromptSubmitHook(
-			{
-				...userPromptSubmitInput(root),
-				transcript_path: transcriptPath,
-				prompt: "continue",
-			},
-			{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
-		);
-
-		// then
-		expect(output).toBe("");
-	});
-
-	it("#given context-pressure transcript and empty dynamic cache #when PostToolUse runs #then it emits no dynamic context", async () => {
-		// given
-		const { root, pluginData } = makeTempProject();
-		const transcriptPath = writeContextPressureTranscript(root);
-		const filePath = path.join(root, "src", "app.ts");
-		mkdirSync(path.dirname(filePath), { recursive: true });
-		writeFileSync(filePath, "export const answer = 42;\n");
-
-		// when
-		const output = await runPostToolUseHook(
-			{
-				session_id: "session-context-pressure",
-				turn_id: "turn-1",
-				transcript_path: transcriptPath,
-				cwd: root,
-				hook_event_name: "PostToolUse",
-				model: "gpt-5.5",
-				permission_mode: "default",
-				tool_name: "mcp__filesystem__read_file",
-				tool_input: { path: filePath },
-				tool_response: { text: "export const answer = 42;" },
-				tool_use_id: "call-1",
-			},
-			{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
-		);
-
-		// then
-		expect(output).toBe("");
-	});
-
-	it("#given Codex canonical context-window transcript and empty dynamic cache #when PostToolUse runs #then it emits no dynamic context", async () => {
-		// given
-		const { root, pluginData } = makeTempProject();
-		const transcriptPath = writeCodexContextWindowTranscript(root);
-		const filePath = path.join(root, "src", "app.ts");
-		mkdirSync(path.dirname(filePath), { recursive: true });
-		writeFileSync(filePath, "export const answer = 42;\n");
-
-		// when
-		const output = await runPostToolUseHook(
-			{
-				session_id: "session-context-pressure",
-				turn_id: "turn-1",
-				transcript_path: transcriptPath,
-				cwd: root,
-				hook_event_name: "PostToolUse",
-				model: "gpt-5.5",
-				permission_mode: "default",
-				tool_name: "mcp__filesystem__read_file",
-				tool_input: { path: filePath },
-				tool_response: { text: "export const answer = 42;" },
-				tool_use_id: "call-1",
-			},
-			{ pluginDataRoot: pluginData, env: PROJECT_ONLY_ENV },
-		);
-
-		// then
-		expect(output).toBe("");
-	});
+			// then
+			expect(output).toBe("");
+		});
+	}
 });
 
 function makeTempProject(): { readonly root: string; readonly pluginData: string } {
@@ -189,6 +128,33 @@ function userPromptSubmitInput(root: string): Parameters<typeof runUserPromptSub
 		permission_mode: "default",
 		prompt: "read src/app.ts",
 	};
+}
+
+function postToolUseInput(
+	root: string,
+	transcriptPath: string,
+	filePath: string,
+): Parameters<typeof runPostToolUseHook>[0] {
+	return {
+		session_id: "session-context-pressure",
+		turn_id: "turn-1",
+		transcript_path: transcriptPath,
+		cwd: root,
+		hook_event_name: "PostToolUse",
+		model: "gpt-5.5",
+		permission_mode: "default",
+		tool_name: "mcp__filesystem__read_file",
+		tool_input: { path: filePath },
+		tool_response: { text: "export const answer = 42;" },
+		tool_use_id: "call-1",
+	};
+}
+
+function writeAppFile(root: string): string {
+	const filePath = path.join(root, "src", "app.ts");
+	mkdirSync(path.dirname(filePath), { recursive: true });
+	writeFileSync(filePath, "export const answer = 42;\n");
+	return filePath;
 }
 
 function writeContextPressureTranscript(root: string): string {

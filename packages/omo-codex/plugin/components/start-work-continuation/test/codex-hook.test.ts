@@ -22,6 +22,21 @@ describe("start-work Stop hook", () => {
 		expect(output).toBe("");
 	});
 
+	it("#given no boulder state and start work prompt #when stop hook runs #then it stays quiet", () => {
+		// given
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(),
+			last_assistant_message: "I'll start work on this plan now.",
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given active codex work with remaining top-level tasks #when hook runs #then returns block JSON", () => {
 		// given
 		const fs = createMemoryFs({
@@ -49,6 +64,38 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
 	});
 
+	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {
+		// given
+		const transcriptPath = "/repo/transcript.jsonl";
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+			}),
+			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+			[transcriptPath]: [
+				JSON.stringify({
+					type: "message",
+					payload: {
+						content: {
+							error: {
+								code: "context_too_large",
+							},
+						},
+					},
+				}),
+				"Your input exceeds the context window of this model.",
+				"",
+			].join("\n"),
+		});
+
+		// when
+		const output = runStopHook({ ...createStopInput(), transcript_path: transcriptPath }, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given active codex work #when continuation directive is emitted #then subagent guidance is reliable", () => {
 		// given
 		const fs = createMemoryFs({
@@ -65,10 +112,34 @@ describe("start-work Stop hook", () => {
 		// then
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toMatch(/TASK:/);
-		expect(parsed.reason).toMatch(/fork_turns:\s*"none"/);
-		expect(parsed.reason).toMatch(/wait_agent.*signal, not proof/);
-		expect(parsed.reason).toMatch(/one targeted followup/);
+		expect(parsed.reason).toMatch(/fork_context:\s*false/);
+		expect(parsed.reason).toMatch(/wait_agent.*mailbox signals/);
+		expect(parsed.reason).toMatch(/TASK STILL ACTIVE/);
 		expect(parsed.reason).toMatch(/respawn.*smaller/);
+		expect(parsed.reason).toMatch(/WORKING:/);
+	});
+
+	it("#given active codex work #when continuation directive is emitted #then QA weight is tier-scoped without echo bloat", () => {
+		// given
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+			}),
+			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		});
+
+		// when
+		const output = runStopHook(createStopInput(), fs);
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toMatch(/LIGHT/);
+		expect(parsed.reason).toMatch(/HEAVY/);
+		expect(parsed.reason).toMatch(/When unsure[^.]{0,30}HEAVY/);
+		expect(parsed.reason).toMatch(/mirrors its implementation/);
+		expect((parsed.reason.match(/malformed input, prompt injection/g) ?? []).length).toBe(1);
+		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1100);
 	});
 
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {
@@ -104,6 +175,19 @@ describe("start-work Stop hook", () => {
 		const fs = createMemoryFs({
 			[BOULDER_PATH]: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "completed" }),
 			[PLAN_PATH]: "- [ ] First",
+		});
+
+		// when
+		const output = runStopHook(createStopInput(), fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given malformed boulder JSON #when hook runs #then returns empty output", () => {
+		// given
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: "{",
 		});
 
 		// when

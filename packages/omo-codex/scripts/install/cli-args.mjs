@@ -1,5 +1,5 @@
 const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs.";
-const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run", "ulw-loop"]);
+export const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run", "ulw-loop"]);
 
 export function parseLazyCodexInstallCliArgs(argv) {
 	const args = [...argv];
@@ -72,6 +72,34 @@ export function parseLazyCodexInstallCliArgs(argv) {
 			index += 1;
 			continue;
 		}
+		if (arg === "update") {
+			index += 1;
+			while (index < args.length) {
+				const updateArg = args[index];
+				if (updateArg === "--dry-run") {
+					dryRun = true;
+					index += 1;
+					continue;
+				}
+				if (updateArg === "--repo-root") {
+					repoRoot = readOptionValue(args, index, "--repo-root");
+					index += 2;
+					continue;
+				}
+				if (typeof updateArg === "string" && updateArg.startsWith("--repo-root=")) {
+					const value = updateArg.slice("--repo-root=".length);
+					if (value.trim().length === 0) throw new Error("--repo-root requires a path");
+					repoRoot = value;
+					index += 1;
+					continue;
+				}
+				throw new Error(`Unsupported lazycodex-ai update option: ${String(updateArg)}`);
+			}
+			return { kind: "update", dryRun, repoRoot };
+		}
+		if (arg === "uninstall") {
+			return { kind: "command", command: "cleanup", dryRun, args: args.slice(index + 1) };
+		}
 		if (PASSTHROUGH_COMMANDS.has(arg)) {
 			return { kind: "command", command: arg, dryRun, args: args.slice(index + 1) };
 		}
@@ -104,9 +132,18 @@ function readOptionValue(args, index, option) {
 }
 
 export function formatLazyCodexInstallHelp() {
+	const passthrough = [...PASSTHROUGH_COMMANDS].sort().join(", ");
 	return [
 		"Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
+		"       lazycodex-ai uninstall [--project <path>]",
+		"       lazycodex-ai update [--dry-run] [--repo-root <path>]",
+		"       lazycodex-ai version",
+		"       lazycodex-ai <command> [args...]",
 		"",
-		"Installs the Codex Light edition into ~/.codex using Node/npm.",
+		"Installs or removes the Codex Light edition in ~/.codex using Node/npm.",
+		"`uninstall` removes managed Codex Light state; `cleanup` is a backward-compatible alias.",
+		"`update` refreshes the installed Codex Light edition in place.",
+		"",
+		`Pass-through commands delegated to the omo CLI: ${passthrough}.`,
 	].join("\n");
 }

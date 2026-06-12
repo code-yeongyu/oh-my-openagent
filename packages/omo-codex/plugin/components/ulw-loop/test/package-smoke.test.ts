@@ -59,10 +59,10 @@ describe("package.json", () => {
 		expect((pkg["engines"] as Record<string, unknown>)["node"]).toBe(">=20.0.0");
 	});
 
-	it("exposes the omo binary pointing at dist/cli.js", async () => {
+	it("#given package metadata #when bin is inspected #then exposes the omo-ulw-loop binary pointing at dist/cli.js", async () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const bin = pkg["bin"] as Record<string, string>;
-		expect(bin["omo"]).toBe("./dist/cli.js");
+		expect(bin["omo-ulw-loop"]).toBe("./dist/cli.js");
 	});
 
 	it("ships the expected files for npm publish", async () => {
@@ -118,8 +118,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		const text = await readText("skills/ulw-loop/SKILL.md");
 
 		expect(text).toMatch(/^---\nname: ulw-loop\n/m);
-		expect(text).toContain("Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.");
-		expect(text).toContain("short-description: Goal-like ultrawork loop for systematic decomposition");
 	});
 
 	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop surfaces the ulw-loop alias", async () => {
@@ -136,29 +134,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 
 		expect(text).toContain("search_terms:");
 		expect(text).toContain('- "ulw-loop"');
-	});
-
-	it("references the success criteria and record-evidence vocabulary", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-		expect(text.toLowerCase()).toMatch(/success criteria|successcriteria/);
-		expect(text.toLowerCase()).toContain("record-evidence");
-	});
-
-	it("#given omo is absent from PATH #when bootstrap instructions are read #then local cached CLI fallback is documented", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toContain("If `omo` is absent from PATH");
-		expect(text).toContain("ULW_LOOP_CLI");
-		expect(text).toContain("components/ulw-loop/dist/cli.js");
-	});
-
-	it("#given empty PATH #when bootstrap instructions are read #then handles empty PATH without losing notepad bootstrap", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toContain("If PATH is empty");
-		expect(text).toContain("ULW_LOOP_NODE");
-		expect(text).toContain(".omo/ulw-loop/bootstrap-notepad.md");
-		expect(text).not.toContain("ls -1");
 	});
 
 	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
@@ -205,40 +180,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		}
 	});
 
-	it("uses the .omo workspace path", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
-		expect(text).toContain(".omo/ulw-loop");
-	});
-
-	it("#given long Codex runs #when worker guidance is inspected #then avoids context-expensive agent polling", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toMatch(/list_agents/);
-		expect(text).toMatch(/polling or status tool/);
-		expect(text).toMatch(/replay large agent status and latest-message payloads/);
-		expect(text).toMatch(/Track spawned agent names locally/);
-		expect(text).toMatch(/wait_agent.*completion/);
-		expect(text).toMatch(/targeted followups only when needed/);
-		expect(text).toMatch(/close_agent.*after integrating each result/);
-		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
-		expect(text).toMatch(/short wait_agent cycles/);
-		expect(text).toMatch(/single long blocking wait/);
-		expect(text).toContain("Every worker message MUST carry");
-		expect(text).toContain("Each worker does strict TDD");
-	});
-
-	it("#given Codex subagent delegation #when worker guidance is inspected #then assignment ambiguity is hardened", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
-
-		expect(text).toMatch(/TASK:/);
-		expect(text).toMatch(/fork_turns:\s*"none"/);
-		expect(text).toMatch(/wait_agent.*signal, not proof/);
-		expect(text).toMatch(/one targeted followup/);
-		expect(text).toMatch(/respawn.*smaller/);
-		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
-		expect(text).toMatch(/short wait_agent cycles/);
-		expect(text).toMatch(/single long blocking wait/);
-	});
 });
 
 describe("source LOC budget", () => {

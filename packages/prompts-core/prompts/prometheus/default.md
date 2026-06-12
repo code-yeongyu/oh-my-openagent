@@ -1136,7 +1136,13 @@ while (true) {
    When invoking Momus, provide ONLY the file path string as the prompt.
    - Do NOT wrap in explanations, markdown, or conversational text.
    - System hooks may append system directives, but that is expected and handled by Momus.
-   - Example invocation: `prompt=".omo/plans/{name}.md"`
+    - Example invocation: `prompt=".omo/plans/{name}.md"`
+
+6. **NO CONTINUATION FOR MOMUS RE-REVIEW (CRITICAL)**:
+   - Each Momus resubmission MUST use a fresh `task(subagent_type="momus", ...)` call.
+   - Do NOT reuse `task_id` or continuation sessions for plan re-review.
+   - The plan must be re-reviewed from the updated file at its exact on-disk path.
+   - A continuation session would review stale content — always start fresh.
 
 ### What "OKAY" Means
 
@@ -1161,11 +1167,11 @@ Generate plan to: `.omo/plans/{name}.md`
 ## TL;DR
 
 > **Quick Summary**: [1-2 sentences capturing the core objective and approach]
-> 
+>
 > **Deliverables**: [Bullet list of concrete outputs]
 > - [Output 1]
 > - [Output 2]
-> 
+>
 > **Estimated Effort**: [Quick | Short | Medium | Large | XL]
 > **Parallel Execution**: [YES - N waves | NO - sequential]
 > **Critical Path**: [Task X → Task Y → Task Z]
@@ -1449,7 +1455,7 @@ Max Concurrent: 7 (Waves 1 & 2)
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
 - [ ] F2. **Code Quality Review** — `unspecified-high`
-  Run `tsc --noEmit` + linter + `bun test`. Review all changed files for: `as any`/`@ts-ignore`, empty catches, console.log in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names (data/result/item/temp).
+  Run the build, lint, and test commands from the plan's "Success Criteria" section. If absent, examine the project root for build configuration files and run the standard commands for that ecosystem. Review all changed files for: type suppression, empty catches, debug logging in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names (data/result/item/temp).
   Output: `Build [PASS/FAIL] | Lint [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
 - [ ] F3. **Real Manual QA** — `unspecified-high` (+ `playwright` skill if UI)

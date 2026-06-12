@@ -31,6 +31,7 @@ bunx oh-my-opencode
 | Command | Description |
 | --- | --- |
 | `install` | Interactive setup wizard |
+| `uninstall` / `cleanup` | Remove managed Codex Light state |
 | `doctor` | Installation health diagnostics |
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
@@ -85,6 +86,32 @@ Opt-out env vars:
 
 - Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
 - Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
+
+For the full Codex Light event inventory, collected properties, local state path, and lazycodex marketplace copy path, see [Codex Light telemetry](./codex-telemetry.md).
+
+---
+
+## uninstall / cleanup
+
+Removes managed Codex Light state. `cleanup` remains available as a backward-compatible alias.
+
+### Usage
+
+```bash
+npx lazycodex-ai uninstall
+omo uninstall --platform=codex
+```
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--platform codex` | Required when using the shared `omo` CLI unless `OMO_INVOCATION_NAME` is `lazycodex-ai` |
+| `--codex-home <path>` | Codex home to clean, defaulting to `CODEX_HOME` or `~/.codex` |
+| `--project <path>` | Project directory to inspect for project-local legacy Codex artifacts |
+| `--json` | Output structured JSON result |
+
+The command removes the managed `sisyphuslabs` plugin cache and marketplace snapshot, strips `omo@sisyphuslabs` plugin, hook-state, and managed agent blocks from `~/.codex/config.toml` after writing a backup, and removes managed agent TOML files from `~/.codex/agents/`, including orphaned files whose install manifest is already gone. Project-owned `.codex` artifacts are reported, not deleted.
 
 ---
 

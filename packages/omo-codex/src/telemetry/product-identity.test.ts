@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test"
 
+import packageJson from "../../package.json" with { type: "json" }
 import { getProductVersion } from "./product-identity"
 
 describe("getProductVersion", () => {
-  it("returns omo-codex package version", () => {
-    // given
-
+  it("returns the omo-codex package version from the single source of truth", () => {
     // when
     const version = getProductVersion()
 
     // then
-    expect(version).toBe("0.1.0")
+    expect(version).toBe(packageJson.version)
+    expect(version).toMatch(/^\d+\.\d+\.\d+/)
   })
 })

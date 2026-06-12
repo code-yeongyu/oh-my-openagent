@@ -21,6 +21,19 @@ export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiR
 		parsePositiveInteger(
 			firstEnv(env, "CODEX_RULES_POST_COMPACT_MAX_RESULT_CHARS", "PI_RULES_POST_COMPACT_MAX_RESULT_CHARS"),
 		) ?? config.postCompactMaxResultChars;
+	config.dynamicMaxRuleChars =
+		parsePositiveInteger(firstEnv(env, "CODEX_RULES_DYNAMIC_MAX_RULE_CHARS", "PI_RULES_DYNAMIC_MAX_RULE_CHARS")) ??
+		config.dynamicMaxRuleChars;
+	config.dynamicMaxResultChars =
+		parsePositiveInteger(
+			firstEnv(env, "CODEX_RULES_DYNAMIC_MAX_RESULT_CHARS", "PI_RULES_DYNAMIC_MAX_RESULT_CHARS"),
+		) ?? config.dynamicMaxResultChars;
+	config.promptMaxRuleChars =
+		parsePositiveInteger(firstEnv(env, "CODEX_RULES_PROMPT_MAX_RULE_CHARS", "PI_RULES_PROMPT_MAX_RULE_CHARS")) ??
+		config.promptMaxRuleChars;
+	config.promptMaxResultChars =
+		parsePositiveInteger(firstEnv(env, "CODEX_RULES_PROMPT_MAX_RESULT_CHARS", "PI_RULES_PROMPT_MAX_RESULT_CHARS")) ??
+		config.promptMaxResultChars;
 	config.enabledSources = parseEnabledSources(
 		firstEnv(env, "CODEX_RULES_ENABLED_SOURCES", "PI_RULES_ENABLED_SOURCES"),
 		disableBundledRules,
@@ -77,7 +90,7 @@ function parseEnabledSources(value: string | undefined, disableBundledRules: boo
 		sources.push(source);
 	}
 	const enabledSources = disableBundledRules ? sources.filter((source) => source !== "plugin-bundled") : sources;
-	return enabledSources.length > 0 || sources.length > 0 ? enabledSources : "auto";
+	return enabledSources;
 }
 
 function sourcesWithoutBundledRules(): RuleSource[] {
@@ -91,15 +104,11 @@ function toRuleSource(value: string): RuleSource | null {
 		case ".cursor/rules":
 		case ".github/instructions":
 		case ".github/copilot-instructions.md":
-		case "AGENTS.md":
-		case "CLAUDE.md":
 		case "CONTEXT.md":
 		case "plugin-bundled":
 		case "~/.omo/rules":
 		case "~/.opencode/rules":
 		case "~/.claude/rules":
-		case "~/.config/opencode/AGENTS.md":
-		case "~/.claude/CLAUDE.md":
 			return value;
 		default:
 			return null;

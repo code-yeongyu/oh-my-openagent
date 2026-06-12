@@ -54,6 +54,7 @@ sandbox, free port, server start/stop, and an EXIT-trap cleanup). It requires
 | Export a whole session as JSON | D | `scripts/export-roundtrip.sh <ses_id>` | `references/db-investigation.md` |
 | Check the HTTP server / an endpoint | B | `scripts/server-smoke.sh` | `references/server-api.md` |
 | Prove a hook / action / event fired | B | `scripts/sse-hook-probe.sh` | `references/events-hooks.md` |
+| Prove serve-topology wake runner-split (reproduced/fixed) | B | `scripts/serve-wake-split-probe.sh --expect reproduced\|fixed --evidence-dir DIR` (self-test: `--self-test`; fake LLM: `scripts/lib/fake-openai-server.mjs`) | `references/events-hooks.md` |
 | Smoke-test the TUI | C | `scripts/tui-smoke.sh` | `references/tui-tmux.md` |
 | Write/run a test in the opencode source | - | (bun test) | `references/testing-harness.md` |
 | Drive opencode from a Bun/TS script | - | (SDK) | `references/sdk.md` |

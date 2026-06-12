@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 export const TELEMETRY_SYNC_FILES = [
 	"atomic-write.ts",
 	"data-path.ts",
+	"diagnostics.ts",
 	"env-flags.ts",
 	"posthog-activity-state.ts",
 ];

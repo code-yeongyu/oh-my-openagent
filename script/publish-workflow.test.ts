@@ -18,7 +18,7 @@ const workflowChecks = [
     path: ciWorkflowPath,
     testRuns: [
       "run: bun test",
-      "run: bun test src/shared/dist-bundle-bun-globals.test.ts",
+      "run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts",
     ],
   },
   {
@@ -48,30 +48,58 @@ describe("test workflows", () => {
     }
   })
 
-  test("prepares lsp-tools-mcp before publish workflow tests and typecheck", () => {
+  test("prepares vendored lsp-tools-mcp before publish workflow tests and typecheck", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const testJob = sliceWorkflowSection(workflow, "  test:", "  typecheck:")
     const typecheckJob = sliceWorkflowSection(workflow, "  typecheck:", "  preflight-trust:")
 
     // #when
-    const testHasRecursiveCheckout = testJob.includes("submodules: recursive")
     const testHasNodeSetup = testJob.includes('node-version: "24"')
-    const testBuildsLspToolsMcp = testJob.includes("name: Build lsp-tools-mcp submodule") &&
+    const testBuildsLspToolsMcp = testJob.includes("name: Build vendored lsp-tools-mcp package") &&
       testJob.includes("working-directory: packages/lsp-tools-mcp")
 
-    const typecheckHasRecursiveCheckout = typecheckJob.includes("submodules: recursive")
     const typecheckHasNodeSetup = typecheckJob.includes('node-version: "24"')
-    const typecheckBuildsLspToolsMcp = typecheckJob.includes("name: Build lsp-tools-mcp submodule") &&
+    const typecheckBuildsLspToolsMcp = typecheckJob.includes("name: Build vendored lsp-tools-mcp package") &&
       typecheckJob.includes("working-directory: packages/lsp-tools-mcp")
 
     // #then
-    expect(testHasRecursiveCheckout, "publish test job must checkout submodules recursively").toBe(true)
-    expect(testHasNodeSetup, "publish test job must setup Node for MCP submodule builds").toBe(true)
+    expect(testHasNodeSetup, "publish test job must setup Node for MCP package builds").toBe(true)
     expect(testBuildsLspToolsMcp, "publish test job must build lsp-tools-mcp before bun test").toBe(true)
-    expect(typecheckHasRecursiveCheckout, "publish typecheck job must checkout submodules recursively").toBe(true)
-    expect(typecheckHasNodeSetup, "publish typecheck job must setup Node for MCP submodule builds").toBe(true)
+    expect(typecheckHasNodeSetup, "publish typecheck job must setup Node for MCP package builds").toBe(true)
     expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
+  })
+
+  test("runs Codex compatibility checks before publish jobs", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  preflight-trust:")
+
+    // #when
+    const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
+    const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
+    const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
+    const buildsLspToolsMcp =
+      codexCompatibilityJob.includes("name: Build vendored lsp-tools-mcp package") &&
+      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
+      codexCompatibilityJob.indexOf("name: Build vendored lsp-tools-mcp package") <
+        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
+    const runsCodexCommand = codexCompatibilityJob.includes("run: bun run test:codex")
+    const publishMainNeedsCodex =
+      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
+      workflow.includes("needs.codex-compatibility.result == 'success'")
+    const publishPlatformNeedsCodex =
+      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]") &&
+      workflow.includes("needs.codex-compatibility.result == 'success'")
+
+    // #then
+    expect(hasCodexMatrixJob, "publish workflow must expose a Codex compatibility job").toBe(true)
+    expect(hasSupportedOsMatrix, "publish Codex compatibility must cover supported OSes").toBe(true)
+    expect(hasNodeSetup, "publish Codex compatibility must setup Node for MCP package builds").toBe(true)
+    expect(buildsLspToolsMcp, "publish Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
+    expect(runsCodexCommand, "publish Codex compatibility must run the shared Codex test script").toBe(true)
+    expect(publishMainNeedsCodex, "main wrapper publish must wait for Codex compatibility").toBe(true)
+    expect(publishPlatformNeedsCodex, "platform publish must wait for Codex compatibility").toBe(true)
   })
 
   test("exercise root checks across linux macos and windows", () => {
@@ -102,6 +130,21 @@ describe("test workflows", () => {
     expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
   })
 
+  test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
+
+    const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
+    const buildsLspToolsMcp =
+      codexCompatibilityJob.includes("name: Build vendored lsp-tools-mcp package") &&
+      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
+      codexCompatibilityJob.indexOf("name: Build vendored lsp-tools-mcp package") <
+        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
+
+    expect(hasNodeSetup, "Codex compatibility must setup Node for MCP package builds").toBe(true)
+    expect(buildsLspToolsMcp, "Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
+  })
+
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {
     // #given
     const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
@@ -109,7 +152,7 @@ describe("test workflows", () => {
     // #when
     const codexTestScriptBuildsMcpRuntimes =
       packageManifest.includes(
-        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
+        '"test:codex": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
       )
 
     // #then
@@ -171,7 +214,7 @@ describe("test workflows", () => {
     const computesVersionOnce = (workflow.match(/id: version/g) ?? []).length === 1
     const platformUsesMetadata = workflow.includes("version: ${{ needs.release-metadata.outputs.version }}") &&
       workflow.includes("dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}")
-    const mainWaitsForPlatform = workflow.includes("needs: [test, typecheck, preflight-trust, release-metadata, publish-platform]") &&
+    const mainWaitsForPlatform = workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
       workflow.includes("inputs.skip_platform == true || needs.publish-platform.result == 'success'")
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")
     const wrappersVerifyPlatformPackages = workflow.includes("name: Verify platform packages are published") &&
@@ -300,9 +343,23 @@ describe("test workflows", () => {
     // #then
     expect(buildStep).toContain("bun run build:binaries")
     expect(buildStep).toContain("bin/oh-my-opencode.js")
-    expect(buildStep).not.toContain("bun build src/cli/index.ts --compile")
+    expect(buildStep).not.toContain("bun build packages/omo-opencode/src/cli/index.ts --compile")
     expect(darwinVerifyStep).toContain("#!/usr/bin/env node")
     expect(darwinVerifyStep).not.toContain("codesign")
+  })
+
+  test("regenerates and commits bun.lock in the release version bump", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+
+    // #when
+    const applyStep = sliceWorkflowSection(workflow, "      - name: Apply release version to source tree", "      - name: Commit version bump")
+    const commitStep = sliceWorkflowSection(workflow, "      - name: Commit version bump", "      - name: Create release tag")
+
+    // #then
+    expect(applyStep).toContain("bun install --lockfile-only")
+    expect(applyStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(applyStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
+    expect(commitStep).toContain(" bun.lock")
   })
 
   test("keeps the release tail safe to rerun after a tag exists", () => {

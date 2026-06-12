@@ -19,25 +19,25 @@ type CiTestTargetSelection = {
   sharedTestFiles: string[]
 }
 
-const TEST_ROOTS = ["bin", "script", "src"] as const
+const TEST_ROOTS = ["bin", "script", "packages/omo-opencode/src"] as const
 const MODULE_MOCK_PATTERN = "mock.module("
 const ALWAYS_ISOLATED_TEST_FILES = [
-  "src/features/team-mode/team-mailbox/ack.test.ts",
-  "src/features/team-mode/team-mailbox/send.test.ts",
-  "src/features/team-mode/team-runtime/shutdown.test.ts",
-  "src/features/team-mode/team-runtime/status.test.ts",
-  "src/features/team-mode/team-state-store/resume.test.ts",
-  "src/features/team-mode/team-state-store/store.test.ts",
-  "src/features/boulder-state/storage.test.ts",
-  "src/hooks/anthropic-context-window-limit-recovery/aggressive-truncation-strategy.test.ts",
-  "src/hooks/session-notification-input-needed.test.ts",
-  "src/hooks/session-notification-sender.test.ts",
-  "src/hooks/session-notification.test.ts",
-  "src/openclaw/__tests__/reply-listener-discord.test.ts",
-  "src/tools/background-task/create-background-output.blocking.test.ts",
-  "src/tools/background-task/tools.test.ts",
-  "src/tools/interactive-bash/tmux-path-resolver.test.ts",
-  "src/tools/task/task-list.test.ts",
+  "packages/omo-opencode/src/features/team-mode/team-mailbox/ack.test.ts",
+  "packages/omo-opencode/src/features/team-mode/team-mailbox/send.test.ts",
+  "packages/omo-opencode/src/features/team-mode/team-runtime/shutdown.test.ts",
+  "packages/omo-opencode/src/features/team-mode/team-runtime/status.test.ts",
+  "packages/omo-opencode/src/features/team-mode/team-state-store/resume.test.ts",
+  "packages/omo-opencode/src/features/team-mode/team-state-store/store.test.ts",
+  "packages/omo-opencode/src/features/boulder-state/storage.test.ts",
+  "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/aggressive-truncation-strategy.test.ts",
+  "packages/omo-opencode/src/hooks/session-notification-input-needed.test.ts",
+  "packages/omo-opencode/src/hooks/session-notification-sender.test.ts",
+  "packages/omo-opencode/src/hooks/session-notification.test.ts",
+  "packages/omo-opencode/src/openclaw/__tests__/reply-listener-discord.test.ts",
+  "packages/omo-opencode/src/tools/background-task/create-background-output.blocking.test.ts",
+  "packages/omo-opencode/src/tools/background-task/tools.test.ts",
+  "packages/omo-opencode/src/tools/interactive-bash/tmux-path-resolver.test.ts",
+  "packages/omo-opencode/src/tools/task/task-list.test.ts",
 ] as const
 
 async function collectTestFiles(rootDirectory: string): Promise<string[]> {

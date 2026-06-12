@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { ulwLoopCommand } from "./cli-commands.js";
+import { isUlwLoopSubcommand, ulwLoopCommand } from "./cli-commands.js";
 import { runPreToolUseGoalBudgetGuardCli, runUlwLoopHookCli } from "./codex-hook.js";
 
 const TOP_LEVEL_HELP =
@@ -26,6 +26,7 @@ async function main(): Promise<number> {
 		process.stderr.write(`[omo] unknown hook subcommand: ${sub ?? "(none)"}\n`);
 		return 1;
 	}
+	if (isUlwLoopSubcommand(command)) return ulwLoopCommand(argv);
 	process.stderr.write(`[omo] unknown command: ${command}\n${TOP_LEVEL_HELP}`);
 	return 1;
 }

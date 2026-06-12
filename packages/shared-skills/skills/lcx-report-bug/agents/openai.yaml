@@ -1,0 +1,11 @@
+interface:
+  display_name: "lcx-report-bug (omo)"
+  short_description: "Route LazyCodex or Codex bugs with source evidence"
+  search_terms:
+    - "lcx-report-bug"
+    - "lazycodex bug"
+    - "lazycodex issue"
+    - "omo-codex bug"
+    - "openai codex bug"
+    - "codex upstream issue"
+  default_prompt: "Use $lcx-report-bug to investigate this LazyCodex or Codex bug, compare LazyCodex evidence with /tmp openai/codex source, choose the correct GitHub repo, and file an issue (or, for openai/codex only, a PR — never a PR on code-yeongyu/lazycodex) with reproduction, root cause, fix guidance, and the lazycodex-generated label and footer."

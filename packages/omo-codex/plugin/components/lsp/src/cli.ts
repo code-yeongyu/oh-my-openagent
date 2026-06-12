@@ -3,10 +3,10 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { argv, execPath, stderr } from "node:process";
 
-import { runPostToolUseHookCli } from "./codex-hook-cli.js";
+import { runPostCompactHookCli, runPostToolUseHookCli } from "./codex-hook-cli.js";
 
 const require = createRequire(import.meta.url);
-const PACKAGE_LSP_MCP_CLI = "@code-yeongyu/lsp-tools-mcp/dist/cli.js";
+const PACKAGE_LSP_MCP_CLI = "@code-yeongyu/lsp-daemon/dist/cli.js";
 
 async function main(): Promise<void> {
 	const [command = "mcp", subcommand = ""] = argv.slice(2);
@@ -15,13 +15,17 @@ async function main(): Promise<void> {
 		await runPostToolUseHookCli();
 		return;
 	}
+	if (command === "hook" && subcommand === "post-compact") {
+		await runPostCompactHookCli();
+		return;
+	}
 
 	if (command === "mcp") {
 		await runPackageLspMcpCli();
 		return;
 	}
 
-	stderr.write("Usage: omo-lsp [mcp | hook post-tool-use]\n");
+	stderr.write("Usage: omo-lsp [mcp | hook post-tool-use | hook post-compact]\n");
 	process.exitCode = 2;
 }
 

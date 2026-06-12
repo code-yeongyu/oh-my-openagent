@@ -26,14 +26,17 @@ interface Fixture {
 
 const BUNDLED_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: "plugin-bundled",
+	CODEX_RULES_MAX_RESULT_CHARS: "40000",
 };
 
 const PROJECT_AND_BUNDLED_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: ".omo/rules,plugin-bundled",
+	CODEX_RULES_MAX_RESULT_CHARS: "40000",
 };
 
 const DISABLED_BUNDLED_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: "plugin-bundled",
+	CODEX_RULES_MAX_RESULT_CHARS: "40000",
 	CODEX_RULES_DISABLE_BUNDLED: "1",
 };
 
@@ -147,9 +150,9 @@ describe("plugin bundled rules", () => {
 		expect(cache.scannedRuleFiles.has(join(pluginRoot, "bundled-rules"))).toBe(true);
 	});
 
-	it("#given alwaysApply bundled rule #when SessionStart runs #then static context includes it", async () => {
+	it("#given alwaysApply bundled Hephaestus rule #when SessionStart runs #then static context expands it inline", async () => {
 		// given
-		const { root, pluginData } = makeFixture();
+		const { root, pluginData, bundledRulePath } = makeFixture();
 
 		// when
 		const output = await runSessionStartHook(sessionStartInput(root), {
@@ -159,10 +162,14 @@ describe("plugin bundled rules", () => {
 
 		// then
 		expect(output).toContain('"hookEventName":"SessionStart"');
+		expect(output).toContain(`Instructions from: ${bundledRulePath}`);
 		expect(output).toContain(BUNDLED_BODY);
+		expect(output).toContain("## Project Instructions");
+		expect(output).not.toContain("must read project rules:");
+		expect(output).not.toContain(`- [hephaestus.md]{${bundledRulePath}}`);
 	});
 
-	it("#given same project and bundled body #when SessionStart runs #then project rule wins", async () => {
+	it("#given same project and bundled body #when SessionStart runs #then project rule file wins", async () => {
 		// given
 		const { root, pluginData, bundledRulePath, projectRulePath } = makeFixture({ writeProjectDuplicate: true });
 
@@ -173,8 +180,9 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
-		expect(occurrenceCount(output, SHARED_BODY)).toBe(1);
-		expect(output).toContain(projectRulePath);
+		expect(occurrenceCount(output, "- [hephaestus.md]{")).toBe(0);
+		expect(output).toContain(`Instructions from: ${projectRulePath}`);
+		expect(output).toContain(SHARED_BODY);
 		expect(output).not.toContain(bundledRulePath);
 	});
 
@@ -192,13 +200,14 @@ describe("plugin bundled rules", () => {
 		expect(output).toBe("");
 	});
 
-	it("#given bundled static context already injected #when UserPromptSubmit runs after PostCompact #then it emits no duplicate bundled context", async () => {
+	it("#given bundled static context dropped by compaction #when UserPromptSubmit runs after PostCompact #then it re-injects the bundled persona body in full", async () => {
 		// given
-		const { root, pluginData } = makeFixture();
+		const { root, pluginData, bundledRulePath } = makeFixture();
 		const firstOutput = await runSessionStartHook(sessionStartInput(root), {
 			pluginDataRoot: pluginData,
 			env: BUNDLED_ONLY_ENV,
 		});
+		expect(firstOutput).toContain(`Instructions from: ${bundledRulePath}`);
 		expect(firstOutput).toContain(BUNDLED_BODY);
 
 		// when
@@ -210,10 +219,12 @@ describe("plugin bundled rules", () => {
 
 		// then
 		expect(compactOutput).toBe("");
-		expect(output).toBe("");
+		expect(output).toContain(`Instructions from: ${bundledRulePath}`);
+		expect(output).toContain(BUNDLED_BODY);
+		expect(output).not.toContain("[Truncated. Full:");
 	});
 
-	it("#given bundled rule body exceeds per-rule cap #when SessionStart runs #then bundled body lands in full without truncation", async () => {
+	it("#given bundled Hephaestus rule body exceeds per-rule cap #when SessionStart runs #then static context expands the body within result budget", async () => {
 		// given
 		const root = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-project-"));
 		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-plugin-"));
@@ -224,8 +235,9 @@ describe("plugin bundled rules", () => {
 		const oversizedBody = "The bundled craftsman discipline is non-negotiable. ".repeat(400);
 		expect(oversizedBody.length).toBeGreaterThan(12000);
 		const tailMarker = "BUNDLED_TAIL_SENTINEL_LANDS_IN_FULL";
+		const bundledRulePath = join(pluginRoot, "bundled-rules", "hephaestus.md");
 		const bundledBody = `${oversizedBody}\n\n${tailMarker}\n`;
-		writeFileSync(join(pluginRoot, "bundled-rules", "hephaestus.md"), ruleMarkdown(bundledBody));
+		writeFileSync(bundledRulePath, ruleMarkdown(bundledBody));
 		process.env["PLUGIN_ROOT"] = pluginRoot;
 
 		// when
@@ -235,11 +247,13 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
+		expect(output).toContain(`Instructions from: ${bundledRulePath}`);
+		expect(output).toContain("The bundled craftsman discipline is non-negotiable.");
 		expect(output).toContain(tailMarker);
 		expect(output).not.toContain("[Truncated. Full:");
 	});
 
-	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then project body is truncated", async () => {
+	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then static context injects a truncated body", async () => {
 		// given
 		const root = mkdtempSync(join(tmpdir(), "codex-rules-project-large-project-"));
 		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-project-large-plugin-"));
@@ -251,8 +265,9 @@ describe("plugin bundled rules", () => {
 		const oversizedBody = "The project rule body is intentionally oversized for the cap test. ".repeat(300);
 		expect(oversizedBody.length).toBeGreaterThan(12000);
 		const tailMarker = "PROJECT_TAIL_SENTINEL_SHOULD_NOT_LAND";
+		const projectRulePath = join(root, ".omo", "rules", "oversized.md");
 		const projectBody = `${oversizedBody}\n\n${tailMarker}\n`;
-		writeFileSync(join(root, ".omo", "rules", "oversized.md"), ruleMarkdown(projectBody));
+		writeFileSync(projectRulePath, ruleMarkdown(projectBody));
 		process.env["PLUGIN_ROOT"] = pluginRoot;
 
 		// when
@@ -262,7 +277,9 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
-		expect(output).toContain("[Truncated. Full: .omo/rules/oversized.md]");
+		expect(output).toContain(`Instructions from: ${projectRulePath}`);
+		expect(output).toContain("The project rule body is intentionally oversized for the cap test.");
+		expect(output).toContain("[Truncated. Full:");
 		expect(output).not.toContain(tailMarker);
 	});
 });

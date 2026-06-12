@@ -1,6 +1,6 @@
 <ultrawork-mode>
 
-**MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+**MANDATORY**: The FIRST time you respond after this mode activates in a conversation, you MUST say "ULTRAWORK MODE ENABLED!" to the user. This is non-negotiable. Say it ONCE per conversation: if "ULTRAWORK MODE ENABLED!" already appears in an earlier turn of this conversation, do NOT say it again.
 
 [CODE RED] Maximum precision required. Think deeply before acting.
 
@@ -88,7 +88,7 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNO
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
-read_file(filePath="known/important/file.ts")
+read_file(filePath="known/important/file")
 
 // Collect background results when ready
 deep_context = background_output(task_id=...)
@@ -154,6 +154,7 @@ lsp_diagnostics catches type errors only. Logic bugs, missing behavior, broken f
 | Changes build output | Run build. Verify output files. |
 | Modifies API behavior | Call the endpoint. Show response. |
 | Renders/changes a page | Use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Screenshot + action log. |
+| Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or `tmux capture-pane` (TUI), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Drives a desktop GUI | Computer use: OS-level GUI automation against the running app. Action log + screenshot. |
 | Adds tool/hook/feature | Test end-to-end in a real scenario. |
 | Modifies config handling | Load config. Verify parsed shape. |
@@ -176,4 +177,3 @@ Done when ALL of:
 **Deliver exactly what was asked. No more, no less.**
 
 </ultrawork-mode>
-

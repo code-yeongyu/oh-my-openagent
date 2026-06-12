@@ -41,14 +41,14 @@ flowchart TB
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m2.7"]
+        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
     end
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m2.7"]
+        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
-        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / claude-haiku-4-5"]
-        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / claude-haiku-4-5"]
+        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
+        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Frontend[" visual-engineering<br/>(category + frontend-ui-ux)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
     end
 
@@ -75,7 +75,7 @@ flowchart TB
     Frontend -->|"UI code"| Orchestrator
 ```
 
-Model labels above show the current fallback stacks from `src/shared/model-requirements.ts`, not marketing names.
+Model labels above show the current fallback stacks from `packages/omo-opencode/src/shared/model-requirements.ts`, not marketing names.
 
 ### Agent Inventory and Modes (Current)
 
@@ -274,7 +274,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.5` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
@@ -324,7 +324,7 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 Notes:
 
-- Built-in defaults are defined in `src/tools/delegate-task/*-categories.ts` and `src/shared/model-requirements.ts`
+- Built-in defaults are defined in `packages/omo-opencode/src/tools/delegate-task/*-categories.ts` and `packages/omo-opencode/src/shared/model-requirements.ts`
 - Projects/users can extend categories via config; additional category names may appear in your session prompt
 - Regardless of category name, category dispatch goes through Sisyphus-Junior
 

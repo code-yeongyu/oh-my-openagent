@@ -1,11 +1,11 @@
 > [!NOTE]
-> **🚀 First Codex Release: omo is now available for Codex CLI**
+> **OmO for Codex is here: try LazyCodex**
 >
-> No more complex JSON configurations. Just run:
+> We loved Anthropic models enough to get blocked. Now we are backing Codex.
+> If you are an OmO fan but the setup felt like too much, use LazyCodex. OmO for Codex has shipped:
 > ```bash
 > npx lazycodex-ai install
 > ```
-> Your Codex will code clearly and complete tasks using built-in computer-use QA.
 > Learn more at [lazycodex.ai](https://lazycodex.ai).
 
 > [!NOTE]
@@ -114,7 +114,7 @@ Install oh-my-openagent. Type `ultrawork`. Done.
 oh-my-openagent ships in two editions of the same product:
 
 - **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, ulw-loop, ultrawork, hashline edits — everything.
-- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`. No agent orchestration, no `team_*` tools, no built-in MCPs beyond LSP — Codex CLI's own surface does that work.
+- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `ast_grep`, `grep_app`, `context7`, `git_bash`, and `lsp`. No agent orchestration and no `team_*` tools — Codex CLI's own surface does that work.
 
 Pick the edition(s) you want.
 
@@ -157,7 +157,7 @@ Fetch the full guide and follow it step by step:
 curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `search`, `analyze`, `team`, `hyperplan`), slash commands, the Light edition's 5 Codex components, Team Mode, and uninstall. Don't summarize it; read it end to end.
+The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `search`, `analyze`, `team`, `hyperplan`), slash commands, the Light edition's 8 Codex components, Team Mode, and uninstall. Don't summarize it; read it end to end.
 
 ### Note on package and command names
 
@@ -212,7 +212,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |       | Feature                                                  | Edition  | What it does                                                                                                                                                                                                     |
 | :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                              | Light    | Portable OMO components (rules, comment-checker, LSP, ultrawork, ulw-loop, start-work continuation, telemetry) running inside OpenAI Codex CLI. Install via `npx lazycodex-ai install`.                       |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | Portable OMO components (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, start-work continuation, telemetry) running inside OpenAI Codex CLI. Install via `npx lazycodex-ai install`.             |
 |   👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Analyzes true user intent before classifying or acting. No more literal misinterpretations. (Light edition only recognises the `ultrawork`/`ulw` keyword.)                                                       |
@@ -407,12 +407,16 @@ To remove oh-my-openagent:
 4. **Remove omo-codex (Codex CLI Light edition)**
 
    ```bash
+   npx lazycodex-ai uninstall
+   # backward-compatible alias:
    npx lazycodex-ai cleanup
-   # or, from the shared CLI:
+
+   omo uninstall --platform=codex
+   # backward-compatible alias:
    omo cleanup --platform=codex
    ```
 
-   The cleanup command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old `oh-my-codex` / `omx` state, run the command from that project or pass `--project <path>`; it repairs the known project-local `.codex/config.toml` conflict and reports `.codex` / `.omx` artifacts without deleting project-owned files.
+   The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old project-local Codex plugin state, run the command from that project or pass `--project <path>`; it repairs known project-local `.codex/config.toml` conflicts and reports project-local `.codex` artifacts without deleting project-owned files.
 
 ## Features
 
@@ -489,6 +493,8 @@ This plugin is the distillation. Take the best. Got improvements? PRs welcome.
 Sounds arrogant? Have a better way? Contribute. You're welcome.
 
 No affiliation with any project or model mentioned. Just personal experimentation.
+
+Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal, UltraQA, and Sparkshell ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
 
 99% of this project was built with OpenCode. I don't really know TypeScript, **but I personally reviewed and largely rewrote this doc.**
 

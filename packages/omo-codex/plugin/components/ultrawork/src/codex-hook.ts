@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { ULTRAWORK_DIRECTIVE } from "./directive.js";
 
 const ULTRAWORK_PATTERN = /\b(?:ultrawork|ulw)\b/i;
+const ULTRAWORK_DIRECTIVE_MARKER = "<ultrawork-mode>";
+const TRANSCRIPT_SEARCH_BYTES = 512_000;
 const CONTEXT_PRESSURE_MARKERS = [
 	"context compacted",
 	"context_length_exceeded",
@@ -29,8 +31,52 @@ interface UserPromptSubmitHookOutput {
 export function runUserPromptSubmitHook(input: unknown): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
+	if (hasUltraworkDirectiveAlreadyInTranscript(input.transcript_path)) return "";
 	if (isContextPressureTranscript(input.transcript_path)) return "";
 	return isUltraworkPrompt(input.prompt) ? formatAdditionalContextOutput(ULTRAWORK_DIRECTIVE) : "";
+}
+
+function hasUltraworkDirectiveAlreadyInTranscript(transcriptPath: string | null | undefined): boolean {
+	if (transcriptPath === undefined || transcriptPath === null) return false;
+	try {
+		const rawTranscript = readTranscriptTail(transcriptPath);
+		for (const line of rawTranscript.split(/\r?\n/)) {
+			const parsed = parseJsonLine(line);
+			if (parsed === null) {
+				continue;
+			}
+
+			if (!isRecord(parsed)) {
+				continue;
+			}
+
+			const hookSpecificOutput = parsed["hookSpecificOutput"];
+			if (!isRecord(hookSpecificOutput)) {
+				continue;
+			}
+
+			if (hookSpecificOutput["hookEventName"] !== "UserPromptSubmit") {
+				continue;
+			}
+
+			if (
+				typeof hookSpecificOutput["additionalContext"] === "string" &&
+				hookSpecificOutput["additionalContext"].includes(ULTRAWORK_DIRECTIVE_MARKER)
+			) {
+				return true;
+			}
+		}
+	} catch (error) {
+		if (error instanceof Error) return false;
+		throw error;
+	}
+
+	return false;
+}
+
+function readTranscriptTail(transcriptPath: string): string {
+	const rawTranscript = readFileSync(transcriptPath);
+	return rawTranscript.subarray(Math.max(0, rawTranscript.byteLength - TRANSCRIPT_SEARCH_BYTES)).toString("utf8");
 }
 
 export function isUltraworkPrompt(prompt: string): boolean {
@@ -66,6 +112,22 @@ function formatAdditionalContextOutput(additionalContext: string): string {
 
 function normalizeAdditionalContext(additionalContext: string): string {
 	return additionalContext.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+}
+
+function parseJsonLine(line: string): unknown | null {
+	if (line.trim().length === 0) {
+		return null;
+	}
+
+	try {
+		const parsed: unknown = JSON.parse(line);
+		return parsed;
+	} catch (error) {
+		if (error instanceof Error) {
+			return null;
+		}
+		throw error;
+	}
 }
 
 function isCodexUserPromptSubmitInput(value: unknown): value is CodexUserPromptSubmitInput {

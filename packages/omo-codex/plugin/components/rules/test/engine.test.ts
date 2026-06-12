@@ -1,14 +1,15 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { configFromEnvironment } from "../src/config.js";
 import { createEngine, defaultConfig, type EngineDeps } from "../src/rules/engine.js";
 import { matchRule as defaultMatchRule } from "../src/rules/matcher.js";
 import type { RuleCandidate } from "../src/rules/types.js";
 
 const projectRoot = "/tmp/codex-rules-engine";
 
-function makeCandidate(): RuleCandidate {
-	return {
+function makeCandidate(overrides: Partial<RuleCandidate> = {}): RuleCandidate {
+	const candidate = {
 		path: join(projectRoot, ".omo", "rules", "typescript.md"),
 		realPath: join(projectRoot, ".omo", "rules", "typescript.md"),
 		source: ".omo/rules",
@@ -16,7 +17,8 @@ function makeCandidate(): RuleCandidate {
 		isGlobal: false,
 		isSingleFile: false,
 		relativePath: ".omo/rules/typescript.md",
-	};
+	} satisfies RuleCandidate;
+	return { ...candidate, ...overrides };
 }
 
 describe("rule engine dynamic matching", () => {
@@ -188,5 +190,117 @@ describe("rule engine dynamic matching", () => {
 		expect(sourceResult.rules).toHaveLength(1);
 		expect(testResult.rules).toHaveLength(0);
 		expect(matchCalls).toBe(2);
+	});
+});
+
+describe("rule engine default source selection", () => {
+	it("#given auto source selection #when loading static rules #then Codex-native and Claude-home sources are disabled by default", () => {
+		// given
+		let capturedDisabledSources: ReadonlySet<string> | undefined;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: (options) => {
+				capturedDisabledSources = options.disabledSources;
+				return [];
+			},
+			readFile: () => null,
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(capturedDisabledSources?.has("AGENTS.md")).toBe(true);
+		expect(capturedDisabledSources?.has("~/.claude/rules")).toBe(true);
+		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(true);
+		expect(capturedDisabledSources?.has("CLAUDE.md")).toBe(false);
+	});
+
+	it("#given removed agent-doc sources and a real source are requested #when loading static rules #then only real sources are enabled", () => {
+		// given
+		let capturedDisabledSources: ReadonlySet<string> | undefined;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: (options) => {
+				capturedDisabledSources = options.disabledSources;
+				return [];
+			},
+			readFile: () => null,
+		} satisfies EngineDeps;
+		const engine = createEngine(
+			configFromEnvironment({ CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,~/.claude/CLAUDE.md,plugin-bundled" }),
+			deps,
+		);
+
+		// when
+		engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(capturedDisabledSources?.has("AGENTS.md")).toBe(false);
+		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(false);
+		expect(capturedDisabledSources?.has("plugin-bundled")).toBe(false);
+		expect(capturedDisabledSources?.has(".omo/rules")).toBe(true);
+	});
+});
+
+describe("rule engine static loading", () => {
+	it("#given multiple root single-file candidates #when loading static rules #then only one root single-file rule is selected", () => {
+		// given
+		const firstCandidate = makeCandidate({
+			path: join(projectRoot, "CONTEXT.md"),
+			realPath: join(projectRoot, "CONTEXT.md"),
+			source: "CONTEXT.md",
+			isSingleFile: true,
+			relativePath: "CONTEXT.md",
+		});
+		const secondCandidate = makeCandidate({
+			path: join(projectRoot, "nested", "CONTEXT.md"),
+			realPath: join(projectRoot, "nested", "CONTEXT.md"),
+			source: "CONTEXT.md",
+			isSingleFile: true,
+			relativePath: "nested/CONTEXT.md",
+		});
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [firstCandidate, secondCandidate],
+			readFile: () => "Shared project context.",
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(result.rules).toHaveLength(1);
+		expect(result.rules[0]?.matchReason).toBe("single-file");
+	});
+
+	it("#given project candidate resolves outside project #when loading static rules #then the rule is skipped with a diagnostic", () => {
+		// given
+		const outsidePath = "/tmp/codex-rules-outside/.omo/rules/typescript.md";
+		const outsideCandidate = makeCandidate({
+			path: outsidePath,
+			realPath: outsidePath,
+		});
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: () => [outsideCandidate],
+			readFile: () => "Should not be read.",
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		const result = engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(result.rules).toEqual([]);
+		expect(result.diagnostics).toEqual([
+			{
+				severity: "warning",
+				source: outsidePath,
+				message: "Rule file resolves outside project root",
+			},
+		]);
 	});
 });

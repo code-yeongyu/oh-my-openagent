@@ -34,7 +34,7 @@ oqa_tui_smoke() {
   tmux new-session -d -s "$sess" -x 200 -y 50
   # launch the TUI inside the pane, carrying the isolated sandbox env
   tmux send-keys -t "$sess" \
-    "XDG_DATA_HOME='$XDG_DATA_HOME' XDG_CONFIG_HOME='$XDG_CONFIG_HOME' XDG_CACHE_HOME='$XDG_CACHE_HOME' XDG_STATE_HOME='$XDG_STATE_HOME' OPENCODE_DISABLE_AUTOUPDATE=1 OPENCODE_DISABLE_MODELS_FETCH=1 opencode '$OQA_PROJ'" Enter
+    "HOME='$HOME' OPENCODE_TEST_HOME='$OPENCODE_TEST_HOME' XDG_DATA_HOME='$XDG_DATA_HOME' XDG_CONFIG_HOME='$XDG_CONFIG_HOME' XDG_CACHE_HOME='$XDG_CACHE_HOME' XDG_STATE_HOME='$XDG_STATE_HOME' OPENCODE_DISABLE_AUTOUPDATE=1 OPENCODE_DISABLE_MODELS_FETCH=1 opencode '$OQA_PROJ'" Enter
 
   # poll for a render marker (version string, composer placeholder, or footer)
   for ((i=0; i<50; i++)); do

@@ -1,6 +1,6 @@
 # @oh-my-opencode/omo-codex
 
-Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, LSP MCP, ultrawork, ulw-loop, start-work continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
+Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, plugin-scoped MCPs, ultrawork, ulw-loop, start-work continuation, telemetry) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
 
 ## Layout
 
@@ -14,7 +14,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 
 ## Components Vendored
 
-- `rules` (TypeScript) - injects `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**` into context via `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact`.
+- `rules` (TypeScript) - injects `CONTEXT.md` / `.omo/rules/**` and other explicit rule sources into context via `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact`; `AGENTS.md` is left to Codex native handling.
 - `comment-checker` (TypeScript) - runs `@code-yeongyu/comment-checker` after `apply_patch` / `edit` / `write` tool use.
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
 - `git-bash` (TypeScript + Git Bash MCP) - exposes the Windows-only `git_bash` MCP and reminds Codex on the first shell-like call, including the first one after compaction.
@@ -35,11 +35,12 @@ npx lazycodex-ai install --no-tui --codex-autonomous
 
 To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
 
-The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes stable agent TOML links through `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
-To remove managed Codex Light state, run `npx lazycodex-ai cleanup`. The command removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes installed agent TOML links from the manifest, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving `.codex` / `.omx` project files in place.
+To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
-The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer leaves any existing user-level `[mcp_servers.context7]` block untouched but no longer creates one.
+The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
+The same plugin-scoped MCP manifest also bundles `ast_grep`, `grep_app`, `git_bash`, and `lsp`. `git_bash` is enabled only on Windows by default.
 
 Native Windows installs prepare Git Bash before the installer mutates `~/.codex/`. If `bash.exe` is not already discoverable, the installer first tries the same best-effort install command shown here, then resolves Git Bash again:
 
@@ -75,6 +76,8 @@ Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits t
 
 Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
 
+The captured properties are limited to product/runtime metadata, operating-system metadata, coarse machine shape (`cpu_count`, `cpu_model`, `total_memory_gb`), locale/timezone, shell/terminal hints, `source`, `reason`, and `day_utc`. Telemetry does not send prompt contents, chat transcripts, source files, repository contents, file paths, access tokens, API keys, raw hostnames, Git remotes, usernames, email addresses, or runtime error diagnostics.
+
 Opt out with:
 
 ```bash
@@ -89,7 +92,7 @@ export OMO_SEND_ANONYMOUS_TELEMETRY=0
 
 The identity constants and opt-out behavior are pinned across both sources by `src/telemetry/cross-package-equivalence.test.ts`.
 
-See `/Users/yeongyu/local-workspaces/omodex/docs/legal/privacy-policy.md` for the full disclosure.
+See [Codex Light telemetry](../../docs/reference/codex-telemetry.md) and the [Privacy Policy](../../docs/legal/privacy-policy.md) for the full disclosure.
 
 ## Component Sources
 

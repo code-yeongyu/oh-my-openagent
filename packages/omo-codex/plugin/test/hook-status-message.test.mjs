@@ -11,6 +11,7 @@ import {
 } from "../scripts/hook-status-message.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const repoRoot = join(root, "..", "..", "..");
 
 const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:SessionStart:0:0", "Loading Project Rules"],
@@ -24,6 +25,7 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:PostToolUse:0:1", "Checking LSP Diagnostics"],
 	["hooks/hooks.json:PostToolUse:1:0", "Matching Project Rules"],
 	["hooks/hooks.json:PostCompact:0:0", "Resetting Project Rule Cache"],
+	["hooks/hooks.json:PostCompact:2:0", "Resetting LSP Diagnostics Cache"],
 	["hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
 	["hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
 ]);
@@ -31,6 +33,7 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 const COMPONENT_EXPECTED_LABELS = new Map([
 	["components/comment-checker/hooks/hooks.json:PostToolUse:0:0", "Checking Comments"],
 	["components/lsp/hooks/hooks.json:PostToolUse:0:0", "Checking LSP Diagnostics"],
+	["components/lsp/hooks/hooks.json:PostCompact:0:0", "Resetting LSP Diagnostics Cache"],
 	["components/rules/hooks/hooks.json:SessionStart:0:0", "Loading Project Rules"],
 	["components/rules/hooks/hooks.json:UserPromptSubmit:0:0", "Loading Project Rules"],
 	["components/rules/hooks/hooks.json:PostToolUse:0:0", "Matching Project Rules"],
@@ -45,6 +48,18 @@ const COMPONENT_EXPECTED_LABELS = new Map([
 
 async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
+}
+
+async function readRepoJson(relativePath) {
+	return JSON.parse(await readFile(join(repoRoot, relativePath), "utf8"));
+}
+
+async function readPluginVersion() {
+	return (await readJson(".codex-plugin/plugin.json")).version;
+}
+
+async function readComponentVersion(componentName) {
+	return (await readJson(join("components", componentName, "package.json"))).version;
 }
 
 async function exists(relativePath) {
@@ -64,30 +79,10 @@ async function readComponentHookManifests() {
 		if (!entry.isDirectory()) continue;
 		const source = join("components", entry.name, "hooks", "hooks.json");
 		if (!(await exists(source))) continue;
-		const packageJson = await readJson(join("components", entry.name, "package.json"));
-		manifests.push({ source, version: packageJson.version, hooks: await readJson(source) });
+		const version = await readComponentVersion(entry.name);
+		manifests.push({ source, version, hooks: await readJson(source) });
 	}
 	return manifests.sort((left, right) => left.source.localeCompare(right.source));
-}
-
-async function readComponentVersions() {
-	const components = await readdir(join(root, "components"), { withFileTypes: true });
-	const versions = new Map();
-	for (const entry of components) {
-		if (!entry.isDirectory()) continue;
-		if (!(await exists(join("components", entry.name, "package.json")))) continue;
-		const packageJson = await readJson(join("components", entry.name, "package.json"));
-		versions.set(entry.name, packageJson.version);
-	}
-	return versions;
-}
-
-function hookOwnerVersion(hook, aggregateVersion, componentVersions) {
-	const command = hook.command;
-	for (const [componentName, version] of componentVersions.entries()) {
-		if (command.includes(`/components/${componentName}/dist/cli.js`)) return version;
-	}
-	return aggregateVersion;
 }
 
 function collectCommandHooks(hooks, source, version) {
@@ -109,16 +104,16 @@ function collectCommandHooks(hooks, source, version) {
 	return commandHooks;
 }
 
-test("#given hook status label #when formatting #then prefixes LazyCodex with version", () => {
+test("#given hook status label #when formatting #then prefixes LazyCodex with current version", async () => {
 	// given
-	const version = "0.1.0";
+	const version = (await readRepoJson("package.json")).version;
 	const label = "Checking Comments";
 
 	// when
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-	assert.equal(message, "LazyCodex(0.1.0): Checking Comments");
+	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
 test("#given hook status label with blank version #when formatting #then prefixes LazyCodex with local version", () => {
@@ -133,9 +128,9 @@ test("#given hook status label with blank version #when formatting #then prefixe
 	assert.equal(message, "LazyCodex(local): Checking Comments");
 });
 
-test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", () => {
+test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", async () => {
 	// given
-	const version = "0.1.0";
+	const version = (await readRepoJson("package.json")).version;
 	const label = "  checking   OMO comments  ";
 
 	// when
@@ -144,36 +139,32 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 
 	// then
 	assert.equal(normalized, "Checking Comments");
-	assert.equal(message, "LazyCodex(0.1.0): Checking Comments");
+	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
+	const aggregateVersion = await readPluginVersion();
 	const aggregateHooks = await readJson("hooks/hooks.json");
-	const componentVersions = await readComponentVersions();
 
 	// when
-	const hooks = collectCommandHooks(aggregateHooks, "hooks/hooks.json", "0.1.0");
+	const hooks = collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion);
 	const commentCheckerHook = hooks.find((hook) => hook.id === "hooks/hooks.json:PostToolUse:0:0");
 
 	// then
-	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage(componentVersions.get("comment-checker"), "Checking Comments"));
+	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage(aggregateVersion, "Checking Comments"));
 	assert.doesNotMatch(JSON.stringify(aggregateHooks), /checking\s+OMO\s+comments/i);
 });
 
 test("#given aggregate and component hooks #when status messages are inspected #then all use the LazyCodex formatter", async () => {
 	// given
-	const aggregateVersion = (await readJson(".codex-plugin/plugin.json")).version;
+	const aggregateVersion = await readPluginVersion();
 	const aggregateHooks = await readJson("hooks/hooks.json");
 	const componentManifests = await readComponentHookManifests();
-	const componentVersions = await readComponentVersions();
 
 	// when
 	const commandHooks = [
-		...collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion).map((hook) => ({
-			...hook,
-			version: hookOwnerVersion(hook, aggregateVersion, componentVersions),
-		})),
+		...collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion),
 		...componentManifests.flatMap((manifest) => collectCommandHooks(manifest.hooks, manifest.source, manifest.version)),
 	];
 	const expectedLabels = new Map([...AGGREGATE_EXPECTED_LABELS, ...COMPONENT_EXPECTED_LABELS]);

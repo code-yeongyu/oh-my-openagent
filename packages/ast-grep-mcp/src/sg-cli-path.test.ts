@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { executableCandidates, isValidBinary } from "./sg-cli-path"
+import { executableCandidates, findSgCliPathSync, isValidBinary } from "./sg-cli-path"
 
 const temporaryDirectories: string[] = []
 
@@ -17,6 +17,131 @@ afterEach(() => {
 	for (const directory of temporaryDirectories.splice(0)) {
 		rmSync(directory, { recursive: true, force: true })
 	}
+})
+
+function writeFakeSgBinary(path: string): void {
+	writeFileSync(path, Buffer.alloc(20001, 0x61))
+}
+
+function createRuntimeDirSg(codexHome: string, platformArch: string, binaryName: string): string {
+	const runtimeDirectory = join(codexHome, "runtime", "ast-grep", platformArch)
+	mkdirSync(runtimeDirectory, { recursive: true })
+	const binaryPath = join(runtimeDirectory, binaryName)
+	writeFakeSgBinary(binaryPath)
+	return binaryPath
+}
+
+function rejectModuleResolution(specifier: string): string {
+	throw new Error(`Cannot find module '${specifier}'`)
+}
+
+describe("findSgCliPathSync resolution order", () => {
+	it("prefers the OMO_AST_GREP_SG_PATH env override over every other step", () => {
+		const overrideDirectory = createTemporaryDirectory("omo-sg-env-override-")
+		const overridePath = join(overrideDirectory, "sg")
+		writeFakeSgBinary(overridePath)
+		const codexHome = createTemporaryDirectory("omo-sg-codex-home-")
+		createRuntimeDirSg(codexHome, "darwin-arm64", "sg")
+
+		const resolved = findSgCliPathSync({
+			env: { OMO_AST_GREP_SG_PATH: overridePath, CODEX_HOME: codexHome },
+			platform: "darwin",
+			arch: "arm64",
+			homedir: () => "/nonexistent-home",
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBe(overridePath)
+	})
+
+	it("falls through without throwing when the env override points at a missing file", () => {
+		const codexHome = createTemporaryDirectory("omo-sg-codex-home-")
+		const runtimeBinaryPath = createRuntimeDirSg(codexHome, "darwin-arm64", "sg")
+
+		const resolved = findSgCliPathSync({
+			env: { OMO_AST_GREP_SG_PATH: "/nope/sg", CODEX_HOME: codexHome },
+			platform: "darwin",
+			arch: "arm64",
+			homedir: () => "/nonexistent-home",
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBe(runtimeBinaryPath)
+	})
+
+	it("resolves the CODEX_HOME runtime dir before the Homebrew fallback", () => {
+		const codexHome = createTemporaryDirectory("omo-sg-codex-home-")
+		const runtimeBinaryPath = createRuntimeDirSg(codexHome, "darwin-arm64", "sg")
+
+		const resolved = findSgCliPathSync({
+			env: { CODEX_HOME: codexHome },
+			platform: "darwin",
+			arch: "arm64",
+			homedir: () => "/nonexistent-home",
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBe(runtimeBinaryPath)
+	})
+
+	it("falls back to <homedir>/.codex when CODEX_HOME is unset", () => {
+		const homeDirectory = createTemporaryDirectory("omo-sg-home-")
+		const runtimeBinaryPath = createRuntimeDirSg(join(homeDirectory, ".codex"), "linux-x64", "sg")
+
+		const resolved = findSgCliPathSync({
+			env: {},
+			platform: "linux",
+			arch: "x64",
+			homedir: () => homeDirectory,
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBe(runtimeBinaryPath)
+	})
+
+	it("treats a blank CODEX_HOME as unset", () => {
+		const homeDirectory = createTemporaryDirectory("omo-sg-home-")
+		const runtimeBinaryPath = createRuntimeDirSg(join(homeDirectory, ".codex"), "linux-x64", "sg")
+
+		const resolved = findSgCliPathSync({
+			env: { CODEX_HOME: "   " },
+			platform: "linux",
+			arch: "x64",
+			homedir: () => homeDirectory,
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBe(runtimeBinaryPath)
+	})
+
+	it("probes sg.exe in the runtime dir on win32", () => {
+		const codexHome = createTemporaryDirectory("omo-sg-codex-home-")
+		const runtimeBinaryPath = createRuntimeDirSg(codexHome, "win32-x64", "sg.exe")
+
+		const resolved = findSgCliPathSync({
+			env: { CODEX_HOME: codexHome },
+			platform: "win32",
+			arch: "x64",
+			homedir: () => "/nonexistent-home",
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBe(runtimeBinaryPath)
+	})
+
+	it("returns null when every step misses, including a bogus env override", () => {
+		const codexHome = createTemporaryDirectory("omo-sg-codex-home-")
+
+		const resolved = findSgCliPathSync({
+			env: { OMO_AST_GREP_SG_PATH: "/nope/sg", CODEX_HOME: codexHome },
+			platform: "linux",
+			arch: "x64",
+			homedir: () => "/nonexistent-home",
+			resolveModulePath: rejectModuleResolution,
+		})
+
+		expect(resolved).toBeNull()
+	})
 })
 
 describe("executableCandidates", () => {
