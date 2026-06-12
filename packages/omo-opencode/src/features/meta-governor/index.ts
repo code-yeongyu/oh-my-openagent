@@ -47,3 +47,9 @@ export type {
   AgentmemoryWriteBackend,
   MemoryBackends,
 } from "./types"
+
+// PR 5: scoring-engine (weighted evidence → action)
+export {
+  score,
+  defaultScoringConfig,
+} from "./scoring-engine"
