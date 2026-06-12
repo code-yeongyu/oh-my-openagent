@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "./config"
 import type { ModelCacheState } from "./plugin-state"
 import type { PluginContext, TmuxConfig } from "./plugin/types"
+import type { PluginConfigStore } from "./features/plugin-config-store"
 
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
@@ -45,6 +46,7 @@ export type Managers = {
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
   modelFallbackControllerAccessor: ModelFallbackControllerAccessor
+  configStore: PluginConfigStore
 }
 
 export function createManagers(args: {
@@ -170,6 +172,9 @@ export function createManagers(args: {
 
   const skillMcpManager = new deps.SkillMcpManagerClass()
 
+  const { PluginConfigStore } = require("./features/plugin-config-store")
+  const configStore = new PluginConfigStore(pluginConfig, ctx.directory ?? process.cwd())
+
   const configHandler = deps.createConfigHandlerFn({
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
@@ -182,5 +187,6 @@ export function createManagers(args: {
     skillMcpManager,
     configHandler,
     modelFallbackControllerAccessor,
+    configStore,
   }
 }
