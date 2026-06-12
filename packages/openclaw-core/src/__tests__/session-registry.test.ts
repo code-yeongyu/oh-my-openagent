@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import * as sessionRegistryModule from "../session-registry"
 import { getRegistryPath } from "../session-registry-paths"
 import type { SessionMapping } from "../session-registry"
@@ -93,6 +93,34 @@ describe("session-registry", () => {
       rmSync(otherDataHome, { recursive: true, force: true })
       process.env.XDG_DATA_HOME = tempDataHome
     }
+  })
+
+  test("#given XDG_DATA_HOME #when resolving registry paths #then the path bytes match OpenCode storage plus openclaw", () => {
+    // given
+    const mapping = createMapping()
+
+    // when
+    expect(sessionRegistryModule.registerMessage(mapping)).toBe(true)
+
+    // then
+    expect(getRegistryPath()).toBe(join(tempDataHome, "opencode", "storage", "openclaw", "reply-session-registry.jsonl"))
+    expect(existsSync(registryPath)).toBe(true)
+  })
+
+  test("#given a stale registry lock from a dead process #when registering #then it recovers and releases the lock", () => {
+    // given
+    mkdirSync(dirname(lockPath), { recursive: true })
+    writeFileSync(lockPath, JSON.stringify({ pid: 999_999_999, acquiredAt: 0, token: "stale-token" }))
+    const oldTimestamp = new Date(Date.now() - 20_000)
+    utimesSync(lockPath, oldTimestamp, oldTimestamp)
+
+    // when
+    const result = sessionRegistryModule.registerMessage(createMapping())
+
+    // then
+    expect(result).toBe(true)
+    expect(sessionRegistryModule.loadAllMappings()).toHaveLength(1)
+    expect(existsSync(lockPath)).toBe(false)
   })
 
   test("looks up mappings by platform and message id", () => {

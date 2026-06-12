@@ -1,4 +1,4 @@
-/// <reference path="../../../../../bun-test.d.ts" />
+/// <reference path="../../../../bun-test.d.ts" />
 
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
@@ -25,11 +25,11 @@ const getTmuxPathMock = mock(async (): Promise<string | null> => "/mock/tmux")
 let tmuxModule: typeof import("../tmux")
 
 beforeAll(async () => {
-  mock.module("../../shared/tmux/runner", () => ({
+  mock.module("@oh-my-opencode/tmux-core", () => ({
     runTmuxCommand: runTmuxCommandMock,
   }))
 
-  mock.module("../../tools/interactive-bash/tmux-path-resolver", () => ({
+  mock.module("../tmux-path", () => ({
     getTmuxPath: getTmuxPathMock,
   }))
 
