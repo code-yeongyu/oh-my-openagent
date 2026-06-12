@@ -30,6 +30,23 @@ test("#given ulw-plan skill #when the planning gate is inspected #then it explor
 	assert.doesNotMatch(skill, /Proceeding to plan generation/);
 });
 
+test("#given ulw-plan workflow #when the approval brief is answered directly #then common approval replies enter planning and scope changes stay gated", async () => {
+	// given
+	const skill = await readFile(skillPath, "utf8");
+	const workflow = await readFile(workflowPath, "utf8");
+	const approvalGate = `${skill}\n${workflow}`.toLowerCase();
+	const directApprovalReplies = ["yes", "approve", "proceed", "write the plan", "create the plan"];
+
+	// then
+	assert.deepEqual(
+		directApprovalReplies.filter((reply) => !approvalGate.includes(reply)),
+		[],
+	);
+	assert.match(workflow, /only when they answer the approval brief/i);
+	assert.match(workflow, /change the scope first/i);
+	assert.match(workflow, /fold it in and re-present the brief/i);
+});
+
 test("#given ulw-plan skill #when the execution gate is inspected #then plan mode is sticky, execution needs an explicit start, and the high-accuracy ask is mandatory", async () => {
 	// given
 	const skill = await readFile(skillPath, "utf8");

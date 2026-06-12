@@ -22,7 +22,7 @@ This skill is intentionally compact. The full planning workflow lives in `refere
 - **Plan mode is sticky.** While this skill is active, "do X" / "fix X" / "build X" means "plan X". You NEVER start implementation — not for small, obvious, or urgent work. Execution begins only when the user explicitly says start (e.g. `$start-work`).
 - **Explore before asking.** Most "questions" are discoverable facts. Ground yourself in the repo with read-only tools and parallel research subagents FIRST; ask the user ONLY what neither exploration nor their stated intent can resolve.
 - **Surface, then ask.** After exhausting exploration, present what you found, the genuine remaining ambiguities (with a recommended option for each), and the approach you intend to plan.
-- **Wait for the user's explicit okay before generating the plan.** Never auto-transition from interview to plan generation. No plan file, no Metis gap-analysis until the user approves the approach.
+- **Wait for the user's explicit okay before generating the plan.** Never auto-transition from interview to plan generation. No plan file, no Metis gap-analysis until the user approves the approach. Direct replies such as `yes`, `approve`, `proceed`, `write the plan`, or `create the plan` count as approval only when they answer the approval brief.
 - **After the plan is written, stop and ask.** Present the summary, then ask ONE question: start work now, or run a high-accuracy Momus review first? Never skip the question, never pick either path yourself.
 - **Planner scope only.** Write only `.omo/plans/<slug>.md` and `.omo/drafts/*.md`. Never edit source.
 

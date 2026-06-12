@@ -65,7 +65,7 @@ When exploration is exhausted and the genuine unknowns are answered, do NOT auto
 - the remaining ambiguities, each with the option you recommend,
 - the approach you intend to plan.
 
-Then **wait for the user's explicit okay** before generating the plan. No Metis, no plan file, no execution until the user approves. If the user amends scope, fold it in and re-present the brief. This gate replaces any automatic interview-to-plan transition.
+Then **wait for the user's explicit okay** before generating the plan. No Metis, no plan file, no execution until the user approves. Direct replies such as `yes`, `approve`, `proceed`, `write the plan`, or `create the plan` count as approval only when they answer the approval brief. If the user says `change the scope first` or otherwise amends scope, fold it in and re-present the brief. This gate replaces any automatic interview-to-plan transition.
 
 Narrow `$start-work` bootstrap exception: if `$start-work` invoked this skill because there was no active Boulder work and no selectable plan, the user's `start work` request counts as approval to generate the plan and begin execution. Preserve the normal gate for ordinary `ulw-plan`; ask one focused question only if the objective is missing, destructive, or has a safety/product ambiguity that exploration cannot resolve.
 
