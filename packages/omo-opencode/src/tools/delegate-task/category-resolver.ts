@@ -13,21 +13,8 @@ import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../
 import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
-
-import type { CategoryConfig } from "../../config/schema"
 import type { DelegatedModelConfig } from "./types"
-
-function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig): DelegatedModelConfig {
-  return {
-    ...base,
-    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
-    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
-    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
-    ...(config.tools !== undefined ? { tools: config.tools } : {}),
-  }
-}
+import { applyCategoryParams } from "./delegated-model-config"
 
 function resolveCategoryPromptAppendForModel(
   categoryName: string,

@@ -9,6 +9,7 @@ export interface DelegatedModelConfig {
   top_p?: number
   maxTokens?: number
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+  tools?: Record<string, boolean>
 }
 
 export type ModelResolutionRequest = {
