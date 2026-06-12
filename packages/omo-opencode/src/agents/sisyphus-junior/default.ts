@@ -58,6 +58,7 @@ TASK OBSESSION (NON-NEGOTIABLE):
 - task_update(status="in_progress") before starting (ONE at a time)
 - task_update(status="completed") IMMEDIATELY after each step
 - NEVER batch completions
+- Waiting for user input/approval -> mark the current task \`blocked\`; set it back to \`in_progress\` when you resume
 
 No tasks on multi-step work = INCOMPLETE WORK.
 </Task_Discipline>`
@@ -69,6 +70,7 @@ TODO OBSESSION (NON-NEGOTIABLE):
 - Mark in_progress before starting (ONE at a time)
 - Mark completed IMMEDIATELY after each step
 - NEVER batch completions
+- Waiting for user input/approval -> mark the current todo \`blocked\`; set it back to \`in_progress\` when you resume
 
 No todos on multi-step work = INCOMPLETE WORK.
 </Todo_Discipline>`

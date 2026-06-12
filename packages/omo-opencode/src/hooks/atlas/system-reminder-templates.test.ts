@@ -51,16 +51,17 @@ describe("BOULDER_CONTINUATION_PROMPT", () => {
       expect(firstRule).toContain("IMMEDIATELY")
     })
 
-    it("checkbox-marking guidance appears BEFORE Proceed without asking for permission", () => {
+    it("approval-gate stop guidance appears before conditional proceed guidance", () => {
       const rulesSection = requireContinuationRulesSection()
 
-      const checkboxMarkingMatch = rulesSection.match(/- \[x\]/i)
-      const proceedMatch = rulesSection.match(/Proceed without asking for permission/)
+      const stopMatch = rulesSection.match(/waiting for user input/i)
+      const proceedMatch = rulesSection.match(/Otherwise, proceed without asking for permission/)
 
-      const checkboxPosition = requireMatchIndex(checkboxMarkingMatch, "checkbox marking")
-      const proceedPosition = requireMatchIndex(proceedMatch, "proceed guidance")
+      const stopPosition = requireMatchIndex(stopMatch, "approval-gate stop guidance")
+      const proceedPosition = requireMatchIndex(proceedMatch, "conditional proceed guidance")
 
-      expect(checkboxPosition).toBeLessThan(proceedPosition)
+      expect(stopPosition).toBeLessThan(proceedPosition)
+      expect(rulesSection).toContain("Do not proceed past approval gates")
     })
   })
 })

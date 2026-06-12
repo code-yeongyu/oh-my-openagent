@@ -58,6 +58,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 2. **Before each step**: \`task_update(status="in_progress")\` (ONE at a time)
 3. **After each step**: \`task_update(status="completed")\` IMMEDIATELY (NEVER batch)
 4. **Scope changes**: Update tasks BEFORE proceeding
+5. **Waiting for user input/approval**: Mark the task \`blocked\`. Set back to \`in_progress\` when you resume.
 
 **NO TASKS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
   }
@@ -78,6 +79,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 2. **Before each step**: Mark \`in_progress\` (ONE at a time)
 3. **After each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
 4. **Scope changes**: Update todos BEFORE proceeding
+5. **Waiting for user input/approval**: Mark the todo \`blocked\`. Set back to \`in_progress\` when you resume.
 
 **NO TODOS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
 }

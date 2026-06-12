@@ -224,7 +224,8 @@ Skip tasks for V1 trivial fixes and single-step requests.
 - **2+ steps in V2/V3** - task_create FIRST, atomic breakdown
 - **Starting step** - task_update(status="in_progress") - ONE at a time
 - **Completing step** - task_update(status="completed") IMMEDIATELY
-- **Batching** - NEVER batch completions`;
+- **Batching** - NEVER batch completions
+- **Waiting for user input/approval** - Mark the current task \`blocked\`; set it back to \`in_progress\` when you resume`;
   }
 
   return `## Todo Discipline (NON-NEGOTIABLE)
@@ -235,5 +236,6 @@ Skip todos for V1 trivial fixes and single-step requests.
 - **2+ steps in V2/V3** - todowrite FIRST, atomic breakdown
 - **Starting step** - Mark in_progress - ONE at a time
 - **Completing step** - Mark completed IMMEDIATELY
-- **Batching** - NEVER batch completions`;
+- **Batching** - NEVER batch completions
+- **Waiting for user input/approval** - Mark the current todo \`blocked\`; set it back to \`in_progress\` when you resume`;
 }

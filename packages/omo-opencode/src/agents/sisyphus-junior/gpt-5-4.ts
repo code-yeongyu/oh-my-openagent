@@ -146,6 +146,7 @@ function buildGpt54TaskDisciplineSection(useTaskSystem: boolean): string {
 - **Starting step** - task_update(status="in_progress") - ONE at a time
 - **Completing step** - task_update(status="completed") IMMEDIATELY
 - **Batching** - NEVER batch completions
+- **Waiting for user input/approval** - Mark the current task \`blocked\`; set it back to \`in_progress\` when you resume
 
 No tasks on multi-step work = INCOMPLETE WORK.`;
   }
@@ -156,6 +157,7 @@ No tasks on multi-step work = INCOMPLETE WORK.`;
 - **Starting step** - Mark in_progress - ONE at a time
 - **Completing step** - Mark completed IMMEDIATELY
 - **Batching** - NEVER batch completions
+- **Waiting for user input/approval** - Mark the current todo \`blocked\`; set it back to \`in_progress\` when you resume
 
 No todos on multi-step work = INCOMPLETE WORK.`;
 }

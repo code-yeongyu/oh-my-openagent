@@ -73,6 +73,25 @@ describe("syncTaskToTodo", () => {
     expect(result?.status).toBe("completed");
   });
 
+  it("converts blocked task to blocked todo", () => {
+    // given
+    const task: Task = {
+      id: "T-blocked",
+      subject: "Await user approval",
+      description: "Waiting for review gate",
+      status: "blocked",
+      blocks: [],
+      blockedBy: [],
+    };
+
+    // when
+    const result = syncTaskToTodo(task);
+
+    // then
+    expect(result?.status).toBe("blocked");
+    expect(result?.content).toBe("Await user approval");
+  });
+
   it("returns null for deleted task", () => {
     // given
     const task: Task = {

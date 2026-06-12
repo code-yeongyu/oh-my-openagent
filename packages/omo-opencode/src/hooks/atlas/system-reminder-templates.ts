@@ -28,9 +28,10 @@ You have an active work plan with incomplete tasks. Continue working.
 
 RULES:
 - **FIRST**: Read the plan file NOW. If the last completed task is still unchecked, mark it \`- [x]\` IMMEDIATELY before anything else
-- Proceed without asking for permission
+- If you are currently waiting for user input, approval, or a human decision, STOP. Do not proceed past approval gates. Wait for the user's response.
+- Otherwise, proceed without asking for permission
 - Use the notepad at .omo/notepads/{PLAN_NAME}/ to record learnings
-- Do not stop until all tasks are complete
+- Otherwise, do not stop until all tasks are complete
 - If a task is blocked by missing external input, unavailable credentials, access limits, or a decision only the user can make, you MUST edit the plan file in this turn and change that task's checkbox from \`- [ ]\` to \`- [~]\` before moving on
 - A text-only explanation of a blocker is NOT progress. The \`- [~]\` checkbox edit is mandatory and must happen via a real file-editing tool call`
 
