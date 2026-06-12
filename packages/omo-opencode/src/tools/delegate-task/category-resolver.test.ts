@@ -623,4 +623,33 @@ describe("resolveCategoryExecution", () => {
 		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
 		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_LEGACY")
 	})
+
+	test("inherits parent model when no explicit category config is set", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: {}, // No explicit model config
+		}
+		const inheritedModel = "anthropic/claude-opus-4-7" // Parent agent's model
+		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe(inheritedModel)
+		expect(result.modelInfo?.type).toBe("inherited")
+	})
+})
+})
 })
