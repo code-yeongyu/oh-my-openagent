@@ -12,6 +12,7 @@ const corePackages = [
   "packages/comment-checker-core",
   "packages/hashline-core",
   "packages/boulder-state",
+  "packages/telemetry-core",
 ] as const
 
 const forbiddenSourcePatterns = [

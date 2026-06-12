@@ -35,6 +35,7 @@
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
+        "@oh-my-opencode/telemetry-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "@types/picomatch": "^4.0.3",
@@ -81,6 +82,7 @@
       "dependencies": {
         "@ast-grep/cli": "^0.42.2",
         "@oh-my-opencode/ast-grep-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
       },
       "devDependencies": {
         "bun-types": "1.3.12",
@@ -89,13 +91,13 @@
     "packages/boulder-state": {
       "name": "@oh-my-opencode/boulder-state",
       "version": "0.1.0",
-      "dependencies": {
-        "@oh-my-opencode/utils": "workspace:*",
-      },
     },
     "packages/comment-checker-core": {
       "name": "@oh-my-opencode/comment-checker-core",
       "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+      },
     },
     "packages/git-bash-mcp": {
       "name": "@oh-my-opencode/git-bash-mcp",
@@ -120,9 +122,6 @@
     "packages/model-core": {
       "name": "@oh-my-opencode/model-core",
       "version": "0.1.0",
-      "dependencies": {
-        "@oh-my-opencode/utils": "workspace:*",
-      },
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
@@ -174,12 +173,21 @@
       "name": "@oh-my-opencode/rules-engine",
       "version": "0.1.0",
       "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
         "picomatch": "^4.0.4",
       },
     },
     "packages/shared-skills": {
       "name": "@oh-my-opencode/shared-skills",
       "version": "0.1.0",
+    },
+    "packages/telemetry-core": {
+      "name": "@oh-my-opencode/telemetry-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+        "posthog-node": "^5.34.3",
+      },
     },
     "packages/utils": {
       "name": "@oh-my-opencode/utils",
@@ -286,6 +294,8 @@
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
 
     "@oh-my-opencode/shared-skills": ["@oh-my-opencode/shared-skills@workspace:packages/shared-skills"],
+
+    "@oh-my-opencode/telemetry-core": ["@oh-my-opencode/telemetry-core@workspace:packages/telemetry-core"],
 
     "@oh-my-opencode/utils": ["@oh-my-opencode/utils@workspace:packages/utils"],
 
