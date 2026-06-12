@@ -166,20 +166,7 @@ export function buildEnvPrefix(
  * const cmd = `/bin/sh -c "opencode attach ${escaped} --session ${sessionId}"`
  * ```
  */
-export function shellEscapeForDoubleQuotedCommand(value: string): string {
-  // Order matters: escape backslash FIRST, then other characters
-  return value
-    .replace(/\\/g, "\\\\") // escape backslash first
-    .replace(/\$/g, "\\$") // escape dollar sign
-    .replace(/`/g, "\\`") // escape backticks
-    .replace(/"/g, "\\\"") // escape double quotes
-    .replace(/;/g, "\\;") // escape semicolon (command separator)
-    .replace(/\|/g, "\\|") // escape pipe (command separator)
-    .replace(/&/g, "\\&") // escape ampersand (command separator)
-    .replace(/#/g, "\\#") // escape hash (comment)
-    .replace(/\(/g, "\\(") // escape parentheses
-    .replace(/\)/g, "\\)") // escape parentheses
-}
+export { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 
 export function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`

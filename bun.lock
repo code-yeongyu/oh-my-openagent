@@ -38,6 +38,7 @@
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
+        "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "@types/picomatch": "^4.0.3",
@@ -167,6 +168,7 @@
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
+        "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@opencode-ai/plugin": "^1.15.4",
         "@opencode-ai/sdk": "^1.15.4",
@@ -204,6 +206,13 @@
       "dependencies": {
         "@oh-my-opencode/utils": "workspace:*",
         "posthog-node": "^5.34.3",
+      },
+    },
+    "packages/tmux-core": {
+      "name": "@oh-my-opencode/tmux-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
       },
     },
     "packages/utils": {
@@ -317,6 +326,8 @@
     "@oh-my-opencode/shared-skills": ["@oh-my-opencode/shared-skills@workspace:packages/shared-skills"],
 
     "@oh-my-opencode/telemetry-core": ["@oh-my-opencode/telemetry-core@workspace:packages/telemetry-core"],
+
+    "@oh-my-opencode/tmux-core": ["@oh-my-opencode/tmux-core@workspace:packages/tmux-core"],
 
     "@oh-my-opencode/utils": ["@oh-my-opencode/utils@workspace:packages/utils"],
 
