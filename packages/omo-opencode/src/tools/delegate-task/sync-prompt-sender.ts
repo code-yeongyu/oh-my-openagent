@@ -5,6 +5,7 @@ import { createInternalAgentTextPart } from "../../shared/internal-initiator-mar
 import {
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
+import { migrateToolsToPermission } from "../../shared/permission-compat"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { routePromptRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -85,7 +86,10 @@ export async function sendSyncPrompt(
 ): Promise<string | null> {
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
-  const tools = buildSyncPromptTools(input.agentToUse)
+  const userPermission = input.categoryModel?.tools
+    ? migrateToolsToPermission(input.categoryModel.tools)
+    : undefined
+  const tools = buildSyncPromptTools(input.agentToUse, userPermission)
   setSessionTools(input.sessionID, tools)
 
   applySessionPromptParams(input.sessionID, input.categoryModel)
