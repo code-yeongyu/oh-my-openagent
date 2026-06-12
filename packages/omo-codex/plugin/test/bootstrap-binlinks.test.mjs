@@ -112,6 +112,17 @@ async function assertNoDanglingEntries(binDir) {
 	}
 }
 
+async function assertComponentBinPointsTo(binDir, target, message) {
+	if (process.platform !== "win32") {
+		assert.equal(await readlink(join(binDir, COMPONENT_BIN_NAME)), target, message);
+		return;
+	}
+
+	const shim = await readFile(join(binDir, `${COMPONENT_BIN_NAME}.cmd`), "utf8");
+	assert.ok(shim.includes(target), message);
+	await assert.rejects(() => lstat(join(binDir, COMPONENT_BIN_NAME)), "win32 must not leave a posix component link behind");
+}
+
 test("#given two versioned plugin roots #when the worker setup runs against each in turn #then bin links re-point to the new root and none resolve under the old", async () => {
 	await withBinLinkFixture(async (fixture) => {
 		const rootV1 = await writeVersionedRoot(fixture.root, "1.0.0");
@@ -146,22 +157,23 @@ test("#given a completed v1 marker #when the worker runs against a v2 root #then
 		});
 		const argv = ["--codex-home", fixture.codexHome, "--only", "setup"];
 
-		const firstRun = await runBootstrapWorker({ argv, env: workerEnv(rootV1) });
+		const firstRun = await runBootstrapWorker({ argv, env: workerEnv(rootV1), platform: process.platform });
 		assert.equal(firstRun.ran, true);
 
-		const repeatRun = await runBootstrapWorker({ argv, env: workerEnv(rootV1) });
+		const repeatRun = await runBootstrapWorker({ argv, env: workerEnv(rootV1), platform: process.platform });
 		assert.deepEqual(repeatRun, { ran: false, reason: "already-completed" });
-		assert.equal(
-			await readlink(join(fixture.binDir, COMPONENT_BIN_NAME)),
+		await assertComponentBinPointsTo(
+			fixture.binDir,
 			join(rootV1, "components", "toolbox", "dist", "cli.js"),
 			"a same-version skip must leave the existing links untouched",
 		);
 
-		const upgradeRun = await runBootstrapWorker({ argv, env: workerEnv(rootV2) });
+		const upgradeRun = await runBootstrapWorker({ argv, env: workerEnv(rootV2), platform: process.platform });
 		assert.equal(upgradeRun.ran, true, "a changed completedForVersion marker must re-run the worker");
-		assert.equal(
-			await readlink(join(fixture.binDir, COMPONENT_BIN_NAME)),
+		await assertComponentBinPointsTo(
+			fixture.binDir,
 			join(rootV2, "components", "toolbox", "dist", "cli.js"),
+			"a version change must re-point component bins to the new plugin root",
 		);
 		const state = JSON.parse(await readFile(join(fixture.pluginData, "bootstrap", "state.json"), "utf8"));
 		assert.equal(state.completedForVersion, "2.0.0");
@@ -202,10 +214,12 @@ test("#given a marketplace payload without dist/cli #when the worker setup runs 
 		await assert.rejects(() => lstat(join(fixture.binDir, "omo.cmd")), "no Windows omo wrapper may be written without dist/cli");
 		await assertNoDanglingEntries(fixture.binDir);
 		const log = await readFile(join(fixture.pluginData, "bootstrap", "bootstrap.log"), "utf8");
+		const warning = JSON.parse(log)["warning"];
+		assert.equal(typeof warning, "string", `bootstrap.log warning must be a string, got: ${log}`);
 		assert.ok(
-			log.includes("skipped the omo runtime wrapper because ") &&
-				log.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
-				log.includes("omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
+			warning.includes("skipped the omo runtime wrapper because ") &&
+				warning.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
+				warning.includes("omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
 			`bootstrap.log must carry the install-local warning text, got: ${log}`,
 		);
 	});
