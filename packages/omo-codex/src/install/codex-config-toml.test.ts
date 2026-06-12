@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { lstat, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -390,6 +390,60 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("omo@lazycodex")
     expect(content).not.toContain("/tmp/stale-lazycodex-cache")
     expect(content).not.toContain("code-yeongyu-codex-plugins")
+  })
+
+  test("#given marketplace bootstrap preserves source #when marketplace block exists #then existing source stays byte-identical", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-preserve-marketplace-"))
+    const configPath = join(root, "config.toml")
+    const existingMarketplaceBlock = [
+      "[marketplaces.sisyphuslabs]",
+      'last_updated = "2026-06-15T00:00:00Z"',
+      'source_type = "git"',
+      'source = "https://github.com/code-yeongyu/lazycodex.git"',
+      'ref = "main"',
+    ].join("\n")
+    await writeFile(configPath, `${existingMarketplaceBlock}\n`)
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      preserveMarketplaceSource: true,
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain(existingMarketplaceBlock)
+    expect(content).not.toContain('source = "/repo/packages/omo-codex"')
+  })
+
+  test("#given config path is a symlink #when updating config #then writes through target and preserves link", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-symlink-"))
+    const targetPath = join(root, "target.toml")
+    const configPath = join(root, "config.toml")
+    await writeFile(targetPath, "")
+    await symlink(targetPath, configPath)
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const linkStats = await lstat(configPath)
+    const content = await readFile(targetPath, "utf8")
+    expect(linkStats.isSymbolicLink()).toBe(true)
+    expect(content).toContain("[marketplaces.debug]")
+    expect(content).toContain("[plugins.\"omo@debug\"]")
   })
 
   test("repairs existing agent config_file entries without dropping descriptions", async () => {

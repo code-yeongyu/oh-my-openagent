@@ -1,9 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { ensureAgentConfig, removeStaleManagedAgentBlocks } from "./codex-config-agents"
+import { writeFileAtomic } from "./codex-config-atomic-write"
 import { ensureFeatureEnabled } from "./codex-config-features"
 import {
   ensureMarketplaceBlock,
+  hasMarketplaceBlock,
   legacyMarketplaceNames,
   removeMarketplaceBlock,
   removeStaleMarketplaceHookStateBlocks,
@@ -27,6 +29,7 @@ export async function updateCodexConfig(input: {
   readonly trustedHookStates?: readonly TrustedHookState[]
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
+  readonly preserveMarketplaceSource?: boolean
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
   let config = ""
@@ -51,7 +54,9 @@ export async function updateCodexConfig(input: {
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
   config = ensureCodexMultiAgentV2Config(config)
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)
-  config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource)
+  if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
+    config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource)
+  }
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
@@ -63,7 +68,7 @@ export async function updateCodexConfig(input: {
     config = ensureAgentConfig(config, agentConfig)
   }
 
-  await writeFile(input.configPath, `${config.trimEnd()}\n`)
+  await writeFileAtomic(input.configPath, `${config.trimEnd()}\n`)
 }
 
 async function exists(path: string): Promise<boolean> {

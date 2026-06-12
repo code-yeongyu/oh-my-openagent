@@ -12,6 +12,10 @@ export function removeMarketplaceBlock(config: string, marketplaceName: string):
   return removeTomlSections(config, (header) => header === `marketplaces.${marketplaceName}`)
 }
 
+export function hasMarketplaceBlock(config: string, marketplaceName: string): boolean {
+  return findTomlSection(config, `marketplaces.${marketplaceName}`) !== null
+}
+
 export function removeStaleMarketplacePluginBlocks(
   config: string,
   marketplaceName: string,

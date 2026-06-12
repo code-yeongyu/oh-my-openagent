@@ -13,6 +13,13 @@ export { detectCodexInstallation, formatCodexInstallationWarning } from "./codex
 export { cleanupCodexLight, cleanupCodexLightConfigText } from "./codex-cleanup"
 export { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 export { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, rewriteCachedMcpManifest } from "./codex-cache"
+export {
+  findNewestCachedCodexComponentCli,
+  resolveCachedCodexComponentCliPath,
+  resolveCodexComponentBinCandidates,
+  resolveCodexPluginCacheRoot,
+  resolveDefaultCodexHome,
+} from "./codex-cache-paths"
 export { updateCodexConfig } from "./codex-config-toml"
 export { trustedHookStatesForPlugin } from "./codex-hook-trust"
 export { assertHookCommandTargets, findMissingHookCommandTargets } from "./codex-hook-targets"

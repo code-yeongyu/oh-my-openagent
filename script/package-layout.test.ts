@@ -168,6 +168,19 @@ describe("published package layout", () => {
     expect(packedObsoleteForks).toEqual([])
   }, packDryRunTimeoutMs)
 
+  test("#given Codex installer source tree #when checking obsolete forks #then hand-written install mjs files are absent", () => {
+    // given
+    const obsoleteForkRoot = join(repositoryRoot, "packages/omo-codex/scripts/install")
+
+    // when
+    const obsoleteForks = existsSync(obsoleteForkRoot)
+      ? collectPackagePathsRecursively(obsoleteForkRoot).filter((packagePath) => packagePath.endsWith(".mjs"))
+      : []
+
+    // then
+    expect(obsoleteForks).toEqual([])
+  })
+
   test("#given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship", async () => {
     // given
     const expectedAssetPaths = collectExpectedAssetPaths()
