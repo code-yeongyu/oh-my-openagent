@@ -66,6 +66,9 @@ export class ParentWakeFlushRunner {
       log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
       })
+      if (latestWake.shouldReply) {
+        this.schedulePendingParentWakeFlush(sessionID)
+      }
       return
     }
 
