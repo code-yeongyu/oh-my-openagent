@@ -8,7 +8,7 @@ import * as injectionModule from "../reply-listener-injection"
 import * as sessionRegistryModule from "../session-registry"
 import type { ReplyListenerDaemonState } from "../reply-listener-state"
 import type { OpenClawConfig } from "../types"
-import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 const originalFetch = globalThis.fetch
 

@@ -36,6 +36,7 @@
         "@oh-my-opencode/mcp-stdio-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
+        "@oh-my-opencode/openclaw-core": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -190,6 +191,7 @@
         "@oh-my-opencode/mcp-client-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
+        "@oh-my-opencode/openclaw-core": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -205,6 +207,14 @@
         "picocolors": "^1.1.1",
         "picomatch": "^4.0.4",
         "zod": "^4.4.3",
+      },
+    },
+    "packages/openclaw-core": {
+      "name": "@oh-my-opencode/openclaw-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/tmux-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
       },
     },
     "packages/prompts-core": {
@@ -362,6 +372,8 @@
     "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
 
     "@oh-my-opencode/omo-opencode": ["@oh-my-opencode/omo-opencode@workspace:packages/omo-opencode"],
+
+    "@oh-my-opencode/openclaw-core": ["@oh-my-opencode/openclaw-core@workspace:packages/openclaw-core"],
 
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
