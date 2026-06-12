@@ -49,6 +49,7 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly checkToolState?: boolean
   readonly ttlMs?: number
   readonly onExpiredOrFailed?: (result: InternalPromptDispatchResult) => void
+  readonly onDispatched?: (result: InternalPromptDispatchResult) => void
 }
 
 export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> & (
@@ -106,4 +107,5 @@ export type QueuedInternalPrompt = {
   readonly enqueuedAt: number
   readonly ttlMs?: number
   readonly onExpiredOrFailed?: (result: InternalPromptDispatchResult) => void
+  readonly onDispatched?: (result: InternalPromptDispatchResult) => void
 }

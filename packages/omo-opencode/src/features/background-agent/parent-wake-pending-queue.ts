@@ -59,6 +59,12 @@ export class ParentWakePendingQueue {
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
       if (notificationsChanged) {
         delete pendingWake.noReplyAdmittedAt
+        // HOLE 3 (Oracle): a force-queued gate entry holds the OLD notification
+        // snapshot. New content must be free to dispatch, so clear the
+        // force-queued marker too. The stale gate entry may still deliver, but
+        // semantic-dedupe plus the superseding (now-merged) wake make any
+        // residual duplicate tolerable.
+        delete pendingWake.forcedQueuedAt
       }
       return
     }

@@ -194,7 +194,7 @@ export function hasAssistantOutputAfterParentWakeAdmission(input: {
   readonly messages: readonly ParentWakeSessionMessage[] | undefined
   readonly wake: PendingParentWake
 }): boolean {
-  const admittedAt = input.wake.noReplyAdmittedAt ?? input.wake.forcedQueuedAt
+  const admittedAt = input.wake.noReplyAdmittedAt
   if (admittedAt === undefined || !input.messages) {
     return false
   }

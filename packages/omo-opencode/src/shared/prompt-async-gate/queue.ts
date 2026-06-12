@@ -232,6 +232,8 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
         awaitedResult = result
       } else if (result.status === "failed") {
         entry.onExpiredOrFailed?.(result)
+      } else if (result.status === "dispatched") {
+        entry.onDispatched?.(result)
       }
 
       const remainingQueue = promptQueues.get(sessionID)

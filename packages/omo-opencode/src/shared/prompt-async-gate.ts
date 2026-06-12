@@ -264,6 +264,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       enqueuedAt: Date.now(),
       ttlMs: args.ttlMs ?? DEFAULT_PROMPT_QUEUE_TTL_MS,
       onExpiredOrFailed: args.onExpiredOrFailed,
+      onDispatched: args.onDispatched,
       checkStatus: args.checkStatus !== false,
       checkToolState: args.checkToolState !== false,
       dispatch: async (_dispatchInput: unknown) => dispatchWithPathCompatibility(dispatch, input),

@@ -180,7 +180,7 @@ export class ParentWakeFlushRunner {
   // the live turn consumed the deposit — re-dispatching it would inject a
   // duplicate notification and fork a concurrent assistant chain.
   private async dropAdmittedWakeConsumedByParent(sessionID: string, latestWake: PendingParentWake): Promise<boolean> {
-    if (latestWake.noReplyAdmittedAt === undefined && latestWake.forcedQueuedAt === undefined) {
+    if (latestWake.noReplyAdmittedAt === undefined) {
       return false
     }
     if (!(await this.deps.sessionInspector.hasAssistantOutputAfterAdmittedWake(sessionID, latestWake))) {
@@ -204,6 +204,7 @@ export class ParentWakeFlushRunner {
       readonly markForceQueued?: (queuedAt: number) => void
       readonly onForceQueueResolved?: () => void
       readonly forceQueueTtlMs?: number
+      readonly onForceDispatched?: () => void
     },
   ): Promise<void> {
     if (options.retainPendingWake !== true) {
@@ -231,6 +232,7 @@ export class ParentWakeFlushRunner {
       ...(options.markForceQueued !== undefined ? { markForceQueued: options.markForceQueued } : {}),
       ...(options.onForceQueueResolved !== undefined ? { onForceQueueResolved: options.onForceQueueResolved } : {}),
       ...(options.forceQueueTtlMs !== undefined ? { forceQueueTtlMs: options.forceQueueTtlMs } : {}),
+      ...(options.onForceDispatched !== undefined ? { onForceDispatched: options.onForceDispatched } : {}),
       emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
       toolWaitDecision: options.toolWaitDecision,
       getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
@@ -303,6 +305,7 @@ export class ParentWakeFlushRunner {
       markForceQueued: (queuedAt) => this.markForceQueued(sessionID, queuedAt),
       onForceQueueResolved: () => this.handleForceQueueResolved(sessionID),
       forceQueueTtlMs: this.deps.maxDeferMs,
+      onForceDispatched: () => this.handleForceDispatched(sessionID),
     })
     const stillPending = this.deps.pendingQueue.getWake(sessionID)
     if (stillPending) {
@@ -343,6 +346,29 @@ export class ParentWakeFlushRunner {
     const wake = this.deps.pendingQueue.getWake(sessionID)
     if (wake) {
       delete wake.forcedQueuedAt
+    }
+    this.schedulePendingParentWakeFlush(sessionID)
+  }
+
+  // BUG B1 follow-up (Oracle): the gate ACTUALLY dispatched the previously-queued
+  // force entry — only now is the content in parent history. Record the real
+  // noReply admission (mirrors markRetainedNoReplyAdmission) and clear the
+  // force-queued marker so a reply-required wake proceeds through the normal
+  // retained-reply lifecycle: consume-drop once the parent responds, or a
+  // reply-producing resume once the parent is safe. This is what prevents the
+  // "delivered but no parent output" deadlock (HOLE 2).
+  private handleForceDispatched(sessionID: string): void {
+    const wake = this.deps.pendingQueue.getWake(sessionID)
+    if (wake) {
+      // The deferral is over: the content actually reached parent history. Clear
+      // the force-queued marker and the B1 deferral budget, and record the real
+      // noReply admission so the wake follows the standard retained-reply path.
+      delete wake.forcedQueuedAt
+      delete wake.firstDeferredAt
+      wake.deferCount = 0
+      if (wake.shouldReply) {
+        wake.noReplyAdmittedAt = Date.now()
+      }
     }
     this.schedulePendingParentWakeFlush(sessionID)
   }

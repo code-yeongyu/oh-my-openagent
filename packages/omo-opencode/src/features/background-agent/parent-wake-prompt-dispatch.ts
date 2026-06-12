@@ -32,6 +32,7 @@ type ParentWakePromptDispatchInput = {
   readonly markForceQueued?: (queuedAt: number) => void
   readonly onForceQueueResolved?: () => void
   readonly forceQueueTtlMs?: number
+  readonly onForceDispatched?: () => void
 }
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
@@ -55,6 +56,9 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         ? { onExpiredOrFailed: () => input.onForceQueueResolved?.() }
         : {}),
       ...(input.forceQueueTtlMs !== undefined ? { ttlMs: input.forceQueueTtlMs } : {}),
+      ...(input.onForceDispatched !== undefined
+        ? { onDispatched: () => input.onForceDispatched?.() }
+        : {}),
       input: {
         path: { id: input.sessionID },
         body: {

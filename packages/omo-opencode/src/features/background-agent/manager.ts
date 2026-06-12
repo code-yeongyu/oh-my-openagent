@@ -144,23 +144,22 @@ type StabilityMessage = {
  * old finished turn cannot complete a task that just received a new prompt/resume).
  */
 function isSessionMessageComplete(messages: StabilityMessage[]): boolean {
-  let lastUser: StabilityMessage | undefined
-  let lastAssistant: StabilityMessage | undefined
+  let lastUserIndex = -1
+  let lastAssistantIndex = -1
   for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (!lastAssistant && message.info?.role === "assistant") lastAssistant = message
-    if (!lastUser && message.info?.role === "user") lastUser = message
-    if (lastUser && lastAssistant) break
+    const role = messages[i]?.info?.role
+    if (lastAssistantIndex === -1 && role === "assistant") lastAssistantIndex = i
+    if (lastUserIndex === -1 && role === "user") lastUserIndex = i
+    if (lastUserIndex !== -1 && lastAssistantIndex !== -1) break
   }
 
+  if (lastAssistantIndex === -1 || lastUserIndex === -1) return false
+  const lastAssistant = messages[lastAssistantIndex]
   const finish = lastAssistant?.info?.finish
   if (typeof finish !== "string" || finish.length === 0) return false
   if (NON_TERMINAL_FINISH_REASONS.has(finish)) return false
   if (lastAssistant?.parts?.some((part) => typeof part.type === "string" && PENDING_TOOL_PART_TYPES.has(part.type))) return false
-  const userId = lastUser?.info?.id
-  const assistantId = lastAssistant?.info?.id
-  if (!userId || !assistantId) return false
-  return userId < assistantId
+  return lastAssistantIndex > lastUserIndex
 }
 
 type ResumeTaskSnapshot = {
