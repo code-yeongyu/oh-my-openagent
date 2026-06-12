@@ -13,6 +13,7 @@ const corePackages = [
   "packages/mcp-stdio-core",
   "packages/comment-checker-core",
   "packages/hashline-core",
+  "packages/tmux-core",
   "packages/boulder-state",
   "packages/telemetry-core",
 ] as const

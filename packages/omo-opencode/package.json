@@ -18,6 +18,7 @@
     "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/shared-skills": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
+    "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@opencode-ai/plugin": "^1.15.4",
     "@opencode-ai/sdk": "^1.15.4",
