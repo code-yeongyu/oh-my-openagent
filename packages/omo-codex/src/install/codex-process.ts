@@ -28,6 +28,7 @@ export const defaultRunCommand: RunCommand = async (command, args, options) => {
   const proc = spawn({
     cmd: [invocation.command, ...invocation.args],
     cwd: options.cwd,
+    env: options.env,
     stdin: "ignore",
     stdout: "inherit",
     stderr: "inherit",

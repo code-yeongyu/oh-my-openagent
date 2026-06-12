@@ -265,11 +265,12 @@ function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource
 
 async function trackCodexInstallTelemetry(): Promise<void> {
   try {
-    const { createInstallPostHog, getPostHogDistinctId } = await import("@oh-my-opencode/omo-codex/telemetry")
+    const { createInstallPostHog, getPostHogDistinctId } = await import("../telemetry")
     const posthog = createInstallPostHog()
     posthog.trackActive(getPostHogDistinctId(), "install_completed")
     await posthog.shutdown()
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) return
     return
   }
 }

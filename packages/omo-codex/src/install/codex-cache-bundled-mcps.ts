@@ -1,4 +1,4 @@
-import { isPlainRecord } from "@oh-my-opencode/utils"
+import { isPlainRecord } from "./codex-cache-fs"
 import { cp, mkdir, readFile, stat } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 

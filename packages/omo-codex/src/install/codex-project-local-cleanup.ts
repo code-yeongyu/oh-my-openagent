@@ -37,10 +37,13 @@ export interface ProjectLocalCodexCleanupResult {
 }
 
 export async function repairNearestProjectLocalCodexArtifacts(input: {
-  readonly startDirectory: string
+  readonly startDirectory?: string
   readonly codexHome?: string
   readonly now?: () => Date
 }): Promise<ProjectLocalCodexCleanupResult> {
+  if (input.startDirectory === undefined) {
+    return emptyProjectLocalCodexCleanupResult()
+  }
   const project = await findProjectLocalCodexConfigs(input.startDirectory, input.codexHome)
   if (project === null) {
     return emptyProjectLocalCodexCleanupResult()

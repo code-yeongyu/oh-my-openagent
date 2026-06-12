@@ -50,6 +50,7 @@ export interface CodexAgentConfig {
 
 export interface CommandRunOptions {
   readonly cwd: string
+  readonly env?: NodeJS.ProcessEnv
 }
 
 export type RunCommand = (

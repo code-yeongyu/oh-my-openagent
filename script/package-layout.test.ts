@@ -131,7 +131,11 @@ describe("published package layout", () => {
       cwd: repositoryRoot,
       encoding: "utf8",
     })
-    const gitmodules = existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
+    const trackedGitmodulesPath = execFileSync("git", ["ls-files", "--", ".gitmodules"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    }).trim()
+    const gitmodules = trackedGitmodulesPath && existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
 
     // then
     expect(trackedEntries).not.toContain("160000")
@@ -148,6 +152,20 @@ describe("published package layout", () => {
 
     // then
     expect(packedPaths.has(expectedPackageRootManifest)).toBe(true)
+  }, packDryRunTimeoutMs)
+
+  test("#given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not", async () => {
+    // given
+    const expectedGeneratedInstaller = "packages/omo-codex/scripts/install-dist/install-local.mjs"
+    const obsoleteForkPrefix = "packages/omo-codex/scripts/install/"
+
+    // when
+    const packedPaths = await packDryRunPaths()
+    const packedObsoleteForks = [...packedPaths].filter((packagePath) => packagePath.startsWith(obsoleteForkPrefix))
+
+    // then
+    expect(packedPaths.has(expectedGeneratedInstaller)).toBe(true)
+    expect(packedObsoleteForks).toEqual([])
   }, packDryRunTimeoutMs)
 
   test("#given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship", async () => {

@@ -465,7 +465,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
+            .files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |

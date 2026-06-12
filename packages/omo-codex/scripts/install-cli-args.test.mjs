@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PASSTHROUGH_COMMANDS, formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
+import { PASSTHROUGH_COMMANDS, formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install-local.mjs";
 
 test("#given lazycodex install flags #when parsing Node installer argv #then keeps Codex autonomous intent", () => {
 	// given

@@ -8,7 +8,7 @@ export function resolveCodexInstallerBinDir(input: {
   readonly homeDir?: string
 }): string {
   const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR
-  if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0) return resolve(explicitBinDir)
+  if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0) return resolve(explicitBinDir.trim())
 
   const homeDir = input.homeDir ?? homedir()
   const defaultCodexHome = resolve(homeDir, ".codex")

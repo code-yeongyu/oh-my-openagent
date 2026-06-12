@@ -218,7 +218,7 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
     const lazycodexStepScopesPublishedFiles = workflow.includes(
-      '.files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
+      '.files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
     )
     const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
     const lazycodexShipsRootCliDistAfterBuild =

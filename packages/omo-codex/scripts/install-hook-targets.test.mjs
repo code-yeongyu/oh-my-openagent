@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { assertHookCommandTargets, findMissingHookCommandTargets } from "./install/hook-targets.mjs";
+import { assertHookCommandTargets, findMissingHookCommandTargets } from "./install-dist/install-local.mjs";
 
 const HOOKS_MANIFEST = {
 	hooks: {

@@ -153,11 +153,11 @@ describe("test workflows", () => {
     // #when
     const codexTestScriptBuildsMcpRuntimes =
       packageManifest.includes(
-        '"test:codex": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
+        '"test:codex": "bun run build:codex-install && bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
       )
 
     // #then
-    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must install nested Codex plugin deps and build bundled runtimes before installer tests copy them").toBe(true)
+    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must build the generated Codex installer, install nested Codex plugin deps, and build bundled runtimes before installer tests copy them").toBe(true)
   })
 
   test("runs Git Bash installer regressions in Codex compatibility checks", () => {
@@ -167,7 +167,7 @@ describe("test workflows", () => {
     // #when
     const codexTestScriptRunsGitBashRegressions =
       packageManifest.includes("packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs") &&
-      packageManifest.includes("packages/omo-codex/scripts/install/git-bash.test.mjs")
+      packageManifest.includes("packages/omo-codex/scripts/install-generated-bundle.test.mjs")
 
     // #then
     expect(codexTestScriptRunsGitBashRegressions, "test:codex must cover Windows Git Bash preflight and install guidance").toBe(true)

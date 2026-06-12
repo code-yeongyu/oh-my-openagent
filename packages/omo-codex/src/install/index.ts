@@ -15,4 +15,6 @@ export { readMarketplace, readPluginManifest, resolvePluginSource, validatePathS
 export { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, rewriteCachedMcpManifest } from "./codex-cache"
 export { updateCodexConfig } from "./codex-config-toml"
 export { trustedHookStatesForPlugin } from "./codex-hook-trust"
+export { assertHookCommandTargets, findMissingHookCommandTargets } from "./codex-hook-targets"
+export { stampGitBashMcpEnv } from "./codex-git-bash-mcp-env"
 export { defaultRunCommand } from "./codex-process"
