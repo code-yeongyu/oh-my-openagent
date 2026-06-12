@@ -7,30 +7,29 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
-  comment-source-repo:
+  close-with-source-guidance:
     runs-on: ubuntu-latest
     steps:
-      - name: Comment with source repository guidance
+      - name: Close PR with source repository guidance
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
 
-          marker="canonical LazyCodex source lives in"
-          if gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments --jq '.comments[].body' | grep -F "$marker" >/dev/null; then
-            echo "Source guidance comment already exists."
-            exit 0
-          fi
+          PR_URL="https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
 
           body="$(mktemp)"
-          cat > "$body" <<'MARKDOWN'
-          Thanks for opening this PR. The canonical LazyCodex source lives in [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), and the Codex Light implementation is under [`packages/omo-codex`](https://github.com/code-yeongyu/oh-my-openagent/tree/dev/packages/omo-codex).
+          cat > "$body" <<MARKDOWN
+          Thanks for the PR! Changes to LazyCodex land through [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) — could you open this against [omo-codex](https://github.com/code-yeongyu/oh-my-openagent/tree/dev/packages/omo-codex) over there instead? PRs in this repository can't be merged.
 
-          Direct edits in this marketplace repository can be overwritten by the release sync. Please open the implementation PR in `code-yeongyu/oh-my-openagent` and add the `lazycodex` label there so it gets routed faster.
+          If you're working with a coding agent, prompt it like this:
+
+          > I opened $PR_URL ("$PR_TITLE") against code-yeongyu/lazycodex, but changes there land through code-yeongyu/oh-my-openagent, where the Codex implementation lives under packages/omo-codex. Read my original PR, then open an equivalent PR against code-yeongyu/oh-my-openagent. In the new PR body, link the original PR ($PR_URL), explain that it was first opened against lazycodex, and describe in detail what that PR changed and why.
           MARKDOWN
 
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          gh pr close "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --comment "$(cat "$body")"

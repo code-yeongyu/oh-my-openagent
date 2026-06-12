@@ -282,9 +282,9 @@ If you cannot explain every changed line, you have NOT reviewed it.
 #### PHASE 2: AUTOMATED VERIFICATION
 
 1. `lsp_diagnostics` per changed file → ZERO new errors
-2. Targeted tests (`bun test src/changed-module`) → pass
-3. Full suite (`bun test`) → pass
-4. Build/typecheck → exit 0
+2. Targeted tests (from the plan's "Success Criteria", scoped to changed modules) → pass
+3. Full test suite (from the plan's "Success Criteria") → pass
+4. Build (from the plan's "Success Criteria") → exit 0
 
 If Phase 1 found issues but Phase 2 passes: Phase 2 is incomplete. Fix the code.
 

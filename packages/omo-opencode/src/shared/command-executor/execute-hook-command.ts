@@ -20,6 +20,13 @@ export interface ExecuteHookOptions {
   killGraceMs?: number;
   /** When provided, scrub process.env to only include these vars plus HOME/PATH/etc. Used for plugin-sourced hooks. */
   allowedEnvVars?: string[];
+  /**
+   * Plugin install path. When set, CLAUDE_PLUGIN_ROOT is exported into the
+   * spawn env and substituted in the command string so plugin-sourced hooks
+   * can reference $CLAUDE_PLUGIN_ROOT / ${CLAUDE_PLUGIN_ROOT} the same way
+   * Claude Code's CLI does (#4458).
+   */
+  pluginRoot?: string;
 }
 
 export async function executeHookCommand(
@@ -32,11 +39,18 @@ export async function executeHookCommand(
   const timeoutMs = options?.timeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS;
   const killGraceMs = options?.killGraceMs ?? SIGKILL_GRACE_MS;
 
-  const expandedCommand = command
+  const pluginRoot = options?.pluginRoot;
+  let expandedCommand = command
     .replace(/^~(?=\/|$)/g, home)
     .replace(/\s~(?=\/)/g, ` ${home}`)
     .replace(/\$CLAUDE_PROJECT_DIR/g, cwd)
     .replace(/\$\{CLAUDE_PROJECT_DIR\}/g, cwd);
+
+  if (pluginRoot) {
+    expandedCommand = expandedCommand
+      .replace(/\$CLAUDE_PLUGIN_ROOT/g, pluginRoot)
+      .replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, pluginRoot);
+  }
 
   let finalCommand = expandedCommand;
 
@@ -62,7 +76,7 @@ export async function executeHookCommand(
 
     // Keys that are always set from normalized sources and must not be
     // overwritten by ambient process.env values during the allowlist merge.
-    const PROTECTED_ENV_KEYS = new Set(["HOME", "CLAUDE_PROJECT_DIR"]);
+    const PROTECTED_ENV_KEYS = new Set(["HOME", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT"]);
 
     let env: Record<string, string | undefined>;
     if (options?.allowedEnvVars) {
@@ -79,6 +93,10 @@ export async function executeHookCommand(
       }
     } else {
       env = { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: cwd };
+    }
+
+    if (pluginRoot) {
+      env.CLAUDE_PLUGIN_ROOT = pluginRoot;
     }
 
     const proc = spawn(finalCommand, {

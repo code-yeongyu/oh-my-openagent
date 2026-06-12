@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import * as configManager from "./config-manager"
 import * as codexInstaller from "./install-codex"
 import { runCliInstaller } from "./cli-installer"
+import { ULTIMATE_FALLBACK } from "./model-fallback"
+import { getNoModelProvidersWarning } from "./provider-availability"
 import type { InstallArgs } from "./types"
 
 describe("runCliInstaller", () => {
@@ -178,5 +180,127 @@ describe("runCliInstaller", () => {
     addPluginSpy.mockRestore()
     writeConfigSpy.mockRestore()
     codexSpy.mockRestore()
+  })
+
+  it("does not warn about missing providers when only Bailian is configured", async () => {
+    const restoreSpies = [
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/oh-my-opencode.jsonc",
+      }),
+    ]
+
+    const args: InstallArgs = {
+      tui: false,
+      platform: "opencode",
+      claude: "no",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+      kimiForCoding: "no",
+      opencodeGo: "no",
+      bailianCodingPlan: "yes",
+      minimaxCnCodingPlan: "no",
+      minimaxCodingPlan: "no",
+      vercelAiGateway: "no",
+    }
+
+    const result = await runCliInstaller(args, "3.4.0")
+
+    expect(result).toBe(0)
+    const output = mockConsoleLog.mock.calls.map((call) => call.join(" ")).join("\n")
+    expect(output).not.toContain("No model providers configured")
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+  })
+
+  it("warns with ultimate fallback when no providers are configured", async () => {
+    const restoreSpies = [
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/oh-my-opencode.jsonc",
+      }),
+    ]
+
+    const args: InstallArgs = {
+      tui: false,
+      platform: "opencode",
+      claude: "no",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+      kimiForCoding: "no",
+      opencodeGo: "no",
+      bailianCodingPlan: "no",
+      minimaxCnCodingPlan: "no",
+      minimaxCodingPlan: "no",
+      vercelAiGateway: "no",
+    }
+
+    const result = await runCliInstaller(args, "3.4.0")
+
+    expect(result).toBe(0)
+    const output = mockConsoleLog.mock.calls.map((call) => call.join(" ")).join("\n")
+    expect(output).toContain(getNoModelProvidersWarning())
+    expect(output).toContain(ULTIMATE_FALLBACK)
+    expect(output).not.toContain("opencode/big-pickle")
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
   })
 })

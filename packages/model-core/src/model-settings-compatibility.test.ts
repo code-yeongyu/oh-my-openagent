@@ -258,7 +258,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
+      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Llama", modelID: "llama-4-maverick", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -278,14 +278,19 @@ describe("resolveCompatibleModelSettings", () => {
       })
 
       test(`${name} (${modelID}): downgrades unsupported variant`, () => {
+        const supportsMax = expectedVariants.includes("max")
+        const desiredVariant = supportsMax ? "xhigh" : "max"
+        const expectedDowngrade = supportsMax
+          ? "high"
+          : expectedVariants[expectedVariants.length - 1]
+
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
           modelID,
-          desired: { variant: "max" },
+          desired: { variant: desiredVariant },
         })
 
-        const highest = expectedVariants[expectedVariants.length - 1]
-        expect(result.variant).toBe(highest)
+        expect(result.variant).toBe(expectedDowngrade)
         expect(result.changes[0]?.reason).toBe("unsupported-by-model-family")
       })
 

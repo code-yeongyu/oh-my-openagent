@@ -102,7 +102,7 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	zls: { command: ["zls"], extensions: [".zig", ".zon"] },
 	csharp: { command: ["csharp-ls"], extensions: [".cs"] },
 	fsharp: { command: ["fsautocomplete"], extensions: [".fs", ".fsi", ".fsx", ".fsscript"] },
-	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".objc", ".objcpp"] },
+	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".m", ".mm"] },
 	rust: { command: ["rust-analyzer"], extensions: [".rs"] },
 	clangd: {
 		command: ["clangd", "--background-index", "--clang-tidy"],
@@ -140,7 +140,7 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 		command: ["haskell-language-server-wrapper", "--lsp"],
 		extensions: [".hs", ".lhs"],
 	},
-	"kotlin-ls": { command: ["kotlin-lsp"], extensions: [".kt", ".kts"] },
+	"kotlin-ls": { command: ["kotlin-lsp", "--stdio"], extensions: [".kt", ".kts"] },
 	julials: {
 		command: ["julia", "--startup-file=no", "--history-file=no", "-e", "using LanguageServer; runserver()"],
 		extensions: [".jl"],

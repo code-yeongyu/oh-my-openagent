@@ -11,8 +11,8 @@ function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function cloneJsonRecord(value: JsonRecord): JsonRecord {
-  return { ...value }
+function omitEmptyStringFields(record: JsonRecord): JsonRecord {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== ""))
 }
 
 function getMemberName(value: unknown): string | undefined {
@@ -128,6 +128,7 @@ function buildPromptFromNaturalMember(member: JsonRecord): string {
 }
 
 function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecInputOptions): JsonRecord {
+  const strippedMember = omitEmptyStringFields(member)
   const {
     capabilities: _capabilities,
     description: _description,
@@ -139,7 +140,7 @@ function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecIn
     systemPrompt: _systemPrompt,
     system_prompt: _systemPromptSnakeCase,
     ...normalizedMember
-  } = member
+  } = strippedMember
 
   const rawKind = normalizedMember.kind
 
@@ -167,7 +168,7 @@ function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecIn
   }
 
   if (normalizedMember.kind === "category" && normalizedMember.prompt === undefined) {
-    normalizedMember.prompt = buildPromptFromNaturalMember(member)
+    normalizedMember.prompt = buildPromptFromNaturalMember(strippedMember)
   }
 
   return normalizedMember
@@ -178,16 +179,18 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
     return raw
   }
 
-  const normalizedSpec = cloneJsonRecord(raw)
+  const normalizedSpec = omitEmptyStringFields(raw)
   if (typeof normalizedSpec.name === "string") {
     normalizedSpec.name = normalizeNameStem(normalizedSpec.name)
   }
 
   const rawMembers = raw.members
-  const rawLead = raw.lead
-  let leadAgentId = typeof raw.leadAgentId === "string" ? raw.leadAgentId : undefined
+  const rawLead = isJsonRecord(raw.lead) && Object.keys(omitEmptyStringFields(raw.lead)).length > 0
+    ? raw.lead
+    : undefined
+  let leadAgentId = typeof normalizedSpec.leadAgentId === "string" ? normalizedSpec.leadAgentId : undefined
   const hasExplicitLead = leadAgentId !== undefined
-    || isJsonRecord(rawLead)
+    || rawLead !== undefined
     || (Array.isArray(rawMembers) && hasMemberLeadFlag(rawMembers))
 
   if (Array.isArray(rawMembers)) {

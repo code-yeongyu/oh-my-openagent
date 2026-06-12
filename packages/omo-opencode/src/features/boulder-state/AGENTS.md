@@ -6,7 +6,7 @@
 
 10 files (~1k LOC excl. tests). Tracks Sisyphus's "boulder" — the active work plan being rolled across sessions, worktrees, and subagent task delegations. Named after the Sisyphus myth: the boulder must keep rolling until the plan is complete.
 
-Inspected interactively via `bunx oh-my-opencode boulder` (see [`src/cli/boulder/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/cli/boulder/)).
+Inspected interactively via `bunx oh-my-opencode boulder` (see [`src/cli/boulder/`](../../cli/boulder)).
 
 ## SCHEMA (v2)
 
@@ -58,11 +58,11 @@ session.completed
 
 | Where | What |
 |-------|------|
-| [`src/cli/boulder/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/cli/boulder/) | CLI inspector formats this state |
-| [`src/hooks/atlas/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/atlas/) | Reads work state, drives boulder-complete and parallel-delegation prompts |
-| [`src/hooks/ralph-loop/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/ralph-loop/) | Resumes subagent task sessions via `task_sessions` |
-| [`src/hooks/start-work/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/start-work/) | Creates the BoulderState on `/start-work` invocation |
-| [`src/hooks/todo-continuation-enforcer/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/todo-continuation-enforcer/) | Session-idle continuation when boulder incomplete |
+| [`src/cli/boulder/`](../../cli/boulder) | CLI inspector formats this state |
+| [`src/hooks/atlas/`](../../hooks/atlas) | Reads work state, drives boulder-complete and parallel-delegation prompts |
+| [`src/hooks/ralph-loop/`](../../hooks/ralph-loop) | Resumes subagent task sessions via `task_sessions` |
+| [`src/hooks/start-work/`](../../hooks/start-work) | Creates the BoulderState on `/start-work` invocation |
+| [`src/hooks/todo-continuation-enforcer/`](../../hooks/todo-continuation-enforcer) | Session-idle continuation when boulder incomplete |
 
 ## STORAGE
 

@@ -40,6 +40,7 @@ export async function formatFullSession(
     sinceMessageId?: string
     includeToolResults: boolean
     thinkingMaxChars?: number
+    fromEnd?: boolean
   }
 ): Promise<string> {
   if (!task.sessionId) {
@@ -94,6 +95,9 @@ export async function formatFullSession(
       if (part.type === "tool_result") {
         return includeToolResults
       }
+      if (part.type === "tool_use" || part.type === "tool") {
+        return includeToolResults
+      }
       return part.type === "text"
     })
 
@@ -106,7 +110,14 @@ export async function formatFullSession(
 
   const limit = typeof options.messageLimit === "number" ? Math.min(options.messageLimit, MAX_MESSAGE_LIMIT) : undefined
   const hasMore = limit !== undefined && normalizedMessages.length > limit
-  const visibleMessages = limit !== undefined ? normalizedMessages.slice(0, limit) : normalizedMessages
+  let visibleMessages: typeof normalizedMessages
+  if (limit === undefined) {
+    visibleMessages = normalizedMessages
+  } else if (options.fromEnd) {
+    visibleMessages = normalizedMessages.slice(-limit)
+  } else {
+    visibleMessages = normalizedMessages.slice(0, limit)
+  }
 
   const lines: string[] = []
   lines.push("# Full Session Output")
@@ -147,6 +158,9 @@ export async function formatFullSession(
         for (const toolText of toolTexts) {
           lines.push(`[tool result] ${toolText}`)
         }
+      } else if ((part.type === "tool_use" || part.type === "tool") && part.tool) {
+        const input = part.input === undefined ? "" : truncateText(JSON.stringify(part.input), thinkingMaxChars)
+        lines.push(`[tool: ${part.tool}] ${input}`.trimEnd())
       }
     }
   }

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 import { getLocale, initI18n, t } from "../shared/i18n"
 import { createPluginModule } from "./create-plugin-module"
 
+const sourcePlugin = new URL("../index.ts", import.meta.url).href
+
 const mockInitConfigContext = mock(() => {})
 const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null, allPlugins: [] }))
 const mockGetSkillPluginConflictWarning = mock(() => "")
@@ -233,7 +235,7 @@ describe("createPluginModule()", () => {
       // given
       const pluginModule = createTestPluginModule()
       const duplicatePlugins = [
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        sourcePlugin,
         "oh-my-openagent@latest",
       ]
       mockDetectDuplicateOmoPlugin.mockReturnValue({

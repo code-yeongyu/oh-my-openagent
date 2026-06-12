@@ -140,6 +140,20 @@ export function createManagers(args: {
 
         log("[create-managers] onSubagentSessionCreated callback completed")
     },
+    onSubagentSessionDeleted: async (event: { sessionID: string }) => {
+      log("[create-managers] onSubagentSessionDeleted callback received", {
+        sessionID: event.sessionID,
+      })
+
+      await tmuxSessionManager.onSessionDeleted(event).catch((error) => {
+        log("[create-managers] onSubagentSessionDeleted callback error:", {
+          sessionID: event.sessionID,
+          error: String(error),
+        })
+      })
+
+      log("[create-managers] onSubagentSessionDeleted callback completed")
+    },
     onShutdown: async () => {
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during shutdown:", error)

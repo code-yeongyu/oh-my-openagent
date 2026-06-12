@@ -7,6 +7,7 @@ import {
 import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
 import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
+import { findDeliveredMessageIds, requeuePendingLiveDeliveries } from "../../features/team-mode/team-mailbox/pending-delivery-recovery"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { log } from "../../shared/logger"
@@ -30,6 +31,7 @@ type TeamIdleWakeHintContext = {
     session: {
       promptAsync?: (input: PromptAsyncInput) => Promise<unknown>
       status?: () => Promise<unknown>
+      messages?: (input: { path: { id: string } }) => Promise<unknown>
     }
   }
 }
@@ -134,13 +136,24 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
           config,
         )
         if (claimedMessageIds.length > 0) {
-          await ackMessages(runtimeState.teamRunId, memberEntry.name, claimedMessageIds, config)
+          const deliveredMessageIds = typeof ctx.client.session.messages === "function"
+            ? await findDeliveredMessageIds(ctx.client, sessionID, claimedMessageIds)
+            : new Set(claimedMessageIds)
+          const ackedMessageIds = claimedMessageIds.filter((messageId) => deliveredMessageIds.has(messageId))
+          const requeuedMessageIds = claimedMessageIds.filter((messageId) => !deliveredMessageIds.has(messageId))
+          if (ackedMessageIds.length > 0) {
+            await ackMessages(runtimeState.teamRunId, memberEntry.name, ackedMessageIds, config)
+          }
+          if (requeuedMessageIds.length > 0) {
+            await requeuePendingLiveDeliveries(runtimeState.teamRunId, memberEntry.name, requeuedMessageIds, config)
+          }
           log("team idle handled pending live delivery ack", {
             event: "team-mode-idle-pending-ack",
             teamRunId: runtimeState.teamRunId,
             memberName: memberEntry.name,
             sessionID,
-            ackedCount: claimedMessageIds.length,
+            ackedCount: ackedMessageIds.length,
+            requeuedCount: requeuedMessageIds.length,
           })
         }
       }

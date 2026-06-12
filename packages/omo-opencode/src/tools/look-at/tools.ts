@@ -15,7 +15,9 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
     description: LOOK_AT_DESCRIPTION,
     args: {
       file_path: tool.schema.string().optional().describe("Absolute path to the file to analyze"),
+      file_paths: tool.schema.array(tool.schema.string()).optional().describe("Absolute paths to the files to analyze"),
       image_data: tool.schema.string().optional().describe("Base64 encoded image data (for clipboard/pasted images)"),
+      image_data_list: tool.schema.array(tool.schema.string()).optional().describe("Base64 encoded image data entries (for multiple clipboard/pasted images)"),
       goal: tool.schema.string().describe("What specific information to extract from the file"),
     },
     async execute(rawArgs: LookAtArgs, toolContext) {
@@ -32,7 +34,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       }
 
       const preparedInput = preparedInputResult.value
-      const { isBase64Input, sourceDescription } = preparedInput
+      const { sourceDescription } = preparedInput
       log(`[look_at] Analyzing ${sourceDescription}, goal: ${args.goal}`)
 
       try {
@@ -40,8 +42,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           ctx,
           toolContext,
           goal: args.goal,
-          filePart: preparedInput.filePart,
-          isBase64Input,
+          inputParts: preparedInput.inputParts,
         })
       } catch (error) {
         const missingFilePath = getMissingLookAtFilePath(error, args)
