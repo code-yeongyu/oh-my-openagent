@@ -17,6 +17,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@oh-my-opencode/utils": "file:../../../../utils",
 		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3"
 	},

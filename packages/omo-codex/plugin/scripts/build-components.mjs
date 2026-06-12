@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,13 +9,15 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 const workspaces = Array.isArray(packageJson.workspaces) ? packageJson.workspaces : [];
 const workspaceSet = new Set(workspaces);
+const builtinModuleNames = new Set(builtinModules.filter((moduleName) => !moduleName.startsWith("_")));
 
 for (const workspace of workspaces) {
 	if (typeof workspace !== "string" || !workspace.startsWith("components/")) continue;
 	if (!(await hasBuildScript(workspace))) continue;
 
 	console.log(`Building ${workspace}`);
-	runBuild(["run", "--workspace", workspace, "build"], root);
+	run("npm", ["run", "--workspace", workspace, "build"], root);
+	await bundleCli(workspace);
 }
 
 for (const componentName of await readStandaloneComponentNames()) {
@@ -22,7 +25,8 @@ for (const componentName of await readStandaloneComponentNames()) {
 	if (!(await hasBuildScript(componentPath))) continue;
 
 	console.log(`Building ${componentPath} (standalone)`);
-	runBuild(["run", "build"], join(root, componentPath));
+	run("npm", ["run", "build"], join(root, componentPath));
+	await bundleCli(componentPath);
 }
 
 async function readStandaloneComponentNames() {
@@ -44,12 +48,32 @@ async function hasBuildScript(relativePath) {
 	return typeof manifest.scripts?.build === "string";
 }
 
-function runBuild(npmArgs, cwd) {
-	const result = spawnSync("npm", npmArgs, {
+async function bundleCli(workspace) {
+	const entry = join(root, workspace, "src", "cli.ts");
+	const output = join(root, workspace, "dist", "cli.js");
+	console.log(`Bundling ${workspace}/dist/cli.js`);
+	run("bun", ["build", entry, "--target", "node", "--format", "esm", "--outfile", output], root);
+	await normalizeBuiltinImports(output);
+}
+
+function run(command, args, cwd) {
+	const result = spawnSync(command, args, {
 		cwd,
 		shell: process.platform === "win32",
 		stdio: "inherit",
 	});
 	if (result.error !== undefined) throw result.error;
 	if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+async function normalizeBuiltinImports(output) {
+	const bundled = await readFile(output, "utf8");
+	const normalized = bundled.replace(/(from\s+["']|import\s*\(\s*["'])([^"']+)(["'])/g, (match, prefix, specifier, suffix) => {
+		if (specifier.startsWith("node:")) return match;
+		if (!builtinModuleNames.has(specifier)) return match;
+		return `${prefix}node:${specifier}${suffix}`;
+	});
+	if (normalized !== bundled) {
+		await writeFile(output, normalized);
+	}
 }
