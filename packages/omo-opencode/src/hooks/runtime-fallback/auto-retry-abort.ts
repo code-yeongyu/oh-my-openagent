@@ -18,7 +18,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
       releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
-        reservedBy: `runtime-fallback:${source}`,
+        reservedBy: [`runtime-fallback:${source}`, "model-suggestion-retry:sync"],
         reservedByPrefix: "runtime-fallback:",
       })
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
