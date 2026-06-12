@@ -58,6 +58,8 @@ import { ConcurrencyManager } from "./concurrency"
 import {
   POLLING_INTERVAL_MS,
   type QueueItem,
+  SESSION_ERROR_TRANSIENT_THRESHOLD,
+  SESSION_ERROR_WINDOW_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
@@ -1011,6 +1013,11 @@ The fallback retry session is now created and can be inspected directly.
         this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
           log("[background-agent] Failed to notify on error:", err)
         })
+      } else {
+        // No task owns this session (orphaned by definition of this branch): abort it best-effort
+        log("[background-agent] No task resolved for failed launch prompt, aborting orphaned session:", { sessionID })
+        clearDelegatedChildSessionBootstrap(sessionID)
+        await this.abortSessionWithLogging(sessionID, "orphaned launch session cleanup")
       }
     })
 
@@ -1414,10 +1421,14 @@ The fallback retry session is now created and can be inspected directly.
         return
       }
 
-      existingTask.status = "interrupt"
       const errorMessage = errorInfo.message ?? (error instanceof Error ? error.message : String(error))
-      existingTask.error = errorMessage
-      existingTask.completedAt = new Date()
+      if (existingTask.currentAttemptID) {
+        finalizeAttempt(existingTask, existingTask.currentAttemptID, "interrupt", errorMessage)
+      } else {
+        existingTask.status = "interrupt"
+        existingTask.error = errorMessage
+        existingTask.completedAt = new Date()
+      }
       if (existingTask.rootSessionId) {
         this.unregisterRootDescendant(existingTask.rootSessionId)
       }
@@ -1673,6 +1684,10 @@ The fallback retry session is now created and can be inspected directly.
         }
       }
       task.progress.lastUpdate = partInfo?.activityTime ?? new Date()
+      if (task.sessionErrorCount) {
+        task.sessionErrorCount = 0
+        task.lastSessionErrorAt = undefined
+      }
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
         const countedToolPartIDs = task.progress.countedToolPartIDs ?? new Set<string>()
@@ -2011,24 +2026,48 @@ The fallback retry session is now created and can be inspected directly.
       canRetry,
     })
 
+    let repeatedTransientError = false
     const sessionId = task.sessionId
     if (sessionId) {
       const sessionStillAlive = await this.verifySessionExists(sessionId)
       if (sessionStillAlive) {
-        this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
+        const now = Date.now()
+        const lastSessionErrorAt = task.lastSessionErrorAt?.getTime()
+        if (lastSessionErrorAt !== undefined && now - lastSessionErrorAt > SESSION_ERROR_WINDOW_MS) {
+          task.sessionErrorCount = 0
+        }
+        task.sessionErrorCount = (task.sessionErrorCount ?? 0) + 1
+        task.lastSessionErrorAt = new Date(now)
+
+        if (task.sessionErrorCount < SESSION_ERROR_TRANSIENT_THRESHOLD) {
+          this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
+            taskId: task.id,
+            sessionId,
+            sessionErrorCount: task.sessionErrorCount,
+            errorMessage: errorMsg?.slice(0, 200),
+          })
+          return
+        }
+
+        repeatedTransientError = true
+        this.logger("[background-agent] session.error repeated past transient threshold while session alive, failing task:", {
           taskId: task.id,
           sessionId,
+          sessionErrorCount: task.sessionErrorCount,
           errorMessage: errorMsg?.slice(0, 200),
         })
-        return
       }
     }
 
+    const failureError = repeatedTransientError
+      ? `Session repeatedly errored ${task.sessionErrorCount} times without recovering. Last error: ${errorMsg}`
+      : errorMsg
+
     if (task.currentAttemptID) {
-      finalizeAttempt(task, task.currentAttemptID, "error", errorMsg)
+      finalizeAttempt(task, task.currentAttemptID, "error", failureError)
     } else {
       task.status = "error"
-      task.error = errorMsg
+      task.error = failureError
       task.completedAt = new Date()
     }
     if (task.rootSessionId) {

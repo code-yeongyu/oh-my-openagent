@@ -15,6 +15,10 @@ export const MIN_IDLE_TIME_MS = 5000
 export const POLLING_INTERVAL_MS = 3000
 export const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000
 export const TMUX_CALLBACK_DELAY_MS = 200
+/** Number of transient session.error events (session still alive) within the window before a task is failed */
+export const SESSION_ERROR_TRANSIENT_THRESHOLD = 3
+/** Rolling window for counting transient session.error events; resets the counter once exceeded */
+export const SESSION_ERROR_WINDOW_MS = 10 * 60 * 1000
 
 export type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 
