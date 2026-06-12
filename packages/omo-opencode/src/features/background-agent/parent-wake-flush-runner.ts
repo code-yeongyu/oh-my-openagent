@@ -20,7 +20,7 @@ type ParentWakeFlushRunnerDeps = {
 export class ParentWakeFlushRunner {
   constructor(private readonly deps: ParentWakeFlushRunnerDeps) {}
 
-  // ITEM 1 (Oracle): monotonic token bound to each force-queue attempt so stale
+  // Monotonic token bound to each force-queue attempt so stale
   // gate callbacks (onDispatched / onExpiredOrFailed) only mutate the wake they
   // actually belong to.
   private forceQueueTokenSeq = 0
@@ -66,7 +66,7 @@ export class ParentWakeFlushRunner {
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
       return
     }
-    // BUG B1 follow-up (Oracle): while a forced wake is still queued at the gate
+    // While a forced wake is still queued at the gate
     // it is neither lost nor re-dispatched. Suppress all new dispatch paths and
     // just re-flush; it clears via consume-detection above (gate delivered it)
     // or via the onExpiredOrFailed re-arm (gate dropped it).
@@ -336,7 +336,7 @@ export class ParentWakeFlushRunner {
     }
   }
 
-  // BUG B1 follow-up (Oracle): a force-dispatch can be QUEUED at the gate rather
+  // A force-dispatch can be QUEUED at the gate rather
   // than dispatched. While queued, the wake stays pending and is neither tracked
   // as dispatched nor re-forced (forcedQueuedAt suppresses hasExceededMaxDeferral).
   private markForceQueued(sessionID: string, queuedAt: number, token: number): void {
@@ -358,16 +358,16 @@ export class ParentWakeFlushRunner {
     this.schedulePendingParentWakeFlush(sessionID)
   }
 
-  // BUG B1 follow-up (Oracle): the gate ACTUALLY dispatched the previously-queued
+  // The gate ACTUALLY dispatched the previously-queued
   // force entry — only now is the content in parent history. Record the real
   // noReply admission (mirrors markRetainedNoReplyAdmission) and clear the
   // force-queued marker so a reply-required wake proceeds through the normal
   // retained-reply lifecycle: consume-drop once the parent responds, or a
   // reply-producing resume once the parent is safe. This is what prevents the
-  // "delivered but no parent output" deadlock (HOLE 2).
+  // "delivered but no parent output" deadlock.
   private handleForceDispatched(sessionID: string, token: number): void {
     const wake = this.deps.pendingQueue.getWake(sessionID)
-    // ITEM 1 (Oracle): only honor this callback if the wake is STILL the one we
+    // Only honor this callback if the wake is STILL the one we
     // force-queued under this token. A newer notification merge rotates the token
     // (clearing it), so a stale entry's onDispatched can never admit content the
     // queued entry did not actually contain.

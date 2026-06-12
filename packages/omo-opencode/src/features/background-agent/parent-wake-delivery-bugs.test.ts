@@ -354,7 +354,7 @@ describe("BUG B4: deleted parent session drops the wake instead of retrying fore
   })
 })
 
-describe("BUG B1 follow-up (Oracle): force-dispatch that QUEUES at the gate is not tracked as dispatched", () => {
+describe("force-dispatch that QUEUES at the gate is not tracked as dispatched", () => {
   test("#given an active reservation on the parent #when a wake exceeds max deferral and force-dispatch queues at the gate #then it is not tracked dispatched, starts no B3 window, and the gate delivers it exactly once", async () => {
     // given: a foreign reservation holds the gate, so an enqueue force-dispatch
     // returns "queued" (blocked) rather than "dispatched".
@@ -435,7 +435,7 @@ describe("BUG B1 follow-up (Oracle): force-dispatch that QUEUES at the gate is n
   })
 })
 
-describe("BUG B1 follow-up round-2 (Oracle): force-queued lifecycle is gate-truthful", () => {
+describe("force-queued lifecycle is gate-truthful", () => {
   const SECOND_WAKE = [
     "<system-reminder>",
     "[BACKGROUND TASK COMPLETED]",
@@ -576,7 +576,7 @@ describe("BUG B1 follow-up round-2 (Oracle): force-queued lifecycle is gate-trut
       expect(notifier.getPendingParentWakes().get("parent-1")?.forcedQueuedAt).toBeUndefined()
       expect(JSON.stringify(notifier.getPendingParentWakes().get("parent-1")?.notifications)).toContain("task-z")
 
-      // when: the stale gate entry drops (Oracle: residual old-entry delivery is
+      // when: the stale gate entry drops (residual old-entry delivery is
       // tolerated) and the gate is free, the unblocked wake force-dispatches the
       // new merged content. Clearing gate state simulates the old queued entry
       // expiring/being superseded.
@@ -594,7 +594,7 @@ describe("BUG B1 follow-up round-2 (Oracle): force-queued lifecycle is gate-trut
   })
 })
 
-describe("BUG B1 follow-up round-3 (Oracle): force-queue callbacks are identity-bound", () => {
+describe("force-queue callbacks are identity-bound", () => {
   const SECOND_WAKE = [
     "<system-reminder>",
     "[BACKGROUND TASK COMPLETED]",

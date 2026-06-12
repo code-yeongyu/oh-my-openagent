@@ -105,7 +105,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       return
     }
     if (promptResult.status === "queued" && input.markForceQueued !== undefined) {
-      // BUG B1 follow-up (Oracle): a force-dispatch that merely QUEUED at the
+      // A force-dispatch that merely QUEUED at the
       // gate (blocked by an existing reservation) is NOT yet in parent history.
       // It must not be tracked as dispatched (that would start the B3 silent-loss
       // window on a wake that hasn't dispatched and let unrelated assistant output
@@ -121,7 +121,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         })
         return
       }
-      // ITEM 2 (Oracle): a coalesced "queued" result has NO entry carrying our
+      // A coalesced "queued" result has NO entry carrying our
       // callbacks (semantic-dedupe / same-dedupe reservation). An equivalent
       // dispatch is already in flight, so do NOT mark force-queued (that marker
       // would never resolve). Leave the wake pending to retry normally; the
