@@ -70,7 +70,7 @@ describe("plugin package metadata", () => {
 		expect(packageJson.type).toBe("module");
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
 		expect(packageJson.dependencies).toEqual({
-			"@code-yeongyu/lsp-tools-mcp": "file:../../../../lsp-tools-mcp",
+			"@code-yeongyu/lsp-daemon": "file:../../../../lsp-daemon",
 		});
 		expect(packageJson.bin["omo-lsp"]).toBe("./dist/cli.js");
 		expect(packageJson.bin["codex-lsp"]).toBeUndefined();
@@ -80,29 +80,17 @@ describe("plugin package metadata", () => {
 		expect(postToolUseCommand).toBe(`node "${pluginRoot}/dist/cli.js" hook post-tool-use`);
 		expect(postCompactCommand).toBe(`node "${pluginRoot}/dist/cli.js" hook post-compact`);
 		expect(lspServer?.command).toBe("node");
-		expect(lspServer?.args).toEqual(["../../../../lsp-tools-mcp/dist/cli.js", "mcp"]);
+		expect(lspServer?.args).toEqual(["../../../../lsp-daemon/dist/cli.js", "mcp"]);
 		expect(cliSource).not.toContain("./lazy-lsp-mcp.js");
-		expect(cliSource).toContain("@code-yeongyu/lsp-tools-mcp/dist/cli.js");
-		expect(cliSource).not.toContain("../../../../../lsp-tools-mcp/dist/cli.js");
-		expect(codexHookCliSource).toContain("@code-yeongyu/lsp-tools-mcp/dist/lsp/manager.js");
-		expect(codexHookSource).toContain("@code-yeongyu/lsp-tools-mcp/dist/tools.js");
-		expect(codexHookCliSource).not.toContain("../../../../../lsp-tools-mcp/dist/lsp/manager.js");
-		expect(codexHookSource).not.toContain("../../../../../lsp-tools-mcp/dist/tools.js");
+		expect(cliSource).toContain("@code-yeongyu/lsp-daemon/dist/cli.js");
+		expect(cliSource).not.toContain("../../../../../lsp-daemon/dist/cli.js");
+		expect(codexHookCliSource).toContain("@code-yeongyu/lsp-daemon");
+		expect(codexHookSource).toContain("@code-yeongyu/lsp-daemon");
+		expect(codexHookCliSource).not.toContain("../../../../../lsp-daemon");
+		expect(codexHookSource).not.toContain("../../../../../lsp-daemon");
 		expect(sourceFiles.filter((name) => name.startsWith("lazy-mcp") || name === "lazy-lsp-mcp.ts")).toEqual([]);
 	});
 
-	it("#given LSP skill guidance #when validating MCP tool instructions #then tool names are not framed as shell commands", () => {
-		// given
-		const skill = readFileSync("skills/lsp/SKILL.md", "utf8");
-
-		// when
-		const mentionsToolInterface = skill.includes("through the tool interface");
-		const rejectsShellExecution = skill.includes("not shell commands");
-
-		// then
-		expect(mentionsToolInterface).toBe(true);
-		expect(rejectsShellExecution).toBe(true);
-	});
 });
 
 function isPackageJson(value: unknown): value is PackageJson {

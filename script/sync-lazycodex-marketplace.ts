@@ -7,6 +7,7 @@ const PLUGIN_SOURCE_PATH = join("packages", "omo-codex", "plugin")
 const AST_GREP_MCP_DIST_SOURCE_PATH = join("packages", "ast-grep-mcp", "dist")
 const GIT_BASH_MCP_DIST_SOURCE_PATH = join("packages", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_SOURCE_PATH = join("packages", "lsp-tools-mcp", "dist")
+const LSP_DAEMON_DIST_SOURCE_PATH = join("packages", "lsp-daemon", "dist")
 const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
   "packages",
   "omo-codex",
@@ -21,12 +22,15 @@ const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows
 const AST_GREP_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "ast-grep-mcp", "dist")
 const GIT_BASH_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "lsp-tools-mcp", "dist")
+const LSP_DAEMON_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "lsp-daemon", "dist")
 const AST_GREP_MCP_SOURCE_ARG = "../../ast-grep-mcp/dist/cli.js"
 const AST_GREP_MCP_PLUGIN_ARG = "./components/ast-grep-mcp/dist/cli.js"
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
 const GIT_BASH_MCP_PLUGIN_ARG = "./components/git-bash-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_SOURCE_ARG = "../../lsp-tools-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_PLUGIN_ARG = "./components/lsp-tools-mcp/dist/cli.js"
+const LSP_DAEMON_SOURCE_ARG = "../../lsp-daemon/dist/cli.js"
+const LSP_DAEMON_PLUGIN_ARG = "./components/lsp-daemon/dist/cli.js"
 
 const BUNDLED_MCP_DISTS = [
   {
@@ -44,18 +48,25 @@ const BUNDLED_MCP_DISTS = [
     sourcePath: LSP_TOOLS_MCP_DIST_SOURCE_PATH,
     destinationPath: LSP_TOOLS_MCP_DIST_DESTINATION_PATH,
   },
+  {
+    label: "LSP daemon",
+    sourcePath: LSP_DAEMON_DIST_SOURCE_PATH,
+    destinationPath: LSP_DAEMON_DIST_DESTINATION_PATH,
+  },
 ] as const
 
 const MCP_ARG_REWRITES = [
   [AST_GREP_MCP_SOURCE_ARG, AST_GREP_MCP_PLUGIN_ARG],
   [GIT_BASH_MCP_SOURCE_ARG, GIT_BASH_MCP_PLUGIN_ARG],
   [LSP_TOOLS_MCP_SOURCE_ARG, LSP_TOOLS_MCP_PLUGIN_ARG],
+  [LSP_DAEMON_SOURCE_ARG, LSP_DAEMON_PLUGIN_ARG],
 ] as const
 
 export interface SyncLazycodexMarketplaceInput {
   readonly sourceRoot: string
   readonly lazycodexRoot: string
   readonly releaseVersion?: string
+  readonly allowMissingBundledDists?: boolean
 }
 
 interface MarketplaceManifest {
@@ -96,7 +107,7 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     filter: (path) => shouldCopyPluginPath(path, pluginRoot),
   })
   await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
-  await copyBundledMcpDists(sourceRoot, lazycodexRoot)
+  await copyBundledMcpDists(sourceRoot, lazycodexRoot, input.allowMissingBundledDists === true)
   await rewritePluginMcpManifest(destinationPluginRoot)
   await stampReleaseVersion(destinationPluginRoot, input.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION)
   await validateLazycodexPluginBundle(destinationPluginRoot)
@@ -142,9 +153,9 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
-async function copyBundledMcpDists(sourceRoot: string, lazycodexRoot: string): Promise<void> {
+async function copyBundledMcpDists(sourceRoot: string, lazycodexRoot: string, skipMissing: boolean): Promise<void> {
   for (const mcpDist of BUNDLED_MCP_DISTS) {
-    await copyBundledMcpDist(sourceRoot, lazycodexRoot, mcpDist)
+    await copyBundledMcpDist(sourceRoot, lazycodexRoot, mcpDist, skipMissing)
   }
 }
 
@@ -160,9 +171,14 @@ async function copyBundledMcpDist(
   sourceRoot: string,
   lazycodexRoot: string,
   mcpDist: (typeof BUNDLED_MCP_DISTS)[number],
+  skipMissing: boolean,
 ): Promise<void> {
   const sourcePath = join(sourceRoot, mcpDist.sourcePath)
   if (!(await isDirectory(sourcePath))) {
+    if (skipMissing) {
+      console.warn(`[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing ${mcpDist.label} dist at ${sourcePath}`)
+      return
+    }
     throw new Error(`missing built ${mcpDist.label} dist at ${sourcePath}`)
   }
   const destinationPath = join(lazycodexRoot, mcpDist.destinationPath)
@@ -261,10 +277,12 @@ function rewriteMcpArg(arg: unknown): unknown {
   return rewrite?.[1] ?? arg
 }
 
+const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude"])
+
 function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative.length === 0) return true
-  return !relative.split(sep).some((part) => part === ".git" || part === "node_modules")
+  return !relative.split(sep).some((part) => PLUGIN_COPY_DENYLIST.has(part))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -272,10 +290,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 if (import.meta.main) {
-  const sourceRoot = process.argv[2] ?? process.cwd()
-  const lazycodexRoot = process.argv[3]
+  const args = process.argv.slice(2)
+  const positional = args.filter((a) => !a.startsWith("--"))
+  const sourceRoot = positional[0] ?? process.cwd()
+  const lazycodexRoot = positional[1]
   if (lazycodexRoot === undefined) {
     throw new Error("Usage: bun run script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>")
   }
-  await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+  await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot, allowMissingBundledDists: args.includes("--previous-payload") })
 }

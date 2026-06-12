@@ -8,13 +8,13 @@ const PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe"
 const WINGET_INSTALL_ARGS = ["install", "--id", "Git.Git", "-e", "--source", "winget"];
 
 export function resolveGitBash({ platform, env, exists, where }) {
-	if (platform !== "win32") return { found: true, path: null, source: "not-required" };
+	if (platform !== "win32") return { found: true, path: null, source: "not-required", checkedPaths: [] };
 
 	const checkedPaths = [];
 	const envPath = nonEmptyEnvValue(env, GIT_BASH_ENV_KEY);
 	if (envPath !== undefined) {
 		checkedPaths.push(envPath);
-		if (isBashExePath(envPath) && exists(envPath)) return { found: true, path: envPath, source: "env" };
+		if (isBashExePath(envPath) && exists(envPath)) return { found: true, path: envPath, source: "env", checkedPaths };
 		return missingGitBash(checkedPaths);
 	}
 
@@ -23,14 +23,15 @@ export function resolveGitBash({ platform, env, exists, where }) {
 		{ path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" },
 	]) {
 		checkedPaths.push(candidate.path);
-		if (exists(candidate.path)) return { found: true, path: candidate.path, source: candidate.source };
+		if (exists(candidate.path)) return { found: true, path: candidate.path, source: candidate.source, checkedPaths };
 	}
 
 	for (const pathCandidate of where("bash")) {
 		const candidate = pathCandidate.trim();
 		if (candidate.length === 0) continue;
 		checkedPaths.push(candidate);
-		if (isBashExePath(candidate) && exists(candidate)) return { found: true, path: candidate, source: "path" };
+		if (isKnownNonGitBashLauncher(candidate)) continue;
+		if (isBashExePath(candidate) && exists(candidate)) return { found: true, path: candidate, source: "path", checkedPaths };
 	}
 
 	return missingGitBash(checkedPaths);
@@ -84,6 +85,13 @@ function nonEmptyEnvValue(env, key) {
 
 function isBashExePath(path) {
 	return path.toLowerCase().endsWith("bash.exe");
+}
+
+const NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS = ["\\windows\\system32\\", "\\microsoft\\windowsapps\\"];
+
+function isKnownNonGitBashLauncher(path) {
+	const normalized = path.replaceAll("/", "\\").toLowerCase();
+	return NON_GIT_BASH_LAUNCHER_DIR_SEGMENTS.some((segment) => normalized.includes(segment));
 }
 
 function whereCommand(command) {

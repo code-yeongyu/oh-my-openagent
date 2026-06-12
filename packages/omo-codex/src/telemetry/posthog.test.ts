@@ -221,7 +221,7 @@ describe("omo-codex posthog telemetry", () => {
   it("uses API key exactly matching omodex source bytes", async () => {
     // given
     const posthog = await importPostHogModule()
-    const omodexPosthog = readFileSync(join(import.meta.dir, "../../../../src/shared/posthog.ts"), "utf-8")
+    const omodexPosthog = readFileSync(join(import.meta.dir, "../../../../packages/omo-opencode/src/shared/posthog.ts"), "utf-8")
     const match = omodexPosthog.match(/DEFAULT_POSTHOG_API_KEY = "(phc_[a-zA-Z0-9]+)"/)
 
     // when

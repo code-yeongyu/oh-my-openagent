@@ -68,7 +68,7 @@ jobs:
               packages/ast-grep-mcp/*) return 0 ;;
               packages/git-bash-mcp/*) return 0 ;;
               packages/lsp-tools-mcp/*) return 0 ;;
-              src/cli/install-codex/*) return 0 ;;
+              packages/omo-opencode/src/cli/install-codex/*) return 0 ;;
               script/*lazycodex*) return 0 ;;
               docs/reference/lazycodex-*) return 0 ;;
               docs/*lazycodex*) return 0 ;;

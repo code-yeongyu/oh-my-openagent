@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
+import { forceDisableMultiAgentV2 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
 import { readState, resolveStatePath, writeState } from "./migrate-codex-config/state.mjs";
 
@@ -41,12 +42,28 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG, previousState } = {}) {
 	const before = await readConfig(configPath);
 	const decision = shouldApplyCatalog(before, catalog, previousState);
-	if (!decision.apply) return { changed: false, written: readRootSettings(before), managed: decision.managed };
-	const after = ensureCodexReasoningConfig(before, catalog.current);
-	if (after === before) return { changed: false, written: catalog.current, managed: true };
-	await mkdir(dirname(configPath), { recursive: true });
-	await writeFile(configPath, `${after.trimEnd()}\n`);
-	return { changed: true, written: catalog.current, managed: true };
+
+	let config = before;
+	let reasoningApplied = false;
+
+	if (decision.apply) {
+		config = ensureCodexReasoningConfig(config, catalog.current);
+		reasoningApplied = config !== before;
+	}
+
+	const afterMultiAgentGuard = forceDisableMultiAgentV2(config);
+	const multiAgentChanged = afterMultiAgentGuard !== config;
+	if (multiAgentChanged) config = afterMultiAgentGuard;
+
+	const changed = reasoningApplied || multiAgentChanged;
+	if (changed) {
+		await mkdir(dirname(configPath), { recursive: true });
+		await writeFile(configPath, `${config.trimEnd()}\n`);
+	}
+
+	const written = decision.apply ? catalog.current : readRootSettings(config);
+	const managed = decision.apply ? true : decision.managed;
+	return { changed, written, managed };
 }
 
 function shouldApplyCatalog(config, catalog, previousState) {

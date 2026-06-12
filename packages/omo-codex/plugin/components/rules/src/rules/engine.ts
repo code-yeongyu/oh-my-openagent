@@ -7,10 +7,14 @@ import {
 	markStaticInjected as markStaticInjectedInState,
 } from "./cache.js";
 import {
+	DEFAULT_DYNAMIC_MAX_RESULT_CHARS,
+	DEFAULT_DYNAMIC_MAX_RULE_CHARS,
 	DEFAULT_MAX_RESULT_CHARS,
 	DEFAULT_MAX_RULE_CHARS,
 	DEFAULT_POST_COMPACT_MAX_RESULT_CHARS,
 	DEFAULT_POST_COMPACT_MAX_RULE_CHARS,
+	DEFAULT_PROMPT_MAX_RESULT_CHARS,
+	DEFAULT_PROMPT_MAX_RULE_CHARS,
 } from "./constants.js";
 import { loadDynamicCandidates } from "./engine-dynamic-loader.js";
 import { loadStaticCandidates } from "./engine-static-loader.js";
@@ -29,6 +33,10 @@ export function defaultConfig(): PiRulesConfig {
 		maxResultChars: DEFAULT_MAX_RESULT_CHARS,
 		postCompactMaxRuleChars: DEFAULT_POST_COMPACT_MAX_RULE_CHARS,
 		postCompactMaxResultChars: DEFAULT_POST_COMPACT_MAX_RESULT_CHARS,
+		dynamicMaxRuleChars: DEFAULT_DYNAMIC_MAX_RULE_CHARS,
+		dynamicMaxResultChars: DEFAULT_DYNAMIC_MAX_RESULT_CHARS,
+		promptMaxRuleChars: DEFAULT_PROMPT_MAX_RULE_CHARS,
+		promptMaxResultChars: DEFAULT_PROMPT_MAX_RESULT_CHARS,
 		enabledSources: "auto",
 	};
 }

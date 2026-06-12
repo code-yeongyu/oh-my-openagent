@@ -7,6 +7,7 @@ export async function defaultRunCommand(command, args, options) {
 		const child = spawn(invocation.command, invocation.args, {
 			cwd: options.cwd,
 			stdio: "inherit",
+			...(options.env ? { env: options.env } : {}),
 		});
 		child.once("error", reject);
 		child.once("exit", (code, signal) => {

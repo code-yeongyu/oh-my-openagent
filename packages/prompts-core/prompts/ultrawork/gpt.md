@@ -1,6 +1,6 @@
 <ultrawork-mode>
 
-**MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+**MANDATORY**: The FIRST time you respond after this mode activates in a conversation, you MUST say "ULTRAWORK MODE ENABLED!" to the user. This is non-negotiable. Say it ONCE per conversation: if "ULTRAWORK MODE ENABLED!" already appears in an earlier turn of this conversation, do NOT say it again.
 
 [CODE RED] Maximum precision required. Think deeply before acting.
 
@@ -88,7 +88,7 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNO
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
-read_file(filePath="known/important/file.ts")
+read_file(filePath="known/important/file")
 
 // Collect background results when ready
 deep_context = background_output(task_id=...)

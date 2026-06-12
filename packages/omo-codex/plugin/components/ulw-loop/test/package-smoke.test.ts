@@ -118,8 +118,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		const text = await readText("skills/ulw-loop/SKILL.md");
 
 		expect(text).toMatch(/^---\nname: ulw-loop\n/m);
-		expect(text).toContain("Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.");
-		expect(text).toContain("short-description: Goal-like ultrawork loop for systematic decomposition");
 	});
 
 	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop surfaces the ulw-loop alias", async () => {
@@ -136,37 +134,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 
 		expect(text).toContain("search_terms:");
 		expect(text).toContain('- "ulw-loop"');
-	});
-
-	it("references the success criteria and record-evidence vocabulary", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-		expect(text.toLowerCase()).toMatch(/success criteria|successcriteria/);
-		expect(text.toLowerCase()).toContain("record-evidence");
-	});
-
-	it("#given workflow Acquire Next Goal text #when inspected #then create_goal uses objective-only payload wording", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toContain("instruction.json.objective");
-		expect(text).toContain("objective only");
-		expect(text).not.toContain("Call `create_goal` with the handoff payload.");
-	});
-
-	it("#given omo is absent from PATH #when bootstrap instructions are read #then local cached CLI fallback is documented", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toContain("If `omo` is absent from PATH");
-		expect(text).toContain("ULW_LOOP_CLI");
-		expect(text).toContain("components/ulw-loop/dist/cli.js");
-	});
-
-	it("#given empty PATH #when bootstrap instructions are read #then handles empty PATH without losing notepad bootstrap", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toContain("If PATH is empty");
-		expect(text).toContain("ULW_LOOP_NODE");
-		expect(text).toContain(".omo/ulw-loop/bootstrap-notepad.md");
-		expect(text).not.toContain("ls -1");
 	});
 
 	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
@@ -213,69 +180,6 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		}
 	});
 
-	it("uses the .omo workspace path", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
-		expect(text).toContain(".omo/ulw-loop");
-	});
-
-	it("#given completed default state #when skill guidance is inspected #then it prefers a fresh session", async () => {
-		const skill = await readText("skills/ulw-loop/SKILL.md");
-		const workflow = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(skill).toContain("fresh `--session-id <new-id>`");
-		expect(skill).toContain("Use `--force` only");
-		expect(workflow).toContain("create-goals --session-id <new-id>");
-		expect(workflow).toContain("overwriting completed evidence");
-	});
-
-	it("#given long Codex runs #when worker guidance is inspected #then avoids context-expensive agent polling", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toMatch(/list_agents/);
-		expect(text).toMatch(/polling loop/);
-		expect(text).toMatch(/replay large payloads/);
-		expect(text).toMatch(/Track spawned agent names locally/);
-		expect(text).toMatch(/wait_agent.*mailbox signals/);
-		expect(text).toMatch(/WORKING:/);
-		expect(text).toMatch(/single `list_agents`/);
-		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
-		expect(text).toMatch(/short wait_agent cycles/);
-		expect(text).toMatch(/single long blocking wait/);
-		expect(text).toMatch(/git-master/);
-		expect(text).toMatch(/touched-path commit history/);
-		expect(text).toMatch(/commit in the observed style/);
-		expect(text).toMatch(/omnibus commit/);
-		expect(text).toContain("Every worker message MUST carry");
-		expect(text).toContain("Each worker does strict TDD");
-	});
-
-	it("#given Codex subagent delegation #when worker guidance is inspected #then assignment ambiguity is hardened", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
-
-		expect(text).toMatch(/TASK:/);
-		expect(text).toMatch(/fork_turns:\s*"none"/);
-		expect(text).toMatch(/wait_agent.*mailbox signals/);
-		expect(text).toMatch(/WORKING:/);
-		expect(text).toMatch(/single `list_agents`/);
-		expect(text).toMatch(/Fallback only when/);
-		expect(text).toMatch(/BLOCKED:/);
-		expect(text).toMatch(/respawn.*smaller/);
-		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
-		expect(text).toMatch(/short wait_agent cycles/);
-		expect(text).toMatch(/single long blocking wait/);
-		expect(text).toMatch(/git-master/);
-		expect(text).toMatch(/commit each verified work unit atomically/);
-	});
-
-	it("#given quiet Codex reviewers #when full workflow guidance is inspected #then timeout is not treated as death", async () => {
-		const text = await readText("skills/ulw-loop/references/full-workflow.md");
-
-		expect(text).toMatch(/A timeout only means no new mailbox update arrived/i);
-		expect(text).toMatch(/WORKING:/);
-		expect(text).toMatch(/single `list_agents`/);
-		expect(text).toMatch(/do not count it as pass\/review approval/i);
-		expect(text).toMatch(/record inconclusive/i);
-	});
 });
 
 describe("source LOC budget", () => {

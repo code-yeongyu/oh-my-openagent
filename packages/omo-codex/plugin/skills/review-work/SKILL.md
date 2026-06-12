@@ -8,27 +8,28 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 | OpenCode example | Codex tool to use |
 | --- | --- |
-| `call_omo_agent(subagent_type="explore", ...)` | `spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ...","fork_turns":"none"})` |
-| `call_omo_agent(subagent_type="librarian", ...)` | `spawn_agent({"task_name":"...","message":"TASK: act as a librarian. ...","fork_turns":"none"})` |
-| `task(subagent_type="plan", ...)` | `spawn_agent({"task_name":"...","message":"TASK: act as a planning agent. ...","fork_turns":"none"})` |
-| `task(subagent_type="oracle", ...)` for final verification | `spawn_agent({"task_name":"...","message":"TASK: act as a rigorous reviewer. ...","fork_turns":"none"})` |
-| `task(category="...", ...)` for implementation or QA | `spawn_agent({"task_name":"...","message":"TASK: act as an implementation or QA worker. ...","fork_turns":"none"})` |
-| `background_output(task_id="...")` | `wait_agent(...)` for mailbox signals; after a timeout, run one `list_agents` check for the named child if reassurance is needed |
-| `team_*(...)` | Use Codex native subagents plus `send_message`, `followup_task`, `wait_agent`, and `close_agent` |
+| `call_omo_agent(subagent_type="explore", ...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","agent_type":"explorer","fork_context":false})` |
+| `call_omo_agent(subagent_type="librarian", ...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","agent_type":"librarian","fork_context":false})` |
+| `task(subagent_type="plan", ...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a planning agent. ...","agent_type":"plan","fork_context":false})` |
+| `task(subagent_type="oracle", ...)` for final verification | `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"codex-ultrawork-reviewer","fork_context":false})` |
+| `task(category="...", ...)` for implementation or QA | `multi_agent_v1.spawn_agent({"message":"TASK: act as an implementation or QA worker. ...","fork_context":false})` |
+| `background_output(task_id="...")` | `multi_agent_v1.wait_agent(...)` for mailbox signals |
+| `team_*(...)` | Use Codex native subagents via `multi_agent_v1.spawn_agent`, `multi_agent_v1.send_input`, `multi_agent_v1.wait_agent`, and `multi_agent_v1.close_agent` |
 
-Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained `message` and usually should use a non-full-history fork mode such as `fork_turns="none"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
+Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. OMO installs these selectable agent roles into `~/.codex/agents/`: `explorer`, `librarian`, `plan`, `momus`, `metis`, and `codex-ultrawork-reviewer` — pass the matching name as `agent_type` so the child gets that role's model and instructions. On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If the spawn tool exposes no `agent_type` parameter, omit it and describe the role inside `message`. If a code block below conflicts with this section, this section wins.
+
+For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.
 
 ## Codex Subagent Reliability
 
-Every `spawn_agent` message must be self-contained. Start with
+Every `multi_agent_v1.spawn_agent` message must be self-contained. Start with
 `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and
 `VERIFY`. State that it is an executable assignment, not a context
-handoff. Role or specialty instructions belong inside `message`; the
-Codex tool schema only accepts `task_name`, `message`, and `fork_turns`.
-Prefer `fork_turns: "none"` unless full history is truly
+handoff. Role or specialty instructions belong inside `message`.
+Use `fork_context: false` unless full history is truly
 required; paste only the review context that worker needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, require the child to send
@@ -37,16 +38,13 @@ review passes, and `BLOCKED: <reason>` only when it cannot progress.
 While any child is active, keep the parent visibly alive with active
 subagent count, agent names, latest `WORKING:` phase, and whether the
 parent is waiting for mailbox updates. Track spawned agent names
-locally. Use `wait_agent` for mailbox signals, not proof of completion.
-A timeout only means no new mailbox update arrived; after a timeout,
-run a single `list_agents` check for the named child when you need
-reassurance. If it is running or its latest message is `WORKING:`,
-treat it as alive. Do not use `list_agents` as a polling loop or status
-feed; it can replay large payloads. Fallback only when the child is
+locally. Use `multi_agent_v1.wait_agent` for mailbox signals, not proof of completion.
+A timeout only means no new mailbox update arrived. Treat a running child as alive.
+Fallback only when the child is
 completed without the deliverable, ack-only after followup, explicitly
 `BLOCKED:`, or no longer running. Then mark that review lane
 `INCONCLUSIVE`, do not count it as PASS or approval, close if safe, and
-respawn a smaller `fork_turns: "none"` reviewer with the missing
+respawn a smaller `fork_context: false` reviewer with the missing
 deliverable. Preserve completed lane results immediately. If the retry
 budget is exhausted, keep the lane `INCONCLUSIVE` and still emit a final
 aggregate result.
@@ -543,7 +541,7 @@ After launching all 5 agents in one turn, wait for completions in bounded
 cycles. Do not treat a timeout, ack-only reply, or empty child result as
 a PASS.
 
-As each completes, collect via the Codex mapping above (`wait_agent`,
+As each completes, collect via the Codex mapping above (`multi_agent_v1.wait_agent`,
 then the child's substantive final result). Preserve completed lane
 results immediately; never lose a PASS/FAIL because another lane is
 still running. Store each verdict independently:
@@ -563,7 +561,7 @@ inconclusive and respawn a smaller reviewer/worker for that exact lane.
 If it still remains unfinished after that retry, close the still-running
 agent if safe, keep the lane INCONCLUSIVE, and emit the final aggregate
 review result with the incomplete lane named. Do not spin in repeated
-wait/followup cycles. Do not use `send_message` as an interrupt; queued
+wait/followup cycles. Do not use `multi_agent_v1.send_input` as an interrupt; queued
 followups are not cancellation.
 
 ---

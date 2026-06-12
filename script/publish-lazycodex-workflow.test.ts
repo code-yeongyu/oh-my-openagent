@@ -44,9 +44,7 @@ describe("LazyCodex publish workflow", () => {
     const stampsCodexPluginMetadata =
       workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") &&
       workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json")
-    const lazycodexReleaseDefaultsOn = workflow.includes("sync_lazycodex_marketplace:") &&
-      workflow.includes('description: "Release the LazyCodex Codex marketplace repository when the omo-codex payload changed"') &&
-      workflow.includes("default: true")
+    const lazycodexSyncHasNoManualOptOut = !workflow.includes("sync_lazycodex_marketplace")
     const publishAliasDefaultsOn = workflow.includes("publish_lazycodex:") &&
       workflow.includes('description: "Publish the lazycodex-ai npm alias"') &&
       workflow.includes("default: true")
@@ -81,8 +79,9 @@ describe("LazyCodex publish workflow", () => {
       publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
       publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
-    const syncsLazycodexMarketplaceWhenEnabled = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
-      workflow.includes("if: inputs.sync_lazycodex_marketplace != false")
+    const syncsLazycodexMarketplaceOnStableReleases = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
+      syncMarketplaceStep.includes("if: needs.release-metadata.outputs.dist_tag == ''") &&
+      lazycodexReleaseStateStep.includes("if: needs.release-metadata.outputs.dist_tag == ''")
     const tokenRequirementBeforePublish = workflow.indexOf("name: Require LazyCodex sync token") <
       workflow.indexOf("publish-main:")
     const requiresLazycodexSyncToken = workflow.includes("LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
@@ -95,23 +94,29 @@ describe("LazyCodex publish workflow", () => {
       lazycodexReleaseStateStep.includes("PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}")
     const comparesAgainstPreviousLazycodexVersion =
       lazycodexReleaseStateStep.includes("npm pack \"lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}\"") &&
-      lazycodexReleaseStateStep.includes("bun run script/sync-lazycodex-marketplace.ts \"$PREVIOUS_PACKAGE_ROOT\" \"$PREVIOUS_MARKETPLACE_ROOT\"") &&
+      lazycodexReleaseStateStep.includes("bun run script/sync-lazycodex-marketplace.ts \"$PREVIOUS_PACKAGE_ROOT\" \"$PREVIOUS_MARKETPLACE_ROOT\" --previous-payload") &&
       lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json\" \"$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json\"") &&
       lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml\" \"$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml\"") &&
-      lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/plugins/omo\" \"$CURRENT_MARKETPLACE_ROOT/plugins/omo\"")
+      lazycodexReleaseStateStep.includes("diff -qr \"$PREVIOUS_MARKETPLACE_ROOT/plugins/omo\" \"$CURRENT_MARKETPLACE_ROOT/plugins/omo\"") &&
+      !syncMarketplaceStep.includes("--previous-payload")
     const exposesChangedOutput =
       lazycodexReleaseStateStep.includes("lazycodex_changed=true") &&
       lazycodexReleaseStateStep.includes("lazycodex_changed=false") &&
       lazycodexReleaseStateStep.includes("previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}")
     const createsLazycodexReleaseOnlyWhenChanged =
-      lazycodexReleaseStep.includes("if: inputs.sync_lazycodex_marketplace != false && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'") &&
+      lazycodexReleaseStep.includes(
+        "if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'",
+      ) &&
       lazycodexReleaseStep.includes("GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
       lazycodexReleaseStep.includes('gh release create "v${VERSION}" --repo code-yeongyu/lazycodex') &&
       lazycodexReleaseStep.includes("--notes-file /tmp/lazycodex-release-notes.md")
 
     // #then
     expect(stampsCodexPluginMetadata, "LazyCodex plugin metadata must be stamped with the release version").toBe(true)
-    expect(lazycodexReleaseDefaultsOn, "LazyCodex marketplace release must default to enabled").toBe(true)
+    expect(
+      lazycodexSyncHasNoManualOptOut,
+      "LazyCodex marketplace sync must not expose a manual opt-out input",
+    ).toBe(true)
     expect(publishAliasDefaultsOn, "LazyCodex npm alias publish must stay enabled by default").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
@@ -122,7 +127,10 @@ describe("LazyCodex publish workflow", () => {
     expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
     expect(alwaysChecksLazycodexNpm, "release must always check lazycodex using the release version").toBe(true)
     expect(publishesLazycodexNpm, "lazycodex npm publish must be part of the normal release, tag stable releases as latest, and fail loudly").toBe(true)
-    expect(syncsLazycodexMarketplaceWhenEnabled, "LazyCodex marketplace sync must be explicitly skippable").toBe(true)
+    expect(
+      syncsLazycodexMarketplaceOnStableReleases,
+      "LazyCodex marketplace sync must run on every stable release (empty dist_tag)",
+    ).toBe(true)
     expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
     expect(capturesPreviousLazycodexBeforePublishing, "release metadata must capture the previous lazycodex-ai version before publishing the new one").toBe(true)
     expect(comparesAgainstPreviousLazycodexVersion, "LazyCodex release state must compare current payload with the previous lazycodex-ai package").toBe(true)
@@ -210,8 +218,13 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
     const lazycodexStepScopesPublishedFiles = workflow.includes(
-      '.files = ["packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
+      '.files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
     )
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+    const lazycodexShipsRootCliDistAfterBuild =
+      publishMainJob.indexOf("bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") >= 0 &&
+      publishMainJob.indexOf("bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") <
+        publishMainJob.indexOf("name: Publish lazycodex-ai")
     const shimKeepsLazycodexMappedForSharedWrapper = platformResolver.includes("lazycodex: \"oh-my-openagent\"")
 
     // #then
@@ -221,7 +234,14 @@ describe("LazyCodex publish workflow", () => {
     expect(lazycodexStepDropsLifecycleScripts, "lazycodex publish step must not ship Bun-backed prepare/build lifecycle scripts").toBe(true)
     expect(lazycodexStepDropsPlatformOptionalDeps, "lazycodex publish step must not install Bun-backed platform launchers").toBe(true)
     expect(lazycodexStepDropsRuntimeDependencies, "lazycodex publish step must not install OpenCode CLI runtime dependencies").toBe(true)
-    expect(lazycodexStepScopesPublishedFiles, "lazycodex npm package must only ship the Node installer and Codex marketplace assets").toBe(true)
+    expect(
+      lazycodexStepScopesPublishedFiles,
+      "lazycodex npm package must ship the root CLI dist (omo runtime wrapper target), the Node installer and Codex marketplace assets, and packages/lsp-daemon (lsp MCP arg target and components/lsp file: dependency — npm ci in the plugin cache hard-fails without it)",
+    ).toBe(true)
+    expect(
+      lazycodexShipsRootCliDistAfterBuild,
+      "publish-main must build the root CLI dist before the lazycodex-ai publish step so dist/cli/index.js exists in the tarball",
+    ).toBe(true)
     expect(shimKeepsLazycodexMappedForSharedWrapper, "platform resolver keeps lazycodex mapped when the shared wrapper is used outside the lazycodex package").toBe(true)
   })
 
@@ -253,6 +273,13 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
       smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
       smokeStep.includes("npx --yes --package oh-my-openagent omo doctor")
+    const installsRealPackageAndVerifiesOmoBin =
+      smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
+      smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
+      smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
+      smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
+      smokeStep.includes('sparkshell_output=$("$CODEX_LOCAL_BIN_DIR/omo" sparkshell echo lazycodex-smoke 2>&1)') &&
+      smokeStep.includes('[ "$sparkshell_output" = "lazycodex-smoke" ]')
 
     // #then
     expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
@@ -261,9 +288,13 @@ describe("LazyCodex publish workflow", () => {
     expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)
     expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
+    expect(
+      installsRealPackageAndVerifiesOmoBin,
+      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes sparkshell",
+    ).toBe(true)
   })
 
-  test("builds the Codex plugin components in publish-main before publishing the lazycodex-ai alias", () => {
+  test("builds the Codex plugin components in publish-main before any package that ships the plugin tree", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
     const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
@@ -271,29 +302,40 @@ describe("LazyCodex publish workflow", () => {
     // #when
     const installDepsIndex = publishMainJob.indexOf("npm --prefix packages/omo-codex/plugin ci")
     const buildComponentsIndex = publishMainJob.indexOf("bun run --cwd packages/omo-codex/plugin build")
+    const opencodePublishIndex = publishMainJob.indexOf("name: Publish oh-my-opencode")
+    const openagentPublishIndex = publishMainJob.indexOf("name: Publish oh-my-openagent")
     const lazycodexPublishIndex = publishMainJob.indexOf("name: Publish lazycodex-ai")
-    const buildStepStart = publishMainJob.indexOf("name: Build Codex plugin components for lazycodex-ai")
+    const buildStepStart = publishMainJob.indexOf("name: Build Codex plugin components")
     const buildStepSection =
-      buildStepStart >= 0 ? publishMainJob.slice(buildStepStart, lazycodexPublishIndex) : ""
+      buildStepStart >= 0 ? publishMainJob.slice(buildStepStart, publishMainJob.indexOf("- name:", buildStepStart + 1)) : ""
 
     const buildsPluginComponents = buildComponentsIndex >= 0
     const installsPluginDepsBeforeBuild =
       installDepsIndex >= 0 && buildComponentsIndex >= 0 && installDepsIndex < buildComponentsIndex
+    // oh-my-opencode/oh-my-openagent tarballs feed the lazycodex plugin cache, so packing
+    // them before the component build ships source-only hooks (lazycodex#45, 4.8.1).
+    const buildsBeforeOpencodePublish =
+      buildComponentsIndex >= 0 && opencodePublishIndex > buildComponentsIndex
+    const buildsBeforeOpenagentPublish =
+      buildComponentsIndex >= 0 && openagentPublishIndex > buildComponentsIndex
     const buildsBeforeLazycodexPublish =
       buildComponentsIndex >= 0 && lazycodexPublishIndex > buildComponentsIndex
-    const buildStepGatedByPublishLazycodex = buildStepSection.includes(
-      "if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'",
-    )
+    const buildStepRunsForEveryPluginShippingPackage =
+      buildStepSection.includes("steps.check.outputs.skip != 'true'") &&
+      buildStepSection.includes("steps.check-openagent.outputs.skip != 'true'") &&
+      buildStepSection.includes("inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'")
     const metadataStampIndex = publishMainJob.indexOf("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json")
     const stampsMetadataBeforeBuild =
       metadataStampIndex >= 0 && buildComponentsIndex >= 0 && metadataStampIndex < buildComponentsIndex
 
     // #then
-    expect(buildsPluginComponents, "publish-main must build the Codex plugin components so lazycodex-ai ships compiled dist (B1)").toBe(true)
+    expect(buildsPluginComponents, "publish-main must build the Codex plugin components so published tarballs ship compiled dist (B1)").toBe(true)
     expect(installsPluginDepsBeforeBuild, "publish-main must install nested Codex plugin deps before building the components").toBe(true)
     expect(stampsMetadataBeforeBuild, "publish-main must stamp the Codex plugin release version before building status messages").toBe(true)
+    expect(buildsBeforeOpencodePublish, "Codex plugin components must be built before the oh-my-opencode npm publish step").toBe(true)
+    expect(buildsBeforeOpenagentPublish, "Codex plugin components must be built before the oh-my-openagent npm publish step").toBe(true)
     expect(buildsBeforeLazycodexPublish, "Codex plugin components must be built before the lazycodex-ai npm publish step").toBe(true)
-    expect(buildStepGatedByPublishLazycodex, "plugin component build must only run when publishing the lazycodex-ai alias").toBe(true)
+    expect(buildStepRunsForEveryPluginShippingPackage, "plugin component build must run whenever any plugin-shipping package publishes").toBe(true)
   })
 
 })

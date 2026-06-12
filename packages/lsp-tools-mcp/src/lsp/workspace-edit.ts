@@ -2,6 +2,7 @@ import { existsSync, readFileSync, realpathSync, unlinkSync, writeFileSync } fro
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { contextCwd } from "../request-context.js";
 import type { TextEdit, WorkspaceEdit } from "./types.js";
 
 export interface ApplyResult {
@@ -108,7 +109,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null, options: ApplyWor
 	}
 
 	const result: ApplyResult = { success: true, filesModified: [], totalEdits: 0, errors: [] };
-	const workspaceRoot = realpathSync(options.workspaceRoot ?? process.cwd());
+	const workspaceRoot = realpathSync(options.workspaceRoot ?? contextCwd());
 
 	if (edit.changes) {
 		for (const [uri, edits] of Object.entries(edit.changes)) {

@@ -58,7 +58,7 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 
 Older variant guidance.
 
-When translating \`load_skills=[...]\`, name the skills inside the spawned agent's \`message\`.
+When translating \`load_skills=[...]\`, name the skills inside the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
 
 ---
 
@@ -103,6 +103,71 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	assert.equal(adapted, content);
 });
 
+test("#given early generated stale Codex compatibility guidance #when adapting a skill #then it is replaced", () => {
+	// given
+	const content = `---
+name: example
+---
+
+## Codex Harness Tool Compatibility
+
+This skill may include examples copied from the OpenCode harness. In Codex, do not call OpenCode-only tools such as \`call_omo_agent(...)\`, \`task(...)\`, \`background_output(...)\`, or \`team_*(...)\` literally. Translate those examples to Codex native tools:
+
+| OpenCode example | Codex tool to use |
+| --- | --- |
+| \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ...","fork_turns":"none"})\` |
+| \`background_output(task_id="...")\` | \`wait_agent(...)\` for mailbox signals; after a timeout, run one \`list_agents\` check for the named child if reassurance is needed |
+
+Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained \`message\` and usually should use a non-full-history fork mode such as \`fork_turns="none"\`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+
+For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`wait_agent\` timeout only means no new mailbox update arrived. Treat a running child or latest \`WORKING:\` message as alive. Do not use \`list_agents\` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
+
+When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+
+# Example Skill
+
+call_omo_agent(subagent_type="explore", prompt="inspect")
+`;
+
+	// when
+	const adapted = insertCodexCompatibilityGuidance(content);
+
+	// then
+	assert.match(adapted, /multi_agent_v1\.spawn_agent/);
+	assert.match(adapted, /fork_context":false/);
+	assert.match(adapted, /"agent_type":"explorer"/);
+	assert.match(adapted, /multi_agent_v1\.wait_agent/);
+	assert.doesNotMatch(adapted, /fork_turns="none"/);
+	assert.doesNotMatch(adapted, /list_agents/);
+});
+
+test("#given generated guidance before a template export #when adapting a skill #then the export wrapper is preserved", () => {
+	// given
+	const content = `---
+name: refactor
+---
+
+## Codex Harness Tool Compatibility
+
+Older variant guidance.
+
+When translating \`load_skills=[...]\`, name the skills inside the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+
+export const REFACTOR_TEMPLATE = \`# Refactor
+
+call_omo_agent(subagent_type="explore", prompt="inspect")
+\`
+`;
+
+	// when
+	const adapted = insertCodexCompatibilityGuidance(content);
+
+	// then
+	assert.match(adapted, /export const REFACTOR_TEMPLATE = `# Refactor/);
+	assert.match(adapted, /multi_agent_v1\.spawn_agent/);
+	assert.doesNotMatch(adapted, /Older variant guidance/);
+});
+
 test("#given synced aggregate Codex skills #when they describe background orchestration #then liveness is framed as progress rather than timeout failure", async () => {
 	// given
 	const orchestrationPattern = /\b(?:run_in_background|background_output|wait_agent)\b/;
@@ -110,8 +175,7 @@ test("#given synced aggregate Codex skills #when they describe background orches
 		["working progress message", /WORKING:/],
 		["blocked progress message", /BLOCKED:/],
 		["mailbox timeout framing", /timeout only means no new mailbox update arrived/],
-		["single liveness check", /single `list_agents` check|one `list_agents` check/],
-		["polling-loop guard", /Do not use `list_agents` as a polling loop|Do NOT use `list_agents` as a polling loop/],
+		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
 		["explicit fallback conditions", /Fallback only when|Mark a file for retry only when/],
 	];
 	const bannedPatterns = [
@@ -148,5 +212,5 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /Overall Verdict: PASSED \/ FAILED \/ INCONCLUSIVE/);
 	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
-	assert.match(content, /Do not use `send_message` as an interrupt/);
+	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
 });

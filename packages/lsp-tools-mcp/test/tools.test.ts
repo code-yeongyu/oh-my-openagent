@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { loadInstallDecision } from "../src/lsp/server-install-state.js";
 import { executeLspTool } from "../src/tools.js";
 
 const missingServerMessagePrefix = "No LSP server configured for extension: .wat";
@@ -113,5 +118,76 @@ describe("executeLspTool", () => {
 			errorKind: "missing_dependency",
 		});
 		expect(result.details).toHaveProperty("error", result.content[0]?.text);
+	});
+});
+
+describe("executeLspTool install_decision", () => {
+	const tempDirectories: string[] = [];
+	const saved = new Map<string, string | undefined>();
+
+	function setEnv(name: string, value: string): void {
+		if (!saved.has(name)) saved.set(name, process.env[name]);
+		process.env[name] = value;
+	}
+
+	beforeEach(() => {
+		const dir = mkdtempSync(join(tmpdir(), "lsp-tool-decisions-"));
+		tempDirectories.push(dir);
+		setEnv("LSP_TOOLS_MCP_INSTALL_DECISIONS", join(dir, "lsp-install-decisions.json"));
+		setEnv("LSP_TOOLS_MCP_USER_CONFIG", join(dir, "absent-user.json"));
+		setEnv("LSP_TOOLS_MCP_PROJECT_CONFIG", join(dir, "absent-project.json"));
+	});
+
+	afterEach(() => {
+		for (const [name, value] of saved) {
+			if (value === undefined) {
+				delete process.env[name];
+			} else {
+				process.env[name] = value;
+			}
+		}
+		saved.clear();
+		for (const directory of tempDirectories.splice(0)) {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	});
+
+	it("#given a known server #when recording a decline #then persists it and confirms", async () => {
+		// when
+		const result = await executeLspTool("install_decision", { server_id: "typescript", decision: "declined" });
+
+		// then
+		expect(result.isError ?? false).toBe(false);
+		expect(result.content[0]?.text).toContain("typescript");
+		expect(result.content[0]?.text.toLowerCase()).toContain("declined");
+		expect(loadInstallDecision("typescript")).toMatchObject({ decision: "declined" });
+	});
+
+	it("#given an allowed decision #when recording it #then persists allowed", async () => {
+		// when
+		await executeLspTool("install_decision", { server_id: "typescript", decision: "allowed" });
+
+		// then
+		expect(loadInstallDecision("typescript")).toMatchObject({ decision: "allowed" });
+	});
+
+	it("#given an unknown server id #when recording a decision #then returns a helpful error", async () => {
+		// when
+		const result = await executeLspTool("install_decision", { server_id: "no-such-server", decision: "declined" });
+
+		// then
+		expect(result.isError).toBe(true);
+		expect(result.content[0]?.text).toContain("no-such-server");
+		expect(loadInstallDecision("no-such-server")).toBeUndefined();
+	});
+
+	it("#given an invalid decision value #when recording it #then returns a helpful error", async () => {
+		// when
+		const result = await executeLspTool("install_decision", { server_id: "typescript", decision: "maybe" });
+
+		// then
+		expect(result.isError).toBe(true);
+		expect(result.content[0]?.text.toLowerCase()).toContain("decision");
+		expect(loadInstallDecision("typescript")).toBeUndefined();
 	});
 });

@@ -258,7 +258,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
+      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Llama", modelID: "llama-4-maverick", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -278,14 +278,19 @@ describe("resolveCompatibleModelSettings", () => {
       })
 
       test(`${name} (${modelID}): downgrades unsupported variant`, () => {
+        const supportsMax = expectedVariants.includes("max")
+        const desiredVariant = supportsMax ? "xhigh" : "max"
+        const expectedDowngrade = supportsMax
+          ? "high"
+          : expectedVariants[expectedVariants.length - 1]
+
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
           modelID,
-          desired: { variant: "max" },
+          desired: { variant: desiredVariant },
         })
 
-        const highest = expectedVariants[expectedVariants.length - 1]
-        expect(result.variant).toBe(highest)
+        expect(result.variant).toBe(expectedDowngrade)
         expect(result.changes[0]?.reason).toBe("unsupported-by-model-family")
       })
 
@@ -321,6 +326,41 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
+  test("GitHub Copilot GPT-5 high-tier variants downgrade to high", () => {
+    for (const modelID of ["gpt-5.4", "gpt-5.5"]) {
+      for (const requested of ["xhigh", "max"]) {
+        const capabilities = getModelCapabilities({
+          providerID: "github-copilot",
+          modelID,
+        })
+        const result = resolveCompatibleModelSettings({
+          providerID: "github-copilot",
+          modelID,
+          desired: { variant: requested, reasoningEffort: requested },
+          capabilities,
+        })
+
+        expect(result).toEqual({
+          variant: "high",
+          reasoningEffort: "high",
+          changes: [
+            {
+              field: "variant",
+              from: requested,
+              to: "high",
+              reason: "unsupported-by-model-metadata",
+            },
+            {
+              field: "reasoningEffort",
+              from: requested,
+              to: "high",
+              reason: "unsupported-by-model-metadata",
+            },
+          ],
+        })
+      }
+    }
+  })
   test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
     for (const reasoningEffort of ["high", "max"]) {
       const result = resolveCompatibleModelSettings({

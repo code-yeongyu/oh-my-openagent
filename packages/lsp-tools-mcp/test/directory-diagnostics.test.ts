@@ -29,4 +29,18 @@ describe("collectFilesWithExtension", () => {
 		// then
 		expect(files).toHaveLength(2);
 	});
+
+	it("#given a directory with a basename Dockerfile #when collecting .dockerfile inputs #then the Dockerfile is included", () => {
+		// given
+		const root = mkdtempSync(join(tmpdir(), "codex-lsp-directory-"));
+		tempDirectories.push(root);
+		writeFileSync(join(root, "Dockerfile"), "FROM alpine\n");
+		writeFileSync(join(root, "Containerfile"), "FROM alpine\n");
+
+		// when
+		const files = collectFilesWithExtension(root, ".dockerfile", 10);
+
+		// then
+		expect(files).toHaveLength(2);
+	});
 });

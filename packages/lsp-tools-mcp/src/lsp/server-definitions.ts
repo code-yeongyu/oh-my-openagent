@@ -43,6 +43,10 @@ export const LSP_INSTALL_HINTS: Record<string, string> = {
 	"haskell-language-server": "ghcup install hls",
 	bash: "npm install -g bash-language-server",
 	"kotlin-ls": "See https://github.com/Kotlin/kotlin-lsp",
+	julials: "julia -e 'using Pkg; Pkg.add(\"LanguageServer\")'",
+	razor:
+		"Razor runs through the Roslyn language server (cohosting). " +
+		"Install: dotnet tool install -g roslyn-language-server --prerelease (requires v5.8.0+). See https://github.com/dotnet/razor",
 };
 
 export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
@@ -98,7 +102,7 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	zls: { command: ["zls"], extensions: [".zig", ".zon"] },
 	csharp: { command: ["csharp-ls"], extensions: [".cs"] },
 	fsharp: { command: ["fsautocomplete"], extensions: [".fs", ".fsi", ".fsx", ".fsscript"] },
-	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".objc", ".objcpp"] },
+	"sourcekit-lsp": { command: ["sourcekit-lsp"], extensions: [".swift", ".m", ".mm"] },
 	rust: { command: ["rust-analyzer"], extensions: [".rs"] },
 	clangd: {
 		command: ["clangd", "--background-index", "--clang-tidy"],
@@ -136,7 +140,15 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 		command: ["haskell-language-server-wrapper", "--lsp"],
 		extensions: [".hs", ".lhs"],
 	},
-	"kotlin-ls": { command: ["kotlin-lsp"], extensions: [".kt", ".kts"] },
+	"kotlin-ls": { command: ["kotlin-lsp", "--stdio"], extensions: [".kt", ".kts"] },
+	julials: {
+		command: ["julia", "--startup-file=no", "--history-file=no", "-e", "using LanguageServer; runserver()"],
+		extensions: [".jl"],
+	},
+	razor: {
+		command: ["roslyn-language-server", "--stdio"],
+		extensions: [".razor", ".cshtml"],
+	},
 };
 
 export const AUTO_INSTALLABLE_SERVERS: Record<string, string[]> = {
@@ -160,4 +172,5 @@ export const AUTO_INSTALLABLE_SERVERS: Record<string, string[]> = {
 	ty: ["pip", "install", "ty"],
 	"ruby-lsp": ["gem", "install", "ruby-lsp"],
 	"ocaml-lsp": ["opam", "install", "ocaml-lsp-server"],
+	julials: ["julia", "-e", 'using Pkg; Pkg.add("LanguageServer")'],
 };

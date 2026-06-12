@@ -12,6 +12,12 @@ const MARKSMAN_INITIALIZE_TIMEOUT = [
 	'[01:16:41 INF] <Folder> Loading folder documents: {"uri":"file:///repo"}',
 ].join("\n");
 
+const DAEMON_UNREACHABLE = [
+	"LSP daemon unreachable: daemon did not become reachable.",
+	"The MCP server is a thin proxy and never runs language servers in-process.",
+	"Logs: /tmp/daemon.log",
+].join("\n");
+
 const tempDirs: string[] = [];
 
 afterEach(() => {
@@ -114,6 +120,68 @@ describe("codex PostToolUse unavailable LSP suppression", () => {
 			// then
 			expect(cleanProbeOutput).toBe("");
 			expect(laterDiagnosticOutput).toContain("recovered markdown diagnostic");
+			expect(calls).toBe(3);
+		});
+	});
+
+	it("#given the LSP daemon is unreachable #when PostToolUse repeats #then it suppresses feedback once and retries on the next edit", async () => {
+		// given
+		const pluginData = tempPluginData();
+		const input = postToolUseInput("session-daemon-down", "src/app.ts");
+		let calls = 0;
+
+		await withPluginData(pluginData, async () => {
+			// when
+			const firstOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return DAEMON_UNREACHABLE;
+			});
+			const secondOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return "error[typescript] (2304) at 1:1: Cannot find name 'missing'.";
+			});
+
+			// then
+			expect(firstOutput).toBe("");
+			expect(secondOutput).toContain("Cannot find name 'missing'");
+			expect(calls).toBe(2);
+		});
+	});
+
+	it("#given a cached unavailable extension #when the post-compact probe hits a daemon outage #then the cache survives and the probe stays pending", async () => {
+		// given
+		const pluginData = tempPluginData();
+		const input = postToolUseInput("session-daemon-down-probe", ".omo/ulw-loop/evidence/note.md");
+		let calls = 0;
+
+		await withPluginData(pluginData, async () => {
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return MARKSMAN_INITIALIZE_TIMEOUT;
+			});
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return "error[markdown] (1000) at 1:1: cached call should have been skipped.";
+			});
+			await runLspPostCompactHook({ session_id: "session-daemon-down-probe" });
+
+			// when
+			const outageProbeOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return DAEMON_UNREACHABLE;
+			});
+			const retriedProbeOutput = await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return MARKSMAN_INITIALIZE_TIMEOUT;
+			});
+			await runLspPostToolUseHook(input, async () => {
+				calls += 1;
+				return "error[markdown] (1000) at 1:1: re-cached call should have been skipped.";
+			});
+
+			// then
+			expect(outageProbeOutput).toBe("");
+			expect(retriedProbeOutput).toBe("");
 			expect(calls).toBe(3);
 		});
 	});

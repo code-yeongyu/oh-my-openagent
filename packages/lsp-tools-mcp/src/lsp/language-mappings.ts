@@ -78,6 +78,7 @@ export const EXT_TO_LANG: Record<string, string> = {
 	".htm": "html",
 	".ini": "ini",
 	".java": "java",
+	".jl": "julia",
 	".js": "javascript",
 	".jsx": "javascriptreact",
 	".json": "json",

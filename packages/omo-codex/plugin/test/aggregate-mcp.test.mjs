@@ -33,7 +33,7 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	assert.match(bundledMcpBuildScript, /git-bash-mcp/);
 	assert.doesNotMatch(packageJson.scripts.build, /--workspaces/);
 	assert.equal(lspServer.command, "node");
-	assert.deepEqual(lspServer.args, ["../../lsp-tools-mcp/dist/cli.js", "mcp"]);
+	assert.deepEqual(lspServer.args, ["../../lsp-daemon/dist/cli.js", "mcp"]);
 	assert.equal(lspServer.cwd, ".");
 	assert.equal(astGrepServer.command, "node");
 	assert.deepEqual(astGrepServer.args, ["../../ast-grep-mcp/dist/cli.js", "mcp"]);

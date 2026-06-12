@@ -112,6 +112,10 @@ export interface PiRulesConfig {
 	maxResultChars: number;
 	postCompactMaxRuleChars: number;
 	postCompactMaxResultChars: number;
+	dynamicMaxRuleChars: number;
+	dynamicMaxResultChars: number;
+	promptMaxRuleChars: number;
+	promptMaxResultChars: number;
 	enabledSources: RuleSource[] | "auto";
 }
 
