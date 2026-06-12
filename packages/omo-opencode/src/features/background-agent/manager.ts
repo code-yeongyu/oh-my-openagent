@@ -106,7 +106,7 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
-import { createTaskPersistenceStore, type TaskPersistenceStore } from "./task-persistence"
+import { createTaskPersistenceStore, recoverPersistedTasks, type TaskPersistenceStore } from "./task-persistence"
 import {
   archiveBackgroundTask,
   forgetBackgroundTask,
@@ -465,6 +465,7 @@ export class BackgroundManager {
       model: task.model,
       error: task.error,
       category: task.category,
+      result: task.result,
     }
 
     this.completedTaskArchive.set(task.id, archivedTask)
@@ -475,6 +476,38 @@ export class BackgroundManager {
     const oldestTaskID = this.completedTaskArchive.keys().next().value
     if (typeof oldestTaskID === "string") {
       this.completedTaskArchive.delete(oldestTaskID)
+    }
+  }
+
+  /**
+   * Reconcile persisted task snapshots after an OpenCode restart and surface the
+   * recovered tasks through the same read paths `background_output` already uses
+   * (`completedTaskArchive` + the cross-instance registry). Recovered tasks are
+   * never re-added to `this.tasks`: no polling, notifications, parent-wake, or
+   * prompts are triggered for them. Fire-and-forget safe: the whole body is
+   * wrapped so a failure can never propagate to plugin init.
+   */
+  async restorePersistedTasks(options?: { isPidAlive?: (pid: number) => boolean }): Promise<void> {
+    if (!this.persistenceStore) {
+      return
+    }
+
+    try {
+      const recovered = await recoverPersistedTasks({
+        store: this.persistenceStore,
+        client: this.client,
+        isPidAlive: options?.isPidAlive,
+        logger: this.logger,
+      })
+
+      for (const { task } of recovered) {
+        this.archiveCompletedTask(task)
+        archiveBackgroundTask(task)
+      }
+    } catch (error) {
+      this.logger("[background-agent] restorePersistedTasks failed:", {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -6,7 +6,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import type { PersistedTaskSnapshot } from "./task-persistence"
 import { BackgroundManager } from "./manager"
-import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
+import { clearBackgroundTaskRegistryForTesting, getRegisteredBackgroundTask } from "./task-registry"
 import type { BackgroundTask, BackgroundTaskStatus } from "./types"
 
 function cast<T>(value: unknown): T {
@@ -272,6 +272,233 @@ describe("BackgroundManager snapshot persistence", () => {
 
       // then
       expect(existsSync(tasksDirFor(directory))).toBe(false)
+    })
+  })
+})
+
+function deadOwner(): PersistedTaskSnapshot["owner"] {
+  // 999999999 is beyond Linux pid_max, so process.kill(pid, 0) reports ESRCH.
+  return { pid: 999999999, startedAt: new Date().toISOString() }
+}
+
+function makeSnapshot(
+  overrides: Partial<PersistedTaskSnapshot> & { id: string },
+): PersistedTaskSnapshot {
+  return {
+    schema_version: 1,
+    description: "restore test",
+    agent: "general",
+    status: "completed",
+    owner: deadOwner(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
+function writeSnapshotToDisk(dir: string, snapshot: PersistedTaskSnapshot): void {
+  mkdirSync(tasksDirFor(dir), { recursive: true })
+  writeFileSync(
+    snapshotPathFor(dir, snapshot.id),
+    `${JSON.stringify(snapshot, null, 2)}\n`,
+    "utf-8",
+  )
+}
+
+function createReconcileClient(options: {
+  sessionSurvives: boolean
+}) {
+  return {
+    session: {
+      get: async () =>
+        options.sessionSurvives
+          ? { data: { id: "ses_orphan" } }
+          : { error: { name: "NotFoundError", data: {} } },
+      messages: async () => ({ data: [] }),
+      create: async () => ({ data: { id: "ses_orphan" } }),
+      prompt: async () => ({ data: {} }),
+      promptAsync: async () => ({ data: {} }),
+      abort: async () => ({ data: {} }),
+    },
+  }
+}
+
+describe("BackgroundManager.restorePersistedTasks", () => {
+  describe("#given a terminal snapshot owned by a dead process (S1)", () => {
+    test("#when manager B restores #then getTask and the registry resolve the completed task", async () => {
+      // given
+      const managerA = createManager({ directory, client: createFakeClient("ses_s1") })
+      const task = await launchAndAwaitRunning(managerA, directory)
+      await internals(managerA).tryCompleteTask(task, "test")
+      expect(readSnapshot(directory, task.id).status).toBe("completed")
+
+      // simulate a restart: the snapshot is now owned by a dead process and the
+      // in-memory registry is wiped.
+      const snapshot = readSnapshot(directory, task.id)
+      writeSnapshotToDisk(directory, { ...snapshot, owner: deadOwner() })
+      clearBackgroundTaskRegistryForTesting()
+
+      // when
+      const managerB = createManager({ directory, client: createFakeClient("ses_s1") })
+      await managerB.restorePersistedTasks({ isPidAlive: () => false })
+
+      // then
+      const restored = managerB.getTask(task.id)
+      expect(restored?.status).toBe("completed")
+      expect(getRegisteredBackgroundTask(task.id)).toBeDefined()
+    })
+  })
+
+  describe("#given a snapshot owned by a live process (S2)", () => {
+    test("#when manager B restores #then nothing is restored and the file is byte-identical", async () => {
+      // given
+      const id = "bg_s2"
+      writeSnapshotToDisk(
+        directory,
+        makeSnapshot({
+          id,
+          sessionId: "ses_s2",
+          status: "completed",
+          owner: { pid: process.pid, startedAt: new Date().toISOString() },
+        }),
+      )
+      clearBackgroundTaskRegistryForTesting()
+      const before = readFileSync(snapshotPathFor(directory, id), "utf-8")
+
+      // when (real default isPidAlive sees process.pid as alive)
+      const manager = createManager({ directory, client: createFakeClient("ses_s2") })
+      await manager.restorePersistedTasks()
+
+      // then
+      expect(manager.getTask(id)).toBeUndefined()
+      const after = readFileSync(snapshotPathFor(directory, id), "utf-8")
+      expect(after).toBe(before)
+    })
+  })
+
+  describe("#given an orphaned running snapshot whose session is lost (S3)", () => {
+    test("#when manager B restores #then the task and snapshot become error 'session lost across restart'", async () => {
+      // given
+      const id = "bg_s3"
+      writeSnapshotToDisk(
+        directory,
+        makeSnapshot({
+          id,
+          sessionId: "ses_orphan",
+          parentSessionId: "ses_parent",
+          status: "running",
+        }),
+      )
+      clearBackgroundTaskRegistryForTesting()
+
+      // when
+      const manager = createManager({
+        directory,
+        client: createReconcileClient({ sessionSurvives: false }),
+      })
+      await manager.restorePersistedTasks({ isPidAlive: () => false })
+
+      // then
+      const restored = manager.getTask(id)
+      expect(restored?.status).toBe("error")
+      expect(restored?.error).toBe("session lost across restart")
+      const snapshot = readSnapshot(directory, id)
+      expect(snapshot.status).toBe("error")
+      expect(snapshot.error).toBe("session lost across restart")
+    })
+
+    test("#when the session survived #then the task becomes interrupt with session_read guidance", async () => {
+      // given
+      const id = "bg_s3_interrupt"
+      writeSnapshotToDisk(
+        directory,
+        makeSnapshot({
+          id,
+          sessionId: "ses_orphan",
+          parentSessionId: "ses_parent",
+          status: "running",
+        }),
+      )
+      clearBackgroundTaskRegistryForTesting()
+
+      // when
+      const manager = createManager({
+        directory,
+        client: createReconcileClient({ sessionSurvives: true }),
+      })
+      await manager.restorePersistedTasks({ isPidAlive: () => false })
+
+      // then
+      const restored = manager.getTask(id)
+      expect(restored?.status).toBe("interrupt")
+      expect(restored?.result).toContain("session_read")
+      expect(readSnapshot(directory, id).status).toBe("interrupt")
+    })
+  })
+
+  describe("#given persistence is disabled", () => {
+    test("#when restorePersistedTasks runs #then it resolves and no directory is created", async () => {
+      // given
+      const manager = createManager({
+        directory,
+        client: createFakeClient("ses_off"),
+        persistence: false,
+      })
+
+      // when
+      await manager.restorePersistedTasks()
+
+      // then
+      expect(existsSync(tasksDirFor(directory))).toBe(false)
+    })
+  })
+
+  describe("#given a corrupt snapshot alongside a good one", () => {
+    test("#when manager B restores #then it does not throw and the good snapshot is restored", async () => {
+      // given
+      mkdirSync(tasksDirFor(directory), { recursive: true })
+      writeFileSync(snapshotPathFor(directory, "bg_corrupt"), "{ not valid json", "utf-8")
+      writeSnapshotToDisk(
+        directory,
+        makeSnapshot({ id: "bg_good", sessionId: "ses_good", status: "completed" }),
+      )
+      clearBackgroundTaskRegistryForTesting()
+
+      // when
+      const manager = createManager({ directory, client: createFakeClient("ses_good") })
+      await manager.restorePersistedTasks({ isPidAlive: () => false })
+
+      // then
+      expect(manager.getTask("bg_good")?.status).toBe("completed")
+      expect(manager.getTask("bg_corrupt")).toBeUndefined()
+    })
+  })
+
+  describe("#given more terminal snapshots than the archive cap", () => {
+    test("#when 105 are restored #then exactly the 100-entry cap is retrievable without crashing", async () => {
+      // given
+      const ids: string[] = []
+      for (let index = 0; index < 105; index++) {
+        const id = `bg_bulk_${String(index).padStart(3, "0")}`
+        ids.push(id)
+        writeSnapshotToDisk(
+          directory,
+          makeSnapshot({ id, sessionId: `ses_${id}`, status: "completed" }),
+        )
+      }
+      clearBackgroundTaskRegistryForTesting()
+
+      // when
+      const manager = createManager({ directory, client: createFakeClient("ses_bulk") })
+      await manager.restorePersistedTasks({ isPidAlive: () => false })
+
+      // then
+      let retrievable = 0
+      for (const id of ids) {
+        if (manager.getTask(id)) {
+          retrievable++
+        }
+      }
+      expect(retrievable).toBe(100)
     })
   })
 })
