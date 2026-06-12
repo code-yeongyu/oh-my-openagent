@@ -384,4 +384,72 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 		expect(checkedUrls).toEqual(["http://127.0.0.1:4108"])
 		expect(closed).toEqual(["%team"])
 	})
+
+	it("#given OMO attach panes point at untrusted hosts #when sweep called #then health checks are not attempted", async () => {
+		// given
+		const checkedUrls: string[] = []
+		const closed: string[] = []
+		const logged: string[] = []
+		const deps: SweepAttachPaneDeps = {
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [
+				{
+					paneId: "%metadata-external",
+					title: "sleep 300",
+					attachServerUrl: "https://example.com:4108",
+					commandLine: "fish fish",
+				},
+				{
+					paneId: "%metadata-link-local",
+					title: "sleep 300",
+					attachServerUrl: "http://169.254.169.254:4108",
+					commandLine: "fish fish",
+				},
+				{
+					paneId: "%command-private",
+					title: "omo-subagent-private",
+					attachServerUrl: "",
+					commandLine: "opencode attach http://192.168.1.20:4108 --session ses_private",
+				},
+				{
+					paneId: "%command-external",
+					title: "omo-team-external",
+					attachServerUrl: "",
+					commandLine: "opencode attach 'https://example.org:4108/' --session ses_external",
+				},
+				{
+					paneId: "%local",
+					title: "omo-subagent-local",
+					attachServerUrl: "",
+					commandLine: "opencode attach http://localhost:4108 --session ses_local",
+				},
+			],
+			isServerRunning: async (serverUrl: string) => {
+				checkedUrls.push(serverUrl)
+				return false
+			},
+			closePane: async (paneId: string) => {
+				closed.push(paneId)
+				return true
+			},
+			log: (message: string) => {
+				logged.push(message)
+			},
+		}
+
+		// when
+		const result = await sweepStaleOmoAttachPanesWith(deps)
+
+		// then
+		expect(result).toBe(1)
+		expect(checkedUrls).toEqual(["http://localhost:4108"])
+		expect(closed).toEqual(["%local"])
+		expect(logged).toEqual([
+			"[sweepStaleOmoAttachPanesWith] skipped untrusted attach server URL",
+			"[sweepStaleOmoAttachPanesWith] skipped untrusted attach server URL",
+			"[sweepStaleOmoAttachPanesWith] skipped untrusted attach server URL",
+			"[sweepStaleOmoAttachPanesWith] skipped untrusted attach server URL",
+		])
+	})
 })

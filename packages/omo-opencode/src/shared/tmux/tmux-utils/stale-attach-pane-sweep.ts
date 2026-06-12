@@ -82,6 +82,45 @@ function extractAttachServerUrl(commandLine: string): string | null {
 	return match[1] ?? match[2] ?? match[3] ?? null
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+	const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "")
+	if (normalized === "localhost" || normalized === "::1") {
+		return true
+	}
+
+	const octets = normalized.split(".")
+	if (octets.length !== 4 || octets[0] !== "127") {
+		return false
+	}
+
+	return octets.every((octet) => {
+		if (!/^\d{1,3}$/.test(octet)) {
+			return false
+		}
+		const value = Number(octet)
+		return value >= 0 && value <= 255
+	})
+}
+
+function normalizeTrustedAttachServerUrl(serverUrl: string): string | null {
+	let parsed: URL
+	try {
+		parsed = new URL(serverUrl)
+	} catch {
+		return null
+	}
+
+	if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+		return null
+	}
+
+	if (!isLoopbackHostname(parsed.hostname)) {
+		return null
+	}
+
+	return serverUrl
+}
+
 function isOmoAttachPane(pane: TmuxAttachPane): boolean {
 	return pane.attachServerUrl.length > 0 || OMO_ATTACH_PANE_TITLE_PREFIXES.some((prefix) => pane.title.startsWith(prefix))
 }
@@ -110,8 +149,17 @@ export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): P
 	for (const pane of candidatePanes) {
 		if (!isOmoAttachPane(pane)) continue
 
-		const serverUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine)
-		if (serverUrl === null) continue
+		const rawServerUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine)
+		if (rawServerUrl === null) continue
+
+		const serverUrl = normalizeTrustedAttachServerUrl(rawServerUrl)
+		if (serverUrl === null) {
+			deps.log("[sweepStaleOmoAttachPanesWith] skipped untrusted attach server URL", {
+				paneId: pane.paneId,
+				serverUrl: rawServerUrl,
+			})
+			continue
+		}
 
 		let serverRunning: boolean
 		try {
