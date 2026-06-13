@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { readJson, root } from "./aggregate-plugin-fixture.mjs";
@@ -57,13 +57,13 @@ test("#given built workspace component CLIs #when dynamically imported with hook
 	assert.deepEqual(failures, []);
 });
 
-test("#given representative component hook payloads #when executed through dist CLI contract #then current hook behavior is preserved", () => {
+test("#given representative component hook payloads #when executed through dist CLI contract #then current hook behavior is preserved", async () => {
 	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-cli-contract-"));
 	try {
 		const cases = componentHookContractCases(tempRoot);
 
 		for (const hookCase of cases) {
-			const result = runHookCli(hookCase.component, hookCase.event, hookCase.payload, tempRoot, hookCase.env);
+			const result = await runHookCli(hookCase.component, hookCase.event, hookCase.payload, tempRoot, hookCase.env);
 			assert.equal(
 				result.status,
 				0,
@@ -143,7 +143,7 @@ function componentCliPath(component) {
 }
 
 function runHookCli(component, event, payload, tempRoot, extraEnv = {}) {
-	return runHookCliRaw(component, event, `${JSON.stringify(payload)}\n`, tempRoot, extraEnv);
+	return runHookCliAsync(component, event, `${JSON.stringify(payload)}\n`, tempRoot, extraEnv);
 }
 
 function runHookCliRaw(component, event, input, tempRoot, extraEnv = {}) {
@@ -153,6 +153,40 @@ function runHookCliRaw(component, event, input, tempRoot, extraEnv = {}) {
 		env: hookEnv(tempRoot, extraEnv),
 		input,
 		timeout: HOOK_CLI_TEST_TIMEOUT_MS,
+	});
+}
+
+function runHookCliAsync(component, event, input, tempRoot, extraEnv = {}) {
+	return new Promise((resolve, reject) => {
+		const child = spawn(process.execPath, [componentCliPath(component), "hook", event], {
+			cwd: root,
+			env: hookEnv(tempRoot, extraEnv),
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+		let stdout = "";
+		let stderr = "";
+		const timeout = setTimeout(() => {
+			child.kill();
+			reject(new Error(`${component} ${event} timed out after ${HOOK_CLI_TEST_TIMEOUT_MS}ms`));
+		}, HOOK_CLI_TEST_TIMEOUT_MS);
+
+		child.stdout.setEncoding("utf8");
+		child.stderr.setEncoding("utf8");
+		child.stdout.on("data", (chunk) => {
+			stdout += chunk;
+		});
+		child.stderr.on("data", (chunk) => {
+			stderr += chunk;
+		});
+		child.once("error", (error) => {
+			clearTimeout(timeout);
+			reject(error);
+		});
+		child.once("close", (status, signal) => {
+			clearTimeout(timeout);
+			resolve({ status, signal, stdout, stderr });
+		});
+		child.stdin.end(input);
 	});
 }
 
