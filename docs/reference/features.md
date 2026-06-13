@@ -71,6 +71,32 @@ task(subagent_type="explore", load_skills=[], prompt="Find auth implementations"
 background_output(task_id="bg_abc123")
 ```
 
+#### Background Agent Work Directories
+
+Background agents inherit the session working directory from OpenCode and OMO when
+the task tool starts them. OMO does not force the model's own shell commands to
+stay inside that directory after launch. If a model decides to clone a repo,
+download docs, or create scratch files under `/tmp` or macOS `/var/folders/...`,
+the filesystem prompt comes from that command, not from a separate OMO storage
+root.
+
+`APP_DIR` is an OpenCode process environment value. Treat it as process context,
+not as a guarantee that every background agent artifact will land there.
+
+For projects that must keep all agent scratch work under the repository, add a
+project `AGENTS.md` rule with an explicit writable path:
+
+```md
+Use ./.omo/session-work/ for clones, downloaded docs, scratch files, and
+temporary outputs. Do not write under /tmp, /var, or other OS temp directories
+unless the user approves it.
+```
+
+If you use tmux panes for background agents, each pane still follows the same
+model instructions. A project rule is more reliable than repeating the
+constraint in one prompt, because every subagent receives the rule with the
+project context.
+
 #### Visual Multi-Agent with Tmux
 
 Enable `tmux.enabled` to see background agents in separate tmux panes:
