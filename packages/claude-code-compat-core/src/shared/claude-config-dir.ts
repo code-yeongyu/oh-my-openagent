@@ -6,6 +6,6 @@ export function getClaudeConfigDir(): string {
   if (envConfigDir) {
     return envConfigDir
   }
-  
-  return join(homedir(), ".claude")
+
+  return join(process.env.HOME || process.env.USERPROFILE || homedir(), ".claude")
 }
