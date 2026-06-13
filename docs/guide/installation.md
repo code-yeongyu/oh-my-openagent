@@ -711,6 +711,7 @@ The Codex CLI Light edition is fully independent of the OpenCode plugin. You can
 | `Ignoring malformed agent role definition: agents.*.config_file must point to an existing file` | Re-run `npx lazycodex-ai install`. The installer repairs stale managed `[agents.*]` entries and recreates `~/.codex/agents/*.toml`. |
 | `agents.max_threads cannot be set when multi_agent_v2 is enabled` in one project | Re-run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers, creates `.backup-<timestamp>` files for changed configs, and leaves user-authored `.codex` artifacts in place. |
 | `SessionStart hook (failed)` / `UserPromptSubmit hook (failed)` with `MODULE_NOT_FOUND` for `components/*/dist/cli.js` | Re-run the installer so the cached plugin is rebuilt with component `dist/` files. If the cache was manually edited, remove `~/.codex/plugins/cache/sisyphuslabs` first. |
+| Windows behind an HTTP proxy shows only default OpenCode agents, and logs include `fetch() proxy.url must be a non-empty string` while loading `oh-my-openagent@latest` | This fails before OMO code loads. Configure npm/proxy outside OpenCode, or preinstall the plugin with system npm: `npm install oh-my-openagent@latest --prefix "%APPDATA%\\opencode"` (PowerShell/cmd). Restart OpenCode and run with logs if agents still do not appear. |
 | Hook trust hash mismatch warnings | Re-run the installer; hashes are regenerated each install |
 
 ### Step 8: Team Mode (optional, opt-in)
