@@ -38,3 +38,20 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #5025 — OpenCode Desktop loads the plugin but only shows native modes
+
+- **Affects**: OpenCode Desktop on Windows with `oh-my-openagent@4.7.5`.
+- **Symptom**: The Desktop plugin list shows `oh-my-openagent` as loaded, but the UI only exposes the native `build` and `plan` modes. The OpenCode log may include `Runtime skill source server requires Bun.serve failed to load plugin`.
+- **Workaround**: Disable the runtime security skills that start the Bun-backed skill source server, then restart OpenCode Desktop:
+
+  ```json
+  {
+    "disabled_skills": [
+      "security-research",
+      "security-review"
+    ]
+  }
+  ```
+
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5025.
