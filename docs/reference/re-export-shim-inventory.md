@@ -10,7 +10,7 @@ Generated command:
 find packages/omo-opencode/src packages/omo-codex/src -type f -name '*.ts' -print0 | sort -z | xargs -0 awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-06-13. Total shim exports found: 319.
+Snapshot date: 2026-06-13. Total shim exports found: 316.
 
 ## Aggregate By Target Package
 
