@@ -89,7 +89,8 @@ describe("runtime shims", () => {
     const script = String.raw`
       const modulePath = process.env.OMO_RUNTIME_SHIM_MODULE;
       if (!modulePath) throw new Error("missing OMO_RUNTIME_SHIM_MODULE");
-      const { spawn, spawnSync } = await import(modulePath);
+      const { pathToFileURL } = await import("node:url");
+      const { spawn, spawnSync } = await import(pathToFileURL(modulePath).href);
       async function readProcessStream(stream) {
         if (!stream) return "";
         const reader = stream.getReader();
