@@ -37,6 +37,15 @@ function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: 
   return workflow.slice(start, end)
 }
 
+function expectBunSetupBeforeLspToolsBuild(workflowSection: string, label: string): void {
+  const bunSetupIndex = workflowSection.indexOf("uses: oven-sh/setup-bun@v2")
+  const lspBuildIndex = workflowSection.indexOf("name: Build vendored lsp-tools-mcp package")
+
+  expect(bunSetupIndex, `${label} must setup Bun`).toBeGreaterThanOrEqual(0)
+  expect(lspBuildIndex, `${label} must build lsp-tools-mcp`).toBeGreaterThanOrEqual(0)
+  expect(bunSetupIndex, `${label} must setup Bun before lsp-tools-mcp build`).toBeLessThan(lspBuildIndex)
+}
+
 describe("test workflows", () => {
   test("use pure bun test for workflows", () => {
     for (const workflowCheck of workflowChecks) {
@@ -144,6 +153,28 @@ describe("test workflows", () => {
 
     expect(hasNodeSetup, "Codex compatibility must setup Node for MCP package builds").toBe(true)
     expect(buildsLspToolsMcp, "Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
+  })
+
+  test("sets up Bun before vendored lsp-tools-mcp builds", () => {
+    // #given
+    const ciWorkflow = readFileSync(ciWorkflowPath, "utf8")
+    const publishWorkflow = readFileSync(publishWorkflowPath, "utf8")
+    const ciTestJob = sliceWorkflowSection(ciWorkflow, "  test:", "  typecheck:")
+    const ciTypecheckJob = sliceWorkflowSection(ciWorkflow, "  typecheck:", "  codex-compatibility:")
+    const ciCodexCompatibilityJob = sliceWorkflowSection(ciWorkflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
+    const ciBuildJob = sliceWorkflowSection(ciWorkflow, "  build:", "  draft-release:")
+    const publishTestJob = sliceWorkflowSection(publishWorkflow, "  test:", "  typecheck:")
+    const publishTypecheckJob = sliceWorkflowSection(publishWorkflow, "  typecheck:", "  codex-compatibility:")
+    const publishCodexCompatibilityJob = sliceWorkflowSection(publishWorkflow, "  codex-compatibility:", "  preflight-trust:")
+
+    // #then
+    expectBunSetupBeforeLspToolsBuild(ciTestJob, "CI test job")
+    expectBunSetupBeforeLspToolsBuild(ciTypecheckJob, "CI typecheck job")
+    expectBunSetupBeforeLspToolsBuild(ciCodexCompatibilityJob, "CI Codex compatibility job")
+    expectBunSetupBeforeLspToolsBuild(ciBuildJob, "CI build job")
+    expectBunSetupBeforeLspToolsBuild(publishTestJob, "publish test job")
+    expectBunSetupBeforeLspToolsBuild(publishTypecheckJob, "publish typecheck job")
+    expectBunSetupBeforeLspToolsBuild(publishCodexCompatibilityJob, "publish Codex compatibility job")
   })
 
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {
