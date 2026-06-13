@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #4170 - CJK characters in custom agent display names can render as mojibake
+
+- **Affects**: OpenCode TUI sessions with custom OMO agent display names that include Chinese, Japanese, or Korean characters.
+- **Symptom**: The ASCII part of the agent name renders normally, but the CJK characters in the TUI header can appear garbled.
+- **Workaround**: Use ASCII-only custom display names such as `Sisyphus - Orchestrator` until the TUI rendering path handles multi-byte character widths reliably.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4170.
+
 ## v4.2.1 - Delegate-task early-failure-fallback (BLOCKER-4, resolved)
 
 BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first prompt payload before dispatch and consume that bootstrap payload exactly once when runtime fallback must retry an empty-history child session.
