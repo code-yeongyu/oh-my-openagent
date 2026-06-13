@@ -27,6 +27,7 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
+  createMetaGovernorHook,
 } from "../../hooks"
 import {
   detectExternalNotificationPlugin,
@@ -61,6 +62,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
+  metaGovernor: ReturnType<typeof createMetaGovernorHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -218,6 +220,12 @@ export function createSessionHooks(args: {
         }))
     : null
 
+  const metaGovernor =
+    isHookEnabled("meta-governor") && pluginConfig.meta_governor?.enabled
+      ? safeHook("meta-governor", () =>
+          createMetaGovernorHook(ctx, { config: pluginConfig.meta_governor ?? undefined }))
+      : null
+
   const legacyPluginToast = isHookEnabled("legacy-plugin-toast")
     ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
     : null
@@ -245,5 +253,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     runtimeFallback,
     legacyPluginToast,
+    metaGovernor,
   }
 }

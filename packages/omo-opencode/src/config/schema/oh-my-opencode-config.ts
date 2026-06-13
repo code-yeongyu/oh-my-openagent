@@ -27,6 +27,7 @@ import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
 import { StartWorkConfigSchema } from "./start-work"
 import { WebsearchConfigSchema } from "./websearch"
+import { MetaGovernorConfigSchema } from "./meta-governor"
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -94,6 +95,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: StartWorkConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, ralph loop) */
   default_mode: DefaultModeConfigSchema.optional(),
+  /** MetaGovernor self-judging orchestration layer (default: disabled) */
+  meta_governor: MetaGovernorConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })
