@@ -21,10 +21,11 @@ export function findProjectRoot(startPath: string, markers: ReadonlyArray<string
 			}
 		}
 
-		if (currentDirectory === filesystemRoot) {
+		const parentDirectory = dirname(currentDirectory);
+		if (currentDirectory === filesystemRoot || parentDirectory === currentDirectory) {
 			return null;
 		}
 
-		currentDirectory = dirname(currentDirectory);
+		currentDirectory = parentDirectory;
 	}
 }
