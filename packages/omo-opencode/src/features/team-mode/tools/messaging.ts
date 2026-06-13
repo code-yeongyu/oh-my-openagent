@@ -5,8 +5,8 @@ import { z } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { log } from "../../../shared/logger"
-import { BroadcastNotPermittedError, sendMessage } from "../team-mailbox/send"
-import { MessageSchema } from "../types"
+import { BroadcastNotPermittedError, sendMessage } from "@oh-my-opencode/team-core/team-mailbox/send"
+import { MessageSchema } from "@oh-my-opencode/team-core/types"
 import { deliverLive, type LiveDeliveryClient } from "./messaging-live-delivery"
 import {
   defaultTeamSendMessageToolDeps,

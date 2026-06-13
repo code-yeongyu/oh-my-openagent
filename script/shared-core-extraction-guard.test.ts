@@ -16,6 +16,7 @@ const corePackages = [
   "packages/comment-checker-core",
   "packages/hashline-core",
   "packages/tmux-core",
+  "packages/team-core",
   "packages/openclaw-core",
   "packages/boulder-state",
   "packages/telemetry-core",

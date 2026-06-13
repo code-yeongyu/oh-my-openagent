@@ -24,6 +24,7 @@
     "@oh-my-opencode/skills-loader-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
     "@oh-my-opencode/tmux-core": "workspace:*",
+    "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@opencode-ai/plugin": "^1.15.4",
     "@opencode-ai/sdk": "^1.15.4",
