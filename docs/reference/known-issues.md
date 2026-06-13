@@ -38,3 +38,10 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #4710: `@plan` may stay in Sisyphus instead of switching to Prometheus
+
+- **Affects**: Current OpenCode/Ultimate planning flow.
+- **Symptom**: Typing `@plan` from Sisyphus can leave the request in Sisyphus instead of handing it to Prometheus.
+- **Workaround**: Switch to Prometheus first with the Tab agent selector or `/agent`, ask for the plan there, then run `/start-work` after approval.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4710.
