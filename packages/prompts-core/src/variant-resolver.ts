@@ -4,6 +4,7 @@ import {
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isKimiK27Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core"
 import type { VariantTable } from "./types"
@@ -21,6 +22,7 @@ const PLANNER_AGENT_NAMES: ReadonlySet<string> = new Set(["prometheus"] as const
 const MODEL_MATCHERS: Readonly<Record<string, ModelMatcher>> = {
   gpt: isGptModel,
   gemini: isGeminiModel,
+  "kimi-k2-7": isKimiK27Model,
   kimi: isKimiK2Model,
   glm: isGlmModel,
   "opus-4-7": isClaudeOpus47Model,
