@@ -98,6 +98,42 @@ describe("git-bash", () => {
     expect(result).toEqual({ found: true, path: pathCandidate, source: "path" })
   })
 
+  test("#given Windows System32 bash alias is the only PATH candidate #when resolving #then it is not accepted as Git Bash", () => {
+    // given
+    const system32Bash = "C:\\Windows\\System32\\bash.exe"
+
+    // when
+    const result = resolveGitBash({
+      platform: "win32",
+      env: {},
+      exists: (path: string) => path === system32Bash,
+      where: () => [system32Bash],
+    })
+
+    // then
+    expect(result.found).toBe(false)
+    if (result.found) return
+    expect(result.checkedPaths).toEqual([PROGRAM_FILES_GIT_BASH, PROGRAM_FILES_X86_GIT_BASH, system32Bash])
+  })
+
+  test("#given WindowsApps bash alias is the only PATH candidate #when resolving #then it is not accepted as Git Bash", () => {
+    // given
+    const windowsAppsBash = "C:\\Users\\codex\\AppData\\Local\\Microsoft\\WindowsApps\\bash.exe"
+
+    // when
+    const result = resolveGitBash({
+      platform: "win32",
+      env: {},
+      exists: (path: string) => path === windowsAppsBash,
+      where: () => [windowsAppsBash],
+    })
+
+    // then
+    expect(result.found).toBe(false)
+    if (result.found) return
+    expect(result.checkedPaths).toEqual([PROGRAM_FILES_GIT_BASH, PROGRAM_FILES_X86_GIT_BASH, windowsAppsBash])
+  })
+
   test("#given Windows without Git Bash #when resolving #then returns install guidance", () => {
     // given / when
     const result = resolveGitBash({
