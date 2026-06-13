@@ -2,6 +2,7 @@
 .omo/*
 !.omo/rules/
 !.omo/rules/**
+packages/*/.omo/*
 .sisyphus/*
 !.sisyphus/rules/
 !.sisyphus/rules/**
@@ -51,6 +52,7 @@ oauth-success.html
 .debugging
 .debug-journal*.md
 session-ses_*.md
+pr-*.md
 plans/
 .ulw/
 .claude/
