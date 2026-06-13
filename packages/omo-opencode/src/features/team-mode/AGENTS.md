@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Spawns coordinated agent teams with shared mailbox, task list, optional tmux layout, and graceful lifecycle. Modeled after Claude Code Agent Teams. **OFF by default.** Enable via `team_mode.enabled` in `oh-my-opencode.jsonc`; restart OpenCode after enabling.
+Spawns coordinated agent teams with shared mailbox, task list, optional tmux layout, and graceful lifecycle. Modeled after Claude Code Agent Teams. **OFF by default.** Enable via `team_mode.enabled` in `oh-my-opencode.jsonc`; restart OpenCode after enabling. Harness-neutral registry/mailbox/tasklist/state/worktree/tmux-layout primitives are extracted to [`packages/team-core/`](../../../../../packages/team-core); this directory remains the OpenCode adapter for session spawning, hooks, tools, and config integration.
 
 User docs: [`docs/guide/team-mode.md`](../../../../../docs/guide/team-mode.md).
 
@@ -79,8 +79,8 @@ Hard-reject agents throw at TeamSpec parse with a specific message ("Agent 'X' i
 
 ```
 team-mode/
-├── index.ts                    # barrel
-├── types.ts                    # Zod schemas: TeamSpec, Member, Message, Task, RuntimeState; AGENT_ELIGIBILITY_REGISTRY
+├── index.ts                    # barrel and adapter exports
+├── types.ts                    # OpenCode-facing re-exports/wrappers for team-core schemas plus AGENT_ELIGIBILITY_REGISTRY
 ├── deps.ts                     # checkTeamModeDependencies (git, tmux availability)
 ├── member-parser.ts            # member validation against eligibility registry
 ├── member-guidance.ts          # auto-injected guidance per member kind
@@ -88,16 +88,16 @@ team-mode/
 ├── member-session-routing.ts
 ├── resolve-caller-team-lead.ts # determine if a session is acting as lead
 ├── team-session-registry.ts    # spawn-race-safe sessionID → team/member lookups
-├── team-registry/              # team spec loading from ~/.omo/teams/{name}/config.json
+├── team-registry/              # adapter shim over team-core team spec loading
 │   ├── loader.ts
 │   ├── paths.ts                # ensureBaseDirs, resolveBaseDir
 │   └── validator.ts
-├── team-state-store/           # durable runtime state.json with atomic locks
+├── team-state-store/           # adapter shim over team-core durable runtime state.json with atomic locks
 ├── team-runtime/               # create/status/shutdown lifecycle
-├── team-mailbox/               # async messaging (send / poll / ack / inbox)
-├── team-tasklist/              # CRUD + claiming + dependencies
-├── team-worktree/              # one git worktree per member; cleanup on delete
-├── team-layout-tmux/           # optional pane layout — close-team-member-pane, sweep-stale-team-sessions
+├── team-mailbox/               # adapter shim over team-core async messaging (send / poll / ack / inbox)
+├── team-tasklist/              # adapter shim over team-core CRUD + claiming + dependencies
+├── team-worktree/              # adapter shim over team-core git worktree primitives
+├── team-layout-tmux/           # adapter shim over team-core optional pane layout
 └── tools/                      # 12 team_* tool implementations + tests
 ```
 
