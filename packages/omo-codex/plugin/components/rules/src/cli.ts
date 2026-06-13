@@ -139,5 +139,6 @@ function readStdin(): Promise<string> {
 		processStdin.once("end", () => {
 			resolve(data);
 		});
+		processStdin.resume();
 	});
 }
