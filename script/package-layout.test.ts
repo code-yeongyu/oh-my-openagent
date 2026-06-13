@@ -7,6 +7,16 @@ import { fileURLToPath } from "node:url"
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const commandRoots = [".opencode/command", ".agents/command"] as const
 const skillRoots = [".opencode/skills", ".agents/skills"] as const
+const codexHookComponentRuntimePaths = [
+  "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
+  "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
+  "packages/omo-codex/plugin/components/lsp/dist/cli.js",
+  "packages/omo-codex/plugin/components/rules/dist/cli.js",
+  "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js",
+  "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
+  "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
+  "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
+] as const
 const packageLayoutTestTimeoutMs = 60_000
 const packDryRunTimeoutMs = 15_000
 
@@ -166,6 +176,18 @@ describe("published package layout", () => {
     // then
     expect(packedPaths.has(expectedGeneratedInstaller)).toBe(true)
     expect(packedObsoleteForks).toEqual([])
+  }, packDryRunTimeoutMs)
+
+  test("#given Codex hook component runtimes #when packing package #then every hook command target ships", async () => {
+    // given
+    const expectedRuntimePaths = codexHookComponentRuntimePaths
+
+    // when
+    const packedPaths = await packDryRunPaths()
+    const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+
+    // then
+    expect(missingRuntimePaths).toEqual([])
   }, packDryRunTimeoutMs)
 
   test("#given Codex installer source tree #when checking obsolete forks #then hand-written install mjs files are absent", () => {
