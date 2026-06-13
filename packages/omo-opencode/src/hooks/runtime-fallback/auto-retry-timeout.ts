@@ -3,6 +3,7 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
+import { subagentSessions } from "../../features/claude-code-session-state"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -39,9 +40,15 @@ export function createFallbackTimeoutHelpers(
 
     const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
     if (timeoutMs <= 0) return
+    const wasSubagentSession = subagentSessions.has(sessionID)
 
     const timer = setTimeout(async () => {
       sessionFallbackTimeouts.delete(sessionID)
+
+      if (wasSubagentSession && !subagentSessions.has(sessionID)) {
+        log(`[${HOOK_NAME}] Session fallback timeout skipped for completed subagent`, { sessionID })
+        return
+      }
 
       const state = sessionStates.get(sessionID)
       if (!state) return
