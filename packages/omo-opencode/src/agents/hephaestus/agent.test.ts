@@ -213,8 +213,8 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("You build context by examining");
     expect(config.prompt).toContain("Never chain together bash commands");
     expect(config.prompt).toContain("<tool_usage_rules>");
-    expect(config.prompt).toContain("Do not use `apply_patch`");
-    expect(config.prompt).toContain("`edit` and `write`");
+    expect(config.prompt).toContain("Use `apply_patch`");
+    expect(config.prompt).not.toContain("Do not use `apply_patch`");
   });
 
   test("GPT 5.5 model includes GPT-5.5 specific prompt content", () => {
@@ -228,8 +228,8 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("based on GPT-5.5");
     expect(config.prompt).toContain("Manual QA Gate");
     expect(config.prompt).toContain("Forbidden stops");
-    expect(config.prompt).toContain("Do not use `apply_patch`");
-    expect(config.prompt).toContain("`edit` and `write`");
+    expect(config.prompt).toContain("Use `apply_patch`");
+    expect(config.prompt).not.toContain("Do not use `apply_patch`");
   });
 
   test("includes Hephaestus identity in prompt", () => {
@@ -244,7 +244,7 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("autonomous deep worker");
   });
 
-  test("generic GPT model includes apply_patch workaround guidance", () => {
+  test("generic GPT model gets tool-agnostic file-edit guidance", () => {
     // given
     const model = "openai/gpt-4o";
 
@@ -252,11 +252,12 @@ describe("createHephaestusAgent", () => {
     const config = createHephaestusAgent(model);
 
     // then
-    expect(config.prompt).toContain("Do not use `apply_patch`");
-    expect(config.prompt).toContain("`edit` and `write`");
+    expect(config.prompt).toContain("apply_patch");
+    expect(config.prompt).toContain("`edit`/`write`");
+    expect(config.prompt).not.toContain("Do not use `apply_patch`");
   });
 
-  test("GPT models deny apply_patch while non-GPT models do not", () => {
+  test("GPT and non-GPT models do not force-deny apply_patch", () => {
     // given
     const gpt54Model = "openai/gpt-5.4";
     const gptGenericModel = "openai/gpt-4o";
@@ -268,8 +269,8 @@ describe("createHephaestusAgent", () => {
     const claudeConfig = createHephaestusAgent(claudeModel);
 
     // then
-    expect(gpt54Config.permission ?? {}).toHaveProperty("apply_patch", "deny");
-    expect(gptGenericConfig.permission ?? {}).toHaveProperty("apply_patch", "deny");
+    expect(gpt54Config.permission ?? {}).not.toHaveProperty("apply_patch");
+    expect(gptGenericConfig.permission ?? {}).not.toHaveProperty("apply_patch");
     expect(claudeConfig.permission ?? {}).not.toHaveProperty("apply_patch");
   });
 
@@ -303,9 +304,9 @@ import { maybeCreateHephaestusConfig } from "../builtin-agents/hephaestus-agent"
 import type { AgentOverrides } from "../types";
 import type { CategoryConfig } from "../../config/schema";
 
-describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
+describe("maybeCreateHephaestusConfig apply_patch permission", () => {
   describe("#given GPT model with user override allowing apply_patch", () => {
-    test("#when config is created #then apply_patch is still denied", () => {
+    test("#when config is created #then user override is respected", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -334,7 +335,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       // then
       expect(config).toBeDefined();
       expect(config?.model).toBe("openai/gpt-5.4");
-      expect(config?.permission).toHaveProperty("apply_patch", "deny");
+      expect(config?.permission).toHaveProperty("apply_patch", "allow");
     });
   });
 
@@ -373,7 +374,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
   });
 
   describe("#given generic GPT model with user override allowing apply_patch", () => {
-    test("#when config is created #then apply_patch is still denied", () => {
+    test("#when config is created #then user override is respected", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -402,7 +403,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       // then
       expect(config).toBeDefined();
       expect(config?.model).toBe("openai/gpt-4o");
-      expect(config?.permission).toHaveProperty("apply_patch", "deny");
+      expect(config?.permission).toHaveProperty("apply_patch", "allow");
     });
   });
 

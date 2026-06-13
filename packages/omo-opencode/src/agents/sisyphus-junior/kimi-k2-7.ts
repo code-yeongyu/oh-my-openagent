@@ -11,7 +11,6 @@
 
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri";
 import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder";
-import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
 import { KIMI_TOOL_LOOP_GUARD } from "../kimi-tool-loop-guard";
 
 function buildKimiK27TaskDisciplineSection(useTaskSystem: boolean): string {
@@ -62,7 +61,7 @@ ${buildAntiDuplicationSection()}
 
 ## Before you write code
 
-Search for the existing pattern and match it — naming, imports, error handling, indentation. Default to ASCII and comment only the non-obvious. ${GPT_APPLY_PATCH_GUIDANCE} Keep each shell command in its own call rather than chaining with separators.
+Search for the existing pattern and match it — naming, imports, error handling, indentation. Default to ASCII and comment only the non-obvious. Keep each shell command in its own call rather than chaining with separators.
 
 ## Verify before you claim done
 

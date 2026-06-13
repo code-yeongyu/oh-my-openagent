@@ -8,7 +8,6 @@ import type {
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
 import { categorizeTools, buildAgentIdentitySection } from "../dynamic-agent-prompt-builder";
-import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard";
 import { getFrontierToolSchemaPermission } from "../frontier-tool-schema-guard";
 
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
@@ -128,7 +127,6 @@ export function createHephaestusAgent(
       question: "allow",
       call_omo_agent: "deny",
       ...getFrontierToolSchemaPermission(model),
-      ...getGptApplyPatchPermission(model),
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };
