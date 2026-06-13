@@ -2,12 +2,12 @@
 
 This inventory tracks adapter shims that preserve old `packages/omo-opencode/src/` and `packages/omo-codex/src/` import paths while the implementation lives in extracted packages. These files should stay thin: a shim re-exports from `@oh-my-opencode/*` and should not regain local logic.
 
-Exact scan definition: a shim is a `.ts` file under `packages/omo-opencode/src` or `packages/omo-codex/src` whose first line matches `/^export (\*|\{).*from ["']@oh-my-opencode\//`.
+Exact scan definition: a shim is a tracked `.ts` file under `packages/omo-opencode/src` or `packages/omo-codex/src` whose first line matches `/^export (\*|\{).*from ["']@oh-my-opencode\//`.
 
 Generated command:
 
 ```bash
-find packages/omo-opencode/src packages/omo-codex/src -type f -name '*.ts' -print0 | sort -z | xargs -0 awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
+git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
 Snapshot date: 2026-06-13. Total shim exports found: 316.
@@ -26,7 +26,7 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `@oh-my-opencode/omo-codex` | 41 |
 | `@oh-my-opencode/openclaw-core` | 30 |
 | `@oh-my-opencode/rules-engine` | 4 |
-| `@oh-my-opencode/skills-loader-core` | 68 |
+| `@oh-my-opencode/skills-loader-core` | 65 |
 | `@oh-my-opencode/team-core` | 45 |
 | `@oh-my-opencode/tmux-core` | 3 |
 | `@oh-my-opencode/utils` | 54 |
@@ -163,10 +163,7 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/features/opencode-runtime-skills/skill-markdown.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-runtime-skills/source-server.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/allowed-tools-parser.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/async-loader.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/blocking.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/config-source-discovery.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/discover-worker.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/git-master-template-injection.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/index.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/loaded-skill-from-path.ts` | `@oh-my-opencode/skills-loader-core` |
