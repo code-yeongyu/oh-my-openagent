@@ -18,9 +18,14 @@ export function mergeDelegatePromptTools(input: {
 
 export function buildDelegateSessionPermission(
   configuredTools?: DelegateToolOverrides,
+  hardRestrictions?: Record<string, boolean>,
 ): SessionPermissionRule[] {
-  const permission = configuredTools ? migrateToolsToPermission(configuredTools) : {}
-  permission.question = "deny"
+  const promptTools = mergeDelegatePromptTools({
+    defaults: {},
+    configuredTools,
+    hardRestrictions,
+  })
+  const permission = migrateToolsToPermission(promptTools)
 
   const rules: SessionPermissionRule[] = []
   for (const [toolName, action] of Object.entries(permission)) {

@@ -9,6 +9,7 @@ import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
 import { buildDelegateSessionPermission } from "../../shared/delegate-tool-overrides"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 
@@ -44,7 +45,10 @@ export async function executeUnstableAgentTask(
       skillContent: systemContent,
       category: args.category,
       categoryTools,
-      sessionPermission: buildDelegateSessionPermission(categoryTools),
+      sessionPermission: buildDelegateSessionPermission(
+        categoryTools,
+        getAgentToolRestrictions(agentToUse),
+      ),
     })
     launchedTaskID = task.id
 

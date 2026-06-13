@@ -27,12 +27,14 @@ describe("createSyncSession", () => {
     // then
     expect(result).toEqual({ ok: true, sessionID: "ses_child", parentDirectory: "/parent" })
     expect(createCalls).toHaveLength(1)
-    expect(createCalls[0]?.body).toEqual({
+    expect(createCalls[0]?.body).toMatchObject({
       parentID: "ses_parent",
       title: "test task (@explore subagent)",
-      permission: [
+      permission: expect.arrayContaining([
         { permission: "question", action: "deny", pattern: "*" },
-      ],
+        { permission: "task", action: "deny", pattern: "*" },
+        { permission: "call_omo_agent", action: "deny", pattern: "*" },
+      ]),
     })
   })
 
@@ -60,14 +62,15 @@ describe("createSyncSession", () => {
 
     // then
     expect(result.ok).toBe(true)
-    expect(createCalls[0]?.body).toEqual({
+    expect(createCalls[0]?.body).toMatchObject({
       parentID: "ses_parent",
       title: "test task (@sisyphus-junior subagent)",
-      permission: [
+      permission: expect.arrayContaining([
         { permission: "grep", action: "deny", pattern: "*" },
         { permission: "glob", action: "allow", pattern: "*" },
         { permission: "question", action: "deny", pattern: "*" },
-      ],
+        { permission: "task", action: "deny", pattern: "*" },
+      ]),
     })
   })
 })

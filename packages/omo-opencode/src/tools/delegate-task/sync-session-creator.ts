@@ -1,6 +1,7 @@
 import type { OpencodeClient } from "./types"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { buildDelegateSessionPermission } from "../../shared/delegate-tool-overrides"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 
 export async function createSyncSession(
   client: OpencodeClient,
@@ -22,7 +23,10 @@ export async function createSyncSession(
     body: {
       parentID: input.parentSessionID,
       title: `${input.description} (@${input.agentToUse} subagent)`,
-      permission: buildDelegateSessionPermission(input.categoryTools),
+      permission: buildDelegateSessionPermission(
+        input.categoryTools,
+        getAgentToolRestrictions(input.agentToUse),
+      ),
       ...(input.categoryModel
         ? {
             model: {

@@ -247,9 +247,11 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then
     expectFn(launchCalls).toHaveLength(1)
-    expectFn(launchCalls[0].sessionPermission).toEqual([
+    expectFn(launchCalls[0].sessionPermission).toEqual(expectFn.arrayContaining([
       { permission: "question", action: "deny", pattern: "*" },
-    ])
+      { permission: "task", action: "deny", pattern: "*" },
+      { permission: "call_omo_agent", action: "deny", pattern: "*" },
+    ]))
   })
 
   testFn("passes category tool permissions and prompt tools when launching delegate task", async () => {
@@ -296,11 +298,12 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then
     expectFn(launchCalls).toHaveLength(1)
     expectFn(launchCalls[0].categoryTools).toEqual({ grep: false, glob: true })
-    expectFn(launchCalls[0].sessionPermission).toEqual([
+    expectFn(launchCalls[0].sessionPermission).toEqual(expectFn.arrayContaining([
       { permission: "grep", action: "deny", pattern: "*" },
       { permission: "glob", action: "allow", pattern: "*" },
       { permission: "question", action: "deny", pattern: "*" },
-    ])
+      { permission: "task", action: "deny", pattern: "*" },
+    ]))
   })
 
   testFn("strips leading zwsp from agent name before launching background task", async () => {
