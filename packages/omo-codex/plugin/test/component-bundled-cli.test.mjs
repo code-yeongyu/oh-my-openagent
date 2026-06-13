@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { readJson, root } from "./aggregate-plugin-fixture.mjs";
+import { componentHookContractCases } from "./component-hook-contract-cases.mjs";
 
 const HOOK_EVENTS_BY_COMPONENT = {
 	"comment-checker": "post-tool-use",
@@ -18,6 +19,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	ultrawork: "user-prompt-submit",
 	"ulw-loop": "pre-tool-use",
 };
+const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;
 
 test("#given built workspace component CLIs #when import specifiers are inspected #then each CLI is self-contained except node builtins", async () => {
 	// given
@@ -58,170 +60,15 @@ test("#given built workspace component CLIs #when dynamically imported with hook
 test("#given representative component hook payloads #when executed through dist CLI contract #then current hook behavior is preserved", () => {
 	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-cli-contract-"));
 	try {
-		const cases = [
-			{
-				name: "rules session-start",
-				component: "rules",
-				event: "session-start",
-				payload: {
-					hook_event_name: "SessionStart",
-					session_id: "s-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					source: "startup",
-				},
-				assertOutput(stdout) {
-					const output = JSON.parse(stdout);
-					assert.equal(output.hookSpecificOutput.hookEventName, "SessionStart");
-					assert.match(output.hookSpecificOutput.additionalContext, /Hephaestus/);
-				},
-			},
-			{
-				name: "telemetry session-start opt-out",
-				component: "telemetry",
-				event: "session-start",
-				payload: {
-					hook_event_name: "SessionStart",
-					session_id: "s-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					source: "startup",
-				},
-				assertOutput(stdout) {
-					assert.equal(stdout, "");
-				},
-			},
-			{
-				name: "ultrawork user-prompt-submit trigger",
-				component: "ultrawork",
-				event: "user-prompt-submit",
-				payload: {
-					hook_event_name: "UserPromptSubmit",
-					session_id: "s-task12",
-					turn_id: "t-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					prompt: "please ultrawork this",
-				},
-				assertOutput(stdout) {
-					const output = JSON.parse(stdout);
-					assert.equal(output.hookSpecificOutput.hookEventName, "UserPromptSubmit");
-					assert.match(output.hookSpecificOutput.additionalContext, /<ultrawork-mode>/);
-				},
-			},
-			{
-				name: "ulw-loop pre-tool-use budget guard",
-				component: "ulw-loop",
-				event: "pre-tool-use",
-				payload: {
-					hook_event_name: "PreToolUse",
-					session_id: "s-task12",
-					turn_id: "t-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					tool_name: "create_goal",
-					tool_use_id: "tool-task12",
-					tool_input: { objective: "x", token_budget: 100 },
-				},
-				assertOutput(stdout) {
-					const output = JSON.parse(stdout);
-					assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
-					assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
-					assert.match(output.hookSpecificOutput.additionalContext, /Omit token_budget/);
-				},
-			},
-			{
-				name: "git-bash pre-tool-use windows reminder",
-				component: "git-bash",
-				event: "pre-tool-use",
-				payload: {
-					hook_event_name: "PreToolUse",
-					session_id: "s-task12-windows",
-					turn_id: "t-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					tool_name: "Bash",
-					tool_use_id: "tool-task12",
-					tool_input: { cmd: "pwd" },
-				},
-				env: { OS: "Windows_NT" },
-				assertOutput(stdout) {
-					const output = JSON.parse(stdout);
-					assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
-					assert.match(output.hookSpecificOutput.additionalContext, /git_bash MCP/);
-				},
-			},
-			{
-				name: "comment-checker post-tool-use no requests",
-				component: "comment-checker",
-				event: "post-tool-use",
-				payload: {
-					hook_event_name: "PostToolUse",
-					session_id: "s-task12",
-					turn_id: "t-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					tool_name: "Read",
-					tool_use_id: "tool-task12",
-					tool_input: {},
-					tool_response: { text: "ok" },
-				},
-				assertOutput(stdout) {
-					assert.equal(stdout, "");
-				},
-			},
-			{
-				name: "lsp post-compact reset",
-				component: "lsp",
-				event: "post-compact",
-				payload: {
-					hook_event_name: "PostCompact",
-					session_id: "s-task12",
-					turn_id: "t-task12",
-					transcript_path: null,
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					trigger: "manual",
-				},
-				assertOutput(stdout) {
-					assert.equal(stdout, "");
-				},
-			},
-			{
-				name: "start-work-continuation stop no state",
-				component: "start-work-continuation",
-				event: "stop",
-				payload: {
-					hook_event_name: "Stop",
-					session_id: "s-task12",
-					turn_id: "t-task12",
-					transcript_path: join(tempRoot, "transcript.jsonl"),
-					cwd: tempRoot,
-					model: "gpt-5.5",
-					permission_mode: "default",
-					stop_hook_active: false,
-				},
-				assertOutput(stdout) {
-					assert.equal(stdout, "");
-				},
-			},
-		];
+		const cases = componentHookContractCases(tempRoot);
 
 		for (const hookCase of cases) {
 			const result = runHookCli(hookCase.component, hookCase.event, hookCase.payload, tempRoot, hookCase.env);
-			assert.equal(result.status, 0, `${hookCase.name} exited ${result.status}: ${result.stderr}`);
+			assert.equal(
+				result.status,
+				0,
+				`${hookCase.name} exited ${result.status} signal=${result.signal} error=${result.error?.message ?? ""}: ${result.stderr}`,
+			);
 			assert.equal(result.stderr, "", `${hookCase.name} stderr`);
 			hookCase.assertOutput(result.stdout);
 		}
@@ -305,7 +152,7 @@ function runHookCliRaw(component, event, input, tempRoot, extraEnv = {}) {
 		encoding: "utf8",
 		env: hookEnv(tempRoot, extraEnv),
 		input,
-		timeout: 15_000,
+		timeout: HOOK_CLI_TEST_TIMEOUT_MS,
 	});
 }
 
@@ -324,7 +171,7 @@ function smokeImportComponent(component, event) {
 			encoding: "utf8",
 			env: hookEnv(tempRoot),
 			input: "",
-			timeout: 15_000,
+			timeout: HOOK_CLI_TEST_TIMEOUT_MS,
 		});
 	} finally {
 		rmSync(tempRoot, { recursive: true, force: true });

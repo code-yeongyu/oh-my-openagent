@@ -5,6 +5,7 @@ import { tmpdir } from "os"
 import { fileExists, fileExistsStrict, resolveSymlink, resolveSymlinkAsync, isSymbolicLink } from "./file-utils"
 
 const testDir = join(tmpdir(), "file-utils-test-" + Date.now())
+const supportsPosixChmodPermissions = process.platform !== "win32"
 
 // Create a directory structure that mimics the real-world scenario:
 //
@@ -131,6 +132,8 @@ describe("fileExists", () => {
 	})
 
 	it("#given an inaccessible child path #when checking existence #then it returns false", async () => {
+		if (!supportsPosixChmodPermissions) return
+
 		// given
 		const lockedDir = join(testDir, "locked-quiet")
 		const filePath = join(lockedDir, "secret.txt")
@@ -174,6 +177,8 @@ describe("fileExistsStrict", () => {
 	})
 
 	it("#given an inaccessible child path #when checking existence strictly #then it rethrows the permission error", async () => {
+		if (!supportsPosixChmodPermissions) return
+
 		// given
 		const lockedDir = join(testDir, "locked-strict")
 		const filePath = join(lockedDir, "secret.txt")

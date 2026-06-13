@@ -61,6 +61,10 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
   return files
 }
 
+function toPosixPath(filePath: string): string {
+  return filePath.replaceAll("\\", "/")
+}
+
 describe("shared core extraction guardrails", () => {
   test("#given core package production sources #when scanned #then they stay harness-neutral", async () => {
     // given
@@ -76,7 +80,7 @@ describe("shared core extraction guardrails", () => {
     const offenders: string[] = []
     for (const file of files) {
       const source = await readFile(file, "utf8")
-      const relativeFilePath = relative(process.cwd(), file)
+      const relativeFilePath = toPosixPath(relative(process.cwd(), file))
       for (const forbidden of forbiddenSourcePatterns) {
         const allowedByPackage = forbidden.allowPackagePaths?.some((packagePath) =>
           relativeFilePath.startsWith(`${packagePath}/`),
@@ -100,7 +104,7 @@ describe("shared core extraction guardrails", () => {
     for (const file of packageJsonFiles) {
       const manifest = await readFile(file, "utf8")
       if (manifest.includes("@opencode-ai/") || manifest.includes("@oh-my-opencode/omo-codex")) {
-        offenders.push(relative(process.cwd(), file))
+        offenders.push(toPosixPath(relative(process.cwd(), file)))
       }
     }
 
