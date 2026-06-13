@@ -6,18 +6,17 @@ import { shouldLoadMcpServer } from "./scope-filter"
 
 const TEST_DIR = join(tmpdir(), `mcp-scope-filtering-test-${Date.now()}`)
 const TEST_HOME = join(TEST_DIR, "home")
+const ORIGINAL_HOME = process.env.HOME
+const ORIGINAL_USERPROFILE = process.env.USERPROFILE
+const ORIGINAL_CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
 
 describe("loadMcpConfigs", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_HOME, { recursive: true })
-    mock.module("os", () => ({
-      homedir: () => TEST_HOME,
-      tmpdir,
-    }))
-    mock.module("../../shared/claude-config-dir", () => ({
-      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
-    }))
+    process.env.HOME = TEST_HOME
+    process.env.USERPROFILE = TEST_HOME
+    process.env.CLAUDE_CONFIG_DIR = join(TEST_HOME, ".claude")
     mock.module("../../shared/logger", () => ({
       log: () => {},
     }))
@@ -25,6 +24,21 @@ describe("loadMcpConfigs", () => {
 
   afterEach(() => {
     mock.restore()
+    if (ORIGINAL_HOME === undefined) {
+      delete process.env.HOME
+    } else {
+      process.env.HOME = ORIGINAL_HOME
+    }
+    if (ORIGINAL_USERPROFILE === undefined) {
+      delete process.env.USERPROFILE
+    } else {
+      process.env.USERPROFILE = ORIGINAL_USERPROFILE
+    }
+    if (ORIGINAL_CLAUDE_CONFIG_DIR === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = ORIGINAL_CLAUDE_CONFIG_DIR
+    }
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
