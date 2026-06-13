@@ -465,6 +465,28 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("kimi-k2")
   })
 
+  test("returns 'kimi-k2-7' for kimi-k2.7 model, not 'kimi-k2'", () => {
+    // given
+    const model = "opencode-go/kimi-k2.7"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k2-7")
+  })
+
+  test("returns 'kimi-k2-7' for k2p7 shorthand", () => {
+    // given
+    const model = "kimi-for-coding/k2p7"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k2-7")
+  })
+
   test("returns 'gpt-5-4' for GPT 5.4 models", () => {
     // given
     const model = "openai/gpt-5.4"
@@ -609,6 +631,18 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("<Role>")
     expect(prompt).toContain("<Todo_Discipline>")
     expect(prompt).toContain("todowrite")
+  })
+
+  test("K2.7 model uses the restrained K2.7 prompt, not the K2.6 prompt", () => {
+    // given
+    const k27 = buildSisyphusJuniorPrompt("opencode-go/kimi-k2.7", false)
+    const k26 = buildSisyphusJuniorPrompt("opencode-go/kimi-k2.6", false)
+
+    // then
+    expect(k27).toContain("K2.7 calibration")
+    expect(k27).not.toContain("Toggle RL")
+    expect(k26).toContain("Toggle RL")
+    expect(k26).not.toContain("K2.7 calibration")
   })
 
   test("useTaskSystem=true includes Task Discipline for GPT 5.4", () => {
