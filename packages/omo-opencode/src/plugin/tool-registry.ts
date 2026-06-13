@@ -5,7 +5,7 @@ import type { SkillContext } from "./skill-context"
 import type { PluginContext, ToolsRecord } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
-import { isInteractiveBashEnabled } from "../create-runtime-tmux-config"
+import { isInteractiveBashEnabled } from "../interactive-bash-availability"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { log } from "../shared"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
