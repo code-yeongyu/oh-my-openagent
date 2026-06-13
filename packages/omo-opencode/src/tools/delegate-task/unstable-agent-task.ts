@@ -47,7 +47,7 @@ export async function executeUnstableAgentTask(
       categoryTools,
       sessionPermission: buildDelegateSessionPermission(
         categoryTools,
-        getAgentToolRestrictions(agentToUse),
+        getAgentToolRestrictions(agentToUse, { model: categoryModel?.modelID ?? actualModel }),
       ),
     })
     launchedTaskID = task.id

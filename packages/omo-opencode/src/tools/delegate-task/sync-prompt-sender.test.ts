@@ -135,8 +135,8 @@ bunDescribe("sendSyncPrompt", () => {
         load_skills: [],
       },
       systemContent: undefined,
-      categoryModel: undefined,
-      categoryTools: { grep: false, glob: true },
+      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryTools: { grep: false, glob: true, apply_patch: true },
       toastManager: null,
       taskId: undefined,
     }
@@ -147,6 +147,7 @@ bunDescribe("sendSyncPrompt", () => {
     //#then
     bunExpect(promptArgs.body.tools.grep).toBe(false)
     bunExpect(promptArgs.body.tools.glob).toBe(true)
+    bunExpect(promptArgs.body.tools.apply_patch).toBe(false)
     bunExpect(promptArgs.body.tools.question).toBe(false)
     bunExpect(promptArgs.body.tools.task).toBe(false)
   })

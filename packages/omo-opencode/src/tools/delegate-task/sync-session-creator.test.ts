@@ -57,7 +57,8 @@ describe("createSyncSession", () => {
       agentToUse: "sisyphus-junior",
       description: "test task",
       defaultDirectory: "/fallback",
-      categoryTools: { grep: false, glob: true },
+      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryTools: { grep: false, glob: true, apply_patch: true },
     })
 
     // then
@@ -68,6 +69,7 @@ describe("createSyncSession", () => {
       permission: expect.arrayContaining([
         { permission: "grep", action: "deny", pattern: "*" },
         { permission: "glob", action: "allow", pattern: "*" },
+        { permission: "apply_patch", action: "deny", pattern: "*" },
         { permission: "question", action: "deny", pattern: "*" },
         { permission: "task", action: "deny", pattern: "*" },
       ]),

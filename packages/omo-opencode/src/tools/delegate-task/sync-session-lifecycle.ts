@@ -8,7 +8,7 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildTaskPrompt } from "./prompt-builder"
 import { buildSyncPromptTools } from "./sync-prompt-sender"
-import type { DelegateTaskArgs } from "./types"
+import type { DelegatedModelConfig, DelegateTaskArgs } from "./types"
 
 export async function registerSyncSessionSideEffects(input: {
   readonly args: DelegateTaskArgs
@@ -18,6 +18,7 @@ export async function registerSyncSessionSideEffects(input: {
   readonly agentToUse: string
   readonly fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
   readonly systemContent: string | undefined
+  readonly categoryModel: DelegatedModelConfig | undefined
   readonly categoryTools?: Record<string, boolean>
 }): Promise<void> {
   subagentSessions.add(input.sessionID)
@@ -30,7 +31,7 @@ export async function registerSyncSessionSideEffects(input: {
     fallbackChain: input.fallbackChain,
     category: input.args.category,
     system: input.systemContent,
-    tools: buildSyncPromptTools(input.agentToUse, input.categoryTools),
+    tools: buildSyncPromptTools(input.agentToUse, input.categoryTools, input.categoryModel?.modelID),
     modelFallbackControllerAccessor: input.executorCtx.modelFallbackControllerAccessor,
   })
 

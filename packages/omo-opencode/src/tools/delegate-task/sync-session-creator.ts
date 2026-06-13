@@ -25,7 +25,7 @@ export async function createSyncSession(
       title: `${input.description} (@${input.agentToUse} subagent)`,
       permission: buildDelegateSessionPermission(
         input.categoryTools,
-        getAgentToolRestrictions(input.agentToUse),
+        getAgentToolRestrictions(input.agentToUse, { model: input.categoryModel?.modelID }),
       ),
       ...(input.categoryModel
         ? {

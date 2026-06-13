@@ -60,6 +60,7 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
       configuredTools: options.kind === "launch" ? options.categoryTools : undefined,
       hardRestrictions: getAgentToolRestrictions(options.agent, {
         includeTeamToolDenylist: options.includeTeamToolDenylist,
+        model: options.model?.modelID,
       }),
     }),
     parts: [createInternalAgentTextPart(options.prompt)],

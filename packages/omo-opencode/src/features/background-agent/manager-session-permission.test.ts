@@ -145,7 +145,8 @@ describe("BackgroundManager session permission", () => {
       agent: "sisyphus-junior",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
-      categoryTools: { grep: false, glob: true },
+      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryTools: { grep: false, glob: true, apply_patch: true },
     })
     await new Promise(resolve => setTimeout(resolve, 50))
     manager.shutdown()
@@ -156,6 +157,7 @@ describe("BackgroundManager session permission", () => {
       tools: {
         grep: false,
         glob: true,
+        apply_patch: false,
         question: false,
         task: false,
       },

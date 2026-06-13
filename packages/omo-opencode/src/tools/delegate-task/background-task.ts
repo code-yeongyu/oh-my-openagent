@@ -132,7 +132,7 @@ export async function executeBackgroundTask(
       categoryTools,
       sessionPermission: buildDelegateSessionPermission(
         categoryTools,
-        getAgentToolRestrictions(normalizedAgent),
+        getAgentToolRestrictions(normalizedAgent, { model: categoryModel?.modelID }),
       ),
     })
 

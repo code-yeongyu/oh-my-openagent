@@ -3,6 +3,8 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
 import { log, readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { buildDelegateSessionPermission } from "../../shared/delegate-tool-overrides"
 import {
   shouldRetryError,
   getNextFallback,
@@ -217,7 +219,10 @@ export async function tryFallbackRetry(args: {
     model: nextModel,
     fallbackChain: task.fallbackChain,
     skillContent: task.skillContent,
-    sessionPermission: task.sessionPermission,
+    sessionPermission: buildDelegateSessionPermission(
+      task.categoryTools,
+      getAgentToolRestrictions(task.agent, { model: nextModel.modelID }),
+    ),
     categoryTools: task.categoryTools,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,

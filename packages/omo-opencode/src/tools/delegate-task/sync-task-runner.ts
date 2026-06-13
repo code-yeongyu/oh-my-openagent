@@ -28,7 +28,7 @@ type SyncTaskRunnerInput = {
   readonly toastManager: TaskToastManager | undefined
   readonly modelInfo: ModelFallbackInfo | undefined
   readonly categoryTools?: Record<string, boolean>
-  readonly registerSyncSession: (newSessionID: string) => Promise<void>
+  readonly registerSyncSession: (newSessionID: string, currentModel: DelegatedModelConfig | undefined) => Promise<void>
   readonly publishSyncMetadata: (
     currentSessionID: string,
     currentModel: DelegatedModelConfig | undefined,
@@ -188,7 +188,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       activeSessionID = retrySessionResult.sessionID
       setSyncSessionID(activeSessionID)
       effectiveCategoryModel = nextFallbackModel
-      await registerSyncSession(activeSessionID)
+      await registerSyncSession(activeSessionID, effectiveCategoryModel)
       addRetryTaskToast({
         args,
         agentToUse,

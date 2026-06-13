@@ -42,3 +42,24 @@ test("buildDelegateSessionPermission keeps hard tool denies above category allow
     { permission: "team_create", action: "allow", pattern: "*" },
   )
 })
+
+test("buildDelegateSessionPermission keeps GPT Sisyphus-Junior apply_patch denied above category allows", () => {
+  //#given
+  const configuredTools = {
+    apply_patch: true,
+  }
+
+  //#when
+  const rules = buildDelegateSessionPermission(
+    configuredTools,
+    getAgentToolRestrictions("sisyphus-junior", { model: "openai/gpt-5.4-mini" }),
+  )
+
+  //#then
+  expect(rules).toContainEqual(
+    { permission: "apply_patch", action: "deny", pattern: "*" },
+  )
+  expect(rules).not.toContainEqual(
+    { permission: "apply_patch", action: "allow", pattern: "*" },
+  )
+})

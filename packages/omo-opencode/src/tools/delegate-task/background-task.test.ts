@@ -289,18 +289,19 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       { manager },
       { sessionID: "ses_parent", messageID: "msg_category_tools" },
       "sisyphus-junior",
+      { providerID: "openai", modelID: "gpt-5.4-mini" },
       undefined,
       undefined,
-      undefined,
-      { grep: false, glob: true },
+      { grep: false, glob: true, apply_patch: true },
     )
 
     //#then
     expectFn(launchCalls).toHaveLength(1)
-    expectFn(launchCalls[0].categoryTools).toEqual({ grep: false, glob: true })
+    expectFn(launchCalls[0].categoryTools).toEqual({ grep: false, glob: true, apply_patch: true })
     expectFn(launchCalls[0].sessionPermission).toEqual(expectFn.arrayContaining([
       { permission: "grep", action: "deny", pattern: "*" },
       { permission: "glob", action: "allow", pattern: "*" },
+      { permission: "apply_patch", action: "deny", pattern: "*" },
       { permission: "question", action: "deny", pattern: "*" },
       { permission: "task", action: "deny", pattern: "*" },
     ]))

@@ -53,6 +53,7 @@ function isUnexpectedEofError(error: unknown): boolean {
 export function buildSyncPromptTools(
   agentToUse: string,
   categoryTools?: Record<string, boolean>,
+  model?: string,
 ): Record<string, boolean> {
   return mergeDelegatePromptTools({
     defaults: {
@@ -61,7 +62,7 @@ export function buildSyncPromptTools(
       question: false,
     },
     configuredTools: categoryTools,
-    hardRestrictions: getAgentToolRestrictions(agentToUse),
+    hardRestrictions: getAgentToolRestrictions(agentToUse, { model }),
   })
 }
 
@@ -83,7 +84,7 @@ export async function sendSyncPrompt(
 ): Promise<string | null> {
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
-  const tools = buildSyncPromptTools(input.agentToUse, input.categoryTools)
+  const tools = buildSyncPromptTools(input.agentToUse, input.categoryTools, input.categoryModel?.modelID)
   setSessionTools(input.sessionID, tools)
 
   applySessionPromptParams(input.sessionID, input.categoryModel)

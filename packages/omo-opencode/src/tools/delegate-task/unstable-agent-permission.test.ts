@@ -61,9 +61,10 @@ describe("executeUnstableAgentTask session permission", () => {
       executorContext,
       parentContext,
       "sisyphus-junior",
+      { providerID: "openai", modelID: "gpt-5.4-mini" },
       undefined,
-      undefined,
-      "test-model",
+      "openai/gpt-5.4-mini",
+      { apply_patch: true },
     )
 
     // then
@@ -71,6 +72,7 @@ describe("executeUnstableAgentTask session permission", () => {
     expect(launchCalls[0]?.sessionPermission).toEqual(expect.arrayContaining([
       { permission: "question", action: "deny", pattern: "*" },
       { permission: "task", action: "deny", pattern: "*" },
+      { permission: "apply_patch", action: "deny", pattern: "*" },
     ]))
   })
 })

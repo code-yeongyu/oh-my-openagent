@@ -888,9 +888,7 @@ The fallback retry session is now created and can be inspected directly.
         question: false,
       },
       configuredTools: input.categoryTools,
-      hardRestrictions: getAgentToolRestrictions(input.agent, {
-        includeTeamToolDenylist: input.teamRunId === undefined,
-      }),
+      hardRestrictions: getAgentToolRestrictions(input.agent, { includeTeamToolDenylist: input.teamRunId === undefined, model: input.model?.modelID }),
     })
     setSessionTools(sessionID, launchTools)
 
@@ -1369,9 +1367,7 @@ The fallback retry session is now created and can be inspected directly.
               task: false,
               call_omo_agent: true,
               question: false,
-              ...getAgentToolRestrictions(existingTask.agent, {
-                includeTeamToolDenylist: existingTask.teamRunId === undefined,
-              }),
+              ...getAgentToolRestrictions(existingTask.agent, { includeTeamToolDenylist: existingTask.teamRunId === undefined, model: existingTask.model?.modelID }),
             }
             setSessionTools(existingTask.sessionId!, tools)
             return tools

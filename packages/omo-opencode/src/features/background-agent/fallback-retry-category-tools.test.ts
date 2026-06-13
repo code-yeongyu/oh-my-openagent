@@ -9,7 +9,7 @@ import type { BackgroundTask } from "./types"
 
 test("preserves category tools in fallback retry input", async () => {
   const fallbackChain: FallbackEntry[] = [
-    { model: "fallback-model", providers: ["provider-a"], variant: undefined },
+    { model: "gpt-5.4-mini", providers: ["openai"], variant: undefined },
   ]
   const task: BackgroundTask = {
     id: "task-category-tools",
@@ -27,7 +27,7 @@ test("preserves category tools in fallback retry input", async () => {
       { permission: "grep", action: "deny", pattern: "*" },
       { permission: "question", action: "deny", pattern: "*" },
     ],
-    categoryTools: { grep: false },
+    categoryTools: { grep: false, apply_patch: true },
   }
   const queuesByKey = new Map<string, QueueItem[]>()
   const processKey = mock(() => {})
@@ -59,10 +59,11 @@ test("preserves category tools in fallback retry input", async () => {
 
   const key = `${task.model?.providerID}/${task.model?.modelID}`
   const retryInput = queuesByKey.get(key)?.[0]?.input
-  expect(retryInput?.categoryTools).toEqual({ grep: false })
-  expect(retryInput?.sessionPermission).toEqual([
+  expect(retryInput?.categoryTools).toEqual({ grep: false, apply_patch: true })
+  expect(retryInput?.sessionPermission).toEqual(expect.arrayContaining([
     { permission: "grep", action: "deny", pattern: "*" },
+    { permission: "apply_patch", action: "deny", pattern: "*" },
     { permission: "question", action: "deny", pattern: "*" },
-  ])
+  ]))
   expect(processKey).toHaveBeenCalledWith(key)
 })
