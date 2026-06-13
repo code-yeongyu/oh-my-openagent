@@ -8,7 +8,6 @@ import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
-import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateSisyphusConfig(input: {
@@ -102,11 +101,6 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusOverride?.permission,
     (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
-
-  const gptDeny = getGptApplyPatchPermission(resolvedModel)
-  if (Object.keys(gptDeny).length > 0 && sisyphusConfig.permission) {
-    Object.assign(sisyphusConfig.permission, gptDeny)
-  }
 
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
     disableOmoEnv,
