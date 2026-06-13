@@ -169,7 +169,7 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Prometheus (G
 |---|---|---|---|
 | 1 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Native OpenAI is the gold standard for principle-driven prompts. Hephaestus requires this family. |
 | 2 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
-| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
+| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v4-pro`, `deepseek-v4-flash`, `deepseek-v3.2`, `deepseek-chat-v3.1`) | provider-specific DeepSeek routes, such as `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models` only when your runtime exposes the exact model ID. |
 | 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used only in **utility** fallback chains (Explore, Librarian, `quick`). Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
 > **DeepSeek ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
@@ -433,7 +433,11 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
 
 ### Example D — Adding DeepSeek as GPT Alternative
 
-If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
+If your provider exposes DeepSeek V4-compatible IDs, prefer the exact
+runtime model names over a generic `deepseek-v4` string. Use
+`deepseek-v4-flash` for quick or utility lanes after a smoke test, and
+use `deepseek-v4-pro` only where the provider's tool-call and reasoning
+round trip works with OpenCode.
 
 ```jsonc
 {
@@ -443,15 +447,30 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
       "variant": "high",
       "fallback_models": [
         "anthropic/claude-opus-4-7",
-        { "model": "openrouter/deepseek/deepseek-v3.2", "temperature": 0.7 },
+        { "model": "openrouter/deepseek/deepseek-v4-pro", "variant": "high" },
         "opencode-go/glm-5.1",
       ],
     },
+  },
+  "categories": {
+    "quick": { "model": "openrouter/deepseek/deepseek-v4-flash" },
   },
 }
 ```
 
 `fallback_models` accepts a mix of plain model strings and per-fallback objects with `variant`, `reasoningEffort`, `temperature`, `top_p`, `maxTokens`, `thinking`.
+
+Before moving a DeepSeek route into a default worker, verify the runtime
+and tool path:
+
+```bash
+bunx oh-my-opencode@latest doctor
+opencode run -- "Reply exactly MODEL_SMOKE"
+opencode run --agent build -- "Read package.json and summarize scripts only. Do not edit."
+```
+
+If the smoke test fails or the provider's model list uses different
+IDs, trust the runtime output over this example.
 
 ---
 
