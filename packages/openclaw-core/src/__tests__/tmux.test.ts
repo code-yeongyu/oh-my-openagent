@@ -1,6 +1,7 @@
 /// <reference path="../../../../bun-test.d.ts" />
 
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import * as tmuxModule from "../tmux"
 
 type MockTmuxCommandResult = {
   success: boolean
@@ -22,20 +23,6 @@ const runTmuxCommandMock = mock(
 
 const getTmuxPathMock = mock(async (): Promise<string | null> => "/mock/tmux")
 
-let tmuxModule: typeof import("../tmux")
-
-beforeAll(async () => {
-  mock.module("@oh-my-opencode/tmux-core", () => ({
-    runTmuxCommand: runTmuxCommandMock,
-  }))
-
-  mock.module("../tmux-path", () => ({
-    getTmuxPath: getTmuxPathMock,
-  }))
-
-  tmuxModule = await import("../tmux")
-})
-
 beforeEach(() => {
   runTmuxCommandMock.mockReset()
   getTmuxPathMock.mockReset()
@@ -47,6 +34,11 @@ afterAll(() => {
 })
 
 describe("openclaw tmux helpers", () => {
+  const tmuxDeps = {
+    getTmuxPath: getTmuxPathMock,
+    runTmuxCommand: runTmuxCommandMock,
+  }
+
   test("analyzePaneContent recognizes the opencode welcome prompt", () => {
     // given
     const content = "opencode\nAsk anything...\nRun /help"
@@ -80,7 +72,7 @@ describe("openclaw tmux helpers", () => {
     })
 
     // when
-    const result = await tmuxModule.isTmuxAvailable()
+    const result = await tmuxModule.isTmuxAvailableWithDeps(tmuxDeps)
 
     // then
     expect(result).toBe(true)
@@ -100,7 +92,7 @@ describe("openclaw tmux helpers", () => {
     })
 
     // when
-    const result = await tmuxModule.getTmuxSessionName()
+    const result = await tmuxModule.getTmuxSessionNameWithDeps(tmuxDeps)
 
     // then
     expect(result).toBe("team-mode")
@@ -114,7 +106,7 @@ describe("openclaw tmux helpers", () => {
     })
 
     // when
-    const result = await tmuxModule.getTmuxSessionName()
+    const result = await tmuxModule.getTmuxSessionNameWithDeps(tmuxDeps)
 
     // then
     expect(result).toBeNull()
@@ -131,7 +123,7 @@ describe("openclaw tmux helpers", () => {
     })
 
     // when
-    const result = await tmuxModule.captureTmuxPane("%42", 30)
+    const result = await tmuxModule.captureTmuxPaneWithDeps("%42", 30, tmuxDeps)
 
     // then
     expect(result).toBe("pane output")
@@ -146,7 +138,7 @@ describe("openclaw tmux helpers", () => {
     })
 
     // when
-    const result = tmuxModule.captureTmuxPane("%42", 30)
+    const result = tmuxModule.captureTmuxPaneWithDeps("%42", 30, tmuxDeps)
 
     // then
     await result.then(
@@ -170,7 +162,7 @@ describe("openclaw tmux helpers", () => {
     })
 
     // when
-    const result = await tmuxModule.sendToPane("%42", "hello", true)
+    const result = await tmuxModule.sendToPaneWithDeps("%42", "hello", true, tmuxDeps)
 
     // then
     expect(result).toBe(true)

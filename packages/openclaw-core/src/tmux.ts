@@ -1,13 +1,23 @@
-import { runTmuxCommand } from "@oh-my-opencode/tmux-core"
+import { runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
 import { getTmuxPath } from "./tmux-path"
 
-async function runOpenClawTmuxCommand(args: string[]) {
-  const tmuxPath = await getTmuxPath()
+type OpenClawTmuxDeps = {
+  readonly getTmuxPath: () => Promise<string | null>
+  readonly runTmuxCommand: (tmuxPath: string, args: string[]) => Promise<TmuxCommandResult>
+}
+
+const defaultTmuxDeps: OpenClawTmuxDeps = {
+  getTmuxPath,
+  runTmuxCommand,
+}
+
+async function runOpenClawTmuxCommand(args: string[], deps: OpenClawTmuxDeps) {
+  const tmuxPath = await deps.getTmuxPath()
   if (!tmuxPath) {
     return null
   }
 
-  return runTmuxCommand(tmuxPath, args)
+  return deps.runTmuxCommand(tmuxPath, args)
 }
 
 export function getCurrentTmuxSession(): string | null {
@@ -18,8 +28,12 @@ export function getCurrentTmuxSession(): string | null {
 }
 
 export async function getTmuxSessionName(): Promise<string | null> {
+  return getTmuxSessionNameWithDeps(defaultTmuxDeps)
+}
+
+export async function getTmuxSessionNameWithDeps(deps: OpenClawTmuxDeps): Promise<string | null> {
   try {
-    const result = await runOpenClawTmuxCommand(["display-message", "-p", "#S"])
+    const result = await runOpenClawTmuxCommand(["display-message", "-p", "#S"], deps)
     if (!result?.success) return null
     return result.output.trim() || null
   } catch (error) {
@@ -29,8 +43,16 @@ export async function getTmuxSessionName(): Promise<string | null> {
 }
 
 export async function captureTmuxPane(paneId: string, lines = 15): Promise<string | null> {
+  return captureTmuxPaneWithDeps(paneId, lines, defaultTmuxDeps)
+}
+
+export async function captureTmuxPaneWithDeps(
+  paneId: string,
+  lines: number,
+  deps: OpenClawTmuxDeps,
+): Promise<string | null> {
   try {
-    const result = await runOpenClawTmuxCommand(["capture-pane", "-p", "-t", paneId, "-S", `-${lines}`])
+    const result = await runOpenClawTmuxCommand(["capture-pane", "-p", "-t", paneId, "-S", `-${lines}`], deps)
     if (!result?.success) return null
     return result.output.trim() || null
   } catch (error) {
@@ -40,13 +62,22 @@ export async function captureTmuxPane(paneId: string, lines = 15): Promise<strin
 }
 
 export async function sendToPane(paneId: string, text: string, confirm = true): Promise<boolean> {
+  return sendToPaneWithDeps(paneId, text, confirm, defaultTmuxDeps)
+}
+
+export async function sendToPaneWithDeps(
+  paneId: string,
+  text: string,
+  confirm: boolean,
+  deps: OpenClawTmuxDeps,
+): Promise<boolean> {
   try {
-    const literalResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "-l", "--", text])
+    const literalResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "-l", "--", text], deps)
     if (!literalResult?.success) return false
 
     if (!confirm) return true
 
-    const enterResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "Enter"])
+    const enterResult = await runOpenClawTmuxCommand(["send-keys", "-t", paneId, "Enter"], deps)
     return enterResult?.success ?? false
   } catch (error) {
     if (!(error instanceof Error)) throw error
@@ -55,8 +86,12 @@ export async function sendToPane(paneId: string, text: string, confirm = true): 
 }
 
 export async function isTmuxAvailable(): Promise<boolean> {
+  return isTmuxAvailableWithDeps(defaultTmuxDeps)
+}
+
+export async function isTmuxAvailableWithDeps(deps: OpenClawTmuxDeps): Promise<boolean> {
   try {
-    const result = await runOpenClawTmuxCommand(["-V"])
+    const result = await runOpenClawTmuxCommand(["-V"], deps)
     return result?.success ?? false
   } catch (error) {
     if (!(error instanceof Error)) throw error
