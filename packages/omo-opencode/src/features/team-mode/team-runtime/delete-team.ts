@@ -61,16 +61,7 @@ export async function deleteTeam(
   const runtimeState = await loadRuntimeState(teamRunId, config)
   const nonLeadMembers = runtimeState.members.filter((member) => member.agentType !== "leader")
 
-  if (options?.force === true) {
-    await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      members: currentRuntimeState.members.map((member) => (
-        member.agentType === "leader" || !FORCE_COMPLETABLE_MEMBER_STATUSES.has(member.status)
-          ? member
-          : { ...member, status: "completed" }
-      )),
-    }), config)
-  } else if (nonLeadMembers.some((member) => !DELETABLE_MEMBER_STATUSES.has(member.status))) {
+  if (options?.force !== true && nonLeadMembers.some((member) => !DELETABLE_MEMBER_STATUSES.has(member.status))) {
     throw new Error("members still active")
   }
 
@@ -82,6 +73,17 @@ export async function deleteTeam(
       source: "team-mode-delete",
       reason: `delete team ${teamRunId}`,
     })))
+  }
+
+  if (options?.force === true) {
+    await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((member) => (
+        member.agentType === "leader" || !FORCE_COMPLETABLE_MEMBER_STATUSES.has(member.status)
+          ? member
+          : { ...member, status: "completed" }
+      )),
+    }), config)
   }
 
   const deletableTeamStatuses = options?.force === true
