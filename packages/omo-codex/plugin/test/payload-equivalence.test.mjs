@@ -71,7 +71,7 @@ test("payload-equivalence: #given telemetry-core and component shim #when sessio
 					$os: "darwin",
 					$os_version: "26.0.0",
 					$process_person_profile: false,
-					ci: false,
+					ci: Boolean(process.env.CI),
 					cpu_count: 1,
 					cpu_model: "Test CPU",
 					day_utc: "2026-06-12",
