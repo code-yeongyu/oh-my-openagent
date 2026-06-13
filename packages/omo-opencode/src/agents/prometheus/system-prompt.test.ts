@@ -77,11 +77,12 @@ describe("getPrometheusPromptSource Claude per-model routing", () => {
         expect(getPrometheusPromptSource("moonshotai/kimi-k2.5")).toBe("default")
       })
 
-      it("#then the K2.7 prompt carries a restrained outcome-first self_knowledge block", () => {
+      it("#then the K2.7 prompt is a from-scratch K2.7-native planner prompt", () => {
         const prompt = getPrometheusPrompt("opencode-go/kimi-k2.7", [])
 
-        expect(prompt).toContain("<self_knowledge>")
-        expect(prompt).toContain("Kimi K2.7")
+        expect(prompt).toContain("running on Kimi K2.7")
+        expect(prompt).not.toContain("<self_knowledge>")
+        expect(prompt).toContain("decision-complete")
       })
     })
   })
