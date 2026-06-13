@@ -112,11 +112,14 @@ Useful options:
 bun run update:harnesses -- --yes
 bun run update:harnesses -- --skip-live-verification
 bun run update:harnesses -- --backup-dir /path/to/backup
+bun run update:harnesses -- --resume ~/.omo/harness-update-backups/<timestamp>
 ```
 
 Use `--yes` only in an attended automation context. A package merge conflict still stops the script and prints the exact merge workspace and restore command. The updater never embeds or prints an API key. Override diagnostic models with `OMO_UPDATE_VERIFY_MODEL` and `OMO_UPDATE_FALLBACK_MODEL`.
 
 The merge uses the installed packages as the local-edit source of truth because those are the files the harness update replaces. The separate `/home/supreme/pr-work/oh-my-pi` and `/home/supreme/pi-mono` worktrees are recorded in the backup workspace but are not copied over a newer installed release.
+
+After resolving and committing a reported merge conflict inside its printed merge workspace, continue the same update with `--resume`. Resume mode validates every saved merge, completes packages that had not been merged yet, and continues rebuild/testing without running either harness update command again.
 
 ## Build The Adapter Bundle
 

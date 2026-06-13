@@ -10,6 +10,17 @@ describe("update-target-harnesses", () => {
     expect(script).toContain('[[ "$confirmation" == "UPDATE BOTH" ]]')
   })
 
+  test("#given an interrupted update #when resumed #then harness updates are not run again", () => {
+    expect(script).toContain("--resume PATH")
+    expect(script).toContain("Type RESUME UPDATE to continue")
+    expect(script).toContain("resume_merge_package")
+    expect(script).toContain('write_stage "merges-complete"')
+    expect(script).toContain("continues the saved update without updating either harness again")
+    expect(script).toContain('base_commit="$(git -C "$merge_dir" rev-parse local-patches^)"')
+    expect(script).toContain("--resume and --backup-dir cannot be used together")
+    expect(script).toContain("Resume folder is missing a merge workspace")
+  })
+
   test("#given dry-run mode #when invoked #then it exits before downloads and updates", () => {
     const dryRunBranchStart = script.indexOf("if ((DRY_RUN)); then")
     const dryRunBranchEnd = script.indexOf("\nfi", dryRunBranchStart)
@@ -20,6 +31,18 @@ describe("update-target-harnesses", () => {
     expect(dryRunBranch).toContain("exit 0")
     expect(dryRunBranch).not.toContain("npm pack")
     expect(dryRunBranch).not.toContain("omp update --force")
+  })
+
+  test("#given any update run #when confirmation is shown #then a pre-update skim is printed first", () => {
+    const scanCall = script.indexOf("print_pre_update_scan")
+    const confirmationPrompt = script.indexOf("Type UPDATE BOTH to continue")
+
+    expect(script).toContain("Pre-update skim findings:")
+    expect(script).toContain("extension install")
+    expect(script).toContain("duplicate OMO installs")
+    expect(script).toContain("Certification after update")
+    expect(scanCall).toBeGreaterThan(0)
+    expect(confirmationPrompt).toBeGreaterThan(scanCall)
   })
 
   test("#given locally patched packages #when harnesses update #then a three-way merge is required", () => {
@@ -41,6 +64,8 @@ describe("update-target-harnesses", () => {
     expect(script).toContain('log "Running the full OMO build"')
     expect(script).toContain("bun run build")
     expect(script).toContain("bun src/cli/index.ts install-targets --target both")
+    expect(script).toContain("src/hosts/target-feature-parity.test.ts")
+    expect(script).toContain("bun run test:harness-features")
     expect(script).toContain("src/host-contract")
     expect(script).toContain("bun run typecheck")
     expect(script).toContain("omo_diagnostic")
