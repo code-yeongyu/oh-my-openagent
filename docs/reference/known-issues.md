@@ -38,3 +38,12 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #3835 / #3456 — OpenCode Desktop shows only native agents
+
+- **Affects**: OpenCode Desktop sessions where `opencode agent list` or the TUI still shows OMO agents, but the Desktop agent selector only shows native agents such as Build and Plan.
+- **Symptom**: Desktop hides Sisyphus, Hephaestus, Prometheus, Atlas, or other OMO agents even though `oh-my-openagent doctor` passes.
+- **First check**: Inspect the OpenCode Desktop log for `Failed to load plugin oh-my-openagent@latest` and missing files under `~/.cache/opencode/packages/oh-my-openagent@latest/node_modules`.
+- **Cache workaround**: Close Desktop, remove the `oh-my-openagent@latest` package cache, then reinstall the plugin from the same working directory with `opencode plugin oh-my-openagent@latest`.
+- **Scope workaround**: If the plugin loads in one shell but not Desktop, compare the active user and project `opencode.json` files. OpenCode can read a closer project `.opencode/opencode.json` instead of the user config you inspected.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/3835 and https://github.com/code-yeongyu/oh-my-openagent/issues/3456. This entry documents current triage steps; it does not resolve Desktop GUI rendering regressions.
