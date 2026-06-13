@@ -38,3 +38,10 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #5120: Sisyphus can loop on simple tasks
+
+- **Affects**: OpenCode 1.17.0 with oh-my-openagent 4.8.1.
+- **Symptom**: A trivial prompt such as `output hello world` can repeat the plan-style status block instead of answering directly.
+- **Workaround**: For one-off trivial prompts, run `opencode --pure` or temporarily disable the plugin for that session.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5120.
