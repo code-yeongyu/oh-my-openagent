@@ -17,6 +17,8 @@ export type DeleteTeamDeps = {
   log: typeof log
 }
 
+export type DeleteTeamBackgroundManager = Pick<BackgroundManager, "getTasksByParentSession" | "cancelTask">
+
 const defaultDeleteTeamDeps: DeleteTeamDeps = {
   canVisualize,
   removeTeamLayout,
@@ -52,22 +54,12 @@ export async function deleteTeam(
   teamRunId: string,
   config: TeamModeConfig,
   tmuxMgr?: TmuxSessionManager,
-  bgMgr?: BackgroundManager,
+  bgMgr?: DeleteTeamBackgroundManager,
   options?: { force?: boolean },
   deps: DeleteTeamDeps = defaultDeleteTeamDeps,
 ): Promise<{ removedWorktrees: string[]; removedLayout: boolean }> {
   const runtimeState = await loadRuntimeState(teamRunId, config)
   const nonLeadMembers = runtimeState.members.filter((member) => member.agentType !== "leader")
-
-  if (bgMgr && runtimeState.leadSessionId) {
-    const teamMessageMarkerPrefix = `team-create:${teamRunId}:`
-    const teamTasks = bgMgr.getTasksByParentSession(runtimeState.leadSessionId)
-      .filter((task) => task.teamRunId === teamRunId || task.parentMessageId?.startsWith(teamMessageMarkerPrefix))
-    await Promise.all(teamTasks.map((task) => bgMgr.cancelTask(task.id, {
-      source: "team-mode-delete",
-      reason: `delete team ${teamRunId}`,
-    })))
-  }
 
   if (options?.force === true) {
     await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
@@ -80,6 +72,16 @@ export async function deleteTeam(
     }), config)
   } else if (nonLeadMembers.some((member) => !DELETABLE_MEMBER_STATUSES.has(member.status))) {
     throw new Error("members still active")
+  }
+
+  if (bgMgr && runtimeState.leadSessionId) {
+    const teamMessageMarkerPrefix = `team-create:${teamRunId}:`
+    const teamTasks = bgMgr.getTasksByParentSession(runtimeState.leadSessionId)
+      .filter((task) => task.teamRunId === teamRunId || task.parentMessageId?.startsWith(teamMessageMarkerPrefix))
+    await Promise.all(teamTasks.map((task) => bgMgr.cancelTask(task.id, {
+      source: "team-mode-delete",
+      reason: `delete team ${teamRunId}`,
+    })))
   }
 
   const deletableTeamStatuses = options?.force === true
