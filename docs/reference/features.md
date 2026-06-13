@@ -104,8 +104,8 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 
 ### Architecture Snapshot (current)
 
-- **Feature modules**: `src/features/` has 20 modules.
-- **Tool system**: `src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
+- **Feature modules**: `packages/omo-opencode/src/features/` has 20 modules.
+- **Tool system**: `packages/omo-opencode/src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
 - **Hook system**: 5-tier composition is **54 base hooks**. With team mode it becomes **61** (extra tool guard + transforms + direct team session event handlers).
 - **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
@@ -496,11 +496,11 @@ Creates directory-specific context files that agents automatically read:
 
 ```
 project/
-├── AGENTS.md              # Project-wide context
-├── src/
-│   ├── AGENTS.md          # src-specific context
+├── AGENTS.md                        # Project-wide context
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # src-specific context
 │   └── components/
-│       └── AGENTS.md      # Component-specific context
+│       └── AGENTS.md                # Component-specific context
 ```
 
 ### /ralph-loop
@@ -584,7 +584,7 @@ Load custom commands from:
 
 ## Tools
 
-Tool registration is config-gated. `src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
+Tool registration is config-gated. `packages/omo-opencode/src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
 
 ### Code Search Tools
 
@@ -762,7 +762,7 @@ Current composition counts:
 - Continuation: 7
 - Skill: 2
 - Total base: 54
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 61
+- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `packages/omo-opencode/src/plugin/event.ts` = 61
 
 ### Hook Events
 
@@ -813,7 +813,6 @@ Current composition counts:
 
 | Hook                                        | Event           | Description                                                                                                                                                                                                                                                 |
 | ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **session-recovery**                        | Event           | Recovers from session errors — missing tool results, thinking block issues, empty messages.                                                                                                                                                                 |
 | **anthropic-context-window-limit-recovery** | Event           | Handles Claude context window limits gracefully.                                                                                                                                                                                                            |
 | **runtime-fallback**                        | Event + Message | Automatically switches to backup models on retryable API errors (e.g., 429, 500, 502, 503, 504), provider key misconfiguration errors (e.g., missing API key), and provider retry signals. `message.updated` retry-signal detection requires `timeout_seconds > 0`; structured `session.status` retry events can still trigger fallback. |
 | **model-fallback**                          | Event + Message | Manages model fallback chain when primary model is unavailable.                                                                                                                                                                                             |
@@ -907,7 +906,7 @@ Disable specific hooks in config:
 
 The plugin uses a three-tier MCP architecture:
 
-1. Built-in MCPs from `src/mcp/` (remote plus local stdio)
+1. Built-in MCPs from `packages/omo-opencode/src/mcp/` (remote plus local stdio)
 2. Claude Code `.mcp.json` loader with `${VAR}` expansion
 3. Skill-embedded MCP servers declared in `SKILL.md` frontmatter
 
@@ -1046,12 +1045,12 @@ Auto-injects AGENTS.md when reading files. Walks from file directory to project 
 
 ```
 project/
-├── AGENTS.md              # Injected first
-├── src/
-│   ├── AGENTS.md          # Injected second
+├── AGENTS.md                        # Injected first
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # Injected second
 │   └── components/
-│       ├── AGENTS.md      # Injected third
-│       └── Button.tsx     # Reading this injects all 3
+│       ├── AGENTS.md                # Injected third
+│       └── Button.tsx               # Reading this injects all 3
 ```
 
 ### Conditional Rules

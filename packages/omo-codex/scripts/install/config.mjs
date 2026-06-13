@@ -24,11 +24,13 @@ export async function updateCodexConfig({
 	repoRoot,
 	marketplaceName,
 	marketplaceSource = defaultMarketplaceSource(repoRoot),
+	preserveMarketplaceSource = false,
 	pluginNames,
 	platform = process.platform,
 	trustedHookStates = [],
 	agentConfigs = [],
 	autonomousPermissions = false,
+	gitBashEnabled = false,
 }) {
 	await mkdir(dirname(configPath), { recursive: true });
 	let config = "";
@@ -49,11 +51,18 @@ export async function updateCodexConfig({
 	config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(repoRoot));
 	config = ensureCodexMultiAgentV2Config(config);
 	if (autonomousPermissions === true) config = ensureAutonomousPermissions(config);
-	config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);
+	// Marketplace-flow bootstrap (preserveMarketplaceSource) must keep the
+	// Codex-managed [marketplaces.<name>] block byte-identical: rewriting it
+	// would replace the git source with a local one and bump last_updated on
+	// every worker run. When the block is absent we write nothing rather than
+	// invent a source.
+	if (preserveMarketplaceSource !== true) {
+		config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);
+	}
 	for (const pluginName of pluginNames) {
 		config = ensurePluginEnabled(config, `${pluginName}@${marketplaceName}`);
 	}
-	config = ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform });
+	config = ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform, gitBashEnabled });
 	for (const state of trustedHookStates) {
 		config = ensureHookTrusted(config, state.key, state.trustedHash);
 	}
@@ -154,10 +163,10 @@ function ensurePluginMcpEnabled(config, pluginKey, serverName, enabled) {
 	return replaceOrInsertSetting(config, section, "enabled", enabledValue);
 }
 
-function ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform }) {
+function ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform, gitBashEnabled }) {
 	if (marketplaceName !== "sisyphuslabs" || !pluginNames.includes("omo")) return config;
 	let nextConfig = ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "context7", true);
-	nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", platform === "win32");
+	nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", platform === "win32" && gitBashEnabled === true);
 	return nextConfig;
 }
 
@@ -253,5 +262,4 @@ function parseJsonString(value) {
 		return null;
 	}
 }
-
 

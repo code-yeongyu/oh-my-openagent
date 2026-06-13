@@ -1,6 +1,6 @@
 declare const require: NodeJS.Require
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
 import { getAgentDisplayName, getAgentListDisplayName } from "../../shared/agent-display-names"
 import type { CategoryConfig } from "../../config/schema"
 import type { DelegateTaskArgs } from "./types"
@@ -196,35 +196,6 @@ describe("sisyphus-task", () => {
     })
   })
 
-  describe("CATEGORY_PROMPT_APPENDS", () => {
-    test("visual-engineering category has design-focused prompt", () => {
-      // given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["visual-engineering"]
-
-      // when / #then
-      expect(promptAppend).toContain("VISUAL/UI")
-      expect(promptAppend).toContain("Design-first")
-    })
-
-    test("ultrabrain category has deep logical reasoning prompt", () => {
-      // given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["ultrabrain"]
-
-      // when / #then
-      expect(promptAppend).toContain("DEEP LOGICAL REASONING")
-      expect(promptAppend).toContain("Strategic advisor")
-    })
-
-    test("deep category has goal-oriented autonomous prompt", () => {
-      // given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["deep"]
-
-      // when / #then
-      expect(promptAppend).toContain("GOAL-ORIENTED")
-      expect(promptAppend).toContain("autonomous")
-    })
-  })
-
   describe("CATEGORY_DESCRIPTIONS", () => {
     test("has description for all default categories", () => {
       // given
@@ -243,7 +214,6 @@ describe("sisyphus-task", () => {
 
       // then
       expect(description).toBeDefined()
-      expect(description).toContain("high effort")
     })
   })
 

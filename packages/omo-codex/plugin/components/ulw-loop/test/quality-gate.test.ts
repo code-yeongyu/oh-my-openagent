@@ -31,6 +31,29 @@ function makeGate(overrides: Record<string, unknown> = {}): Record<string, unkno
 	return { ...VALID_GATE, ...overrides };
 }
 
+describe("validateQualityGate LIGHT-tier shape", () => {
+	it("#given a light-tier gate with none-applicable classes and self-review approval evidence #when validated #then it passes without reviewer fields", () => {
+		// given
+		const gate = makeGate({
+			codeReview: {
+				evidence: "UNCONDITIONAL APPROVAL — LIGHT tier: single-file copy change, self-reviewed diff + diagnostics",
+			},
+			criteriaCoverage: {
+				totalCriteria: 1,
+				passCount: 1,
+				adversarialClassesCovered: ["none-applicable: prompt-file-only change, no input parsing or state"],
+			},
+		});
+
+		// when
+		const validated = validateQualityGate(gate);
+
+		// then
+		expect(validated.codeReview.recommendation).toBe("APPROVE");
+		expect(validated.codeReview.architectStatus).toBe("CLEAR");
+	});
+});
+
 function getQualityGateError(input: unknown): UlwLoopError {
 	try {
 		validateQualityGate(input);

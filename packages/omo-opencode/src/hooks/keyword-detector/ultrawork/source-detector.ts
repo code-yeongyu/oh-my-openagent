@@ -25,7 +25,7 @@ export function isPlannerAgent(agentName?: string): boolean {
 
 /**
  * Checks if agent is a non-OMO agent (e.g., OpenCode's built-in Builder/Plan).
- * Non-OMO agents should not receive keyword injection (search-mode, analyze-mode, etc.).
+ * Non-OMO agents should not receive keyword injection.
  */
 export function isNonOmoAgent(agentName?: string): boolean {
   if (!agentName) return false

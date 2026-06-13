@@ -16,6 +16,7 @@ import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
+import { buildKimiK27SisyphusPrompt } from "./sisyphus/kimi-k2-7";
 import type { AgentMode } from "./types";
 import {
   isClaudeFable5Model,
@@ -25,6 +26,7 @@ import {
   isGptModel,
   isGptNativeSisyphusModel,
   isKimiK2Model,
+  isKimiK27Model,
 } from "./types";
 
 const MODE: AgentMode = "primary";
@@ -41,6 +43,14 @@ export function createSisyphusAgent(
   const skills = availableSkills ?? [];
   const categories = availableCategories ?? [];
   const agents = availableAgents ?? [];
+
+  if (isKimiK27Model(model)) {
+    return buildGptSisyphusAgentConfig(
+      MODE,
+      model,
+      buildKimiK27SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+    );
+  }
 
   if (isKimiK2Model(model)) {
     return buildGptSisyphusAgentConfig(

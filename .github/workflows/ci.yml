@@ -68,6 +68,10 @@ jobs:
         run: npm ci && npm run build
         working-directory: packages/lsp-daemon
 
+      - name: Run vendored lsp-daemon tests
+        run: npm test
+        working-directory: packages/lsp-daemon
+
       - name: Run tests
         run: bun test
 

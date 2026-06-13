@@ -2374,6 +2374,45 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(abortedSessionIDs).toEqual(["session-1"])
   })
 
+  test("should fire onSubagentSessionDeleted callback on completion", async () => {
+    // #given
+    const deletedSessionIDs: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      onSubagentSessionDeleted: async (event) => {
+        deletedSessionIDs.push(event.sessionID)
+      },
+    })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-deleted-callback",
+      sessionId: "session-deleted-cb",
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "test task for deleted callback",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+
+    // #then
+    expect(deletedSessionIDs).toEqual(["session-deleted-cb"])
+  })
+
   test("should clean pendingByParent even when promptAsync notification fails", async () => {
     // given
     const client = {
@@ -3048,7 +3087,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     function createMockClient() {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async () => ({ data: { directory: "/test/dir" } }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
@@ -3066,7 +3105,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     ) {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async ({ path }: { path: { id: string } }) => {
             if (options?.sessionLookupError) {
               throw options.sessionLookupError
@@ -3348,7 +3387,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   describe("task transitions pending→running when slot available", () => {
     test("does not override parent session permission when creating child session", async () => {
       // given
-      const createCalls: any[] = []
+      const createCalls: Array<{ body?: { permission?: unknown } }> = []
       const parentPermission = [
         { permission: "question", action: "allow" as const, pattern: "*" },
         { permission: "plan_enter", action: "deny" as const, pattern: "*" },
@@ -3356,7 +3395,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const customClient = {
         session: {
-          create: async (args?: any) => {
+          create: async (args: { body?: { permission?: unknown } }) => {
             createCalls.push(args)
             return { data: { id: `ses_${crypto.randomUUID()}` } }
           },

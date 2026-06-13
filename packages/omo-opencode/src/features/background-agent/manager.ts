@@ -8,6 +8,7 @@ import {
   type PromptAsyncGateResult,
 } from "../../hooks/shared/prompt-async-gate"
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
+import { resolveDispatchClient } from "../../shared/live-server-route"
 import {
   createInternalAgentTextPart,
   getAgentToolRestrictions,
@@ -216,6 +217,12 @@ export interface SubagentSessionCreatedEvent {
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
 
+export interface SubagentSessionDeletedEvent {
+  sessionID: string
+}
+
+export type OnSubagentSessionDeleted = (event: SubagentSessionDeletedEvent) => Promise<void>
+
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
 const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
@@ -225,6 +232,7 @@ export interface BackgroundManagerConfig {
   config?: BackgroundTaskConfig
   tmuxConfig?: TmuxConfig
   onSubagentSessionCreated?: OnSubagentSessionCreated
+  onSubagentSessionDeleted?: OnSubagentSessionDeleted
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
@@ -248,6 +256,7 @@ export class BackgroundManager {
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
+  private onSubagentSessionDeleted?: OnSubagentSessionDeleted
   private onShutdown?: () => void | Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
@@ -283,6 +292,7 @@ export class BackgroundManager {
     this.config = options.config
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
+    this.onSubagentSessionDeleted = options?.onSubagentSessionDeleted
     this.onShutdown = options?.onShutdown
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
@@ -2184,12 +2194,12 @@ The task was re-queued on a fallback model after a retryable failure.
       // - "tool" with .state.output property (tool call results)
       // - "text" with .text property (final text output)
       // - "step-start"/"step-finish" (metadata, no content)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hasContent = messages.some((m: any) => {
+      type SessionPart = { type?: string; text?: string; content?: string | unknown[] }
+      type SessionMessage = { info?: { role?: string }; parts?: SessionPart[] }
+      const hasContent = messages.some((m: SessionMessage) => {
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) =>
+      return parts.some((p: SessionPart) =>
         // Text content (final output)
         (p.type === "text" && p.text && p.text.trim().length > 0) ||
         // Reasoning content (thinking blocks)
@@ -2480,6 +2490,13 @@ The task was re-queued on a fallback model after a retryable failure.
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
+      // @allow Notify tmux to close the pane immediately. client.session.abort() does not
+      // reliably emit session.deleted, so the polling fallback (60-min SESSION_TIMEOUT_MS)
+      // leaves panes orphaned for too long. See #4773.
+      await this.onSubagentSessionDeleted?.({ sessionID: task.sessionId }).catch((error) => {
+        log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID: task.sessionId, error: String(error) })
+      })
+
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
@@ -2687,7 +2704,8 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
-    return isOpenCodeSessionActive(this.client, sessionID)
+    const resolved = await resolveDispatchClient(this.client, sessionID)
+    return isOpenCodeSessionActive(resolved.client as Parameters<typeof isOpenCodeSessionActive>[0], sessionID)
   }
 
   private queuePendingParentWake(

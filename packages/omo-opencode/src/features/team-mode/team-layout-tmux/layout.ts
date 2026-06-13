@@ -7,6 +7,9 @@ import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 type TmuxCommandResult = Awaited<ReturnType<typeof sharedTmuxModule.runTmuxCommand>>
+const TEAM_PANE_TITLE_PREFIX = "omo-team-"
+const OMO_ATTACH_SERVER_URL_OPTION = "@omo_attach_server_url"
+const OMO_ATTACH_SESSION_ID_OPTION = "@omo_attach_session_id"
 
 export type TeamLayoutDeps = {
   runTmuxCommand: (tmuxPath: string, args: Array<string>, options?: Parameters<typeof sharedTmuxModule.runTmuxCommand>[2]) => Promise<TmuxCommandResult>
@@ -116,7 +119,9 @@ async function createTeamLayoutInCallerWindow(
     const paneId = split.output.trim()
     teammatePanes = [...teammatePanes, paneId]
     panesByMember[member.name] = paneId
-    await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", member.name])
+    await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`])
+    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION, serverUrl])
+    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId])
     await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
   }
 

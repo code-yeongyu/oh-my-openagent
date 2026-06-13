@@ -70,4 +70,24 @@ describe("BUILTIN_SERVERS", () => {
 		expect(hint).toContain("roslyn-language-server");
 		expect(hint).toContain("dotnet tool install");
 	});
+
+	it("#given kotlin-ls #when looking it up #then starts kotlin-lsp over stdio", () => {
+		// given
+		const kotlin = BUILTIN_SERVERS["kotlin-ls"];
+
+		// when / then
+		expect(kotlin).toBeDefined();
+		expect(kotlin?.command).toEqual(["kotlin-lsp", "--stdio"]);
+		expect(kotlin?.extensions).toEqual([".kt", ".kts"]);
+	});
+
+	it("#given sourcekit-lsp #when looking it up #then binds Swift and Objective-C file extensions", () => {
+		// given
+		const sourcekit = BUILTIN_SERVERS["sourcekit-lsp"];
+
+		// when / then
+		expect(sourcekit).toBeDefined();
+		expect(sourcekit?.command[0]).toBe("sourcekit-lsp");
+		expect(sourcekit?.extensions).toEqual([".swift", ".m", ".mm"]);
+	});
 });

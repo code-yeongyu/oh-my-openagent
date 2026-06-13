@@ -11,6 +11,8 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
   "empty-message-sanitizer": null,
   "delegate-task-english-directive": null,
   "gpt-permission-continuation": null,
+  "thinking-block-validator": null,
+  "session-recovery": null,
 }
 
 export function migrateHookNames(

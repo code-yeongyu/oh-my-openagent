@@ -13,7 +13,7 @@ import {
 	pruneMarketplacePluginCaches,
 } from "./install/cache.mjs";
 import { agentSourceRootsForInstall } from "./install/agent-source-roots.mjs";
-import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./install/agents.mjs";
+import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./install/agents.mjs";
 import { writeCachedMarketplaceManifest } from "./install/cached-marketplace-manifest.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
 import {
@@ -39,17 +39,8 @@ import {
 } from "./install/lazycodex-version-stamp.mjs";
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
-
-export function resolveCodexInstallerBinDir(options = {}) {
-	const homeDir = resolve(options.homeDir ?? homedir());
-	const env = options.env ?? process.env;
-	const explicitBinDir = nonEmptyEnvValue(env, "CODEX_LOCAL_BIN_DIR");
-	if (explicitBinDir !== undefined) return explicitBinDir;
-
-	const codexHome = resolve(options.codexHome ?? nonEmptyEnvValue(env, "CODEX_HOME") ?? join(homeDir, ".codex"));
-	const defaultCodexHome = resolve(join(homeDir, ".codex"));
-	return codexHome === defaultCodexHome ? join(homeDir, ".local", "bin") : join(codexHome, "bin");
-}
+export { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
+import { nonEmptyEnvValue, resolveCodexInstallerBinDir } from "./install/bin-dir.mjs";
 
 export async function installMarketplaceLocally(options = {}) {
 	const repoRoot = resolve(options.repoRoot ?? process.cwd());
@@ -125,10 +116,11 @@ export async function installMarketplaceLocally(options = {}) {
 	}
 
 	const preservedReasoning = await capturePreservedAgentReasoning({ codexHome });
+	const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome });
 	const agentSourceRoots = await agentSourceRootsForInstall({ codexHome, marketplace, installed, pluginSources });
 	for (const plugin of installed) {
 		const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path;
-		const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform, preservedReasoning });
+		const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform, preservedReasoning, preservedServiceTier });
 		for (const link of agentLinks) {
 			log(`Linked agent ${link.name} -> ${link.target}`);
 			const agentName = agentNameFromToml(link.name);
@@ -165,6 +157,7 @@ export async function installMarketplaceLocally(options = {}) {
 		marketplaceSource: { sourceType: "local", source: marketplaceRoot },
 		pluginNames,
 		platform,
+		gitBashEnabled: platform === "win32" && gitBashResolution.found,
 		trustedHookStates,
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 		autonomousPermissions: options.autonomousPermissions !== false,
@@ -200,13 +193,6 @@ function formatUnknownError(error) {
 
 function agentNameFromToml(fileName) {
 	return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
-}
-
-function nonEmptyEnvValue(env, key) {
-	const value = env[key];
-	if (typeof value !== "string") return undefined;
-	const trimmed = value.trim();
-	return trimmed.length === 0 ? undefined : trimmed;
 }
 
 function legacyCacheMarketplaces(marketplaceName) {

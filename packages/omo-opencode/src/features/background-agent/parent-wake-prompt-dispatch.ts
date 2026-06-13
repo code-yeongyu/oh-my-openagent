@@ -2,6 +2,7 @@ import {
   createInternalAgentTextPart,
   isAmbiguousPostDispatchPromptFailure,
   log,
+  withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
@@ -48,7 +49,11 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         body: {
           noReply: input.forceNoReply === true || !input.latestWake.shouldReply,
           ...input.latestWake.promptContext,
-          parts: [createInternalAgentTextPart(notificationContent)],
+          parts: [
+            input.forceNoReply === true || !input.latestWake.shouldReply
+              ? withInternalNoReplyMarker(createInternalAgentTextPart(notificationContent))
+              : createInternalAgentTextPart(notificationContent),
+          ],
         },
         query: { directory: input.directory },
       },

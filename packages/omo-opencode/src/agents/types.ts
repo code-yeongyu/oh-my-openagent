@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 
 import {
   isClaudeFable5Model,
+  isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
@@ -9,11 +10,13 @@ import {
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isKimiK27Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
 export {
   isClaudeFable5Model,
+  isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
@@ -21,6 +24,7 @@ export {
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isKimiK27Model,
   isMiniMaxModel,
 };
 

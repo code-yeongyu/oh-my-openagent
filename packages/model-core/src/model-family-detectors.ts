@@ -7,6 +7,11 @@ export function isGptModel(model: string): boolean {
   return modelName.includes("gpt")
 }
 
+export function isClaudeOpus46Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return modelName.includes("claude-opus-4-6")
+}
+
 export function isClaudeOpus47Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
   return modelName.includes("claude-opus-4-7")
@@ -42,7 +47,14 @@ export function isClaudeOpus47OrLaterModel(model: string): boolean {
 export function isKimiK2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   if (modelName.includes("kimi")) return true
-  if (/k2[-.]?p[56]/.test(modelName)) return true
+  if (/k2[-.]?p[567]/.test(modelName)) return true
+  return false
+}
+
+export function isKimiK27Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  if (/kimi-k2[.\-]?7/.test(modelName)) return true
+  if (/k2[-.]?p7/.test(modelName)) return true
   return false
 }
 

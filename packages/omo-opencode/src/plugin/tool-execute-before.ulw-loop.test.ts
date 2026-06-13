@@ -68,7 +68,6 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		expect(output.args.run_in_background).toBe(false)
 		expect(output.args.prompt).toContain("Original task:")
 		expect(output.args.prompt).toContain("Ship feature")
-		expect(output.args.prompt).toContain("Review the work skeptically and critically")
 		expect(output.args.prompt).toContain(`<promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>`)
 
 		clearState(directory)

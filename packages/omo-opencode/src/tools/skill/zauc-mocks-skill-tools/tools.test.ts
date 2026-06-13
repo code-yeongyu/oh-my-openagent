@@ -550,19 +550,6 @@ describe("skill tool - ordering and priority", () => {
     expect(opencodeIndex).toBeLessThan(builtinIndex)
   })
 
-  it("includes priority documentation in description", () => {
-    //#given: some skills and commands
-    const skills = [createMockSkillWithScope("test-skill", "project")]
-    const commands = [createMockCommand("test-cmd", "project")]
-
-    //#when: creating tool
-    const tool = createSkillTool({ skills, commands })
-
-    //#then
-    expect(tool.description).toContain("Priority: project > user > opencode > builtin/plugin")
-    expect(tool.description).not.toContain("Skills listed before commands")
-  })
-
   it("uses <available_items> wrapper with unified command format", () => {
     //#given: mix of skills and commands
     const skills = [createMockSkillWithScope("test-skill", "project")]

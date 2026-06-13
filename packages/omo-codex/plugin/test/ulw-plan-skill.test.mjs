@@ -30,6 +30,30 @@ test("#given ulw-plan skill #when the planning gate is inspected #then it explor
 	assert.doesNotMatch(skill, /Proceeding to plan generation/);
 });
 
+test("#given ulw-plan skill #when the execution gate is inspected #then plan mode is sticky, execution needs an explicit start, and the high-accuracy ask is mandatory", async () => {
+	// given
+	const skill = await readFile(skillPath, "utf8");
+
+	// then
+	assert.match(skill, /plan mode is sticky/i);
+	assert.match(skill, /never\s+(?:start|begin)[^.]{0,80}(?:implement|execut)/i);
+	assert.match(skill, /ask[^.]{0,160}high[- ]accuracy/i);
+	assert.match(skill, /two filters/i);
+	assert.match(skill, /\bWHY\b/);
+});
+
+test("#given ulw-plan full workflow reference #when the delivery phase is inspected #then it mandates the start-or-high-accuracy question and forbids self-started execution", async () => {
+	// given
+	const workflow = await readFile(workflowPath, "utf8");
+
+	// then
+	assert.match(workflow, /plan mode is sticky/i);
+	assert.match(workflow, /two filters/i);
+	assert.match(workflow, /ask[^.]{0,160}high[- ]accuracy/i);
+	assert.match(workflow, /execution belongs to the worker/i);
+	assert.doesNotMatch(workflow, /High-accuracy review \(optional\)/);
+});
+
 test("#given ulw-plan full workflow reference #when inspected #then it documents the approval gate and .omo plan output with Codex-native tools only", async () => {
 	// given
 	const workflow = await readFile(workflowPath, "utf8");

@@ -42,6 +42,9 @@ export class ParentWakeFlushRunner {
     if (!latestWake) {
       return
     }
+    if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
+      return
+    }
     if (sessionActive) {
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
@@ -140,6 +143,23 @@ export class ParentWakeFlushRunner {
 
   clearPendingParentWakeTimer(sessionID: string): void {
     this.deps.pendingQueue.clearTimer(sessionID)
+  }
+
+  // A retained reply-required wake is only liveness insurance for a deposit the
+  // parent never saw. Assistant output created after the noReply admission means
+  // the live turn consumed the deposit — re-dispatching it would inject a
+  // duplicate notification and fork a concurrent assistant chain.
+  private async dropAdmittedWakeConsumedByParent(sessionID: string, latestWake: PendingParentWake): Promise<boolean> {
+    if (latestWake.noReplyAdmittedAt === undefined) {
+      return false
+    }
+    if (!(await this.deps.sessionInspector.hasAssistantOutputAfterAdmittedWake(sessionID, latestWake))) {
+      return false
+    }
+    this.deps.pendingQueue.deleteWake(sessionID)
+    this.deps.dispatchedTracker.clearWake(sessionID)
+    log("[background-agent] Dropped retained parent wake after parent consumed admitted notification:", { sessionID })
+    return true
   }
 
   private async sendParentWakePrompt(

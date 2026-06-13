@@ -30,6 +30,17 @@ describe("resolveVariant", () => {
     expect(resolveVariant({ modelID: "kimi-k2-6", variants })).toBe("kimi")
   })
 
+  test("#given a kimi-k2-7 variant ordered before kimi #then K2.7 wins and K2.6 stays on kimi", () => {
+    const orderedVariants = {
+      "kimi-k2-7": promptSource("/prompts/kimi-k2-7"),
+      kimi: promptSource("/prompts/kimi"),
+      default: promptSource("/prompts/default"),
+    } satisfies VariantTable
+
+    expect(resolveVariant({ modelID: "kimi-k2.7", variants: orderedVariants })).toBe("kimi-k2-7")
+    expect(resolveVariant({ modelID: "kimi-k2-6", variants: orderedVariants })).toBe("kimi")
+  })
+
   test("#given GLM model #then resolves glm variant", () => {
     expect(resolveVariant({ modelID: "glm-5-1", variants })).toBe("glm")
   })

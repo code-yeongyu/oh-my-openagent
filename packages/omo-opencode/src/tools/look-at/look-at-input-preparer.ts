@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { LookAtArgs } from "./types"
@@ -21,9 +22,15 @@ export interface LookAtFilePart {
   filename: string
 }
 
+export interface LookAtTextPart {
+  type: "text"
+  text: string
+}
+
+export type LookAtInputPart = LookAtFilePart | LookAtTextPart
+
 export interface PreparedLookAtInput {
-  readonly filePart: LookAtFilePart
-  readonly isBase64Input: boolean
+  readonly inputParts: LookAtInputPart[]
   readonly sourceDescription: string
   cleanup(): void
 }
@@ -50,58 +57,38 @@ function getTemporaryConversionPath(error: unknown): string | null {
   return null
 }
 
+function createJsonTextPart(filePath: string): LookAtTextPart {
+  const fileContent = readFileSync(filePath, "utf-8")
+  return {
+    type: "text",
+    text: `Attached JSON file (${basename(filePath)}):\n\n${fileContent}`,
+  }
+}
+
 export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
-  const imageData = args.image_data
-  const filePath = args.file_path
+  const filePaths = args.file_paths ?? (args.file_path ? [args.file_path] : [])
+  const imageDataList = args.image_data_list ?? (args.image_data ? [args.image_data] : [])
+  const totalInputs = filePaths.length + imageDataList.length
 
-  if (imageData) {
-    const mimeType = inferMimeTypeFromBase64(imageData)
-
-    let finalBase64Data = extractBase64Data(imageData)
-    let finalMimeType = mimeType
-    let tempFilesToCleanup: string[] = []
-
-    if (needsConversion(mimeType)) {
-      log(`[look_at] Detected unsupported Base64 format: ${mimeType}, converting to JPEG...`)
-      try {
-        const { base64, tempFiles } = convertBase64ImageToJpeg(finalBase64Data, mimeType)
-        finalBase64Data = base64
-        finalMimeType = "image/jpeg"
-        tempFilesToCleanup = tempFiles
-        log("[look_at] Base64 conversion successful")
-      } catch (conversionError) {
-        log(`[look_at] Base64 conversion failed: ${conversionError}`)
-        return {
-          ok: false,
-          error: `Error: Failed to convert Base64 image format. ${conversionError}`,
-        }
-      }
-    }
-
+  if (totalInputs === 0) {
     return {
-      ok: true,
-      value: {
-        isBase64Input: true,
-        sourceDescription: "clipboard/pasted image",
-        filePart: {
-          type: "file",
-          mime: finalMimeType,
-          url: `data:${finalMimeType};base64,${finalBase64Data}`,
-          filename: `clipboard-image.${finalMimeType.split("/")[1] || "png"}`,
-        },
-        cleanup() {
-          for (const temporaryFile of tempFilesToCleanup) {
-            cleanupConvertedImage(temporaryFile)
-          }
-        },
-      },
+      ok: false,
+      error: "Error: Must provide either 'file_path', 'file_paths', 'image_data', or 'image_data_list'.",
     }
   }
 
-  if (filePath) {
+  const inputParts: LookAtInputPart[] = []
+  const tempFilesToCleanup: string[] = []
+
+  for (const filePath of filePaths) {
     let mimeType = inferMimeTypeFromFilePath(filePath)
     let actualFilePath = filePath
     let tempConversionPath: string | null = null
+
+    if (mimeType === "application/json") {
+      inputParts.push(createJsonTextPart(filePath))
+      continue
+    }
 
     if (needsConversion(mimeType)) {
       log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
@@ -124,28 +111,65 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
       }
     }
 
-    return {
-      ok: true,
-      value: {
-        isBase64Input: false,
-        sourceDescription: filePath,
-        filePart: {
-          type: "file",
-          mime: mimeType,
-          url: pathToFileURL(actualFilePath).href,
-          filename: basename(actualFilePath),
-        },
-        cleanup() {
-          if (tempConversionPath) {
-            cleanupConvertedImage(tempConversionPath)
-          }
-        },
-      },
+    if (tempConversionPath) {
+      tempFilesToCleanup.push(tempConversionPath)
     }
+
+    inputParts.push({
+      type: "file",
+      mime: mimeType,
+      url: pathToFileURL(actualFilePath).href,
+      filename: basename(actualFilePath),
+    })
   }
 
+  for (const imageData of imageDataList) {
+    const mimeType = inferMimeTypeFromBase64(imageData)
+
+    let finalBase64Data = extractBase64Data(imageData)
+    let finalMimeType = mimeType
+
+    if (needsConversion(mimeType)) {
+      log(`[look_at] Detected unsupported Base64 format: ${mimeType}, converting to JPEG...`)
+      try {
+        const { base64, tempFiles } = convertBase64ImageToJpeg(finalBase64Data, mimeType)
+        finalBase64Data = base64
+        finalMimeType = "image/jpeg"
+        tempFilesToCleanup.push(...tempFiles)
+        log("[look_at] Base64 conversion successful")
+      } catch (conversionError) {
+        log(`[look_at] Base64 conversion failed: ${conversionError}`)
+        return {
+          ok: false,
+          error: `Error: Failed to convert Base64 image format. ${conversionError}`,
+        }
+      }
+    }
+
+    inputParts.push({
+      type: "file",
+      mime: finalMimeType,
+      url: `data:${finalMimeType};base64,${finalBase64Data}`,
+      filename: `clipboard-image.${finalMimeType.split("/")[1] || "png"}`,
+    })
+  }
+
+  const sourceDescription = totalInputs > 1
+    ? `${totalInputs} files/images`
+    : imageDataList.length === 1
+      ? "clipboard/pasted image"
+      : filePaths[0]
+
   return {
-    ok: false,
-    error: "Error: Must provide either 'file_path' or 'image_data'.",
+    ok: true,
+    value: {
+      inputParts,
+      sourceDescription,
+      cleanup() {
+        for (const temporaryFile of tempFilesToCleanup) {
+          cleanupConvertedImage(temporaryFile)
+        }
+      },
+    },
   }
 }

@@ -27,6 +27,8 @@ export interface HookCommand {
   command: string
   /** Env vars allowed to pass through to the spawned process (plugin-sourced hooks are intersected with mcp_env_allowlist) */
   allowedEnvVars?: string[]
+  /** Plugin install path. When set, CLAUDE_PLUGIN_ROOT is injected into the spawn env and substituted in the command string. */
+  pluginRoot?: string
 }
 
 export interface HookHttp {
@@ -35,6 +37,8 @@ export interface HookHttp {
   headers?: Record<string, string>
   allowedEnvVars?: string[]
   timeout?: number
+  /** Plugin install path. Recorded for diagnostics; HTTP hooks do not spawn a child process. */
+  pluginRoot?: string
 }
 
 export type HookAction = HookCommand | HookHttp

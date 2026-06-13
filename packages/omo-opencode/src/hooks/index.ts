@@ -4,7 +4,6 @@ export { sendSessionNotification, playSessionNotificationSound, detectPlatform, 
 export { buildWindowsToastScript, escapeAppleScriptText, escapePowerShellSingleQuotedText } from "./session-notification-formatting";
 export { hasIncompleteTodos } from "./session-todo-status";
 export { createIdleNotificationScheduler } from "./session-notification-scheduler";
-export { createSessionRecoveryHook, type SessionRecoveryHook, type SessionRecoveryOptions } from "./session-recovery";
 export { createCommentCheckerHooks } from "./comment-checker";
 export { createToolOutputTruncatorHook } from "./tool-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
@@ -30,7 +29,6 @@ export { createKeywordDetectorHook } from "./keyword-detector";
 export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 
-export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createTeamMailboxInjector } from "./team-mailbox-injector";
 export { createTeamModeStatusInjector } from "./team-mode-status-injector";
 export { createToolPairValidatorHook } from "./tool-pair-validator";

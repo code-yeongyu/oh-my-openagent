@@ -43,33 +43,6 @@ test("#given start-work skill without selectable plan #when inspected #then boot
 	assert.deepEqual(missing, []);
 });
 
-test("#given worker done claim #when start-work contract is inspected #then adversarial verification gates fully done", async () => {
-	// given
-	const missing = [];
-
-	// when
-	for (const skillPath of startWorkSkillPaths) {
-		const skill = await readFile(skillPath, "utf8");
-		if (
-			!/DoneClaim/i.test(skill) ||
-			!/worker done claim/i.test(skill) ||
-			!/stale_state/.test(skill) ||
-			!/misleading_success_output/.test(skill) ||
-			!/dirty_worktree/.test(skill) ||
-			!/Plan reread/i.test(skill) ||
-			!/Manual-QA/i.test(skill) ||
-			!/Adversarial QA/i.test(skill) ||
-			!/Cleanup/i.test(skill) ||
-			!/Only after verification passes/i.test(skill)
-		) {
-			missing.push(skillPath);
-		}
-	}
-
-	// then
-	assert.deepEqual(missing, []);
-});
-
 test("#given packaged start-work completion surfaces #when inspected #then global review and debugging gate blocks completion", async () => {
 	// given
 	const [startWorkSkill, reviewWorkSkill, hephaestusRule] = await Promise.all([
@@ -83,13 +56,18 @@ test("#given packaged start-work completion surfaces #when inspected #then globa
 	assert.match(startWorkSkill, /\breview-work\b/);
 	assert.match(startWorkSkill, /\bdebugging\b/);
 	assert.match(startWorkSkill, /inconclusive/i);
-	assert.match(startWorkSkill, /redact|mask/i);
-	assert.match(startWorkSkill, /raw (?:tokens|credentials|auth headers|cookies)/i);
-	assert.match(startWorkSkill, /ORCHESTRATION COMPLETE/);
 	assert.match(reviewWorkSkill, /debugging/i);
 	assert.match(reviewWorkSkill, /inconclusive/i);
 	assert.match(hephaestusRule, /Global Review and Debugging Gate/);
-	assert.match(hephaestusRule, /redact.*secrets.*PII/s);
+});
+
+test("#given start-work skill #when echo discipline is inspected #then the ultraqa class list is enumerated once and the budget holds", async () => {
+	// given
+	const skill = await readFile(startWorkSkillPaths[0], "utf8");
+
+	// then
+	assert.equal((skill.match(/malformed input/g) ?? []).length, 1);
+	assert.ok(skill.split(/\s+/).filter(Boolean).length <= 1924);
 });
 
 test("#given start-work continuation hook #when inspected #then it remains Boulder-only without planning bootstrap logic", async () => {

@@ -61,3 +61,16 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 
   return skills.filter((skill) => !disabledSkills.has(skill.name))
 }
+
+export interface ResolveActiveBuiltinSkillsOptions extends CreateBuiltinSkillsOptions {
+  systemMcpNames: Set<string>
+}
+
+export function resolveActiveBuiltinSkills(options: ResolveActiveBuiltinSkillsOptions): BuiltinSkill[] {
+  const { systemMcpNames, ...createOptions } = options
+
+  return createBuiltinSkills(createOptions).filter((skill) => {
+    if (!skill.mcpConfig) return true
+    return !Object.keys(skill.mcpConfig).some((mcpName) => systemMcpNames.has(mcpName))
+  })
+}

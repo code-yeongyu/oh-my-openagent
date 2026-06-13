@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { callDiagnosticsViaDaemon, currentRequestContext } from "@code-yeongyu/lsp-daemon";
 
 import {
+	isLspDaemonUnreachableDiagnostics,
 	isUnavailableLspDiagnostics,
 	markLspSessionCompacted,
 	recordLspDiagnosticsObservations,
@@ -76,6 +77,9 @@ export async function runLspPostToolUseHook(
 	const blocks: DiagnosticBlock[] = [];
 	const observations: Array<{ filePath: string; unavailable: boolean }> = [];
 	for (const { filePath, diagnostics } of await collectDiagnostics(filePaths, runDiagnostics)) {
+		// A daemon outage is transient (connect-or-spawn retries on the next request);
+		// recording it would silence this extension for the rest of the session.
+		if (isLspDaemonUnreachableDiagnostics(diagnostics)) continue;
 		const unavailable = isUnavailableLspDiagnostics(diagnostics);
 		observations.push({ filePath, unavailable });
 		if (isCleanDiagnostics(diagnostics)) continue;

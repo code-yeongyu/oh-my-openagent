@@ -55,8 +55,10 @@
           "review-work",
           "remove-ai-slops",
           "init-deep",
+          "debugging",
           "security-research",
           "security-review",
+          "visual-qa",
           "team-mode"
         ]
       }
@@ -5769,9 +5771,6 @@
         "aggressive_truncation": {
           "type": "boolean"
         },
-        "auto_resume": {
-          "type": "boolean"
-        },
         "preemptive_compaction": {
           "type": "boolean"
         },
@@ -5917,6 +5916,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
+        },
+        "disable_live_parent_wake_routing": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -6454,8 +6456,6 @@
             "type": "string",
             "enum": [
               "ultrawork",
-              "search",
-              "analyze",
               "team",
               "hyperplan",
               "hyperplan-ultrawork"
@@ -6468,8 +6468,6 @@
             "type": "string",
             "enum": [
               "ultrawork",
-              "search",
-              "analyze",
               "team",
               "hyperplan",
               "hyperplan-ultrawork"

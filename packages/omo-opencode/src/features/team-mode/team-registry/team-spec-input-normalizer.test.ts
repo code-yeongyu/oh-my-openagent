@@ -191,4 +191,45 @@ describe("normalizeTeamSpecInput", () => {
       ],
     })
   })
+
+  test("strips empty-string optional fields injected by the tool host", () => {
+    // given
+    const rawSpec = {
+      name: "hyperplan-smoke-test",
+      members: [
+        { name: "worker", kind: "category", category: "quick", subagent_type: "", prompt: "Temporary smoke test member.", cwd: "", worktreePath: "", color: "" },
+      ],
+      leadAgentId: "",
+      sessionPermission: "",
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec) as Record<string, unknown>
+
+    // then
+    expect(normalizedSpec).toMatchObject({
+      leadAgentId: "worker",
+      members: [{ name: "worker", kind: "category", category: "quick", prompt: "Temporary smoke test member." }],
+    })
+    expect(JSON.stringify(normalizedSpec.members)).not.toContain("subagent_type")
+    expect(normalizedSpec.sessionPermission ?? undefined).toBeUndefined()
+  })
+
+  test("treats an all-empty lead object as absent", () => {
+    // given
+    const rawSpec = {
+      name: "hyperplan-smoke-test",
+      members: [{ name: "worker", kind: "category", category: "quick", prompt: "Temporary smoke test member." }],
+      lead: { name: "", kind: "", category: "", subagent_type: "", prompt: "" },
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec)
+
+    // then no bogus lead member is prepended and the single member becomes the lead
+    expect(normalizedSpec).toMatchObject({
+      leadAgentId: "worker",
+      members: [{ name: "worker", kind: "category", category: "quick" }],
+    })
+  })
 })

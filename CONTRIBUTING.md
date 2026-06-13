@@ -86,15 +86,15 @@ After making changes, you can test your local build in OpenCode:
 
    ```json
    {
-     "plugin": ["file:///absolute/path/to/oh-my-opencode/dist/index.js"]
+     "plugin": ["file://./oh-my-opencode/dist/index.js"]
    }
    ```
 
-   For example, if your project is at `/Users/yourname/projects/oh-my-opencode`:
+   For example, if your config is in the parent directory of `oh-my-opencode`:
 
    ```json
    {
-     "plugin": ["file:///Users/yourname/projects/oh-my-opencode/dist/index.js"]
+     "plugin": ["file://./oh-my-opencode/dist/index.js"]
    }
    ```
 
@@ -108,7 +108,7 @@ After making changes, you can test your local build in OpenCode:
 
 ```
 oh-my-opencode/
-├── src/
+├── packages/omo-opencode/src/
 │   ├── index.ts         # Plugin entry (V1 PluginModule, default export)
 │   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
 │   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
@@ -121,7 +121,6 @@ oh-my-opencode/
 │   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── plugin/          # 10 OpenCode hook handlers + 52 hook composition
 │   └── plugin-handlers/ # 6-phase config loading pipeline
-├── packages/            # Monorepo: comment-checker, opencode-sdk
 └── dist/                # Build output (ESM + .d.ts)
 ```
 
@@ -142,7 +141,7 @@ bun run clean
 # Rebuild from scratch
 bun run clean && bun run build
 
-# Build schema only (after modifying src/config/schema.ts)
+# Build schema only (after modifying packages/omo-opencode/src/config/schema/)
 bun run build:schema
 ```
 
@@ -171,14 +170,14 @@ bun run build:schema
 
 ### Adding a New Agent
 
-1. Create a new `.ts` file in `src/agents/`
+1. Create a new `.ts` file in `packages/omo-opencode/src/agents/`
 2. Define the agent configuration following existing patterns
-3. Add to `builtinAgents` in `src/agents/index.ts`
-4. Update `src/agents/types.ts` if needed
+3. Add to `builtinAgents` in `packages/omo-opencode/src/agents/index.ts`
+4. Update `packages/omo-opencode/src/agents/types.ts` if needed
 5. Run `bun run build:schema` to update the JSON schema
 
 ```typescript
-// src/agents/my-agent.ts
+// packages/omo-opencode/src/agents/my-agent.ts
 import type { AgentConfig } from "./types";
 
 export const myAgent: AgentConfig = {
@@ -193,12 +192,12 @@ export const myAgent: AgentConfig = {
 
 ### Adding a New Hook
 
-1. Create a new directory in `src/hooks/` (kebab-case)
+1. Create a new directory in `packages/omo-opencode/src/hooks/` (kebab-case)
 2. Implement `createXXXHook()` function returning event handlers
-3. Export from `src/hooks/index.ts`
+3. Export from `packages/omo-opencode/src/hooks/index.ts`
 
 ```typescript
-// src/hooks/my-hook/index.ts
+// packages/omo-opencode/src/hooks/my-hook/index.ts
 import type { PluginInput } from "@opencode-ai/plugin";
 
 export function createMyHook(input: PluginInput) {
@@ -212,18 +211,18 @@ export function createMyHook(input: PluginInput) {
 
 ### Adding a New Tool
 
-1. Create a new directory in `src/tools/` with required files:
+1. Create a new directory in `packages/omo-opencode/src/tools/` with required files:
    - `index.ts` - Main exports
    - `types.ts` - TypeScript interfaces
    - `constants.ts` - Constants and tool descriptions
    - `tools.ts` - Tool implementations
    - `utils.ts` - Helper functions
-2. Add to `builtinTools` in `src/tools/index.ts`
+2. Add to `builtinTools` in `packages/omo-opencode/src/tools/index.ts`
 
 ### Adding a New MCP Server
 
-1. Create configuration in `src/mcp/`
-2. Add to `src/mcp/index.ts`
+1. Create configuration in `packages/omo-opencode/src/mcp/`
+2. Add to `packages/omo-opencode/src/mcp/index.ts`
 3. Document in README if it requires external setup
 
 ## Pull Request Process
@@ -265,7 +264,7 @@ export function createMyHook(input: PluginInput) {
 ## Getting Help
 
 - **Project Knowledge**: Check `AGENTS.md` for detailed project documentation
-- **Code Patterns**: Review existing implementations in `src/`
+- **Code Patterns**: Review existing implementations in `packages/omo-opencode/src/`
 - **Issues**: Open an issue for bugs or feature requests
 - **Discussions**: Start a discussion for questions or ideas
 

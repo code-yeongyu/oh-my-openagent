@@ -10,6 +10,8 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
 
+const sourcePlugin = new URL("../index.ts", import.meta.url).href
+
 async function importFreshExternalPluginDetectorModule(): Promise<typeof import("./external-plugin-detector")> {
   return import(`./external-plugin-detector?test=${Date.now()}-${Math.random()}`)
 }
@@ -303,13 +305,13 @@ describe("external-plugin-detector", () => {
       expect(result.pluginName).toBe("opencode-notifier")
     })
 
-    test("should match file:///path/to/opencode-notifier (file path)", () => {
+    test("should match relative file path to opencode-notifier", () => {
       // given - file path
       const opencodeDir = path.join(tempDir, ".opencode")
       fs.mkdirSync(opencodeDir, { recursive: true })
       fs.writeFileSync(
         path.join(opencodeDir, "opencode.json"),
-        JSON.stringify({ plugin: ["file:///home/user/plugins/opencode-notifier"] })
+        JSON.stringify({ plugin: ["file://./plugins/opencode-notifier"] })
       )
 
       // when
@@ -430,13 +432,13 @@ describe("external-plugin-detector", () => {
       expect(result.pluginName).toBe("opencode-skills")
     })
 
-    test("should detect file:///path/to/opencode-skills", () => {
+    test("should detect relative file path to opencode-skills", () => {
       // given - file path
       const opencodeDir = path.join(tempDir, ".opencode")
       fs.mkdirSync(opencodeDir, { recursive: true })
       fs.writeFileSync(
         path.join(opencodeDir, "opencode.json"),
-        JSON.stringify({ plugin: ["file:///home/user/plugins/opencode-skills"] })
+        JSON.stringify({ plugin: ["file://./plugins/opencode-skills"] })
       )
 
       // when
@@ -499,7 +501,7 @@ describe("external-plugin-detector", () => {
       fs.mkdirSync(profileConfigDir, { recursive: true })
       fs.writeFileSync(
         path.join(projectConfigDir, "opencode.json"),
-        JSON.stringify({ plugin: ["file:///Users/yeongyu/local-workspaces/omo/src/index.ts"] }),
+        JSON.stringify({ plugin: [sourcePlugin] }),
       )
       fs.writeFileSync(
         path.join(profileConfigDir, "opencode.json"),
@@ -521,7 +523,7 @@ describe("external-plugin-detector", () => {
       expect(result.detected).toBe(true)
       expect(result.pluginName).toBe("oh-my-openagent")
       expect(result.duplicatePlugins).toEqual([
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        sourcePlugin,
         "oh-my-openagent@latest",
       ])
     })
@@ -567,7 +569,7 @@ describe("external-plugin-detector", () => {
     test("#given duplicate OMO entries #when generating a warning #then it tells the user startup is disabled", () => {
       // when
       const warning = getDuplicateOmoPluginWarning([
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        sourcePlugin,
         "oh-my-openagent@latest",
       ])
 

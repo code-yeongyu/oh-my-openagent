@@ -54,19 +54,50 @@ export function storeToolMetadata(
 /**
  * Consume stored metadata (one-time read, removes from store).
  * Called from tool.execute.after hook.
+ *
+ * For background/child sessions the after-hook's sessionID can diverge
+ * from the execute() sessionID, so an exact-key miss falls back to the
+ * callID alone - but only when exactly one session holds that callID,
+ * declining ambiguous cross-session collisions.
  */
 export function consumeToolMetadata(
   sessionID: string,
   callID: string
 ): PendingToolMetadata | undefined {
-  const key = makeKey(sessionID, callID)
+  const stored = takeEntry(makeKey(sessionID, callID)) ?? takeUnambiguousCallIDEntry(callID)
+  if (!stored) {
+    return undefined
+  }
+  const { storedAt: _, ...data } = stored
+  return data
+}
+
+function takeEntry(key: string): (PendingToolMetadata & { storedAt: number }) | undefined {
   const stored = pendingStore.get(key)
   if (stored) {
     pendingStore.delete(key)
-    const { storedAt: _, ...data } = stored
-    return data
   }
-  return undefined
+  return stored
+}
+
+function callIDOfKey(key: string): string {
+  return key.slice(key.indexOf(":") + 1)
+}
+
+function takeUnambiguousCallIDEntry(
+  callID: string
+): (PendingToolMetadata & { storedAt: number }) | undefined {
+  let matchedKey: string | undefined
+  for (const key of pendingStore.keys()) {
+    if (callIDOfKey(key) !== callID) {
+      continue
+    }
+    if (matchedKey !== undefined) {
+      return undefined
+    }
+    matchedKey = key
+  }
+  return matchedKey === undefined ? undefined : takeEntry(matchedKey)
 }
 
 /**

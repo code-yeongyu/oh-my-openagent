@@ -5,6 +5,8 @@ import { dirname, join } from "node:path"
 import type { DependencyInfo } from "../types"
 import { spawnWithTimeout } from "../spawn-with-timeout"
 import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
+import { bunWhich } from "../../../shared/bun-which-shim"
+import { isModuleResolutionFailure } from "../../../shared/module-resolution-failure"
 
 type BinaryCheck =
   | { exists: true; path: string }
@@ -12,7 +14,7 @@ type BinaryCheck =
 
 async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
   try {
-    const path = Bun.which(binary)
+    const path = bunWhich(binary)
     if (path) {
       return { exists: true, path }
     }
@@ -60,10 +62,12 @@ export async function checkAstGrepCli(): Promise<DependencyInfo> {
   }
 }
 
-export async function checkAstGrepNapi(): Promise<DependencyInfo> {
+export async function checkAstGrepNapi(
+  importNapiProbe: () => Promise<unknown> = () => import("@ast-grep/napi"),
+): Promise<DependencyInfo> {
   // Try dynamic import first (works in bunx temporary environments)
   try {
-    await import("@ast-grep/napi")
+    await importNapiProbe()
     return {
       name: "AST-Grep NAPI",
       required: false,
@@ -72,7 +76,7 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
       path: null,
     }
   } catch (error) {
-    if (!(error instanceof Error)) throw error
+    if (!(error instanceof Error) && !isModuleResolutionFailure(error)) throw error
     // Fallback: check common installation paths
     const { existsSync } = await import("fs")
     const { join } = await import("path")
@@ -106,22 +110,25 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
   }
 }
 
-export function findCommentCheckerPackageBinary(baseDirOverride?: string): string | null {
+function resolveCommentCheckerPackageJson(): string {
+  const require = createRequire(import.meta.url)
+  return require.resolve("@code-yeongyu/comment-checker/package.json")
+}
+
+export function findCommentCheckerPackageBinary(
+  baseDirOverride?: string,
+  resolvePackageJsonPath: () => string = resolveCommentCheckerPackageJson,
+): string | null {
   const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
   const platformKey = `${process.platform}-${process.arch === "x64" ? "x64" : process.arch}`
   try {
-    let packageDir = baseDirOverride
-    if (!packageDir) {
-      const require = createRequire(import.meta.url)
-      const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
-      packageDir = dirname(pkgPath)
-    }
+    const packageDir = baseDirOverride ?? dirname(resolvePackageJsonPath())
     const vendorPath = join(packageDir, "vendor", platformKey, binaryName)
     if (existsSync(vendorPath)) return vendorPath
     const binPath = join(packageDir, "bin", binaryName)
     if (existsSync(binPath)) return binPath
   } catch (error) {
-    if (!(error instanceof Error)) throw error
+    if (!(error instanceof Error) && !isModuleResolutionFailure(error)) throw error
   }
   return null
 }

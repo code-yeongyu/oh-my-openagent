@@ -7,12 +7,21 @@ export async function doctor(options: DoctorOptions = { mode: "default" }): Prom
     const result = await runDoctor(options)
     return result.exitCode
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error("\nDoctor failed unexpectedly:", message)
-    console.error("This may indicate memory pressure (OOM/SIGKILL) or a corrupted installation.")
-    console.error("Try: OMO_DISABLE_POSTHOG=1 bunx oh-my-opencode doctor --verbose\n")
+    for (const line of formatDoctorFailure(error)) {
+      console.error(line)
+    }
     return EXIT_CODES.FAILURE
   }
+}
+
+export function formatDoctorFailure(error: unknown): string[] {
+  const message = error instanceof Error ? error.message : String(error)
+  const lines = [`\nDoctor failed unexpectedly: ${message}`]
+  if (error instanceof Error && error.stack) {
+    lines.push(error.stack)
+  }
+  lines.push("Try: OMO_DISABLE_POSTHOG=1 bunx oh-my-opencode doctor --verbose\n")
+  return lines
 }
 
 export * from "./types"

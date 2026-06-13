@@ -3,7 +3,7 @@ import type { ContextCollector } from "../../../features/context-injector"
 import { clearClaudeHooksConfigCache, loadClaudeHooksConfig } from "../config"
 import { clearPluginExtendedConfigCache, loadPluginExtendedConfig } from "../config-loader"
 import { executeStopHooks, type StopContext } from "../stop"
-import { clearTranscriptCache } from "../transcript"
+import { clearTranscriptCache, getTranscriptPath } from "../transcript"
 import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
@@ -91,6 +91,7 @@ export function createSessionEventHandler(
 				sessionId: sessionID,
 				parentSessionId,
 				cwd: ctx.directory,
+				transcriptPath: getTranscriptPath(sessionID),
 			}
 
 			const stopResult = await executeStopHooks(stopCtx, claudeConfig, extendedConfig)

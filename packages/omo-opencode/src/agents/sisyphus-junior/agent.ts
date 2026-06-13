@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, buildClaudeThinkingConfig } from "../types"
+import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, isKimiK27Model, buildClaudeThinkingConfig } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -22,6 +22,7 @@ import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
+import { buildKimiK27SisyphusJuniorPrompt } from "./kimi-k2-7"
 import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
@@ -42,12 +43,14 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 export type SisyphusJuniorPromptSource =
   | "default"
   | "kimi-k2"
+  | "kimi-k2-7"
   | "gpt"
   | "gpt-5-5"
   | "gpt-5-4"
   | "gemini"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
+  if (model && isKimiK27Model(model)) return "kimi-k2-7"
   if (model && isKimiK2Model(model)) return "kimi-k2"
   if (model && isGptModel(model)) {
     if (isGpt5_5Model(model)) return "gpt-5-5"
@@ -72,6 +75,8 @@ export function buildSisyphusJuniorPrompt(
   const source = getSisyphusJuniorPromptSource(model)
 
   switch (source) {
+    case "kimi-k2-7":
+      return buildKimiK27SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "kimi-k2":
       return buildKimiK26SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-5":

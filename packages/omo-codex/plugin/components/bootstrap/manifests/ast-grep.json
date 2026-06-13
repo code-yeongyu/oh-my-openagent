@@ -1,0 +1,22 @@
+{
+	"name": "ast-grep",
+	"platforms": {
+		"darwin-arm64": {
+			"sha256": "12a870c414c90208f338649b0b53d9659b724b680edaf9da9c151275dad3e41a",
+			"url": "https://github.com/ast-grep/ast-grep/releases/download/0.42.3/app-aarch64-apple-darwin.zip"
+		},
+		"darwin-x64": {
+			"sha256": "af5a04a43c062974634296f692ab93c03755e5b6f33e70e226a434cde1355a1f",
+			"url": "https://github.com/ast-grep/ast-grep/releases/download/0.42.3/app-x86_64-apple-darwin.zip"
+		},
+		"linux-x64": {
+			"sha256": "4191ac4247d183c502778e740a68b7cf45fe477b6423c43b8b8d6e732ba3b333",
+			"url": "https://github.com/ast-grep/ast-grep/releases/download/0.42.3/app-x86_64-unknown-linux-gnu.zip"
+		},
+		"win32-x64": {
+			"sha256": "98acb57edae7a9f9e68657c2cc03ce25b7144bae69621fe7cf2d0492807cb623",
+			"url": "https://github.com/ast-grep/ast-grep/releases/download/0.42.3/app-x86_64-pc-windows-msvc.zip"
+		}
+	},
+	"version": "0.42.3"
+}

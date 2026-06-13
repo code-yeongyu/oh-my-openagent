@@ -6,7 +6,7 @@
 
 Project-scope skills + slash commands under the new `.agents/` directory name. During the `oh-my-opencode` → `oh-my-openagent` rename transition, this directory is the **target** of the migration from `.opencode/`. It is a strict SUPERSET of `.opencode/` (5 -> 10 skills; 5 commands).
 
-Loaded alongside `.opencode/` by [`src/features/opencode-skill-loader/`](file:///Users/yeongyu/local-workspaces/omo/src/features/opencode-skill-loader/). When both directories declare the same skill or command name, the higher-priority scope wins per the loader's deduplication rules.
+Loaded alongside `.opencode/` by [`packages/omo-opencode/src/features/opencode-skill-loader/`](../packages/omo-opencode/src/features/opencode-skill-loader/). When both directories declare the same skill or command name, the higher-priority scope wins per the loader's deduplication rules.
 
 ## SKILLS (10, superset of `.opencode/`)
 
@@ -45,7 +45,7 @@ Identical set to `.opencode/command/`:
 | Concern | Plan |
 |---------|------|
 | Why TWO directories? | `.opencode/` is the legacy layout. `.agents/` is the future-proof name after the harness rename. |
-| When does `.opencode/` go away? | After the multi-harness refactor lands and existing users have re-installed. Tracked in [ROADMAP](file:///Users/yeongyu/local-workspaces/omo/ROADMAP.md). |
+| When does `.opencode/` go away? | After the multi-harness refactor lands and existing users have re-installed. Tracked in [ROADMAP](../ROADMAP.md). |
 | What if both exist with conflicting skills? | The skill-loader dedupes by name. Higher-priority scope wins. The 5 shared skills (`work-with-pr`, `hyperplan`, etc.) are byte-identical between the two dirs today; if they diverge, fix here first. |
 | Where do NEW skills go? | `.agents/` only. Do NOT add new entries to `.opencode/`. |
 

@@ -30,6 +30,11 @@ import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
+import {
+  initLiveServerRoute,
+  setLiveParentWakeRoutingDisabled,
+  warmLiveServerProbe,
+} from "../shared/live-server-route"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
 
 type HooksWithRuntimeLifecycle = Hooks & {
@@ -49,6 +54,9 @@ export type PluginModuleDeps = {
   detectExternalSkillPlugin: typeof detectExternalSkillPlugin
   getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
   injectServerAuthIntoClient: typeof injectServerAuthIntoClient
+  initLiveServerRoute: typeof initLiveServerRoute
+  setLiveParentWakeRoutingDisabled: typeof setLiveParentWakeRoutingDisabled
+  warmLiveServerProbe: typeof warmLiveServerProbe
   loadPluginConfig: typeof loadPluginConfig
   initI18n: typeof initI18n
   initializeOpenClaw: typeof initializeOpenClaw
@@ -76,6 +84,9 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
   injectServerAuthIntoClient,
+  initLiveServerRoute,
+  setLiveParentWakeRoutingDisabled,
+  warmLiveServerProbe,
   loadPluginConfig,
   initI18n,
   initializeOpenClaw,
@@ -116,11 +127,14 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: input.client })
+    deps.setLiveParentWakeRoutingDisabled(pluginConfig.experimental?.disable_live_parent_wake_routing === true)
+    deps.warmLiveServerProbe()
     const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
-    let runtimeSkillSource: ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]> | undefined
+    let runtimeSkillSource: Awaited<ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]>> | undefined
     if (runtimeSecuritySkills.length > 0) {
       try {
-        runtimeSkillSource = deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
+        runtimeSkillSource = await deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         console.warn(`[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: ${detail}`)

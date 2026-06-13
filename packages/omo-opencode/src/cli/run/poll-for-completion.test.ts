@@ -412,6 +412,60 @@ describe("pollForCompletion", () => {
     expect(result).toBe(1)
   })
 
+  it("clears the error latch and completes when the session retries after an error (runtime fallback in flight)", async () => {
+    //#given - quota error latched, live status reports 'retry' then the session recovers to idle
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.mainSessionError = true
+    eventState.lastError = "kimi usage limit reached"
+    eventState.hasReceivedMeaningfulWork = true
+    let statusCalls = 0
+    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
+      statusCalls++
+      if (statusCalls <= 3) {
+        return { data: { "test-session": { type: "retry" } } }
+      }
+      return { data: { "test-session": { type: "idle" } } }
+    })
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 10,
+    })
+
+    //#then - fallback recovery resumed the session; run completes instead of exiting 1
+    expect(result).toBe(0)
+    expect(eventState.mainSessionError).toBe(false)
+  })
+
+  it("does not exit 1 while the session is busy again after an error (fallback dispatch rearmed the session)", async () => {
+    //#given - error latched but live status reports the session is busy again
+    const ctx = createMockContext({
+      statuses: { "test-session": { type: "busy" } },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.mainSessionError = true
+    eventState.lastError = "quota error"
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when - poll well past ERROR_GRACE_CYCLES, then abort
+    abortAfter(abortController, 100)
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 3,
+    })
+
+    //#then - aborted by the test (130), not terminated with exit 1
+    expect(result).toBe(130)
+    expect(eventState.mainSessionError).toBe(false)
+  })
+
   it("returns 1 when CLI run requires meaningful work but the prompt never produces output", async () => {
     //#given
     const ctx = createMockContext()

@@ -7,8 +7,9 @@
  * 1. Claude Opus 4.7       → opus-4-7.md   (literal-following + explicit fan-out push)
  * 2. GPT family            → gpt.md        (calibrated for GPT-5.5)
  * 3. Gemini family         → gemini.md
- * 4. Kimi K2.x family      → kimi.md       (Claude-family base + K2.6 thinking-mode calibration)
- * 5. Default (Claude 4.6 family: opus-4-6, sonnet-4-6, haiku-4-5, etc.) → default.md
+ * 4. Kimi K2.7             → kimi-k2-7.md  (restrained, outcome-first; checked before generic kimi)
+ * 5. Kimi K2.x family      → kimi.md       (Claude-family base + K2.6 thinking-mode calibration)
+ * 6. Default (Claude 4.6 family: opus-4-6, sonnet-4-6, haiku-4-5, etc.) → default.md
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
@@ -34,7 +35,7 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "opus-4-7"
+export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k2-7" | "opus-4-7"
 
 class AtlasPromptVariantError extends Error {
   readonly name = "AtlasPromptVariantError"

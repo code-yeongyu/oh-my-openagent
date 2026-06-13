@@ -14,6 +14,7 @@ export const expectedSkills = [
 	"lcx-doctor",
 	"lcx-report-bug",
 	"lsp",
+	"lsp-setup",
 	"programming",
 	"refactor",
 	"remove-ai-slops",

@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./link-cached-plugin-agents"
+import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
 
 async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-agents-"))
@@ -140,6 +140,30 @@ describe("linkCachedPluginAgents", () => {
     const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).not.toContain('model_reasoning_effort = "xhigh"')
+    expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
+  })
+
+  test("preserves removed installed agent service tier when reinstalling file copies", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\nservice_tier = "fast"\n',
+    )
+    await writeFile(
+      join(agentsDir, "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+    )
+    const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux", preservedServiceTier })
+
+    // then
+    const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
+    expect(content).not.toContain("service_tier")
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
   })
 
