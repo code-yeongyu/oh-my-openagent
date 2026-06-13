@@ -40,7 +40,7 @@ describe("createSisyphusAgent", () => {
         },
         {
           model: "opencode-go/kimi-k2.7",
-          promptAnchors: ["K2.7 calibration", "<verification_loop>"],
+          promptAnchors: ["running on Kimi K2.7", "<operating_rules>"],
         },
         {
           model: "openai/gpt-5.5",
@@ -83,10 +83,10 @@ describe("createSisyphusAgent", () => {
       const k26Agent = createSisyphusAgent("opencode-go/kimi-k2.6");
 
       // then
-      expect(k27Agent.prompt).toContain("K2.7 calibration");
+      expect(k27Agent.prompt).toContain("running on Kimi K2.7");
       expect(k27Agent.prompt).not.toContain("Toggle RL");
       expect(k26Agent.prompt).toContain("Toggle RL");
-      expect(k26Agent.prompt).not.toContain("K2.7 calibration");
+      expect(k26Agent.prompt).not.toContain("Kimi K2.7");
     });
   });
 
