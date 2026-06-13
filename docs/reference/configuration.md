@@ -1038,6 +1038,45 @@ The installer prepares Git Bash with normal detection, `OMO_CODEX_GIT_BASH_PATH`
 
 Install [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) for Google Gemini. Provides multi-account load balancing, dual quota, and variant-based thinking.
 
+##### Split Claude Routing
+
+Provider path affects the effective Claude context limit. Antigravity Claude
+models are the stable 200k lane. Direct Anthropic Claude models are the 1M lane
+for accounts and model IDs that support long context.
+
+Use Antigravity for cheaper or quota-balanced work where 200k context is enough.
+Use direct Anthropic for long-context planning, review, and research sessions
+where early compaction would lose important context.
+
+```jsonc
+{
+  "agents": {
+    // 200k lane: Google Antigravity Claude.
+    "explore": {
+      "model": "google/antigravity-claude-sonnet-4-6"
+    },
+    "librarian": {
+      "model": "google/antigravity-claude-sonnet-4-6"
+    },
+
+    // 1M lane: direct Anthropic, only for eligible long-context accounts/models.
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max"
+    },
+    "oracle": {
+      "model": "anthropic/claude-opus-4-6"
+    }
+  }
+}
+```
+
+If you see an error like `prompt is too long ... > 200000`, check whether the
+agent is routed through `google/antigravity-*`. Move that agent to a direct
+`anthropic/*` model only when the account, model, and required beta/header setup
+support 1M context. Keep the Antigravity lane explicit when you want predictable
+200k behavior.
+
 #### Ollama
 
 **Must** disable streaming to avoid JSON parse errors:
