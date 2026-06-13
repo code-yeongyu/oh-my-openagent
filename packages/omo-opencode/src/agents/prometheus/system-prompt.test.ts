@@ -67,6 +67,24 @@ describe("getPrometheusPromptSource Claude per-model routing", () => {
       })
     })
   })
+
+  describe("#given Kimi K2.7 vs generic Kimi model ids", () => {
+    describe("#when resolving the prompt source", () => {
+      it("#then should route K2.7 to its own variant while generic Kimi stays default", () => {
+        expect(getPrometheusPromptSource("opencode-go/kimi-k2.7")).toBe("kimi-k2-7")
+        expect(getPrometheusPromptSource("kimi-for-coding/k2p7")).toBe("kimi-k2-7")
+        expect(getPrometheusPromptSource("opencode-go/kimi-k2.6")).toBe("default")
+        expect(getPrometheusPromptSource("moonshotai/kimi-k2.5")).toBe("default")
+      })
+
+      it("#then the K2.7 prompt carries a restrained outcome-first self_knowledge block", () => {
+        const prompt = getPrometheusPrompt("opencode-go/kimi-k2.7", [])
+
+        expect(prompt).toContain("<self_knowledge>")
+        expect(prompt).toContain("Kimi K2.7")
+      })
+    })
+  })
 })
 
 describe("getPrometheusPrompt Claude per-model tuning blocks", () => {
