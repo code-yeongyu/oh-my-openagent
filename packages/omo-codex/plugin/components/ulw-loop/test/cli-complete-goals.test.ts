@@ -1,9 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.ts";
+import { ulwLoopLedgerPath } from "../src/paths.ts";
 
 let testDir: string;
 let out: string[];
@@ -31,6 +32,14 @@ function stdoutJson(): Record<string, unknown> {
 	return JSON.parse(out.join(""));
 }
 
+async function ledgerKinds(sessionId: string): Promise<string[]> {
+	const raw = await readFile(ulwLoopLedgerPath(testDir, { sessionId }), "utf8");
+	return raw
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.map((line) => JSON.parse(line).kind);
+}
+
 async function createPlan(): Promise<void> {
 	expect(await ulwLoopCommand(["create-goals", "--brief", "- Goal A\n- Goal B", "--json"])).toBe(0);
 	resetOutput();
@@ -48,5 +57,23 @@ describe("ulwLoopCommand complete-goals", () => {
 			instruction: { json: { objective: expect.any(String) } },
 		});
 		expect(JSON.stringify(stdoutJson())).not.toContain('"status":"active"');
+	});
+
+	it("#given an in-progress goal #when complete-goals resumes it #then the ledger is not mutated", async () => {
+		const sessionId = "resume-ledger";
+		expect(
+			await ulwLoopCommand(["create-goals", "--brief", "- Goal A\n- Goal B", "--session-id", sessionId, "--json"]),
+		).toBe(0);
+		resetOutput();
+
+		expect(await ulwLoopCommand(["complete-goals", "--session-id", sessionId, "--json"])).toBe(0);
+		expect(stdoutJson()).toMatchObject({ ok: true, resumed: false, goal: { status: "in_progress" } });
+		expect(await ledgerKinds(sessionId)).toEqual(["plan_created", "goal_started"]);
+		resetOutput();
+
+		expect(await ulwLoopCommand(["complete-goals", "--session-id", sessionId, "--json"])).toBe(0);
+
+		expect(stdoutJson()).toMatchObject({ ok: true, resumed: true, goal: { status: "in_progress" } });
+		expect(await ledgerKinds(sessionId)).toEqual(["plan_created", "goal_started"]);
 	});
 });

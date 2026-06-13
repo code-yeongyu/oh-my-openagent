@@ -101,7 +101,7 @@ export async function startNextUlwLoop(repoRoot: string, args: { retryFailed?: b
 		const now = iso();
 		if (plan.aggregateCompletion?.status === "complete") return { done: true, plan };
 		const existing = plan.goals.find((goal) => goal.status === "in_progress" && isScheduleEligible(goal));
-		if (existing) { await appendLedger(repoRoot, { at: now, kind: "goal_resumed", goalId: existing.id, status: existing.status, message: "Resuming active ulw-loop" }, scope); return { plan, goal: existing, resumed: true }; }
+		if (existing) return { plan, goal: existing, resumed: true };
 		let next = plan.goals.find((goal) => goal.status === "pending" && isScheduleEligible(goal));
 		if (!next && args.retryFailed) {
 			next = plan.goals.find((goal) => goal.status === "failed" && !goal.nonRetriable && isScheduleEligible(goal));
