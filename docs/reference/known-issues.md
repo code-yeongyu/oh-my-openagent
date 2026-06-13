@@ -38,3 +38,10 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #5021 — Codex planner or reviewer subagents can appear stuck
+
+- **Affects**: LazyCodex / OMO Codex planner and reviewer flows that use native Codex subagents.
+- **Symptom**: A parent session can receive repeated `wait_agent` timeouts while a planner or reviewer subagent remains `running`. Follow-up prompts may not recover the run, and the session can look stuck until the child agent is closed or respawned.
+- **Workaround**: Use short wait cycles, send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5021.
