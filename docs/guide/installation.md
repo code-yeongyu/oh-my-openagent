@@ -139,6 +139,8 @@ bunx oh-my-openagent install
 
 The TUI walks you through it. **Do NOT use `npm install -g`, `bun add -g`, or `bun install -g`** — global installation is not officially supported. oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins, and the `prepare` script requires Bun. Always invoke via `bunx`.
 
+**OpenCode update path.** `opencode plugin install` can refresh the package metadata under an OpenCode-managed `packages/` directory while the running plugin still resolves from OpenCode's runtime cache under `~/.cache/opencode/node_modules/`. If `bunx oh-my-openagent doctor` still reports the old version after an OpenCode plugin install, relaunch OpenCode once and rerun `bunx oh-my-openagent install --platform=opencode` so the plugin entry and runtime package path line up again. Use `bunx oh-my-openagent get-local-version` or `bunx oh-my-openagent doctor` to confirm the version OpenCode is loading.
+
 ## For LLM Agents
 
 > **IMPORTANT: Use `curl` to fetch this file, NOT WebFetch.** WebFetch summarizes content and loses critical flags like `--platform`, subscription questions, and Codex verification details. Always use:
