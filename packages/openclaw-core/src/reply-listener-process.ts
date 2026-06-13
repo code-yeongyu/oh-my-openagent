@@ -41,6 +41,21 @@ function ignoreReplyListenerProcessProbeError(error: unknown): void {
   throw error
 }
 
+type ProcessProbe = {
+  readonly exitCode: number | null
+  readonly exited: Promise<number>
+  readonly stdout: ReadableStream<Uint8Array>
+}
+
+type ReplyListenerProcessDeps = {
+  readonly spawn: (
+    command: string[],
+    options: { readonly stdout: "pipe"; readonly stderr: "ignore" },
+  ) => ProcessProbe
+  readonly platform?: typeof process.platform
+  readonly readProcCmdline?: (pid: number) => string
+}
+
 export function createReplyListenerDaemonEnv(extraEnv: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {}
 
@@ -65,13 +80,24 @@ export function isReplyListenerProcessRunning(pid: number): boolean {
 }
 
 export async function isReplyListenerDaemonProcess(pid: number): Promise<boolean> {
+  return isReplyListenerDaemonProcessWithDeps(pid, { spawn })
+}
+
+export async function isReplyListenerDaemonProcessWithDeps(
+  pid: number,
+  deps: ReplyListenerProcessDeps,
+): Promise<boolean> {
   try {
-    if (process.platform === "linux") {
-      const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8")
+    const platform = deps.platform ?? process.platform
+    if (platform === "linux") {
+      const readProcCmdline =
+        deps.readProcCmdline ??
+        ((targetPid) => readFileSync(`/proc/${targetPid}/cmdline`, "utf-8"))
+      const cmdline = readProcCmdline(pid)
       return cmdline.includes(REPLY_LISTENER_DAEMON_IDENTITY_MARKER)
     }
 
-    const processInfo = spawn(["ps", "-p", String(pid), "-o", "args="], {
+    const processInfo = deps.spawn(["ps", "-p", String(pid), "-o", "args="], {
       stdout: "pipe",
       stderr: "ignore",
     })
