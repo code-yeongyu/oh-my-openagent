@@ -38,3 +38,16 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #4863 — OpenCode 1.16.x starts with only build/plan agents after install
+
+- **Affects**: OpenCode 1.16.x with oh-my-openagent 4.7.x.
+- **Symptom**: After installing oh-my-openagent, the OpenCode agent list only shows the built-in build/plan agents. `bunx oh-my-openagent doctor` can still report `System OK`, so this looks like a successful install even though the OMO agents are not visible.
+- **Workaround**: Stop OpenCode, clear the OpenCode and OMO cache directories, then reinstall:
+
+  ```sh
+  rm -rf ~/.cache/opencode/ ~/.cache/oh-my-openagent/ ~/.cache/oh-my-opencode/
+  bunx oh-my-openagent install
+  ```
+
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4863.
