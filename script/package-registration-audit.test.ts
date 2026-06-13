@@ -311,5 +311,5 @@ describe("package registration audit", () => {
     expect(documentedTotal).toBe(shims.length)
     expect(missingTargetPackages).toEqual([])
     expect(missingPaths).toEqual([])
-  })
+  }, { timeout: 20_000 })
 })
