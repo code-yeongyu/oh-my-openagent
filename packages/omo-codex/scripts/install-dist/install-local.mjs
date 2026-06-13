@@ -7434,6 +7434,9 @@ function legacyMarketplaceNames(marketplaceName) {
 function removeMarketplaceBlock(config, marketplaceName) {
   return removeTomlSections(config, (header) => header === `marketplaces.${marketplaceName}`);
 }
+function hasMarketplaceBlock(config, marketplaceName) {
+  return findTomlSection(config, `marketplaces.${marketplaceName}`) !== null;
+}
 function removeStaleMarketplacePluginBlocks(config, marketplaceName, keepPluginNames) {
   return removeTomlSections(config, (header) => {
     const pluginKey = parsePluginHeaderKey(header);
@@ -7749,7 +7752,9 @@ async function updateCodexConfig(input) {
   config = ensureCodexMultiAgentV2Config(config);
   if (input.autonomousPermissions === true)
     config = ensureAutonomousPermissions(config);
-  config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource);
+  if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
+    config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource);
+  }
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`);
   }
