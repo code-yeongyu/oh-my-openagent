@@ -38,3 +38,11 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #3435 — Anthropic subscription auth may reject prompts containing `opencode`
+
+- **Affects**: Anthropic subscription-token routes and third-party auth plugins. API-key routes may behave differently.
+- **Symptom**: Anthropic returns `Third-party apps now draw from extra usage, not plan limits...` for one project while similar projects still work.
+- **Likely trigger**: Upstream Anthropic filtering appears sensitive to the literal string `opencode` in custom project rules, system prompt text, or OMO's legacy prompt identifiers.
+- **Workaround**: In user-controlled project files such as `AGENTS.md`, prefer `oh-my-openagent`, `OMO`, or `OpenCode` wording instead of the lowercase literal `opencode` when targeting Anthropic subscription providers.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/3435. The runtime prompt-identity cleanup still needs maintainer direction, so this workaround does not close the underlying issue.
