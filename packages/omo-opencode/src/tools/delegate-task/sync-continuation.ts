@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
-import { isPlanFamily } from "./constants"
+import { getDeliverableTag, isPlanFamily } from "./constants"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
@@ -197,6 +197,7 @@ export async function executeSyncContinuation(
         }
         const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
           strictAbortRecovery: true,
+          deliverableTag: getDeliverableTag(resumeAgent),
         })
         if (!recoveredResult.ok) {
           return pollError
@@ -220,7 +221,9 @@ ${buildTaskMetadataBlock({
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
+      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+        deliverableTag: getDeliverableTag(resumeAgent),
+      })
       if (!result.ok) {
         return result.error
       }

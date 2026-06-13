@@ -177,6 +177,122 @@ describe("fetchSyncResult", () => {
     expect(result.error).toContain("Latest assistant message is an error")
   })
 
+  test("deliverableTag: returns tagged turn even when a newer untagged turn exists", async () => {
+    //#given - the doc's failure sequence: plan written in an earlier turn, then a
+    // brief notification-triggered follow-up that does NOT carry the envelope.
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "<plan>\n# Real Plan\nfull content\n</plan>" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 } },
+              parts: [{ type: "text", text: "Results confirm the plan." }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
+
+    //#then - returns the envelope contents, not the newer untagged follow-up
+    expect(result).toEqual({ ok: true, textContent: "# Real Plan\nfull content" })
+  })
+
+  test("deliverableTag: prefers the newest tagged turn when multiple envelopes exist", async () => {
+    //#given - a refined plan emitted after results supersedes an earlier draft
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "<plan>draft</plan>" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 } },
+              parts: [{ type: "text", text: "<plan>refined</plan>" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
+
+    //#then
+    expect(result).toEqual({ ok: true, textContent: "refined" })
+  })
+
+  test("deliverableTag: falls back to recency when no closed envelope is present", async () => {
+    //#given - the model never emitted a complete <plan> block
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "First response" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: { id: "msg_004", role: "assistant", time: { created: 4000 } },
+              parts: [{ type: "text", text: "Latest response" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
+
+    //#then - unchanged behavior: newest assistant text
+    expect(result).toEqual({ ok: true, textContent: "Latest response" })
+  })
+
+  test("deliverableTag: an unclosed envelope does not match and falls back", async () => {
+    //#given - streaming cut off before the closing tag
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "<plan>\n# Truncated plan with no closing tag" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
+
+    //#then - falls back to returning the assistant text as-is
+    expect(result).toEqual({ ok: true, textContent: "<plan>\n# Truncated plan with no closing tag" })
+  })
+
   test("strict abort recovery: requires latest assistant text output", async () => {
     //#given
     const { fetchSyncResult } = require("./sync-result-fetcher")

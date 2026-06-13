@@ -1055,9 +1055,23 @@ The fallback retry session is now created and can be inspected directly.
     return tasks
   }
 
-  /** Return whether a session has direct child background tasks still in flight. */
+  /** Return whether a session has any descendant background task still in flight. */
   hasActiveChildTasks(sessionID: string): boolean {
-    return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
+    return this.getAllDescendantTasks(sessionID).some(t => t.status === "running" || t.status === "pending")
+  }
+
+  /**
+   * Return whether a parent-wake notification for this session is queued, scheduled,
+   * or dispatched-but-not-yet-consumed. Lets a sync poll loop keep waiting across the
+   * gap between "all children finished" and "the notification-triggered turn started",
+   * instead of declaring the task complete during that window.
+   */
+  hasPendingParentWake(sessionID: string): boolean {
+    return (
+      this.parentWakeNotifier.getPendingParentWakes().has(sessionID) ||
+      this.parentWakeNotifier.getPendingParentWakeTimers().has(sessionID) ||
+      this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+    )
   }
 
   private updateBackgroundTaskMarker(parentSessionID: string): void {

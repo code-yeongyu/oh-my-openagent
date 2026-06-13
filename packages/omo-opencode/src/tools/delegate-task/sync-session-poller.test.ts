@@ -728,6 +728,49 @@ describe("pollSyncSession", () => {
       expect(childCheck).toBeGreaterThanOrEqual(3)
     })
 
+    test("keeps waiting while a parent wake is pending even after children clear", async () => {
+      // Regression: children finish, but the parent-wake notification (debounce +
+      // queue + promptAsync gate) has not yet produced the continuation turn. With a
+      // tiny settle window, the loop must still wait on hasPendingParentWake rather
+      // than returning the pre-results turn.
+      const { pollSyncSession } = require("./sync-session-poller")
+      let wakePolls = 0
+      const synthesizedMessages = {
+        data: [
+          ...completeMessages.data,
+          { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+          {
+            info: { id: "msg_004", role: "assistant", time: { created: 4000 }, finish: "stop" },
+            parts: [{ type: "text", text: "Plan with results" }],
+          },
+        ],
+      }
+      const mockClient = {
+        session: {
+          // The continuation turn lands as the dispatched wake is consumed.
+          messages: async () => (wakePolls >= 2 ? synthesizedMessages : completeMessages),
+          status: async () => ({ data: { ses_test: { type: "idle" } } }),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        childWakeGraceMs: 1,
+        hasActiveChildBackgroundTasks: () => false,
+        hasPendingParentWake: () => {
+          wakePolls++
+          return wakePolls < 3
+        },
+      })
+
+      expect(result).toBeNull()
+      // Without the wake gate the loop would have broken on the very first poll.
+      expect(wakePolls).toBeGreaterThanOrEqual(3)
+    })
+
     test("times out when direct child background tasks never finish", async () => {
       const { pollSyncSession } = require("./sync-session-poller")
       const mockClient = {
