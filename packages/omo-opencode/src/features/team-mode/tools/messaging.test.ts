@@ -250,6 +250,27 @@ describe("createTeamSendMessageTool", () => {
     await expect(readdir(escapedInboxRoot)).rejects.toThrow()
   })
 
+  test("treats a host-injected empty correlationId as omitted", async () => {
+    // given
+    const fixture = await createTeamFixture()
+
+    // when
+    const result = await fixture.tool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "hello without metadata",
+      correlationId: "",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const parsedResult = parseToolResult(result)
+
+    // then
+    expect(parsedResult.deliveredTo).toEqual(["m2"])
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const [messageFile] = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
+    const message = MessageSchema.parse(JSON.parse(await readFile(path.join(inboxDir, messageFile), "utf8")))
+    expect(message.correlationId).toBeUndefined()
+  })
+
   test("persists optional message metadata from tool arguments", async () => {
     // given
     const fixture = await createTeamFixture()
