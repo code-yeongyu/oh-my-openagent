@@ -46,6 +46,15 @@ function toJsonObject(value: Record<string, unknown>): JsonObject {
   return value as JsonObject
 }
 
+function errorMessage(result: HostToolResult): string {
+  const text = result.content
+    .filter((item): item is Extract<(typeof result.content)[number], { type: "text" }> => item.type === "text")
+    .map((item) => item.text)
+    .join("\n")
+    .trim()
+  return text || "Tool execution failed."
+}
+
 function createTargetExecute(
   tool: HostToolDefinition<JsonObject>,
   createSessionContext: () => HostSessionContext,
@@ -64,6 +73,9 @@ function createTargetExecute(
       result = createHostToolErrorResult(error)
     }
 
+    if (result.isError === true) {
+      throw new Error(errorMessage(result))
+    }
     return toTargetToolResult(result)
   }
 }

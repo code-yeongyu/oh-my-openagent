@@ -63,4 +63,41 @@ describe("target tool guards", () => {
       content: [{ type: "text", text: "done" }, { type: "text", text: "Remove narration comment." }],
     })
   })
+
+  test("#given Prometheus target policy #when mutations target markdown and source files #then only markdown is allowed", async () => {
+    const previousPolicy = process.env.OMO_TARGET_AGENT_POLICY
+    process.env.OMO_TARGET_AGENT_POLICY = "prometheus-markdown-only"
+    try {
+      const handlers = setup()
+      const markdown = await handlers.get("tool_call")?.(
+        { toolName: "write", toolCallId: "write-md", input: { path: "plan.md", content: "plan" } } as never,
+        { cwd },
+      )
+      const source = await handlers.get("tool_call")?.(
+        { toolName: "write", toolCallId: "write-ts", input: { path: "source.ts", content: "code" } } as never,
+        { cwd },
+      )
+
+      expect(markdown).toBeUndefined()
+      expect(source).toEqual({ block: true, reason: "Prometheus may only mutate Markdown files." })
+    } finally {
+      if (previousPolicy === undefined) delete process.env.OMO_TARGET_AGENT_POLICY
+      else process.env.OMO_TARGET_AGENT_POLICY = previousPolicy
+    }
+  })
+
+  test("#given read-only target policy #when mutation is attempted #then it is blocked", async () => {
+    const previousPolicy = process.env.OMO_TARGET_AGENT_POLICY
+    process.env.OMO_TARGET_AGENT_POLICY = "read-only"
+    try {
+      const result = await setup().get("tool_call")?.(
+        { toolName: "edit", toolCallId: "edit-1", input: { path: "file.md", old_string: "a", new_string: "b" } } as never,
+        { cwd },
+      )
+      expect(result).toEqual({ block: true, reason: "This OMO agent is read-only and cannot mutate files." })
+    } finally {
+      if (previousPolicy === undefined) delete process.env.OMO_TARGET_AGENT_POLICY
+      else process.env.OMO_TARGET_AGENT_POLICY = previousPolicy
+    }
+  })
 })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { installTargetExtensions } from "./install-target-extensions"
@@ -27,5 +27,18 @@ describe("target extension installer", () => {
 
     expect(result.installed).toBe(false)
     expect(result.conflict).toContain("untouched")
+  })
+
+  it("#given one selected harness #when installed #then the other harness root remains untouched", () => {
+    home = mkdtempSync(join(tmpdir(), "omo-target-install-"))
+    const [result] = installTargetExtensions({
+      home,
+      packageRoot: join(home, "package"),
+      targets: ["pi"],
+    })
+
+    expect(result.target).toBe("pi")
+    expect(result.installed).toBe(true)
+    expect(existsSync(join(home, ".omp"))).toBe(false)
   })
 })

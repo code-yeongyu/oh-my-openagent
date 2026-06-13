@@ -1,14 +1,9 @@
 import type { OhMyOpenCodeConfig, TmuxConfig } from "./config"
 import { TmuxConfigSchema } from "./config/schema/tmux"
-
-type RuntimeWithBun = typeof globalThis & {
-  Bun?: {
-    which(binary: string): string | null
-  }
-}
+import { bunWhich } from "./shared/bun-which-shim"
 
 function defaultWhich(binary: string): string | null {
-  return (globalThis as RuntimeWithBun).Bun?.which(binary) ?? null
+  return bunWhich(binary)
 }
 
 export function isTmuxIntegrationEnabled(

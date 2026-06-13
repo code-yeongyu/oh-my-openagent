@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -20,10 +20,14 @@ describe("createRuntimeTmuxConfig", () => {
   })
 
   describe("#given the runtime does not expose Bun", () => {
-    test("#when interactive bash availability is checked from a bundled module #then it returns false without crashing", async () => {
+    test("#when tmux is executable on PATH #then interactive bash availability is true", async () => {
       const outdir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-"))
+      const binDir = join(outdir, "bin")
 
       try {
+        await Bun.$`mkdir -p ${binDir}`.quiet()
+        writeFileSync(join(binDir, "tmux"), "#!/bin/sh\nexit 0\n", "utf8")
+        chmodSync(join(binDir, "tmux"), 0o755)
         const build = await Bun.build({
           entrypoints: [join(import.meta.dir, "create-runtime-tmux-config.ts")],
           outdir,
@@ -42,13 +46,14 @@ console.log(String(mod.isInteractiveBashEnabled()));`,
           env: {
             ...process.env,
             MODULE_PATH: join(outdir, "create-runtime-tmux-config.js"),
+            PATH: binDir,
           },
           encoding: "utf8",
         })
 
         expect(result.stderr).toBe("")
         expect(result.status).toBe(0)
-        expect(result.stdout.trim()).toBe("false")
+        expect(result.stdout.trim()).toBe("true")
       } finally {
         rmSync(outdir, { recursive: true, force: true })
       }

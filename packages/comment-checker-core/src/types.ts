@@ -96,6 +96,8 @@ export interface ResolveCommentCheckerBinaryInput {
   readonly existsSync: (path: string) => boolean
   readonly importMetaUrl?: string
   readonly packageName?: string
+  readonly platform?: NodeJS.Platform
+  readonly arch?: NodeJS.Architecture
 }
 
 export interface RunCommentCheckerInput {

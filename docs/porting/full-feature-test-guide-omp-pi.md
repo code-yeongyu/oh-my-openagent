@@ -1,6 +1,6 @@
 # Full Feature Test Guide for Oh My Pi and Pi
 
-Date: 2026-06-11
+Date: 2026-06-13
 
 This guide is the step-by-step field test for the Oh My OpenAgent target adapters:
 
@@ -9,10 +9,10 @@ This guide is the step-by-step field test for the Oh My OpenAgent target adapter
 
 It is designed to prove real harness behavior without running the entire root test suite by default. The full root suite is resource-heavy and slow; run it only when you intentionally want a release-grade whole-repo check.
 
-The guide uses Xiaomi MiMo v2.5 Pro at medium thinking level because that is the dogfood model used for the final headless proof:
+The guide uses Xiaomi MiMo v2.5 Pro at high thinking level because that is the requested dogfood model used for the final headless proof:
 
 ```bash
---model xiaomi-mimo/mimo-v2.5-pro --thinking medium
+--model xiaomi-mimo/mimo-v2.5-pro --thinking high
 ```
 
 ## What This Proves
@@ -49,7 +49,7 @@ Do not paste or print API keys. The commands below copy model config files when 
 
 Use temp working directories for harness runs. The guide creates task/team state under the temp project `.omo/` directory so your real repos stay clean.
 
-Use an isolated Pi agent directory for full Pi testing. The normal `/home/supreme/.pi/agent` may contain other extensions. In the current environment, `pi-hermes-memory` conflicts with OMO tool names `skill` and `session_search`, so the reliable full Pi pass uses `PI_CODING_AGENT_DIR=<temp-agent>`.
+Use an isolated Pi agent directory for full Pi testing. The normal `/home/supreme/.pi/agent` may contain unrelated extensions and child processes. OMO now yields duplicate canonical tools such as `skill` and `session_search` when configured Hermes owns them, but isolation still makes reload and process-lifecycle results attributable to OMO.
 
 ## Prerequisites
 
@@ -80,9 +80,43 @@ pi --mode text --print --list-models mimo-v2.5-pro
 Expected:
 
 - A provider/model row for `xiaomi-mimo/mimo-v2.5-pro`
-- Thinking levels include `medium`
+- Thinking levels include `high`
 
 If this fails, fix model configuration before continuing. Do not print the model config file.
+
+## Guarded Update of Both Harnesses
+
+Use the repository updater when Oh My Pi or Pi releases a new version and you want to keep the local runtime edits while rebuilding and relinking the current OMO source:
+
+```bash
+cd /home/supreme/oh-my-openagent
+bun run update:harnesses -- --dry-run
+bun run update:harnesses
+```
+
+The real run asks you to type `UPDATE BOTH`. It then:
+
+- Fully backs up the four installed harness packages.
+- Downloads the exact old registry packages as pristine merge bases.
+- Updates with `omp update --force` and `pi update pi --force`.
+- Three-way merges compatible local installed-package edits onto the new versions.
+- Stops on merge conflicts before installing any merged result.
+- Runs the full OMO build and relinks OMO into both harnesses.
+- Runs the focused target suite, OMO typecheck, bundle import checks, and live adapter diagnostics.
+
+Backups and merge workspaces are written under `~/.omo/harness-update-backups/<timestamp>/`. Each run includes `restore-before-update.sh`. Agent state is also snapshotted without large session, registry, memory, and cache directories.
+
+Useful options:
+
+```bash
+bun run update:harnesses -- --yes
+bun run update:harnesses -- --skip-live-verification
+bun run update:harnesses -- --backup-dir /path/to/backup
+```
+
+Use `--yes` only in an attended automation context. A package merge conflict still stops the script and prints the exact merge workspace and restore command. The updater never embeds or prints an API key. Override diagnostic models with `OMO_UPDATE_VERIFY_MODEL` and `OMO_UPDATE_FALLBACK_MODEL`.
+
+The merge uses the installed packages as the local-edit source of truth because those are the files the harness update replaces. The separate `/home/supreme/pr-work/oh-my-pi` and `/home/supreme/pi-mono` worktrees are recorded in the backup workspace but are not copied over a newer installed release.
 
 ## Build The Adapter Bundle
 
@@ -148,7 +182,21 @@ mkdir -p /home/supreme/.pi/agent/extensions
 ln -sfn /home/supreme/oh-my-openagent /home/supreme/.pi/agent/extensions/oh-my-openagent-dev
 ```
 
-If normal Pi fails with tool conflicts from another extension, use the isolated `PI_CODING_AGENT_DIR` path above.
+If normal Pi fails or hangs because another extension owns conflicting tools or leaves children active, use the isolated `PI_CODING_AGENT_DIR` path above and record the external extension separately.
+
+The public installer can select one or both target harnesses. Use disposable homes when testing installer behavior:
+
+```bash
+HOME="$(mktemp -d /tmp/omo-install-omp-XXXXXX)" bun src/cli/index.ts install-targets --target oh-my-pi
+HOME="$(mktemp -d /tmp/omo-install-pi-XXXXXX)" bun src/cli/index.ts install-targets --target pi
+HOME="$(mktemp -d /tmp/omo-install-both-XXXXXX)" bun src/cli/index.ts install-targets --target both
+```
+
+Expected:
+
+- `oh-my-pi` creates only the OMP extension link
+- `pi` creates only the Pi extension link
+- `both` creates both links
 
 ## Create Test Workspaces
 
@@ -235,7 +283,7 @@ Set common model variables:
 
 ```bash
 export OMO_MODEL="xiaomi-mimo/mimo-v2.5-pro"
-export OMO_THINKING="medium"
+export OMO_THINKING="high"
 ```
 
 ## Oh My Pi Full Harness Pass
@@ -578,6 +626,70 @@ Clean up tmux sessions:
 tmux list-sessions -F '#S' 2>/dev/null | rg '^omo-target-team' | xargs -r -n1 tmux kill-session -t
 ```
 
+## Hyperplan Full Workflow
+
+Hyperplan is more than command expansion. A valid pass must prove the bundled skill loads, the inline category roster survives normalization, every direct member message executes a target child agent, the planner alias runs in the foreground, and cleanup removes all target-owned state.
+
+Run the real command on Oh My Pi:
+
+```bash
+cd "$OMO_OMP_WORK"
+OMO_TEAM_MODE=1 timeout 1800s omp --mode json --print --no-title --auto-approve \
+  --model "$OMO_MODEL" --thinking "$OMO_THINKING" \
+  '/hyperplan Plan a safe migration of a small API endpoint.'
+```
+
+Run the real command on isolated Pi:
+
+```bash
+cd "$OMO_PI_WORK"
+PI_CODING_AGENT_DIR="$OMO_PI_AGENT" OMO_TEAM_MODE=1 timeout 1800s pi --mode json --print \
+  --model "$OMO_MODEL" --thinking "$OMO_THINKING" \
+  '/hyperplan Plan a safe migration of a small API endpoint.'
+```
+
+Inspect each JSONL trace. A complete workflow has:
+
+- One successful `skill` call for `hyperplan`
+- One successful `team_create` with members `skeptic`, `validator`, `researcher`, `architect`, and `creative`, plus the caller lead
+- Five successful `team_send_message` calls for each of the three rounds, 15 total
+- Every direct member message returns a member response from a routed `sisyphus-junior` child process
+- One successful foreground `task` call using `subagent_type: "plan"`, routed to Prometheus
+- Five `team_shutdown_request` calls and five `team_approve_shutdown` calls
+- One successful `team_delete`
+- No tool result with `isError: true`
+
+Verify cleanup after each run:
+
+```bash
+cat .omo/target-team-index.json
+find .omo/target-team-mode/runtime -mindepth 1 -maxdepth 1 -type d -print
+find .omo/target-team-mode/worktrees -mindepth 1 -print
+tmux list-sessions -F '#S' 2>/dev/null | rg '^omo-target-team' || true
+```
+
+Expected:
+
+- Index contains `{}`
+- No runtime directories
+- No worktree entries
+- No target-owned tmux session
+
+For deterministic control-flow certification, use a local OpenAI-compatible fixture provider that emits the exact tool sequence above and local child executables that record each subprocess start. This removes provider queue variance while still executing the installed harness, extension, target tools, filesystem state, tmux lifecycle, subprocess routing, planner alias, and cleanup. The final certification observed 16 child starts per harness: 15 `sisyphus-junior` member turns and one Prometheus planner turn.
+
+## Reload, Optional Dependencies, And Child Cleanup
+
+Run Pi reload tests with an isolated `PI_CODING_AGENT_DIR`. A normal global Pi home may load unrelated Hermes extensions; Hermes can leave its own MCP children active after reload and keep the process alive. That external behavior is not an OMO reload failure when an isolated OMO-only Pi reload passes.
+
+Test missing tmux support with a temporary `PATH` that excludes `tmux`. Both harnesses should omit `interactive_bash`, complete a provider turn, and exit 0.
+
+Test background cleanup twice:
+
+- Explicit cancellation: start a long-running background `call_omo_agent`, call `background_cancel`, verify the child receives `SIGTERM`, and verify no child remains.
+- Parent exit: start a long-running background child, let the headless parent finish without explicit cancellation, and verify `session_shutdown` terminates the child before process exit.
+
+Use deterministic local child executables for these lifecycle checks. They should record `START` and `TERM` events and wait long enough that an unhandled orphan is observable.
+
 ## Targeted Regression Pass
 
 Run these after code changes. This is the recommended high-signal test pass instead of full `bun test`:
@@ -589,13 +701,16 @@ timeout 240s bun test \
   src/host-tools/look-at-tool.test.ts \
   src/host-hooks/provider-fallback.test.ts \
   src/host-tools/team-tools.test.ts \
+  src/host-tools/always-on-tools.test.ts \
+  src/host-agents/agent-routing.test.ts \
+  src/features/team-mode/team-state-store/store.test.ts \
   src/features/mcp-oauth/discovery.test.ts \
   src/features/mcp-oauth/provider.test.ts \
   src/features/mcp-oauth/provider-live-local.test.ts \
   src/plugin/consensus-removal.test.ts
 ```
 
-Expected from the latest certification: 37 tests, 93 assertions.
+Expected: every selected test passes. Exact counts can change as focused regressions are added.
 
 Expanded adapter pass:
 
@@ -620,7 +735,7 @@ timeout 180s bun test \
   src/cli/install-targets/install-target-extensions.test.ts
 ```
 
-Expected from the latest certification: 46 tests, 106 assertions.
+Expected: every selected test passes. Exact counts can change as focused regressions are added.
 
 Typecheck:
 
@@ -644,6 +759,43 @@ timeout 900s bun test
 ```
 
 This is not part of the default guide because it is resource-heavy.
+
+## Update Safety
+
+Updating `omp` or `pi` is reasonable, but package updates can overwrite installed-runtime patches. Preserve and replay the source changes deliberately.
+
+Before an update:
+
+```bash
+git -C /home/supreme/oh-my-openagent status --short
+git -C /home/supreme/pr-work/oh-my-pi status --short
+git -C /home/supreme/pi-mono status --short
+```
+
+Commit or stash the source-repository changes you intend to keep. Also capture diffs for any files changed directly under `/home/supreme/.bun/install/global/node_modules/`, because those installed copies will be replaced by an update.
+
+What survives:
+
+- Edits in `/home/supreme/oh-my-openagent` survive harness package updates. Rebuild the OMO target bundles afterward.
+- Edits in `/home/supreme/pr-work/oh-my-pi` survive an installed OMP update, but the installed OMP runtime will not automatically use those source edits.
+- Edits in `/home/supreme/pi-mono` survive an installed Pi update, but the installed Pi runtime will not automatically use those source edits.
+- Source-linked OMO extension symlinks continue pointing at this repository unless an installer replaces or removes them.
+
+What is overwritten:
+
+- Any edits under `/home/supreme/.bun/install/global/node_modules/@oh-my-pi/`
+- Any edits under `/home/supreme/.bun/install/global/node_modules/@earendil-works/`
+
+After an update:
+
+```bash
+cd /home/supreme/oh-my-openagent
+bun build src/hosts/oh-my-pi/index.ts src/hosts/pi/index.ts --root src --outdir dist --target bun --format esm --external @ast-grep/napi --external zod
+bun run build:node-require-shim
+bun run typecheck
+```
+
+Then reapply or install the durable harness-source patches into the updated runtime, rerun diagnostic discovery, provider fallback, compaction, background cleanup, Team Mode, and Hyperplan. Do not replace the installed OMP package wholesale with the current local OMP source checkout without checking versions; the installed OMP runtime may be newer than that checkout.
 
 ## Oh My Pi Source Checks
 
@@ -681,7 +833,7 @@ Record these for a complete certification note:
 
 - `omp --version`
 - `pi --version`
-- Model list confirms `xiaomi-mimo/mimo-v2.5-pro` and `medium`
+- Model list confirms `xiaomi-mimo/mimo-v2.5-pro` and `high`
 - Build command and result
 - Focused bundle tests result
 - Oh My Pi diagnostic result
@@ -696,6 +848,9 @@ Record these for a complete certification note:
 - Pi LSP/ast-grep result names `add` and `multiply`
 - Pi hashline file diff or targeted hashline regression
 - Pi Team Mode state under `.omo/target-team-mode`
+- Hyperplan trace proves skill load, 15 member turns, planner handoff, shutdown, and zero residue
+- Explicit background cancellation and parent-exit cleanup leave no child process
+- Isolated reload passes; unrelated global extension behavior is recorded separately
 - Any tmux sessions cleaned up
 - Any normal Pi extension conflicts noted
 - Full root suite status: skipped by instruction, passed, failed, or not run

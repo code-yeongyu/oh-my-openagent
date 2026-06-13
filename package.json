@@ -77,6 +77,7 @@
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
     "build:model-capabilities": "bun run script/build-model-capabilities.ts",
+    "update:harnesses": "bash script/update-target-harnesses.sh",
     "clean": "rm -rf dist",
     "prepare": "bun run build",
     "postinstall": "node postinstall.mjs",

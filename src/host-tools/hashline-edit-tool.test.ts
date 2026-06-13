@@ -69,22 +69,20 @@ describe("registerHashlineEditTool", () => {
     expect(readFileSync(filePath, "utf-8")).toBe("one\nTWO\nthree")
   })
 
-  test("#given stale hash anchor #when executing target edit #then file is unchanged and result is error", async () => {
+  test("#given stale hash anchor #when executing target edit #then file is unchanged and execution rejects", async () => {
     // given
     const filePath = join(tempDirectory, "target.txt")
     writeFileSync(filePath, "one\ntwo\nthree", "utf-8")
     const tool = registerTool("pi")
 
     // when
-    const result = await tool.execute("call-1", {
+    const execution = tool.execute("call-1", {
       filePath,
       edits: [{ op: "replace", pos: "2#ZZ", lines: "stale" }],
     })
 
     // then
-    expect(result.isError).toBe(true)
-    expect(getText(result)).toContain("hash mismatch")
-    expect(getText(result)).toContain(">>>")
+    await expect(execution).rejects.toThrow("hash mismatch")
     expect(readFileSync(filePath, "utf-8")).toBe("one\ntwo\nthree")
   })
 })

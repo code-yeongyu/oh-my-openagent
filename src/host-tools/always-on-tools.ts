@@ -3,10 +3,11 @@ import type { HostKind, HostSessionActions, HostSessionContext, HostToolDefiniti
 import { BACKGROUND_CANCEL_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION } from "../tools/background-task/constants"
 import { createGlobTools } from "../tools/glob"
 import { createGrepTools } from "../tools/grep"
-import { createSessionManagerTools } from "../tools/session-manager"
 import { createSkillTool } from "../tools/skill"
+import { createTargetNativeSkillAccessor } from "../host-resources"
 import { createHostToolFromOpenCodeTool, registerTargetTool, type TargetToolDefinition, type TargetToolRegistry } from "./tool-registration"
 import { TargetBackgroundManager } from "./background-manager"
+import { createTargetSessionTools } from "./target-session-tools"
 
 export const ALWAYS_ON_UTILITY_TOOL_NAMES = [
   "grep",
@@ -26,7 +27,9 @@ export type AlwaysOnUtilityToolsOptions = {
   host: Exclude<HostKind, "opencode">
   registry: TargetToolRegistry
   cwd: string
+  packageRoot?: string
   backgroundManager?: TargetBackgroundManager
+  disabledToolNames?: readonly AlwaysOnUtilityToolName[]
 }
 
 function createDetachedSessionContext(cwd: string): HostSessionContext {
@@ -75,7 +78,16 @@ function createBackgroundTool(
     description,
     parameters: {
       type: "object",
-      properties: {},
+      properties: {
+        task_id: {
+          type: "string",
+          description: "Background task ID returned by task or call_omo_agent.",
+        },
+        taskId: {
+          type: "string",
+          description: "Alias for task_id.",
+        },
+      },
       additionalProperties: true,
     },
     execute: async ({ input }) => {
@@ -98,13 +110,23 @@ function createAlwaysOnOpenCodeTools(cwd: string): Record<string, ToolDefinition
   return {
     ...createGrepTools(ctx),
     ...createGlobTools(ctx),
-    ...createSessionManagerTools(ctx, {
-      setStorageClient: () => {},
-    }),
     skill: createSkillTool({
       directory: cwd,
       commands: [],
-      skills: [],
+      includeSkillsInDescription: true,
+    }),
+  }
+}
+
+function createAlwaysOnOpenCodeToolsWithPackageSkills(cwd: string, packageRoot?: string): Record<string, ToolDefinition> {
+  const tools = createAlwaysOnOpenCodeTools(cwd)
+  if (!packageRoot) return tools
+  return {
+    ...tools,
+    skill: createSkillTool({
+      directory: cwd,
+      commands: [],
+      nativeSkills: createTargetNativeSkillAccessor(packageRoot, cwd),
       includeSkillsInDescription: true,
     }),
   }
@@ -141,9 +163,13 @@ function registerNativeHostTool(
 export function registerAlwaysOnUtilityTools(options: AlwaysOnUtilityToolsOptions): readonly TargetToolDefinition[] {
   const registered: TargetToolDefinition[] = []
   const backgroundManager = options.backgroundManager ?? new TargetBackgroundManager()
-  const openCodeTools = createAlwaysOnOpenCodeTools(options.cwd)
+  const openCodeTools = createAlwaysOnOpenCodeToolsWithPackageSkills(options.cwd, options.packageRoot)
+  const targetSessionTools = createTargetSessionTools({ host: options.host, cwd: options.cwd })
+  const disabledToolNames = new Set(options.disabledToolNames ?? [])
 
   for (const name of ALWAYS_ON_UTILITY_TOOL_NAMES) {
+    if (disabledToolNames.has(name)) continue
+
     if (name === "background_output") {
       registered.push(registerNativeHostTool(options, createBackgroundTool(name, BACKGROUND_OUTPUT_DESCRIPTION, backgroundManager)))
       continue
@@ -151,6 +177,12 @@ export function registerAlwaysOnUtilityTools(options: AlwaysOnUtilityToolsOption
 
     if (name === "background_cancel") {
       registered.push(registerNativeHostTool(options, createBackgroundTool(name, BACKGROUND_CANCEL_DESCRIPTION, backgroundManager)))
+      continue
+    }
+
+    const targetSessionTool = targetSessionTools[name]
+    if (targetSessionTool) {
+      registered.push(registerNativeHostTool(options, targetSessionTool))
       continue
     }
 

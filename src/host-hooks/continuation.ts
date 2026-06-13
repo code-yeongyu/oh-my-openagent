@@ -18,13 +18,35 @@ function sessionID(payload: unknown, context: unknown): string {
 
 export function registerTargetContinuation(
   host: Exclude<HostKind, "opencode">,
-  api: TargetHookApi & { sendUserMessage(content: string): void | Promise<void> },
+  api: TargetHookApi & {
+    sendUserMessage(content: string, options?: { deliverAs?: "steer" | "followUp" }): void | Promise<void>
+  },
 ): TargetPromptGate {
-  const gate = new TargetPromptGate((message) => api.sendUserMessage(message))
-  const handler = (payload: unknown, context: unknown) =>
-    gate.dispatch(sessionID(payload, context), "compaction-continuation", COMPACTION_CONTINUATION)
+  let ohMyPiAutoCompactionActive = false
+  const gate = new TargetPromptGate(async (message, delivery) => {
+    if (delivery === "followUp") {
+      await api.sendUserMessage(message, { deliverAs: "followUp" })
+      return
+    }
+    try {
+      await api.sendUserMessage(message)
+    } catch {
+      await api.sendUserMessage(message, { deliverAs: "followUp" })
+    }
+  })
+  const handler = (payload: unknown, context: unknown) => {
+    if (ohMyPiAutoCompactionActive) return undefined
+    return gate.dispatch(sessionID(payload, context), "compaction-continuation", COMPACTION_CONTINUATION)
+  }
+  if (host === "oh-my-pi") {
+    api.on("auto_compaction_start", () => {
+      ohMyPiAutoCompactionActive = true
+    })
+    api.on("auto_compaction_end", () => {
+      ohMyPiAutoCompactionActive = false
+    })
+  }
   api.on("session_compact", handler)
-  if (host === "oh-my-pi") api.on("auto_compaction_end", handler)
   return gate
 }
 
@@ -33,5 +55,10 @@ export function notifyTargetBackgroundCompletion(
   session: string,
   taskID: string,
 ): Promise<"dispatched" | "coalesced"> {
-  return gate.dispatch(session, `background:${taskID}`, `Background task ${taskID} completed. Review its result and continue.`)
+  return gate.dispatch(
+    session,
+    `background:${taskID}`,
+    `Background task ${taskID} completed. Review its result and continue.`,
+    "followUp",
+  )
 }

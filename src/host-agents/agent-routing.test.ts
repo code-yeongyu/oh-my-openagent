@@ -14,18 +14,20 @@ describe("target agent inventory", () => {
     const agents = createTargetAgentInventory()
     expect(agents.find((agent) => agent.name === "oracle")?.policy).toBe("read-only")
     expect(agents.find((agent) => agent.name === "prometheus")?.policy).toBe("prometheus-markdown-only")
-    expect(agents.find((agent) => agent.name === "prometheus")?.tools).toEqual(["read", "grep", "find", "ls"])
+    expect(agents.find((agent) => agent.name === "prometheus")?.tools).toEqual(["read", "grep", "find", "ls", "write", "edit"])
   })
 
   test("#given agent and category routes #when resolved #then core read-only restricted and category paths route", () => {
     const core = resolveTargetAgentRoute("pi", { subagentType: "sisyphus", prompt: "implement" })
     const readOnly = resolveTargetAgentRoute("pi", { subagentType: "oracle", prompt: "review" })
     const restricted = resolveTargetAgentRoute("oh-my-pi", { subagentType: "prometheus", prompt: "plan" })
+    const planAlias = resolveTargetAgentRoute("pi", { subagentType: "plan", prompt: "formalize" })
     const category = resolveTargetAgentRoute("oh-my-pi", { category: "quick", prompt: "fix typo" })
 
     expect(core.agent.policy).toBe("full")
     expect(readOnly.agent.policy).toBe("read-only")
     expect(restricted.agent.policy).toBe("prometheus-markdown-only")
+    expect(planAlias.agent.name).toBe("prometheus")
     expect(category.agent.name).toBe("sisyphus-junior")
     expect(category.prompt).toContain("fix typo")
     expect(createTargetCategoryInventory().length).toBeGreaterThan(0)

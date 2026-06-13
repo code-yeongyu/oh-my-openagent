@@ -69,6 +69,37 @@ function contentParts(message: Record<string, unknown>): unknown[] {
   return Array.isArray(message.content) ? message.content : []
 }
 
+function transformUserMessage(message: unknown): unknown {
+  if (!isRecord(message) || message.role !== "user") return message
+
+  if (typeof message.content === "string") {
+    const content = injectTargetKeywordMessages(message.content)
+    return content === message.content ? message : { ...message, content }
+  }
+
+  if (!Array.isArray(message.content)) return message
+  let changed = false
+  const content = message.content.map((part) => {
+    if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string") return part
+    const text = injectTargetKeywordMessages(part.text)
+    if (text === part.text) return part
+    changed = true
+    return { ...part, text }
+  })
+  return changed ? { ...message, content } : message
+}
+
+export function injectTargetKeywordMessagesIntoContext(messages: readonly unknown[]): unknown[] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const transformed = transformUserMessage(messages[index])
+    if (transformed === messages[index]) continue
+    const next = [...messages]
+    next[index] = transformed
+    return next
+  }
+  return [...messages]
+}
+
 export function validateTargetMessages(messages: readonly unknown[]): TargetMessageValidationReport {
   const toolCallIDs = new Set<string>()
   const toolResultIDs = new Set<string>()
@@ -114,7 +145,7 @@ export function registerTargetMessageTransforms(
 
   api.on("before_agent_start", (payload) => {
     if (!isRecord(payload) || typeof payload.prompt !== "string") return undefined
-    if (!alreadyInjected(payload.prompt)) return undefined
+    if (!alreadyInjected(payload.prompt) && injectTargetKeywordMessages(payload.prompt) === payload.prompt) return undefined
     const event = payload as TargetBeforeAgentStartEvent
     return { systemPrompt: appendSystemPrompt(host, event.systemPrompt) }
   })
@@ -123,6 +154,6 @@ export function registerTargetMessageTransforms(
     if (!isRecord(payload) || !Array.isArray(payload.messages)) return undefined
     const event = payload as TargetContextEvent
     validateTargetMessages(event.messages)
-    return { messages: event.messages }
+    return { messages: injectTargetKeywordMessagesIntoContext(event.messages) }
   })
 }

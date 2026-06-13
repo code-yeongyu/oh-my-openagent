@@ -45,6 +45,18 @@ function asText(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined
 }
 
+function targetAgentPolicyBlock(name: string, path: string | undefined): { block: true; reason: string } | undefined {
+  const policy = process.env.OMO_TARGET_AGENT_POLICY
+  if (!["write", "edit", "apply_patch"].includes(name)) return undefined
+  if (policy === "read-only") {
+    return { block: true, reason: "This OMO agent is read-only and cannot mutate files." }
+  }
+  if (policy === "prometheus-markdown-only" && (!path || !path.toLowerCase().endsWith(".md"))) {
+    return { block: true, reason: "Prometheus may only mutate Markdown files." }
+  }
+  return undefined
+}
+
 export function registerTargetToolGuards(api: TargetToolGuardApi, options: TargetToolGuardOptions): void {
   const readPaths = new Set<string>()
   const pendingMutationInputs = new Map<string, ToolCallEvent>()
@@ -62,6 +74,8 @@ export function registerTargetToolGuards(api: TargetToolGuardApi, options: Targe
     }
 
     const path = filePath(event.input)
+    const policyBlock = targetAgentPolicyBlock(name, path)
+    if (policyBlock) return policyBlock
     if (!path) return undefined
     const resolvedPath = absolutePath(cwd, path)
     if (name === "read") {

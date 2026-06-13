@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { loadSkillsFromDir } from "../features/opencode-skill-loader"
+import type { NativeSkillEntry } from "../tools/skill/native-skills"
 
 export type TargetResourcesDiscoverEvent = {
   type: "resources_discover"
@@ -44,4 +46,44 @@ export function discoverTargetResourcePaths(packageRoot: string, cwd: string): T
 
 export function registerTargetResourceDiscovery(api: TargetResourceApi, packageRoot: string): void {
   api.on("resources_discover", (event) => discoverTargetResourcePaths(packageRoot, event.cwd))
+}
+
+export function createTargetNativeSkillAccessor(packageRoot: string, cwd: string): {
+  all(): Promise<NativeSkillEntry[]>
+  get(name: string): Promise<NativeSkillEntry | undefined>
+  dirs(): string[]
+} {
+  const skillPaths = discoverTargetResourcePaths(packageRoot, cwd).skillPaths ?? []
+
+  const all = async (): Promise<NativeSkillEntry[]> => {
+    const loaded = await Promise.all(
+      skillPaths.map((skillsDir, index) => loadSkillsFromDir({
+        skillsDir,
+        scope: index < 2 ? "project" : "config",
+      })),
+    )
+    const byName = new Map<string, NativeSkillEntry>()
+    for (const skill of loaded.flat()) {
+      if (byName.has(skill.name)) continue
+      byName.set(skill.name, {
+        name: skill.name,
+        description: skill.definition.description ?? "",
+        location: skill.path ?? skill.resolvedPath ?? skillsDirFallback(skillPaths),
+        content: skill.definition.template ?? "",
+      })
+    }
+    return [...byName.values()]
+  }
+
+  return {
+    all,
+    async get(name) {
+      return (await all()).find((skill) => skill.name === name)
+    },
+    dirs: () => [...skillPaths],
+  }
+}
+
+function skillsDirFallback(skillPaths: readonly string[]): string {
+  return skillPaths[0] ?? process.cwd()
 }

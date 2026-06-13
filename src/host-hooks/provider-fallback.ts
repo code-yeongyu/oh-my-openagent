@@ -22,11 +22,10 @@ type TargetMessageEnd = {
 
 export type TargetProviderApi = {
   on(
-    event: "before_provider_request" | "after_provider_response" | "message_end",
+    event: "before_provider_request" | "after_provider_response" | "message_end" | "turn_end" | "agent_end",
     handler: (payload: unknown, context: unknown) => unknown | Promise<unknown>,
   ): void
   setModel?(model: TargetModel): Promise<boolean>
-  sendUserMessage?(content: string, options?: { deliverAs?: "steer" | "followUp" }): void | Promise<void>
 }
 
 export type TargetProviderState = {
@@ -63,8 +62,13 @@ function unwrapProviderPayload(eventOrPayload: unknown): unknown {
 function assistantHasError(payload: unknown): boolean {
   if (!isRecord(payload)) return false
   const event = payload as TargetMessageEnd
-  if (!isRecord(event.message) || event.message.role !== "assistant") return false
-  return typeof event.message.errorMessage === "string" && event.message.errorMessage.length > 0
+  const messages = Array.isArray(payload.messages) ? payload.messages : [event.message]
+  return messages.some((message) =>
+    isRecord(message)
+    && message.role === "assistant"
+    && typeof message.errorMessage === "string"
+    && message.errorMessage.length > 0
+  )
 }
 
 function extractTextContent(value: unknown): string | undefined {
@@ -124,22 +128,12 @@ async function applyNextFallback(
   return false
 }
 
-async function replayFailedTurn(api: TargetProviderApi, state: TargetProviderState): Promise<void> {
-  if (!api.sendUserMessage || !state.lastPrompt) return
-  if (state.lastReplayPrompt === state.lastPrompt) return
-  state.replayAttempts += 1
-  await api.sendUserMessage(state.lastPrompt, { deliverAs: "followUp" })
-  state.lastReplayPrompt = state.lastPrompt
-  state.replayApplied += 1
-}
-
-async function applyFallbackAndReplay(
+async function applyFallback(
   api: TargetProviderApi,
   context: TargetProviderContext,
   state: TargetProviderState,
 ): Promise<void> {
-  const fallbackApplied = await applyNextFallback(api, context, state)
-  if (fallbackApplied) await replayFailedTurn(api, state)
+  await applyNextFallback(api, context, state)
 }
 
 export function registerTargetProviderFallback(
@@ -153,7 +147,10 @@ export function registerTargetProviderFallback(
     replayApplied: 0,
   },
 ): TargetProviderState {
+  let fallbackPending = false
+
   api.on("before_provider_request", (eventOrPayload) => {
+    fallbackPending = false
     const payload = isRecord(eventOrPayload) && "payload" in eventOrPayload ? eventOrPayload.payload : eventOrPayload
     const prompt = extractReplayPrompt(payload)
     if (prompt) state.lastPrompt = prompt
@@ -170,20 +167,20 @@ export function registerTargetProviderFallback(
     const response = payload as TargetProviderResponse
     state.responseErrors += 1
     state.lastErrorStatus = response.status
-    if (response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500) {
-      await applyFallbackAndReplay(api, isRecord(context) ? context : {}, state)
-    }
     return undefined
   })
 
-  api.on("message_end", async (payload, context) => {
-    if (!assistantHasError(payload)) return undefined
+  const handleFailedTurn = async (payload: unknown, context: unknown) => {
+    if (fallbackPending || !assistantHasError(payload)) return undefined
     state.responseErrors += 1
     const contextPrompt = extractReplayPrompt(context)
     if (contextPrompt) state.lastPrompt = contextPrompt
-    await applyFallbackAndReplay(api, isRecord(context) ? context : {}, state)
+    await applyFallback(api, isRecord(context) ? context : {}, state)
+    fallbackPending = true
     return undefined
-  })
+  }
+  api.on("turn_end", handleFailedTurn)
+  api.on("agent_end", handleFailedTurn)
 
   return state
 }

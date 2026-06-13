@@ -5,6 +5,7 @@ import type { TargetToolDefinition } from "../host-tools"
 describe("target skill MCP tool", () => {
   it("#given a skill frontmatter MCP and two sessions #when calls execute #then the target passes isolated session keys", async () => {
     const sessionIDs: string[] = []
+    const disconnectedSessionIDs: string[] = []
     let currentSession = "session-a"
     let targetTool: TargetToolDefinition | undefined
     registerTargetSkillMcpTool({
@@ -25,7 +26,9 @@ describe("target skill MCP tool", () => {
         },
         readResource: async () => [],
         getPrompt: async () => [],
-        disconnectSession: async () => {},
+        disconnectSession: async (sessionID) => {
+          disconnectedSessionIDs.push(sessionID)
+        },
       },
     })
 
@@ -34,5 +37,11 @@ describe("target skill MCP tool", () => {
     await targetTool?.execute("two", { mcp_name: "echo", tool_name: "run" })
 
     expect(sessionIDs).toEqual(["session-a", "session-b"])
+    expect(disconnectedSessionIDs).toEqual(["session-a", "session-b"])
+    expect(targetTool?.parameters).toMatchObject({
+      properties: {
+        arguments: { type: "string" },
+      },
+    })
   })
 })

@@ -15,7 +15,7 @@ describe("target provider and fallback hooks", () => {
     })
   })
 
-  it("#given a retryable provider response #when response observer runs #then an available source fallback model is selected", async () => {
+  it("#given a retryable failed turn #when the harness finishes it #then an available source fallback model is selected", async () => {
     const handlers = new Map<string, (payload: unknown, context: unknown) => unknown | Promise<unknown>>()
     const selected: Array<{ provider: string; id: string }> = []
     const api: TargetProviderApi = {
@@ -29,8 +29,8 @@ describe("target provider and fallback hooks", () => {
     }
     const state = registerTargetProviderFallback(api)
 
-    await handlers.get("after_provider_response")?.(
-      { status: 429, headers: {} },
+    await handlers.get("turn_end")?.(
+      { message: { role: "assistant", errorMessage: "429 failure" } },
       {
         model: { provider: "test", id: "broken" },
         modelRegistry: {
@@ -41,7 +41,7 @@ describe("target provider and fallback hooks", () => {
     )
 
     expect(selected).toEqual([{ provider: "anthropic", id: "claude-opus-4-7" }])
-    expect(state).toMatchObject({ responseErrors: 1, fallbackAttempts: 1, fallbackApplied: 1, lastErrorStatus: 429 })
+    expect(state).toMatchObject({ responseErrors: 1, fallbackAttempts: 1, fallbackApplied: 1 })
   })
 
   it("#given a wrapped provider response #when response observer runs #then status is still observed", async () => {
@@ -64,20 +64,16 @@ describe("target provider and fallback hooks", () => {
       },
     )
 
-    expect(state).toMatchObject({ responseErrors: 1, fallbackAttempts: 1, fallbackApplied: 1, lastErrorStatus: 429 })
+    expect(state).toMatchObject({ responseErrors: 1, fallbackAttempts: 0, fallbackApplied: 0, lastErrorStatus: 429 })
   })
 
-  it("#given a failed provider turn #when fallback applies #then failed prompt is replayed once", async () => {
+  it("#given a failed provider turn #when fallback applies #then the harness retry owns replay", async () => {
     const handlers = new Map<string, (payload: unknown, context: unknown) => unknown | Promise<unknown>>()
-    const replayed: Array<{ content: string; deliverAs?: string }> = []
     const api: TargetProviderApi = {
       on: (event, handler) => {
         handlers.set(event, handler)
       },
       setModel: async () => true,
-      sendUserMessage: async (content, options) => {
-        replayed.push({ content, deliverAs: options?.deliverAs })
-      },
     }
     const state = registerTargetProviderFallback(api)
 
@@ -94,8 +90,8 @@ describe("target provider and fallback hooks", () => {
       },
       {},
     )
-    await handlers.get("after_provider_response")?.(
-      { type: "after_provider_response", status: 429, headers: {} },
+    await handlers.get("turn_end")?.(
+      { type: "turn_end", message: { role: "assistant", errorMessage: "429 failure" } },
       {
         model: { provider: "test", id: "broken" },
         modelRegistry: {
@@ -103,8 +99,8 @@ describe("target provider and fallback hooks", () => {
         },
       },
     )
-    await handlers.get("after_provider_response")?.(
-      { type: "after_provider_response", status: 429, headers: {} },
+    await handlers.get("agent_end")?.(
+      { type: "agent_end", messages: [{ role: "assistant", errorMessage: "429 failure" }] },
       {
         model: { provider: "test", id: "broken" },
         modelRegistry: {
@@ -113,7 +109,13 @@ describe("target provider and fallback hooks", () => {
       },
     )
 
-    expect(replayed).toEqual([{ content: "repair the failing test", deliverAs: "followUp" }])
-    expect(state).toMatchObject({ replayAttempts: 1, replayApplied: 1, lastPrompt: "repair the failing test" })
+    expect(state).toMatchObject({
+      fallbackAttempts: 1,
+      fallbackApplied: 1,
+      replayAttempts: 0,
+      replayApplied: 0,
+      lastPrompt: "repair the failing test",
+    })
   })
+
 })

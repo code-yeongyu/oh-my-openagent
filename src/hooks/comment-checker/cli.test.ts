@@ -73,6 +73,17 @@ describe("comment-checker CLI", () => {
       expect(result === null || typeof result === "string").toBe(true)
     })
 
+    test("#given packaged native binary #when resolving synchronously #then bundled vendor binary is found", async () => {
+      // given
+      const cliModule = await import(`./cli?vendor-binary=${crypto.randomUUID()}`)
+
+      // when
+      const result = cliModule.getCommentCheckerPathSync()
+
+      // then
+      expect(result).toContain(join("vendor", `${process.platform}-${process.arch}`, process.platform === "win32" ? "comment-checker.exe" : "comment-checker"))
+    })
+
     test("COMMENT_CHECKER_CLI_PATH export should not exist", async () => {
       // given
       const cliModule = await import("./cli")

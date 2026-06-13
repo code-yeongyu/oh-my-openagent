@@ -30,6 +30,9 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../.."
 
 export default function ohMyOpenAgentOhMyPiExtension(pi: OhMyPiExtensionApi): void {
   const backgroundManager = new TargetBackgroundManager()
+  pi.on("session_shutdown", () => {
+    backgroundManager.cancelAll()
+  })
   pi.setLabel(OH_MY_PI_EXTENSION_LABEL)
   registerOhMyPiDiagnostics(pi)
   registerTargetCommands(pi, { cwd: process.cwd() })
@@ -49,6 +52,7 @@ export default function ohMyOpenAgentOhMyPiExtension(pi: OhMyPiExtensionApi): vo
     host: "oh-my-pi",
     registry,
     cwd: process.cwd(),
+    packageRoot: PACKAGE_ROOT,
     backgroundManager,
   })
   registerMcpBackedTools({
@@ -78,6 +82,7 @@ export default function ohMyOpenAgentOhMyPiExtension(pi: OhMyPiExtensionApi): vo
         "target-session",
         `background:${taskID}`,
         `Background task ${taskID} completed. Review its result and continue.`,
+        "followUp",
       )
     },
   })

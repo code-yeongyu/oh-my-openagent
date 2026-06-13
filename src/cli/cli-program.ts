@@ -131,8 +131,10 @@ configureCleanupCommand(program)
 program
   .command("install-targets")
   .description("Link this package into Oh My Pi and Pi extension roots")
-  .action(() => {
-    const results = installTargetExtensions({ packageRoot: resolve(import.meta.dir, "../..") })
+  .addOption(new Option("--target <target>", "Target harness: oh-my-pi, pi, or both").choices(["oh-my-pi", "pi", "both"]).default("both"))
+  .action((options: { target: "oh-my-pi" | "pi" | "both" }) => {
+    const targets = options.target === "both" ? undefined : [options.target]
+    const results = installTargetExtensions({ packageRoot: resolve(import.meta.dir, "../.."), targets })
     console.log(JSON.stringify(results, null, 2))
   })
 

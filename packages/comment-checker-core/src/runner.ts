@@ -40,8 +40,15 @@ export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryIn
   try {
     const require = createRequire(input.importMetaUrl)
     const packageJsonPath = require.resolve(`${packageName}/package.json`)
-    const binaryPath = join(dirname(packageJsonPath), "bin", input.binaryName)
-    return input.existsSync(binaryPath) ? binaryPath : null
+    const packageDirectory = dirname(packageJsonPath)
+    const platform = input.platform ?? process.platform
+    const arch = input.arch ?? process.arch
+    const platformKey = `${platform}-${arch === "x64" ? "x64" : arch}`
+    const candidates = [
+      join(packageDirectory, "vendor", platformKey, input.binaryName),
+      join(packageDirectory, "bin", input.binaryName),
+    ]
+    return candidates.find(input.existsSync) ?? null
   } catch (error) {
     if (error instanceof Error) {
       return null

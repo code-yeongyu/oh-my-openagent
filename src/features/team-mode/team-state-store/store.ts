@@ -139,6 +139,8 @@ export async function createRuntimeState(
     members: spec.members.map((member) => ({
       name: member.name,
       agentType: spec.leadAgentId === member.name ? "leader" : "general-purpose",
+      subagent_type: member.kind === "subagent_type" ? member.subagent_type : undefined,
+      category: member.kind === "category" ? member.category : undefined,
       status: "pending",
       color: member.color,
       worktreePath: member.worktreePath,

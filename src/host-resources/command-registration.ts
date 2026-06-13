@@ -5,6 +5,8 @@ import { parseFrontmatter } from "../shared/frontmatter"
 
 export type TargetCommandContext = {
   cwd: string
+  isIdle?(): boolean
+  waitForIdle?(): Promise<void>
   ui: {
     notify(message: string, type?: "info" | "warning" | "error"): void
   }
@@ -36,6 +38,20 @@ function substitute(template: string, argument: string): string {
     .replaceAll("$ARGUMENTS", argument)
     .replaceAll("$SESSION_ID", "target-session")
     .replaceAll("$TIMESTAMP", new Date().toISOString())
+}
+
+async function waitForDispatchedCommandTurn(context: TargetCommandContext): Promise<void> {
+  if (!context.isIdle || !context.waitForIdle) return
+
+  for (let attempt = 0; attempt < 1_000; attempt += 1) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    if (context.isIdle()) continue
+    while (!context.isIdle()) {
+      await context.waitForIdle()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+    }
+    return
+  }
 }
 
 function discoverFileCommands(cwd: string): TargetCommandDefinition[] {
@@ -72,8 +88,9 @@ export function registerTargetCommands(
   for (const command of commands.values()) {
     api.registerCommand(command.name, {
       description: command.description,
-      handler: async (argument) => {
+      handler: async (argument, context) => {
         await api.sendUserMessage(substitute(command.template, argument))
+        await waitForDispatchedCommandTurn(context)
       },
     })
   }

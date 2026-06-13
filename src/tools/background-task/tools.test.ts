@@ -5,6 +5,7 @@ import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
+import type { BackgroundOutputArgs } from "./types"
 import { consumeToolMetadata, clearPendingStore } from "../../features/tool-metadata-store"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
@@ -380,6 +381,38 @@ describe("background_output blocking", () => {
     expect(pollCount).toBeGreaterThanOrEqual(3)
     expect(output).toContain("Task Result")
     expect(output).toContain("completed result")
+  })
+})
+
+describe("background_output missing task_id", () => {
+  test("returns actionable error when task_id is not provided", async () => {
+    // #given
+    const manager = createMockManager(createTask())
+    const client = createMockClient({})
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when
+    const output = await tool.execute({ task_id: "" }, mockContext)
+
+    // #then
+    expect(output).toContain("No task ID provided")
+    expect(output).toContain("task_id")
+    expect(output).toContain("bg_")
+  })
+
+  test("returns actionable error when task_id is undefined", async () => {
+    // #given
+    const manager = createMockManager(createTask())
+    const client = createMockClient({})
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when
+    const output = await tool.execute(unsafeTestValue<BackgroundOutputArgs>({}), mockContext)
+
+    // #then
+    expect(output).toContain("No task ID provided")
+    expect(output).toContain("task_id")
+    expect(output).toContain("bg_")
   })
 })
 

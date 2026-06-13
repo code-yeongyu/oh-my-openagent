@@ -34,6 +34,36 @@ describe("registerTargetCommands", () => {
     expect(messages[0]).not.toContain("$ARGUMENTS")
   })
 
+  test("#given fire-and-forget target message dispatch #when command runs #then handler waits for the dispatched turn", async () => {
+    const commands = new Map<string, TargetCommandOptions>()
+    let idle = true
+    let waitCount = 0
+    registerTargetCommands(
+      {
+        registerCommand: (name, command) => commands.set(name, command),
+        sendUserMessage: () => {
+          queueMicrotask(() => {
+            idle = false
+          })
+        },
+      },
+      { cwd },
+    )
+
+    await commands.get("cancel-ralph")?.handler("", {
+      cwd,
+      isIdle: () => idle,
+      waitForIdle: async () => {
+        waitCount += 1
+        if (waitCount > 1) idle = true
+      },
+      ui: { notify: () => {} },
+    })
+
+    expect(idle).toBe(true)
+    expect(waitCount).toBe(2)
+  })
+
   test("#given canonical and legacy command files #when discovered #then agents command wins", async () => {
     mkdirSync(join(cwd, ".agents", "command"), { recursive: true })
     mkdirSync(join(cwd, ".opencode", "command"), { recursive: true })

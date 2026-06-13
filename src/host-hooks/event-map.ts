@@ -13,6 +13,7 @@ export type TargetHookEventName =
   | "context"
   | "before_agent_start"
   | "resources_discover"
+  | "auto_compaction_start"
   | "auto_compaction_end"
 
 export type TargetHookEventMapping = {
@@ -32,7 +33,6 @@ export const TARGET_HOOK_EVENT_MAP: readonly TargetHookEventMapping[] = [
   { tier: "transform", targetEvent: "before_agent_start", opencodeSurface: "experimental.chat.system.transform", hosts: ["oh-my-pi", "pi"] },
   { tier: "continuation", targetEvent: "session_compact", opencodeSurface: "experimental.compaction.autocontinue", hosts: ["oh-my-pi", "pi"] },
   { tier: "continuation", targetEvent: "session.compacting", opencodeSurface: "experimental.session.compacting", hosts: ["oh-my-pi"] },
-  { tier: "continuation", targetEvent: "auto_compaction_end", opencodeSurface: "experimental.compaction.autocontinue", hosts: ["oh-my-pi"] },
   { tier: "skill", targetEvent: "resources_discover", opencodeSurface: "skill hooks", hosts: ["oh-my-pi", "pi"] },
 ] as const
 

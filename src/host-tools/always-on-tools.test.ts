@@ -43,6 +43,26 @@ describe("registerAlwaysOnUtilityTools", () => {
     expect([...tools.keys()].sort()).toEqual([...ALWAYS_ON_UTILITY_TOOL_NAMES].sort())
   })
 
+  test("#given host-owned canonical tools #when registering utility tools #then only selected duplicates are skipped", () => {
+    const tools = new Map<string, TargetToolDefinition>()
+
+    registerAlwaysOnUtilityTools({
+      host: "pi",
+      cwd: tempDirectory,
+      disabledToolNames: ["skill", "session_search"],
+      registry: {
+        registerTool: (tool) => {
+          tools.set(tool.name, tool)
+        },
+      },
+    })
+
+    expect(tools.has("skill")).toBe(false)
+    expect(tools.has("session_search")).toBe(false)
+    expect(tools.has("session_list")).toBe(true)
+    expect(tools.has("grep")).toBe(true)
+  })
+
   test("#given registered read-only tool #when executing glob #then target wrapper returns matching file output", async () => {
     // given
     mkdirSync(join(tempDirectory, "src"), { recursive: true })
@@ -87,6 +107,33 @@ describe("registerAlwaysOnUtilityTools", () => {
     expect(result ? getText(result) : "").toBe("No sessions found.")
   })
 
+  test("#given package resource skill #when target skill tool executes #then it loads the package skill body", async () => {
+    const packageRoot = join(tempDirectory, "package")
+    const skillDirectory = join(packageRoot, ".agents", "skills", "hyperplan")
+    mkdirSync(skillDirectory, { recursive: true })
+    writeFileSync(
+      join(skillDirectory, "SKILL.md"),
+      "---\nname: hyperplan\ndescription: adversarial planning\n---\nHYPERPLAN TARGET BODY",
+      "utf-8",
+    )
+    const tools = new Map<string, TargetToolDefinition>()
+    registerAlwaysOnUtilityTools({
+      host: "pi",
+      cwd: tempDirectory,
+      packageRoot,
+      registry: {
+        registerTool: (tool) => {
+          tools.set(tool.name, tool)
+        },
+      },
+    })
+
+    const result = await tools.get("skill")?.execute("call-1", { name: "hyperplan" })
+
+    expect(result?.isError).toBeUndefined()
+    expect(result ? getText(result) : "").toContain("HYPERPLAN TARGET BODY")
+  })
+
   test("#given registered background task #when output is requested #then target manager reports completion", async () => {
     // given
     const tools = new Map<string, TargetToolDefinition>()
@@ -110,5 +157,55 @@ describe("registerAlwaysOnUtilityTools", () => {
     // then
     expect(result?.isError).toBe(false)
     expect(result ? getText(result) : "").toContain("completed")
+  })
+
+  test("#given background tools #when registered for Pi #then their schemas preserve both task ID spellings", () => {
+    // given
+    const tools = new Map<string, TargetToolDefinition>()
+
+    // when
+    registerAlwaysOnUtilityTools({
+      host: "pi",
+      cwd: tempDirectory,
+      registry: {
+        registerTool: (tool) => {
+          tools.set(tool.name, tool)
+        },
+      },
+    })
+
+    // then
+    for (const name of ["background_output", "background_cancel"]) {
+      const parameters = tools.get(name)?.parameters as {
+        properties?: Record<string, unknown>
+      }
+      expect(parameters.properties?.task_id).toBeDefined()
+      expect(parameters.properties?.taskId).toBeDefined()
+    }
+  })
+
+  test("#given registered background task #when output is requested with taskId alias #then target manager finds it", async () => {
+    // given
+    const tools = new Map<string, TargetToolDefinition>()
+    const manager = new (await import("./background-manager")).TargetBackgroundManager()
+    const task = manager.start(async () => "alias-done")
+    registerAlwaysOnUtilityTools({
+      host: "pi",
+      cwd: tempDirectory,
+      backgroundManager: manager,
+      registry: {
+        registerTool: (tool) => {
+          tools.set(tool.name, tool)
+        },
+      },
+    })
+
+    // when
+    await Bun.sleep(0)
+    const result = await tools.get("background_output")?.execute("call-1", { taskId: task.id })
+
+    // then
+    expect(result?.isError).toBe(false)
+    expect(result ? getText(result) : "").toContain("alias-done")
   })
 })

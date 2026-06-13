@@ -44,5 +44,5 @@ export type OhMyPiExtensionApi = TargetResourceApi & TargetHookApi & TargetMessa
   setLabel(label: string): void
   registerCommand(name: string, options: OhMyPiCommandOptions): void
   registerTool<TDetails = unknown>(tool: OhMyPiToolDefinition<TDetails>): void
-  sendUserMessage(content: string): void | Promise<void>
+  sendUserMessage(content: string, options?: { deliverAs?: "steer" | "followUp" }): void | Promise<void>
 }

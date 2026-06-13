@@ -62,9 +62,8 @@ describe("registerGatedRuntimeTools", () => {
 
   test("#given tmux available #when attempting kill-server #then interactive bash blocks the command", async () => {
     const tools = collectTools({ interactiveBashEnabled: true })
-    const result = await tools.get("interactive_bash")?.execute("call-1", { tmux_command: "kill-server" })
+    const execution = tools.get("interactive_bash")?.execute("call-1", { tmux_command: "kill-server" })
 
-    expect(result?.isError).toBe(true)
-    expect(result?.content[0]).toMatchObject({ type: "text" })
+    await expect(execution).rejects.toThrow("'kill-server' is prohibited")
   })
 })

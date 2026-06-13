@@ -15,7 +15,10 @@ const parameters: JsonObject = {
     tool_name: { type: "string" },
     resource_name: { type: "string" },
     prompt_name: { type: "string" },
-    arguments: {},
+    arguments: {
+      type: "string",
+      description: "Optional MCP arguments encoded as a JSON object string.",
+    },
   },
   required: ["mcp_name"],
   additionalProperties: false,
@@ -76,18 +79,22 @@ export function registerTargetSkillMcpTool(options: {
           ? rawArguments
           : undefined,
       )
-      let result: unknown
-      if (selected.type === "tool") result = await manager.callTool(info, found.context, selected.name, args)
-      else if (selected.type === "resource") result = await manager.readResource(info, found.context, selected.name)
-      else {
-        result = await manager.getPrompt(
-          info,
-          found.context,
-          selected.name,
-          Object.fromEntries(Object.entries(args).map(([key, value]) => [key, String(value)])),
-        )
+      try {
+        let result: unknown
+        if (selected.type === "tool") result = await manager.callTool(info, found.context, selected.name, args)
+        else if (selected.type === "resource") result = await manager.readResource(info, found.context, selected.name)
+        else {
+          result = await manager.getPrompt(
+            info,
+            found.context,
+            selected.name,
+            Object.fromEntries(Object.entries(args).map(([key, value]) => [key, String(value)])),
+          )
+        }
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }
+      } finally {
+        await manager.disconnectSession(info.sessionID)
       }
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }
     },
   }
 

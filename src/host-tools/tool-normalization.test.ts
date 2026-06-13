@@ -186,7 +186,7 @@ describe("host target tool registration", () => {
     })
   })
 
-  test("#given host tool throws #when target wrapper executes #then error result is returned", async () => {
+  test("#given host tool throws #when target wrapper executes #then harness receives a rejected execution", async () => {
     // given
     const hostTool: HostToolDefinition<JsonObject> = {
       name: "throw_tool",
@@ -210,10 +210,34 @@ describe("host target tool registration", () => {
     )
 
     // then
-    await expect(targetTool.execute("call-1", {})).resolves.toEqual({
-      content: [{ type: "text", text: "target failure" }],
-      details: undefined,
-      isError: true,
-    })
+    await expect(targetTool.execute("call-1", {})).rejects.toThrow("target failure")
+  })
+
+  test("#given host tool returns an error result #when target wrapper executes #then harness receives a rejected execution", async () => {
+    // given
+    const hostTool: HostToolDefinition<JsonObject> = {
+      name: "error_result_tool",
+      label: "Error Result",
+      description: "Returns an error result",
+      parameters: {},
+      execute: async () => ({
+        content: [{ type: "text", text: "invalid input" }],
+        isError: true,
+      }),
+    }
+
+    // when
+    const targetTool = registerTargetTool(
+      { registerTool: () => {} },
+      hostTool,
+      {
+        host: "pi",
+        parameters: { kind: "json-schema", schema: { type: "object", properties: {} } },
+        createSessionContext,
+      },
+    )
+
+    // then
+    await expect(targetTool.execute("call-1", {})).rejects.toThrow("invalid input")
   })
 })

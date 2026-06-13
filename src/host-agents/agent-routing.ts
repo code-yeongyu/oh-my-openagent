@@ -21,7 +21,8 @@ export function resolveTargetAgentRoute(
 ): TargetAgentRoute {
   const agents = createTargetAgentInventory()
   if (request.subagentType) {
-    const agent = agents.find((candidate) => candidate.name === request.subagentType)
+    const targetAgentName = request.subagentType === "plan" ? "prometheus" : request.subagentType
+    const agent = agents.find((candidate) => candidate.name === targetAgentName)
     if (!agent) throw new Error(`Unknown OMO agent "${request.subagentType}". Available: ${agents.map((item) => item.name).join(", ")}`)
     return { host, agent, prompt: request.prompt }
   }

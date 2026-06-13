@@ -114,8 +114,8 @@ describe("runtime state store", () => {
       maxMemberTurns: 50,
     })
     expect(runtimeState.members).toEqual([
-      expect.objectContaining({ name: "lead", agentType: "leader", status: "pending", pendingInjectedMessageIds: [] }),
-      expect.objectContaining({ name: "worker", agentType: "general-purpose", status: "pending", pendingInjectedMessageIds: [] }),
+      expect.objectContaining({ name: "lead", agentType: "leader", subagent_type: "sisyphus", status: "pending", pendingInjectedMessageIds: [] }),
+      expect.objectContaining({ name: "worker", agentType: "general-purpose", category: "deep", status: "pending", pendingInjectedMessageIds: [] }),
     ])
     expect(persistedState.status).toBe("creating")
   })

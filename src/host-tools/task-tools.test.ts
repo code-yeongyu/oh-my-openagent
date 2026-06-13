@@ -57,6 +57,40 @@ describe("registerTargetTaskTools", () => {
     expect(backgroundManager.get(details?.taskID ?? "")).toMatchObject({ status: "completed", output: "background done" })
   })
 
+  test("#given a stale completion notifier #when background work completes #then task output survives without an unhandled rejection", async () => {
+    const manager = new TargetBackgroundManager()
+    const task = manager.start(
+      async () => "completed output",
+      async () => {
+        throw new Error("stale extension context")
+      },
+    )
+
+    await Bun.sleep(0)
+
+    expect(manager.get(task.id)).toMatchObject({
+      status: "completed",
+      output: "completed output",
+      notificationError: "stale extension context",
+    })
+  })
+
+  test("#given running background tasks #when manager shuts down #then every task is cancelled", async () => {
+    const manager = new TargetBackgroundManager()
+    const run = (signal: AbortSignal) =>
+      new Promise<string>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true })
+      })
+    const first = manager.start(run)
+    const second = manager.start(run)
+
+    expect(manager.cancelAll()).toBe(2)
+    await Bun.sleep(0)
+
+    expect(manager.get(first.id)?.status).toBe("cancelled")
+    expect(manager.get(second.id)?.status).toBe("cancelled")
+  })
+
   test("#given target adapter #when registering task tools #then complete task surface is present", () => {
     expect([...tools().keys()].sort()).toEqual([...TARGET_TASK_TOOL_NAMES].sort())
   })

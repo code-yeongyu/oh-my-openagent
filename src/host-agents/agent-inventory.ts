@@ -26,6 +26,7 @@ export type TargetAgentDefinition = {
 }
 
 const READ_ONLY_TOOLS = ["read", "grep", "find", "ls"] as const
+const PROMETHEUS_TOOLS = [...READ_ONLY_TOOLS, "write", "edit"] as const
 
 function definition(
   name: string,
@@ -38,7 +39,7 @@ function definition(
     description: config.description ?? `${getAgentDisplayName(name)} agent`,
     systemPrompt: config.prompt ?? "",
     policy,
-    tools: policy === "full" ? undefined : READ_ONLY_TOOLS,
+    tools: policy === "full" ? undefined : policy === "prometheus-markdown-only" ? PROMETHEUS_TOOLS : READ_ONLY_TOOLS,
     teamEligibility: AGENT_ELIGIBILITY_REGISTRY[name]?.verdict ?? "hard-reject",
   }
 }

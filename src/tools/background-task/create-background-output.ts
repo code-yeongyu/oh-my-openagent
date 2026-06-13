@@ -114,6 +114,13 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
         const ctx = toolContext as ToolContextWithMetadata
+
+        if (!args.task_id) {
+          return `No task ID provided. Pass the \`task_id\` parameter with the background task ID (\`bg_...\`) returned by the background task launch or completion notification.
+
+Example: background_output(task_id="bg_21fc86ff-...")`
+        }
+
         const task = await getTaskWithMissingRetry(manager, args.task_id)
         if (!task) {
           return formatTaskNotFoundMessage(args.task_id)

@@ -40,5 +40,5 @@ export type PiToolDefinition<TDetails = unknown> = {
 export type PiExtensionApi = TargetResourceApi & TargetHookApi & TargetMessageTransformApi & TargetProviderApi & TargetToolGuardApi & {
   registerCommand(name: string, options: PiCommandOptions): void
   registerTool<TDetails = unknown>(tool: PiToolDefinition<TDetails>): void
-  sendUserMessage(content: string): void | Promise<void>
+  sendUserMessage(content: string, options?: { deliverAs?: "steer" | "followUp" }): void | Promise<void>
 }

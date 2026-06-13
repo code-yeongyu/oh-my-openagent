@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import {
   injectTargetKeywordMessages,
+  injectTargetKeywordMessagesIntoContext,
   registerTargetMessageTransforms,
   validateTargetMessages,
   type TargetMessageTransformApi,
@@ -44,11 +45,45 @@ describe("target message transforms", () => {
       },
     }
     registerTargetMessageTransforms("oh-my-pi", api)
+    const input = await handlers.get("input")?.(
+      { text: "search for it", source: "interactive" },
+      {},
+    )
+    expect(input).toMatchObject({ text: expect.stringContaining("[search-mode]") })
     const system = await handlers.get("before_agent_start")?.(
-      { prompt: "[search-mode]\nfind it", systemPrompt: ["base"] },
+      { prompt: "search for it", systemPrompt: ["base"] },
       {},
     )
     expect(system).toMatchObject({ systemPrompt: expect.any(Array) })
+  })
+
+  it("#given a headless user prompt #when context is transformed #then the latest user text receives the mode block immutably", () => {
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "old message" }] },
+      { role: "assistant", content: [{ type: "text", text: "reply" }] },
+      { role: "user", content: [{ type: "text", text: "ultrawork finish this" }] },
+    ]
+    const before = structuredClone(messages)
+
+    const transformed = injectTargetKeywordMessagesIntoContext(messages)
+
+    expect(transformed).not.toBe(messages)
+    expect((transformed[2] as { content: Array<{ text: string }> }).content[0]?.text).toContain("<ultrawork-mode>")
+    expect(messages).toEqual(before)
+  })
+
+  it("#given an already injected or slash-command prompt #when context is transformed #then no duplicate mode block is added", () => {
+    const injected = injectTargetKeywordMessages("search for it")
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "/search for it" }] },
+      { role: "user", content: [{ type: "text", text: injected }] },
+    ]
+
+    const transformed = injectTargetKeywordMessagesIntoContext(messages)
+    const text = (transformed[1] as { content: Array<{ text: string }> }).content[0]?.text ?? ""
+
+    expect(text.match(/\[search-mode\]/g)?.length).toBe(1)
+    expect((transformed[0] as { content: Array<{ text: string }> }).content[0]?.text).toBe("/search for it")
   })
 
   it("#given target provider messages #when validators run #then tool pairs and thinking blocks are observed without mutating payload", () => {

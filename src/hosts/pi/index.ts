@@ -24,11 +24,15 @@ import {
   TargetHookDispatcher,
   targetOpenClawConfigFromEnv,
 } from "../../host-hooks"
+import { resolvePiHermesOwnedToolNames } from "./hermes-interoperability"
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..")
 
 export default function ohMyOpenAgentPiExtension(pi: PiExtensionApi): void {
   const backgroundManager = new TargetBackgroundManager()
+  pi.on("session_shutdown", () => {
+    backgroundManager.cancelAll()
+  })
   registerPiDiagnostics(pi)
   registerTargetCommands(pi, { cwd: process.cwd() })
   registerTargetResourceDiscovery(pi, PACKAGE_ROOT)
@@ -47,7 +51,9 @@ export default function ohMyOpenAgentPiExtension(pi: PiExtensionApi): void {
     host: "pi",
     registry,
     cwd: process.cwd(),
+    packageRoot: PACKAGE_ROOT,
     backgroundManager,
+    disabledToolNames: resolvePiHermesOwnedToolNames({ cwd: process.cwd() }),
   })
   registerMcpBackedTools({
     host: "pi",
@@ -76,6 +82,7 @@ export default function ohMyOpenAgentPiExtension(pi: PiExtensionApi): void {
         "target-session",
         `background:${taskID}`,
         `Background task ${taskID} completed. Review its result and continue.`,
+        "followUp",
       )
     },
   })

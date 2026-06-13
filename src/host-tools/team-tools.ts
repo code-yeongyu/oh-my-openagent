@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { TeamModeConfig } from "../config/schema/team-mode"
 import { TeamModeConfigSchema } from "../config/schema/team-mode"
 import type { HostKind, HostToolDefinition, JsonObject } from "../host-contract"
+import { resolveTargetAgentRoute, runTargetAgent, type TargetAgentRoute, type TargetAgentRunResult } from "../host-agents"
 import { createTask, getTask, listTasks, updateTaskStatus } from "../features/team-mode/team-tasklist"
 import { sendMessage } from "../features/team-mode/team-mailbox"
 import { ensureBaseDirs, getInboxDir, getWorktreeDir, resolveBaseDir } from "../features/team-mode/team-registry/paths"
 import { createRuntimeState, listActiveTeams, loadRuntimeState, transitionRuntimeState } from "../features/team-mode/team-state-store/store"
+import { parseInlineTeamSpec } from "../features/team-mode/tools/lifecycle-inline-spec"
 import { AGENT_ELIGIBILITY_REGISTRY, TeamSpecSchema, type RuntimeState, type TeamSpec } from "../features/team-mode/types"
 import { runTmuxCommand, type TmuxCommandResult } from "../shared/tmux"
 import { getTmuxPath } from "../tools/interactive-bash/tmux-path-resolver"
@@ -18,11 +20,13 @@ type TeamIndex = Record<string, string>
 type TargetTeamDeps = {
   getTmuxPath(): Promise<string | null>
   runTmuxCommand(tmuxPath: string, args: string[]): Promise<TmuxCommandResult>
+  runAgent?(route: TargetAgentRoute, options: { cwd: string }): Promise<TargetAgentRunResult>
 }
 
 const DEFAULT_TEAM_DEPS: TargetTeamDeps = {
   getTmuxPath,
   runTmuxCommand: (tmuxPath, args) => runTmuxCommand(tmuxPath, args, { timeoutMs: 10_000 }),
+  runAgent: (route, options) => runTargetAgent(route, options),
 }
 
 const schema: JsonObject = {
@@ -34,6 +38,11 @@ const schema: JsonObject = {
     team: { type: "string", description: "Team name." },
     team_run_id: { type: "string", description: "Explicit team run id." },
     teamRunId: { type: "string", description: "Explicit team run id." },
+    inline_spec: {
+      type: "object",
+      description: "Inline Team Mode specification, including category members used by Hyperplan.",
+      additionalProperties: true,
+    },
     members: {
       type: "array",
       description: "Team members to create, such as sisyphus and atlas.",
@@ -97,6 +106,10 @@ function indexPath(cwd: string): string {
   return join(cwd, ".omo", "target-team-index.json")
 }
 
+function specPath(cwd: string, runId: string): string {
+  return join(resolveBaseDir(targetTeamConfig(cwd)), "runtime", runId, "spec.json")
+}
+
 async function loadIndex(cwd: string): Promise<TeamIndex> {
   try {
     return JSON.parse(await readFile(indexPath(cwd), "utf8")) as TeamIndex
@@ -146,6 +159,19 @@ function createSpec(name: string, members: readonly string[]): TeamSpec {
       prompt: `Target Team Mode member ${member}. Watch your inbox and work from the assigned worktree.`,
     })),
   })
+}
+
+function resolveCreateSpec(input: JsonObject): TeamSpec {
+  if (input.inline_spec !== undefined) {
+    return parseInlineTeamSpec(input.inline_spec, {
+      callerTeamLead: {
+        agentTypeId: "sisyphus",
+        displayName: "sisyphus",
+        isEligibleForTeamLead: true,
+      },
+    })
+  }
+  return createSpec(teamName(input), parseMembers(input))
 }
 
 async function resolveRunId(input: JsonObject, cwd: string, config: TeamModeConfig): Promise<string> {
@@ -242,47 +268,111 @@ async function activateTargetTmuxLayout(
 
 async function createTeam(input: JsonObject, cwd: string, deps: TargetTeamDeps): Promise<RuntimeState> {
   const config = targetTeamConfig(cwd)
-  const name = teamName(input)
-  const members = parseMembers(input)
-  assertEligible(members)
-  const spec = createSpec(name, members)
+  const spec = resolveCreateSpec(input)
+  assertEligible(spec.members.flatMap((member) => member.kind === "subagent_type" ? [member.subagent_type] : []))
   await ensureBaseDirs(resolveBaseDir(config))
   let runtimeState = await createRuntimeState(spec, "target-session", "project", config)
+  await writeFile(specPath(cwd, runtimeState.teamRunId), `${JSON.stringify(spec, null, 2)}\n`)
   runtimeState = await createWorktreeLayout(runtimeState, config)
   await ensureRuntimeDirectories(runtimeState, config)
   runtimeState = await activateTargetTmuxLayout(runtimeState, config, deps)
   runtimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
   const index = await loadIndex(cwd)
-  index[name] = runtimeState.teamRunId
+  index[spec.name] = runtimeState.teamRunId
   await saveIndex(cwd, index)
   return runtimeState
 }
 
-async function handleTeamTool(name: string, input: JsonObject, cwd: string, deps: TargetTeamDeps): Promise<unknown> {
+async function deleteTargetTeam(runId: string, cwd: string, config: TeamModeConfig, deps: TargetTeamDeps): Promise<RuntimeState> {
+  const current = await loadRuntimeState(runId, config)
+  const deleting = await transitionRuntimeState(runId, (runtimeState) => ({ ...runtimeState, status: "deleting" }), config)
+  const tmuxLayout = current.tmuxLayout
+  if (tmuxLayout?.ownedSession && tmuxLayout.targetSessionId) {
+    const tmuxPath = await deps.getTmuxPath()
+    if (tmuxPath) {
+      await deps.runTmuxCommand(tmuxPath, ["kill-session", "-t", tmuxLayout.targetSessionId])
+    }
+  }
+  const deleted = await transitionRuntimeState(deleting.teamRunId, (runtimeState) => ({ ...runtimeState, status: "deleted" }), config)
+  await rm(join(resolveBaseDir(config), "worktrees", runId), { recursive: true, force: true })
+  const index = await loadIndex(cwd)
+  for (const [name, indexedRunId] of Object.entries(index)) {
+    if (indexedRunId === runId) delete index[name]
+  }
+  await saveIndex(cwd, index)
+  await rm(join(resolveBaseDir(config), "runtime", runId), { recursive: true, force: true })
+  return deleted
+}
+
+async function runTargetTeamMember(
+  host: Exclude<HostKind, "opencode">,
+  runId: string,
+  recipient: string,
+  body: string,
+  cwd: string,
+  deps: TargetTeamDeps,
+): Promise<TargetAgentRunResult> {
+  const spec = TeamSpecSchema.parse(JSON.parse(await readFile(specPath(cwd, runId), "utf8")))
+  const member = spec.members.find((candidate) => candidate.name === recipient)
+  if (!member) throw new Error(`Team member "${recipient}" not found.`)
+  const prompt = `${member.prompt ?? `Act as team member ${member.name}.`}\n\n${body}`
+  const route = resolveTargetAgentRoute(host, member.kind === "category"
+    ? { category: member.category, prompt }
+    : { subagentType: member.subagent_type, prompt })
+  const result = await (deps.runAgent ?? DEFAULT_TEAM_DEPS.runAgent!)(route, { cwd })
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `${recipient} exited with code ${result.exitCode}.`)
+  }
+  return result
+}
+
+async function handleTeamTool(
+  host: Exclude<HostKind, "opencode">,
+  name: string,
+  input: JsonObject,
+  cwd: string,
+  deps: TargetTeamDeps,
+): Promise<unknown> {
   const config = targetTeamConfig(cwd)
   if (name === "team_create") return await createTeam(input, cwd, deps)
   if (name === "team_list") return await listActiveTeams(config)
 
   const runId = await resolveRunId(input, cwd, config)
   if (name === "team_status") return await loadRuntimeState(runId, config)
-  if (name === "team_delete") {
-    const deleted = await transitionRuntimeState(runId, (runtimeState) => ({ ...runtimeState, status: "deleting" }), config)
-    return await transitionRuntimeState(deleted.teamRunId, (runtimeState) => ({ ...runtimeState, status: "deleted" }), config)
-  }
+  if (name === "team_delete") return await deleteTargetTeam(runId, cwd, config, deps)
   if (name === "team_send_message") {
     const runtimeState = await loadRuntimeState(runId, config)
-    return await sendMessage({
+    const from = text(input.from) ?? "lead"
+    const to = text(input.to) ?? "*"
+    const body = text(input.body) ?? text(input.message) ?? ""
+    const delivered = await sendMessage({
       version: 1,
       messageId: randomUUID(),
-      from: text(input.from) ?? "lead",
-      to: text(input.to) ?? "*",
+      from,
+      to,
       kind: "message",
-      body: text(input.body) ?? text(input.message) ?? "",
+      body,
       timestamp: Date.now(),
     }, runId, config, {
       isLead: true,
       activeMembers: runtimeState.members.map((member) => member.name),
     })
+    if (from !== "lead" || to === "*" || to === "lead") return delivered
+    const memberResult = await runTargetTeamMember(host, runId, to, body, cwd, deps)
+    const memberResponse = memberResult.text || memberResult.stderr || `${to} produced no output.`
+    await sendMessage({
+      version: 1,
+      messageId: randomUUID(),
+      from: to,
+      to: "lead",
+      kind: "message",
+      body: memberResponse,
+      timestamp: Date.now(),
+    }, runId, config, {
+      isLead: true,
+      activeMembers: runtimeState.members.map((member) => member.name),
+    })
+    return { ...delivered, memberResponse, memberExitCode: memberResult.exitCode }
   }
   if (name === "team_task_create") {
     return await createTask(runId, {
@@ -323,7 +413,6 @@ async function handleTeamTool(name: string, input: JsonObject, cwd: string, deps
   if (name === "team_reject_shutdown") {
     return await transitionRuntimeState(runId, (runtimeState) => ({
       ...runtimeState,
-      status: "active",
       shutdownRequests: runtimeState.shutdownRequests.map((request) => ({
         ...request,
         rejectedReason: text(input.reason) ?? "rejected",
@@ -355,7 +444,7 @@ export function registerTargetTeamTools(options: {
       description: `${name} manages target Team Mode runtime state, worktrees, and tmux layout.`,
       parameters: schema,
       execute: async ({ input }) => ({
-        content: [{ type: "text", text: JSON.stringify(await handleTeamTool(name, input, options.cwd, deps), null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(await handleTeamTool(options.host, name, input, options.cwd, deps), null, 2) }],
       }),
     }
     return registerTargetTool(options.registry, tool, {
