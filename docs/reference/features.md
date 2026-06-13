@@ -652,6 +652,32 @@ These user-facing tool names are served by the built-in local `ast_grep` MCP bac
 | **session_search** | Full-text search across session messages |
 | **session_info**   | Get session metadata and statistics      |
 
+#### Finding older sessions hidden by `/sessions`
+
+OpenCode's built-in `/sessions` picker can omit older sessions even when they still exist in the local session store. Use OMO's session tools to find the ID, then continue it from the TUI.
+
+```ts
+session_list({
+  from_date: "2026-01-01T00:00:00Z",
+  to_date: "2026-02-11T00:00:00Z",
+  project_path: "/absolute/path/to/project",
+  limit: 50,
+})
+```
+
+After you find the session ID, type this in OpenCode:
+
+```text
+/continue <session_id>
+```
+
+If you remember text from the conversation but not the date, search first and then read the matching session:
+
+```ts
+session_search({ query: "migration bug", limit: 20 })
+session_read({ session_id: "ses_...", limit: 200 })
+```
+
 ### Task Management Tools
 
 Requires `experimental.task_system: true` in config.
