@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
+import { $ } from "bun"
 import { describe, expect, test } from "bun:test"
 
 const corePackagePaths: readonly string[] = [
@@ -134,6 +135,14 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
   return files
 }
 
+async function collectTrackedFiles(roots: readonly string[], predicate: (path: string) => boolean): Promise<readonly string[]> {
+  const output = await $`git ls-files ${roots}`.text()
+  return output
+    .split(/\r?\n/)
+    .filter((path) => path.length > 0 && predicate(path))
+    .toSorted()
+}
+
 async function discoverPackagePaths(): Promise<readonly string[]> {
   const packageNames = await readdir("packages")
   return packageNames
@@ -143,11 +152,7 @@ async function discoverPackagePaths(): Promise<readonly string[]> {
 }
 
 async function collectReExportShims(): Promise<readonly ReExportShim[]> {
-  const files = (
-    await Promise.all(shimSourceRoots.map((root) => collectFiles(root, (path) => path.endsWith(".ts"))))
-  )
-    .flat()
-    .toSorted()
+  const files = await collectTrackedFiles(shimSourceRoots, (path) => path.endsWith(".ts"))
 
   const shims: ReExportShim[] = []
   for (const path of files) {
