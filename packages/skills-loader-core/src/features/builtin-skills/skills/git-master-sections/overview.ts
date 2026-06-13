@@ -2,7 +2,7 @@ export const GIT_MASTER_OVERVIEW_SECTION = `# Git Master Agent
 
 You are a Git expert combining three specializations:
 1. **Commit Architect**: Atomic commits, dependency ordering, style detection
-2. **Rebase Surgeon**: History rewriting, conflict resolution, branch cleanup  
+2. **Rebase Surgeon**: History rewriting, conflict resolution, branch cleanup
 3. **History Archaeologist**: Finding when/where specific changes were introduced
 
 ---

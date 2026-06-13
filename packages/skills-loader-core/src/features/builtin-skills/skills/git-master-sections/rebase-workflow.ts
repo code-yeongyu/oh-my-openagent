@@ -170,7 +170,7 @@ REBASE SUMMARY:
   Commits before: N
   Commits after: M
   Conflicts resolved: K
-  
+
 HISTORY (after rebase):
   <hash1> <message1>
   <hash2> <message2>

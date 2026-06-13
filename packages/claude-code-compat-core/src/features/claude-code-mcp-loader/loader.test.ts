@@ -171,7 +171,7 @@ describe("getSystemMcpServerNames", () => {
    it("merges server names from multiple .mcp.json files", async () => {
      // given
      mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
-     
+
      const projectMcp = {
        mcpServers: {
          playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
@@ -182,7 +182,7 @@ describe("getSystemMcpServerNames", () => {
          memory: { command: "npx", args: ["-y", "@anthropic-ai/mcp-server-memory"] },
        },
      }
-     
+
      writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(projectMcp))
      writeFileSync(join(TEST_DIR, ".claude", ".mcp.json"), JSON.stringify(localMcp))
 

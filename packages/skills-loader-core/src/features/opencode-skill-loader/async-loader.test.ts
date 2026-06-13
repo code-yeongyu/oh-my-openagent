@@ -218,7 +218,7 @@ Invalid skill.
       createTestSkill("valid-skill", validContent)
       const invalidDir = createTestSkill("invalid-skill", invalidContent)
       const invalidFile = join(invalidDir, "SKILL.md")
-      
+
       // Make file unreadable on Unix systems
       if (process.platform !== "win32") {
         chmodSync(invalidFile, 0o000)
@@ -262,7 +262,7 @@ Skill two.
       // then
       expect(asyncSkills.length).toBe(2)
       expect(asyncSkills.map((s: LoadedSkill) => s.name).sort()).toEqual(["skill-one", "skill-two"])
-      
+
       const skill1Result = asyncSkills.find((s: LoadedSkill) => s.name === "skill-one")
       expect(skill1Result?.definition.description).toContain("First skill")
     })

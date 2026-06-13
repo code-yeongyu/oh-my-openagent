@@ -109,7 +109,7 @@ Skill 2 content.`
     // then returns all valid skills
     expect(skills).toBeArray()
     expect(skills.length).toBe(2)
-    
+
     const skillNames = skills.map(s => s.name).sort()
     expect(skillNames).toEqual(["skill1", "skill2"])
   })

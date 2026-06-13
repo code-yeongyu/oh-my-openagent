@@ -207,7 +207,7 @@ DETAILS:
   Author: John Doe <john@example.com>
   Date: 2024-06-15
   Files changed: 3
-  
+
 DIFF EXCERPT (if applicable):
   + def calculate_discount(price, rate):
   +     return price * (1 - rate)

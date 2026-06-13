@@ -17,17 +17,17 @@ export async function mapWithConcurrency<T, R>(
 ): Promise<R[]> {
   const results: R[] = new Array(items.length)
   let index = 0
-  
+
   const worker = async () => {
     while (index < items.length) {
       const currentIndex = index++
       results[currentIndex] = await mapper(items[currentIndex])
     }
   }
-  
+
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
   await Promise.all(workers)
-  
+
   return results
 }
 
@@ -52,11 +52,11 @@ export async function loadMcpJsonFromDirAsync(skillDir: string): Promise<SkillMc
   try {
     const content = await readFile(mcpJsonPath, "utf-8")
     const parsed = JSON.parse(content) as Record<string, unknown>
-    
+
     if (parsed && typeof parsed === "object" && "mcpServers" in parsed && parsed.mcpServers) {
       return parsed.mcpServers as SkillMcpConfig
     }
-    
+
     if (parsed && typeof parsed === "object" && !("mcpServers" in parsed)) {
       const hasCommandField = Object.values(parsed).some(
         (v) => v && typeof v === "object" && "command" in (v as Record<string, unknown>)
@@ -82,7 +82,7 @@ export async function loadSkillFromPathAsync(
     const content = await readFile(skillPath, "utf-8")
     const { data, body, parseError } = parseFrontmatter<SkillMetadata>(content)
     if (parseError) return null
-    
+
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = await loadMcpJsonFromDirAsync(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -134,12 +134,12 @@ $ARGUMENTS
 
 function parseAllowedTools(allowedTools: string | string[] | undefined): string[] | undefined {
   if (!allowedTools) return undefined
-  
+
   // Handle YAML array format: already parsed as string[]
   if (Array.isArray(allowedTools)) {
     return allowedTools.map(t => t.trim()).filter(Boolean)
   }
-  
+
   // Handle space-separated string format: "Read Write Edit Bash"
   return allowedTools.split(/\s+/).filter(Boolean)
 }
@@ -153,7 +153,7 @@ export async function discoverSkillsInDirAsync(
 ): Promise<LoadedSkill[]> {
   try {
     const entries = await readdir(skillsDir, { withFileTypes: true })
-    
+
     const processEntry = async (entry: Dirent): Promise<LoadedSkill | LoadedSkill[] | null> => {
       if (entry.name.startsWith(".")) return null
 

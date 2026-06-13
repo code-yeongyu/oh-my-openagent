@@ -1,6 +1,6 @@
 /**
  * Claude Code Plugin Types
- * 
+ *
  * Type definitions for Claude Code plugin system compatibility.
  * Based on https://code.claude.com/docs/en/plugins-reference
  */
@@ -100,7 +100,7 @@ export interface PluginManifest {
   repository?: string
   license?: string
   keywords?: string[]
-  
+
   // Component paths (can be string or array)
   commands?: string | string[]
   agents?: string | string[]
@@ -195,7 +195,7 @@ export interface LoadedPlugin {
   installPath: string
   manifest?: PluginManifest
   pluginKey: string
-  
+
   // Resolved paths for components
   commandsDir?: string
   agentsDir?: string
@@ -248,7 +248,7 @@ export interface PluginLoaderOptions {
    * Override enabled plugins from oh-my-opencode config.
    * Key format: "pluginName@marketplace" (e.g., "shell-scripting@claude-code-workflows")
    * Value: true = enabled, false = disabled
-   * 
+   *
    * This takes precedence over ~/.claude/settings.json enabledPlugins
    */
   enabledPluginsOverride?: Record<string, boolean>
