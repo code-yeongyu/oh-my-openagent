@@ -16,10 +16,37 @@ var __export = (target, all) => {
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 
 // packages/utils/src/atomic-write.ts
-import { renameSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  fsyncSync,
+  openSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync
+} from "node:fs";
+function isToleratedFsyncError(error) {
+  if (!(error instanceof Error))
+    return false;
+  const code = error.code;
+  return code !== undefined && TOLERATED_FSYNC_CODES.has(code);
+}
+function tolerantFsyncSync(fileDescriptor, fsyncImpl) {
+  try {
+    fsyncImpl(fileDescriptor);
+  } catch (error) {
+    if (!isToleratedFsyncError(error))
+      throw error;
+  }
+}
 function writeFileAtomically(filePath, content, options = {}) {
   const tempPath = `${filePath}.tmp`;
   writeFileSync(tempPath, content, "utf-8");
+  const tempFileDescriptor = openSync(tempPath, "r+");
+  try {
+    tolerantFsyncSync(tempFileDescriptor, options.fsyncSync ?? fsyncSync);
+  } finally {
+    closeSync(tempFileDescriptor);
+  }
   try {
     renameSync(tempPath, filePath);
   } catch (error) {
@@ -32,7 +59,15 @@ function writeFileAtomically(filePath, content, options = {}) {
     throw error;
   }
 }
-var init_atomic_write = () => {};
+var TOLERATED_FSYNC_CODES;
+var init_atomic_write = __esm(() => {
+  TOLERATED_FSYNC_CODES = new Set([
+    "EPERM",
+    "EACCES",
+    "ENOTSUP",
+    "EINVAL"
+  ]);
+});
 
 // packages/utils/src/xdg-data-dir.ts
 import { accessSync, constants, mkdirSync } from "node:fs";

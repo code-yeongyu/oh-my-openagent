@@ -93,7 +93,7 @@
   "types": "./index.d.ts",
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "bun test src/*.test.ts"
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
