@@ -633,16 +633,16 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("todowrite")
   })
 
-  test("K2.7 model uses the restrained K2.7 prompt, not the K2.6 prompt", () => {
+  test("K2.7 model uses the from-scratch K2.7 prompt, not the K2.6 prompt", () => {
     // given
     const k27 = buildSisyphusJuniorPrompt("opencode-go/kimi-k2.7", false)
     const k26 = buildSisyphusJuniorPrompt("opencode-go/kimi-k2.6", false)
 
     // then
-    expect(k27).toContain("K2.7 calibration")
+    expect(k27).toContain("running on Kimi K2.7")
     expect(k27).not.toContain("Toggle RL")
     expect(k26).toContain("Toggle RL")
-    expect(k26).not.toContain("K2.7 calibration")
+    expect(k26).not.toContain("Kimi K2.7")
   })
 
   test("useTaskSystem=true includes Task Discipline for GPT 5.4", () => {
