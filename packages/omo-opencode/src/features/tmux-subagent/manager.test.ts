@@ -2601,6 +2601,48 @@ describe('TmuxSessionManager', () => {
       expect(mockKillTmuxSessionIfExists).toHaveBeenCalledTimes(0)
     })
 
+    test('#given inline isolation #when the first subagent session is created #then stale OMO attach sweep runs once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 0)
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'inline',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_inline_a', 'ses_parent', 'A'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_inline_b', 'ses_parent', 'B'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
+    })
+
+    test('#given window isolation #when the first subagent session is created #then stale OMO attach sweep runs once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 0)
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'window',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_window_a', 'ses_parent', 'A'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_window_b', 'ses_parent', 'B'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
+    })
+
     test('#given sweepStaleOmoAgentSessions throws on first onSessionCreated #when second onSessionCreated fires #then sweep is retried instead of skipped forever', async () => {
       // given
       mockSweepStaleOmoAgentSessions.mockClear()
