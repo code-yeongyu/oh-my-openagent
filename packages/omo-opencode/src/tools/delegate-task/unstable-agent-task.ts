@@ -8,7 +8,8 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
-import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { buildDelegateSessionPermission } from "../../shared/delegate-tool-overrides"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 
@@ -20,7 +21,8 @@ export async function executeUnstableAgentTask(
   agentToUse: string,
   categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
-  actualModel: string | undefined
+  actualModel: string | undefined,
+  categoryTools?: Record<string, boolean>,
 ): Promise<string> {
   const { manager, client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   let cleanupReason: string | undefined
@@ -42,7 +44,11 @@ export async function executeUnstableAgentTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
-      sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      categoryTools,
+      sessionPermission: buildDelegateSessionPermission(
+        categoryTools,
+        getAgentToolRestrictions(agentToUse, { model: categoryModel?.modelID ?? actualModel }),
+      ),
     })
     launchedTaskID = task.id
 

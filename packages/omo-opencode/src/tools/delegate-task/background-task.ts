@@ -7,7 +7,8 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { buildDelegateSessionPermission } from "../../shared/delegate-tool-overrides"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
@@ -106,6 +107,7 @@ export async function executeBackgroundTask(
   categoryModel: DelegatedModelConfig | undefined,
   systemContent: string | undefined,
   fallbackChain?: FallbackEntry[],
+  categoryTools?: Record<string, boolean>,
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -127,7 +129,11 @@ export async function executeBackgroundTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
-      sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      categoryTools,
+      sessionPermission: buildDelegateSessionPermission(
+        categoryTools,
+        getAgentToolRestrictions(normalizedAgent, { model: categoryModel?.modelID }),
+      ),
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up

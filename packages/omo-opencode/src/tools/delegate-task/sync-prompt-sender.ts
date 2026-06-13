@@ -1,5 +1,6 @@
 import type { SisyphusAgentConfig } from "../../config/schema"
 import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
+import { mergeDelegatePromptTools } from "../../shared/delegate-tool-overrides"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import {
@@ -49,13 +50,20 @@ function isUnexpectedEofError(error: unknown): boolean {
   return lowered.includes("unexpected eof") || lowered.includes("json parse error")
 }
 
-export function buildSyncPromptTools(agentToUse: string): Record<string, boolean> {
-  return {
-    task: isPlanFamily(agentToUse),
-    call_omo_agent: true,
-    question: false,
-    ...getAgentToolRestrictions(agentToUse),
-  }
+export function buildSyncPromptTools(
+  agentToUse: string,
+  categoryTools?: Record<string, boolean>,
+  model?: string,
+): Record<string, boolean> {
+  return mergeDelegatePromptTools({
+    defaults: {
+      task: isPlanFamily(agentToUse),
+      call_omo_agent: true,
+      question: false,
+    },
+    configuredTools: categoryTools,
+    hardRestrictions: getAgentToolRestrictions(agentToUse, { model }),
+  })
 }
 
 export async function sendSyncPrompt(
@@ -66,6 +74,7 @@ export async function sendSyncPrompt(
     args: DelegateTaskArgs
     systemContent: string | undefined
     categoryModel: DelegatedModelConfig | undefined
+    categoryTools?: Record<string, boolean>
     directory: string
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
@@ -75,7 +84,7 @@ export async function sendSyncPrompt(
 ): Promise<string | null> {
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
-  const tools = buildSyncPromptTools(input.agentToUse)
+  const tools = buildSyncPromptTools(input.agentToUse, input.categoryTools, input.categoryModel?.modelID)
   setSessionTools(input.sessionID, tools)
 
   applySessionPromptParams(input.sessionID, input.categoryModel)

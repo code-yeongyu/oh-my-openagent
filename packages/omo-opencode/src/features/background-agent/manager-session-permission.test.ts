@@ -121,4 +121,46 @@ describe("BackgroundManager session permission", () => {
       ],
     })
   })
+
+  test("applies category tools to child prompt body", async () => {
+    // given
+    const promptCalls: Array<Record<string, unknown>> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async () => ({ data: { id: "ses_child" } }),
+        promptAsync: async (input: Record<string, unknown>) => {
+          promptCalls.push(input)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+
+    // when
+    await manager.launch({
+      description: "Test task",
+      prompt: "Do something",
+      agent: "sisyphus-junior",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryTools: { grep: false, glob: true, apply_patch: true },
+    })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    manager.shutdown()
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.body).toMatchObject({
+      tools: {
+        grep: false,
+        glob: true,
+        apply_patch: false,
+        question: false,
+        task: false,
+      },
+    })
+  })
 })

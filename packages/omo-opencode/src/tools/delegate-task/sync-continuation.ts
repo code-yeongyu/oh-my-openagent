@@ -157,7 +157,7 @@ export async function executeSyncContinuation(
       task: allowTask,
       call_omo_agent: true,
       question: false,
-      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
+      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent, { model: resumeModel?.modelID }) : {}),
     }
     setSessionTools(continuationID, tools)
 

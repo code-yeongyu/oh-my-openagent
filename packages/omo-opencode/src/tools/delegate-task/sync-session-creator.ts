@@ -1,6 +1,7 @@
 import type { OpencodeClient } from "./types"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
-import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { buildDelegateSessionPermission } from "../../shared/delegate-tool-overrides"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 
 export async function createSyncSession(
   client: OpencodeClient,
@@ -10,6 +11,7 @@ export async function createSyncSession(
     description: string
     defaultDirectory: string
     categoryModel?: DelegatedModelConfig
+    categoryTools?: Record<string, boolean>
   }
 ): Promise<{ ok: true; sessionID: string; parentDirectory: string } | { ok: false; error: string }> {
   const parentSession = client.session.get
@@ -21,7 +23,10 @@ export async function createSyncSession(
     body: {
       parentID: input.parentSessionID,
       title: `${input.description} (@${input.agentToUse} subagent)`,
-      permission: QUESTION_DENIED_SESSION_PERMISSION,
+      permission: buildDelegateSessionPermission(
+        input.categoryTools,
+        getAgentToolRestrictions(input.agentToUse, { model: input.categoryModel?.modelID }),
+      ),
       ...(input.categoryModel
         ? {
             model: {

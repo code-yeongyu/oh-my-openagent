@@ -107,6 +107,51 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptArgs.body.tools.question).toBe(false)
   })
 
+  bunTest("applies category tool overrides to the prompt tools", async () => {
+    //#given
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
+      promptArgs = input
+      return { data: {} }
+    })
+
+    const mockClient = {
+      session: {
+        prompt: promptAsync,
+        promptAsync,
+      },
+    }
+
+    const input = {
+      sessionID: "test-session",
+      agentToUse: "sisyphus-junior",
+      args: {
+        description: "test task",
+        prompt: "test prompt",
+        category: "visual-engineering",
+        run_in_background: false,
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryTools: { grep: false, glob: true, apply_patch: true },
+      toastManager: null,
+      taskId: undefined,
+    }
+
+    //#when
+    await sendSyncPrompt(mockClient, input)
+
+    //#then
+    bunExpect(promptArgs.body.tools.grep).toBe(false)
+    bunExpect(promptArgs.body.tools.glob).toBe(true)
+    bunExpect(promptArgs.body.tools.apply_patch).toBe(false)
+    bunExpect(promptArgs.body.tools.question).toBe(false)
+    bunExpect(promptArgs.body.tools.task).toBe(false)
+  })
+
   bunTest("applies agent tool restrictions for explore agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")

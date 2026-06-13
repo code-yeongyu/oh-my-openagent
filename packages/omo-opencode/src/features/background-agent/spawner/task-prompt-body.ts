@@ -1,4 +1,5 @@
 import { createInternalAgentTextPart, getAgentToolRestrictions } from "../../../shared"
+import { mergeDelegatePromptTools } from "../../../shared/delegate-tool-overrides"
 import type { LaunchInput } from "../types"
 
 type PromptModel = LaunchInput["model"]
@@ -11,6 +12,7 @@ type TaskPromptBodyOptions =
       readonly system: LaunchInput["skillContent"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly categoryTools?: Record<string, boolean>
     }
   | {
       readonly kind: "resume"
@@ -49,14 +51,18 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
     ...(promptModel ? { model: promptModel } : {}),
     ...(promptVariant ? { variant: promptVariant } : {}),
     ...(options.kind === "launch" ? { system: options.system } : {}),
-    tools: {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(options.agent, {
+    tools: mergeDelegatePromptTools({
+      defaults: {
+        task: false,
+        call_omo_agent: true,
+        question: false,
+      },
+      configuredTools: options.kind === "launch" ? options.categoryTools : undefined,
+      hardRestrictions: getAgentToolRestrictions(options.agent, {
         includeTeamToolDenylist: options.includeTeamToolDenylist,
+        model: options.model?.modelID,
       }),
-    },
+    }),
     parts: [createInternalAgentTextPart(options.prompt)],
   }
 }

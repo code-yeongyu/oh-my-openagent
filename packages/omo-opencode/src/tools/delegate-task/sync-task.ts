@@ -12,6 +12,10 @@ import { runSyncTaskLoop } from "./sync-task-runner"
 import { cleanupSyncSessionSideEffects, registerSyncSessionSideEffects } from "./sync-session-lifecycle"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
+function isSyncTaskDeps(value: SyncTaskDeps | Record<string, boolean>): value is SyncTaskDeps {
+  return typeof value.sendSyncPrompt === "function"
+}
+
 export async function executeSyncTask(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
@@ -22,8 +26,12 @@ export async function executeSyncTask(
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: FallbackEntry[],
-  deps: SyncTaskDeps = syncTaskDeps
+  depsOrCategoryTools: SyncTaskDeps | Record<string, boolean> = syncTaskDeps,
+  categoryToolsForDeps?: Record<string, boolean>,
 ): Promise<string> {
+  const hasDeps = isSyncTaskDeps(depsOrCategoryTools)
+  const deps = hasDeps ? depsOrCategoryTools : syncTaskDeps
+  const categoryTools = hasDeps ? categoryToolsForDeps : depsOrCategoryTools
   const { client, directory, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
@@ -43,6 +51,7 @@ export async function executeSyncTask(
       description: args.description,
       defaultDirectory: directory,
       categoryModel,
+      categoryTools,
     })
 
     if (!createSessionResult.ok) {
@@ -54,7 +63,10 @@ export async function executeSyncTask(
     spawnReservation?.commit()
     syncSessionID = sessionID
 
-    const registerSyncSession = async (newSessionID: string): Promise<void> => {
+    const registerSyncSession = async (
+      newSessionID: string,
+      currentModel: DelegatedModelConfig | undefined,
+    ): Promise<void> => {
       syncSessionID = newSessionID
       await registerSyncSessionSideEffects({
         args,
@@ -64,6 +76,8 @@ export async function executeSyncTask(
         agentToUse,
         fallbackChain,
         systemContent,
+        categoryModel: currentModel,
+        categoryTools,
       })
     }
 
@@ -83,7 +97,7 @@ export async function executeSyncTask(
       })
     }
 
-    await registerSyncSession(sessionID)
+    await registerSyncSession(sessionID, categoryModel)
 
     taskId = `sync_${sessionID.slice(0, 8)}`
     const startTime = new Date()
@@ -131,6 +145,7 @@ export async function executeSyncTask(
         systemContent,
         toastManager: toastManager ?? undefined,
         modelInfo,
+        categoryTools,
         registerSyncSession,
         publishSyncMetadata,
         cleanupRetrySession,

@@ -1,4 +1,5 @@
 import { stripInvisibleAgentCharacters } from "./agent-display-names"
+import { isGptModel } from "@oh-my-opencode/model-core"
 
 /**
  * Agent tool restrictions for session.prompt calls.
@@ -61,17 +62,23 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 
 type AgentToolRestrictionsOptions = {
   includeTeamToolDenylist?: boolean
+  model?: string
 }
 
 export function getAgentToolRestrictions(agentName: string, options: AgentToolRestrictionsOptions = {}): Record<string, boolean> {
   const stripped = stripInvisibleAgentCharacters(agentName)
+  const normalizedAgent = stripped.toLowerCase()
   const agentRestrictions = AGENT_RESTRICTIONS[stripped]
-    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === normalizedAgent)?.[1]
     ?? {}
+  const modelRestrictions: Record<string, boolean> = normalizedAgent === "sisyphus-junior" && options.model && isGptModel(options.model)
+    ? { apply_patch: false }
+    : {}
 
   return {
     ...(options.includeTeamToolDenylist === false ? {} : TEAM_TOOL_DENYLIST),
     ...agentRestrictions,
+    ...modelRestrictions,
   }
 }
 
