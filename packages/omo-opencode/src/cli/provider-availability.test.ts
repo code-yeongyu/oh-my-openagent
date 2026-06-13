@@ -19,7 +19,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     isMax20: false,
     hasOpenAI: false,
     hasGemini: false,
-    hasCopilot: false,
+    copilotTier: "no",
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,

@@ -519,7 +519,7 @@ describe("generateModelConfig", () => {
         hasGemini: true,
         hasOpencodeZen: true,
         hasOpencodeGo: true,
-        hasCopilot: true,
+        copilotTier: "pro-plus",
         hasZaiCodingPlan: true,
         hasVercelAiGateway: true,
       })
@@ -680,7 +680,7 @@ describe("shouldShowChatGPTOnlyWarning", () => {
   const mixedProviderCases: Array<{ name: string; overrides: Partial<InstallConfig> }> = [
     { name: "Claude", overrides: { hasClaude: true } },
     { name: "Gemini", overrides: { hasGemini: true } },
-    { name: "Copilot", overrides: { hasCopilot: true } },
+    { name: "Copilot", overrides: { copilotTier: "pro-plus" } },
     { name: "OpenCode Zen", overrides: { hasOpencodeZen: true } },
     { name: "Z.ai Coding Plan", overrides: { hasZaiCodingPlan: true } },
     { name: "Kimi for Coding", overrides: { hasKimiForCoding: true } },
