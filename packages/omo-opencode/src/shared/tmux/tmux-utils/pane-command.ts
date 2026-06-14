@@ -1,4 +1,4 @@
-import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
+import { shellEscapeForDoubleQuotedCommand, shellSingleQuote } from "../../shell-env"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
@@ -10,6 +10,6 @@ export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, dir
 }
 
 export function buildTmuxPlaceholderCommand(description: string): string {
-  const escapedDescription = shellEscapeForDoubleQuotedCommand(description)
-  return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${escapedDescription}\\" \\"Focus this pane to attach.\\"; while :; do sleep 86400; done"`
+  const escapedDescription = shellSingleQuote(`OMO subagent pane ready: ${description}`)
+  return `${TMUX_COMMAND_SHELL} -c 'printf "%s\\n%s\\n" "$1" "Attaching automatically when ready."; exec tail -f /dev/null' sh ${escapedDescription}`
 }

@@ -3,9 +3,9 @@ import type { TmuxConfig } from "../../config/schema"
 import type { CapacityConfig, TrackedSession } from "./types"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
-import { queryWindowState } from "./pane-state-querier"
+import { queryWindowState as defaultQueryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, type SessionMapping } from "./decision-engine"
-import { executeActions, type ExecuteActionsResult } from "./action-executor"
+import { executeActions as defaultExecuteActions } from "./action-executor"
 import type { SessionCreatedEvent } from "./session-created-event"
 import { createTrackedSession } from "./tracked-session-state"
 
@@ -25,8 +25,8 @@ export interface SessionCreatedHandlerDeps {
   getSessionMappings: () => SessionMapping[]
   waitForSessionReady: (sessionId: string) => Promise<boolean>
   startPolling: () => void
-  queryWindowState?: typeof queryWindowState
-  executeActions?: typeof executeActions
+  queryWindowState?: typeof defaultQueryWindowState
+  executeActions?: typeof defaultExecuteActions
 }
 
 export async function handleSessionCreated(
@@ -65,7 +65,9 @@ export async function handleSessionCreated(
   deps.pendingSessions.add(sessionId)
 
   try {
-    const state = await (deps.queryWindowState ?? queryWindowState)(deps.sourcePaneId)
+    const queryWindowState = deps.queryWindowState ?? defaultQueryWindowState
+    const executeActions = deps.executeActions ?? defaultExecuteActions
+    const state = await queryWindowState(deps.sourcePaneId)
     if (!state) {
       log("[tmux-session-manager] failed to query window state")
       return
@@ -104,21 +106,7 @@ export async function handleSessionCreated(
       return
     }
 
-    // Wait for the child session to be registered in the opencode server's status
-    // map BEFORE spawning the tmux pane. If we spawn first, `opencode attach`
-    // exits immediately (session not yet visible), tmux auto-closes the pane, and
-    // the subagent runs invisibly in the background — the bug described in #3505.
-    const sessionReady = await deps.waitForSessionReady(sessionId)
-    if (!sessionReady) {
-      log("[tmux-session-manager] session readiness failed before spawn", {
-        sessionId,
-        stage: "session.created",
-      })
-      return
-    }
-
-    const runActions = deps.executeActions ?? executeActions
-    const result: ExecuteActionsResult = await runActions(decision.actions, {
+    const result = await executeActions(decision.actions, {
       config: deps.tmuxConfig,
       directory: deps.directory,
       serverUrl: deps.serverUrl,
@@ -153,19 +141,18 @@ export async function handleSessionCreated(
       return
     }
 
-    deps.sessions.set(
-      sessionId,
-      createTrackedSession({
-        sessionId,
-        paneId: result.spawnedPaneId,
-        description: title,
-      }),
-    )
-
-    log("[tmux-session-manager] pane spawned and tracked", {
+    const tracked = createTrackedSession({
       sessionId,
       paneId: result.spawnedPaneId,
-      sessionReady,
+      description: title,
+      attachReady: true,
+    })
+    deps.sessions.set(sessionId, tracked)
+
+    log("[tmux-session-manager] pane spawned and ready for attach", {
+      sessionId,
+      paneId: result.spawnedPaneId,
+      attachReady: tracked.attachReady,
     })
 
     deps.startPolling()

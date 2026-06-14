@@ -59,10 +59,14 @@
       "import": "./dist/index.js"
     },
     "./server": "./dist/index.js",
-    "./schema.json": "./dist/oh-my-opencode.schema.json"
+    "./schema.json": "./dist/oh-my-opencode.schema.json",
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./dist/tui.js"
+    }
   },
   "scripts": {
-    "build": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun build packages/omo-opencode/src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:cli-node && bun run build:schema",
+    "build": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun build packages/omo-opencode/src/index.ts packages/omo-opencode/src/tui.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:cli-node && bun run build:schema",
     "build:cli-node": "bun run script/build-cli-node.ts",
     "build:lsp-tools-mcp": "npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build",
     "build:lsp-daemon": "npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build",

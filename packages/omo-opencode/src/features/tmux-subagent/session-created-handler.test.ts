@@ -70,6 +70,8 @@ function makeDeps(overrides: Partial<SessionCreatedHandlerDeps> = {}): {
   return { deps, mockExecuteActions, mockWaitForSessionReady }
 }
 
+// We test ordering by observing call order via a shared call-log array.
+
 describe("handleSessionCreated – #3505 session readiness race", () => {
   test("#given session not yet ready #when session.created fires #then pane is NOT spawned", async () => {
     const callLog: string[] = []
@@ -102,56 +104,42 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
     expect(waitForSessionReady).not.toHaveBeenCalled() // short-circuits at sourcePaneId check
   })
 
-  test("#given spawn path reached #when waitForSessionReady is pending #then executeActions is deferred until readiness resolves", async () => {
-    // Regression test for #3505: the handler must `await waitForSessionReady`
-    // BEFORE calling executeActions. This test actually exercises the spawn
-    // path (mocked queryWindowState returns a valid window state, mocked
-    // executeActions is a spy) so the readiness-then-spawn ordering is
-    // observable and asserted, not assumed.
+  test("#given spawn path reached #when session.created fires #then placeholder is immediately attach-ready", async () => {
+    // Regression test for tmux visual sync: `session.created` is the reliable
+    // signal that the child session exists in this OpenCode environment. The
+    // status API can remain empty, so the placeholder must become attach-ready
+    // immediately instead of waiting for status polling.
     const callLog: string[] = []
-    let resolveReadiness: ((ready: boolean) => void) | undefined
-    const readinessGate = new Promise<boolean>((resolve) => { resolveReadiness = resolve })
-
     const waitForSessionReady = mock(async (_id: string): Promise<boolean> => {
-      callLog.push("waitForSessionReady:start")
-      const ready = await readinessGate
-      callLog.push("waitForSessionReady:end")
-      return ready
+      callLog.push("waitForSessionReady")
+      return false
     })
     const { deps, mockExecuteActions } = makeDeps({ waitForSessionReady })
     mockExecuteActions.mockImplementation(async (_actions, _ctx) => {
       callLog.push("executeActions")
       return { success: true, spawnedPaneId: "%99", results: [] }
     })
-
     const handlerPromise = handleSessionCreated(deps, makeEvent("ses_race"))
 
-    // Yield so the handler reaches the readiness gate; executeActions must NOT
-    // have been invoked yet because waitForSessionReady has not resolved.
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
-    expect(mockExecuteActions).not.toHaveBeenCalled()
-
-    if (!resolveReadiness) {
-      throw new Error("readiness resolver was not initialized")
-    }
-    resolveReadiness(true)
     await handlerPromise
 
-    // Now executeActions must have fired exactly once, AFTER waitForSessionReady.
     expect(mockExecuteActions).toHaveBeenCalledTimes(1)
-    expect(callLog).toEqual(["waitForSessionReady:start", "waitForSessionReady:end", "executeActions"])
+    expect(waitForSessionReady).not.toHaveBeenCalled()
+    const tracked = deps.sessions.get("ses_race")
+    expect(tracked?.paneId).toBe("%99")
+    expect(tracked?.attachReady).toBe(true)
+    expect(callLog).toEqual(["executeActions"])
   })
 
-  test("#given spawn path reached #when waitForSessionReady resolves false #then executeActions is never called", async () => {
+  test("#given spawn path reached #when status readiness would fail #then attach readiness still follows session.created", async () => {
     const waitForSessionReady = mock(async (_id: string) => false)
     const { deps, mockExecuteActions } = makeDeps({ waitForSessionReady })
 
     await handleSessionCreated(deps, makeEvent("ses_notready_spawn"))
 
-    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
-    expect(mockExecuteActions).not.toHaveBeenCalled()
+    expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+    expect(waitForSessionReady).not.toHaveBeenCalled()
+    expect(deps.sessions.get("ses_notready_spawn")?.attachReady).toBe(true)
   })
 
   test("#given duplicate session.created events #when first is pending #then second is deduplicated", async () => {

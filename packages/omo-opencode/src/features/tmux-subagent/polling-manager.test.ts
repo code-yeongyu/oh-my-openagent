@@ -284,7 +284,7 @@ describe("TmuxPollingManager overlap", () => {
     expect(closedSessionIds).toEqual([])
   })
 
-  test("activates focused panes once before polling statuses", async () => {
+  test("activates ready panes once before polling statuses even when the pane is not focused", async () => {
     //#given
     const sessions = new Map<string, TrackedSession>()
     const tracked: TrackedSession = {
@@ -314,7 +314,7 @@ describe("TmuxPollingManager overlap", () => {
       sessionAttached: true,
       mainPane: null,
       agentPanes: [
-        { paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: true },
+        { paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: false },
       ],
     }
     const manager = new TmuxPollingManager(
@@ -332,6 +332,64 @@ describe("TmuxPollingManager overlap", () => {
 
     //#when
     await pollSessions.call(manager)
+    await pollSessions.call(manager)
+
+    //#then
+    expect(activatedSessionIds).toEqual(["ses-1"])
+    expect(tracked.attachActivated).toBe(true)
+  })
+
+
+  test("does not activate panes before attach readiness", async () => {
+    //#given
+    const sessions = new Map<string, TrackedSession>()
+    const tracked: TrackedSession = {
+      sessionId: "ses-1",
+      paneId: "%1",
+      description: "test",
+      attachReady: false,
+      attachActivated: false,
+      createdAt: new Date(),
+      lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    }
+    sessions.set("ses-1", tracked)
+
+    const activatedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-1": { type: "running" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const windowState: WindowState = {
+      windowWidth: 160,
+      windowHeight: 48,
+      windowActive: true,
+      sessionAttached: true,
+      mainPane: null,
+      agentPanes: [
+        { paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: false },
+      ],
+    }
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async () => {},
+      undefined,
+      async () => windowState,
+      async (session) => {
+        activatedSessionIds.push(session.sessionId)
+        return true
+      },
+    )
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+    //#when
+    await pollSessions.call(manager)
+    tracked.attachReady = true
     await pollSessions.call(manager)
 
     //#then

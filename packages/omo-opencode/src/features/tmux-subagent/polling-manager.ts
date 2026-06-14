@@ -242,12 +242,18 @@ export class TmuxPollingManager {
     }
 
     const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
-    const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))
-    if (activePaneIds.size === 0) return
+    const paneIds = new Set(panes.map((pane) => pane.paneId))
 
     for (const tracked of this.sessions.values()) {
       if (tracked.attachActivated) continue
-      if (!activePaneIds.has(tracked.paneId)) continue
+      if (!paneIds.has(tracked.paneId)) continue
+      if (tracked.attachReady === false) {
+        log("[tmux-session-manager] placeholder pane is waiting for session readiness before attach", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+        })
+        continue
+      }
 
       const activated = await this.activateSessionPane(tracked)
       if (activated) {
@@ -256,7 +262,7 @@ export class TmuxPollingManager {
         tracked.lastSeenAt = new Date()
         tracked.stableIdlePolls = 0
         tracked.observedIdleActivityVersion = tracked.activityVersion
-        log("[tmux-session-manager] activated focused pane", {
+        log("[tmux-session-manager] activated ready pane", {
           sessionId: tracked.sessionId,
           paneId: tracked.paneId,
         })
