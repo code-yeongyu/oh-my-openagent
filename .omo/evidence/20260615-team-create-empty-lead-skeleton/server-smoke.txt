@@ -1,0 +1,4 @@
+PASS: GET /global/health healthy=true version=1.17.6 (http://127.0.0.1:35233)
+PASS: GET /doc lists 146 documented paths (>=100)
+PASS: unauthenticated GET /session rejected with HTTP 401
+PASS: server-smoke
