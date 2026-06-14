@@ -435,6 +435,42 @@ opencode auth login
 
 The plugin supports up to 10 Google accounts. When one account hits rate limits, it automatically switches to the next available account.
 
+##### Amazon Bedrock
+
+OpenCode owns Bedrock authentication. Configure Bedrock in `opencode.json` or through AWS environment variables first, then use Bedrock model IDs in OMO agent or category routing.
+
+```json
+{
+  "provider": {
+    "amazon-bedrock": {
+      "options": {
+        "region": "us-east-1",
+        "profile": "my-aws-profile"
+      }
+    }
+  }
+}
+```
+
+For one-off launches, set the AWS credentials around OpenCode instead:
+
+```bash
+AWS_PROFILE=my-aws-profile AWS_REGION=us-east-1 opencode
+```
+
+After OpenCode sees the provider, reference models with the OpenCode provider prefix:
+
+```json
+{
+  "agents": {
+    "sisyphus": { "model": "amazon-bedrock/us.anthropic.claude-opus-4-7" },
+    "metis": { "model": "amazon-bedrock/us.anthropic.claude-sonnet-4-6" }
+  }
+}
+```
+
+Use OpenCode's [Amazon Bedrock provider guide](https://opencode.ai/docs/providers/#amazon-bedrock) for model access, bearer tokens, named profiles, VPC endpoints, and custom inference profile ARNs. OMO does not run a separate Bedrock login flow during install.
+
 ##### GitHub Copilot (Fallback Provider)
 
 GitHub Copilot is supported as a **fallback provider** when native providers are unavailable. Priority is agent-specific. Common install-time defaults when Copilot is the best available provider:
