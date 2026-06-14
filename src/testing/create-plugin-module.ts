@@ -152,6 +152,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       pluginConfig,
       modelCacheState,
       backgroundManager: managers.backgroundManager,
+      monitorManager: managers.monitorManager,
       modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
       isHookEnabled,
       safeHookEnabled,

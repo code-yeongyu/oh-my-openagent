@@ -214,6 +214,15 @@ export function createMessagesTransformHandler(args: {
     )
 
     await runMessagesTransformHookSafely(
+      "monitorStatusInjector",
+      args.hooks.monitorStatusInjector?.[
+        "experimental.chat.messages.transform"
+      ],
+      input,
+      output,
+    )
+
+    await runMessagesTransformHookSafely(
       "teamMailboxInjector",
       args.hooks.teamMailboxInjector?.[
         "experimental.chat.messages.transform"
