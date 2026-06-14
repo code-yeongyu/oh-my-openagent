@@ -2495,6 +2495,11 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     if (task.sessionId) {
+      subagentSessions.delete(task.sessionId)
+      clearSessionAgent(task.sessionId)
+      clearDelegatedChildSessionBootstrap(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
+
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
@@ -2504,9 +2509,6 @@ The task was re-queued on a fallback model after a retryable failure.
       await this.onSubagentSessionDeleted?.({ sessionID: task.sessionId }).catch((error) => {
         log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID: task.sessionId, error: String(error) })
       })
-
-      clearDelegatedChildSessionBootstrap(task.sessionId)
-      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode

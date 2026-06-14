@@ -9,6 +9,10 @@ import {
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import {
+  _resetForTesting as resetClaudeCodeSessionState,
+  subagentSessions,
+} from "../../features/claude-code-session-state"
+import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
@@ -26,6 +30,7 @@ describe("runtime-fallback", () => {
     logCalls = []
     toastCalls = []
     SessionCategoryRegistry.clear()
+    resetClaudeCodeSessionState()
     clearAllDelegatedChildSessionBootstrap()
     releaseAllPromptAsyncReservationsForTesting()
 
@@ -44,6 +49,7 @@ describe("runtime-fallback", () => {
 
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    resetClaudeCodeSessionState()
     clearAllDelegatedChildSessionBootstrap()
     releaseAllPromptAsyncReservationsForTesting()
     mock.restore()
@@ -1804,6 +1810,79 @@ describe("runtime-fallback", () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
 
       expect(retriedModels).toHaveLength(1)
+    })
+
+    test("should not advance fallback timeout after completed subagent clears eligibility", async () => {
+      const retriedModels: string[] = []
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.7",
+            "anthropic/claude-opus-4-7",
+            "openai/gpt-5.4",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-completed-subagent-cancels-timeout-fallback"
+      subagentSessions.add(sessionID)
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.7"])
+
+      subagentSessions.delete(sessionID)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.7"])
+      expect(abortCalls).toEqual([])
+      const skipLog = logCalls.find((c) => c.msg.includes("Session fallback timeout skipped for completed subagent"))
+      expect(skipLog).toBeDefined()
     })
 
     test("should not trigger second fallback after successful assistant reply", async () => {
