@@ -38,6 +38,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
     ],
     requiresProvider: ["openai", "github-copilot", "venice", "opencode", "vercel"],
+    requiresAnyModel: true,
   },
   oracle: {
     fallbackChain: [
