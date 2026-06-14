@@ -53,6 +53,7 @@
         "oh-my-opencode-linux-x64-baseline": "4.9.2",
         "oh-my-opencode-linux-x64-musl": "4.9.2",
         "oh-my-opencode-linux-x64-musl-baseline": "4.9.2",
+        "oh-my-opencode-windows-arm64": "4.9.2",
         "oh-my-opencode-windows-x64": "4.9.2",
         "oh-my-opencode-windows-x64-baseline": "4.9.2",
       },
@@ -488,6 +489,8 @@
     "oh-my-opencode-linux-x64-musl": ["oh-my-opencode-linux-x64-musl@4.9.2", "", { "os": "linux", "cpu": "x64" }, "sha512-cjxVD5/rgSpHgbmdfi6qlrFm1uhFJA9tezYcKK3hzkSdYWfGiA7HAgaEVybUIn7eIWJkd7NM2+mv453WfhVZYA=="],
 
     "oh-my-opencode-linux-x64-musl-baseline": ["oh-my-opencode-linux-x64-musl-baseline@4.9.2", "", { "os": "linux", "cpu": "x64" }, "sha512-8omGz/d8Xr4+d7fhlVWIuNWxDoKMkvh5DA1fKfScDIu/rBXFCO/9Ofixj3DnVLWA9pgoghlZGK0lFIZn3wHWMw=="],
+
+    "oh-my-opencode-windows-arm64": ["oh-my-opencode-windows-arm64@4.9.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-VUls30tCjL3YkF9oQ6t74CCEesU/x8jpdkRb5jj5d2bUQ5KTtHIqov6NmHS9Cl+Yxj2ECCGZCm9RMeSQ8oxFjg=="],
 
     "oh-my-opencode-windows-x64": ["oh-my-opencode-windows-x64@4.9.2", "", { "os": "win32", "cpu": "x64" }, "sha512-T2nXZwMSvxcFfjDp+HW4e8Nr400sqcvKEcsVJweRTKDOObuhgzBKsh95JpLLDTC3tA/YmOcYWIpe3Gvvv3uIVA=="],
 
