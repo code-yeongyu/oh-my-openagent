@@ -93,6 +93,69 @@ describe("updateConnectedProvidersCache", () => {
 		}
 	})
 
+	test("preserves last-good providers and models when a refresh returns a narrower partial list", async () => {
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
+
+		try {
+			//#given - a previous complete provider snapshot includes the Sisyphus fallback provider
+			await testCacheStore.updateConnectedProvidersCache({
+				provider: {
+					list: async () => ({
+						data: {
+							connected: ["google", "anthropic"],
+							all: [
+								{
+									id: "google",
+									models: {
+										"gemini-3.1-pro": { id: "gemini-3.1-pro" },
+									},
+								},
+								{
+									id: "anthropic",
+									models: {
+										"claude-opus-4-7": { id: "claude-opus-4-7" },
+									},
+								},
+							],
+						},
+					}),
+				},
+			})
+
+			//#when - a transient cold-start refresh only reports one connected provider
+			await testCacheStore.updateConnectedProvidersCache({
+				provider: {
+					list: async () => ({
+						data: {
+							connected: ["google"],
+							all: [
+								{
+									id: "google",
+									models: {
+										"gemini-3.1-pro": { id: "gemini-3.1-pro" },
+									},
+								},
+							],
+						},
+					}),
+				},
+			})
+
+			//#then - the partial refresh does not poison the model gate cache
+			expect(testCacheStore.readConnectedProvidersCache()).toEqual(["google", "anthropic"])
+			expect(testCacheStore.readProviderModelsCache()).toMatchObject({
+				connected: ["google", "anthropic"],
+				models: {
+					google: [{ id: "gemini-3.1-pro" }],
+					anthropic: [{ id: "claude-opus-4-7" }],
+				},
+			})
+		} finally {
+			cleanupTestCacheContext(fakeUserCacheRoot)
+		}
+	})
+
 	test("writes empty models when provider has no models", async () => {
 		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
 		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
