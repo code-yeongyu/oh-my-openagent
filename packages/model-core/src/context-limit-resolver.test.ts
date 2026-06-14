@@ -157,7 +157,7 @@ describe("resolveActualContextLimit", () => {
     })).toBe(1_000_000)
   })
 
-  it("returns GA 1M for claude-mythos-5 on google-vertex-anthropic", () => {
+  it("returns GA 1M for claude-fable-5 on google-vertex-anthropic", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
