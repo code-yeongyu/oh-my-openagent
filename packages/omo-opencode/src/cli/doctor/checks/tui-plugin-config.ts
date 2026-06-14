@@ -34,6 +34,7 @@ interface TuiPluginInfo {
   configPath: string | null
   exists: boolean
   hasNamedTuiEntry: boolean
+  hasCanonicalNamedTuiEntry: boolean
 }
 
 function fileEntryPackageJsonPath(entry: string): string {
@@ -115,6 +116,11 @@ function isNamedTuiPluginEntry(entry: string): boolean {
   return false
 }
 
+function isCanonicalNamedTuiPluginEntry(entry: string): boolean {
+  const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
+  return entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)
+}
+
 export function detectServerPluginRegistration(): ServerPluginInfo {
   const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
   const configPath = existsSync(paths.configJsonc)
@@ -145,7 +151,7 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
 export function detectTuiPluginRegistration(): TuiPluginInfo {
   const tuiJsonPath = join(getOpenCodeConfigDir({ binary: "opencode" }), "tui.json")
   if (!existsSync(tuiJsonPath)) {
-    return { registered: false, configPath: tuiJsonPath, exists: false, hasNamedTuiEntry: false }
+    return { registered: false, configPath: tuiJsonPath, exists: false, hasNamedTuiEntry: false, hasCanonicalNamedTuiEntry: false }
   }
 
   try {
@@ -156,10 +162,11 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       configPath: tuiJsonPath,
       exists: true,
       hasNamedTuiEntry: plugins.some(isNamedTuiPluginEntry),
+      hasCanonicalNamedTuiEntry: plugins.some(isCanonicalNamedTuiPluginEntry),
     }
   } catch (error) {
     void error
-    return { registered: false, configPath: tuiJsonPath, exists: true, hasNamedTuiEntry: false }
+    return { registered: false, configPath: tuiJsonPath, exists: true, hasNamedTuiEntry: false, hasCanonicalNamedTuiEntry: false }
   }
 }
 
@@ -183,12 +190,17 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
     }
   }
 
-  if (server.registered && server.packageExportsTui === false && tui.hasNamedTuiEntry) {
+  const hasKnownBrokenNamedTuiEntry = server.packageExportsTui === false && tui.hasNamedTuiEntry
+  const hasUninspectableCanonicalTuiEntry = server.packageExportsTui === null && tui.hasCanonicalNamedTuiEntry
+  if (server.registered && (hasKnownBrokenNamedTuiEntry || hasUninspectableCanonicalTuiEntry)) {
+    const exportStatus = server.packageExportsTui === null
+      ? `could not be inspected for a "${TUI_EXPORT_SUBPATH}" export`
+      : `does not export "${TUI_EXPORT_SUBPATH}"`
     issues.push({
       title: "TUI plugin entry in tui.json is unresolvable",
       description:
-        `The installed ${PLUGIN_NAME} package registered in opencode.json does not export `
-        + `"${TUI_EXPORT_SUBPATH}", but tui.json contains "${PLUGIN_NAME}/${TUI_SUBPATH}". `
+        `The installed ${PLUGIN_NAME} package registered in opencode.json ${exportStatus}, `
+        + `but tui.json contains "${PLUGIN_NAME}/${TUI_SUBPATH}". `
         + "OpenCode TUI may try to resolve that package subpath as a GitHub repository and fail.",
       fix: `Remove "${PLUGIN_NAME}/${TUI_SUBPATH}" or "${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}" from the "plugin" array in ${tui.configPath}.`,
       affects: ["TUI startup", "plugin loading"],
