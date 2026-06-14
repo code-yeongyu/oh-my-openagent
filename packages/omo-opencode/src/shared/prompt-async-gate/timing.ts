@@ -3,6 +3,7 @@ export const DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS = 15_000
 export const DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS = 30_000
 export const DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS = 5_000
 export const DEFAULT_PROMPT_QUEUE_RETRY_MS = 250
+export const DEFAULT_PROMPT_QUEUE_TTL_MS = 5 * 60_000
 
 declare function setTimeout(callback: () => void, delay?: number): unknown
 declare function clearTimeout(timeout: unknown): void

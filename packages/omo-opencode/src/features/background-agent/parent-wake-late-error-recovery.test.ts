@@ -64,6 +64,10 @@ function createNotifier(args: {
       acceptedMessageSkewMs: 100,
       toolCallDeferMaxMs: 5_000,
       failureRequeueWindowMs: 1,
+      // This suite exercises the late session.error requeue path, not the B3
+      // silent-drop window-refresh requeue; keep the refresh budget effectively
+      // unbounded so the 1ms window only re-arms (matching pre-B3 behavior).
+      maxWindowRefreshes: Number.MAX_SAFE_INTEGER,
       userMessageInProgressWindowMs: 0,
     },
   )

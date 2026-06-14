@@ -1,15 +1,16 @@
 import {
   createInternalAgentTextPart,
-  isAmbiguousPostDispatchPromptFailure,
+  isVerifiableAmbiguousPromptFailure,
   log,
   withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptQueueBehavior, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
+import type { SessionExistenceStatus } from "./session-existence"
 
 type ParentWakePromptDispatchInput = {
   readonly client: PromptDispatchClient
@@ -25,6 +26,13 @@ type ParentWakePromptDispatchInput = {
   readonly trackDispatchedWake: (wake: PendingParentWake, dispatchedAt: number) => void
   readonly requeueWake: (wake: PendingParentWake) => void
   readonly scheduleFlush: (delayMs?: number) => void
+  readonly queueBehavior?: InternalPromptQueueBehavior
+  readonly checkSessionExists?: (sessionID: string) => Promise<SessionExistenceStatus>
+  readonly dropWake?: () => void
+  readonly markForceQueued?: (queuedAt: number) => void
+  readonly onForceQueueResolved?: () => void
+  readonly forceQueueTtlMs?: number
+  readonly onForceDispatched?: () => void
 }
 
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
@@ -41,9 +49,16 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
         : {}),
       settleMs: 0,
-      queueBehavior: "defer",
+      queueBehavior: input.queueBehavior ?? "defer",
       checkStatus: input.forceNoReply !== true,
       checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
+      ...(input.onForceQueueResolved !== undefined
+        ? { onExpiredOrFailed: () => input.onForceQueueResolved?.() }
+        : {}),
+      ...(input.forceQueueTtlMs !== undefined ? { ttlMs: input.forceQueueTtlMs } : {}),
+      ...(input.onForceDispatched !== undefined
+        ? { onDispatched: () => input.onForceDispatched?.() }
+        : {}),
       input: {
         path: { id: input.sessionID },
         body: {
@@ -59,7 +74,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       },
     })
     if (promptResult.status === "failed") {
-      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+      if (isVerifiableAmbiguousPromptFailure(promptResult)) {
         const dispatchedWake = cloneParentWake(input.latestWake)
         dispatchedWake.dispatchedAt = dispatchStartedAt
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
@@ -89,6 +104,34 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       })
       return
     }
+    if (promptResult.status === "queued" && input.markForceQueued !== undefined) {
+      // A force-dispatch that merely QUEUED at the
+      // gate (blocked by an existing reservation) is NOT yet in parent history.
+      // It must not be tracked as dispatched (that would start the B3 silent-loss
+      // window on a wake that hasn't dispatched and let unrelated assistant output
+      // clear the tracker) nor recorded as a noReply admission.
+      if (promptResult.queuedEntryCreated) {
+        // A real queue entry now carries our onDispatched/onExpiredOrFailed
+        // callbacks: mark force-queued so the force path is suppressed until the
+        // gate delivers it (then onDispatched admits) or drops it (onExpiredOrFailed).
+        input.markForceQueued(dispatchStartedAt)
+        log("[background-agent] Parent wake force-queued at promptAsync gate; awaiting gate delivery:", {
+          sessionID: input.sessionID,
+          queuedBy: promptResult.queuedBy,
+        })
+        return
+      }
+      // A coalesced "queued" result has NO entry carrying our
+      // callbacks (semantic-dedupe / same-dedupe reservation). An equivalent
+      // dispatch is already in flight, so do NOT mark force-queued (that marker
+      // would never resolve). Leave the wake pending to retry normally; the
+      // recent-dispatch redundancy checks govern duplication.
+      log("[background-agent] Force parent wake coalesced with an in-flight identical dispatch; not marking force-queued:", {
+        sessionID: input.sessionID,
+        queuedBy: promptResult.queuedBy,
+      })
+      return
+    }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
       input.requeueWake(input.latestWake)
       input.scheduleFlush()
@@ -104,6 +147,17 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
   } catch (error) {
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
+    if (input.checkSessionExists !== undefined) {
+      const existence = await input.checkSessionExists(input.sessionID)
+      if (existence === "missing") {
+        input.dropWake?.()
+        log("[background-agent] Dropped parent wake because parent session no longer exists:", {
+          sessionID: input.sessionID,
+          error: errorText,
+        })
+        return
+      }
+    }
     input.requeueWake(input.latestWake)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })

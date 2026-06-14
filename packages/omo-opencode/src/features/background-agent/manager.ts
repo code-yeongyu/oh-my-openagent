@@ -56,8 +56,12 @@ import {
 } from "./compaction-aware-message-resolver"
 import { ConcurrencyManager } from "./concurrency"
 import {
+  MIN_RUNTIME_BEFORE_STALE_MS,
+  MIN_STABILITY_TIME_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
+  SESSION_ERROR_TRANSIENT_THRESHOLD,
+  SESSION_ERROR_WINDOW_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
@@ -84,6 +88,7 @@ import type { PendingParentWake } from "./parent-wake-dedupe"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
+  checkSessionExistence,
   MIN_SESSION_GONE_POLLS,
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
@@ -120,6 +125,42 @@ import type {
 } from "./types"
 
 type OpencodeClient = PluginInput["client"]
+
+// Finish reasons that do NOT mean the assistant turn is done (mid tool-loop / unknown).
+// Mirrored from tools/delegate-task/sync-session-poller.ts.
+const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
+const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
+
+type StabilityMessage = {
+  info?: { role?: string; finish?: unknown; id?: string }
+  parts?: Array<{ type?: string }>
+}
+
+/**
+ * Terminal-completion check mirrored from
+ * tools/delegate-task/sync-session-poller.ts `isSessionComplete`. A session turn is
+ * complete only when the latest assistant message has a terminal finish reason, has
+ * no pending tool-call parts, and comes strictly AFTER the latest user message (so an
+ * old finished turn cannot complete a task that just received a new prompt/resume).
+ */
+function isSessionMessageComplete(messages: StabilityMessage[]): boolean {
+  let lastUserIndex = -1
+  let lastAssistantIndex = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const role = messages[i]?.info?.role
+    if (lastAssistantIndex === -1 && role === "assistant") lastAssistantIndex = i
+    if (lastUserIndex === -1 && role === "user") lastUserIndex = i
+    if (lastUserIndex !== -1 && lastAssistantIndex !== -1) break
+  }
+
+  if (lastAssistantIndex === -1 || lastUserIndex === -1) return false
+  const lastAssistant = messages[lastAssistantIndex]
+  const finish = lastAssistant?.info?.finish
+  if (typeof finish !== "string" || finish.length === 0) return false
+  if (NON_TERMINAL_FINISH_REASONS.has(finish)) return false
+  if (lastAssistant?.parts?.some((part) => typeof part.type === "string" && PENDING_TOOL_PART_TYPES.has(part.type))) return false
+  return lastAssistantIndex > lastUserIndex
+}
 
 type ResumeTaskSnapshot = {
   status: BackgroundTask["status"]
@@ -226,6 +267,19 @@ export type OnSubagentSessionDeleted = (event: SubagentSessionDeletedEvent) => P
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
 const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
+/**
+ * Upper bound on how long a single parent-wake may stay deferred before it is
+ * force-dispatched as an admit-only noReply. Without this bound a parent kept
+ * continuously busy (ultrawork / todo-continuation loops re-prompting at every
+ * turn end) starves the wake forever (8267x deferral incident, upstream #5089).
+ */
+const PARENT_WAKE_MAX_DEFER_MS = 120_000
+/**
+ * Number of consecutive 5s failure-requeue windows (each refreshing with zero
+ * assistant/tool output after the wake) tolerated before a silently-dropped
+ * dispatched wake is requeued into the pending queue (~15s total).
+ */
+const PARENT_WAKE_MAX_WINDOW_REFRESHES = 3
 
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
@@ -304,6 +358,8 @@ export class BackgroundManager {
         client: this.client,
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
+        checkParentSessionExistence: (sessionID: string) =>
+          checkSessionExistence(this.client, sessionID, this.directory),
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,
@@ -312,6 +368,8 @@ export class BackgroundManager {
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
         parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
+        maxDeferMs: PARENT_WAKE_MAX_DEFER_MS,
+        maxWindowRefreshes: PARENT_WAKE_MAX_WINDOW_REFRESHES,
       },
     )
     this.registerProcessCleanup()
@@ -531,6 +589,33 @@ export class BackgroundManager {
       this.scheduleTaskRemoval(task.id)
     }
     this.updateBackgroundTaskMarker(task.parentSessionId)
+    this.notifyResumePromptNotDelivered(task, skippedStatus)
+  }
+
+  private notifyResumePromptNotDelivered(task: BackgroundTask, reason: string): void {
+    const parentSessionId = task.parentSessionId
+    if (!parentSessionId) {
+      return
+    }
+    const revertedStatus = task.status
+    const notification = `<system-reminder>
+[BACKGROUND TASK MESSAGE NOT DELIVERED]
+**ID:** \`${task.id}\`
+**Description:** ${task.description}
+
+Your message to this background task was NOT delivered (reason: ${reason}). The task was reverted to "${revertedStatus}". Retry with task(task_id="${task.id}", prompt="...").
+</system-reminder>`
+    void this.resolveParentWakePromptContext(task)
+      .then((promptContext) => {
+        this.queuePendingParentWake(parentSessionId, notification, promptContext, true, PENDING_PARENT_WAKE_DEBOUNCE_MS)
+      })
+      .catch((error) => {
+        log("[background-agent] Failed to resolve prompt context for undelivered-resume notification:", {
+          taskId: task.id,
+          error: String(error),
+        })
+        this.queuePendingParentWake(parentSessionId, notification, {}, true, PENDING_PARENT_WAKE_DEBOUNCE_MS)
+      })
   }
 
   private removeTaskFromParentIndex(taskID: string, parentSessionID: string | undefined): void {
@@ -1019,6 +1104,11 @@ The fallback retry session is now created and can be inspected directly.
         this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
           log("[background-agent] Failed to notify on error:", err)
         })
+      } else {
+        // No task owns this session (orphaned by definition of this branch): abort it best-effort
+        log("[background-agent] No task resolved for failed launch prompt, aborting orphaned session:", { sessionID })
+        clearDelegatedChildSessionBootstrap(sessionID)
+        await this.abortSessionWithLogging(sessionID, "orphaned launch session cleanup")
       }
     })
 
@@ -1422,10 +1512,14 @@ The fallback retry session is now created and can be inspected directly.
         return
       }
 
-      existingTask.status = "interrupt"
       const errorMessage = errorInfo.message ?? (error instanceof Error ? error.message : String(error))
-      existingTask.error = errorMessage
-      existingTask.completedAt = new Date()
+      if (existingTask.currentAttemptID) {
+        finalizeAttempt(existingTask, existingTask.currentAttemptID, "interrupt", errorMessage)
+      } else {
+        existingTask.status = "interrupt"
+        existingTask.error = errorMessage
+        existingTask.completedAt = new Date()
+      }
       if (existingTask.rootSessionId) {
         this.unregisterRootDescendant(existingTask.rootSessionId)
       }
@@ -1681,6 +1775,10 @@ The fallback retry session is now created and can be inspected directly.
         }
       }
       task.progress.lastUpdate = partInfo?.activityTime ?? new Date()
+      if (task.sessionErrorCount) {
+        task.sessionErrorCount = 0
+        task.lastSessionErrorAt = undefined
+      }
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
         const countedToolPartIDs = task.progress.countedToolPartIDs ?? new Set<string>()
@@ -2019,24 +2117,48 @@ The fallback retry session is now created and can be inspected directly.
       canRetry,
     })
 
+    let repeatedTransientError = false
     const sessionId = task.sessionId
     if (sessionId) {
       const sessionStillAlive = await this.verifySessionExists(sessionId)
       if (sessionStillAlive) {
-        this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
+        const now = Date.now()
+        const lastSessionErrorAt = task.lastSessionErrorAt?.getTime()
+        if (lastSessionErrorAt !== undefined && now - lastSessionErrorAt > SESSION_ERROR_WINDOW_MS) {
+          task.sessionErrorCount = 0
+        }
+        task.sessionErrorCount = (task.sessionErrorCount ?? 0) + 1
+        task.lastSessionErrorAt = new Date(now)
+
+        if (task.sessionErrorCount < SESSION_ERROR_TRANSIENT_THRESHOLD) {
+          this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
+            taskId: task.id,
+            sessionId,
+            sessionErrorCount: task.sessionErrorCount,
+            errorMessage: errorMsg?.slice(0, 200),
+          })
+          return
+        }
+
+        repeatedTransientError = true
+        this.logger("[background-agent] session.error repeated past transient threshold while session alive, failing task:", {
           taskId: task.id,
           sessionId,
+          sessionErrorCount: task.sessionErrorCount,
           errorMessage: errorMsg?.slice(0, 200),
         })
-        return
       }
     }
 
+    const failureError = repeatedTransientError
+      ? `Session repeatedly errored ${task.sessionErrorCount} times without recovering. Last error: ${errorMsg}`
+      : errorMsg
+
     if (task.currentAttemptID) {
-      finalizeAttempt(task, task.currentAttemptID, "error", errorMsg)
+      finalizeAttempt(task, task.currentAttemptID, "error", failureError)
     } else {
       task.status = "error"
-      task.error = errorMsg
+      task.error = failureError
       task.completedAt = new Date()
     }
     if (task.rootSessionId) {
@@ -2814,6 +2936,24 @@ The task was re-queued on a fallback model after a retryable failure.
     return verifySessionStillExists(this.client, sessionID, this.directory)
   }
 
+  /**
+   * Surface a first-prompt-watchdog give-up (no fallback chain configured) for a
+   * background task. Locates the task by session and fails it through the same
+   * machinery as a crash so the parent is notified. No-op when the session is not
+   * a background task (e.g. a main session), preserving the watchdog's silent
+   * give-up for non-task sessions.
+   */
+  async failWatchdogExhaustedTask(sessionID: string, info: { model?: string; agent?: string } = {}): Promise<void> {
+    const task = this.findBySession(sessionID)
+    if (!task) return
+    if (task.status !== "running") return
+    const modelLabel = info.model ? ` on model ${info.model}` : ""
+    log("[background-agent] First-prompt watchdog exhausted with no fallback, failing task:", { taskId: task.id, sessionID, model: info.model, agent: info.agent })
+    await this.failCrashedTask(
+      task,
+      `Subagent produced no progress${modelLabel} and the first-prompt watchdog exhausted its same-model retries with no fallback model configured.`,
+    )
+  }
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "error", errorMessage)
@@ -2861,6 +3001,69 @@ The task was re-queued on a fallback model after a retryable failure.
       log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
     })
   }
+
+  /**
+   * Completion fallback for the polling path when SSE idle events are missed.
+   * When a running task's session status is unavailable or stuck-busy, the
+   * idle SSE event can be dropped and the task wedges until the stale timeout.
+   * This detects completion from message stability: if the message count has
+   * been unchanged for MIN_STABILITY_TIME_MS AND the last assistant message is
+   * finished, the task is completed. It can NEVER complete a session that is
+   * still generating, because a growing message count resets the stability
+   * window and an unfinished last assistant message blocks completion.
+   */
+  private async tryMessageStabilityCompletion(task: BackgroundTask, sessionID: string, source: string): Promise<boolean> {
+    if (task.status !== "running") return false
+
+    // Throttle: only consider the fallback once the task has been running a while.
+    const startedAt = task.startedAt?.getTime()
+    if (startedAt === undefined || Date.now() - startedAt < MIN_RUNTIME_BEFORE_STALE_MS) {
+      return false
+    }
+
+    let messages: StabilityMessage[]
+    try {
+      const response = await messagesInDirectory(this.client, { path: { id: sessionID } }, this.directory)
+      messages = normalizeSDKResponse(response, [] as StabilityMessage[], { preferResponseOnMissingData: true })
+    } catch (error) {
+      log("[background-agent] Message-stability fallback failed to read messages:", { taskId: task.id, error })
+      return false
+    }
+
+    const count = messages.length
+    if (task.lastMsgCount !== count) {
+      task.lastMsgCount = count
+      task.lastMessageCountChangedAt = new Date()
+      return false
+    }
+    if (!task.lastMessageCountChangedAt) {
+      task.lastMessageCountChangedAt = new Date()
+      return false
+    }
+    if (Date.now() - task.lastMessageCountChangedAt.getTime() < MIN_STABILITY_TIME_MS) {
+      return false
+    }
+
+    // Stable, but never complete a session whose turn is not terminally finished.
+    // Rejects finish:"tool-calls"/"unknown", pending tool-call parts, and old finished
+    // turns superseded by a newer user/resume message.
+    if (!isSessionMessageComplete(messages)) {
+      return false
+    }
+
+    // Mirror the session.idle completion gates: require real output and no incomplete todos.
+    const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+    if (!hasValidOutput) return false
+    if (task.status !== "running") return false
+    const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
+    if (hasIncompleteTodos) return false
+
+    // Re-check after async work to avoid racing with another completion path.
+    if (task.status !== "running") return false
+
+    return await this.tryCompleteTask(task, source)
+  }
+
 
   private async pollRunningTasks(): Promise<void> {
     if (this.pollingInFlight) return
@@ -2919,6 +3122,7 @@ The task was re-queued on a fallback model after a retryable failure.
               sessionStatus: sessionStatus.type,
               toolCalls: task.progress?.toolCalls ?? 0,
             })
+            await this.tryMessageStabilityCompletion(task, sessionID, "polling (message stability, status busy)")
             continue
           }
 
@@ -2936,6 +3140,7 @@ The task was re-queued on a fallback model after a retryable failure.
           }
 
           if (allStatuses === undefined) {
+            await this.tryMessageStabilityCompletion(task, sessionID, "polling (message stability, status unavailable)")
             continue
           }
 

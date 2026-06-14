@@ -38,12 +38,65 @@ function setPromptQueue(sessionID: string, queue: QueuedInternalPrompt[]): void 
   promptQueues.set(sessionID, queue)
 }
 
-function queuedResult(entry: QueuedInternalPrompt, position: number, queuedBy = entry.source): InternalPromptDispatchResult {
+function queuedResult(
+  entry: QueuedInternalPrompt,
+  position: number,
+  queuedBy = entry.source,
+  queuedEntryCreated = true,
+): InternalPromptDispatchResult {
   return {
     status: "queued",
     queuedBy,
     position,
+    queuedEntryCreated,
   }
+}
+
+function expiredResult(entry: QueuedInternalPrompt, waitedMs: number): InternalPromptDispatchResult {
+  return {
+    status: "expired",
+    source: entry.source,
+    waitedMs,
+  }
+}
+
+function expireStaleEntries(
+  sessionID: string,
+  awaitedEntry?: QueuedInternalPrompt,
+): InternalPromptDispatchResult | undefined {
+  const queue = promptQueues.get(sessionID)
+  if (!queue || queue.length === 0) {
+    return undefined
+  }
+
+  const now = Date.now()
+  const inFlightID = promptQueueInFlight.get(sessionID)?.id
+  let awaitedExpired: InternalPromptDispatchResult | undefined
+  const survivors: QueuedInternalPrompt[] = []
+  for (const entry of queue) {
+    const ttlMs = entry.ttlMs
+    const waitedMs = now - entry.enqueuedAt
+    if (ttlMs === undefined || ttlMs <= 0 || waitedMs < ttlMs || entry.id === inFlightID) {
+      survivors.push(entry)
+      continue
+    }
+
+    const result = expiredResult(entry, waitedMs)
+    log("[prompt-async-gate] queued prompt expired past TTL", {
+      sessionID,
+      source: entry.source,
+      waitedMs,
+      ttlMs,
+    })
+    if (awaitedEntry?.id === entry.id) {
+      awaitedExpired = result
+    } else {
+      entry.onExpiredOrFailed?.(result)
+    }
+  }
+
+  setPromptQueue(sessionID, survivors)
+  return awaitedExpired
 }
 
 function clearPromptQueueTimer(sessionID: string): void {
@@ -132,6 +185,15 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
   let awaitedResult: InternalPromptDispatchResult | undefined
   try {
     while (true) {
+      const expiredAwaited = expireStaleEntries(sessionID, awaitedEntry)
+      if (expiredAwaited) {
+        awaitedResult = expiredAwaited
+        const remainingAfterExpiry = promptQueues.get(sessionID)
+        if (remainingAfterExpiry && remainingAfterExpiry.length > 0) {
+          schedulePromptQueueDrain(sessionID, 0)
+        }
+        break
+      }
       const queue = promptQueues.get(sessionID)
       const entry = queue?.[0]
       if (!entry) {
@@ -174,6 +236,10 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
       removePromptQueueEntry(sessionID, entry)
       if (awaitedEntry?.id === entry.id) {
         awaitedResult = result
+      } else if (result.status === "failed") {
+        entry.onExpiredOrFailed?.(result)
+      } else if (result.status === "dispatched") {
+        entry.onDispatched?.(result)
       }
 
       const remainingQueue = promptQueues.get(sessionID)
@@ -199,7 +265,7 @@ export async function enqueueInternalPrompt(entry: QueuedInternalPrompt): Promis
       source: entry.source,
       queuedBy: activeReservation.source,
     })
-    return queuedResult(entry, 0, activeReservation.source)
+    return queuedResult(entry, 0, activeReservation.source, false)
   }
 
   const queue = getPromptQueue(entry.sessionID)
@@ -213,7 +279,7 @@ export async function enqueueInternalPrompt(entry: QueuedInternalPrompt): Promis
         queuedBy: existing.source,
         position: existingIndex + 1,
       })
-      return queuedResult(existing, existingIndex + 1)
+      return queuedResult(existing, existingIndex + 1, existing.source, false)
     }
   }
 

@@ -58,6 +58,13 @@ export interface RuntimeFallbackOptions {
   config?: RuntimeFallbackConfig
   pluginConfig?: OhMyOpenCodeConfig
   session_timeout_ms?: number
+  /**
+   * Invoked when the first-prompt watchdog gives up on a silent subagent because
+   * no fallback chain is configured. Lets the background manager surface the
+   * exhaustion (fail + notify) instead of leaving the task wedged. No-op for
+   * sessions that are not background tasks.
+   */
+  onWatchdogExhausted?: (sessionID: string, info: { model?: string; agent?: string }) => void | Promise<void>
 }
 
 export interface RuntimeFallbackHook {
@@ -85,4 +92,5 @@ export interface HookDeps {
    * loop (every cycle started over at attempt:1). See issue #4006.
    */
   internallyAbortedSessions: Set<string>
+  onWatchdogExhausted?: (sessionID: string, info: { model?: string; agent?: string }) => void | Promise<void>
 }

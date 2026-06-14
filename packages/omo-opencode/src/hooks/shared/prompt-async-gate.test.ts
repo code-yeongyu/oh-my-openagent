@@ -1088,7 +1088,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "queued", queuedBy: "team-live-delivery", position: 1 })
+    expect(second).toEqual({ status: "queued", queuedBy: "team-live-delivery", position: 1, queuedEntryCreated: true })
     expect(promptCalls).toBe(1)
   })
 
@@ -1215,7 +1215,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     // then
     expect(first.status).toBe("failed")
     expect(first).toMatchObject({ dispatchAttempted: true })
-    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 0 })
+    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 0, queuedEntryCreated: false })
     expect(promptCalls).toBe(1)
   })
 
@@ -1263,7 +1263,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     // then
     expect(first.status).toBe("dispatched")
     expect(released).toBe(false)
-    expect(second).toEqual({ status: "queued", queuedBy: "model-fallbackx:message.updated", position: 1 })
+    expect(second).toEqual({ status: "queued", queuedBy: "model-fallbackx:message.updated", position: 1, queuedEntryCreated: true })
     expect(promptCalls).toBe(1)
   })
 

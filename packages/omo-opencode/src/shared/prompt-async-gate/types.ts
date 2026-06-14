@@ -47,6 +47,9 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly dispatchTimeoutMs?: number
   readonly checkStatus?: boolean
   readonly checkToolState?: boolean
+  readonly ttlMs?: number
+  readonly onExpiredOrFailed?: (result: InternalPromptDispatchResult) => void
+  readonly onDispatched?: (result: InternalPromptDispatchResult) => void
 }
 
 export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> & (
@@ -64,11 +67,12 @@ export type PromptAsyncReservation = {
 
 export type InternalPromptDispatchResult =
   | { readonly status: "dispatched"; readonly response: unknown }
-  | { readonly status: "queued"; readonly queuedBy: string; readonly position: number }
+  | { readonly status: "queued"; readonly queuedBy: string; readonly position: number; readonly queuedEntryCreated: boolean }
   | { readonly status: "active" }
   | { readonly status: "reserved"; readonly reservedBy: string }
   | { readonly status: "unavailable" }
   | { readonly status: "failed"; readonly error: unknown; readonly dispatchAttempted: boolean }
+  | { readonly status: "expired"; readonly source: string; readonly waitedMs: number }
 
 export type PromptAsyncGateResult = InternalPromptDispatchResult
 
@@ -100,4 +104,8 @@ export type QueuedInternalPrompt = {
   readonly checkStatus: boolean
   readonly checkToolState: boolean
   readonly dispatch: (input: unknown) => Promise<unknown>
+  readonly enqueuedAt: number
+  readonly ttlMs?: number
+  readonly onExpiredOrFailed?: (result: InternalPromptDispatchResult) => void
+  readonly onDispatched?: (result: InternalPromptDispatchResult) => void
 }

@@ -95,4 +95,46 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     expect(result).toContain("session_id: ses_resumed_456")
     expect(result).not.toContain("subagent:")
   })
+
+  test("states the message was dispatched asynchronously and a notification will follow if delivery fails", async () => {
+    //#given - mock manager.resume returning a running task (fire-and-forget dispatch)
+    const mockManager = {
+      resume: async () => ({
+        id: "bg_task_001",
+        description: "oracle consultation",
+        agent: "oracle",
+        status: "running",
+        sessionId: "ses_resumed_123",
+      }),
+    }
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-honesty",
+      metadata: mock(() => Promise.resolve()),
+    }
+    const mockExecutorCtx = {
+      manager: mockManager,
+    }
+    const parentContext = {
+      sessionID: "parent-session",
+      messageID: "msg-parent",
+      agent: "sisyphus",
+    }
+    const args = {
+      task_id: "ses_resumed_123",
+      prompt: "continue working",
+      description: "resume oracle",
+      load_skills: [],
+      run_in_background: true,
+    }
+
+    //#when - executeBackgroundContinuation completes
+    const { executeBackgroundContinuation } = require("./background-continuation")
+    const result = await executeBackgroundContinuation(args, mockCtx, mockExecutorCtx, parentContext)
+
+    //#then - output is honest that delivery is async and not yet confirmed
+    expect(result).toContain("dispatched asynchronously")
+    expect(result).toContain("delivery is not yet confirmed")
+    expect(result).toContain('task(task_id="bg_task_001")')
+  })
 })

@@ -37,6 +37,7 @@ import {
   DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
   DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
   DEFAULT_PROMPT_QUEUE_RETRY_MS,
+  DEFAULT_PROMPT_QUEUE_TTL_MS,
   DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
   resetPromptGateTimingForTesting,
 } from "./prompt-async-gate/timing"
@@ -54,6 +55,7 @@ export {
   DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
   DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS,
   DEFAULT_PROMPT_QUEUE_RETRY_MS,
+  DEFAULT_PROMPT_QUEUE_TTL_MS,
   DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
   _setPromptGateMessagesFetchTimeoutMsForTesting,
 } from "./prompt-async-gate/timing"
@@ -259,6 +261,10 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       semanticDedupeHoldMs,
       dispatchTimeoutMs,
       queueRetryMs,
+      enqueuedAt: Date.now(),
+      ttlMs: args.ttlMs ?? DEFAULT_PROMPT_QUEUE_TTL_MS,
+      onExpiredOrFailed: args.onExpiredOrFailed,
+      onDispatched: args.onDispatched,
       checkStatus: args.checkStatus !== false,
       checkToolState: args.checkToolState !== false,
       dispatch: async (_dispatchInput: unknown) => dispatchWithPathCompatibility(dispatch, input),

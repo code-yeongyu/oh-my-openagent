@@ -61,7 +61,7 @@ describe("dispatchInternalPrompt semantic dedupe", () => {
 
       // then
       expect(first.status).toBe("dispatched")
-      expect(second).toEqual({ status: "queued", queuedBy: "test:semantic:first", position: 0 })
+      expect(second).toEqual({ status: "queued", queuedBy: "test:semantic:first", position: 0, queuedEntryCreated: false })
       expect(promptCalls).toEqual(["prompt"])
     } finally {
       Date.now = originalDateNow
@@ -114,7 +114,7 @@ describe("dispatchInternalPrompt semantic dedupe", () => {
 
       // then
       expect(first.status).toBe("dispatched")
-      expect(second).toEqual({ status: "queued", queuedBy: "test:semantic-order:first", position: 0 })
+      expect(second).toEqual({ status: "queued", queuedBy: "test:semantic-order:first", position: 0, queuedEntryCreated: false })
       expect(promptCalls).toEqual(["prompt"])
     } finally {
       Date.now = originalDateNow
@@ -355,6 +355,7 @@ describe("dispatchInternalPrompt semantic dedupe", () => {
         status: "queued",
         queuedBy: "test:semantic-continuation:first",
         position: 0,
+        queuedEntryCreated: false,
       })
       expect(promptCalls).toEqual(["prompt"])
     } finally {

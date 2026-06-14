@@ -17,7 +17,7 @@ import {
 } from "../claude-code-session-state"
 import { _resetTaskToastManagerForTesting, initTaskToastManager } from "../task-toast-manager/manager"
 import type { ConcurrencyManager } from "./concurrency"
-import { MIN_IDLE_TIME_MS } from "./constants"
+import { MIN_IDLE_TIME_MS, SESSION_ERROR_TRANSIENT_THRESHOLD, SESSION_ERROR_WINDOW_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
 import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
@@ -803,6 +803,70 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     expect(abortCalls).toBe(0)
     expect(task.status).toBe("running")
     expect(task.completedAt).toBeUndefined()
+  })
+})
+
+describe("BackgroundManager.resume undelivered notification", () => {
+  test("notifies the parent and reverts the task when a resume prompt cannot be delivered", async () => {
+    //#given - client exposes no promptAsync so the resume dispatch resolves as unavailable
+    const client = {
+      session: {
+        messages: async () => [],
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task: BackgroundTask = {
+      id: "bg_resume_undelivered",
+      sessionId: "ses_resume_undelivered",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "undelivered resume test",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      concurrencyGroup: "anthropic/claude-haiku-4-5",
+    }
+    getTaskMap(manager).set(task.id, task)
+    const queuePendingParentWake = mock(() => {})
+    ;(cast<{
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
+
+    //#when
+    await manager.resume({
+      sessionId: "ses_resume_undelivered",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message-2",
+    })
+    await waitUntil(() => queuePendingParentWake.mock.calls.length > 0, 1_000)
+
+    //#then
+    const storedTask = getTaskMap(manager).get(task.id)
+    expect(storedTask?.status).toBe("completed")
+    expect(queuePendingParentWake).toHaveBeenCalledTimes(1)
+    const wakeCall = cast<Array<[string, string, Record<string, unknown>, boolean]>>(
+      queuePendingParentWake.mock.calls,
+    )[0]
+    if (!wakeCall) {
+      throw new Error("Expected an undelivered-resume parent wake call")
+    }
+    const [sessionID, notification, , shouldReply] = wakeCall
+    expect(sessionID).toBe("parent-session")
+    expect(notification).toContain("NOT delivered")
+    expect(notification).toContain("bg_resume_undelivered")
+    expect(notification).toContain("task_id")
+    expect(shouldReply).toBe(true)
   })
 })
 
@@ -8416,6 +8480,258 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
       sessionId: "session-attempt-2",
     })
     expect(abortCalls).toEqual([])
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager session.error bookkeeping (G1)", () => {
+  const spyVerify = (manager: BackgroundManager, alive: boolean): ReturnType<typeof spyOn> => {
+    const spy = spyOn(
+      cast<{ verifySessionExists: (sessionID: string) => Promise<boolean> }>(manager),
+      "verifySessionExists",
+    )
+    spy.mockImplementation(async () => alive)
+    return spy
+  }
+
+  const fireSessionError = (manager: BackgroundManager, sessionID: string, message: string): void => {
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID,
+        error: { name: "UnknownError", message },
+      },
+    })
+  }
+
+  test("fails task after repeated session.error events while the session stays alive", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+    const verifySpy = spyVerify(manager, true)
+    const concurrencyManager = getConcurrencyManager(manager)
+    const concurrencyKey = "anthropic/claude-opus-4.7"
+    await concurrencyManager.acquire(concurrencyKey)
+    const errorText = "Expected 'function.name' to be a string"
+    const task = createMockTask({
+      id: "task-g1-fail",
+      sessionId: "ses-g1-fail",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-g1",
+      description: "task hit by repeated provider errors",
+      agent: "explore",
+      status: "running",
+      concurrencyKey,
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - first two errors keep the task running (below threshold)
+    fireSessionError(manager, task.sessionId!, errorText)
+    await flushBackgroundNotifications()
+    expect(task.status).toBe("running")
+    expect(task.sessionErrorCount).toBe(1)
+
+    fireSessionError(manager, task.sessionId!, errorText)
+    await flushBackgroundNotifications()
+    expect(task.status).toBe("running")
+    expect(task.sessionErrorCount).toBe(2)
+
+    //#when - the threshold-th error finalizes the task
+    fireSessionError(manager, task.sessionId!, errorText)
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.sessionErrorCount).toBe(SESSION_ERROR_TRANSIENT_THRESHOLD)
+    expect(task.status).toBe("error")
+    expect(task.error).toContain(errorText)
+    expect(task.completedAt).toBeInstanceOf(Date)
+    expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+    expect(getCompletionTimers(manager).has(task.id)).toBe(true)
+    expect(manager.getPendingNotifications("parent-session").some((t) => t.id === task.id)).toBe(true)
+
+    verifySpy.mockRestore()
+    manager.shutdown()
+  })
+
+  test("resets the session.error counter when progress is observed between errors", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+    const verifySpy = spyVerify(manager, true)
+    const sessionID = "ses-g1-progress"
+    const task = createMockTask({
+      id: "task-g1-progress",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-g1-progress",
+      description: "task that recovers progress between errors",
+      agent: "explore",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - two errors accumulate, then progress arrives, then one more error
+    fireSessionError(manager, sessionID, "boom one")
+    await flushBackgroundNotifications()
+    fireSessionError(manager, sessionID, "boom two")
+    await flushBackgroundNotifications()
+    expect(task.sessionErrorCount).toBe(2)
+
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: { sessionID, type: "text" },
+    })
+    expect(task.sessionErrorCount).toBe(0)
+
+    fireSessionError(manager, sessionID, "boom three")
+    await flushBackgroundNotifications()
+
+    //#then - counter restarted from the progress reset, task still running
+    expect(task.status).toBe("running")
+    expect(task.sessionErrorCount).toBe(1)
+
+    verifySpy.mockRestore()
+    manager.shutdown()
+  })
+
+  test("resets the session.error window when the previous error is older than the window", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+    const verifySpy = spyVerify(manager, true)
+    const sessionID = "ses-g1-window"
+    const task = createMockTask({
+      id: "task-g1-window",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-g1-window",
+      description: "task with a stale error window",
+      agent: "explore",
+      status: "running",
+    })
+    task.sessionErrorCount = 2
+    task.lastSessionErrorAt = new Date(Date.now() - (SESSION_ERROR_WINDOW_MS + 60_000))
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    fireSessionError(manager, sessionID, "fresh error after a long gap")
+    await flushBackgroundNotifications()
+
+    //#then - stale window discarded, counter restarts at 1, task still running
+    expect(task.status).toBe("running")
+    expect(task.sessionErrorCount).toBe(1)
+
+    verifySpy.mockRestore()
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager orphaned launch session cleanup (G2)", () => {
+  test("aborts the spawned session when a launch prompt fails and no task owns it", async () => {
+    //#given
+    const abortCalls: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_orphan_launch" } }),
+        promptAsync: async () => {
+          throw new Error("orphaned launch failure")
+        },
+        abort: async (args: { path: { id: string } }) => {
+          abortCalls.push(args.path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{
+      reserveSubagentSpawn: () => Promise<{
+        spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
+        descendantCount: number
+        commit: () => number
+        rollback: () => void
+      }>
+    }>(manager)).reserveSubagentSpawn = async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit: () => 1,
+      rollback: () => {},
+    })
+    // No task can be resolved for the failing session (orphaned by definition of this branch)
+    ;(cast<{ resolveTaskAttemptBySession: () => undefined }>(manager)).resolveTaskAttemptBySession = () => undefined
+
+    //#when
+    await manager.launch({
+      description: "orphaned launch",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(abortCalls).toContain("ses_orphan_launch")
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager resume error finalization (G4)", () => {
+  test("finalizes the current attempt when a resume prompt fails without a fallback", async () => {
+    //#given
+    const client = {
+      session: {
+        promptAsync: async () => {
+          throw new Error("resume prompt blew up")
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task: BackgroundTask = {
+      id: "bg_resume_g4",
+      sessionId: "ses_resume_g4",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "resume finalize test",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      concurrencyGroup: "sisyphus-junior",
+      attempts: [
+        {
+          attemptId: "att_g4",
+          attemptNumber: 1,
+          sessionId: "ses_resume_g4",
+          status: "running",
+          startedAt: new Date(),
+        },
+      ],
+      currentAttemptID: "att_g4",
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: "ses_resume_g4",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message-2",
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    const storedTask = getTaskMap(manager).get(task.id)
+    expect(storedTask?.status).toBe("interrupt")
+    expect(storedTask?.attempts?.[0]?.status).toBe("interrupt")
+    expect(storedTask?.attempts?.[0]?.status).not.toBe("running")
+    expect(storedTask?.error).toContain("resume prompt blew up")
 
     manager.shutdown()
   })
