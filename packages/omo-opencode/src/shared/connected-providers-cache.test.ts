@@ -156,6 +156,74 @@ describe("updateConnectedProvidersCache", () => {
 		}
 	})
 
+	test("removes stale providers when a complete refresh confirms they are disconnected", async () => {
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
+
+		try {
+			//#given - a previous complete provider snapshot includes two connected providers
+			await testCacheStore.updateConnectedProvidersCache({
+				provider: {
+					list: async () => ({
+						data: {
+							connected: ["google", "anthropic"],
+							all: [
+								{
+									id: "google",
+									models: {
+										"gemini-3.1-pro": { id: "gemini-3.1-pro" },
+									},
+								},
+								{
+									id: "anthropic",
+									models: {
+										"claude-opus-4-7": { id: "claude-opus-4-7" },
+									},
+								},
+							],
+						},
+					}),
+				},
+			})
+
+			//#when - a later full provider list still knows anthropic but no longer marks it connected
+			await testCacheStore.updateConnectedProvidersCache({
+				provider: {
+					list: async () => ({
+						data: {
+							connected: ["google"],
+							all: [
+								{
+									id: "google",
+									models: {
+										"gemini-3.1-pro": { id: "gemini-3.1-pro" },
+									},
+								},
+								{
+									id: "anthropic",
+									models: {
+										"claude-opus-4-7": { id: "claude-opus-4-7" },
+									},
+								},
+							],
+						},
+					}),
+				},
+			})
+
+			//#then - disconnected providers are not kept eligible for model fallback
+			expect(testCacheStore.readConnectedProvidersCache()).toEqual(["google"])
+			expect(testCacheStore.readProviderModelsCache()).toMatchObject({
+				connected: ["google"],
+				models: {
+					google: [{ id: "gemini-3.1-pro" }],
+				},
+			})
+		} finally {
+			cleanupTestCacheContext(fakeUserCacheRoot)
+		}
+	})
+
 	test("writes empty models when provider has no models", async () => {
 		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
 		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
@@ -187,6 +255,59 @@ describe("updateConnectedProvidersCache", () => {
 			const cache = testCacheStore.readProviderModelsCache()
 			expect(cache).not.toBeNull()
 			expect(cache!.models).toEqual({})
+		} finally {
+			cleanupTestCacheContext(fakeUserCacheRoot)
+		}
+	})
+
+	test("clears stale models when a connected provider explicitly reports no models", async () => {
+		const { createConnectedProvidersCacheStore } = await importFreshConnectedProvidersCacheModule()
+		const { testCacheStore, fakeUserCacheRoot } = createTestCacheContext(createConnectedProvidersCacheStore)
+
+		try {
+			//#given - a previous provider snapshot includes model metadata for a connected provider
+			await testCacheStore.updateConnectedProvidersCache({
+				provider: {
+					list: async () => ({
+						data: {
+							connected: ["openai"],
+							all: [
+								{
+									id: "openai",
+									models: {
+										"gpt-5.5": { id: "gpt-5.5" },
+									},
+								},
+							],
+						},
+					}),
+				},
+			})
+
+			//#when - a later authoritative refresh reports the provider with an empty model list
+			await testCacheStore.updateConnectedProvidersCache({
+				provider: {
+					list: async () => ({
+						data: {
+							connected: ["openai"],
+							all: [
+								{
+									id: "openai",
+									models: {},
+								},
+							],
+						},
+					}),
+				},
+			})
+
+			//#then - old models are not restored into the connected provider's cache entry
+			expect(testCacheStore.readProviderModelsCache()).toMatchObject({
+				connected: ["openai"],
+				models: {
+					openai: [],
+				},
+			})
 		} finally {
 			cleanupTestCacheContext(fakeUserCacheRoot)
 		}

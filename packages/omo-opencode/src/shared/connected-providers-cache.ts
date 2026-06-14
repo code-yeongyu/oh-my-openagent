@@ -47,7 +47,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null
 }
 
-function mergeConnectedProviders(previous: string[] | null | undefined, fetched: string[]): string[] {
+function mergeConnectedProviders(
+	previous: string[] | null | undefined,
+	fetched: string[],
+	reportedProviderIDs: Set<string>,
+): string[] {
 	if (!previous || previous.length === 0) {
 		return fetched
 	}
@@ -62,18 +66,27 @@ function mergeConnectedProviders(previous: string[] | null | undefined, fetched:
 		return fetched
 	}
 
-	return Array.from(new Set([...previous, ...fetched]))
+	const fetchedSetWithConfirmedDisconnects = new Set(fetched)
+	for (const provider of previous) {
+		if (!reportedProviderIDs.has(provider)) {
+			fetchedSetWithConfirmedDisconnects.add(provider)
+		}
+	}
+	return Array.from(fetchedSetWithConfirmedDisconnects)
 }
 
 function mergeProviderModels(
 	previous: Record<string, string[] | ModelMetadata[]> | undefined,
 	fetched: Record<string, ModelMetadata[]>,
 	connected: string[],
+	reportedModelProviderIDs: Set<string>,
 ): Record<string, string[] | ModelMetadata[]> {
 	const merged: Record<string, string[] | ModelMetadata[]> = {}
 	for (const provider of connected) {
 		if (fetched[provider]) {
 			merged[provider] = fetched[provider]
+		} else if (reportedModelProviderIDs.has(provider) && previous?.[provider]) {
+			merged[provider] = []
 		} else if (previous?.[provider]) {
 			merged[provider] = previous[provider]
 		}
@@ -159,7 +172,9 @@ export function createConnectedProvidersCacheStore(
 			const previousProviderModels = readProviderModelsCache()
 			const result = await client.provider.list()
 			const fetchedConnected = result.data?.connected ?? []
-			const connected = mergeConnectedProviders(previousConnected ?? previousProviderModels?.connected, fetchedConnected)
+			const allProviders = result.data?.all ?? []
+			const reportedProviderIDs = new Set(allProviders.map((provider) => provider.id))
+			const connected = mergeConnectedProviders(previousConnected ?? previousProviderModels?.connected, fetchedConnected, reportedProviderIDs)
 			log("[connected-providers-cache] Fetched connected providers", {
 				count: fetchedConnected.length,
 				providers: fetchedConnected,
@@ -168,10 +183,11 @@ export function createConnectedProvidersCacheStore(
 			writeConnectedProvidersCache(connected)
 
 			const modelsByProvider: Record<string, ModelMetadata[]> = {}
-			const allProviders = result.data?.all ?? []
+			const reportedModelProviderIDs = new Set<string>()
 
 			for (const provider of allProviders) {
 				if (provider.models) {
+					reportedModelProviderIDs.add(provider.id)
 					const modelMetadata = Object.entries(provider.models).map(([modelID, rawMetadata]) => {
 						if (!isRecord(rawMetadata)) {
 							return { id: modelID }
@@ -191,7 +207,7 @@ export function createConnectedProvidersCacheStore(
 					}
 				}
 			}
-			const mergedModelsByProvider = mergeProviderModels(previousProviderModels?.models, modelsByProvider, connected)
+			const mergedModelsByProvider = mergeProviderModels(previousProviderModels?.models, modelsByProvider, connected, reportedModelProviderIDs)
 
 			log("[connected-providers-cache] Extracted models from provider list", {
 				providerCount: Object.keys(mergedModelsByProvider).length,
