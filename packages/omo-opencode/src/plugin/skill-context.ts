@@ -1,6 +1,7 @@
 import type { AvailableSkill } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { BrowserAutomationProvider } from "../config/schema/browser-automation"
+import { BUILTIN_BROWSER_SKILLS } from "../features/builtin-skills/skills"
 import type {
   LoadedSkill,
   SkillScope,
@@ -28,7 +29,7 @@ export type SkillContext = {
   disabledSkills: Set<string>
 }
 
-const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "dev-browser", "playwright"])
+const PROVIDER_GATED_SKILL_NAMES = new Set(Object.values(BUILTIN_BROWSER_SKILLS).map(s => s.name))
 
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"

@@ -16,6 +16,7 @@ import {
   securityReviewSkill,
   visualQaSkill,
   teamModeSkill,
+  fallbackBrowserSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
@@ -24,19 +25,17 @@ export interface CreateBuiltinSkillsOptions {
   teamModeEnabled?: boolean
 }
 
+export const BUILTIN_BROWSER_SKILLS: Record<string, BuiltinSkill> = {
+  playwright: playwrightSkill,
+  "agent-browser": agentBrowserSkill,
+  "dev-browser": devBrowserSkill,
+  "playwright-cli": playwrightCliSkill,
+}
+
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
   const { browserProvider = "playwright", disabledSkills, teamModeEnabled = false } = options
 
-  let browserSkill: BuiltinSkill
-	if (browserProvider === "agent-browser") {
-		browserSkill = agentBrowserSkill
-	} else if (browserProvider === "dev-browser") {
-		browserSkill = devBrowserSkill
-	} else if (browserProvider === "playwright-cli") {
-		browserSkill = playwrightCliSkill
-	} else {
-		browserSkill = playwrightSkill
-	}
+  const browserSkill = BUILTIN_BROWSER_SKILLS[browserProvider] ?? fallbackBrowserSkill
 
 	const skills = [
 		browserSkill,

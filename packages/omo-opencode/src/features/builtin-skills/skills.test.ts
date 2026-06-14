@@ -130,6 +130,27 @@ describe("createBuiltinSkills", () => {
 		expect(defaultSkills).toHaveLength(10)
 		expect(agentBrowserSkills).toHaveLength(10)
 		expect(devBrowserSkills).toHaveLength(10)
+		// content-based assertion: each includes the correct browser skill
+		expect(defaultSkills.map((s) => s.name)).toContain("playwright")
+		expect(agentBrowserSkills.map((s) => s.name)).toContain("agent-browser")
+		expect(devBrowserSkills.map((s) => s.name)).toContain("dev-browser")
+	})
+
+	test("returns fallback skill for custom browser provider", () => {
+		// given
+		const options = { browserProvider: "cloakbrowser" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+
+		// then
+		const browserSkill = skills.find((s) => s.name === "browser-automation")
+		expect(browserSkill).toBeDefined()
+		expect(browserSkill?.description).toContain("custom provider")
+		const skillNames = skills.map((s) => s.name)
+		expect(skillNames).not.toContain("playwright")
+		expect(skillNames).not.toContain("agent-browser")
+		expect(skillNames).not.toContain("dev-browser")
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {

@@ -10,7 +10,7 @@ import type { BuiltinSkill } from "../types"
  */
 export const playwrightCliSkill: BuiltinSkill = {
   name: "playwright",
-  description: "MUST USE for any browser-related tasks. Browser automation via playwright-cli - verification, browsing, information gathering, web scraping, testing, screenshots, and all browser interactions.",
+  description: "Browser automation via playwright-cli — verification, browsing, information gathering, web scraping, testing, screenshots, and all browser interactions.",
   template: `# Browser Automation with playwright-cli
 
 ## Quick start

@@ -306,6 +306,132 @@ describe("createSkillContext", () => {
     }
   })
 
+  it("custom provider filters out builtin-renamed browser skills", async () => {
+    // given
+    const discoveredPlaywrightSkill = {
+      name: "playwright",
+      definition: { description: "Discovered playwright skill" },
+      scope: "user" as const,
+    }
+
+    const discoverConfigSourceSkillsSpy = spyOn(
+      skillLoader,
+      "discoverConfigSourceSkills",
+    ).mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverUserClaudeSkills",
+    ).mockResolvedValue([discoveredPlaywrightSkill])
+    const discoverProjectClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectClaudeSkills",
+    ).mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(
+      skillLoader,
+      "discoverOpencodeGlobalSkills",
+    ).mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectAgentsSkills",
+    ).mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverGlobalAgentsSkills",
+    ).mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(
+      mcpLoader,
+      "getSystemMcpServerNames",
+    ).mockReturnValue(new Set<string>())
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+      browser_automation_engine: { provider: "cloakbrowser" },
+    })
+
+    try {
+      // when
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+      })
+
+      // then
+      expect(result.browserProvider).toBe("cloakbrowser")
+      expect(result.mergedSkills.some((skill) => skill.name === "playwright")).toBe(false)
+      expect(result.availableSkills.some((skill) => skill.name === "playwright")).toBe(false)
+    } finally {
+      discoverConfigSourceSkillsSpy.mockRestore()
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverProjectClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
+
+  it("custom provider retains user skill with same name as custom provider", async () => {
+    // given
+    const discoveredCloakbrowserSkill = {
+      name: "cloakbrowser",
+      definition: { description: "Discovered cloakbrowser skill" },
+      scope: "user" as const,
+    }
+
+    const discoverConfigSourceSkillsSpy = spyOn(
+      skillLoader,
+      "discoverConfigSourceSkills",
+    ).mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverUserClaudeSkills",
+    ).mockResolvedValue([discoveredCloakbrowserSkill])
+    const discoverProjectClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectClaudeSkills",
+    ).mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(
+      skillLoader,
+      "discoverOpencodeGlobalSkills",
+    ).mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectAgentsSkills",
+    ).mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverGlobalAgentsSkills",
+    ).mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(
+      mcpLoader,
+      "getSystemMcpServerNames",
+    ).mockReturnValue(new Set<string>())
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+      browser_automation_engine: { provider: "cloakbrowser" },
+    })
+
+    try {
+      // when
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+      })
+
+      // then
+      expect(result.browserProvider).toBe("cloakbrowser")
+      expect(result.mergedSkills.some((skill) => skill.name === "cloakbrowser")).toBe(true)
+      expect(result.availableSkills.some((skill) => skill.name === "cloakbrowser")).toBe(true)
+    } finally {
+      discoverConfigSourceSkillsSpy.mockRestore()
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverProjectClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
+
   it("prefers host-config skill when plugin-config declares the same name", async () => {
     // given - plugin-config "shared-skill" and host-config "shared-skill"
     // are both loaded with scope "config". Host should win because
