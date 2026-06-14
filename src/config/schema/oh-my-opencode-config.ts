@@ -18,6 +18,7 @@ import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
+import { MonitorConfigSchema } from "./monitor"
 import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
@@ -79,6 +80,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   openclaw: OpenClawConfigSchema.optional(),
   /** Plugin i18n settings */
   i18n: I18nConfigSchema.optional(),
+  monitor: MonitorConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
   /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
