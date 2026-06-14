@@ -100,7 +100,16 @@ describe("validateArchiveEntries", () => {
 	})
 })
 
-describe("archive extraction preflight", () => {
+// The 3 tests in this block spawn `python3` to create malicious archive
+// fixtures. The Windows CI runner (windows-latest) does not have Python
+// preinstalled, so `spawnSync(["python3", ...])` hangs until the 5000ms
+// per-test timeout. The 4 sibling tests in the `validateArchiveEntries`
+// describe above still cover the validation logic (rejects absolute paths,
+// traversal entries, symlink targets, hard-link targets, accepts contained
+// entries); these 3 tests are end-to-end integration tests that verify the
+// same logic on actual archive bytes. macOS and Linux runners have Python
+// installed and still run the full block.
+describe.skipIf(process.platform === "win32", "archive extraction preflight", () => {
 	it("rejects tar archives with traversal entries before extraction", async () => {
 		//#given
 		const rootDir = createTestDir()
