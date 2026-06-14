@@ -91,7 +91,7 @@ describe("createSisyphusAgent", () => {
   });
 
   describe("#given GPT-family Sisyphus models", () => {
-    test("#when creating agents #then preserves reasoning and apply_patch restrictions", () => {
+    test("#when creating agents #then preserves reasoning and leaves apply_patch available", () => {
       // given
       const models = ["openai/gpt-5.5", "openai/gpt-5.4"];
 
@@ -101,7 +101,7 @@ describe("createSisyphusAgent", () => {
 
         // then
         expect(agent.reasoningEffort).toBe("medium");
-        expect(permissionValue(agent.permission, "apply_patch")).toBe("deny");
+        expect(permissionValue(agent.permission, "apply_patch")).toBeUndefined();
         expect(agent.thinking).toBeUndefined();
       }
     });

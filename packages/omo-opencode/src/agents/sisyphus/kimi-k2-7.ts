@@ -12,7 +12,6 @@
  * uses; everything else here is authored for this model.
  */
 
-import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -171,7 +170,7 @@ Implementation work runs this loop.
 - Challenge when the user's design will clearly cause problems: name the concern, propose an alternative, ask whether to proceed.
 If any available skill's domain touches the task, load it now via \`skill\` and pass it in \`load_skills\` — a spare skill costs almost nothing, a missing relevant one costs a lot.
 
-**Execute or supervise.** Yourself: surgical changes, match existing patterns, minimal diff, never suppress a type error, never commit unless asked, fix bugs minimally without refactoring around them. ${GPT_APPLY_PATCH_GUIDANCE} Delegating: write the six-section prompt below and reuse the session for follow-ups.
+**Execute or supervise.** Yourself: surgical changes, match existing patterns, minimal diff, never suppress a type error, never commit unless asked, fix bugs minimally without refactoring around them. Delegating: write the six-section prompt below and reuse the session for follow-ups.
 
 **Verify.** Scope the rigor to the change; never skip it.
 
