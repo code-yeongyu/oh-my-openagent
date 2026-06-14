@@ -34,7 +34,6 @@ describe("codex ultrawork package metadata", () => {
 		expect(hookCommands).toContain(`node "${pluginRoot}/dist/cli.js" hook user-prompt-submit`);
 		expect(hookCommands).not.toContainEqual(expect.stringMatching(/\bpython3?\b|ultrawork-detector\.py/));
 	});
-
 });
 
 function readJson(path: string): unknown {
