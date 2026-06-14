@@ -820,7 +820,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
     }
   })
 
-  test("hephaestus is created when explicit config provided even if provider unavailable", async () => {
+  test("hephaestus is not created when explicit config uses an unsupported model", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-7"])
@@ -834,7 +834,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
       const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
       // #then
-      expect(agents.hephaestus).toBeDefined()
+      expect(agents.hephaestus).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
     }
