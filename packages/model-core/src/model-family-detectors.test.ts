@@ -9,6 +9,7 @@ import {
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isKimiK27Model,
   isMiniMaxModel,
 } from "./model-family-detectors"
 
@@ -32,6 +33,18 @@ describe("model family detectors", () => {
     expect(isKimiK2Model("opencode/k2p5")).toBe(true)
     expect(isKimiK2Model("opencode/k2-p6")).toBe(true)
     expect(isKimiK2Model("anthropic/claude-opus-4-7")).toBe(false)
+  })
+
+  test("#given Kimi K2.7 model ids #then detects K2.7 only, not K2.6", () => {
+    expect(isKimiK27Model("opencode-go/kimi-k2.7")).toBe(true)
+    expect(isKimiK27Model("moonshotai/kimi-k2-7")).toBe(true)
+    expect(isKimiK27Model("kimi-for-coding/k2p7")).toBe(true)
+    expect(isKimiK27Model("opencode/k2-p7")).toBe(true)
+    expect(isKimiK27Model("opencode-go/kimi-k2.6")).toBe(false)
+    expect(isKimiK27Model("kimi-for-coding/k2p6")).toBe(false)
+    expect(isKimiK27Model("kimi-for-coding/k2p5")).toBe(false)
+    expect(isKimiK27Model("anthropic/claude-opus-4-7")).toBe(false)
+    expect(isKimiK2Model("opencode-go/kimi-k2.7")).toBe(true)
   })
 
   test("#given GLM model ids #then detects GLM family only", () => {

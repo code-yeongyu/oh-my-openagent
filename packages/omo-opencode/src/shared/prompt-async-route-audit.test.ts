@@ -30,10 +30,6 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
     path.join(SOURCE_ROOT, "plugin", "unstable-agent-babysitter.ts"),
     "binds SDK Session.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
   ],
-  [
-    path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
-    "runtime type guard checks promptAsync presence before gate-routed dispatchInternalPrompt",
-  ],
 ])
 
 async function listSourceFiles(directory: string): Promise<string[]> {

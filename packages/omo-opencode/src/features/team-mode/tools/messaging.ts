@@ -30,7 +30,7 @@ const TeamSendMessageArgsSchema = z.object({
   to: z.string().min(1),
   body: z.string(),
   kind: z.enum(MESSAGE_TOOL_KINDS).optional(),
-  correlationId: z.uuid().optional(),
+  correlationId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
   summary: z.string().optional(),
   references: z.array(TeamReferenceArgsSchema).optional(),
 })

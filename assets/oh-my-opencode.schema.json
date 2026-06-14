@@ -5771,9 +5771,6 @@
         "aggressive_truncation": {
           "type": "boolean"
         },
-        "auto_resume": {
-          "type": "boolean"
-        },
         "preemptive_compaction": {
           "type": "boolean"
         },

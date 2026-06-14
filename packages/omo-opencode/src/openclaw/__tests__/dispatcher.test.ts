@@ -8,6 +8,8 @@ import {
   wakeCommandGateway,
 } from "../dispatcher"
 
+const commandGatewayTestTimeoutMs = process.platform === "win32" ? 10_000 : 1_000
+
 describe("OpenClaw Dispatcher", () => {
   function withPlatform<T>(platform: NodeJS.Platform, callback: () => T): T {
     const originalPlatform = process.platform
@@ -235,7 +237,7 @@ describe("OpenClaw Dispatcher", () => {
         type: "command",
         method: "POST",
         command: "printf '%s' '{\"messageId\":\"55\",\"platform\":\"telegram\",\"threadId\":\"thr\"}'",
-        timeout: 1000,
+        timeout: commandGatewayTestTimeoutMs,
       },
       {},
     )
@@ -255,7 +257,7 @@ describe("OpenClaw Dispatcher", () => {
         type: "command",
         method: "POST",
         command: "printf '%s' '✅ Sent via Discord. Message ID: 55'",
-        timeout: 1000,
+        timeout: commandGatewayTestTimeoutMs,
       },
       {},
     )

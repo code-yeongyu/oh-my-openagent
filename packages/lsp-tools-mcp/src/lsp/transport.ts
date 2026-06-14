@@ -1,5 +1,5 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
-import { REQUEST_TIMEOUT_MS, STOP_HARD_KILL_TIMEOUT_MS, STOP_SIGKILL_GRACE_MS } from "./constants.js";
+import { INIT_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STOP_HARD_KILL_TIMEOUT_MS, STOP_SIGKILL_GRACE_MS } from "./constants.js";
 import { LspConnectionClosedError, LspProcessExitedError, LspRequestTimeoutError } from "./errors.js";
 import { JsonRpcConnection } from "./json-rpc-connection.js";
 import { type SpawnedProcess, spawnProcess } from "./process.js";
@@ -35,17 +35,28 @@ function parseDiagnosticsParams(params: unknown): DiagnosticsParams | null {
 	return { uri: params["uri"], diagnostics };
 }
 
+export interface LspClientTimeoutOptions {
+	requestTimeoutMs?: number;
+	initializeTimeoutMs?: number;
+}
+
 export class LspClientTransport {
 	protected proc: SpawnedProcess | null = null;
 	protected connection: JsonRpcConnection | null = null;
 	protected readonly stderrBuffer: string[] = [];
 	protected processExited = false;
 	protected readonly diagnosticsStore = new Map<string, Diagnostic[]>();
+	protected readonly requestTimeoutMs: number;
+	protected readonly initializeTimeoutMs: number;
 
 	constructor(
 		protected readonly root: string,
 		protected readonly server: ResolvedServer,
-	) {}
+		timeouts: LspClientTimeoutOptions = {},
+	) {
+		this.requestTimeoutMs = timeouts.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
+		this.initializeTimeoutMs = timeouts.initializeTimeoutMs ?? INIT_TIMEOUT_MS;
+	}
 
 	pid(): number | undefined {
 		return this.proc?.pid;
@@ -129,7 +140,11 @@ export class LspClientTransport {
 
 	protected sendRequest<T>(method: string): Promise<T>;
 	protected sendRequest<T>(method: string, params: unknown): Promise<T>;
-	protected async sendRequest<T>(method: string, ...args: [] | [unknown]): Promise<T> {
+	protected sendRequest<T>(method: string, params: unknown, options: { timeoutMs?: number }): Promise<T>;
+	protected async sendRequest<T>(
+		method: string,
+		...args: [] | [unknown] | [unknown, { timeoutMs?: number }]
+	): Promise<T> {
 		if (!this.connection) throw new Error("LSP client not started");
 
 		if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
@@ -142,12 +157,13 @@ export class LspClientTransport {
 			);
 		}
 
+		const timeoutMs = args[1]?.timeoutMs ?? this.requestTimeoutMs;
 		let timeoutHandle: NodeJS.Timeout | null = null;
 		const timeoutPromise = new Promise<never>((_, reject) => {
 			timeoutHandle = setTimeout(() => {
 				const stderrTail = this.stderrBuffer.slice(-5).join("\n");
 				reject(new LspRequestTimeoutError(method, stderrTail || undefined));
-			}, REQUEST_TIMEOUT_MS);
+			}, timeoutMs);
 		});
 
 		try {

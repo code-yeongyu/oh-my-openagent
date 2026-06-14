@@ -196,7 +196,7 @@ describe("read-only agent tool restrictions", () => {
   })
 
   describe("Sisyphus GPT variants", () => {
-    test("deny apply_patch for GPT models but not Claude models", () => {
+    test("does not force-deny apply_patch for GPT or Claude models", () => {
       // given
       const gpt54Agent = createSisyphusAgent("openai/gpt-5.4")
       const gptGenericAgent = createSisyphusAgent("openai/gpt-5.5")
@@ -208,8 +208,8 @@ describe("read-only agent tool restrictions", () => {
       const claudePermission = (claudeAgent.permission ?? {}) as Record<string, string>
 
       // then
-      expect(gpt54Permission["apply_patch"]).toBe("deny")
-      expect(gptGenericPermission["apply_patch"]).toBe("deny")
+      expect(gpt54Permission["apply_patch"]).toBeUndefined()
+      expect(gptGenericPermission["apply_patch"]).toBeUndefined()
       expect(claudePermission["apply_patch"]).toBeUndefined()
     })
   })

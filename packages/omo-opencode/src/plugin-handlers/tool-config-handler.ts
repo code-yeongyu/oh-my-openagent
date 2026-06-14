@@ -137,7 +137,6 @@ export function applyToolConfig(params: {
   if (junior) {
     junior.permission = {
       ...junior.permission,
-      task: "allow",
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,

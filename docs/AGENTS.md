@@ -28,6 +28,7 @@
 | Privacy & ToS | [docs/legal/](legal) |
 | Manifesto | [docs/manifesto.md](manifesto.md) |
 | Ollama troubleshooting | [docs/troubleshooting/ollama.md](troubleshooting/ollama.md) |
+| Copyable project rules template | [docs/templates/AGENTS.md.example](templates/AGENTS.md.example) |
 
 ## STRUCTURE
 
@@ -39,6 +40,8 @@ docs/
 ├── reference/                                # API / config / CLI reference (8 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
+├── templates/
+│   └── AGENTS.md.example                     # Copyable OMO project rules template
 └── troubleshooting/
     └── ollama.md
 ```

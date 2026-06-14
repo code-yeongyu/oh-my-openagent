@@ -6,12 +6,14 @@ import {
   isClaudeOpus48Model,
   isGeminiModel,
   isGptModel,
+  isKimiK27Model,
 } from "../types"
 
 export type PrometheusPromptSource =
   | "default"
   | "gpt"
   | "gemini"
+  | "kimi-k2-7"
   | "claude-fable-5"
   | "claude-opus-4-8"
   | "claude-opus-4-7"
@@ -42,6 +44,7 @@ export function getPrometheusPromptSource(model?: string): PrometheusPromptSourc
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8"
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7"
   if (isClaudeOpus46Model(model)) return "claude-opus-4-6"
+  if (isKimiK27Model(model)) return "kimi-k2-7"
   if (isGptModel(model)) return "gpt"
   if (isGeminiModel(model)) return "gemini"
   return "default"

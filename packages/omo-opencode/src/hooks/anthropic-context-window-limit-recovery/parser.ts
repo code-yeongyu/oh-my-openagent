@@ -28,8 +28,8 @@ const TOKEN_LIMIT_KEYWORDS = [
   "non-empty content",
 ]
 
-// Patterns that indicate thinking block structure errors (NOT token limit errors)
-// These should be handled by session-recovery hook, not compaction
+// Patterns that indicate thinking block structure errors (NOT token limit errors);
+// compaction must not react to them
 const THINKING_BLOCK_ERROR_PATTERNS = [
   /thinking.*first block/i,
   /first block.*thinking/i,

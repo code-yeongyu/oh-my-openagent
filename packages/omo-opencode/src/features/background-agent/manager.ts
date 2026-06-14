@@ -879,10 +879,18 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(sessionID, input.model)
     }
 
+    const userDenied: Record<string, boolean> = {}
+    if (input.userPermission) {
+      for (const [tool, value] of Object.entries(input.userPermission)) {
+        if (value === "deny") userDenied[tool] = false
+      }
+    }
+
     const launchTools = {
       task: false,
       call_omo_agent: true,
       question: false,
+      ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
@@ -2487,6 +2495,11 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     if (task.sessionId) {
+      subagentSessions.delete(task.sessionId)
+      clearSessionAgent(task.sessionId)
+      clearDelegatedChildSessionBootstrap(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
+
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
@@ -2496,9 +2509,6 @@ The task was re-queued on a fallback model after a retryable failure.
       await this.onSubagentSessionDeleted?.({ sessionID: task.sessionId }).catch((error) => {
         log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID: task.sessionId, error: String(error) })
       })
-
-      clearDelegatedChildSessionBootstrap(task.sessionId)
-      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode

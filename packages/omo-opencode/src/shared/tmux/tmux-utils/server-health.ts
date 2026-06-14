@@ -26,13 +26,15 @@ function isMarkedRunningInProcess(): boolean {
 	return (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY] === true
 }
 
-export function createServerHealthStateForTesting(): ServerHealthState {
+export function createServerHealthState(): ServerHealthState {
 	return {
 		serverAvailable: null,
 		serverCheckUrl: null,
 		serverRunningInProcess: false,
 	}
 }
+
+export const createServerHealthStateForTesting = createServerHealthState
 
 export async function isServerRunning(serverUrl: string, options: IsServerRunningOptions = {}): Promise<boolean> {
 	const fetchImplementation = options.fetchImplementation ?? fetch
