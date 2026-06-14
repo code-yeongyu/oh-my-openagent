@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -58,6 +58,40 @@ function restoreEnv(name: string, value: string | undefined): void {
 function occurrenceCount(value: string, search: string): number {
 	return value.split(search).length - 1;
 }
+
+describe("Windows Git Bash bundled rule content", () => {
+	function readWindowsRuleBody(): string {
+		return readFileSync(join(process.cwd(), WINDOWS_RULE_PATH), "utf8");
+	}
+
+	it("#given the bundled rule #when read #then it keeps valid frontmatter (description + alwaysApply)", () => {
+		const body = readWindowsRuleBody();
+
+		expect(body).toContain(`description: ${WINDOWS_RULE_DESCRIPTION}`);
+		expect(body).toContain("alwaysApply: true");
+	});
+
+	it('#given the bundled rule #when read #then it NEVER recommends bare shell:"bash"', () => {
+		const body = readWindowsRuleBody();
+
+		expect(body).not.toContain('shell: "bash"');
+	});
+
+	it("#given the bundled rule #when read #then it warns that bare bash often resolves to WSL System32", () => {
+		const body = readWindowsRuleBody();
+
+		expect(body).toMatch(/WSL/i);
+		expect(body).toMatch(/System32/i);
+	});
+
+	it("#given the bundled rule #when read #then it prefers the git_bash MCP and the absolute Git Bash path", () => {
+		const body = readWindowsRuleBody();
+
+		expect(body).toContain("git_bash");
+		expect(body).toContain("OMO_CODEX_GIT_BASH_PATH");
+		expect(body).toContain("C:\\Program Files\\Git\\bin\\bash.exe");
+	});
+});
 
 describe("Windows Git Bash bundled rule", () => {
 	it("#given packaged bundled rules #when discovering plugin-bundled candidates #then Windows Git Bash rule is included", () => {
