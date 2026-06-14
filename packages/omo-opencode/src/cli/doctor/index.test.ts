@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 import { formatDoctorFailure } from "./index"
+import { PUBLISHED_PACKAGE_NAME, ACCEPTED_PACKAGE_NAMES } from "../../shared"
 
 describe("formatDoctorFailure", () => {
   it("surfaces the real error message and stack instead of blaming memory pressure", () => {
@@ -30,7 +31,7 @@ describe("formatDoctorFailure", () => {
     expect(lines.join("\n")).not.toContain("memory pressure")
   })
 
-  it("suggests the canonical doctor command", () => {
+  it("suggests the doctor command using the actually installed package name", () => {
     // given
     const error = new Error("boom")
 
@@ -38,7 +39,13 @@ describe("formatDoctorFailure", () => {
     const lines = formatDoctorFailure(error)
 
     // then
-    expect(lines.join("\n")).toContain("bunx oh-my-openagent doctor --verbose")
-    expect(lines.join("\n")).not.toContain("bunx oh-my-opencode doctor")
+    const output = lines.join("\n")
+    expect(output).toContain(`bunx ${PUBLISHED_PACKAGE_NAME} doctor --verbose`)
+    // Should not suggest a package name that is not accepted
+    for (const name of ACCEPTED_PACKAGE_NAMES) {
+      if (name !== PUBLISHED_PACKAGE_NAME) {
+        expect(output).not.toContain(`bunx ${name} doctor`)
+      }
+    }
   })
 })
