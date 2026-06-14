@@ -390,7 +390,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -746,7 +753,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -1102,7 +1116,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -1458,7 +1479,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -1817,7 +1845,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -2173,7 +2208,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -2529,7 +2571,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -2885,7 +2934,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -3241,7 +3297,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -3597,7 +3660,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -3953,7 +4023,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -4309,7 +4386,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -4665,7 +4749,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -5021,7 +5112,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -5378,7 +5476,14 @@
                 ]
               }
             },
-            "additionalProperties": false
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ask",
+                "allow",
+                "deny"
+              ]
+            }
           },
           "maxTokens": {
             "type": "number"
@@ -6530,12 +6635,20 @@
       "properties": {
         "provider": {
           "default": "playwright",
-          "type": "string",
-          "enum": [
-            "playwright",
-            "agent-browser",
-            "dev-browser",
-            "playwright-cli"
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "playwright",
+                "agent-browser",
+                "dev-browser",
+                "playwright-cli"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
           ]
         }
       },

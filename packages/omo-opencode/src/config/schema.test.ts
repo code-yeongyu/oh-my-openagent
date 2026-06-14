@@ -717,15 +717,51 @@ describe("BrowserAutomationProviderSchema", () => {
     expect(result.data).toBe("agent-browser")
   })
 
-  test("rejects invalid provider", () => {
+  test("accepts custom provider", () => {
     // given
-    const input = "invalid-provider"
+    const input = "my-custom-browser"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("my-custom-browser")
+  })
+
+  test("rejects empty string", () => {
+    // given
+    const input = ""
 
     // when
     const result = BrowserAutomationProviderSchema.safeParse(input)
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("accepts provider names with special characters", () => {
+    // given
+    const input = "my-browser_v2"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("my-browser_v2")
+  })
+
+  test("accepts any non-empty custom provider", () => {
+    // given
+    const input = "cloakbrowser"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("cloakbrowser")
   })
 
   test("accepts 'playwright-cli' as valid provider", () => {

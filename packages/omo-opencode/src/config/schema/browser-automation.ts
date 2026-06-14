@@ -1,11 +1,8 @@
 import { z } from "zod"
 
-export const BrowserAutomationProviderSchema = z.enum([
-  "playwright",
-  "agent-browser",
-  "dev-browser",
-  "playwright-cli",
-])
+export const BrowserAutomationProviderSchema = z
+  .enum(["playwright", "agent-browser", "dev-browser", "playwright-cli"])
+  .or(z.string().min(1))
 
 export const BrowserAutomationConfigSchema = z.object({
   /**
@@ -14,6 +11,7 @@ export const BrowserAutomationConfigSchema = z.object({
    * - "agent-browser": Uses Vercel's agent-browser CLI (requires: bun add -g agent-browser)
    * - "dev-browser": Uses dev-browser skill with persistent browser state
    * - "playwright-cli": Uses Playwright CLI (@playwright/cli) - token-efficient CLI alternative
+   * - Custom string: Any non-empty string is accepted for user-installed skill providers
    */
   provider: BrowserAutomationProviderSchema.default("playwright"),
 })
