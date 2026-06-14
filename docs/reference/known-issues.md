@@ -2,6 +2,23 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #4184 - Custom provider models without `limit` do not auto-compact
+
+- **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
+- **Symptom**: OpenCode sees the model context as `0`, so auto-compaction never triggers and long sessions can overflow the model window.
+- **Workaround**: Add a `limit` block to each custom provider model in `opencode.json`, for example:
+
+```json
+{
+  "glm-5.1": {
+    "name": "GLM-5.1",
+    "limit": { "context": 200000, "output": 16384 }
+  }
+}
+```
+
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4184.
+
 ## v4.2.1 - Delegate-task early-failure-fallback (BLOCKER-4, resolved)
 
 BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first prompt payload before dispatch and consume that bootstrap payload exactly once when runtime fallback must retry an empty-history child session.
