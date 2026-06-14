@@ -747,6 +747,7 @@ The Codex CLI Light edition is fully independent of the OpenCode plugin. You can
 | `Ignoring malformed agent role definition: agents.*.config_file must point to an existing file` | Re-run `npx lazycodex-ai install`. The installer repairs stale managed `[agents.*]` entries and recreates `~/.codex/agents/*.toml`. |
 | `agents.max_threads cannot be set when multi_agent_v2 is enabled` in one project | Re-run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers, creates `.backup-<timestamp>` files for changed configs, and leaves user-authored `.codex` artifacts in place. |
 | `SessionStart hook (failed)` / `UserPromptSubmit hook (failed)` with `MODULE_NOT_FOUND` for `components/*/dist/cli.js` | Re-run the installer so the cached plugin is rebuilt with component `dist/` files. If the cache was manually edited, remove `~/.codex/plugins/cache/sisyphuslabs` first. |
+| `SessionStart hook (failed)` / `UserPromptSubmit hook (failed)` with only `hook exited with code 1` after install | Re-run `npx lazycodex-ai install`, then start a fresh Codex session or restart the Codex app. If the same hook fails again in the fresh session, inspect the saved hook output to identify the component command before deleting cache state. |
 | Hook trust hash mismatch warnings | Re-run the installer; hashes are regenerated each install |
 
 ### Step 8: Team Mode (optional, opt-in)
