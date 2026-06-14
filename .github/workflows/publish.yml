@@ -156,7 +156,7 @@ jobs:
             exit 1
           fi
 
-          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
           ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
           if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
             ALL_PACKAGES+=(lazycodex-ai)
@@ -294,7 +294,7 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
           FAILED=()
           for platform in "${PLATFORMS[@]}"; do
             for family in oh-my-opencode oh-my-openagent; do
@@ -367,7 +367,7 @@ jobs:
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
-          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             package_dir="packages/oh-my-opencode-${platform}"
             jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
             mv tmp.json "${package_dir}/package.json"
@@ -616,7 +616,7 @@ jobs:
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
-          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             package_dir="packages/oh-my-opencode-${platform}"
             jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
             mv tmp.json "${package_dir}/package.json"
