@@ -122,7 +122,7 @@ export function createCallOmoAgent(
       subagent_type: tool.schema
         .string()
         .describe(
-          "The agent to invoke. Only explore and librarian are allowed.",
+          "The agent to invoke. Only explore, librarian, and plan are allowed.",
         ),
       run_in_background: tool.schema
         .boolean()

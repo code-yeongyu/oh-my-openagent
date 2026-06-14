@@ -69,7 +69,7 @@ describe("call_omo_agent restricted agent set", () => {
 
     //#then
     expect(result).toContain("Invalid agent type")
-    expect(result).toContain("Only explore, librarian are allowed")
+    expect(result).toContain("Only explore, librarian, plan are allowed")
     expect(launch).not.toHaveBeenCalled()
   })
 
@@ -92,8 +92,30 @@ describe("call_omo_agent restricted agent set", () => {
 
     //#then
     expect(result).toContain("Invalid agent type")
-    expect(result).toContain("Only explore, librarian are allowed")
+    expect(result).toContain("Only explore, librarian, plan are allowed")
     expect(launch).not.toHaveBeenCalled()
+  })
+
+
+  test("#when caller requests plan #then call_omo_agent launches it through the direct path", async () => {
+    //#given
+    clearCallableAgentsCache()
+    const pluginInput = createPluginInput([
+      { name: "explore", mode: "subagent" },
+      { name: "librarian", mode: "subagent" },
+      { name: "plan", mode: "subagent" },
+    ])
+    const { manager, launch } = createBackgroundManager()
+    const toolDefinition = createCallOmoAgent(pluginInput, manager)
+
+    //#when
+    await toolDefinition.execute(
+      { description: "Plan", prompt: "Plan work", subagent_type: "plan", run_in_background: true },
+      toolContext,
+    )
+
+    //#then
+    expect(launch).toHaveBeenCalledTimes(1)
   })
 
   test("#when caller requests explore or librarian #then call_omo_agent still launches them", async () => {
