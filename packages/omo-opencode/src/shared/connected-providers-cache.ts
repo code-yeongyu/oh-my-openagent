@@ -56,7 +56,7 @@ function mergeConnectedProviders(
 		return fetched
 	}
 
-	if (fetched.length === 0) {
+	if (fetched.length === 0 && reportedProviderIDs.size === 0) {
 		return previous
 	}
 
