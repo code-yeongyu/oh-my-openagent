@@ -35,6 +35,23 @@ function pathKey(path: string): string {
   return process.platform === "win32" ? normalized.toLowerCase() : normalized
 }
 
+function findGitMetadataRoot(startDirectory: string): string | undefined {
+  let currentDirectory = normalizePath(startDirectory)
+
+  while (true) {
+    if (existsSync(join(currentDirectory, ".git"))) {
+      return currentDirectory
+    }
+
+    const parentDirectory = dirname(currentDirectory)
+    if (parentDirectory === currentDirectory) {
+      return undefined
+    }
+
+    currentDirectory = normalizePath(parentDirectory)
+  }
+}
+
 function findAncestorDirectories(
   startDirectory: string,
   targetPaths: ReadonlyArray<ReadonlyArray<string>>,
@@ -85,6 +102,12 @@ export function detectWorktreePath(directory: string): string | undefined {
   const cacheKey = pathKey(normalizePath(resolvedDirectory))
   if (worktreePathCache.has(cacheKey)) {
     return worktreePathCache.get(cacheKey)
+  }
+
+  const gitMetadataRoot = findGitMetadataRoot(resolvedDirectory)
+  if (gitMetadataRoot !== undefined) {
+    worktreePathCache.set(cacheKey, gitMetadataRoot)
+    return gitMetadataRoot
   }
 
   try {
