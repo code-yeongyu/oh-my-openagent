@@ -233,6 +233,30 @@ describe("normalizeTeamSpecInput", () => {
     })
   })
 
+  test("preserves category-name lead shorthand", () => {
+    // given
+    const rawSpec = {
+      name: "project-analysis-team",
+      lead: { kind: "quick" },
+      members: [{ name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." }],
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+    })
+
+    // then kind values that are category names remain explicit leads
+    expect(normalizedSpec).toMatchObject({
+      name: "project-analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "category", category: "quick" },
+        { name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." },
+      ],
+    })
+  })
+
   test("treats a kind-only empty lead object from the tool host as absent", () => {
     // given
     const rawSpec = {

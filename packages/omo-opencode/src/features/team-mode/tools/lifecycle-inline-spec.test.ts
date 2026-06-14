@@ -402,6 +402,37 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     expect(firstCall?.[1]).toBe("lead-session")
   })
 
+  test("accepts category-name lead shorthand in inline_spec", async () => {
+    // given a pre-existing shorthand where kind carries the category name
+    const createTeamCreateTool = await loadCreateTeamCreateTool()
+    const config = createConfig()
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+    const rawArgs = {
+      teamName: "",
+      inline_spec: {
+        name: "project-analysis-team",
+        lead: { kind: "quick" },
+        members: [{ name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." }],
+      },
+      leadSessionId: "",
+    }
+
+    // when
+    await teamCreateTool.execute(rawArgs, createToolContext("lead-session", "Sisyphus"))
+    const firstCall = createTeamRunMock.mock.calls[0]
+
+    // then unknown kind strings still normalize to explicit category leads
+    expect(firstCall?.[0]).toMatchObject({
+      name: "project-analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "category", category: "quick" },
+        { name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." },
+      ],
+    })
+    expect(firstCall?.[1]).toBe("lead-session")
+  })
+
   test("accepts inline_spec when the host injects a kind-only empty lead skeleton", async () => {
     // given the tool host preserves a default enum value on an otherwise empty lead object
     const createTeamCreateTool = await loadCreateTeamCreateTool()
