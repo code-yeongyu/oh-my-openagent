@@ -11,6 +11,16 @@ FAKE_SERVER_PORT=""
 FAKE_LLM_LOG="$SCRIPT_DIR/fake-llm-team-create.log"
 RUN_JSONL="$SCRIPT_DIR/opencode-run-team-create.jsonl"
 ASSERTIONS="$SCRIPT_DIR/team-create-assertions.txt"
+DB_ISOLATION="$SCRIPT_DIR/db-isolation.txt"
+ORIG_HOME="${HOME:-}"
+ORIG_XDG_DATA_HOME="${XDG_DATA_HOME:-}"
+ORIG_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-}"
+ORIG_XDG_CACHE_HOME="${XDG_CACHE_HOME:-}"
+ORIG_XDG_STATE_HOME="${XDG_STATE_HOME:-}"
+ORIG_XDG_DATA_HOME_SET=0; [ "${XDG_DATA_HOME+x}" = x ] && ORIG_XDG_DATA_HOME_SET=1
+ORIG_XDG_CONFIG_HOME_SET=0; [ "${XDG_CONFIG_HOME+x}" = x ] && ORIG_XDG_CONFIG_HOME_SET=1
+ORIG_XDG_CACHE_HOME_SET=0; [ "${XDG_CACHE_HOME+x}" = x ] && ORIG_XDG_CACHE_HOME_SET=1
+ORIG_XDG_STATE_HOME_SET=0; [ "${XDG_STATE_HOME+x}" = x ] && ORIG_XDG_STATE_HOME_SET=1
 
 tc_log() { printf '%s\n' "$*" >&2; }
 tc_pass() { printf 'PASS: %s\n' "$*" | tee -a "$ASSERTIONS"; }
@@ -25,6 +35,26 @@ tc_cleanup() {
   fi
 }
 trap 'tc_cleanup; oqa_cleanup' EXIT
+
+tc_real_opencode() {
+  local -a env_cmd
+  env_cmd=(env)
+  if [ "$ORIG_XDG_DATA_HOME_SET" -eq 0 ]; then env_cmd+=(-u XDG_DATA_HOME); fi
+  if [ "$ORIG_XDG_CONFIG_HOME_SET" -eq 0 ]; then env_cmd+=(-u XDG_CONFIG_HOME); fi
+  if [ "$ORIG_XDG_CACHE_HOME_SET" -eq 0 ]; then env_cmd+=(-u XDG_CACHE_HOME); fi
+  if [ "$ORIG_XDG_STATE_HOME_SET" -eq 0 ]; then env_cmd+=(-u XDG_STATE_HOME); fi
+  env_cmd+=("HOME=$ORIG_HOME")
+  if [ "$ORIG_XDG_DATA_HOME_SET" -eq 1 ]; then env_cmd+=("XDG_DATA_HOME=$ORIG_XDG_DATA_HOME"); fi
+  if [ "$ORIG_XDG_CONFIG_HOME_SET" -eq 1 ]; then env_cmd+=("XDG_CONFIG_HOME=$ORIG_XDG_CONFIG_HOME"); fi
+  if [ "$ORIG_XDG_CACHE_HOME_SET" -eq 1 ]; then env_cmd+=("XDG_CACHE_HOME=$ORIG_XDG_CACHE_HOME"); fi
+  if [ "$ORIG_XDG_STATE_HOME_SET" -eq 1 ]; then env_cmd+=("XDG_STATE_HOME=$ORIG_XDG_STATE_HOME"); fi
+  "${env_cmd[@]}" opencode "$@"
+}
+
+tc_real_session_count() {
+  tc_real_opencode db "SELECT count(*) FROM session" --format json \
+    | bun -e 'const input = await Bun.stdin.text(); const rows = JSON.parse(input); console.log(Object.values(rows[0] ?? {})[0] ?? "")'
+}
 
 tc_start_fake_llm() {
   local port_file
@@ -137,7 +167,10 @@ tc_assert_jsonl() {
   return "$failures"
 }
 
-rm -f "$RUN_JSONL" "$ASSERTIONS" "$FAKE_LLM_LOG"
+rm -f "$RUN_JSONL" "$ASSERTIONS" "$FAKE_LLM_LOG" "$DB_ISOLATION"
+
+REAL_DB_PATH_BEFORE="$(tc_real_opencode db path)" || exit 1
+REAL_SESSION_COUNT_BEFORE="$(tc_real_session_count)" || exit 1
 
 oqa_mk_isolated_xdg || exit 1
 tc_start_fake_llm || exit 1
@@ -153,4 +186,39 @@ if [ "$run_status" -ne 0 ]; then
   exit "$run_status"
 fi
 
+SANDBOX_DB_PATH="$(opencode db path)" || exit 1
+REAL_DB_PATH_AFTER="$(tc_real_opencode db path)" || exit 1
+REAL_SESSION_COUNT_AFTER="$(tc_real_session_count)" || exit 1
+
+{
+  printf 'real_db_query=%s\n' 'SELECT count(*) FROM session'
+  printf 'real_db_path_before=%s\n' "$REAL_DB_PATH_BEFORE"
+  printf 'real_session_count_before=%s\n' "$REAL_SESSION_COUNT_BEFORE"
+  printf 'sandbox_xdg_data_home=%s\n' "$XDG_DATA_HOME"
+  printf 'sandbox_db_path=%s\n' "$SANDBOX_DB_PATH"
+  printf 'real_db_path_after=%s\n' "$REAL_DB_PATH_AFTER"
+  printf 'real_session_count_after=%s\n' "$REAL_SESSION_COUNT_AFTER"
+  printf 'real_db_path_stable=%s\n' "$([ "$REAL_DB_PATH_BEFORE" = "$REAL_DB_PATH_AFTER" ] && printf yes || printf no)"
+  printf 'real_session_count_unchanged=%s\n' "$([ "$REAL_SESSION_COUNT_BEFORE" = "$REAL_SESSION_COUNT_AFTER" ] && printf yes || printf no)"
+  printf 'sandbox_db_distinct_from_real=%s\n' "$([ "$SANDBOX_DB_PATH" != "$REAL_DB_PATH_AFTER" ] && printf yes || printf no)"
+} >"$DB_ISOLATION"
+
 tc_assert_jsonl "$RUN_JSONL"
+
+if [ "$REAL_DB_PATH_BEFORE" = "$REAL_DB_PATH_AFTER" ]; then
+  tc_pass "real OpenCode DB path was stable before and after isolated run"
+else
+  tc_fail "real OpenCode DB path changed during isolated run"
+fi
+
+if [ "$REAL_SESSION_COUNT_BEFORE" = "$REAL_SESSION_COUNT_AFTER" ]; then
+  tc_pass "real OpenCode DB session count was unchanged before and after isolated run"
+else
+  tc_fail "real OpenCode DB session count changed during isolated run"
+fi
+
+if [ "$SANDBOX_DB_PATH" != "$REAL_DB_PATH_AFTER" ]; then
+  tc_pass "isolated run used a sandbox OpenCode DB path distinct from the real DB"
+else
+  tc_fail "isolated run used the real OpenCode DB path"
+fi
