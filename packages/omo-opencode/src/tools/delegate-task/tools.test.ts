@@ -380,6 +380,81 @@ describe("sisyphus-task", () => {
     })
   })
 
+
+  describe("plan direct routing", () => {
+    test("#given sync plan task #when executed #then it routes through call_omo_agent instead of delegate sync wrapper", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+      const launch = mock(() => Promise.resolve({
+        id: "plan-task-id",
+        sessionId: "ses-plan",
+        description: "Plan work",
+        agent: "plan",
+        status: "pending",
+      }))
+      const mockManager = {
+        launch,
+        getTask: mock(() => ({ status: "pending", sessionId: "ses-plan" })),
+        reserveSubagentSpawn: mock(() => Promise.resolve({
+          spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
+          descendantCount: 1,
+          commit: mock(() => 1),
+          rollback: mock(() => undefined),
+        })),
+      }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
+        session: {
+          create: mock(async () => ({ data: { id: "ses-sync-wrapper" } })),
+          get: async () => ({ data: { id: "parent-session", directory: "/tmp" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [{
+            info: { role: "assistant", time: { created: 1 } },
+            parts: [{ type: "text", text: "PLAN_OK" }],
+          }] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      const pluginContext = {
+        client: mockClient,
+        directory: "/tmp",
+      }
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        directory: "/tmp",
+        pluginContext,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      //#when
+      const result = await tool.execute({
+        description: "Plan work",
+        prompt: "Plan the work",
+        subagent_type: "plan",
+        run_in_background: false,
+        load_skills: [],
+      }, {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      })
+
+      //#then
+      expect(result).toContain("session_id: ses-sync-wrapper")
+      expect(result).not.toContain("Task completed")
+      expect(launch).not.toHaveBeenCalled()
+      expect(mockManager.reserveSubagentSpawn).toHaveBeenCalledTimes(1)
+      expect(mockClient.session.create).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe("load_skills parsing", () => {
     test("parses valid JSON string into array before validation", async () => {
       //#given
@@ -3924,7 +3999,20 @@ describe("sisyphus-task", () => {
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
        }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+       const tool = createDelegateTask({
+         manager: {
+           launch: async () => ({}),
+           reserveSubagentSpawn: async () => ({
+             spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
+             descendantCount: 1,
+             commit: () => 1,
+             rollback: () => undefined,
+           }),
+         },
+         client: mockClient,
+         directory: "/project",
+         pluginContext: { client: mockClient, directory: "/project" },
+       })
       
       //#when
       const result = await tool.execute(
@@ -4012,7 +4100,20 @@ describe("sisyphus-task", () => {
            status: async () => ({ data: { "ses_ok": { type: "idle" } } }),
          },
        }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
+       const tool = createDelegateTask({
+         manager: {
+           launch: async () => ({}),
+           reserveSubagentSpawn: async () => ({
+             spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
+             descendantCount: 1,
+             commit: () => 1,
+             rollback: () => undefined,
+           }),
+         },
+         client: mockClient,
+         directory: "/project",
+         pluginContext: { client: mockClient, directory: "/project" },
+       })
       
       //#when
       const result = await tool.execute(
@@ -4022,7 +4123,7 @@ describe("sisyphus-task", () => {
       
       //#then
       expect(result).not.toContain("plan-family")
-      expect(result).toContain("Plan created")
+      expect(result).toContain("session_id: ses_ok")
     }, { timeout: 20000 })
   })
 
@@ -4418,59 +4519,56 @@ describe("sisyphus-task", () => {
   })
 
   describe("subagent task permission", () => {
-    test("plan subagent should have task permission enabled", async () => {
-      //#given - sisyphus delegates to plan agent
+    test("plan subagent uses direct call_omo_agent route instead of delegate task permission path", async () => {
+      //#given
       const { createDelegateTask } = require("./tools")
-      let promptBody: CapturedPromptBody = {}
-      
-       const mockManager = { launch: async () => ({}) }
-       
-       const promptMock = async (input: CapturedPromptInput) => {
-         promptBody = input.body
-         return { data: {} }
-       }
-       
-       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_plan_delegate" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }]
-           }),
-           status: async () => ({ data: { "ses_plan_delegate": { type: "idle" } } }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-      
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_plan_delegate" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }] }),
+          status: async () => ({ data: { "ses_plan_delegate": { type: "idle" } } }),
+        },
       }
-      
-      //#when - sisyphus delegates to plan
-      await tool.execute(
+      const tool = createDelegateTask({
+        manager: {
+          launch: async () => ({}),
+          reserveSubagentSpawn: async () => ({
+            spawnContext: { rootSessionID: "root", parentDepth: 0, childDepth: 1 },
+            descendantCount: 1,
+            commit: () => 1,
+            rollback: () => undefined,
+          }),
+        },
+        client: mockClient,
+        directory: "/project",
+        pluginContext: { client: mockClient, directory: "/project" },
+      })
+
+      //#when
+      const result = await tool.execute(
         {
-          description: "Test plan task permission",
+          description: "Test plan direct route",
           prompt: "Create a plan",
           subagent_type: "plan",
           run_in_background: false,
           load_skills: [],
         },
-        toolContext
+        {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "sisyphus",
+          abort: new AbortController().signal,
+        }
       )
-      
-      //#then - plan agent should have task permission
-      expect(promptBody.tools.task).toBe(true)
+
+      //#then
+      expect(result).toContain("session_id: ses_plan_delegate")
+      expect(result).not.toContain("Task completed")
     }, { timeout: 20000 })
 
     test("prometheus primary agent should not be callable via task", async () => {

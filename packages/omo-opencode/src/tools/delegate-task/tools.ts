@@ -16,6 +16,8 @@ import {
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
 import type { NativeSkillEntry } from "../skill/native-skills"
+import { createCallOmoAgent } from "../call-omo-agent/tools"
+import { isPlanFamily } from "./constants"
 
 async function loadNativeSkillEntries(
   nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
@@ -102,6 +104,34 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
         return `Invalid arguments: Must provide either category or subagent_type.`
+      }
+
+      if (
+        delegateTaskArgs.subagent_type?.toLowerCase() === "plan"
+        && !runInBackground
+      ) {
+        if (isPlanFamily(ctx.agent)) {
+          return `You are a plan-family agent (plan/prometheus). You cannot delegate to other plan-family agents via task.
+
+Create the work plan directly - that's your job as the planning agent.`
+        }
+        if (!options.pluginContext) {
+          return `Invalid task configuration: plan direct routing requires pluginContext.`
+        }
+        return createCallOmoAgent(
+          options.pluginContext,
+          options.manager,
+          [],
+          options.agentOverrides,
+          options.userCategories,
+          options.modelFallbackControllerAccessor,
+        ).execute({
+          description: delegateTaskArgs.description,
+          prompt: delegateTaskArgs.prompt,
+          subagent_type: "plan",
+          run_in_background: false,
+          session_id: delegateTaskArgs.task_id,
+        }, toolContext)
       }
 
       let systemDefaultModel: string | undefined
