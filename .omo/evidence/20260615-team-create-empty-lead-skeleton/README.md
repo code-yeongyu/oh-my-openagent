@@ -30,6 +30,7 @@ bash .omo/evidence/20260615-team-create-empty-lead-skeleton/team-create-opencode
 - `GIT_MASTER=1 git diff --check`: passed with no whitespace errors.
 - `opencode-qa` isolated server smoke: passed. See `server-smoke.txt` in this directory.
 - Real OpenCode `opencode run --format json` team-mode QA: passed. See `opencode-run-team-create.jsonl`, `team-create-assertions.txt`, and `fake-llm-team-create.log` in this directory.
+- Real OpenCode DB isolation proof: passed. `db-isolation.txt` records `SELECT count(*) FROM session` before and after the isolated run, unchanged real session count, stable real DB path, and a distinct sandbox DB path.
 - `lsp_diagnostics`: clean for `team-spec-input-normalizer.ts` and `team-spec-input-normalizer.test.ts`. The existing `lifecycle-inline-spec.test.ts` file-level LSP diagnostics still report stale type issues already contradicted by `bun run typecheck:packages` passing.
 
 ## OpenCode QA output
@@ -65,8 +66,30 @@ The run drove the changed tool path directly. `opencode-run-team-create.jsonl` c
 - host-style lead skeleton included in the input;
 - `team_list` verification tool_use emitted;
 - requested team name preserved in the result;
-- stale `team_create requires exactly one of teamName or inline_spec` validation error absent.
+- stale `team_create requires exactly one of teamName or inline_spec` validation error absent;
+- real OpenCode DB path stable before and after the isolated run;
+- real OpenCode DB `SELECT count(*) FROM session` unchanged before and after the isolated run;
+- sandbox OpenCode DB path distinct from the real DB path.
+
+### Real DB isolation receipt
+
+`db-isolation.txt` records the required no-pollution proof for the real OpenCode DB:
+
+```text
+real_db_query=SELECT count(*) FROM session
+real_db_path_before=/home/leejunwoo/.local/share/opencode/opencode.db
+real_session_count_before=4537
+sandbox_xdg_data_home=/tmp/oqa-xdg.tuYrAU/data
+sandbox_db_path=/tmp/oqa-xdg.tuYrAU/data/opencode/opencode.db
+real_db_path_after=/home/leejunwoo/.local/share/opencode/opencode.db
+real_session_count_after=4537
+real_db_path_stable=yes
+real_session_count_unchanged=yes
+sandbox_db_distinct_from_real=yes
+```
+
+This proves the spawned `opencode run` wrote to the isolated XDG database, not the real `~/.local/share/opencode/opencode.db`.
 
 ## QA boundary
 
-`bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check` partially passed but reported `missing dependency: sqlite3`, so the DB-specific dependency check could not fully complete on this machine. The helper still confirmed DB path resolution, SQL escaping, free-port allocation, and isolated XDG sandbox cleanup. The separate `server-smoke.sh` OpenCode QA passed and is recorded in `server-smoke.txt`.
+`bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check` partially passed but reported `missing dependency: sqlite3`. To satisfy the mandatory DB isolation proof without that local binary, `team-create-opencode-run.sh` uses OpenCode's own read-only DB surface, `opencode db "SELECT count(*) FROM session" --format json`, before and after spawning the isolated run. The separate `server-smoke.sh` OpenCode QA passed and is recorded in `server-smoke.txt`.

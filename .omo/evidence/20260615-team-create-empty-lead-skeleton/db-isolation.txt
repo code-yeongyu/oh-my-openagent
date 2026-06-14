@@ -1,0 +1,10 @@
+real_db_query=SELECT count(*) FROM session
+real_db_path_before=/home/leejunwoo/.local/share/opencode/opencode.db
+real_session_count_before=4537
+sandbox_xdg_data_home=/tmp/oqa-xdg.tuYrAU/data
+sandbox_db_path=/tmp/oqa-xdg.tuYrAU/data/opencode/opencode.db
+real_db_path_after=/home/leejunwoo/.local/share/opencode/opencode.db
+real_session_count_after=4537
+real_db_path_stable=yes
+real_session_count_unchanged=yes
+sandbox_db_distinct_from_real=yes
