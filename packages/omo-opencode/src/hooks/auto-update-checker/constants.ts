@@ -4,10 +4,10 @@ import { getOpenCodeCacheDir } from "../../shared/data-path"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import {
   ACCEPTED_PACKAGE_NAMES as SHARED_ACCEPTED_PACKAGE_NAMES,
-  PUBLISHED_PACKAGE_NAME,
+  PLUGIN_NAME,
 } from "../../shared/plugin-identity"
 
-export const PACKAGE_NAME = PUBLISHED_PACKAGE_NAME
+export const PACKAGE_NAME = PLUGIN_NAME
 /**
  * All package names the canonical plugin may be published under.
  *
