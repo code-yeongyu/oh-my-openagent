@@ -6,13 +6,13 @@ export const fallbackBrowserSkill: BuiltinSkill = {
     "Browser automation setup for a custom provider. Load when browser tasks are needed but no built-in browser skill is available.",
   template: `# Browser Automation — Custom Provider Setup
 
-The configured browser automation provider is **{provider}**. No built-in skill exists for this provider.
+The configured browser automation provider is a custom tool with no built-in skill.
 
 ## What You Need to Do
 Tell the user:
 
-> "The browser automation provider **{provider}** requires a skill file to work.
-> Create a SKILL.md at \`~/.claude/skills/{provider}/SKILL.md\` with API documentation
+> "The browser automation provider requires a skill file to work.
+> Create a SKILL.md at \`~/.claude/skills/<tool-name>/SKILL.md\` with API documentation
 > for this browser automation tool. Restart OpenCode after creating the file."
 
 ## How the User Creates the Skill
@@ -20,10 +20,10 @@ The skill file format is standard Claude Code SKILL.md with YAML frontmatter:
 
 \`\`\`markdown
 ---
-name: {provider}
+name: <tool-name>
 description: [purpose]
 ---
-# {provider} API Reference
+# <tool-name> API Reference
 [API usage examples, installation steps, configuration options]
 \`\`\`
 
