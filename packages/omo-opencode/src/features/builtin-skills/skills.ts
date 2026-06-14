@@ -16,18 +16,13 @@ import {
   securityReviewSkill,
   visualQaSkill,
   teamModeSkill,
+  fallbackBrowserSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
   disabledSkills?: Set<string>
   teamModeEnabled?: boolean
-}
-
-const FALLBACK_BROWSER_SKILL: BuiltinSkill = {
-  name: "browser-automation",
-  description: "Browser automation setup for a custom provider. Load when browser tasks are needed but no built-in browser skill is available.",
-  template: "# Browser Automation — Custom Provider Setup\n\nThe configured browser automation provider is not built into OMO.\n\n## What You Need to Do\nTell the user:\n\n> The browser automation provider requires a skill file to work.\n> Create a SKILL.md at `~/.claude/skills/{provider}/SKILL.md` with API documentation.\n\nDO NOT silently fall back to Playwright.",
 }
 
 export const BUILTIN_BROWSER_SKILLS: Record<string, BuiltinSkill> = {
@@ -40,7 +35,7 @@ export const BUILTIN_BROWSER_SKILLS: Record<string, BuiltinSkill> = {
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
   const { browserProvider = "playwright", disabledSkills, teamModeEnabled = false } = options
 
-  const browserSkill = BUILTIN_BROWSER_SKILLS[browserProvider] ?? FALLBACK_BROWSER_SKILL
+  const browserSkill = BUILTIN_BROWSER_SKILLS[browserProvider] ?? fallbackBrowserSkill
 
 	const skills = [
 		browserSkill,
