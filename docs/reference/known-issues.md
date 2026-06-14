@@ -38,3 +38,10 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
 - **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.
+
+## #4990 — Team-mode lead can stall after full quiescence
+
+- **Affects**: Team-mode workflows where the lead and all members become idle with no unread messages or pending tasks.
+- **Symptom**: The team looks finished, but the lead does not start the next turn until the user sends a manual nudge such as `are you done?`. After that nudge, the lead can call `team_status` and continue.
+- **Workaround**: Before assuming the team is stuck, send one short manual nudge and ask the lead to run `team_status` plus `team_task_list`. For long multi-round runs, prefer explicit `team_task_*` state over ad-hoc message counting so the lead has a deterministic completion signal.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4990.
