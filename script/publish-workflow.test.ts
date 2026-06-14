@@ -404,6 +404,12 @@ describe("test workflows", () => {
         .sort(),
     )
 
+    const publishWorkflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishYmlLists = [
+      ...[...publishWorkflow.matchAll(/PLATFORMS=\(([^)]+)\)/g)].map((match) => match[1]),
+      ...[...publishWorkflow.matchAll(/for platform in (darwin-arm64[^\n;]*); do/g)].map((match) => match[1]),
+    ].map((list) => list.trim().split(/\s+/).sort())
+
     // #when / #then
     expect(publishIds, "PLATFORM_PACKAGE_IDS must list windows-arm64").toContain("windows-arm64")
     expect(buildBinariesPlatforms, "build-binaries PLATFORMS must list windows-arm64").toContain("windows-arm64")
@@ -417,6 +423,12 @@ describe("test workflows", () => {
     expect(publishIds, "PLATFORM_PACKAGE_IDS must match build-binaries PLATFORMS exactly").toEqual(
       buildBinariesPlatforms,
     )
+    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 2 version-bump loops").toBe(4)
+    for (const publishYmlList of publishYmlLists) {
+      expect(publishYmlList, "every publish.yml platform list must match build-binaries PLATFORMS exactly").toEqual(
+        buildBinariesPlatforms,
+      )
+    }
   })
 
 })
