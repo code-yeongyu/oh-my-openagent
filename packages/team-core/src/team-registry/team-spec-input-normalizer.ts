@@ -11,8 +11,23 @@ function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function omitEmptyStringFields(record: JsonRecord): JsonRecord {
-  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== ""))
+function isEmptyHostOptionalValue(value: unknown): boolean {
+  return value === "" || (Array.isArray(value) && value.length === 0)
+}
+
+function omitEmptyHostOptionalFields(record: JsonRecord): JsonRecord {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => !isEmptyHostOptionalValue(value)))
+}
+
+function hasUsableLeadField(record: JsonRecord): boolean {
+  const strippedRecord = omitEmptyHostOptionalFields(record)
+  return Object.entries(strippedRecord).some(([key, value]) => {
+    if (key !== "kind") {
+      return true
+    }
+
+    return typeof value === "string" && value !== "category" && value !== "subagent_type"
+  })
 }
 
 function getMemberName(value: unknown): string | undefined {
@@ -128,7 +143,7 @@ function buildPromptFromNaturalMember(member: JsonRecord): string {
 }
 
 function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecInputOptions): JsonRecord {
-  const strippedMember = omitEmptyStringFields(member)
+  const strippedMember = omitEmptyHostOptionalFields(member)
   const {
     capabilities: _capabilities,
     description: _description,
@@ -179,13 +194,13 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
     return raw
   }
 
-  const normalizedSpec = omitEmptyStringFields(raw)
+  const normalizedSpec = omitEmptyHostOptionalFields(raw)
   if (typeof normalizedSpec.name === "string") {
     normalizedSpec.name = normalizeNameStem(normalizedSpec.name)
   }
 
   const rawMembers = raw.members
-  const rawLead = isJsonRecord(raw.lead) && Object.keys(omitEmptyStringFields(raw.lead)).length > 0
+  const rawLead = isJsonRecord(raw.lead) && hasUsableLeadField(raw.lead)
     ? raw.lead
     : undefined
   let leadAgentId = typeof normalizedSpec.leadAgentId === "string" ? normalizedSpec.leadAgentId : undefined

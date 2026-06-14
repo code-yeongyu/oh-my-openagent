@@ -402,6 +402,62 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     expect(firstCall?.[1]).toBe("lead-session")
   })
 
+  test("accepts inline_spec when the host injects a kind-only empty lead skeleton", async () => {
+    // given the tool host preserves a default enum value on an otherwise empty lead object
+    const createTeamCreateTool = await loadCreateTeamCreateTool()
+    const config = createConfig()
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+    const rawArgs = {
+      teamName: "",
+      inline_spec: {
+        name: "project-analysis-team",
+        lead: {
+          name: "",
+          kind: "category",
+          category: "",
+          subagent_type: "",
+          prompt: "",
+          systemPrompt: "",
+          loadSkills: [],
+          role: "",
+          description: "",
+        },
+        members: [
+          {
+            name: "worker",
+            kind: "category",
+            category: "quick",
+            subagent_type: "",
+            prompt: "Inspect the workspace.",
+            systemPrompt: "",
+            loadSkills: [],
+            role: "",
+            description: "",
+          },
+        ],
+        leadAgentId: "",
+        teamAllowedPaths: [],
+        sessionPermission: "",
+      },
+      leadSessionId: "",
+    }
+
+    // when
+    await teamCreateTool.execute(rawArgs, createToolContext("lead-session", "Sisyphus"))
+    const firstCall = createTeamRunMock.mock.calls[0]
+
+    // then the kind-only lead skeleton is absent and caller lead injection still applies
+    expect(firstCall?.[0]).toMatchObject({
+      name: "project-analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "subagent_type", subagent_type: "sisyphus" },
+        { name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." },
+      ],
+    })
+    expect(firstCall?.[1]).toBe("lead-session")
+  })
+
   test("accepts role and capabilities style members with the configured fallback category", async () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
