@@ -390,6 +390,11 @@ function runSpawnedCommand(
       return 1
     }
     writeStderr(`[sparkshell] failed to launch ${command}: ${result.error.message}\n`)
+    if (isSpawnNotFoundError(result.error) && hasShellMetacharacters(command)) {
+      writeStderr(
+        `[sparkshell] '${command}' looks like a shell command; re-run with: omo sparkshell --shell '${command}'\n`,
+      )
+    }
     return 1
   }
   if (typeof result.status === "number") {
@@ -400,6 +405,16 @@ function runSpawnedCommand(
 
 function isCaptureOverflowError(error: Error): boolean {
   return (error as NodeJS.ErrnoException).code === "ENOBUFS"
+}
+
+function isSpawnNotFoundError(error: Error): boolean {
+  return (error as NodeJS.ErrnoException).code === "ENOENT"
+}
+
+const SHELL_METACHARACTER_PATTERN = /(\s&&\s|\s\|\|\s|[|;<>]|\$\(|`)/
+
+function hasShellMetacharacters(command: string): boolean {
+  return SHELL_METACHARACTER_PATTERN.test(command)
 }
 
 function signalExitCode(signal: string | null | undefined): number {
