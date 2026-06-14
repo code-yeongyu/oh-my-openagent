@@ -1,0 +1,5 @@
+PASS: opencode run emitted a team_create tool_use event
+PASS: team_create input included the host-style lead skeleton discriminator
+PASS: opencode run emitted a team_list verification tool_use event
+PASS: team_create result preserved the requested team name
+PASS: team_create did not return the stale exactly-one validation error

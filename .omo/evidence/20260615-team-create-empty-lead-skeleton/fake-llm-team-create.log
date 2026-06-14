@@ -1,0 +1,7 @@
+[2026-06-14T18:03:03.645Z] START port=39535
+[2026-06-14T18:03:10.797Z] branch=title call=1
+[2026-06-14T18:03:12.499Z] branch=team_create call=2
+[2026-06-14T18:03:12.664Z] branch=team_list call=3
+[2026-06-14T18:03:12.716Z] branch=child call=4
+[2026-06-14T18:03:12.820Z] branch=child call=5
+[2026-06-14T18:03:13.095Z] FINAL teamCreateIssued=true teamListIssued=true
