@@ -103,7 +103,10 @@ export async function pollSyncSession(
   let childSettleStartedAt = 0
   // A sync subagent can end its turn and then be re-woken by a parent-wake
   // notification once its background children finish. The task is only truly done
-  // when no descendant work remains AND no wake is queued/in-flight for this session.
+  // when no direct child work remains AND no wake is queued/in-flight for this
+  // session. (Direct children only: a grandchild's completion wake is addressed to
+  // its immediate parent, never to this session, so gating on grandchildren would
+  // block on continuations this session can never receive.)
   // hasPendingParentWake bridges the notification dispatch window (debounce + queue +
   // promptAsync gate), which routinely exceeds a fixed grace; the settle window then
   // covers only the sub-second gap between a child reaching terminal status and the

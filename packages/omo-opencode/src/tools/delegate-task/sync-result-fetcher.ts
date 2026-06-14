@@ -14,6 +14,19 @@ function messageText(msg: SessionMessage): string {
     .join("\n")
 }
 
+// Final text output only — excludes reasoning. The deliverable envelope applies
+// to the agent's final response, not its chain-of-thought, so envelope selection
+// must not pick up a complete `<plan>...</plan>` that the model merely sketched
+// inside a reasoning part (which would otherwise win over an untagged or
+// malformed final text and suppress the correct recency fallback).
+function messageFinalText(msg: SessionMessage): string {
+  return (msg.parts ?? [])
+    .filter((p) => p.type === "text")
+    .map((p) => p.text ?? "")
+    .filter(Boolean)
+    .join("\n")
+}
+
 /**
  * Select the deliverable by an explicit envelope tag (e.g. `<plan>...</plan>`)
  * instead of guessing by recency. The subagent marks its real deliverable with
@@ -30,7 +43,7 @@ function extractTaggedDeliverable(assistantMessages: SessionMessage[], tag: stri
   // span from the first opener to the last closer.
   const pattern = new RegExp(`<${escaped}>([\\s\\S]*?)</${escaped}>`, "gi")
   for (const msg of assistantMessages) {
-    const text = messageText(msg)
+    const text = messageFinalText(msg)
     let last: string | undefined
     for (const match of text.matchAll(pattern)) {
       const inner = match[1].trim()

@@ -1055,9 +1055,21 @@ The fallback retry session is now created and can be inspected directly.
     return tasks
   }
 
-  /** Return whether a session has any descendant background task still in flight. */
+  /**
+   * Return whether a session has direct child background tasks still in flight.
+   *
+   * Intentionally checks immediate children only, not all descendants. A
+   * grandchild's completion wake is addressed to its immediate parent session,
+   * never to this ancestor, so blocking on descendants would make the sync poll
+   * loop wait for grandchildren it can never be woken for (returning a stale
+   * pre-grandchild turn after the settle window, or hitting the sync timeout for
+   * long-running descendants). When a deliverable genuinely depends on a
+   * grandchild, the direct child stays running until that grandchild resolves, so
+   * the immediate-child check already covers it; when the child fire-and-forgets
+   * a grandchild, this session correctly does not wait for work it cannot consume.
+   */
   hasActiveChildTasks(sessionID: string): boolean {
-    return this.getAllDescendantTasks(sessionID).some(t => t.status === "running" || t.status === "pending")
+    return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
   }
 
   /**

@@ -416,4 +416,38 @@ describe("fetchSyncResult", () => {
     //#then - only the final block, with no embedded tags or draft content
     expect(result).toEqual({ ok: true, textContent: "final plan" })
   })
+
+  test("deliverableTag: ignores a complete envelope in reasoning when final text is untagged", async () => {
+    //#given - the model sketched a complete <plan> in its reasoning, but the final
+    // text response carries no envelope. Envelope selection must look at final text
+    // only, so this falls back to recency rather than returning the reasoning draft.
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [
+                { type: "reasoning", text: "<plan>internal draft sketch</plan>" },
+                { type: "text", text: "Final answer without a tag" },
+              ],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
+
+    //#then - falls back to the real response instead of the reasoning-only draft
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.textContent).toContain("Final answer without a tag")
+      expect(result.textContent).not.toBe("internal draft sketch")
+    }
+  })
 })
