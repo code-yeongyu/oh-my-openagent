@@ -1,5 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
+
+import { writeFileAtomic } from "./atomic-write.mjs";
 
 import { ensureCodexMultiAgentV2Config } from "./multi-agent-v2-config.mjs";
 import { readCodexModelCatalog } from "./model-catalog.mjs";
@@ -70,7 +72,7 @@ export async function updateCodexConfig({
 		config = ensureAgentConfig(config, agentConfig);
 	}
 
-	await writeFile(configPath, config.trimEnd() + "\n");
+	await writeFileAtomic(configPath, config.trimEnd() + "\n");
 }
 
 function legacyMarketplaceNames(marketplaceName) {
