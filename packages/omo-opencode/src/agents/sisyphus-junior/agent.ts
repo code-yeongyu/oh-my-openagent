@@ -16,6 +16,7 @@ import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, is
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
+  migrateAgentConfig,
   type PermissionValue,
 } from "../../shared/permission-compat"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
@@ -112,7 +113,10 @@ export function createSisyphusJuniorAgentWithOverrides(
 
   const baseRestrictions = createAgentToolRestrictions(blockedTools)
 
-  const userPermission = (override?.permission ?? {}) as Record<string, PermissionValue>
+  const migratedOverride = override
+    ? (migrateAgentConfig(override as Record<string, unknown>) as typeof override)
+    : undefined
+  const userPermission = (migratedOverride?.permission ?? {}) as Record<string, PermissionValue>
   const basePermission = baseRestrictions.permission
   const merged: Record<string, PermissionValue> = { ...userPermission }
   for (const tool of blockedTools) {

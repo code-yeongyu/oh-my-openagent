@@ -879,10 +879,18 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(sessionID, input.model)
     }
 
+    const userDenied: Record<string, boolean> = {}
+    if (input.userPermission) {
+      for (const [tool, value] of Object.entries(input.userPermission)) {
+        if (value === "deny") userDenied[tool] = false
+      }
+    }
+
     const launchTools = {
       task: false,
       call_omo_agent: true,
       question: false,
+      ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),

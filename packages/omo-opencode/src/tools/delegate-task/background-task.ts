@@ -7,6 +7,7 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { migrateToolsToPermission } from "../../shared/permission-compat"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
@@ -128,6 +129,9 @@ export async function executeBackgroundTask(
       skillContent: systemContent,
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      userPermission: categoryModel?.tools
+        ? migrateToolsToPermission(categoryModel.tools)
+        : undefined,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up

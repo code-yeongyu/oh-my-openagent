@@ -62,6 +62,7 @@ export async function executeSyncTask(
         sessionID: newSessionID,
         parentContext,
         agentToUse,
+        categoryModel,
         fallbackChain,
         systemContent,
       })

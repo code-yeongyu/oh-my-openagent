@@ -248,6 +248,38 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         expect(permission.call_omo_agent).toBe("allow")
       }
     })
+
+    test("tools override migrates boolean tools to permission (issue #5193)", () => {
+      // given
+      const override = {
+        tools: { grep: false, write: false, read: true } as Record<string, boolean>,
+      }
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      // then
+      const permission = result.permission as Record<string, string>
+      expect(permission.grep).toBe("deny")
+      expect(permission.write).toBe("deny")
+      expect(permission.read).toBe("allow")
+    })
+
+    test("permission override with MCP tool keys passes through (issue #5193)", () => {
+      // given
+      const override = {
+        permission: {
+          "mcp__context7__resolve-library-id": "allow",
+          grep: "deny",
+        } as Record<string, string>,
+      }
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      // then
+      const permission = result.permission as Record<string, string>
+      expect(permission["mcp__context7__resolve-library-id"]).toBe("allow")
+      expect(permission.grep).toBe("deny")
+      // task must remain denied (hardcoded BLOCKED_TOOLS)
+      expect(permission.task).toBe("deny")
+    })
   })
 
   describe("useTaskSystem integration", () => {

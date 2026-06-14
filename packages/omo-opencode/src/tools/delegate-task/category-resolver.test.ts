@@ -1,6 +1,9 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 import { resolveCategoryExecution } from "./category-resolver"
+import { applyCategoryParams } from "./delegated-model-config"
+import type { DelegatedModelConfig } from "./types"
+import type { CategoryConfig } from "../../config/schema"
 import type { ExecutorContext } from "./executor-types"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -622,5 +625,23 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
 		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_LEGACY")
+	})
+
+	test("applyCategoryParams propagates category tools config (issue #5182)", () => {
+		//#given a category with tools restriction
+		const base: DelegatedModelConfig = {
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+		}
+		const config: CategoryConfig = {
+			tools: { grep: false, read: true },
+		}
+
+		//#when applyCategoryParams runs with a tools-restricted category config
+		const result = applyCategoryParams(base, config)
+
+		//#then tools from the category config should appear in the result
+		// THIS TEST MUST FAIL (RED) - proves bug #5182 that applyCategoryParams drops config.tools
+		expect((result as unknown as { tools?: Record<string, boolean> }).tools).toEqual({ grep: false, read: true })
 	})
 })

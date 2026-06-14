@@ -3465,7 +3465,7 @@ describe("sisyphus-task", () => {
 			const tool = createDelegateTask({
 				manager: mockManager,
 				client: mockClient,
-			})
+  })
 
 			const toolContext = {
 				sessionID: "parent-session",
@@ -4718,5 +4718,86 @@ describe("sisyphus-task", () => {
       expect(result).toContain("session_id: ses_bg_metadata")
       expect(result).toContain("</task_metadata>")
     }, { timeout: 10000 })
+  })
+})
+
+describe("buildSyncPromptTools (issue #5182)", () => {
+  test("merges user permission denials into tools (fix for issue #5182)", () => {
+    // #given - user configured agents.sisyphus-junior.permission with tool denials
+    const { buildSyncPromptTools } = require("./sync-prompt-sender")
+    const userPermission = { grep: "deny", glob: "deny" }
+
+    // #when - buildSyncPromptTools currently ignores the extra argument;
+    //          the fix should accept permission and merge denials
+    const result = buildSyncPromptTools("sisyphus-junior", userPermission)
+
+    // #then - user denials MUST propagate to false, but DON'T because the
+    //          function never reads permission from config (bug #5182)
+    expect(result.grep).toBe(false)
+    expect(result.glob).toBe(false)
+    // hardcoded restriction (task: false) still applies
+    expect(result.task).toBe(false)
+    // unconditionally allowed tools remain unchanged
+    expect(result.call_omo_agent).toBe(true)
+    expect(result.question).toBe(false)
+  })
+
+  test("categories.<name>.tools propagates to session tools end-to-end (issue #5182)", async () => {
+    // #given a categoryModel with tools restriction
+    const categoryModel = {
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+      tools: { grep: false, glob: false },
+    }
+
+    const mockPromptResolve = () => Promise.resolve()
+
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+    const { getSessionTools } = require("../../shared/session-tools-store")
+
+    const sessionID = "e2e-test-session"
+    const mockClient = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp" } }),
+      },
+    }
+
+    // #when sendSyncPrompt is called with categoryModel.tools
+    await sendSyncPrompt(mockClient, {
+      sessionID,
+      agentToUse: "sisyphus-junior",
+      args: {
+        description: "test",
+        prompt: "test",
+        category: "quick",
+        subagent_type: "",
+        requested_subagent_type: "",
+        run_in_background: false,
+        task_id: "",
+        command: "",
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel,
+      directory: "/tmp",
+      toastManager: null,
+      taskId: undefined,
+    }, {
+      promptSyncWithModelSuggestionRetry: mockPromptResolve,
+    })
+
+    // #then session tools include user's grep:false and glob:false denials
+    const storedTools = getSessionTools(sessionID)
+    expect(storedTools).toBeDefined()
+    expect(storedTools!.grep).toBe(false)
+    expect(storedTools!.glob).toBe(false)
+    // hardcoded restriction (task: false for sisyphus-junior) still applies
+    expect(storedTools!.task).toBe(false)
+    // unconditionally allowed tools remain unchanged
+    expect(storedTools!.call_omo_agent).toBe(true)
+    expect(storedTools!.question).toBe(false)
+    // buildSyncPromptTools only processes denials, not allows,
+    // so read:true from tools config does not appear in the result
+    expect(storedTools!.read).toBeUndefined()
   })
 })
