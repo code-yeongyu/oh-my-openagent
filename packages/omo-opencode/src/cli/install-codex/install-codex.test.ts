@@ -6,18 +6,7 @@ import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
-
-const EXPECTED_OMO_COMPONENT_BINS = [
-  { name: "omo", target: join("dist", "cli", "index.js"), kind: "runtime-wrapper" },
-  { name: "omo-comment-checker", target: join("components", "comment-checker", "dist", "cli.js") },
-  { name: "omo-git-bash-hook", target: join("components", "git-bash", "dist", "cli.js") },
-  { name: "omo-lsp", target: join("components", "lsp", "dist", "cli.js") },
-  { name: "omo-rules", target: join("components", "rules", "dist", "cli.js") },
-  { name: "omo-start-work-continuation", target: join("components", "start-work-continuation", "dist", "cli.js") },
-  { name: "omo-telemetry", target: join("components", "telemetry", "dist", "cli.js") },
-  { name: "omo-ulw-loop", target: join("components", "ulw-loop", "dist", "cli.js") },
-  { name: "omo-ultrawork", target: join("components", "ultrawork", "dist", "cli.js") },
-] as const
+import { createRepoWithBuiltComponentBins, EXPECTED_OMO_COMPONENT_BINS, expectedBinName } from "./install-codex-test-fixtures"
 
 const STALE_CODEX_COMPONENT_BINS = [
   "codex-comment-checker",
@@ -31,45 +20,6 @@ const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
 
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
-}
-
-function expectedBinName(name: string): string {
-  return process.platform === "win32" ? `${name}.cmd` : name
-}
-
-async function createRepoWithBuiltComponentBins(input: { readonly includeRootCliDist?: boolean } = {}): Promise<string> {
-  const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-built-bins-repo-"))
-  const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
-  const pluginRoot = join(codexPackageRoot, "plugin")
-
-  await mkdir(join(repoRoot, "src"), { recursive: true })
-  await mkdir(codexPackageRoot, { recursive: true })
-  await writeFile(join(repoRoot, "src", "index.ts"), "export {}\n")
-  await writeFile(join(repoRoot, "package.json"), JSON.stringify({ name: "oh-my-openagent", version: "4.7.5" }))
-  await writeFile(
-    join(codexPackageRoot, "marketplace.json"),
-    JSON.stringify({ name: "sisyphuslabs", plugins: [{ name: "omo", source: "./plugins/omo" }] }),
-  )
-
-  if (input.includeRootCliDist !== false) {
-    await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
-    await writeFile(join(repoRoot, "dist", "cli", "index.js"), "#!/usr/bin/env node\n")
-  }
-  await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
-  await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "0.1.0" }))
-  await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }))
-
-  for (const entry of EXPECTED_OMO_COMPONENT_BINS) {
-    if ("kind" in entry && entry.kind === "runtime-wrapper") continue
-    const componentName = entry.target.split(/[\\/]/)[1]
-    if (componentName === undefined) throw new Error(`missing component name for ${entry.name}`)
-    const componentRoot = join(pluginRoot, "components", componentName)
-    await mkdir(join(componentRoot, "dist"), { recursive: true })
-    await writeFile(join(componentRoot, "package.json"), JSON.stringify({ name: `@sisyphuslabs/${componentName}`, bin: { [entry.name]: "./dist/cli.js" } }))
-    await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
-  }
-
-  return repoRoot
 }
 
 describe("install-codex", () => {
@@ -244,7 +194,7 @@ describe("install-codex", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-win-"))
-    const repoRoot = process.cwd()
+    const repoRoot = await createRepoWithBuiltComponentBins({ includeBundledGitBashMcp: true })
 
     // when
     const result = await runCodexInstaller({
@@ -275,7 +225,7 @@ describe("install-codex", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-linux-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-linux-"))
-    const repoRoot = process.cwd()
+    const repoRoot = await createRepoWithBuiltComponentBins({ includeBundledGitBashMcp: true })
 
     // when
     const result = await runCodexInstaller({
