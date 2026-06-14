@@ -23,12 +23,20 @@ function messageText(msg: SessionMessage): string {
  * newest message containing a complete tag block, or undefined to fall back.
  */
 function extractTaggedDeliverable(assistantMessages: SessionMessage[], tag: string): string | undefined {
-  const pattern = new RegExp(`<${escapeRegExp(tag)}>([\\s\\S]*)</${escapeRegExp(tag)}>`, "i")
+  const escaped = escapeRegExp(tag)
+  // Non-greedy + global so a message containing multiple complete envelopes
+  // (e.g. a reasoning-part draft `<plan>...</plan>` followed by the final
+  // text-part `<plan>...</plan>`) yields the LAST block rather than a greedy
+  // span from the first opener to the last closer.
+  const pattern = new RegExp(`<${escaped}>([\\s\\S]*?)</${escaped}>`, "gi")
   for (const msg of assistantMessages) {
-    const match = pattern.exec(messageText(msg))
-    if (match && match[1].trim()) {
-      return match[1].trim()
+    const text = messageText(msg)
+    let last: string | undefined
+    for (const match of text.matchAll(pattern)) {
+      const inner = match[1].trim()
+      if (inner) last = inner
     }
+    if (last) return last
   }
   return undefined
 }
@@ -76,18 +84,11 @@ export async function fetchSyncResult(
     return { ok: false, error: `No assistant response found.\n\nSession ID: ${sessionID}` }
   }
 
-  // Prefer an explicit deliverable envelope (e.g. `<plan>...</plan>`) when the
-  // agent is expected to emit one. This selects the turn the agent marked as its
-  // deliverable rather than the newest turn, which is what makes extraction
-  // correct when post-completion (notification-triggered) turns exist. A missing
-  // or unclosed envelope falls through to the recency-based behavior below.
-  if (options?.deliverableTag) {
-    const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
-    if (tagged) {
-      return { ok: true, textContent: tagged }
-    }
-  }
-
+  // Abort recovery must validate the LATEST assistant message before accepting
+  // any older content. Otherwise a provider abort/error on the newest turn could
+  // be masked by returning a stale envelope from an earlier turn — reporting a
+  // failed task as a successful completion. So the error/empty guard runs first;
+  // only once the latest message is known-clean do we prefer the envelope.
   if (options?.strictAbortRecovery) {
     if (lastMessage.info && "error" in lastMessage.info) {
       return {
@@ -105,7 +106,26 @@ export async function fetchSyncResult(
       }
     }
 
+    if (options.deliverableTag) {
+      const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
+      if (tagged) {
+        return { ok: true, textContent: tagged }
+      }
+    }
+
     return { ok: true, textContent: lastContent }
+  }
+
+  // Prefer an explicit deliverable envelope (e.g. `<plan>...</plan>`) when the
+  // agent is expected to emit one. This selects the turn the agent marked as its
+  // deliverable rather than the newest turn, which is what makes extraction
+  // correct when post-completion (notification-triggered) turns exist. A missing
+  // or unclosed envelope falls through to the recency-based behavior below.
+  if (options?.deliverableTag) {
+    const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
+    if (tagged) {
+      return { ok: true, textContent: tagged }
+    }
   }
 
   // Search assistant messages (newest first) for one with text/reasoning content.

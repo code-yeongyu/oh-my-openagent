@@ -318,4 +318,102 @@ describe("fetchSyncResult", () => {
     expect(result.ok).toBe(false)
     expect(result.error).toContain("No assistant text output found in latest response")
   })
+
+  test("strict abort recovery: does not salvage an older envelope when latest assistant is error", async () => {
+    //#given - an earlier turn carries a complete <plan>, but the latest turn aborted.
+    // The abort guard must take precedence over tagged extraction.
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "<plan>\n# Stale draft plan\n</plan>" }],
+            },
+            { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            {
+              info: {
+                id: "msg_004",
+                role: "assistant",
+                time: { created: 4000 },
+                error: { name: "MessageAbortedError", message: "The operation was aborted." },
+              },
+              parts: [],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when - both strictAbortRecovery and deliverableTag are passed, as the real callers do
+    const result = await fetchSyncResult(mockClient, "ses_test", 1, {
+      strictAbortRecovery: true,
+      deliverableTag: "plan",
+    })
+
+    //#then - the abort is reported, not the stale envelope
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain("Latest assistant message is an error")
+  })
+
+  test("strict abort recovery: prefers the envelope when the latest message is clean", async () => {
+    //#given - latest message is clean and carries a complete envelope
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "<plan>\n# Recovered plan\n</plan>" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", 1, {
+      strictAbortRecovery: true,
+      deliverableTag: "plan",
+    })
+
+    //#then - returns the envelope contents
+    expect(result).toEqual({ ok: true, textContent: "# Recovered plan" })
+  })
+
+  test("deliverableTag: selects the last complete envelope within a single message", async () => {
+    //#given - one message concatenates a reasoning-part draft envelope and a
+    // text-part final envelope. A greedy capture would span both and leak tags;
+    // the last complete block must win.
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [
+                { type: "reasoning", text: "<plan>draft sketch</plan>" },
+                { type: "text", text: "<plan>final plan</plan>" },
+              ],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
+
+    //#then - only the final block, with no embedded tags or draft content
+    expect(result).toEqual({ ok: true, textContent: "final plan" })
+  })
 })
