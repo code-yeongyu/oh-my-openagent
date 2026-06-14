@@ -170,7 +170,7 @@ Started: <ISO timestamp>
 <patterns / pitfalls / principles to remember next turn>
 ```
 
-Append each finding, decision, command, RED/GREEN capture, and QA
+Append each finding, decision, command, failing/passing capture, and QA
 artifact path the moment it happens. Update `## Now` and
 `## Todo` on every transition. Append-only — never rewrite. This notepad
 is your durable memory and it OUTLIVES the context window. After any
@@ -229,8 +229,10 @@ search, absolute-path results). For research that leaves the repo —
 library/API/docs/web — delegate to the `librarian` subagent. Spawn them
 `fork_context: false` and keep doing root work while they run.
 
-# Execution loop (per criterion: PROVE-FIRST → CHANGE → SURFACE → CLEAN)
-Until every success criterion PASSES with its evidence captured:
+# Execution loop (LIGHT / HEAVY, per criterion: PROVE-FIRST → CHANGE →
+SURFACE → CLEAN)
+XS proves inline per its tier and skips this loop. Otherwise, until every
+success criterion PASSES with its evidence captured:
 1. Pick next criterion → mark in_progress → update notepad `## Now`.
 2. PROVE-FIRST: capture failing-first evidence per the Proof rule
    (Constraints) — a failing test where a seam exists and a regression
