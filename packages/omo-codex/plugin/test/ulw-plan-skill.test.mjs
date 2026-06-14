@@ -65,3 +65,25 @@ test("#given ulw-plan full workflow reference #when inspected #then it documents
 	assert.doesNotMatch(workflow, opencodeOnlyToolPattern);
 	assert.doesNotMatch(workflow, /Proceeding to plan generation/);
 });
+
+test("#given ulw-plan approval gate #when inspected #then it is a durable decision rule that ends the approval loop (lazycodex #48)", async () => {
+	// given
+	const skill = await readFile(skillPath, "utf8");
+	const workflow = await readFile(workflowPath, "utf8");
+	const combined = `${skill}\n${workflow}`;
+
+	// then — a durable approval-pending checkpoint guards against re-running exploration after compaction
+	assert.match(combined, /awaiting-approval/);
+	assert.match(combined, /instead of re-running exploration/i);
+
+	// then — approval is decided from intent, not a fixed passphrase
+	assert.match(combined, /"proceed"/);
+	assert.match(combined, /"write the plan"/);
+
+	// then — approval authorizes writing the plan, never implementation (resolves sticky-mode ambiguity)
+	assert.match(combined, /authoriz[^.]{0,80}writing the plan/i);
+	assert.match(combined, /never authorization to implement/i);
+
+	// then — the still-unclear path is a single prompt, never a re-exploration loop
+	assert.match(combined, /do not re-explore/i);
+});
