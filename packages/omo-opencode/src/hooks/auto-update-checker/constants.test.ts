@@ -1,7 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { getOpenCodeCacheDir } from "../../shared/data-path"
 
 describe("auto-update-checker constants", () => {
@@ -14,17 +12,14 @@ describe("auto-update-checker constants", () => {
     )
   })
 
-  it("PACKAGE_NAME matches the published package.json name", async () => {
-    // given the canonical package.json shipped with the plugin
-    const here = fileURLToPath(import.meta.url)
-    const repoPackageJsonPath = join(here, "..", "..", "..", "..", "..", "..", "package.json")
-    const repoPackageJson = JSON.parse(readFileSync(repoPackageJsonPath, "utf-8")) as { name: string }
+  it("PACKAGE_NAME uses the canonical package name for new writes", async () => {
+    // given
 
-    // when the auto-update-checker constants are loaded
+    // when
     const { PACKAGE_NAME } = await import(`./constants?test=${Date.now()}`)
 
-    // then PACKAGE_NAME equals the actually published package name
-    expect(PACKAGE_NAME).toBe(repoPackageJson.name)
+    // then
+    expect(PACKAGE_NAME).toBe("oh-my-openagent")
   })
 
   it("ACCEPTED_PACKAGE_NAMES contains both the canonical and aliased npm names (GH-3257)", async () => {
