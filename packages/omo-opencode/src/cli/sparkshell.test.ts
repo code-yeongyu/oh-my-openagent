@@ -480,6 +480,52 @@ describe("sparkshell CLI", () => {
     expect(stderr.join("")).not.toContain("failed to launch")
   })
 
+  test("#given a metacharacter command without --shell #when the spawn reports ENOENT #then hints to re-run with --shell", async () => {
+    // given
+    const stderr: string[] = []
+    const enoentError = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
+
+    // when
+    const exitCode = await runSparkShell(["pwd && ls"], {
+      env: {},
+      appServerClient: null,
+      commandExists: () => false,
+      writeStdout: () => {},
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
+      spawn: (): SparkShellSpawnResult => ({ status: null, error: enoentError }),
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(stderr.join("")).toContain("failed to launch")
+    expect(stderr.join("")).toContain("--shell")
+  })
+
+  test("#given a plain missing command without metacharacters #when the spawn reports ENOENT #then does not hint --shell", async () => {
+    // given
+    const stderr: string[] = []
+    const enoentError = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
+
+    // when
+    const exitCode = await runSparkShell(["definitely-not-a-cmd"], {
+      env: {},
+      appServerClient: null,
+      commandExists: () => false,
+      writeStdout: () => {},
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
+      spawn: (): SparkShellSpawnResult => ({ status: null, error: enoentError }),
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(stderr.join("")).toContain("failed to launch")
+    expect(stderr.join("")).not.toContain("--shell")
+  })
+
   test("#given native sidecar override #when running Sparkshell #then delegates original args to sidecar", async () => {
     // given
     const calls: string[][] = []

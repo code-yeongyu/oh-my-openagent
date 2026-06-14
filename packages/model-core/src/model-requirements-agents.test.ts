@@ -257,5 +257,6 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "vercel",
     ])
     expect(hephaestus.requiresModel).toBeUndefined()
+    expect(hephaestus.requiresAnyModel).toBe(true)
   })
 })
