@@ -1,6 +1,6 @@
 import type { MatrixxConfig } from "./schema/matrixx-config"
 
-export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go"] as const
+export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate"] as const
 export type ProfileName = (typeof PROFILE_NAMES)[number]
 
 const OPUS = "anthropic/claude-opus-4-6"
@@ -21,6 +21,16 @@ const GLM_51 = "opencode-go/glm-5.1"
 const MIMO_PRO = "opencode-go/mimo-v2.5-pro"
 const MINIMAX_27 = "opencode-go/minimax-m2.7"
 const QWEN_36 = "opencode-go/qwen3.6-plus"
+
+// Xiaomi Token Plan AMS provider models
+const XIAOMI_MIMO_V2_OMNI = "xiaomi-token-plan-ams/mimo-v2-omni"
+const XIAOMI_MIMO_V2_PRO = "xiaomi-token-plan-ams/mimo-v2-pro"
+const XIAOMI_MIMO_V2_TTS = "xiaomi-token-plan-ams/mimo-v2-tts"
+const XIAOMI_MIMO_V25 = "xiaomi-token-plan-ams/mimo-v2.5"
+const XIAOMI_MIMO_V25_PRO = "xiaomi-token-plan-ams/mimo-v2.5-pro"
+const XIAOMI_MIMO_V25_TTS = "xiaomi-token-plan-ams/mimo-v2.5-tts"
+const XIAOMI_MIMO_V25_TTS_VOICECLONE = "xiaomi-token-plan-ams/mimo-v2.5-tts-voiceclone"
+const XIAOMI_MIMO_V25_TTS_VOICEDESIGN = "xiaomi-token-plan-ams/mimo-v2.5-tts-voicedesign"
 
 const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
   /* Use only free/zero-cost models. Best for experimentation, quick prototyping,
@@ -199,6 +209,74 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       "blue-pill": { model: SONNET },
       broadcast: { model: SONNET },
       "bullet-time": { model: HAIKU },
+    },
+  },
+
+  /* Ultimate configuration using Xiaomi Token Plan AMS provider models.
+   * Tiered model assignment: mimo-v2.5-pro for heavy reasoning agents,
+   * mimo-v2.5 for lightweight automation tasks. */
+  "xiaomi-ultimate": {
+    agents: {
+      /* Tier 1 — Orchestrators & Deep Workers: mimo-v2.5-pro for complex reasoning */
+      morpheus: { model: XIAOMI_MIMO_V25_PRO },
+      oracle: { model: XIAOMI_MIMO_V25_PRO },
+      seraph: { model: XIAOMI_MIMO_V25_PRO },
+      niobe: { model: XIAOMI_MIMO_V25_PRO },
+      architect: { model: XIAOMI_MIMO_V25_PRO },
+      keymaker: { model: XIAOMI_MIMO_V25_PRO },
+      cipher: { model: XIAOMI_MIMO_V25_PRO },
+      sentinel: { model: XIAOMI_MIMO_V25_PRO },
+      smith: { model: XIAOMI_MIMO_V25_PRO },
+      merovingian: { model: XIAOMI_MIMO_V25_PRO },
+      /* Tier 2 — Automation & Utility: mimo-v2.5 for lightweight tasks */
+      operator: { model: XIAOMI_MIMO_V25 },
+      trinity: { model: XIAOMI_MIMO_V25 },
+      construct: { model: XIAOMI_MIMO_V25 },
+      mouse: { model: XIAOMI_MIMO_V25 },
+      zion: { model: XIAOMI_MIMO_V25 },
+    },
+    categories: {
+      source: { model: XIAOMI_MIMO_V25_PRO },
+      "deep-jack": { model: XIAOMI_MIMO_V25_PRO },
+      "matrix-bend": { model: XIAOMI_MIMO_V25_PRO },
+      "red-pill": { model: XIAOMI_MIMO_V25_PRO },
+      construct: { model: XIAOMI_MIMO_V25 },
+      "blue-pill": { model: XIAOMI_MIMO_V25 },
+      broadcast: { model: XIAOMI_MIMO_V25 },
+      "bullet-time": { model: XIAOMI_MIMO_V25 },
+    },
+  },
+
+  /* Ultimate configuration for OpenCode Go subscription. Uses the best available
+   * models from the Go provider with no cost constraints. Pure performance mode
+   * for users who want maximum capability from their Go subscription. */
+  "go-ultimate": {
+    agents: {
+      morpheus: { model: KIMI_K26 },
+      oracle: { model: KIMI_K26 },
+      seraph: { model: KIMI_K26 },
+      niobe: { model: KIMI_K26 },
+      architect: { model: KIMI_K26 },
+      keymaker: { model: KIMI_K26 },
+      cipher: { model: KIMI_K26 },
+      sentinel: { model: DEEPSEEK_PRO },
+      smith: { model: DEEPSEEK_PRO },
+      merovingian: { model: DEEPSEEK_PRO },
+      operator: { model: DEEPSEEK_PRO },
+      trinity: { model: DEEPSEEK_PRO },
+      construct: { model: DEEPSEEK_PRO },
+      mouse: { model: DEEPSEEK_PRO },
+      zion: { model: DEEPSEEK_PRO },
+    },
+    categories: {
+      source: { model: KIMI_K26 },
+      "deep-jack": { model: KIMI_K26 },
+      "matrix-bend": { model: KIMI_K26 },
+      "red-pill": { model: KIMI_K26 },
+      construct: { model: DEEPSEEK_PRO },
+      "blue-pill": { model: DEEPSEEK_PRO },
+      broadcast: { model: DEEPSEEK_PRO },
+      "bullet-time": { model: DEEPSEEK_PRO },
     },
   },
 }

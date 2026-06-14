@@ -350,7 +350,7 @@ describe("expandProfile", () => {
   })
 
   describe("PROFILE_NAMES", () => {
-    test("should export all six profile names", () => {
+    test("should export all eight profile names", () => {
       //#given
       //#when
       //#then
@@ -360,7 +360,9 @@ describe("expandProfile", () => {
       expect(PROFILE_NAMES).toContain("balanced")
       expect(PROFILE_NAMES).toContain("performance")
       expect(PROFILE_NAMES).toContain("go")
-      expect(PROFILE_NAMES).toHaveLength(6)
+      expect(PROFILE_NAMES).toContain("xiaomi-ultimate")
+      expect(PROFILE_NAMES).toContain("go-ultimate")
+      expect(PROFILE_NAMES).toHaveLength(8)
     })
   })
 })
