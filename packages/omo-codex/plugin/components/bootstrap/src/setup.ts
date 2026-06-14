@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -149,6 +149,7 @@ async function updateConfigStep(
 ): Promise<void> {
 	const configPath = join(options.codexHome, "config.toml");
 	try {
+		await assertWritableConfigIfPresent(configPath);
 		// Re-stamping trusted hook hashes after an upgrade is what makes the
 		// next session's hooks trusted again once the user re-approved the
 		// bootstrap hook itself.
@@ -181,6 +182,19 @@ async function updateConfigStep(
 			reason: `failed to update ${configPath}: ${errorMessage(error)}`,
 		});
 	}
+}
+
+async function assertWritableConfigIfPresent(configPath: string): Promise<void> {
+	try {
+		if (((await stat(configPath)).mode & 0o222) === 0) throw new Error(`${configPath} has no write permission bits set`);
+	} catch (error) {
+		if (errorCode(error) === "ENOENT") return;
+		throw error;
+	}
+}
+
+function errorCode(error: unknown): string | undefined {
+	return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
 }
 
 async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: BootstrapDegradedEntry[]): Promise<void> {
