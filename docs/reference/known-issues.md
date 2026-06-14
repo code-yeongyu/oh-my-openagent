@@ -135,6 +135,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use short wait cycles, send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5021.
 
+## #3303 - Windows OpenCode proxy install can fail before OMO loads
+
+- **Affects**: Windows OpenCode installs behind an HTTP(S) proxy, especially first startup paths that ask OpenCode to fetch `oh-my-openagent@latest`.
+- **Symptom**: OpenCode may show only default agents or log `fetch() proxy.url must be a non-empty string` before OMO loads, so OMO hooks and doctor cannot repair the install from inside the plugin.
+- **Workaround**: Launch OpenCode from a shell that has `HTTP_PROXY` and `HTTPS_PROXY` set, then preinstall the package into OpenCode's Windows config prefix with `npm install oh-my-openagent@latest --prefix "%APPDATA%\\opencode"`. Restart OpenCode and verify with `bunx oh-my-openagent doctor --json`.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/3303.
+
 ## #4702 - Windows TUI plugin install can pause startup on a Bun npm git error
 
 - **Affects**: Windows OpenCode startup when `tui.json` includes `oh-my-openagent/tui`.
