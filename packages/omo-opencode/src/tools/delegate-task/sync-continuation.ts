@@ -14,6 +14,7 @@ import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { clearDelegateTaskSyncSession, clearSyncSessionError, registerDelegateTaskSyncSession } from "../../shared/sync-session-error-store"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -160,6 +161,8 @@ export async function executeSyncContinuation(
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
     }
     setSessionTools(continuationID, tools)
+    clearSyncSessionError(continuationID)
+    registerDelegateTaskSyncSession(continuationID)
 
     await promptWithModelSuggestionRetry(client, {
       path: { id: continuationID },
@@ -175,63 +178,42 @@ export async function executeSyncContinuation(
       queueBehavior: "defer",
       checkToolState: false,
     })
-   } catch (promptError) {
-     if (toastManager) {
-       toastManager.removeTask(taskId)
-     }
-     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-     return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
-   }
+  } catch (promptError) {
+    clearSyncSessionError(continuationID)
+    clearDelegateTaskSyncSession(continuationID)
+    if (toastManager) {
+      toastManager.removeTask(taskId)
+    }
+    const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+    return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
+  }
 
-    try {
-      const pollError = await deps.pollSyncSession(ctx, client, {
-        sessionID: continuationID,
-        agentToUse: resumeAgent ?? "continue",
-        toastManager,
-        taskId,
-        anchorMessageCount,
-      }, syncPollTimeoutMs)
-      if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
-        if (anchorMessageCount === undefined) {
-          return pollError
-        }
-        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-          strictAbortRecovery: true,
-        })
-        if (!recoveredResult.ok) {
-          return pollError
-        }
+  try {
+    const pollError = await deps.pollSyncSession(ctx, client, {
+      sessionID: continuationID,
+      agentToUse: resumeAgent ?? "continue",
+      toastManager,
+      taskId,
+      anchorMessageCount,
+    }, syncPollTimeoutMs)
+    if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
+      if (anchorMessageCount === undefined) {
+        return pollError
+      }
+      const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+        strictAbortRecovery: true,
+      })
+      if (!recoveredResult.ok) {
+        return pollError
+      }
 
-        const duration = formatDuration(startTime)
+      const duration = formatDuration(startTime)
 
-        return `Task continued and completed in ${duration}.
+      return `Task continued and completed in ${duration}.
 
 ---
 
 ${recoveredResult.textContent || "(No text output)"}
-
-${buildTaskMetadataBlock({
-          sessionId: continuationID,
-          taskId: continuationID,
-          agent: resumeAgent,
-          category: args.category,
-        })}`
-      } else if (pollError) {
-        return pollError
-      }
-
-      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
-      if (!result.ok) {
-        return result.error
-      }
-
-     const duration = formatDuration(startTime)
-
-     return `Task continued and completed in ${duration}.
-
----
-
-${result.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
         sessionId: continuationID,
@@ -239,9 +221,34 @@ ${buildTaskMetadataBlock({
         agent: resumeAgent,
         category: args.category,
       })}`
-   } finally {
-     if (toastManager) {
-       toastManager.removeTask(taskId)
-     }
-   }
+    } else if (pollError) {
+      return pollError
+    }
+
+    const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
+    if (!result.ok) {
+      return result.error
+    }
+
+    const duration = formatDuration(startTime)
+
+    return `Task continued and completed in ${duration}.
+
+---
+
+${result.textContent || "(No text output)"}
+
+${buildTaskMetadataBlock({
+      sessionId: continuationID,
+      taskId: continuationID,
+      agent: resumeAgent,
+      category: args.category,
+    })}`
+  } finally {
+    if (toastManager) {
+      toastManager.removeTask(taskId)
+    }
+    clearSyncSessionError(continuationID)
+    clearDelegateTaskSyncSession(continuationID)
+  }
 }

@@ -3,13 +3,23 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
-import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
+import {
+  _resetForTesting,
+  setMainSession,
+  setSessionAgent,
+  syncSubagentSessions,
+} from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
+import {
+  clearAllSyncSessionErrorsForTesting,
+  consumeSyncSessionError,
+  registerDelegateTaskSyncSession,
+} from "../shared/sync-session-error-store"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -32,6 +42,9 @@ function setupConnectedProviderCacheMocks(): void {
 }
 
 describe("createEventHandler - model fallback", () => {
+  const retryableProviderErrorMessage =
+    "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}"
+
   const createHandler = (args?: {
     hooks?: unknown
     pluginConfig?: unknown
@@ -99,6 +112,7 @@ describe("createEventHandler - model fallback", () => {
     readConnectedProvidersCacheSpy = undefined
     readProviderModelsCacheSpy = undefined
     _resetForTesting()
+    clearAllSyncSessionErrorsForTesting()
     releaseAllPromptAsyncReservationsForTesting()
   })
 
@@ -223,6 +237,212 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
+  })
+
+  test("does not record delegate-task sync session.error for poller when model fallback handles it", async () => {
+    //#given
+    const sessionID = "ses_delegate_sync_model_fallback_consumes_error"
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    syncSubagentSessions.add(sessionID)
+    registerDelegateTaskSyncSession(sessionID)
+    setSessionAgent(sessionID, "sisyphus")
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const providerError = {
+      name: "UnknownError",
+      data: {
+        error: {
+          message:
+            "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        },
+      },
+    }
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7-thinking",
+          error: providerError,
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(consumeSyncSessionError(sessionID)).toBeUndefined()
+  })
+
+  test("records delegate-task sync session.error for poller when model fallback abort fails", async () => {
+    //#given
+    const sessionID = "ses_delegate_sync_model_fallback_abort_fails"
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    syncSubagentSessions.add(sessionID)
+    registerDelegateTaskSyncSession(sessionID)
+    setSessionAgent(sessionID, "sisyphus")
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      abort: async () => {
+        throw new Error("abort transport failed")
+      },
+      promptAsync: async () => ({}),
+    })
+    const providerError = {
+      name: "UnknownError",
+      data: {
+        error: {
+          message:
+            "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        },
+      },
+    }
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7-thinking",
+          error: providerError,
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptAsyncCalls).toEqual([])
+    expect(consumeSyncSessionError(sessionID)).toBe(retryableProviderErrorMessage)
+  })
+
+  test("records delegate-task sync session.error for poller when model fallback prompt dispatch fails", async () => {
+    //#given
+    const sessionID = "ses_delegate_sync_model_fallback_prompt_fails"
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    syncSubagentSessions.add(sessionID)
+    registerDelegateTaskSyncSession(sessionID)
+    setSessionAgent(sessionID, "sisyphus")
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => {
+        throw new Error("prompt dispatch rejected")
+      },
+    })
+    const providerError = {
+      name: "UnknownError",
+      data: {
+        error: {
+          message:
+            "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        },
+      },
+    }
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7-thinking",
+          error: providerError,
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptAsyncCalls).toEqual([sessionID])
+    expect(consumeSyncSessionError(sessionID)).toBe(retryableProviderErrorMessage)
+  })
+
+  test("records delegate-task sync session.error when overlapping model fallback abort fails", async () => {
+    //#given
+    const sessionID = "ses_delegate_sync_model_fallback_overlap_fails"
+    let releaseAbort: (() => void) | undefined
+    const abortBlocked = new Promise<void>((resolve) => {
+      releaseAbort = resolve
+    })
+    let firstAbortStartedResolve: (() => void) | undefined
+    const firstAbortStarted = new Promise<void>((resolve) => {
+      firstAbortStartedResolve = resolve
+    })
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    syncSubagentSessions.add(sessionID)
+    registerDelegateTaskSyncSession(sessionID)
+    setSessionAgent(sessionID, "sisyphus")
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      abort: async () => {
+        if (abortCalls.length === 1) {
+          firstAbortStartedResolve?.()
+        }
+        await abortBlocked
+        throw new Error("abort transport failed")
+      },
+      promptAsync: async () => ({}),
+    })
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message: retryableProviderErrorMessage,
+        isRetryable: true,
+      },
+    }
+
+    //#when
+    const messageUpdated = handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_overlap_fails",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "sisyphus",
+          },
+        },
+      },
+    })
+    await firstAbortStarted
+    const sessionError = handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7-thinking",
+          error: assistantError,
+        },
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    releaseAbort?.()
+    await Promise.all([messageUpdated, sessionError])
+
+    //#then
+    expect(pendingFallbackArms).toBe(1)
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptAsyncCalls).toEqual([])
+    expect(consumeSyncSessionError(sessionID)).toBe(retryableProviderErrorMessage)
   })
 
   test("does not dispatch duplicate fallback continuations when error events overlap", async () => {

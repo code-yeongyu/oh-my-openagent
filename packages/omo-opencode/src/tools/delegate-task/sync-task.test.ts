@@ -699,6 +699,86 @@ describe("executeSyncTask - cleanup on error paths", () => {
     })
   })
 
+  test("retries sync session on async provider model-not-found poll error", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const createdSessions: string[] = []
+    const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
+    const polledSessions: string[] = []
+
+    const deps = {
+      createSyncSession: async () => {
+        const sessionID = createdSessions.length === 0 ? "ses_model_missing_first" : "ses_model_missing_second"
+        createdSessions.push(sessionID)
+        return { ok: true as const, sessionID }
+      },
+      sendSyncPrompt: async (_client: unknown, input: { categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
+        attemptedModels.push(input.categoryModel)
+        return null
+      },
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
+        polledSessions.push(input.sessionID)
+        return input.sessionID === "ses_model_missing_first"
+          ? "Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?"
+          : null
+      },
+      fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "unspecified-low",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    const initialModel = {
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+      variant: "medium",
+    }
+    const fallbackChain = [
+      { providers: ["openai"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai"], model: "gpt-5.3-codex-spark" },
+    ]
+
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
+
+    expect(createdSessions).toEqual(["ses_model_missing_first", "ses_model_missing_second"])
+    expect(polledSessions).toEqual(["ses_model_missing_first", "ses_model_missing_second"])
+    expect(attemptedModels).toEqual([
+      { providerID: "openai", modelID: "gpt-5.3-codex", variant: "medium" },
+      { providerID: "openai", modelID: "gpt-5.3-codex-spark", variant: undefined },
+    ])
+    expect(result).toContain("Result from ses_model_missing_second")
+    expect(deleteCalls).toContain("ses_model_missing_first")
+  })
+
   test("#given no fallback chain #when poll returns retryable runtime error #then returns poll error without creating retry session", async () => {
     //#given
     const mockClient = {

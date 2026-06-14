@@ -57,7 +57,7 @@ export function createModelFallbackContinuationController(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
   lastKnownModelBySession: Map<string, { providerID: string; modelID: string }>;
-  continuationsInFlight: Set<string>;
+  continuationsInFlight: Map<string, Promise<boolean>>;
   lastDispatchedContinuationKeys: Map<string, FallbackContinuationDedupeState>;
 }) {
   const { pluginConfig, pluginContext, lastKnownModelBySession, continuationsInFlight } = args;
@@ -118,16 +118,17 @@ export function createModelFallbackContinuationController(args: {
     return state.providerModelKeys.has(keys.providerModelKey) || state.providerlessModelKeys.has(keys.modelKey);
   };
 
-  const shouldSkipFallbackContinuation = (
+  const getExistingFallbackContinuationResult = (
     sessionID: string,
     source: string,
     fallbackContext?: FallbackContinuationContext,
-  ): boolean => {
+  ): Promise<boolean> | boolean | undefined => {
     const fallbackKeys = getFallbackContinuationKeys(fallbackContext);
+    const inFlight = continuationsInFlight.get(sessionID);
 
-    if (continuationsInFlight.has(sessionID)) {
+    if (inFlight) {
       log("[event] model-fallback continuation skipped because one is already in flight", { sessionID, source });
-      return true;
+      return inFlight;
     }
 
     const lastDispatchedKeys = lastDispatchedContinuationKeys.get(sessionID);
@@ -139,7 +140,7 @@ export function createModelFallbackContinuationController(args: {
       return true;
     }
 
-    return false;
+    return undefined;
   };
 
   const markDispatched = (sessionID: string, fallbackContext?: FallbackContinuationContext): void => {
@@ -159,83 +160,95 @@ export function createModelFallbackContinuationController(args: {
     sessionID: string,
     source: string,
     fallbackContext?: FallbackContinuationContext,
-  ): Promise<void> => {
-    if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return;
+  ): Promise<boolean> => {
+    const existingResult = getExistingFallbackContinuationResult(sessionID, source, fallbackContext);
+    if (existingResult !== undefined) return existingResult;
 
-    continuationsInFlight.add(sessionID);
     let dispatched = false;
-    try {
+    const continuationResult = (async (): Promise<boolean> => {
       try {
-        await pluginContext.client.session.abort({ path: { id: sessionID } });
-      } catch (error) {
-        log("[event] model-fallback abort failed", {
-          sessionID,
-          source,
-          error: error instanceof Error ? error : String(error),
+        try {
+          await pluginContext.client.session.abort({ path: { id: sessionID } });
+        } catch (error) {
+          log("[event] model-fallback abort failed", {
+            sessionID,
+            source,
+            error: error instanceof Error ? error : String(error),
+          });
+          return false;
+        }
+        releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
+          reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
+          reservedByPrefix: "model-fallback:",
         });
-        return;
-      }
-      releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
-        reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
-        reservedByPrefix: "model-fallback:",
-      });
 
-      const launchAgent = fallbackContext?.agentName
-        ? resolveRegisteredAgentName(fallbackContext.agentName)
-        : undefined;
-      const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
-        ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
-        : undefined;
-      const agentConfigKey = fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : undefined;
-      const agentSettings = agentConfigKey
-        ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
-        : undefined;
-      const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
-      const promptBody = {
-        path: { id: sessionID },
-        body: {
-          ...(launchAgent ? { agent: launchAgent } : {}),
-          ...(launchModel ? { model: launchModel } : {}),
-          ...(launchVariant ? { variant: launchVariant } : {}),
-          parts: [createInternalAgentContinuationTextPart("continue")],
-        },
-        query: { directory: pluginContext.directory },
-      };
+        const launchAgent = fallbackContext?.agentName
+          ? resolveRegisteredAgentName(fallbackContext.agentName)
+          : undefined;
+        const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
+          ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
+          : undefined;
+        const agentConfigKey = fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : undefined;
+        const agentSettings = agentConfigKey
+          ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
+          : undefined;
+        const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+        const promptBody = {
+          path: { id: sessionID },
+          body: {
+            ...(launchAgent ? { agent: launchAgent } : {}),
+            ...(launchModel ? { model: launchModel } : {}),
+            ...(launchVariant ? { variant: launchVariant } : {}),
+            parts: [createInternalAgentContinuationTextPart("continue")],
+          },
+          query: { directory: pluginContext.directory },
+        };
 
-      const mode = typeof pluginContext.client.session.promptAsync === "function" ? "async" : "sync";
-      const promptResult = await dispatchInternalPrompt({
-        mode,
-        client: pluginContext.client,
-        sessionID,
-        source: mode === "async" ? `model-fallback:${source}` : `model-fallback:${source}:sync`,
-        queueBehavior: "defer",
-        input: promptBody,
-      });
-      if (isInternalPromptDispatchAccepted(promptResult)) {
-        dispatched = true;
-      } else if (promptResult.status === "failed") {
-        if (isAmbiguousPostDispatchPromptFailure(promptResult)) dispatched = true;
-        log(`[event] model-fallback ${mode === "async" ? "promptAsync" : "prompt"} failed`, {
+        const mode = typeof pluginContext.client.session.promptAsync === "function" ? "async" : "sync";
+        const promptResult = await dispatchInternalPrompt({
+          mode,
+          client: pluginContext.client,
           sessionID,
-          source,
-          error: promptResult.error,
+          source: mode === "async" ? `model-fallback:${source}` : `model-fallback:${source}:sync`,
+          queueBehavior: "defer",
+          input: promptBody,
         });
-      } else {
-        log(`[event] model-fallback ${mode === "async" ? "promptAsync" : "prompt"} skipped by gate`, {
-          sessionID,
-          source,
-          status: promptResult.status,
-        });
+        if (isInternalPromptDispatchAccepted(promptResult)) {
+          dispatched = true;
+        } else if (promptResult.status === "failed") {
+          if (isAmbiguousPostDispatchPromptFailure(promptResult)) dispatched = true;
+          log(`[event] model-fallback ${mode === "async" ? "promptAsync" : "prompt"} failed`, {
+            sessionID,
+            source,
+            error: promptResult.error,
+          });
+        } else {
+          log(`[event] model-fallback ${mode === "async" ? "promptAsync" : "prompt"} skipped by gate`, {
+            sessionID,
+            source,
+            status: promptResult.status,
+          });
+        }
+        return dispatched;
+      } finally {
+        if (dispatched) markDispatched(sessionID, fallbackContext);
       }
-    } finally {
-      if (dispatched) markDispatched(sessionID, fallbackContext);
-      continuationsInFlight.delete(sessionID);
-    }
+    })();
+    continuationsInFlight.set(sessionID, continuationResult);
+    void continuationResult.then(
+      () => {
+        if (continuationsInFlight.get(sessionID) === continuationResult) continuationsInFlight.delete(sessionID);
+      },
+      () => {
+        if (continuationsInFlight.get(sessionID) === continuationResult) continuationsInFlight.delete(sessionID);
+      },
+    );
+    return continuationResult;
   };
 
   return {
     autoContinueAfterFallback,
+    getExistingFallbackContinuationResult,
     resolveFallbackProviderID,
-    shouldSkipFallbackContinuation,
   };
 }

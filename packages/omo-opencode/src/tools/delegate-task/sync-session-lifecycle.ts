@@ -5,6 +5,7 @@ import {
 } from "../../shared/delegated-child-session-bootstrap"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearDelegateTaskSyncSession, clearSyncSessionError, registerDelegateTaskSyncSession } from "../../shared/sync-session-error-store"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildTaskPrompt } from "./prompt-builder"
 import { buildSyncPromptTools } from "./sync-prompt-sender"
@@ -19,6 +20,8 @@ export async function registerSyncSessionSideEffects(input: {
   readonly fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
   readonly systemContent: string | undefined
 }): Promise<void> {
+  clearSyncSessionError(input.sessionID)
+  registerDelegateTaskSyncSession(input.sessionID)
   subagentSessions.add(input.sessionID)
   syncSubagentSessions.add(input.sessionID)
   handedBackSyncSessions.delete(input.sessionID)
@@ -58,6 +61,8 @@ export function cleanupSyncSessionSideEffects(
 ): void {
   subagentSessions.delete(sessionID)
   syncSubagentSessions.delete(sessionID)
+  clearSyncSessionError(sessionID)
+  clearDelegateTaskSyncSession(sessionID)
   clearDelegatedChildSessionBootstrap(sessionID)
   executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(sessionID)
   SessionCategoryRegistry.remove(sessionID)

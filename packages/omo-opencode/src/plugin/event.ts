@@ -8,6 +8,7 @@ import { getMainSessionID, subagentSessions, syncSubagentSessions } from "../fea
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../shared/event-session-id";
 import { log } from "../shared/logger";
+import { isDelegateTaskSyncSession, recordSyncSessionError } from "../shared/sync-session-error-store";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { createUserAbortInterruptedRecoveryGuard } from "./user-abort-interrupted-recovery-guard";
@@ -253,9 +254,23 @@ export function createEventHandler(args: {
           messageID: props?.messageID as string | undefined,
           error,
         });
-        if (!recovered && sessionID) {
-          await modelFallbackHandler.handleSessionError({ sessionID, errorName, errorMessage, props });
+        if (recovered || !sessionID) {
+          await runEventHookSafely("teamMemberErrorHandler", teamHandlers.teamMemberErrorHandler, input);
+          return;
         }
+
+        const handledByModelFallback = await modelFallbackHandler.handleSessionError({
+          sessionID,
+          errorName,
+          errorMessage,
+          props,
+        });
+        if (handledByModelFallback) {
+          await runEventHookSafely("teamMemberErrorHandler", teamHandlers.teamMemberErrorHandler, input);
+          return;
+        }
+
+        if (isDelegateTaskSyncSession(sessionID)) recordSyncSessionError(sessionID, error);
       } catch (err) {
         const sessionID = resolveSessionEventID(props);
         log("[event] model-fallback error in session.error:", {
