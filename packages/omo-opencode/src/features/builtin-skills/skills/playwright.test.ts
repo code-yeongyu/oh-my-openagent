@@ -37,7 +37,8 @@ describe("playwright browser skill facade", () => {
 
     // then
     expect(playwrightFacade.playwrightSkill.name).toBe("playwright")
-    expect(playwrightFacade.playwrightSkill.description).toContain("MUST USE")
+    expect(playwrightFacade.playwrightSkill.description).not.toContain("MUST USE")
+    expect(playwrightFacade.playwrightSkill.description).toContain("Browser automation")
     expect(template).toStartWith("# Playwright Browser Automation")
     expect(template).not.toContain("---")
     expect(mcpConfig).toEqual({
