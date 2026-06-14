@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { type CheckpointUlwLoopArgs, checkpointUlwLoop } from "./checkpoint.js";
 import { hasFlag, parseCodexGoalJson, parseRecordEvidenceArgs, positionalText, readStdin, readValue } from "./cli-arg-parser.js";
-import { blockedDecisionHandoff, normalizeCodexGoalMode, printJson, printStatus, ULW_LOOP_HELP } from "./cli-output.js";
+import { blockedDecisionHandoff, normalizeCodexGoalMode, printJson, printJsonError, printStatus, ULW_LOOP_HELP } from "./cli-output.js";
 import { parseSteeringProposal, printSteerResult } from "./cli-steering.js";
 import { buildCodexGoalInstruction } from "./codex-goal-instruction.js";
 import { recordEvidence } from "./evidence.js";
@@ -32,7 +32,10 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 	const json = hasFlag(rest, "--json");
 	const scope = commandScope(rest);
 	try {
-		if (!isUlwLoopSubcommand(command)) { process.stdout.write(`${ULW_LOOP_HELP}\n`); return 1; }
+		if (!isUlwLoopSubcommand(command)) {
+			if (json) { printJsonError(new UlwLoopError(`Unknown ulw-loop subcommand: ${command}.`, "ULW_LOOP_SUBCOMMAND_UNKNOWN", { details: { command } })); return 1; }
+			process.stdout.write(`${ULW_LOOP_HELP}\n`); return 1;
+		}
 		switch (command) {
 			case "help": process.stdout.write(`${ULW_LOOP_HELP}\n`); return 0;
 			case "create-goals": return await createGoals(repoRoot, rest, json, scope);
@@ -47,6 +50,7 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 			default: return unhandledSubcommand(command);
 		}
 	} catch (error) {
+		if (json) { printJsonError(error); return 1; }
 		if (error instanceof UlwLoopError) process.stderr.write(`[ulw-loop] ${error.message}\n`);
 		else if (error instanceof Error) process.stderr.write(`[ulw-loop] unexpected: ${error.message}\n`);
 		else process.stderr.write("[ulw-loop] unknown error\n");
