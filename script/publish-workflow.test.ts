@@ -431,4 +431,33 @@ describe("test workflows", () => {
     }
   })
 
+  test("matches the canonical platform set in optionalDependencies and on-disk platform packages", () => {
+    // #given
+    const rootManifest: { optionalDependencies?: Record<string, string> } = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    )
+    const buildBinariesPlatforms = PLATFORMS.map((entry) => entry.platform).sort()
+    const platformPrefix = "oh-my-opencode-"
+
+    const optionalDependencyPlatforms = Object.keys(rootManifest.optionalDependencies ?? {})
+      .filter((name) => name.startsWith(platformPrefix))
+      .map((name) => name.slice(platformPrefix.length))
+      .sort()
+
+    const onDiskPlatforms = readdirSync(new URL("../packages/", import.meta.url))
+      .filter((name) => name.startsWith(platformPrefix))
+      .map((name) => name.slice(platformPrefix.length))
+      .sort()
+
+    // #when / #then
+    expect(
+      optionalDependencyPlatforms,
+      "root optionalDependencies must list every canonical platform package",
+    ).toEqual(buildBinariesPlatforms)
+    expect(
+      onDiskPlatforms,
+      "packages/ must contain a directory for every canonical platform package",
+    ).toEqual(buildBinariesPlatforms)
+  })
+
 })
