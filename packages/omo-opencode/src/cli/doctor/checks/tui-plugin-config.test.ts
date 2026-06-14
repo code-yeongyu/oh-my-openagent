@@ -66,7 +66,9 @@ describe("tui-plugin-config check", () => {
   })
 
   it("passes when both server and TUI entries are registered", async () => {
-    //#given opencode.json has the server entry and tui.json has the TUI entry
+    //#given opencode.json has the server entry, the installed package exports ./tui,
+    //#      and tui.json has the TUI entry
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
     writeOpenCodeConfig([PLUGIN_NAME])
     writeTuiConfig([`${PLUGIN_NAME}/tui`])
 
