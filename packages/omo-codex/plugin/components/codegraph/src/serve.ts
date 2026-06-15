@@ -2,13 +2,13 @@
 import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { env as processEnv, stderr as processStderr } from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
-import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/resolve.ts";
-import type { CodegraphCommandResolution } from "../../../../../utils/src/codegraph/resolve.ts";
+import { buildCodegraphEnv } from "./codegraph-env.js";
+import { resolveCodegraphCommand } from "./codegraph-resolve.js";
+import type { CodegraphCommandResolution } from "./codegraph-resolve.js";
 
 export type ServeStdio = "inherit";
 
@@ -105,5 +105,8 @@ if (isDirectInvocation(process.argv[1])) {
 
 function isDirectInvocation(argvPath: string | undefined): boolean {
 	if (argvPath === undefined) return false;
-	return realpathSync(resolve(argvPath)) === realpathSync(fileURLToPath(import.meta.url));
+	const modulePath = fileURLToPath(import.meta.url);
+	const moduleName = basename(modulePath);
+	if (moduleName !== "serve.js" && moduleName !== "serve.ts") return false;
+	return realpathSync(resolve(argvPath)) === realpathSync(modulePath);
 }

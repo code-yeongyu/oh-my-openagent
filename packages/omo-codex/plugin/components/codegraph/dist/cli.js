@@ -4,11 +4,11 @@
 import { spawn } from "node:child_process";
 import { existsSync as existsSync2, realpathSync } from "node:fs";
 import { homedir as homedir3 } from "node:os";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { env as processEnv, stderr as processStderr } from "node:process";
 import { fileURLToPath } from "node:url";
 
-// ../../utils/src/codegraph/env.ts
+// components/codegraph/src/codegraph-env.ts
 import { homedir } from "node:os";
 import { join } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
@@ -25,78 +25,11 @@ function buildCodegraphEnv(options = {}) {
   };
 }
 
-// ../../utils/src/codegraph/resolve.ts
-import { existsSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { dirname, join as join3 } from "node:path";
+// components/codegraph/src/codegraph-resolve.ts
+import { accessSync, constants, existsSync } from "node:fs";
 import { createRequire } from "node:module";
-
-// ../../utils/src/runtime/which.ts
-import { accessSync, constants } from "node:fs";
-import { delimiter, join as join2 } from "node:path";
-var runtime = globalThis;
-function isUnsafeCommandName(commandName) {
-  if (commandName.includes("/") || commandName.includes("\\"))
-    return true;
-  if (commandName === "." || commandName === ".." || commandName.includes(".."))
-    return true;
-  if (/^[a-zA-Z]:/.test(commandName))
-    return true;
-  if (commandName.includes("\x00"))
-    return true;
-  return false;
-}
-function isExecutable(filePath) {
-  try {
-    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return true;
-  } catch (error) {
-    if (!(error instanceof Error) && Object.prototype.toString.call(error) !== "[object Error]") {
-      throw error;
-    }
-    return false;
-  }
-}
-function resolvePathValue() {
-  if (process.platform === "win32")
-    return process.env.Path ?? process.env.PATH;
-  return process.env.PATH;
-}
-function getWindowsCandidates(commandName) {
-  if (process.platform !== "win32")
-    return [commandName];
-  if (/\.[^\\/]+$/.test(commandName))
-    return [commandName];
-  return [commandName, `${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`];
-}
-function bunWhich(commandName) {
-  if (!commandName)
-    return null;
-  if (isUnsafeCommandName(commandName))
-    return null;
-  const candidateNames = getWindowsCandidates(commandName);
-  for (const candidateName of candidateNames) {
-    const resolvedPath = runtime.Bun?.which(candidateName) ?? null;
-    if (resolvedPath !== null)
-      return resolvedPath;
-  }
-  const pathValue = resolvePathValue();
-  if (!pathValue)
-    return null;
-  const pathEntries = pathValue.split(delimiter).filter((pathEntry) => pathEntry.length > 0);
-  if (pathEntries.length === 0)
-    return null;
-  for (const pathEntry of pathEntries) {
-    for (const candidateName of candidateNames) {
-      const candidatePath = join2(pathEntry, candidateName);
-      if (isExecutable(candidatePath))
-        return candidatePath;
-    }
-  }
-  return null;
-}
-
-// ../../utils/src/codegraph/resolve.ts
+import { homedir as homedir2 } from "node:os";
+import { delimiter, dirname, join as join2 } from "node:path";
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
 var requireFromHere = createRequire(import.meta.url);
@@ -109,8 +42,8 @@ function defaultNodeRuntime() {
 function defaultProvisionedBin(homeDir, fileExists) {
   const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph";
   const candidates = [
-    join3(homeDir, ".omo", "codegraph", "bin", binaryName),
-    join3(homeDir, ".omo", "codegraph", "node-servers", "node_modules", ".bin", binaryName)
+    join2(homeDir, ".omo", "codegraph", "bin", binaryName),
+    join2(homeDir, ".omo", "codegraph", "node-servers", "node_modules", ".bin", binaryName)
   ];
   return candidates.find((candidate) => fileExists(candidate)) ?? null;
 }
@@ -118,19 +51,61 @@ function resolveBundledShim(requireResolve, fileExists) {
   try {
     const packageJson = requireResolve(`${CODEGRAPH_PACKAGE}/package.json`);
     const packageRoot = dirname(packageJson);
-    const candidates = [join3(packageRoot, "bin", "codegraph.js"), join3(packageRoot, "npm-shim.js")];
+    const candidates = [join2(packageRoot, "bin", "codegraph.js"), join2(packageRoot, "npm-shim.js")];
     return candidates.find((candidate) => fileExists(candidate)) ?? null;
   } catch (error) {
     if (error instanceof Error)
       return null;
-    if (error === null || error === undefined)
-      return null;
-    if (typeof error === "object" || typeof error === "string" || typeof error === "number")
-      return null;
-    if (typeof error === "boolean" || typeof error === "bigint" || typeof error === "symbol")
-      return null;
-    return null;
+    throw error;
   }
+}
+function isUnsafeCommandName(commandName) {
+  if (commandName.includes("/") || commandName.includes("\\"))
+    return true;
+  if (commandName === "." || commandName === ".." || commandName.includes(".."))
+    return true;
+  if (/^[a-zA-Z]:/.test(commandName))
+    return true;
+  return commandName.includes("\x00");
+}
+function isExecutable(filePath) {
+  try {
+    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK);
+    return true;
+  } catch (error) {
+    if (error instanceof Error)
+      return false;
+    throw error;
+  }
+}
+function resolvePathValue(env) {
+  if (process.platform === "win32")
+    return env["Path"] ?? env["PATH"];
+  return env["PATH"];
+}
+function getWindowsCandidates(commandName) {
+  if (process.platform !== "win32")
+    return [commandName];
+  if (/\.[^\\/]+$/.test(commandName))
+    return [commandName];
+  return [commandName, `${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`];
+}
+function findOnPath(commandName, env) {
+  if (commandName.length === 0 || isUnsafeCommandName(commandName))
+    return null;
+  const pathValue = resolvePathValue(env);
+  if (pathValue === undefined || pathValue.length === 0)
+    return null;
+  const candidateNames = getWindowsCandidates(commandName);
+  const pathEntries = pathValue.split(delimiter).filter((pathEntry) => pathEntry.length > 0);
+  for (const pathEntry of pathEntries) {
+    for (const candidateName of candidateNames) {
+      const candidatePath = join2(pathEntry, candidateName);
+      if (isExecutable(candidatePath))
+        return candidatePath;
+    }
+  }
+  return null;
 }
 function resolveCodegraphCommand(options = {}) {
   const env = options.env ?? process.env;
@@ -141,15 +116,15 @@ function resolveCodegraphCommand(options = {}) {
   const fileExists = options.fileExists ?? existsSync;
   const nodeRuntime = options.nodeRuntime ?? defaultNodeRuntime;
   const bundled = resolveBundledShim(options.requireResolve ?? defaultRequireResolve, fileExists);
-  const runtime2 = nodeRuntime();
-  if (bundled !== null && runtime2 !== null) {
-    return { argsPrefix: [bundled], command: runtime2, exists: true, source: "bundled" };
+  const runtime = nodeRuntime();
+  if (bundled !== null && runtime !== null) {
+    return { argsPrefix: [bundled], command: runtime, exists: true, source: "bundled" };
   }
   const provisioned = options.provisioned?.() ?? defaultProvisionedBin(options.homeDir ?? homedir2(), fileExists);
   if (provisioned !== null && fileExists(provisioned)) {
     return { argsPrefix: [], command: provisioned, exists: true, source: "provisioned" };
   }
-  const pathCommand = (options.which ?? bunWhich)("codegraph");
+  const pathCommand = (options.which ?? ((commandName) => findOnPath(commandName, env)))("codegraph");
   return {
     argsPrefix: [],
     command: pathCommand ?? "codegraph",
@@ -216,7 +191,11 @@ if (isDirectInvocation(process.argv[1])) {
 function isDirectInvocation(argvPath) {
   if (argvPath === undefined)
     return false;
-  return realpathSync(resolve(argvPath)) === realpathSync(fileURLToPath(import.meta.url));
+  const modulePath = fileURLToPath(import.meta.url);
+  const moduleName = basename(modulePath);
+  if (moduleName !== "serve.js" && moduleName !== "serve.ts")
+    return false;
+  return realpathSync(resolve(argvPath)) === realpathSync(modulePath);
 }
 
 // components/codegraph/src/cli.ts
