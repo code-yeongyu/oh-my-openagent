@@ -162,6 +162,100 @@ claude project body.
       }
     })
 
+    it("prioritizes project Claude ulw-plan over shared ulw-plan", async () => {
+      const originalCwd = process.cwd()
+      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+
+      const opencodeConfigDir = join(TEST_DIR, "opencode-global")
+      const projectClaudeUlwPlanDir = join(TEST_DIR, ".claude", "skills", "ulw-plan")
+
+      process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
+      process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
+
+      mkdirSync(projectClaudeUlwPlanDir, { recursive: true })
+      writeFileSync(
+        join(projectClaudeUlwPlanDir, "SKILL.md"),
+        `---
+name: ulw-plan
+description: From project Claude ulw-plan (should win over shared)
+---
+project Claude ulw-plan body.
+`
+      )
+
+      const { discoverSkills } = await import("./loader")
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills()
+        const matches = skills.filter(s => s.name === "ulw-plan")
+
+        expect(matches).toHaveLength(1)
+        expect(matches[0]?.scope).toBe("project")
+        expect(matches[0]?.definition.description).toContain("project Claude")
+      } finally {
+        process.chdir(originalCwd)
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
+      }
+    })
+
+    it("prioritizes project Agents ulw-plan over shared ulw-plan", async () => {
+      const originalCwd = process.cwd()
+      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+
+      const opencodeConfigDir = join(TEST_DIR, "opencode-global")
+      const projectAgentsUlwPlanDir = join(TEST_DIR, ".agents", "skills", "ulw-plan")
+
+      process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
+      process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
+
+      mkdirSync(projectAgentsUlwPlanDir, { recursive: true })
+      writeFileSync(
+        join(projectAgentsUlwPlanDir, "SKILL.md"),
+        `---
+name: ulw-plan
+description: From project Agents ulw-plan (should win over shared)
+---
+project Agents ulw-plan body.
+`
+      )
+
+      const { discoverSkills } = await import("./loader")
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills()
+        const matches = skills.filter(s => s.name === "ulw-plan")
+
+        expect(matches).toHaveLength(1)
+        expect(matches[0]?.scope).toBe("project")
+        expect(matches[0]?.definition.description).toContain("project Agents")
+      } finally {
+        process.chdir(originalCwd)
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
+      }
+    })
+
     it("returns no duplicates from discoverSkills", async () => {
       const originalCwd = process.cwd()
       const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
