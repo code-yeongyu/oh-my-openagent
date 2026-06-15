@@ -70,7 +70,7 @@ export interface DiscoverSkillsOptions {
   directory?: string
 }
 
-function createSharedCanonicalAliases(skills: LoadedSkill[]): LoadedSkill[] {
+export function createSharedCanonicalAliases(skills: LoadedSkill[]): LoadedSkill[] {
   return skills.map((skill) => {
     const name = `shared/${skill.name}`
     return {

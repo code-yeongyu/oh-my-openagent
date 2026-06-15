@@ -14,6 +14,9 @@ import {
   discoverOpencodeProjectSkills,
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
+  discoverSharedSkills,
+  createSharedCanonicalAliases,
+  isDisabledSkillAlias,
   mergeSkills,
   readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
@@ -49,6 +52,27 @@ function filterProviderGatedSkills(
   })
 }
 
+function filterDisabledSkills(
+  skills: LoadedSkill[],
+  disabledSkills: ReadonlySet<string>,
+): LoadedSkill[] {
+  if (disabledSkills.size === 0) return skills
+
+  return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
+}
+
+function filterProtectedSharedAliasCollisions(
+  skills: LoadedSkill[],
+  protectedSharedAliasNames: ReadonlySet<string>,
+): LoadedSkill[] {
+  if (protectedSharedAliasNames.size === 0) return skills
+
+  return skills.filter((skill) => {
+    if (skill.scope === "shared") return true
+    return !protectedSharedAliasNames.has(skill.name)
+  })
+}
+
 export async function createSkillContext(args: {
   directory: string
   pluginConfig: OhMyOpenCodeConfig
@@ -78,6 +102,7 @@ export async function createSkillContext(args: {
     opencodeProjectSkills,
     agentsProjectSkills,
     agentsGlobalSkills,
+    sharedSkills,
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: pluginConfig.skills,
@@ -93,6 +118,7 @@ export async function createSkillContext(args: {
     discoverOpencodeProjectSkills(directory),
     discoverProjectAgentsSkills(directory),
     discoverGlobalAgentsSkills(),
+    discoverSharedSkills(),
   ])
 
   // Host-config skills (read from opencode.jsonc skills.paths) take precedence
@@ -124,15 +150,51 @@ export async function createSkillContext(args: {
     agentsGlobalSkills,
     browserProvider,
   )
+  const activeConfigSourceSkills = filterDisabledSkills(filteredConfigSourceSkills, disabledSkills)
+  const activeUserSkills = filterDisabledSkills(filteredUserSkills, disabledSkills)
+  const activeGlobalSkills = filterDisabledSkills(filteredGlobalSkills, disabledSkills)
+  const activeProjectSkills = filterDisabledSkills(filteredProjectSkills, disabledSkills)
+  const activeOpencodeProjectSkills = filterDisabledSkills(
+    filteredOpencodeProjectSkills,
+    disabledSkills,
+  )
+  const activeAgentsProjectSkills = filterDisabledSkills(
+    filteredAgentsProjectSkills,
+    disabledSkills,
+  )
+  const activeAgentsGlobalSkills = filterDisabledSkills(
+    filteredAgentsGlobalSkills,
+    disabledSkills,
+  )
+  const sharedSkillAliases = createSharedCanonicalAliases(sharedSkills)
+  const protectedSharedAliasNames = new Set(sharedSkillAliases.map((skill) => skill.name))
+  const filteredSharedSkills = filterDisabledSkills(
+    filterProviderGatedSkills(sharedSkills, browserProvider),
+    disabledSkills,
+  )
+  const filteredSharedSkillAliases = filterDisabledSkills(
+    filterProviderGatedSkills(sharedSkillAliases, browserProvider),
+    disabledSkills,
+  )
 
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    filteredConfigSourceSkills,
-    [...filteredUserSkills, ...filteredAgentsGlobalSkills],
-    filteredGlobalSkills,
-    [...filteredProjectSkills, ...filteredAgentsProjectSkills],
-    filteredOpencodeProjectSkills,
+    filterProtectedSharedAliasCollisions(activeConfigSourceSkills, protectedSharedAliasNames),
+    [
+      ...filterProtectedSharedAliasCollisions(
+        [...activeUserSkills, ...activeAgentsGlobalSkills],
+        protectedSharedAliasNames,
+      ),
+      ...filteredSharedSkillAliases,
+      ...filteredSharedSkills,
+    ],
+    filterProtectedSharedAliasCollisions(activeGlobalSkills, protectedSharedAliasNames),
+    filterProtectedSharedAliasCollisions(
+      [...activeProjectSkills, ...activeAgentsProjectSkills],
+      protectedSharedAliasNames,
+    ),
+    filterProtectedSharedAliasCollisions(activeOpencodeProjectSkills, protectedSharedAliasNames),
     { configDir: directory },
   )
 
