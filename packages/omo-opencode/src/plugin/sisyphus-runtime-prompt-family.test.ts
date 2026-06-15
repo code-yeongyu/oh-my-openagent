@@ -33,8 +33,12 @@ describe("Sisyphus runtime prompt family reconciliation (#5297)", () => {
     expect(joined).toContain(GPT_FILE_EDIT_GUIDANCE)
   })
 
-  test("#given non-GPT file-edit guidance baked #when runtime model is GPT #then guidance is upgraded to apply_patch", async () => {
-    // given: configured non-GPT model baked the tool-agnostic guidance
+  test("#given the tool-agnostic guidance string is present #when runtime model is GPT #then the helper rewrites it to apply_patch", async () => {
+    // NOTE: this exercises the reverse-direction helper behavior on a synthetic
+    // input. The real non-GPT Sisyphus prompt does not bake GPT_FILE_EDIT_GUIDANCE
+    // (it carries no file-edit guidance line at all), so this is not a proof of a
+    // real config-to-runtime reverse path - only that the swap is correct when
+    // such a string does appear (e.g. in the sisyphus-junior / hephaestus GPT prompts).
     const baked = [`Step 4. ${GPT_FILE_EDIT_GUIDANCE}`]
 
     // when: user switched to a GPT model in the TUI
@@ -64,7 +68,7 @@ describe("Sisyphus runtime prompt family reconciliation (#5297)", () => {
   })
 
   test("#given a real GPT-configured Sisyphus prompt #when run on a non-GPT model #then apply_patch is not forced (config-to-runtime mismatch)", async () => {
-    // given: this is the path issue #5258 tests missed — the prompt is actually
+    // given: this is the path issue #5258 tests missed. The prompt is actually
     // *built* for a GPT model (as it would be from oh-my-openagent.jsonc), then
     // assembled and passed through the runtime hook with a different model.
     const gptAgent = createSisyphusAgent("openai/gpt-5.5", [], [], [], [])

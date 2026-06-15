@@ -15,7 +15,7 @@ const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
  * The Sisyphus prompt body (incl. the file-edit guidance) is baked into the
  * agent config at registration time, based on the *configured* model in
  * `oh-my-openagent.jsonc`. When the user switches to a different model family in
- * the TUI, that baked guidance no longer matches the runtime model — e.g. a
+ * the TUI, that baked guidance no longer matches the runtime model, e.g. a
  * GPT-configured agent run on a non-GPT model still says "Use `apply_patch`",
  * even though `apply_patch` is not exposed (issue #5297).
  *
