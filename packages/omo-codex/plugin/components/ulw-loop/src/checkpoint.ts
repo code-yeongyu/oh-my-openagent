@@ -1,5 +1,5 @@
 // biome-ignore-all format: keep checkpoint orchestration below the pure LOC budget.
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -14,6 +14,8 @@ import { iso, ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER, UlwLoopError } from
 
 export interface CheckpointUlwLoopArgs { readonly goalId: string; readonly status: "complete" | "failed" | "blocked"; readonly evidence: string; readonly codexGoalJson?: string; readonly qualityGateJson?: string }
 export interface CheckpointUlwLoopResult { readonly plan: UlwLoopPlan; readonly goal: UlwLoopItem; readonly ledgerEntry: UlwLoopLedgerEntry; readonly aggregateCompletion?: UlwLoopAggregateCompletion }
+
+const QUALITY_GATE_FS = { existsSync, statSync } as const;
 
 function ulwLoopFail(message: string, code: string): never { throw new UlwLoopError(message, code); }
 function normalizeObjective(value: string): string { return value.replace(/\s+/g, " ").trim(); }
@@ -146,7 +148,7 @@ export async function checkpointUlwLoop(repoRoot: string, args: CheckpointUlwLoo
 				aggregateCompletion = makeAggregateCompletion(now, evidence, codexGoal);
 			}
 			if (final) aggregateCompletion = makeAggregateCompletion(now, evidence, codexGoal);
-			if (final || aggregateCompletion !== undefined) qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot));
+			if (final || aggregateCompletion !== undefined) qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), { repoRoot, fs: QUALITY_GATE_FS });
 			goal.status = "complete";
 			goal.completedAt = now;
 			goal.evidence = evidence;

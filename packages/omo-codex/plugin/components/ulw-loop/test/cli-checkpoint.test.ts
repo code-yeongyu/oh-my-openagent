@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,12 @@ let err: string[];
 let originalCodexSessionId: string | undefined;
 let originalCodexThreadId: string | undefined;
 let originalOmoSessionId: string | undefined;
+
+const QA_DIR = ".omo/ulw-loop/qa";
+const CODE_REVIEW_PATH = `${QA_DIR}/code-review.md`;
+const GATE_REVIEW_PATH = `${QA_DIR}/gate-review.md`;
+const CLI_PASS_PATH = `${QA_DIR}/cli-pass.txt`;
+const REJECTION_LOG_PATH = `${QA_DIR}/rejection.log`;
 
 beforeEach(async () => {
 	testDir = await mkdtemp(join(tmpdir(), "ug-cli-checkpoint-"));
@@ -81,6 +87,81 @@ async function passCriterion(goalId: string, criterionId: string): Promise<void>
 		]),
 	).toBe(0);
 	resetOutput();
+}
+
+async function qualityGateJson(missingArtifactPath: string): Promise<string> {
+	await mkdir(join(testDir, QA_DIR), { recursive: true });
+	await writeFile(join(testDir, CODE_REVIEW_PATH), "code review approved\n", "utf8");
+	await writeFile(join(testDir, GATE_REVIEW_PATH), "gate review approved\n", "utf8");
+	await writeFile(join(testDir, CLI_PASS_PATH), "cli scenario passed\n", "utf8");
+	await writeFile(join(testDir, REJECTION_LOG_PATH), "invalid checkpoint rejected\n", "utf8");
+	return JSON.stringify({
+		codeReview: {
+			by: "lazycodex-code-reviewer",
+			recommendation: "APPROVE",
+			codeQualityStatus: "CLEAR",
+			reportPath: CODE_REVIEW_PATH,
+			evidence: "Reviewed implementation and tests; no blockers remain.",
+			blockers: [],
+		},
+		manualQa: {
+			by: "lazycodex-qa-executor",
+			status: "passed",
+			evidence: "Ran CLI checkpoint validation with artifact-backed evidence.",
+			surfaceEvidence: [
+				{
+					id: "surface-cli-pass",
+					criterionRef: "C001",
+					surface: "cli",
+					invocation: "omo ulw-loop checkpoint --status complete",
+					verdict: "passed",
+					artifactRefs: ["artifact-cli-pass"],
+				},
+			],
+			adversarialCases: [
+				{
+					id: "adv-missing-artifact",
+					criterionRef: "C002",
+					scenario: "quality gate references a missing artifact",
+					expectedBehavior: "CLI rejects final completion with ULW_LOOP_QUALITY_GATE_INVALID",
+					verdict: "passed",
+					artifactRefs: ["artifact-cli-reject"],
+				},
+			],
+			artifactRefs: [
+				{
+					id: "artifact-cli-pass",
+					kind: "cli-transcript",
+					description: "CLI transcript for valid checkpoint.",
+					path: missingArtifactPath,
+				},
+				{
+					id: "artifact-cli-reject",
+					kind: "log",
+					description: "Log proving invalid checkpoint rejection.",
+					path: REJECTION_LOG_PATH,
+				},
+			],
+		},
+		gateReview: {
+			by: "lazycodex-gate-reviewer",
+			recommendation: "APPROVE",
+			reportPath: GATE_REVIEW_PATH,
+			evidence: "Verified all criteria and artifact evidence.",
+			blockers: [],
+		},
+		iteration: {
+			fullRerun: true,
+			status: "passed",
+			rerunCommands: ["bunx vitest run test/cli-checkpoint.test.ts"],
+			evidence: "Focused CLI checkpoint suite reran cleanly.",
+		},
+		criteriaCoverage: {
+			totalCriteria: 2,
+			passCount: 2,
+			adversarialClassesCovered: ["missing_artifact", "cli_checkpoint"],
+		},
+	});
 }
 
 describe("ulwLoopCommand checkpoint", () => {
@@ -162,5 +243,31 @@ describe("ulwLoopCommand checkpoint", () => {
 		).toBe(0);
 
 		expect(stdoutJson()).toMatchObject({ ok: true, goal: { id: "G002-goal-b", status: "blocked" } });
+	});
+
+	it("#given final completion with a missing quality-gate artifact #when checkpointed through CLI #then it is rejected", async () => {
+		await createPlan("- Goal A");
+		await passCriterion("G001-goal-a", "C001");
+		await passCriterion("G001-goal-a", "C002");
+		await passCriterion("G001-goal-a", "C003");
+
+		expect(
+			await ulwLoopCommand([
+				"checkpoint",
+				"--goal-id",
+				"G001-goal-a",
+				"--status",
+				"complete",
+				"--evidence",
+				"final implementation complete and quality gate passed",
+				"--codex-goal-json",
+				codexSnapshot("complete"),
+				"--quality-gate-json",
+				await qualityGateJson(`${QA_DIR}/missing.txt`),
+				"--json",
+			]),
+		).toBe(1);
+		expect(err.join("")).toBe("");
+		expect(stdoutJson()).toMatchObject({ ok: false, error: { code: "ULW_LOOP_QUALITY_GATE_INVALID" } });
 	});
 });
