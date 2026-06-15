@@ -24,6 +24,13 @@ const lazycodexAgentInvariants = new Map([
 		},
 	],
 	[
+		"lazycodex-clone-fidelity-reviewer.toml",
+		{
+			effort: "xhigh",
+			includes: [/recommendation/, /blockers/, /\.omo\/evidence\/<goal>-clone-fidelity\.md/],
+		},
+	],
+	[
 		"lazycodex-code-reviewer.toml",
 		{
 			effort: "xhigh",
@@ -61,6 +68,7 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 	assert.deepEqual(entries, [
 		"codex-ultrawork-reviewer.toml",
 		"explorer.toml",
+		"lazycodex-clone-fidelity-reviewer.toml",
 		"lazycodex-code-reviewer.toml",
 		"lazycodex-executor.toml",
 		"lazycodex-gate-reviewer.toml",
