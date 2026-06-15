@@ -5,7 +5,7 @@ export const QA_DIR = ".omo/ulw-loop/qa";
 export const CODE_REVIEW_PATH = `${QA_DIR}/code-review.md`;
 export const GATE_REVIEW_PATH = `${QA_DIR}/gate-review.md`;
 export const CLI_PASS_PATH = `${QA_DIR}/cli-pass.txt`;
-export const REJECTION_LOG_PATH = `${QA_DIR}/rejection.log`;
+export const REJECTION_LOG_PATH = `${QA_DIR}/rejection.txt`;
 export const MISSING_ARTIFACT_PATH = `${QA_DIR}/missing.txt`;
 
 export async function writeQualityGateArtifacts(repoRoot: string): Promise<void> {
