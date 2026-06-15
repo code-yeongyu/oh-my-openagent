@@ -141,12 +141,23 @@ test("#given LazyCodex reviewer prompts #when inspected #then anti-slop review c
 
 	assert.match(gateReviewer, /remove-ai-slops/);
 	assert.match(gateReviewer, /programming/);
-	assert.match(gateReviewer, /skill-perspective check occurred/);
-	assert.match(gateReviewer, /explain why unavailable/);
-	assert.match(gateReviewer, /code review report explicitly covers the overfit\/slop criterion/);
+	assert.match(gateReviewer, /load or consult/);
+	assert.match(gateReviewer, /documented criteria/);
+	assert.match(gateReviewer, /Run the `remove-ai-slops`/);
+	assert.match(gateReviewer, /Apply the `programming`/);
+	assert.match(gateReviewer, /overfit\/slop pass yourself/);
 	assert.match(gateReviewer, /tests that merely verify a requested removal/);
 	assert.match(gateReviewer, /deletion-only/);
 	assert.match(gateReviewer, /tautological/);
 	assert.match(gateReviewer, /implementation-mirroring tests/);
 	assert.match(gateReviewer, /unnecessary production extraction, parsing, or normalization/);
+
+	const directPassIndex = gateReviewer.indexOf("overfit/slop pass yourself");
+	const reportCoverageIndex = gateReviewer.indexOf("Then confirm the code review report");
+	assert.notEqual(directPassIndex, -1);
+	assert.notEqual(reportCoverageIndex, -1);
+	assert.ok(
+		directPassIndex < reportCoverageIndex,
+		"gate reviewer must perform the overfit/slop pass directly before checking report coverage",
+	);
 });
