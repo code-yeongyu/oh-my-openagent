@@ -1,8 +1,12 @@
 import { createHash, randomUUID } from "node:crypto"
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
+import { execFile } from "node:child_process"
+import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { homedir, hostname } from "node:os"
 import { basename, join } from "node:path"
+import { promisify } from "node:util"
+
+import { CODEGRAPH_PROVISION_MANIFEST } from "./manifest"
 
 export interface CodegraphProvisionAsset {
   readonly executableName: string
@@ -17,6 +21,7 @@ export interface CodegraphProvisionManifest {
 
 export interface EnsureCodegraphProvisionedOptions {
   readonly downloader?: (asset: CodegraphProvisionAsset) => Promise<Uint8Array>
+  readonly downloadTimeoutMs?: number
   readonly forceBadChecksum?: boolean
   readonly installDir?: string
   readonly lockDir: string
@@ -35,10 +40,8 @@ export interface CodegraphProvisionResult {
 
 const DEFAULT_LOCK_WAIT_MS = 5_000
 const DEFAULT_LOCK_STALE_MS = 120_000
-const DEFAULT_MANIFEST: CodegraphProvisionManifest = {
-  assets: {},
-  version: "1.0.1",
-}
+const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000
+const execFileAsync = promisify(execFile)
 
 function platformKey(): string {
   return `${process.platform}-${process.arch}`
@@ -60,12 +63,22 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error
 }
 
+async function removeEmptyDirectory(path: string): Promise<void> {
+  try {
+    await rmdir(path)
+  } catch (error) {
+    if (isErrnoException(error) && error.code === "ENOENT") return
+    if (isErrnoException(error) && error.code === "ENOTEMPTY") return
+    throw error
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function defaultDownloader(asset: CodegraphProvisionAsset): Promise<Uint8Array> {
-  const response = await fetch(asset.url)
+async function defaultDownloader(asset: CodegraphProvisionAsset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS): Promise<Uint8Array> {
+  const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) })
   if (!response.ok) throw new Error(`download failed with HTTP ${response.status}`)
   return new Uint8Array(await response.arrayBuffer())
 }
@@ -128,33 +141,55 @@ async function acquireLock(lockPath: string, waitMs: number, staleMs: number): P
   return null
 }
 
-async function installAsset(
-  asset: CodegraphProvisionAsset,
-  installDir: string,
-  downloader: (asset: CodegraphProvisionAsset) => Promise<Uint8Array>,
-  version: string,
-): Promise<string> {
+async function extractTarGz(archivePath: string, destinationDir: string): Promise<void> {
+  await execFileAsync("tar", ["-xzf", archivePath, "-C", destinationDir])
+}
+
+async function installExtractedBundle(extractDir: string, installDir: string, executableName: string): Promise<string> {
+  const roots = await readdir(extractDir)
+  if (roots.length !== 1) throw new Error(`CodeGraph archive should contain one root directory, found ${roots.length}`)
+  const bundleDir = join(extractDir, roots[0] ?? "")
+  const bundleEntries = await readdir(bundleDir)
+  await mkdir(installDir, { recursive: true })
+  for (const entry of bundleEntries) {
+    await rm(join(installDir, entry), { force: true, recursive: true })
+    await rename(join(bundleDir, entry), join(installDir, entry))
+  }
+
+  const destination = join(installDir, "bin", executableName)
+  if (!existsSync(destination)) throw new Error(`CodeGraph archive did not contain bin/${executableName}`)
+  await chmod(destination, 0o755)
+  return destination
+}
+
+async function installAsset(layout: {
+  readonly asset: CodegraphProvisionAsset
+  readonly downloader: (asset: CodegraphProvisionAsset) => Promise<Uint8Array>
+  readonly installDir: string
+  readonly version: string
+}): Promise<string> {
+  const { asset, downloader, installDir, version } = layout
   const stagingDir = join(installDir, ".staging", randomUUID())
-  const destination = join(installDir, "bin", asset.executableName)
+  const archivePath = join(stagingDir, basename(asset.url))
+  const extractDir = join(stagingDir, "extract")
   try {
-    await mkdir(stagingDir, { recursive: true })
+    await mkdir(extractDir, { recursive: true })
     const bytes = await downloader(asset)
     const actualChecksum = sha256(bytes)
     if (actualChecksum !== asset.sha256) {
       throw new Error(`checksum mismatch for ${basename(asset.url)}: expected ${asset.sha256}, got ${actualChecksum}`)
     }
 
-    const staged = join(stagingDir, asset.executableName)
-    await writeFile(staged, bytes)
-    await chmod(staged, 0o755)
-    await mkdir(join(installDir, "bin"), { recursive: true })
-    await rm(destination, { force: true })
-    await rename(staged, destination)
+    if (!asset.url.endsWith(".tar.gz")) throw new Error(`unsupported CodeGraph archive type for ${basename(asset.url)}`)
+    await writeFile(archivePath, bytes)
+    await extractTarGz(archivePath, extractDir)
+    const destination = await installExtractedBundle(extractDir, installDir, asset.executableName)
     await mkdir(join(installDir, ".provisioned"), { recursive: true })
     await writeFile(markerPath(installDir, version), `${JSON.stringify({ binPath: destination, version })}\n`)
     return destination
   } finally {
     await rm(stagingDir, { force: true, recursive: true })
+    await removeEmptyDirectory(join(installDir, ".staging"))
   }
 }
 
@@ -163,9 +198,10 @@ export async function ensureCodegraphProvisioned(
 ): Promise<CodegraphProvisionResult> {
   const forced = forcedBadChecksumOptions(options)
   const installDir = forced?.installDir ?? options.installDir ?? defaultInstallDir()
-  const manifest = forced?.manifest ?? options.manifest ?? DEFAULT_MANIFEST
+  const manifest = forced?.manifest ?? options.manifest ?? CODEGRAPH_PROVISION_MANIFEST
   const activePlatformKey = forced?.platformKey ?? options.platformKey ?? platformKey()
-  const downloader = forced?.downloader ?? options.downloader ?? defaultDownloader
+  const downloader =
+    forced?.downloader ?? options.downloader ?? ((asset) => defaultDownloader(asset, options.downloadTimeoutMs))
   const marker = markerPath(installDir, options.version)
   const existing = await readMarker(marker)
   if (existing !== null) return { binPath: existing, provisioned: true }
@@ -191,7 +227,7 @@ export async function ensureCodegraphProvisioned(
       return { error: `no CodeGraph ${options.version} asset for ${activePlatformKey}`, provisioned: false }
     }
 
-    const binPath = await installAsset(asset, installDir, downloader, options.version)
+    const binPath = await installAsset({ asset, downloader, installDir, version: options.version })
     return { binPath, provisioned: true }
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error), provisioned: false }
