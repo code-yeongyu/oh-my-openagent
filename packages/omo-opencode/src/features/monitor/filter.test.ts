@@ -104,6 +104,30 @@ describe("createMonitorFilter", () => {
       expect(result.error).toContain("unsafe")
     })
 
+    test('#when an interposed bare group hides the nested quantifier "((a+))+$" #then it still rejects', () => {
+      // given
+      const pattern = "((a+))+$"
+
+      // when
+      const result = createMonitorFilter(pattern, { patternMaxLength: 512 })
+
+      // then
+      expect(result.filter).toBeNull()
+      expect(result.error).toContain("unsafe")
+    })
+
+    test('#when the danger is two groups deep "(((a*)))+" #then it still rejects', () => {
+      // given
+      const pattern = "(((a*)))+"
+
+      // when
+      const result = createMonitorFilter(pattern, { patternMaxLength: 512 })
+
+      // then
+      expect(result.filter).toBeNull()
+      expect(result.error).toContain("unsafe")
+    })
+
     test("#when a rejected pattern would otherwise hang #then matching never runs the unsafe regex", () => {
       // given
       const result = createMonitorFilter("(a+)+$", { patternMaxLength: 512 })

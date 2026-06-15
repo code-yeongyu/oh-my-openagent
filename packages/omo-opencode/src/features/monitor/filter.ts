@@ -87,7 +87,7 @@ function isPotentiallyCatastrophicRegex(pattern: string): boolean {
       if (quant.repeated && frame?.hasUnboundedQuant) {
         return true
       }
-      if (quant.unbounded && groupStack.length > 0) {
+      if (groupStack.length > 0 && (quant.unbounded || frame?.hasUnboundedQuant)) {
         groupStack[groupStack.length - 1].hasUnboundedQuant = true
       }
       i += quant.length
