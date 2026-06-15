@@ -49,7 +49,7 @@ export async function buildTuiRuntimeSnapshot(
     updatedAt: Date.now(),
     activeAgents: await activeAgentsFromStatuses(statuses, input.client, input.sessionAgentResolver ?? getLastAgentFromSession),
     jobBoard: input.backgroundManager.getTasksSnapshot().map(toJobRow),
-    loop: loop.kind === "live" ? loop : null,
+    loop: loop.kind === "live" ? redactLoopText(loop) : null,
   }
 }
 
@@ -92,9 +92,16 @@ function activeStatus(status: string): ActiveAgentStatus | null {
 
 function toJobRow(task: BackgroundTaskSnapshot): JobRow {
   return {
-    title: task.title,
+    title: `${task.agent} background task`,
     status: task.status,
     toolCalls: task.toolCalls,
     lastTool: task.lastTool,
   }
+}
+
+function redactLoopText(loop: TuiRuntimeSnapshot["loop"]): TuiRuntimeSnapshot["loop"] {
+  if (loop === null) {
+    return null
+  }
+  return { ...loop, activeGoal: null }
 }

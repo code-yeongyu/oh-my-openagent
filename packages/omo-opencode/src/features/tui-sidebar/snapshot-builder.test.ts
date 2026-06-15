@@ -51,6 +51,26 @@ function writeLiveLoop(projectDir: string): void {
   )
 }
 
+function writeSensitiveLiveLoop(projectDir: string): void {
+  const filePath = join(projectDir, ".omo", "ulw-loop", "current", "goals.json")
+  mkdirSync(join(filePath, ".."), { recursive: true })
+  writeFileSync(
+    filePath,
+    JSON.stringify({
+      version: 1,
+      activeGoalId: "secret",
+      goals: [
+        {
+          id: "secret",
+          title: "Deploy with token sk-live-secret",
+          status: "in_progress",
+          successCriteria: [{ status: "pending" }],
+        },
+      ],
+    }),
+  )
+}
+
 function createClient(statuses: StatusMap): FakeClient {
   return {
     session: {
@@ -121,7 +141,7 @@ describe("buildTuiRuntimeSnapshot", () => {
       { name: "atlas", status: "retry" },
     ])
     expect(snapshot.jobBoard).toEqual([
-      { title: "Explore runtime", status: "running", toolCalls: 3, lastTool: "grep" },
+      { title: "sisyphus background task", status: "running", toolCalls: 3, lastTool: "grep" },
     ])
     expect(snapshot.loop).toEqual({
       kind: "live",
@@ -131,7 +151,7 @@ describe("buildTuiRuntimeSnapshot", () => {
       fail: 1,
       pending: 0,
       blocked: 0,
-      activeGoal: "Ship mirror",
+      activeGoal: null,
     })
     expect(Date.now() - snapshot.updatedAt).toBeLessThan(LOOP_FRESH_MS)
   })
@@ -154,5 +174,34 @@ describe("buildTuiRuntimeSnapshot", () => {
 
     // then
     expect(snapshot.activeAgents).toEqual([{ name: "ses-fallback", status: "running" }])
+  })
+
+  it("#given prompt-derived task and loop titles #when building #then persisted mirror text is redacted", async () => {
+    // given
+    const projectDir = makeTempDir("sensitive-text")
+    writeSensitiveLiveLoop(projectDir)
+
+    // when
+    const snapshot = await buildTuiRuntimeSnapshot({
+      projectDir,
+      client: createClient({}),
+      backgroundManager: createBackgroundManager([
+        {
+          title: "Read customer secret sk-live-job",
+          status: "running",
+          toolCalls: 1,
+          lastTool: "read",
+          agent: "atlas",
+        },
+      ]),
+      sessionAgentResolver: resolveTestSessionAgent,
+    })
+
+    // then
+    expect(snapshot.loop?.activeGoal).toBeNull()
+    expect(snapshot.jobBoard).toEqual([
+      { title: "atlas background task", status: "running", toolCalls: 1, lastTool: "read" },
+    ])
+    expect(JSON.stringify(snapshot)).not.toContain("sk-live")
   })
 })
