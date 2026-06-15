@@ -14,6 +14,10 @@ type MonitorToolContext = {
   ask?: (input: BashPermissionAskInput) => Promise<void>
 }
 
+type MonitorStartConfig = {
+  monitor?: Partial<NonNullable<OhMyOpenCodeConfig["monitor"]>>
+}
+
 const DEFAULT_MONITOR_CONFIG = {
   enabled: false,
   live_mode_enabled: false,
@@ -27,7 +31,7 @@ const DEFAULT_MONITOR_CONFIG = {
   pattern_max_length: 512,
 }
 
-function getMonitorConfig(pluginConfig: OhMyOpenCodeConfig) {
+function getMonitorConfig(pluginConfig: MonitorStartConfig) {
   return {
     ...DEFAULT_MONITOR_CONFIG,
     ...pluginConfig.monitor,
@@ -72,7 +76,7 @@ output arrives automatically — do not poll`
 
 export function createMonitorStart(
   manager: MonitorManager,
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: MonitorStartConfig,
   _ctx?: PluginContext,
 ): ToolDefinition {
   return tool({

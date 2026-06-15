@@ -1,0 +1,15 @@
+Task 18 monitor tool registry evidence
+
+Implemented:
+- Added createMonitorTools in src/tools/monitor/index.ts.
+- Exported createMonitorTools from src/tools/index.ts.
+- Registered monitor tools in src/plugin/tool-registry.ts behind pluginConfig.monitor?.enabled and managers.monitorManager.
+- Added monitorManager to createToolRegistry and createTools manager Pick types.
+- Added src/plugin/tool-registry.monitor.test.ts coverage for disabled, enabled, normalized schemas, and disabled_tools.
+- Fixed monitor idle event forwarding to pass normalized MonitorManagerEvent shape.
+
+Verification:
+- bun test src/plugin/tool-registry.monitor.test.ts: PASS, 3 tests.
+- bun test src/plugin/event.monitor.test.ts: PASS, 3 tests.
+- bun run typecheck: PASS.
+- Manual library driver via bun --eval: PASS, confirmed monitor tools are absent when disabled, all four present when enabled, and disabled_tools removes only monitor_start.

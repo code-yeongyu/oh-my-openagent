@@ -3,6 +3,7 @@ export { createGlobTools } from "./glob"
 export { createSkillTool } from "./skill"
 export { discoverCommandsSync } from "./slashcommand"
 export { createSessionManagerTools } from "./session-manager"
+export { createMonitorTools } from "./monitor"
 
 export { sessionExists } from "./session-manager/storage"
 

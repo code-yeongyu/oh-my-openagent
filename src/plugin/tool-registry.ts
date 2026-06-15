@@ -32,6 +32,7 @@ import {
   createSkillTool,
   createGrepTools,
   createGlobTools,
+  createMonitorTools,
   createSessionManagerTools,
   createDelegateTask,
   discoverCommandsSync,
@@ -58,6 +59,7 @@ type ToolRegistryFactories = {
   createSkillTool: typeof createSkillTool
   createGrepTools: typeof createGrepTools
   createGlobTools: typeof createGlobTools
+  createMonitorTools: typeof createMonitorTools
   createSessionManagerTools: typeof createSessionManagerTools
   createDelegateTask: typeof createDelegateTask
   discoverCommandsSync: typeof discoverCommandsSync
@@ -89,6 +91,7 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   createSkillTool,
   createGrepTools,
   createGlobTools,
+  createMonitorTools,
   createSessionManagerTools,
   createDelegateTask,
   discoverCommandsSync,
@@ -177,7 +180,7 @@ export function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): vo
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
-  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor">
+  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor" | "monitorManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
   interactiveBashEnabled?: boolean
@@ -334,6 +337,10 @@ export function createToolRegistry(args: {
       }
     : {}
 
+  const monitorToolsRecord: Record<string, ToolDefinition> = pluginConfig.monitor?.enabled && managers.monitorManager
+    ? factories.createMonitorTools(managers.monitorManager, Object.assign({}, ctx, { pluginConfig }))
+    : {}
+
   const allTools: Record<string, ToolDefinition> = {
     ...factories.createGrepTools(ctx),
     ...factories.createGlobTools(ctx),
@@ -346,6 +353,7 @@ export function createToolRegistry(args: {
     skill: skillTool,
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
     ...teamModeToolsRecord,
+    ...monitorToolsRecord,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
   }
