@@ -5,6 +5,7 @@ import type { PluginContext, TmuxConfig } from "./plugin/types"
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import type { MonitorManager } from "./features/monitor"
 import { BackgroundManager } from "./features/background-agent"
+import { createMonitorManager } from "./features/monitor"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { cleanupSessionTeamRuns } from "./features/team-mode/team-runtime/session-cleanup"
 import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
@@ -21,6 +22,7 @@ type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
   SkillMcpManagerClass: typeof SkillMcpManager
   TmuxSessionManagerClass: typeof TmuxSessionManager
+  createMonitorManagerFn: typeof createMonitorManager
   initTaskToastManagerFn: typeof initTaskToastManager
   registerManagerForCleanupFn: typeof registerManagerForCleanup
   cleanupSessionTeamRunsFn: typeof cleanupSessionTeamRuns
@@ -32,6 +34,7 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   BackgroundManagerClass: BackgroundManager,
   SkillMcpManagerClass: SkillMcpManager,
   TmuxSessionManagerClass: TmuxSessionManager,
+  createMonitorManagerFn: createMonitorManager,
   initTaskToastManagerFn: initTaskToastManager,
   registerManagerForCleanupFn: registerManagerForCleanup,
   cleanupSessionTeamRunsFn: cleanupSessionTeamRuns,
@@ -72,6 +75,12 @@ export function createManagers(args: {
   }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
+  const monitorManager = pluginConfig.monitor?.enabled
+    ? deps.createMonitorManagerFn({
+      pluginContext: { client: ctx.client, directory: ctx.directory },
+      config: pluginConfig.monitor,
+    })
+    : undefined
   let backgroundManager: BackgroundManager | undefined
 
   const cleanupTeamModeRuns = async (): Promise<void> => {
@@ -93,6 +102,9 @@ export function createManagers(args: {
       })
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during process shutdown:", error)
+      })
+      await monitorManager?.shutdown().catch((error) => {
+        log("[create-managers] monitor cleanup error during process shutdown:", error)
       })
     },
   })
@@ -160,5 +172,6 @@ export function createManagers(args: {
     skillMcpManager,
     configHandler,
     modelFallbackControllerAccessor,
+    monitorManager,
   }
 }
