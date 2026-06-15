@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
 import { getPrometheusPrompt } from "./system-prompt"
 
@@ -24,6 +26,7 @@ describe("getPrometheusPrompt thin prompt contract", () => {
         expect(prompt).toContain("You are Prometheus, a planning consultant")
         expect(prompt).toContain("You are a PLANNER")
         expect(prompt).toContain("ulw-plan skill")
+        expect(prompt).toContain('skill(name="shared/ulw-plan")')
       })
 
       it("#then returns the same single prompt for every model family", () => {
