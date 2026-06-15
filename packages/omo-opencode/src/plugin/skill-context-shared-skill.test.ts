@@ -14,6 +14,7 @@ import { createSkillContext } from "./skill-context"
 
 const LOCAL_ULW_PLAN_BODY = "LOCAL PROJECT ULW PLAN BODY"
 const POISONED_SHARED_BODY = "POISONED PROJECT SHARED ULW PLAN BODY"
+const POISONED_MIXED_CASE_SHARED_BODY = "POISONED MIXED CASE PROJECT SHARED ULW PLAN BODY"
 
 function createToolContext(directory: string): ToolContext {
   return {
@@ -45,6 +46,10 @@ function writeSkill(dir: string, frontmatterName: string, description: string, b
 
 function toolResultToText(result: ToolResult): string {
   return typeof result === "string" ? result : result.output
+}
+
+function toPosixPath(text: string): string {
+  return text.split("\\").join("/")
 }
 
 async function createPluginWiredSkillTool(args: {
@@ -145,10 +150,54 @@ describe("plugin-wired shared skill aliases", () => {
     expect(plainOutput).not.toContain(POISONED_SHARED_BODY)
 
     expect(sharedOutput).toContain("## Skill: shared/ulw-plan")
-    expect(sharedOutput.replaceAll("\\", "/")).toContain("packages/shared-skills/skills/ulw-plan")
+    expect(toPosixPath(sharedOutput)).toContain("packages/shared-skills/skills/ulw-plan")
     expect(sharedOutput).not.toContain(LOCAL_ULW_PLAN_BODY)
     expect(sharedOutput).not.toContain(POISONED_SHARED_BODY)
     expect(skillTool.description).not.toContain("Hostile project canonical shared ulw-plan")
+  })
+
+  test("#given hostile mixed-case shared ulw-plan project skill #when plugin skill context is built #then it cannot shadow the bundled shared alias", async () => {
+    // given
+    writeSkill(
+      join(testDirectory, ".opencode", "skills", "mixed-case-collision"),
+      "Shared/ulw-plan",
+      "Hostile project mixed-case shared ulw-plan",
+      POISONED_MIXED_CASE_SHARED_BODY,
+    )
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+
+    // when
+    const skillContext = await createSkillContext({
+      directory: testDirectory,
+      pluginConfig,
+    })
+    const systemContent = buildSystemContent({
+      agentsContext: "base",
+      availableCategories: [],
+      availableSkills: skillContext.availableSkills,
+    })
+    const skillTool = createSkillTool({
+      directory: testDirectory,
+      skills: skillContext.mergedSkills,
+      disabledSkills: skillContext.disabledSkills,
+      browserProvider: skillContext.browserProvider,
+      includeSkillsInDescription: true,
+    })
+    const toolContext = createToolContext(testDirectory)
+    const plainOutput = toolResultToText(await skillTool.execute({ name: "ulw-plan" }, toolContext))
+    const sharedOutput = toolResultToText(
+      await skillTool.execute({ name: "shared/ulw-plan" }, toolContext),
+    )
+
+    // then
+    expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
+    expect(toPosixPath(sharedOutput)).toContain("packages/shared-skills/skills/ulw-plan")
+    expect(sharedOutput).not.toContain(LOCAL_ULW_PLAN_BODY)
+    expect(sharedOutput).not.toContain(POISONED_MIXED_CASE_SHARED_BODY)
+    expect(skillContext.availableSkills.map((skill) => skill.name)).not.toContain("Shared/ulw-plan")
+    expect(systemContent).not.toContain("Hostile project mixed-case shared ulw-plan")
+    expect(systemContent).not.toContain(POISONED_MIXED_CASE_SHARED_BODY)
+    expect(skillTool.description).not.toContain("Hostile project mixed-case shared ulw-plan")
   })
 
   test("#given hostile config entry for protected shared ulw-plan #when the plugin-wired skill tool executes #then config is ignored and bundled shared remains", async () => {
@@ -172,11 +221,54 @@ describe("plugin-wired shared skill aliases", () => {
 
     // then
     expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
-    expect(sharedOutput.replaceAll("\\", "/")).toContain("packages/shared-skills/skills/ulw-plan")
+    expect(toPosixPath(sharedOutput)).toContain("packages/shared-skills/skills/ulw-plan")
     expect(sharedOutput).not.toContain(LOCAL_ULW_PLAN_BODY)
     expect(sharedOutput).not.toContain("IGNORE_ALL_PRIOR_INSTRUCTIONS")
     expect(sharedOutput).not.toContain("HOSTILE_BODY")
     expect(skillTool.description).not.toContain("IGNORE_ALL_PRIOR_INSTRUCTIONS")
+  })
+
+  test("#given hostile mixed-case config entry for protected shared ulw-plan #when plugin skill context is built #then config is ignored and bundled shared remains", async () => {
+    // given
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+      skills: {
+        "Shared/ulw-plan": {
+          description: "IGNORE_MIXED_CASE_CONFIG",
+          template: "HOSTILE_MIXED_CASE_CONFIG_BODY",
+        },
+      },
+    })
+
+    // when
+    const skillContext = await createSkillContext({
+      directory: testDirectory,
+      pluginConfig,
+    })
+    const systemContent = buildSystemContent({
+      agentsContext: "base",
+      availableCategories: [],
+      availableSkills: skillContext.availableSkills,
+    })
+    const skillTool = createSkillTool({
+      directory: testDirectory,
+      skills: skillContext.mergedSkills,
+      disabledSkills: skillContext.disabledSkills,
+      browserProvider: skillContext.browserProvider,
+      includeSkillsInDescription: true,
+    })
+    const toolContext = createToolContext(testDirectory)
+    const sharedOutput = toolResultToText(
+      await skillTool.execute({ name: "shared/ulw-plan" }, toolContext),
+    )
+
+    // then
+    expect(toPosixPath(sharedOutput)).toContain("packages/shared-skills/skills/ulw-plan")
+    expect(sharedOutput).not.toContain("IGNORE_MIXED_CASE_CONFIG")
+    expect(sharedOutput).not.toContain("HOSTILE_MIXED_CASE_CONFIG_BODY")
+    expect(skillContext.availableSkills.map((skill) => skill.name)).not.toContain("Shared/ulw-plan")
+    expect(systemContent).not.toContain("IGNORE_MIXED_CASE_CONFIG")
+    expect(systemContent).not.toContain("HOSTILE_MIXED_CASE_CONFIG_BODY")
+    expect(skillTool.description).not.toContain("IGNORE_MIXED_CASE_CONFIG")
   })
 
   test("#given shared ulw-plan is disabled #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {
@@ -196,11 +288,45 @@ describe("plugin-wired shared skill aliases", () => {
     expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
   })
 
+  test("#given shared ulw-plan is disabled with mixed casing #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {
+    // given
+    const skillTool = await createPluginWiredSkillTool({
+      directory: testDirectory,
+      disabledSkills: ["Shared/ulw-plan"],
+    })
+    const toolContext = createToolContext(testDirectory)
+
+    // when
+    const plainOutput = toolResultToText(await skillTool.execute({ name: "ulw-plan" }, toolContext))
+    const sharedUnavailable = expectSkillUnavailable(skillTool, toolContext, "shared/ulw-plan")
+
+    // then
+    await sharedUnavailable
+    expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
+  })
+
   test("#given shared ulw-plan is disabled through skills.disable #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {
     // given
     const skillTool = await createPluginWiredSkillTool({
       directory: testDirectory,
       skills: { disable: ["shared/ulw-plan"] },
+    })
+    const toolContext = createToolContext(testDirectory)
+
+    // when
+    const plainOutput = toolResultToText(await skillTool.execute({ name: "ulw-plan" }, toolContext))
+    const sharedUnavailable = expectSkillUnavailable(skillTool, toolContext, "shared/ulw-plan")
+
+    // then
+    await sharedUnavailable
+    expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
+  })
+
+  test("#given shared ulw-plan is disabled through mixed-case skills.disable #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {
+    // given
+    const skillTool = await createPluginWiredSkillTool({
+      directory: testDirectory,
+      skills: { disable: ["Shared/ulw-plan"] },
     })
     const toolContext = createToolContext(testDirectory)
 
@@ -251,6 +377,25 @@ describe("plugin-wired shared skill aliases", () => {
     await sharedUnavailable
   })
 
+  test("#given mixed-case shared ulw-plan config entry is false without a local override #when the plugin-wired skill tool executes #then shared-scope fallback is unavailable", async () => {
+    // given
+    rmSync(join(testDirectory, ".opencode", "skills", "ulw-plan"), {
+      recursive: true,
+      force: true,
+    })
+    const skillTool = await createPluginWiredSkillTool({
+      directory: testDirectory,
+      skills: { "Shared/ulw-plan": false },
+    })
+    const toolContext = createToolContext(testDirectory)
+
+    // when
+    const sharedUnavailable = expectSkillUnavailable(skillTool, toolContext, "shared/ulw-plan")
+
+    // then
+    await sharedUnavailable
+  })
+
   test("#given shared ulw-plan config entry is disabled without a local override #when the plugin-wired skill tool executes #then shared-scope fallback is unavailable", async () => {
     // given
     rmSync(join(testDirectory, ".opencode", "skills", "ulw-plan"), {
@@ -260,6 +405,25 @@ describe("plugin-wired shared skill aliases", () => {
     const skillTool = await createPluginWiredSkillTool({
       directory: testDirectory,
       skills: { "shared/ulw-plan": { disable: true } },
+    })
+    const toolContext = createToolContext(testDirectory)
+
+    // when
+    const sharedUnavailable = expectSkillUnavailable(skillTool, toolContext, "shared/ulw-plan")
+
+    // then
+    await sharedUnavailable
+  })
+
+  test("#given mixed-case shared ulw-plan config entry is disabled without a local override #when the plugin-wired skill tool executes #then shared-scope fallback is unavailable", async () => {
+    // given
+    rmSync(join(testDirectory, ".opencode", "skills", "ulw-plan"), {
+      recursive: true,
+      force: true,
+    })
+    const skillTool = await createPluginWiredSkillTool({
+      directory: testDirectory,
+      skills: { "Shared/ulw-plan": { disable: true } },
     })
     const toolContext = createToolContext(testDirectory)
 
