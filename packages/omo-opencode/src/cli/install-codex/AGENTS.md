@@ -53,7 +53,8 @@ runCodexInstaller()
 - All TOML mutation is string-based via `toml-section-editor.ts` (no TOML parser dependency)
 - Atomic directory promotion: copy to temp sibling, then `rename()`; backup restored on failure
 - Windows uses `.cmd` shims; POSIX uses symlinks
-- `MANAGED_CODEX_AGENT_NAMES` hardcodes 6 agent names: `codex-ultrawork-reviewer`, `explorer`, `librarian`, `metis`, `momus`, `plan`
+- Current managed Codex agent roster: `explorer`, `librarian`, `metis`, `momus`, `plan`
+- Legacy purge/back-compat code still tracks the retired reviewer agent so installs can remove stale config and agent files from older releases
 - Legacy marketplace cleanup: `lazycodex` and `code-yeongyu-codex-plugins` are pruned on `sisyphuslabs` install
 
 ## ANTI-PATTERNS
