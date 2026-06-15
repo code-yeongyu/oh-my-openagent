@@ -102,6 +102,12 @@ function buildMemberPrompt(
 ): string {
   const promptLines = [`Team: ${spec.name}`, `TeamRunId: ${teamRunId}`, `Member: ${member.name}`]
   if (worktreePath) promptLines.push(`Worktree: ${worktreePath}`)
+  if (member.allowedPaths && member.allowedPaths.length > 0 && !worktreePath) {
+    promptLines.push(
+      `AllowedPaths (glob): ${member.allowedPaths.join(", ")}`,
+      "You may ONLY edit files matching these patterns. Do NOT modify, revert (git restore/checkout), or delete files outside your assignment — other members own those files and your edits will be hard-blocked by the edit tool.",
+    )
+  }
   if (member.prompt) promptLines.push(member.prompt)
   promptLines.push(buildTeammateCommunicationAddendum(config))
   return promptLines.join("\n")

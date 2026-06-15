@@ -1,4 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import picomatch from "picomatch"
+import path from "node:path"
 
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { lookupTeamSession } from "../../features/team-mode/team-session-registry"
@@ -78,7 +80,7 @@ function isTargetMember(participant: TeamParticipant, teamRunId: string | undefi
     && participant.memberName === memberName
 }
 
-export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig | undefined): Hooks {
+export function createTeamToolGating(ctx: PluginInput, config: TeamModeConfig | undefined): Hooks {
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -89,6 +91,12 @@ export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig |
       }
 
       const toolName = input.tool
+
+      if (toolName === "edit") {
+        await enforceEditAllowedPaths(input.sessionID, output.args, ctx, config)
+        return
+      }
+
       if (!toolName.startsWith("team_") && toolName !== "delegate-task") {
         return
       }
@@ -145,5 +153,59 @@ export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig |
         )
       }
     },
+  }
+}
+
+type MemberFileBoundary = {
+  worktreePath?: string
+  allowedPaths?: string[]
+}
+
+async function resolveMemberFileBoundary(
+  teamRunId: string,
+  memberName: string,
+  config: TeamModeConfig,
+): Promise<MemberFileBoundary | undefined> {
+  const runtimeState = await loadRuntimeState(teamRunId, config)
+  if (!ACTIVE_RUNTIME_STATUSES.has(runtimeState.status)) return undefined
+  const member = runtimeState.members.find((entry) => entry.name === memberName)
+  if (!member) return undefined
+  return { worktreePath: member.worktreePath, allowedPaths: member.allowedPaths }
+}
+
+// Resolves filePath against cwd, rejects cwd-escaping paths (../ or absolute outside cwd),
+// then matches the cwd-relative path against the glob allow-list via picomatch.
+function isEditPathAllowed(allowedPaths: string[], filePath: string, cwd: string): boolean {
+  const resolved = path.resolve(cwd, filePath)
+  const relative = path.relative(cwd, resolved)
+  if (relative === "") return false
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return false
+  return picomatch.isMatch(relative, allowedPaths, { dot: true })
+}
+
+async function enforceEditAllowedPaths(
+  sessionID: string,
+  args: Record<string, unknown>,
+  ctx: PluginInput,
+  config: TeamModeConfig,
+): Promise<void> {
+  const participant = await resolveParticipant(sessionID, config)
+  if (participant.role !== "member") return
+
+  const boundary = await resolveMemberFileBoundary(participant.teamRunId, participant.memberName, config)
+  if (!boundary) return
+  // Worktree members are filesystem-isolated; skip the gate.
+  if (boundary.worktreePath) return
+  // No allow-list set = unrestricted (backward compatible).
+  if (!boundary.allowedPaths || boundary.allowedPaths.length === 0) return
+
+  const filePath = getStringArg(args, "filePath")
+  if (!filePath) {
+    throw new Error(`edit denied: member ${participant.memberName} has allowedPaths set but no filePath was provided`)
+  }
+  if (!isEditPathAllowed(boundary.allowedPaths, filePath, ctx.directory)) {
+    throw new Error(
+      `edit denied: "${filePath}" is outside member ${participant.memberName}'s allowedPaths [${boundary.allowedPaths.join(", ")}]`,
+    )
   }
 }

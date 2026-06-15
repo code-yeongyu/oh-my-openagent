@@ -27,6 +27,9 @@ const MemberBaseSchema = z.object({
   name: z.string().min(1).regex(/^[a-z0-9-]+$/),
   cwd: z.string().optional(),
   worktreePath: z.string().optional(),
+  // Glob allow-list (picomatch). Inline members are hard-gated to these paths on the `edit` tool
+  // via team-tool-gating; worktree members bypass it (filesystem-isolated). Unset = unrestricted.
+  allowedPaths: z.array(z.string().min(1)).optional(),
   subscriptions: z.array(z.string()).optional(),
   backendType: z.enum(["in-process", "tmux"]).default("in-process"),
   color: z.string().optional(),
@@ -143,6 +146,7 @@ const RuntimeStateMemberSchema = z.object({
   status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
   color: z.string().optional(),
   worktreePath: z.string().optional(),
+  allowedPaths: z.array(z.string()).optional(),
   lastInjectedTurnMarker: z.string().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
 }).strict()

@@ -49,6 +49,18 @@ function createRuntimeState(): RuntimeState {
   }
 }
 
+function createRuntimeStateWithMemberBoundary(
+  memberName: string,
+  boundary: { allowedPaths?: string[]; worktreePath?: string },
+): RuntimeState {
+  return {
+    ...createRuntimeState(),
+    members: createRuntimeState().members.map((member) =>
+      member.name === memberName ? { ...member, ...boundary } : member,
+    ),
+  }
+}
+
 async function seedTeams(baseDir: string, ...runtimeStates: RuntimeState[]): Promise<void> {
   const config = TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true })
   await Promise.all(runtimeStates.map(async (runtimeState) => {
@@ -285,5 +297,96 @@ describe("createTeamToolGating", () => {
 
     // then
     await expect(result).rejects.toThrow("denied: not a participant of team 11111111-1111-4111-8111-111111111111")
+  })
+
+  test("allows an inline member to edit a file inside its allowedPaths", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeStateWithMemberBoundary("m1", { allowedPaths: ["src/ui/**"] }))
+
+    // when
+    const result = runHook("edit", "member-session-1", { filePath: "src/ui/Button.tsx" }, undefined, baseDir)
+
+    // then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("rejects an inline member editing a file outside its allowedPaths", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeStateWithMemberBoundary("m1", { allowedPaths: ["src/ui/**"] }))
+
+    // when
+    const result = runHook("edit", "member-session-1", { filePath: "src/api/handler.ts" }, undefined, baseDir)
+
+    // then
+    await expect(result).rejects.toThrow(/outside member m1's allowedPaths/)
+  })
+
+  test("allows an inline member to edit any file when allowedPaths is unset", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeState())
+
+    // when
+    const result = runHook("edit", "member-session-1", { filePath: "src/anywhere/handler.ts" }, undefined, baseDir)
+
+    // then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("bypasses the allow-list gate for a worktree member even with allowedPaths set", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeStateWithMemberBoundary("m1", { allowedPaths: ["src/ui/**"], worktreePath: "/tmp/worktree-m1" }))
+
+    // when
+    const result = runHook("edit", "member-session-1", { filePath: "src/api/handler.ts" }, undefined, baseDir)
+
+    // then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows the lead to edit any file (allowedPaths is member-only)", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeStateWithMemberBoundary("m1", { allowedPaths: ["src/ui/**"] }))
+
+    // when
+    const result = runHook("edit", "lead-session", { filePath: "src/api/handler.ts" }, undefined, baseDir)
+
+    // then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows a non-team session to edit without team gating", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeStateWithMemberBoundary("m1", { allowedPaths: ["src/ui/**"] }))
+
+    // when
+    const result = runHook("edit", "non-team-session", { filePath: "src/api/handler.ts" }, undefined, baseDir)
+
+    // then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("rejects an inline member editing via a cwd-escaping path", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeStateWithMemberBoundary("m1", { allowedPaths: ["src/ui/**"] }))
+
+    // when
+    const result = runHook("edit", "member-session-1", { filePath: "../outside-repo/secret.ts" }, undefined, baseDir)
+
+    // then
+    await expect(result).rejects.toThrow(/outside member m1's allowedPaths/)
   })
 })
