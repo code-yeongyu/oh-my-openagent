@@ -8,10 +8,19 @@ import { ulwLoopLedgerPath } from "../src/paths.ts";
 
 let testDir: string;
 let out: string[];
+let originalCodexSessionId: string | undefined;
+let originalCodexThreadId: string | undefined;
+let originalOmoSessionId: string | undefined;
 
 beforeEach(async () => {
 	testDir = await mkdtemp(join(tmpdir(), "ug-cli-complete-"));
 	out = [];
+	originalCodexSessionId = process.env["CODEX_SESSION_ID"];
+	originalCodexThreadId = process.env["CODEX_THREAD_ID"];
+	originalOmoSessionId = process.env["OMO_ULW_LOOP_SESSION_ID"];
+	delete process.env["CODEX_SESSION_ID"];
+	delete process.env["CODEX_THREAD_ID"];
+	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -21,6 +30,12 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	vi.restoreAllMocks();
+	if (originalCodexSessionId === undefined) delete process.env["CODEX_SESSION_ID"];
+	else process.env["CODEX_SESSION_ID"] = originalCodexSessionId;
+	if (originalCodexThreadId === undefined) delete process.env["CODEX_THREAD_ID"];
+	else process.env["CODEX_THREAD_ID"] = originalCodexThreadId;
+	if (originalOmoSessionId === undefined) delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	else process.env["OMO_ULW_LOOP_SESSION_ID"] = originalOmoSessionId;
 	await rm(testDir, { recursive: true, force: true });
 });
 

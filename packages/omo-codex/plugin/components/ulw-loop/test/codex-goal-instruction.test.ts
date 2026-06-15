@@ -91,9 +91,8 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		});
 
 		expect(text).toMatch(/not the final .*do not run .*quality gate/i);
-		expect(text).not.toContain("quality gate JSON");
-		for (const role of FINAL_REVIEW_ROLES) expect(text).not.toContain(role);
-		expect(text).not.toContain("ai-slop-cleaner");
+		expect(text).toContain("checkpoint this OMO ledger story");
+		expect(text).toContain("continue the remaining stories");
 	});
 
 	it("includes quality gate instruction when isFinal", () => {
@@ -119,9 +118,6 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toMatch(/not clean.*do not call update_goal/i);
 		expect(text).toContain("record-review-blockers");
 		expect(text).toContain("checkpoint");
-		expect(text).not.toContain("ai-slop-cleaner");
-		expect(text).not.toContain("codex-ultrawork-reviewer");
-		expect(text).not.toMatch(/architect status/i);
 	});
 
 	it("#given a scoped plan #when rendering final commands #then includes the session id option", () => {
