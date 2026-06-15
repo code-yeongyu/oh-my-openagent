@@ -31,7 +31,7 @@ export type {
 	WorkerAction,
 	WorkerSpawnInvocation,
 } from "./hook-types.js";
-export { runCodegraphSessionStartWorker } from "./session-start-worker.js";
+export { resolveCodegraphCommandInvocation, runCodegraphSessionStartWorker } from "./session-start-worker.js";
 
 export const CODEGRAPH_SESSION_START_NOTICE = "LazyCodex CodeGraph bootstrap scheduled in background";
 
