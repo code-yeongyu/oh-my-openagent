@@ -12,6 +12,7 @@ import { componentHookContractCases } from "./component-hook-contract-cases.mjs"
 const HOOK_EVENTS_BY_COMPONENT = {
 	"comment-checker": "post-tool-use",
 	"git-bash": "pre-tool-use",
+	"lazycodex-executor-verify": "subagent-stop",
 	lsp: "post-compact",
 	rules: "session-start",
 	"start-work-continuation": "stop",
@@ -20,6 +21,19 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	"ulw-loop": "pre-tool-use",
 };
 const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;
+
+test("#given required component CLI contracts #when workspaces are inspected #then every contract component is covered", async () => {
+	// given
+	const components = await workspaceComponents();
+
+	// when
+	const missingWorkspaceComponents = Object.keys(HOOK_EVENTS_BY_COMPONENT).filter(
+		(component) => !components.includes(component),
+	);
+
+	// then
+	assert.deepEqual(missingWorkspaceComponents, []);
+});
 
 test("#given built workspace component CLIs #when import specifiers are inspected #then each CLI is self-contained except node builtins", async () => {
 	// given
