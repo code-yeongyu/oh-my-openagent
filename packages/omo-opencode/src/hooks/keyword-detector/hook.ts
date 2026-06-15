@@ -8,8 +8,10 @@ import {
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
 import {
+  hasInternalInitiatorMarker,
   isRealUserTextPart,
   isSyntheticOrInternalOnlyTextParts,
+  isTextPartLike,
   log,
 } from "../../shared"
 import {
@@ -69,6 +71,11 @@ export function createKeywordDetectorHook(
     ): Promise<void> => {
       if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
         log(`[keyword-detector] Skipping synthetic/internal text message`, { sessionID: input.sessionID })
+        return
+      }
+
+      if ((output.parts ?? []).some((part) => isTextPartLike(part) && hasInternalInitiatorMarker(part.text))) {
+        log(`[keyword-detector] Skipping internal-initiator wake message`, { sessionID: input.sessionID })
         return
       }
 

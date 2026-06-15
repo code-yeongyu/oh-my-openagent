@@ -86,6 +86,28 @@ describe("keyword-detector message transform", () => {
     expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
+  test("should skip keyword injection when any part carries the internal-initiator marker", async () => {
+    // given - an OMO-internal wake whose parts mix a marker part with a real-looking user part
+    const collector = new ContextCollector()
+    const sessionID = "internal-wake-mixed-parts"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [
+        { type: "text", text: OMO_INTERNAL_INITIATOR_MARKER },
+        { type: "text", text: "ultrawork fix the flaky suite" },
+      ],
+    }
+
+    // when - keyword detection runs on the mixed internal wake
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - no mode prompt is injected and both parts stay untouched
+    expect(output.parts[0].text).toBe(OMO_INTERNAL_INITIATOR_MARKER)
+    expect(output.parts[1].text).toBe("ultrawork fix the flaky suite")
+  })
+
   test("should leave search wording as plain user text", async () => {
     // given - mock getMainSessionID to return our session (isolate from global state)
     const collector = new ContextCollector()
