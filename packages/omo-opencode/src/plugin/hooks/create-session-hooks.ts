@@ -141,11 +141,9 @@ export function createSessionHooks(args: {
         }))
     : null
 
-  const codegraphBootstrap = safeCreateHook(
-    "codegraph-bootstrap",
-    () => createCodegraphBootstrapHook(ctx, pluginConfig.codegraph),
-    { enabled: safeHookEnabled },
-  )
+  const codegraphBootstrap = isHookEnabled("codegraph-bootstrap")
+    ? safeHook("codegraph-bootstrap", () => createCodegraphBootstrapHook(ctx, pluginConfig.codegraph))
+    : null
 
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? safeHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx))
