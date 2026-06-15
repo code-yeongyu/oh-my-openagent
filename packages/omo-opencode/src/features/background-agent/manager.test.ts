@@ -1396,6 +1396,71 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 })
 
+describe("BackgroundManager.getTasksSnapshot", () => {
+  test("getTasksSnapshot empty returns an empty defensive snapshot", () => {
+    //#given
+    const manager = createBackgroundManager()
+
+    //#when
+    const snapshots = manager.getTasksSnapshot()
+    snapshots.push({
+      title: "external mutation",
+      status: "pending",
+      toolCalls: null,
+      lastTool: null,
+      agent: "atlas",
+    })
+
+    //#then
+    expect(manager.getTasksSnapshot()).toEqual([])
+
+    manager.shutdown()
+  })
+
+  test("returns frozen snapshots without exposing the internal task map", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-snapshot",
+      parentSessionId: "parent-session",
+      description: "inspect background task",
+      prompt: "fallback prompt",
+      agent: "sisyphus",
+      status: "running",
+      progress: {
+        toolCalls: 2,
+        lastTool: "glob",
+        lastUpdate: new Date("2026-06-15T00:00:00.000Z"),
+      },
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const snapshots = manager.getTasksSnapshot()
+    const first = snapshots[0]
+    task.description = "changed internal task"
+
+    //#then
+    expect(first).toEqual({
+      title: "inspect background task",
+      status: "running",
+      toolCalls: 2,
+      lastTool: "glob",
+      agent: "sisyphus",
+    })
+    expect(first ? Object.isFrozen(first) : false).toBe(true)
+    expect(manager.getTasksSnapshot()).toEqual([{
+      title: "changed internal task",
+      status: "running",
+      toolCalls: 2,
+      lastTool: "glob",
+      agent: "sisyphus",
+    }])
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.notifyParentSession - release ordering", () => {
   test("should unblock queued task even when prompt hangs", async () => {
     // given - concurrency limit 1, task1 running, task2 waiting
