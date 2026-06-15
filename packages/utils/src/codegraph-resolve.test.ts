@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { join } from "node:path"
 
 import { resolveCodegraphCommand } from "./codegraph/resolve"
 
@@ -71,11 +72,13 @@ describe("resolveCodegraphCommand", () => {
 
   it("resolves a bundled package through the injected node runtime", () => {
     // given
-    const packageJson = "/bundle/node_modules/@colbymchenry/codegraph/package.json"
+    const packageRoot = join("/bundle", "node_modules", "@colbymchenry", "codegraph")
+    const bundledShim = join(packageRoot, "bin", "codegraph.js")
+    const packageJson = join(packageRoot, "package.json")
 
     // when
     const result = resolveCodegraphCommand({
-      fileExists: (filePath: string) => filePath.endsWith("/bin/codegraph.js"),
+      fileExists: (filePath: string) => filePath === bundledShim,
       nodeRuntime: () => "/usr/local/bin/node",
       provisioned: () => null,
       requireResolve: () => packageJson,
@@ -84,7 +87,7 @@ describe("resolveCodegraphCommand", () => {
 
     // then
     expect(result).toEqual({
-      argsPrefix: ["/bundle/node_modules/@colbymchenry/codegraph/bin/codegraph.js"],
+      argsPrefix: [bundledShim],
       command: "/usr/local/bin/node",
       exists: true,
       source: "bundled",
