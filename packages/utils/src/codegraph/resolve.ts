@@ -26,6 +26,7 @@ export interface ResolveCodegraphCommandOptions {
 
 const CODEGRAPH_PACKAGE = "@colbymchenry/codegraph"
 const CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN"
+const CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN"
 const requireFromHere = createRequire(import.meta.url)
 
 function defaultRequireResolve(specifier: string): string {
@@ -67,12 +68,12 @@ export function resolveCodegraphCommand(
   options: ResolveCodegraphCommandOptions = {},
 ): CodegraphCommandResolution {
   const env = options.env ?? process.env
-  const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim()
+  const fileExists = options.fileExists ?? existsSync
+  const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim() || env[CODEGRAPH_LEGACY_ENV_BIN]?.trim()
   if (configuredBin !== undefined && configuredBin.length > 0) {
-    return { argsPrefix: [], command: configuredBin, exists: true, source: "env" }
+    return { argsPrefix: [], command: configuredBin, exists: fileExists(configuredBin), source: "env" }
   }
 
-  const fileExists = options.fileExists ?? existsSync
   const nodeRuntime = options.nodeRuntime ?? defaultNodeRuntime
   const bundled = resolveBundledShim(options.requireResolve ?? defaultRequireResolve, fileExists)
   const runtime = nodeRuntime()

@@ -74,7 +74,7 @@ function defaultInstallDir(): string {
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
   if (installDir === undefined) return null
-  const binaryName = process.platform === "win32" ? "codegraph.exe" : "codegraph"
+  const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph"
   const candidate = join(installDir, "bin", binaryName)
   return existsSync(candidate) ? candidate : null
 }

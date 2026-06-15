@@ -10,6 +10,7 @@ describe("resolveCodegraphCommand", () => {
     // when
     const result = resolveCodegraphCommand({
       env,
+      fileExists: (filePath: string) => filePath === env.OMO_CODEGRAPH_BIN,
       provisioned: () => "/provisioned/codegraph",
       requireResolve: () => "/bundle/package.json",
       which: () => "/usr/local/bin/codegraph",
@@ -20,6 +21,50 @@ describe("resolveCodegraphCommand", () => {
       argsPrefix: [],
       command: "/opt/codegraph/bin/codegraph",
       exists: true,
+      source: "env",
+    })
+  })
+
+  it("keeps an invalid OMO_CODEGRAPH_BIN override unavailable", () => {
+    // given
+    const env = { OMO_CODEGRAPH_BIN: "/nonexistent" }
+
+    // when
+    const result = resolveCodegraphCommand({
+      env,
+      fileExists: () => false,
+      provisioned: () => "/provisioned/codegraph",
+      requireResolve: () => "/bundle/package.json",
+      which: () => "/usr/local/bin/codegraph",
+    })
+
+    // then
+    expect(result).toEqual({
+      argsPrefix: [],
+      command: "/nonexistent",
+      exists: false,
+      source: "env",
+    })
+  })
+
+  it("keeps an invalid CODEGRAPH_BIN override unavailable", () => {
+    // given
+    const env = { CODEGRAPH_BIN: "/missing-codegraph" }
+
+    // when
+    const result = resolveCodegraphCommand({
+      env,
+      fileExists: () => false,
+      provisioned: () => "/provisioned/codegraph",
+      requireResolve: () => "/bundle/package.json",
+      which: () => "/usr/local/bin/codegraph",
+    })
+
+    // then
+    expect(result).toEqual({
+      argsPrefix: [],
+      command: "/missing-codegraph",
+      exists: false,
       source: "env",
     })
   })
