@@ -1,6 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	renameSync,
+	rmSync,
+	statSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { platform } from "node:process";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runSubagentStopHook } from "../src/codex-hook.js";
@@ -70,6 +83,43 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		// then
 		expect(output).toBe("");
 		expect(existsSync(join(cwd, ".omo", "lazycodex-executor-verify", "sess.1-agent_1.json"))).toBe(false);
+	});
+
+	it("#given an evidence receipt symlink targets outside evidence root #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const artifactPath = join(cwd, ".omo", "evidence", "passwd-link");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		symlinkSync(existingReceiptTargetOutsideEvidenceRoot(), artifactPath);
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/passwd-link" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given an evidence receipt traverses a symlinked evidence subdirectory #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const outsideRoot = createWorkspace();
+		const outsideReceipt = join(outsideRoot, "receipt.txt");
+		const linkPath = join(cwd, ".omo", "evidence", "outside-dir");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		writeFileSync(outsideReceipt, "outside\n");
+		symlinkSync(outsideRoot, linkPath, platform === "win32" ? "junction" : "dir");
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/outside-dir/receipt.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given an existing absolute receipt outside evidence root #when lazycodex executor stops #then blocks", () => {
@@ -177,8 +227,10 @@ type BlockOutput = {
 
 const nodeFileSystem = {
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	statSync,
@@ -200,6 +252,11 @@ function createWorkspaceWithParentOutsideReceipt(): { readonly cwd: string } {
 }
 
 function existingAbsoluteReceiptOutsideEvidenceRoot(): string {
+	if (existsSync("/etc/passwd") && statSync("/etc/passwd").size > 0) return "/etc/passwd";
+	return existingReceiptTargetOutsideEvidenceRoot();
+}
+
+function existingReceiptTargetOutsideEvidenceRoot(): string {
 	if (existsSync("/etc/passwd") && statSync("/etc/passwd").size > 0) return "/etc/passwd";
 	const root = createWorkspace();
 	const receiptPath = join(root, "outside.txt");

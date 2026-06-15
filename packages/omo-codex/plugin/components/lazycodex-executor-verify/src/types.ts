@@ -21,12 +21,16 @@ export type StopHookOutput = {
 
 export type FileStat = {
 	readonly size: number;
+	readonly isFile?: () => boolean;
+	readonly isSymbolicLink?: () => boolean;
 };
 
 export type HookFileSystem = {
 	existsSync(path: string): boolean;
+	lstatSync?(path: string): FileStat;
 	mkdirSync(path: string, options: { readonly recursive: true }): unknown;
 	readFileSync(path: string, encoding: "utf8"): string;
+	realpathSync?(path: string): string;
 	renameSync(oldPath: string, newPath: string): void;
 	rmSync(path: string, options: { readonly force: true; readonly recursive?: boolean }): void;
 	statSync(path: string): FileStat;

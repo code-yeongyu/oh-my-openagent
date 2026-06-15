@@ -1,3 +1,4 @@
+import { lstatSync as nodeLstatSync, realpathSync as nodeRealpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { renderDirective } from "./directive.js";
@@ -55,7 +56,7 @@ function hasValidEvidenceReceipt(input: SubagentStopInput, fs: HookFileSystem): 
 	const resolvedPath = isAbsolute(receiptPath) ? resolve(receiptPath) : resolve(input.cwd, receiptPath);
 	if (!isPathInsideDirectory(resolvedPath, evidenceRoot)) return false;
 	try {
-		return isNonEmptyFile(resolvedPath, fs);
+		return isNonEmptyFileInsideEvidenceRoot(resolvedPath, evidenceRoot, input.cwd, fs);
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;
@@ -67,12 +68,32 @@ function isPathInsideDirectory(filePath: string, directoryPath: string): boolean
 	return relativePath !== "" && !relativePath.startsWith("..") && !isAbsolute(relativePath);
 }
 
+function isNonEmptyFileInsideEvidenceRoot(
+	filePath: string,
+	evidenceRoot: string,
+	cwd: string,
+	fs: HookFileSystem,
+): boolean {
+	if (!fs.existsSync(filePath)) return false;
+	const realCwd = realPath(cwd, fs);
+	const realEvidenceRoot = realPath(evidenceRoot, fs);
+	const realFilePath = realPath(filePath, fs);
+	if (!isPathInsideDirectory(realEvidenceRoot, realCwd)) return false;
+	if (!isPathInsideDirectory(realFilePath, realEvidenceRoot)) return false;
+	return isNonEmptyFile(filePath, fs);
+}
+
 function isNonEmptyFile(filePath: string, fs: HookFileSystem): boolean {
 	if (!fs.existsSync(filePath)) return false;
+	const linkStat = fs.lstatSync?.(filePath) ?? nodeLstatSync(filePath);
+	if (linkStat.isSymbolicLink?.() === true) return false;
 	const stat = fs.statSync(filePath);
 	if (stat.size <= 0) return false;
-	if ("isFile" in stat && typeof stat.isFile === "function") return stat.isFile();
-	return true;
+	return stat.isFile?.() ?? true;
+}
+
+function realPath(path: string, fs: HookFileSystem): string {
+	return fs.realpathSync?.(path) ?? nodeRealpathSync(path);
 }
 
 function extractEvidencePath(message: string | undefined): string | null {
