@@ -691,7 +691,7 @@ Built-in skills load automatically when their description matches your task. The
 |-------|:--------:|------------------|
 | `playwright` | Ultimate | Browser automation |
 | `git-master` | Ultimate | Atomic commits, rebases, history search |
-| `frontend-ui-ux` | Ultimate | UI/UX implementation work |
+| `frontend` | Ultimate | UI/UX implementation work |
 | `review-work` | Ultimate | Post-implementation code review |
 | `$omo:remove-ai-slops` | Ultimate | Cleaning AI-generated code smells |
 | `team-mode` | Ultimate | Loaded only when `team_mode.enabled` |
