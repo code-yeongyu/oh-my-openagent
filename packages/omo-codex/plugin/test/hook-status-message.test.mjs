@@ -28,6 +28,7 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:PostCompact:2:0", "Resetting LSP Diagnostics Cache"],
 	["hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
 	["hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
+	["hooks/hooks.json:SubagentStop:1:0", "Verifying LazyCodex Executor Evidence"],
 ]);
 
 const COMPONENT_EXPECTED_LABELS = new Map([
@@ -44,6 +45,10 @@ const COMPONENT_EXPECTED_LABELS = new Map([
 	["components/ulw-loop/hooks/hooks.json:PreToolUse:0:0", "Enforcing Unlimited Ulw-Loop Budget"],
 	["components/start-work-continuation/hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
 	["components/start-work-continuation/hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
+	[
+		"components/lazycodex-executor-verify/hooks/hooks.json:SubagentStop:0:0",
+		"Verifying LazyCodex Executor Evidence",
+	],
 ]);
 
 async function readJson(relativePath) {
@@ -142,10 +147,10 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
-test("#given LazyCodex appears inside hook status label #when normalizing #then product casing is preserved", async () => {
+test("#given LazyCodex appears inside hook label #when normalizing #then product casing is preserved", async () => {
 	// given
 	const version = (await readRepoJson("package.json")).version;
-	const label = "Verifying LazyCodex Executor Evidence";
+	const label = "verifying lazycodex executor evidence";
 
 	// when
 	const normalized = normalizeLazyCodexHookStatusLabel(label);
@@ -155,7 +160,6 @@ test("#given LazyCodex appears inside hook status label #when normalizing #then 
 	assert.equal(normalized, "Verifying LazyCodex Executor Evidence");
 	assert.equal(message, `LazyCodex(${version}): Verifying LazyCodex Executor Evidence`);
 });
-
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
 	const aggregateVersion = await readPluginVersion();
