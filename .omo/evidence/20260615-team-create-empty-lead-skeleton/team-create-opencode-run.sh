@@ -134,25 +134,53 @@ tc_assert_jsonl() {
   local failures=0
   : >"$ASSERTIONS"
 
-  if grep -q '"type":"tool_use"' "$run_file" && grep -q '"tool":"team_create"' "$run_file"; then
+  if RUN_FILE="$run_file" bun -e '
+    const lines = (await Bun.file(process.env.RUN_FILE).text()).trim().split(/\n+/).filter(Boolean)
+    const events = lines.map((line) => JSON.parse(line))
+    const teamCreate = events.find((event) => event.type === "tool_use" && event.part?.tool === "team_create")
+    process.exit(teamCreate ? 0 : 1)
+  '; then
     tc_pass "opencode run emitted a team_create tool_use event"
   else
     tc_fail "missing team_create tool_use event"; failures=$((failures+1))
   fi
 
-  if grep -q '"inline_spec"' "$run_file" && grep -q '"lead"' "$run_file" && grep -q '"kind":"category"' "$run_file"; then
+  if RUN_FILE="$run_file" bun -e '
+    const lines = (await Bun.file(process.env.RUN_FILE).text()).trim().split(/\n+/).filter(Boolean)
+    const events = lines.map((line) => JSON.parse(line))
+    const teamCreate = events.find((event) => event.type === "tool_use" && event.part?.tool === "team_create")
+    const lead = teamCreate?.part?.state?.input?.inline_spec?.lead
+    const ok = lead?.kind === "category"
+      && lead?.category === ""
+      && lead?.subagent_type === ""
+      && lead?.prompt === ""
+      && Array.isArray(lead?.loadSkills)
+      && lead.loadSkills.length === 0
+    process.exit(ok ? 0 : 1)
+  '; then
     tc_pass "team_create input included the host-style lead skeleton discriminator"
   else
     tc_fail "missing host-style lead skeleton in team_create input"; failures=$((failures+1))
   fi
 
-  if grep -q '"type":"tool_use"' "$run_file" && grep -q '"tool":"team_list"' "$run_file"; then
+  if RUN_FILE="$run_file" bun -e '
+    const lines = (await Bun.file(process.env.RUN_FILE).text()).trim().split(/\n+/).filter(Boolean)
+    const events = lines.map((line) => JSON.parse(line))
+    const teamList = events.find((event) => event.type === "tool_use" && event.part?.tool === "team_list")
+    process.exit(teamList ? 0 : 1)
+  '; then
     tc_pass "opencode run emitted a team_list verification tool_use event"
   else
     tc_fail "missing team_list verification tool_use event"; failures=$((failures+1))
   fi
 
-  if grep -q 'team-create-empty-lead-qa' "$run_file"; then
+  if RUN_FILE="$run_file" bun -e '
+    const lines = (await Bun.file(process.env.RUN_FILE).text()).trim().split(/\n+/).filter(Boolean)
+    const events = lines.map((line) => JSON.parse(line))
+    const teamCreate = events.find((event) => event.type === "tool_use" && event.part?.tool === "team_create")
+    const output = JSON.parse(teamCreate?.part?.state?.output ?? "{}")
+    process.exit(output?.runtimeState?.teamName === "team-create-empty-lead-qa" ? 0 : 1)
+  '; then
     tc_pass "team_create result preserved the requested team name"
   else
     tc_fail "missing requested team name in output"; failures=$((failures+1))
@@ -203,22 +231,25 @@ REAL_SESSION_COUNT_AFTER="$(tc_real_session_count)" || exit 1
   printf 'sandbox_db_distinct_from_real=%s\n' "$([ "$SANDBOX_DB_PATH" != "$REAL_DB_PATH_AFTER" ] && printf yes || printf no)"
 } >"$DB_ISOLATION"
 
-tc_assert_jsonl "$RUN_JSONL"
+tc_assert_jsonl "$RUN_JSONL" || exit $?
 
+qa_failures=0
 if [ "$REAL_DB_PATH_BEFORE" = "$REAL_DB_PATH_AFTER" ]; then
   tc_pass "real OpenCode DB path was stable before and after isolated run"
 else
-  tc_fail "real OpenCode DB path changed during isolated run"
+  tc_fail "real OpenCode DB path changed during isolated run"; qa_failures=$((qa_failures+1))
 fi
 
 if [ "$REAL_SESSION_COUNT_BEFORE" = "$REAL_SESSION_COUNT_AFTER" ]; then
   tc_pass "real OpenCode DB session count was unchanged before and after isolated run"
 else
-  tc_fail "real OpenCode DB session count changed during isolated run"
+  tc_fail "real OpenCode DB session count changed during isolated run"; qa_failures=$((qa_failures+1))
 fi
 
 if [ "$SANDBOX_DB_PATH" != "$REAL_DB_PATH_AFTER" ]; then
   tc_pass "isolated run used a sandbox OpenCode DB path distinct from the real DB"
 else
-  tc_fail "isolated run used the real OpenCode DB path"
+  tc_fail "isolated run used the real OpenCode DB path"; qa_failures=$((qa_failures+1))
 fi
+
+exit "$qa_failures"
