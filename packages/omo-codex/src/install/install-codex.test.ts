@@ -156,13 +156,15 @@ describe("install-codex", () => {
       readonly version: string
     }
     expect(distributionSnapshot).toEqual({ packageName: rootPackage.name, version: rootPackage.version })
-    const skillNames = (await readdir(join(pluginPath ?? "", "skills"), { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .sort()
-    expect(skillNames).toContain("ulw-plan")
-    expect(skillNames).toContain("ulw-loop")
-    expect(skillNames).not.toContain("planing-prometheustic")
+    let rootSkillsMissing = false
+    try {
+      await stat(join(pluginPath ?? "", "skills"))
+    } catch (error) {
+      rootSkillsMissing = error instanceof Error
+    }
+    expect(rootSkillsMissing).toBe(true)
+    expect((await stat(join(pluginPath ?? "", "components", "ultrawork", "skills", "ulw-plan"))).isDirectory()).toBe(true)
+    expect((await stat(join(pluginPath ?? "", "components", "ulw-loop", "skills", "ulw-loop"))).isDirectory()).toBe(true)
     const mcpManifest = JSON.parse(await readFile(join(pluginPath ?? "", ".mcp.json"), "utf8")) as {
       mcpServers: { ast_grep: { args: string[] }; git_bash: { args: string[] }; lsp: { args: string[] } }
     }
