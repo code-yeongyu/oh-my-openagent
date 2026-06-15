@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parse, printParseErrorCode } from "jsonc-parser"
-import type { ParseError } from "jsonc-parser"
+import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
+import type { ParseError } from "jsonc-parser/lib/esm/main.js"
 
 export interface JsoncParseResult<T> {
   data: T | null
