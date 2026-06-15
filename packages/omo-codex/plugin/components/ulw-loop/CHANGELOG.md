@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- README now documents the implemented CLI (all `omo ulw-loop` subcommands), both the `UserPromptSubmit` and `PreToolUse` hook channels, and the aggregate-plugin layout (the component does not ship its own `.codex-plugin/plugin.json`), replacing the stale "Wave 1 is scaffold only" description.
+- `criteriaCoverage` is now a typed member of `UlwLoopQualityGate` (new `UlwLoopCriteriaCoverage` interface); `validateQualityGate` builds it directly instead of through an `Object.assign` cast.
+
+### Added
+- Smoke-test assertions that pin the README to the implemented CLI subcommands and hook channels, plus a typed `criteriaCoverage` regression in `types.test.ts`.
+
 ## [0.1.0] - unreleased
 
 - Initial scaffold of codex-ulw-loop plugin.
