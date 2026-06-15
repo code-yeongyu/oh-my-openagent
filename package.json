@@ -39,6 +39,7 @@
     "lazycodex-ai": "bin/oh-my-opencode.js"
   },
   "files": [
+    "THIRD-PARTY-NOTICES.md",
     "dist",
     "bin",
     "postinstall.mjs",
@@ -57,6 +58,7 @@
     "packages/shared-skills/package.json",
     "packages/shared-skills/index.mjs",
     "packages/shared-skills/skills",
+    "packages/omo-codex/THIRD-PARTY-NOTICES.md",
     "packages/omo-codex/marketplace.json",
     "packages/omo-codex/lazycodex-repository",
     "packages/omo-codex/plugin",

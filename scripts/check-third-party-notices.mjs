@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
+import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
@@ -95,6 +96,11 @@ const CODEX_COMPONENT_NOTICE_REQUIREMENTS = [
   },
 ]
 
+const ROOT_SHIP_REQUIRED_PATHS = [
+  "THIRD-PARTY-NOTICES.md",
+  "packages/omo-codex/THIRD-PARTY-NOTICES.md",
+]
+
 const scopes = {
   root: {
     noticePath: "THIRD-PARTY-NOTICES.md",
@@ -131,6 +137,10 @@ function headingExists(noticeText, component) {
 
 function unique(values) {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right))
+}
+
+function readJson(path) {
+  return JSON.parse(readFileSync(join(repoRoot, path), "utf8"))
 }
 
 function checkCodexComponentNotices() {
@@ -191,8 +201,85 @@ function runScope(scopeName) {
   console.log(`${scope.noticePath}: ${requiredComponents.length} required notice entries present`)
 }
 
+function runShipCheck() {
+  const failures = []
+  const rootPackageJson = readJson("package.json")
+  const rootPackageFiles = rootPackageJson.files ?? []
+
+  for (const path of ROOT_SHIP_REQUIRED_PATHS) {
+    if (!rootPackageFiles.includes(path)) {
+      failures.push(`package.json files[] is missing ${path}`)
+    }
+  }
+
+  for (const requirement of CODEX_COMPONENT_NOTICE_REQUIREMENTS) {
+    const packagePath = `${requirement.path}/package.json`
+    const packageJson = readJson(packagePath)
+    const packageFiles = packageJson.files ?? []
+    for (const filename of ["LICENSE", "NOTICE"]) {
+      if (existsSync(join(repoRoot, requirement.path, filename)) && !packageFiles.includes(filename)) {
+        failures.push(`${packagePath} files[] is missing ${filename}`)
+      }
+    }
+  }
+
+  const packFiles = readRootDryRunPackFiles()
+  const requiredPackPaths = [
+    ...ROOT_SHIP_REQUIRED_PATHS,
+    ...CODEX_COMPONENT_NOTICE_REQUIREMENTS.flatMap((requirement) =>
+      ["LICENSE", "NOTICE"]
+        .map((filename) => `${requirement.path}/${filename}`)
+        .filter((path) => existsSync(join(repoRoot, path))),
+    ),
+  ]
+
+  for (const path of unique(requiredPackPaths)) {
+    if (!packFiles.has(path)) failures.push(`npm pack dry-run output is missing ${path}`)
+  }
+
+  if (failures.length > 0) {
+    console.error(`ship verification failed with ${failures.length} issue(s):`)
+    for (const failure of failures) console.error(`- ${failure}`)
+    process.exitCode = 1
+    return
+  }
+
+  console.log(`ship verification passed: ${requiredPackPaths.length} notice/license files present in root npm pack payload`)
+}
+
+function readRootDryRunPackFiles() {
+  const result = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20,
+  })
+  if (result.error) throw result.error
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr)
+    process.stdout.write(result.stdout)
+    throw new Error(`npm pack --dry-run --json --ignore-scripts failed with exit ${result.status}`)
+  }
+  const packJson = parseNpmPackJson(result.stdout)
+  return new Set(packJson[0].files.map((file) => file.path))
+}
+
+function parseNpmPackJson(output) {
+  for (let index = output.indexOf("["); index !== -1; index = output.indexOf("[", index + 1)) {
+    try {
+      const parsed = JSON.parse(output.slice(index))
+      if (Array.isArray(parsed) && parsed[0]?.files !== undefined) return parsed
+    } catch (error) {
+      if (error instanceof SyntaxError) continue
+      throw error
+    }
+  }
+  throw new Error("npm pack --dry-run --json did not produce a parseable file list")
+}
+
 const args = process.argv.slice(2)
-if (args.includes("--codex")) {
+if (args.includes("--ship")) {
+  runShipCheck()
+} else if (args.includes("--codex")) {
   runScope("codex")
 } else {
   runScope("root")
