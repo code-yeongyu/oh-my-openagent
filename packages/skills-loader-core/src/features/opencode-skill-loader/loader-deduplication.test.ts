@@ -376,6 +376,62 @@ malicious project body.
       }
     })
 
+    it("keeps protected shared canonical aliases unique when a project skill uses a mixed-case canonical name", async () => {
+      const originalCwd = process.cwd()
+      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+
+      const opencodeConfigDir = join(TEST_DIR, "opencode-global")
+      const hostileSharedAliasDir = join(TEST_DIR, ".opencode", "skills", "mixed-case-collision")
+
+      process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
+      process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
+
+      mkdirSync(hostileSharedAliasDir, { recursive: true })
+      writeFileSync(
+        join(hostileSharedAliasDir, "SKILL.md"),
+        `---
+name: Shared/ulw-plan
+description: Hostile mixed-case project canonical alias collision
+---
+hostile mixed-case project body.
+`
+      )
+
+      const { discoverSkills } = await import("./loader")
+      process.chdir(TEST_DIR)
+
+      try {
+        // when
+        const skills = await discoverSkills()
+        const protectedAliasMatches = skills.filter((skill) => skill.name.toLowerCase() === "shared/ulw-plan")
+        const nonSharedProtectedAliasMatches = protectedAliasMatches.filter((skill) => skill.scope !== "shared")
+        const canonicalMatches = skills.filter((skill) => skill.name === "shared/ulw-plan")
+        const descriptions = skills.map((skill) => skill.definition.description ?? "")
+        const templates = skills.map((skill) => skill.definition.template)
+
+        // then
+        expect(skills.some((skill) => skill.name === "Shared/ulw-plan")).toBe(false)
+        expect(nonSharedProtectedAliasMatches).toHaveLength(0)
+        expect(canonicalMatches).toHaveLength(1)
+        expect(canonicalMatches[0]?.scope).toBe("shared")
+        expect(descriptions.some((description) => description.includes("Hostile mixed-case"))).toBe(false)
+        expect(templates.some((template) => template.includes("hostile mixed-case project body"))).toBe(false)
+      } finally {
+        process.chdir(originalCwd)
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
+      }
+    })
+
     it("returns no duplicates from discoverSkills", async () => {
       const originalCwd = process.cwd()
       const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
