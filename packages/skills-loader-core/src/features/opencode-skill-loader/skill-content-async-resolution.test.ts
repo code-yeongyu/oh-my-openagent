@@ -13,12 +13,21 @@ import {
 } from "./skill-content"
 import { getAllSkills } from "./skill-discovery"
 import { matchSkillByName } from "../../tools/skill/skill-matcher"
+import type { LoadedSkill } from "./types"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
 	mkdirSync(dir, { recursive: true })
 	const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
 	writeFileSync(join(dir, "SKILL.md"), yaml)
+}
+
+function createLoadedSkill(name: string, scope: LoadedSkill["scope"]): LoadedSkill {
+	return {
+		name,
+		definition: { name, description: `${name} description`, template: `${name} body` },
+		scope,
+	}
 }
 
 let originalEnv: Record<string, string | undefined>
@@ -92,6 +101,18 @@ describe("resolveSkillContentAsync", () => {
 
 		// then
 		expect(matchedSkill).toBeUndefined()
+	})
+
+	it("#given a project skill whose literal name starts with shared slash #when matching by exact name #then the project skill remains reachable", () => {
+		// given
+		const skills = [createLoadedSkill("shared/custom", "project")]
+
+		// when
+		const matchedSkill = matchSkillByName(skills, "shared/custom")
+
+		// then
+		expect(matchedSkill?.scope).toBe("project")
+		expect(matchedSkill?.name).toBe("shared/custom")
 	})
 
 	it("#given a local ulw-plan override exists #when only the shared canonical alias is disabled #then the local plain override still resolves", async () => {

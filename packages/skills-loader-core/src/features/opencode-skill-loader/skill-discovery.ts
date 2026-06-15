@@ -6,8 +6,20 @@ import type { SkillResolutionOptions } from "./skill-resolution-options"
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
 const SHARED_SKILL_PREFIX = "shared/"
 
+function isDisabledAlias(name: string, disabledSkills: ReadonlySet<string>): boolean {
+	const normalizedName = name.toLowerCase()
+	if (disabledSkills.has(normalizedName)) return true
+
+	for (const disabledSkill of disabledSkills) {
+		if (disabledSkill.toLowerCase() === normalizedName) return true
+	}
+
+	return false
+}
+
 export function isDisabledSkillAlias(skill: LoadedSkill, disabledSkills: ReadonlySet<string>): boolean {
-	if (disabledSkills.has(skill.name)) {
+	const normalizedSkillName = skill.name.toLowerCase()
+	if (isDisabledAlias(normalizedSkillName, disabledSkills)) {
 		return true
 	}
 
@@ -15,11 +27,11 @@ export function isDisabledSkillAlias(skill: LoadedSkill, disabledSkills: Readonl
 		return false
 	}
 
-	if (skill.name.startsWith(SHARED_SKILL_PREFIX)) {
-		return disabledSkills.has(skill.name.slice(SHARED_SKILL_PREFIX.length))
+	if (normalizedSkillName.startsWith(SHARED_SKILL_PREFIX)) {
+		return isDisabledAlias(normalizedSkillName.slice(SHARED_SKILL_PREFIX.length), disabledSkills)
 	}
 
-	return disabledSkills.has(`${SHARED_SKILL_PREFIX}${skill.name}`)
+	return isDisabledAlias(`${SHARED_SKILL_PREFIX}${normalizedSkillName}`, disabledSkills)
 }
 
 export function clearSkillCache(): void {

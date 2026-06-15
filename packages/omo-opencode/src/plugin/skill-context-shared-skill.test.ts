@@ -16,6 +16,8 @@ const LOCAL_ULW_PLAN_BODY = "LOCAL PROJECT ULW PLAN BODY"
 const LOCAL_INLINE_ULW_PLAN_BODY = "LOCAL_INLINE_ULW_PLAN_BODY"
 const POISONED_SHARED_BODY = "POISONED PROJECT SHARED ULW PLAN BODY"
 const POISONED_MIXED_CASE_SHARED_BODY = "POISONED MIXED CASE PROJECT SHARED ULW PLAN BODY"
+const BLOCKED_MIXED_CASE_SKILL_BODY = "BLOCKED_MIXED_CASE_SKILL_BODY"
+const BLOCKED_MIXED_CASE_SKILL_DESCRIPTION = "BLOCKED_MIXED_CASE_SKILL_DESCRIPTION"
 
 function createToolContext(directory: string): ToolContext {
   return {
@@ -74,6 +76,47 @@ async function createPluginWiredSkillTool(args: {
     browserProvider: skillContext.browserProvider,
     includeSkillsInDescription: true,
   })
+}
+
+async function expectMixedCaseBlockedSkillFiltered(args: {
+  readonly directory: string
+  readonly disabledSkills?: readonly string[]
+  readonly skills?: Record<string, unknown>
+}): Promise<void> {
+  writeSkill(
+    join(args.directory, ".opencode", "skills", "blocked-skill"),
+    "Blocked-Skill",
+    BLOCKED_MIXED_CASE_SKILL_DESCRIPTION,
+    BLOCKED_MIXED_CASE_SKILL_BODY,
+  )
+  const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+    disabled_skills: args.disabledSkills,
+    skills: args.skills,
+  })
+
+  const skillContext = await createSkillContext({
+    directory: args.directory,
+    pluginConfig,
+  })
+  const systemContent = buildSystemContent({
+    agentsContext: "base",
+    availableCategories: [],
+    availableSkills: skillContext.availableSkills,
+  })
+  const skillTool = createSkillTool({
+    directory: args.directory,
+    skills: skillContext.mergedSkills,
+    disabledSkills: skillContext.disabledSkills,
+    browserProvider: skillContext.browserProvider,
+    includeSkillsInDescription: true,
+  })
+
+  expect(skillContext.mergedSkills.map((skill) => skill.name)).not.toContain("Blocked-Skill")
+  expect(skillContext.availableSkills.map((skill) => skill.name)).not.toContain("Blocked-Skill")
+  expect(systemContent).not.toContain(BLOCKED_MIXED_CASE_SKILL_DESCRIPTION)
+  expect(systemContent).not.toContain(BLOCKED_MIXED_CASE_SKILL_BODY)
+  expect(skillTool.description).not.toContain(BLOCKED_MIXED_CASE_SKILL_DESCRIPTION)
+  await expectSkillUnavailable(skillTool, createToolContext(args.directory), "Blocked-Skill")
 }
 
 async function expectSkillUnavailable(
@@ -271,6 +314,22 @@ describe("plugin-wired shared skill aliases", () => {
     expect(systemContent).not.toContain("IGNORE_MIXED_CASE_CONFIG")
     expect(systemContent).not.toContain("HOSTILE_MIXED_CASE_CONFIG_BODY")
     expect(skillTool.description).not.toContain("IGNORE_MIXED_CASE_CONFIG")
+  })
+
+  test("#given mixed-case project skill disabled by lowercase disabled_skills #when plugin skill context is built #then it is absent from context, tool, and delegate prompt", async () => {
+    // when / then
+    await expectMixedCaseBlockedSkillFiltered({
+      directory: testDirectory,
+      disabledSkills: ["blocked-skill"],
+    })
+  })
+
+  test("#given mixed-case project skill disabled by lowercase skills.disable #when plugin skill context is built #then it is absent from context, tool, and delegate prompt", async () => {
+    // when / then
+    await expectMixedCaseBlockedSkillFiltered({
+      directory: testDirectory,
+      skills: { disable: ["blocked-skill"] },
+    })
   })
 
   test("#given shared ulw-plan is disabled #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {

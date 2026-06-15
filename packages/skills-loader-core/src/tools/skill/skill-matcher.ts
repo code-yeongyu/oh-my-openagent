@@ -14,6 +14,11 @@ export function matchSkillByName(skills: LoadedSkill[], requestedName: string): 
       return sharedMatch
     }
 
+    const exactMatch = skills.find((skill) => skill.name.toLowerCase() === normalizedName)
+    if (exactMatch) {
+      return exactMatch
+    }
+
     const unqualifiedName = normalizedName.slice(SHARED_SKILL_PREFIX.length)
     return skills.find(
       (skill) => skill.scope === "shared" && skill.name.toLowerCase() === unqualifiedName,
