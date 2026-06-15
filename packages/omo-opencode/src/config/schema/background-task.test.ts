@@ -72,4 +72,36 @@ describe("BackgroundTaskConfigSchema", () => {
       })
     })
   })
+
+  describe("persistence", () => {
+    describe("#given valid persistence (false)", () => {
+      test("#when parsed #then returns correct value", () => {
+        const result = BackgroundTaskConfigSchema.parse({ persistence: false })
+
+        expect(result.persistence).toBe(false)
+      })
+    })
+
+    describe("#given persistence not provided", () => {
+      test("#when parsed #then field is undefined", () => {
+        const result = BackgroundTaskConfigSchema.parse({})
+
+        expect(result.persistence).toBeUndefined()
+      })
+    })
+
+    describe('#given persistence is non-boolean ("x")', () => {
+      test("#when parsed #then throws ZodError", () => {
+        let thrownError: unknown
+
+        try {
+          BackgroundTaskConfigSchema.parse({ persistence: "x" })
+        } catch (error) {
+          thrownError = error
+        }
+
+        expect(thrownError).toBeInstanceOf(ZodError)
+      })
+    })
+  })
 })

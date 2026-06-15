@@ -6258,6 +6258,10 @@
           "minimum": 10,
           "maximum": 9007199254740991
         },
+        "persistence": {
+          "description": "Persist background task snapshots to <project>/.omo/background-tasks for restart recovery (default: true)",
+          "type": "boolean"
+        },
         "circuitBreaker": {
           "type": "object",
           "properties": {

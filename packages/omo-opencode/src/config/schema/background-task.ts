@@ -24,6 +24,8 @@ export const BackgroundTaskConfigSchema = z.object({
   syncPollTimeoutMs: z.number().min(60000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
+  /** Persist background task snapshots to <project>/.omo/background-tasks for restart recovery (default: true) */
+  persistence: z.boolean().optional().describe("Persist background task snapshots to <project>/.omo/background-tasks for restart recovery (default: true)"),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),
 })
 

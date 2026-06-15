@@ -106,6 +106,7 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import { createTaskPersistenceStore, recoverPersistedTasks, type TaskPersistenceStore } from "./task-persistence"
 import {
   archiveBackgroundTask,
   forgetBackgroundTask,
@@ -237,6 +238,8 @@ export interface BackgroundManagerConfig {
   enableParentSessionNotifications?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   log?: typeof log
+  /** Test seam: override the persistence store (e.g. a recording double). Falls back to the disk store. */
+  persistenceStore?: TaskPersistenceStore
 }
 
 export class BackgroundManager {
@@ -278,6 +281,7 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private persistenceStore?: TaskPersistenceStore
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -299,6 +303,9 @@ export class BackgroundManager {
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
+    const persistenceEnabled = options?.config?.persistence ?? true
+    this.persistenceStore = options?.persistenceStore
+      ?? (persistenceEnabled ? createTaskPersistenceStore({ directory: this.directory }) : undefined)
     this.parentWakeNotifier = new ParentWakeNotifier(
       {
         client: this.client,
@@ -424,17 +431,22 @@ export class BackgroundManager {
     this.tasksByParentSession.set(task.parentSessionId, taskIDs)
   }
 
+  private persistTask(task: BackgroundTask): void {
+    this.persistenceStore?.persist(task)
+  }
+
   private removeTask(task: BackgroundTask): void {
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
     this.tasks.delete(task.id)
+    this.persistenceStore?.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
 
   private archiveCompletedTask(task: BackgroundTask): void {
-    if (!task.sessionId) {
-      return
-    }
+    // Terminal tasks are archived even without a sessionId: recovery surfaces
+    // session-lost tasks here (e.g. a pending-no-session snapshot reconciled to
+    // error), and getTask must be able to resolve them after a restart (F2).
     if (task.status === "running" || task.status === "pending") {
       return
     }
@@ -454,6 +466,7 @@ export class BackgroundManager {
       model: task.model,
       error: task.error,
       category: task.category,
+      result: task.result,
     }
 
     this.completedTaskArchive.set(task.id, archivedTask)
@@ -464,6 +477,39 @@ export class BackgroundManager {
     const oldestTaskID = this.completedTaskArchive.keys().next().value
     if (typeof oldestTaskID === "string") {
       this.completedTaskArchive.delete(oldestTaskID)
+    }
+  }
+
+  /**
+   * Reconcile persisted task snapshots after an OpenCode restart and surface the
+   * recovered tasks through the same read paths `background_output` already uses
+   * (`completedTaskArchive` + the cross-instance registry). Recovered tasks are
+   * never re-added to `this.tasks`: no polling, notifications, parent-wake, or
+   * prompts are triggered for them. Fire-and-forget safe: the whole body is
+   * wrapped so a failure can never propagate to plugin init.
+   */
+  async restorePersistedTasks(options?: { isPidAlive?: (pid: number) => boolean }): Promise<void> {
+    if (!this.persistenceStore) {
+      return
+    }
+
+    try {
+      const recovered = await recoverPersistedTasks({
+        store: this.persistenceStore,
+        client: this.client,
+        directory: this.directory,
+        isPidAlive: options?.isPidAlive,
+        logger: this.logger,
+      })
+
+      for (const { task } of recovered) {
+        this.archiveCompletedTask(task)
+        archiveBackgroundTask(task)
+      }
+    } catch (error) {
+      this.logger("[background-agent] restorePersistedTasks failed:", {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 
@@ -606,6 +652,9 @@ export class BackgroundManager {
       const firstAttempt = startAttempt(task, input.model)
 
       this.addTask(task)
+      // Persist the queued pending task immediately so a crash before the
+      // session binds still leaves a recoverable on-disk snapshot (F2).
+      this.persistTask(task)
       this.taskHistory.record(input.parentSessionId, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
 
       // Track for batched notifications immediately (pending state)
@@ -698,6 +747,9 @@ export class BackgroundManager {
             item.task.error = error instanceof Error ? error.message : String(error)
             item.task.completedAt = new Date()
           }
+          // Persist the terminal status before any await so a crash leaves an
+          // accurate on-disk snapshot, not a stale "running" (F3).
+          this.persistTask(item.task)
 
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
@@ -823,6 +875,7 @@ export class BackgroundManager {
     }
     task.concurrencyKey = concurrencyKey
     task.concurrencyGroup = concurrencyKey
+    this.persistTask(task)
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
@@ -1000,6 +1053,7 @@ The fallback retry session is now created and can be inspected directly.
           existingTask.error = terminalError
           existingTask.completedAt = new Date()
         }
+        this.persistTask(existingTask)
         if (existingTask.rootSessionId) {
           this.unregisterRootDescendant(existingTask.rootSessionId)
         }
@@ -1240,6 +1294,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.addTask(task)
+    this.persistTask(task)
     subagentSessions.add(input.sessionId)
     this.startPolling()
     this.taskHistory.record(input.parentSessionId, { id: task.id, sessionID: input.sessionId, agent: input.agent || "task", description: input.description, status: "running", startedAt: task.startedAt })
@@ -1311,6 +1366,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.startPolling()
+    this.persistTask(existingTask)
     if (existingTask.sessionId) {
       subagentSessions.add(existingTask.sessionId)
     }
@@ -1426,6 +1482,7 @@ The fallback retry session is now created and can be inspected directly.
       const errorMessage = errorInfo.message ?? (error instanceof Error ? error.message : String(error))
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      this.persistTask(existingTask)
       if (existingTask.rootSessionId) {
         this.unregisterRootDescendant(existingTask.rootSessionId)
       }
@@ -1924,6 +1981,7 @@ The fallback retry session is now created and can be inspected directly.
       task.error = errorMessage
       task.completedAt = new Date()
     }
+    this.persistTask(task)
 
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
@@ -2039,6 +2097,7 @@ The fallback retry session is now created and can be inspected directly.
       task.error = errorMsg
       task.completedAt = new Date()
     }
+    this.persistTask(task)
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
@@ -2100,6 +2159,7 @@ The fallback retry session is now created and can be inspected directly.
       idleDeferralTimers: this.idleDeferralTimers,
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
+      persistTask: (task) => this.persistTask(task),
       onRetrying: ({ task, source }) => {
         const currentAttempt = getCurrentAttempt(task)
         const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)
@@ -2119,6 +2179,9 @@ The task was re-queued on a fallback model after a retryable failure.
       },
     })
     const retried = await result
+    // Persist the re-queued pending task (sessionId cleared by the retry) right
+    // after scheduling so a crash before the new attempt starts is recoverable (F4).
+    if (retried) this.persistTask(task)
     if (retried && retryingNotification) {
       const parentPromptContext = await this.resolveParentWakePromptContext(task)
       this.queuePendingParentWake(
@@ -2268,6 +2331,8 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private scheduleTaskRemoval(taskId: string, rescheduleCount = 0): void {
+    const taskToPersist = this.tasks.get(taskId)
+    if (taskToPersist) this.persistTask(taskToPersist)
     const existingTimer = this.completionTimers.get(taskId)
     if (existingTimer) {
       clearTimeout(existingTimer)
@@ -2354,6 +2419,7 @@ The task was re-queued on a fallback model after a retryable failure.
         task.error = reason
       }
     }
+    this.persistTask(task)
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
@@ -2472,6 +2538,8 @@ The task was re-queued on a fallback model after a retryable failure.
       task.status = "completed"
       task.completedAt = new Date()
     }
+    // Persist the terminal status before the abort/notification awaits below (F3).
+    this.persistTask(task)
     this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
     if (task.rootSessionId) {
@@ -2745,12 +2813,14 @@ The task was re-queued on a fallback model after a retryable failure.
       notifications: this.notifications,
       taskTtlMs: this.config?.taskTtlMs,
       sessionStatuses: allStatuses,
+      onTaskRemoved: (taskId) => this.persistenceStore?.delete(taskId),
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()
+        this.persistTask(task)
         if (!wasPending && task.rootSessionId) {
           this.unregisterRootDescendant(task.rootSessionId)
         }
@@ -2807,6 +2877,10 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      onTaskInterrupted: (task) => {
+        this.persistTask(task)
+        removeTaskToastTracking(task.id)
+      },
     })
   }
 
@@ -2822,6 +2896,7 @@ The task was re-queued on a fallback model after a retryable failure.
       task.error = errorMessage
       task.completedAt = new Date()
     }
+    this.persistTask(task)
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }

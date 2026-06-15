@@ -181,6 +181,13 @@ export function createManagers(args: {
     modelFallbackControllerAccessor,
   })
 
+  // Reconcile persisted background-task snapshots from a previous process so
+  // background_output can reach them after an OpenCode restart. Fire-and-forget:
+  // construction must stay synchronous and a failure must not block init.
+  void backgroundManager.restorePersistedTasks().catch((error) => {
+    log("[create-managers] restorePersistedTasks failed:", error)
+  })
+
   deps.initTaskToastManagerFn(ctx.client)
 
   const skillMcpManager = new deps.SkillMcpManagerClass()
