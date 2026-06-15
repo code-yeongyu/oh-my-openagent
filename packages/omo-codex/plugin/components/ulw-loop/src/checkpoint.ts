@@ -170,7 +170,8 @@ export async function checkpointUlwLoop(
 			if (final) {
 				requireAllCriteriaPass(goal);
 				requireAllPlanCriteriaPass(plan);
-			} else requireEssentialCriteriaPass(goal);
+			} else if (aggregate) requireEssentialCriteriaPass(goal);
+			else requireAllCriteriaPass(goal);
 			const snapshot = await readCodexGoalSnapshotInput(args.codexGoalJson, repoRoot);
 			const reconciliation = reconcileCodexGoalSnapshot(snapshot, {
 				expectedObjective: expectedCodexObjective(plan, goal),
