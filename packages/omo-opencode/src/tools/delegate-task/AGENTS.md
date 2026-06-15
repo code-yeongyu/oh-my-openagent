@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-49 files. The `task` tool implementation — delegates work to subagents via background or sync sessions. Resolves categories, models, skills, and manages both async and synchronous execution flows. 8+ built-in categories.
+The `task` tool implementation delegates work to subagents via background or sync sessions. It resolves categories, models, skills, and manages both async and synchronous execution flows. Harness-neutral task selection and retry primitives are extracted to [`packages/delegate-core/`](../../../../../packages/delegate-core); this directory keeps OpenCode session/tool execution wiring. Built-in categories are defined alongside user category overrides.
 
 ## TWO EXECUTION MODES
 

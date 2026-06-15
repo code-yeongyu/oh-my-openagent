@@ -376,7 +376,7 @@ describe("category-skill-reminder hook", () => {
     test("shows built-in skills when only built-in skills are available", async () => {
       // given
       const availableSkills: AvailableSkill[] = [
-        { name: "frontend-ui-ux", description: "Frontend UI/UX work", location: "plugin" },
+        { name: "frontend", description: "Frontend UI/UX work", location: "plugin" },
         { name: "git-master", description: "Git operations", location: "plugin" },
         { name: "playwright", description: "Browser automation", location: "plugin" },
       ]
@@ -392,15 +392,15 @@ describe("category-skill-reminder hook", () => {
 
       // then
       expect(output.output).toContain("**Built-in**:")
-      expect(output.output).toContain("frontend-ui-ux")
+      expect(output.output).toContain("frontend")
       expect(output.output).toContain("**⚡ YOUR SKILLS (PRIORITY)**")
-      expect(output.output).toContain("load_skills=[\"frontend-ui-ux\"")
+      expect(output.output).toContain("load_skills=[\"frontend\"")
     })
 
     test("emphasizes user skills with PRIORITY and uses first user skill in example", async () => {
       // given
       const availableSkills: AvailableSkill[] = [
-        { name: "frontend-ui-ux", description: "Frontend UI/UX work", location: "plugin" },
+        { name: "frontend", description: "Frontend UI/UX work", location: "plugin" },
         { name: "react-19", description: "React 19 expertise", location: "user" },
         { name: "web-designer", description: "Visual design", location: "user" },
       ]

@@ -69,6 +69,66 @@ describe("createLspMcpConfig", () => {
     expect(config.command).toEqual([bunPath, sourceCliPath, "mcp"])
   })
 
+  it("prefers an ancestor dist cli before an earlier source cli candidate", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-lsp-order-root-")
+    const moduleFilePath = join(packageRoot, "nested", "src", "mcp", "lsp.ts")
+    const nearerSourceCliPath = join(packageRoot, "nested", "src", "mcp", "packages", "lsp-daemon", "src", "cli.ts")
+    const nearerToolsDistPath = join(packageRoot, "nested", "src", "mcp", "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const ancestorDistCliPath = join(packageRoot, "packages", "lsp-daemon", "dist", "cli.js")
+    const nodePath = join(packageRoot, "bin", "node")
+    const bunPath = join(packageRoot, "bin", "bun")
+    mkdirSync(join(packageRoot, "nested", "src", "mcp"), { recursive: true })
+    mkdirSync(join(packageRoot, "nested", "src", "mcp", "packages", "lsp-daemon", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "nested", "src", "mcp", "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "dist"), { recursive: true })
+    writeFileSync(nearerSourceCliPath, "console.log('near-source')\n", "utf-8")
+    writeFileSync(nearerToolsDistPath, "#!/usr/bin/env node\n", "utf-8")
+    writeFileSync(ancestorDistCliPath, "#!/usr/bin/env node\n", "utf-8")
+
+    // when
+    const config = createLspMcpConfig({
+      cwd: createTemporaryDirectory("omo-lsp-order-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath, node: nodePath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.command).toEqual([nodePath, ancestorDistCliPath, "mcp"])
+  })
+
+  it("uses the nearest source cli when no dist cli exists in the ancestor walk", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-lsp-source-order-root-")
+    const moduleFilePath = join(packageRoot, "nested", "src", "mcp", "lsp.ts")
+    const nearerSourceCliPath = join(packageRoot, "nested", "src", "mcp", "packages", "lsp-daemon", "src", "cli.ts")
+    const nearerToolsDistPath = join(packageRoot, "nested", "src", "mcp", "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const ancestorSourceCliPath = join(packageRoot, "packages", "lsp-daemon", "src", "cli.ts")
+    const ancestorToolsDistPath = join(packageRoot, "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const bunPath = join(packageRoot, "bin", "bun")
+    mkdirSync(join(packageRoot, "nested", "src", "mcp"), { recursive: true })
+    mkdirSync(join(packageRoot, "nested", "src", "mcp", "packages", "lsp-daemon", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "nested", "src", "mcp", "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    writeFileSync(nearerSourceCliPath, "console.log('near-source')\n", "utf-8")
+    writeFileSync(nearerToolsDistPath, "#!/usr/bin/env node\n", "utf-8")
+    writeFileSync(ancestorSourceCliPath, "console.log('ancestor-source')\n", "utf-8")
+    writeFileSync(ancestorToolsDistPath, "#!/usr/bin/env node\n", "utf-8")
+
+    // when
+    const config = createLspMcpConfig({
+      cwd: createTemporaryDirectory("omo-lsp-source-order-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.command).toEqual([bunPath, nearerSourceCliPath, "mcp"])
+  })
+
   it("does not run the bun daemon source cli when the engine dist is missing; bootstraps instead", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-lsp-source-no-engine-root-")

@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { Message, Part } from "@opencode-ai/sdk"
 
 import { log } from "../shared/logger"
@@ -78,9 +79,7 @@ function findLastUserTurn(messages: MessageWithParts[]): MessageWithParts | unde
   return undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function readStringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key]

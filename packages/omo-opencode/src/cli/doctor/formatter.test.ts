@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { stripAnsi } from "./format-shared"
-import type { DoctorResult } from "./types"
+import { stripAnsi } from "./framework/format-shared"
+import type { DoctorResult } from "./framework/types"
 
 function createDoctorResult(): DoctorResult {
   return {
@@ -104,7 +104,7 @@ describe("formatDoctorOutput", () => {
     it("shows System OK when no issues", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?default-ok-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?default-ok-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "default"))
@@ -116,7 +116,7 @@ describe("formatDoctorOutput", () => {
     it("shows issue count and details when issues exist", async () => {
       //#given
       const result = createDoctorResultWithIssues()
-      const { formatDoctorOutput } = await import(`./formatter?default-issues-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?default-issues-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "default"))
@@ -132,7 +132,7 @@ describe("formatDoctorOutput", () => {
     it("renders system version line", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?status-ver-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?status-ver-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "status"))
@@ -144,7 +144,7 @@ describe("formatDoctorOutput", () => {
     it("renders tool and MCP info", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?status-tools-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?status-tools-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "status"))
@@ -157,7 +157,7 @@ describe("formatDoctorOutput", () => {
     it("renders Codex plugin status for Codex target", async () => {
       //#given
       const result = createCodexDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?status-codex-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?status-codex-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "status"))
@@ -176,7 +176,7 @@ describe("formatDoctorOutput", () => {
     it("includes all section headers", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?verbose-headers-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?verbose-headers-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "verbose"))
@@ -192,7 +192,7 @@ describe("formatDoctorOutput", () => {
     it("shows check summary counts", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?verbose-summary-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?verbose-summary-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "verbose"))
@@ -206,7 +206,7 @@ describe("formatDoctorOutput", () => {
     it("renders check details sections such as Models", async () => {
       //#given
       const result = createDoctorResultWithDetails()
-      const { formatDoctorOutput } = await import(`./formatter?verbose-details-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?verbose-details-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "verbose"))
@@ -220,7 +220,7 @@ describe("formatDoctorOutput", () => {
     it("renders Codex sections for Codex target", async () => {
       //#given
       const result = createCodexDoctorResult()
-      const { formatDoctorOutput } = await import(`./formatter?verbose-codex-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?verbose-codex-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "verbose"))
@@ -242,7 +242,7 @@ describe("formatDoctorOutput", () => {
           config: { ...result.codex.config, marketplaceConfigured: false },
         }
       }
-      const { formatDoctorOutput } = await import(`./formatter?verbose-codex-marketplace-${Date.now()}`)
+      const { formatDoctorOutput } = await import(`./framework/formatter?verbose-codex-marketplace-${Date.now()}`)
 
       //#when
       const output = stripAnsi(formatDoctorOutput(result, "verbose"))
@@ -256,7 +256,7 @@ describe("formatDoctorOutput", () => {
     it("returns valid JSON", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatJsonOutput } = await import(`./formatter?json-valid-${Date.now()}`)
+      const { formatJsonOutput } = await import(`./framework/formatter?json-valid-${Date.now()}`)
 
       //#when
       const output = formatJsonOutput(result)
@@ -268,7 +268,7 @@ describe("formatDoctorOutput", () => {
     it("preserves all result fields", async () => {
       //#given
       const result = createDoctorResult()
-      const { formatJsonOutput } = await import(`./formatter?json-fields-${Date.now()}`)
+      const { formatJsonOutput } = await import(`./framework/formatter?json-fields-${Date.now()}`)
 
       //#when
       const output = formatJsonOutput(result)

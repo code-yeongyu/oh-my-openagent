@@ -25,7 +25,7 @@ describe("codex ultrawork package metadata", () => {
 		expect(packageJson.type).toBe("module");
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
 		expect(packageJson.bin["omo-ultrawork"]).toBe("./dist/cli.js");
-		expect(packageJson.scripts["build"]).toBe("tsc -p tsconfig.build.json");
+		expect(packageJson.scripts["build"]).toBe("node scripts/sync-directive.mjs && tsc -p tsconfig.build.json");
 		expect(packageJson.scripts["test"]).toBe("vitest --run");
 		expect(packageFiles).toContain("dist");
 		expect(packageFiles).toContain("directive.md");

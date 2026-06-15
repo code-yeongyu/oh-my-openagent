@@ -360,7 +360,7 @@ Skills aren't just prompts. Each brings:
 - Embedded MCP servers, on demand.
 - Scoped permissions so agents stay in bounds.
 
-Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend-ui-ux` (design-first UI).
+Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend` (design-first UI).
 
 Add your own under `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*/SKILL.md`.
 

@@ -1,7 +1,1 @@
-export * from "./types"
-export {
-  createBuiltinSkills,
-  resolveActiveBuiltinSkills,
-  type CreateBuiltinSkillsOptions,
-  type ResolveActiveBuiltinSkillsOptions,
-} from "./skills"
+export * from "@oh-my-opencode/skills-loader-core/builtin-skills/index"

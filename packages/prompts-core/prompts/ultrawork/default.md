@@ -153,7 +153,7 @@ task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here
 **CATEGORY + SKILL DELEGATION:**
 ```
 // Frontend work
-task(category="visual-engineering", load_skills=["frontend-ui-ux"], run_in_background=true)
+task(category="visual-engineering", load_skills=["frontend"], run_in_background=true)
 
 // Complex logic
 task(category="ultrabrain", load_skills=[...], run_in_background=true)

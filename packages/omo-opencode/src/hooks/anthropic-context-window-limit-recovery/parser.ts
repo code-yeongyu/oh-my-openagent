@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { ParsedTokenLimitError } from "./types"
 
 interface AnthropicErrorData {
@@ -45,9 +46,7 @@ function isThinkingBlockError(text: string): boolean {
 
 const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object"
-}
+
 
 function readProperty(source: Record<string, unknown>, key: string): unknown | undefined {
   try {

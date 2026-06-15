@@ -7,7 +7,7 @@ import {
 	type SpawnOptions,
 	type SpawnResult,
 } from "@oh-my-opencode/ast-grep-core"
-import { spawn } from "./bun-spawn-shim"
+import { spawn } from "@oh-my-opencode/utils/runtime"
 import {
 	ensureCliAvailable,
 	getAstGrepPath,

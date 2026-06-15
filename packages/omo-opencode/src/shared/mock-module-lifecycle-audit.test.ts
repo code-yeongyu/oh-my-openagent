@@ -60,6 +60,10 @@ const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
     path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "stale-session-sweep-runtime.test.ts"),
     "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
   ],
+  [
+    path.join(WORKSPACE_ROOT, "packages", "openclaw-core", "src", "__tests__", "reply-listener-process.test.ts"),
+    "justification: legacy openclaw-core mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
+  ],
 ])
 
 async function listTestFiles(directory: string): Promise<string[]> {

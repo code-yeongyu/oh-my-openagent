@@ -33,7 +33,7 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js",
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
@@ -41,10 +41,8 @@
 		"lint:fix": "biome check --write .",
 		"check": "tsc --noEmit && biome check . && npm run build"
 	},
-	"dependencies": {
-		"posthog-node": "^5.34.3"
-	},
 	"devDependencies": {
+		"@oh-my-opencode/telemetry-core": "file:../../../../telemetry-core",
 		"@biomejs/biome": "2.4.16",
 		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",

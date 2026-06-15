@@ -25,8 +25,8 @@
 		"omo-start-work-continuation": "./dist/cli.js"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "vitest --run",
+		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
+		"test": "npm run build --silent && vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
@@ -42,6 +42,7 @@
 		"NOTICE"
 	],
 	"devDependencies": {
+		"@oh-my-opencode/boulder-state": "file:../../../../boulder-state",
 		"@biomejs/biome": "2.4.16",
 		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",

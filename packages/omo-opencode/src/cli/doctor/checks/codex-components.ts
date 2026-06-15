@@ -2,7 +2,7 @@ import { statSync, type Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
-import type { CheckResult, DoctorIssue } from "../types"
+import type { CheckResult, DoctorIssue } from "../framework/types"
 import { gatherCodexSummary, type CodexDoctorDeps } from "./codex"
 
 export const CODEX_COMPONENTS_CHECK_ID = "codex-components"
