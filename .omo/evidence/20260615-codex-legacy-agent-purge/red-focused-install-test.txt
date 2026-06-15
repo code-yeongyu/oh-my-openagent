@@ -1,7 +1,7 @@
 bun test v1.3.14 (0d9b296a)
 
 packages/omo-codex/src/install/install-codex.test.ts:
-261 | 
+261 |
 262 |     // then
 263 |     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
 264 |     expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")

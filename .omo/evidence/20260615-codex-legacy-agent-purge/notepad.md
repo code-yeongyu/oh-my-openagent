@@ -45,3 +45,13 @@
 - Defensive layer: filesystem existence checks are boundary checks around user-controlled `CODEX_HOME/agents`.
 - Tests: RED/GREEN focused test, same-name custom preservation test, real generated installer scenario, and full Codex gate passed.
 - Reviewer note: no multi-agent reviewer tool is available in this Codex tool surface; performed strict self-review plus no-excuse, LSP, focused tests, real-surface QA, and `bun run test:codex`.
+
+## Final Anti-Slop Follow-Up
+- Request: split retired managed-agent purge responsibility out of `link-cached-plugin-agents.ts`, keep behavior unchanged, remove trailing whitespace, and commit atomically.
+- RED structural proof: `red-anti-slop-split-check.txt` shows `link-cached-plugin-agents.ts` at 262 pure LOC with purge constants/function still inline.
+- GREEN structural proof: `green-anti-slop-split-check.txt` shows `link-cached-plugin-agents.ts` at 240 pure LOC and `retired-managed-agent-purge.ts` at 49 pure LOC.
+- Behavior lock before split: `baseline-focused-install-tests-before-split.txt` passed 20 install/link/surface tests.
+- Commit-candidate focused tests: `focused-install-tests-commit-candidate.txt` passed 20 tests / 151 assertions.
+- Full gate: `test-codex-after-split.txt` passed `bun run test:codex`.
+- Real surface: `real-surface-install-local-after-split.txt` installed into isolated `CODEX_HOME`, removed the managed retired reviewer TOML, preserved `user-custom.toml`, enabled `omo@sisyphuslabs`, left real `~/.codex/config.toml` hash unchanged, and cleaned the temp root.
+- Static cleanup: `diff-check-commit-candidate.txt`, `loc-check-commit-candidate.txt`, and `no-excuse-check-commit-candidate.txt` passed.
