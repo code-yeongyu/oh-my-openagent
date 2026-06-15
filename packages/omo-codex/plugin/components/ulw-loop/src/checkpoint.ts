@@ -214,7 +214,6 @@ export async function checkpointUlwLoop(
 						`${formatCodexGoalReconciliation(reconciliation)}${aggregate && snapshot?.status === "complete" && objective !== undefined ? buildTaskScopedAggregateReconciliationHint(goal, final) : ""}`,
 						"ulw_loop_codex_snapshot_mismatch",
 					);
-				aggregateCompletion = makeAggregateCompletion(now, evidence, codexGoal);
 			}
 			if (final) aggregateCompletion = makeAggregateCompletion(now, evidence, codexGoal);
 			if (final || aggregateCompletion !== undefined)

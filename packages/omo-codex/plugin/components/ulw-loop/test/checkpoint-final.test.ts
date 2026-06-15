@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
 import { ulwLoopBriefPath } from "../src/paths.js";
+import { startNextUlwLoop } from "../src/plan-crud.js";
 import { criterion, expectCode, goal, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
 import { MISSING_ARTIFACT_PATH, qualityGateJson } from "./fixtures/quality-gate-builder.js";
 
@@ -131,5 +132,34 @@ describe("checkpointUlwLoop final story", () => {
 				qualityGateJson: await qualityGateJson(repo),
 			}),
 		).rejects.toThrow("Final task-scoped aggregate reconciliation");
+	});
+
+	it("keeps aggregate open when non-final task-scoped Codex completion maps to the brief", async () => {
+		const taskObjective = "Implement first accepted story";
+		const first = goal({
+			id: "G001",
+			status: "in_progress",
+			successCriteria: [
+				criterion("C001", "pass", { essential: true }),
+				criterion("C002", "pending", { essential: false }),
+			],
+		});
+		const second = goal({ id: "G002", status: "pending", objective: "Implement second accepted story" });
+		const repo = await repoWith(plan([first, second], { activeGoalId: "G001" }));
+		await writeFile(ulwLoopBriefPath(repo), `${taskObjective}\n`, "utf8");
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G001",
+			status: "complete",
+			evidence: "G001 updated .omo/ulw-loop/goals.json after implementation completed and validation passed",
+			codexGoalJson: snapshot("complete", taskObjective),
+			qualityGateJson: await qualityGateJson(repo),
+		});
+		const next = await startNextUlwLoop(repo);
+
+		expect(result.aggregateCompletion).toBeUndefined();
+		expect(result.plan.aggregateCompletion).toBeUndefined();
+		expect(result.ledgerEntry.kind).toBe("goal_completed");
+		expect(next).toMatchObject({ goal: { id: "G002", status: "in_progress" } });
 	});
 });

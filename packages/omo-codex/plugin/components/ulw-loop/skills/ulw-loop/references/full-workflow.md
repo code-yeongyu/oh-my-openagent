@@ -230,7 +230,7 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 ## Stop Rules
 - All goals complete plus every plan criterion `pass` plus final quality gate clean: DONE.
 - 3x same criterion failure: checkpoint failed, surface diagnosis.
-- 5 cycles on one goal without all-pass: checkpoint failed, surface.
+- 5 cycles on one goal without required criteria passing: checkpoint failed, surface.
 - Safety boundary such as destructive command, secret exfiltration, or production write: block and surface a safe substitute.
 - Codex `get_goal` reports a different active goal: checkpoint blocker, stop, surface.
 - Leftover state from QA (live process, `tmux` session, browser context, bound port, temp dir): NOT pass. Clean up, append the receipt, then continue.
