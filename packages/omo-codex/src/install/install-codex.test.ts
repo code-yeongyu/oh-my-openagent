@@ -16,6 +16,20 @@ const STALE_CODEX_COMPONENT_BINS = [
   "codex-ultrawork",
 ] as const
 
+const EXPECTED_CODEX_AGENT_NAMES = [
+  "codex-ultrawork-reviewer",
+  "explorer",
+  "lazycodex-clone-fidelity-reviewer",
+  "lazycodex-code-reviewer",
+  "lazycodex-executor",
+  "lazycodex-gate-reviewer",
+  "lazycodex-qa-executor",
+  "librarian",
+  "metis",
+  "momus",
+  "plan",
+] as const
+
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
 
 function formatTomlString(value: string): string {
@@ -138,7 +152,7 @@ describe("install-codex", () => {
     expect(configContent).not.toContain('ref = "main"')
     expect(configContent).toContain("[plugins.\"omo@sisyphuslabs\"]")
     expect(configContent).toContain("[hooks.state.")
-    for (const agentName of ["codex-ultrawork-reviewer", "explorer", "librarian", "metis", "momus", "plan"]) {
+    for (const agentName of EXPECTED_CODEX_AGENT_NAMES) {
       expect(configContent).toContain(`[agents.${agentName}]`)
       expect(configContent).toContain(`config_file = "./agents/${agentName}.toml"`)
     }
@@ -183,7 +197,7 @@ describe("install-codex", () => {
     expect(mcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect(mcpManifest.mcpServers.lsp.args[0]?.startsWith(pluginPath ?? "")).toBe(true)
     expect((await stat(mcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
-    for (const agentName of ["codex-ultrawork-reviewer", "explorer", "librarian", "metis", "momus", "plan"]) {
+    for (const agentName of EXPECTED_CODEX_AGENT_NAMES) {
       expect((await stat(join(codexHome, "agents", `${agentName}.toml`))).isFile()).toBe(true)
     }
     const marketplace = JSON.parse(
@@ -256,7 +270,7 @@ describe("install-codex", () => {
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
-  test("#given codex installer #when installing omo #then links omo-prefixed component CLIs to existing cached runtimes", async () => {
+  test("#given codex installer #when installing omo #then links discovered component binaries to existing cached runtimes", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-bins-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-bins-"))
@@ -317,7 +331,7 @@ describe("install-codex", () => {
     expect(linkedNames).not.toContain(expectedBinName("omo"))
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
-  test("#given installation guide #when component binaries are documented #then docs use omo-prefixed names only", async () => {
+  test("#given installation guide #when component binaries and agent roles are documented #then docs match install surface", async () => {
     // given
     const installationGuide = await readFile(join(process.cwd(), "docs", "guide", "installation.md"), "utf8")
 
@@ -331,6 +345,11 @@ describe("install-codex", () => {
     for (const staleName of STALE_CODEX_COMPONENT_BINS) {
       expect(installationGuide).not.toContain(`~/.local/bin/${staleName}`)
       expect(installationGuide).not.toContain(`command not found: ${staleName}`)
+    }
+    expect(installationGuide).toContain("~/.codex/agents/{")
+    expect(installationGuide).toContain("}.toml")
+    for (const agentName of EXPECTED_CODEX_AGENT_NAMES) {
+      expect(installationGuide).toContain(agentName)
     }
   })
 
