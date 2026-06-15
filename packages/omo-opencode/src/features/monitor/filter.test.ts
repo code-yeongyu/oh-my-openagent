@@ -78,4 +78,71 @@ describe("createMonitorFilter", () => {
       expect(result.error).toContain("too long")
     })
   })
+
+  describe("#given a catastrophic-backtracking pattern", () => {
+    test('#when creating the filter with "(a+)+$" #then it rejects before matching', () => {
+      // given
+      const pattern = "(a+)+$"
+
+      // when
+      const result = createMonitorFilter(pattern, { patternMaxLength: 512 })
+
+      // then
+      expect(result.filter).toBeNull()
+      expect(result.error).toContain("unsafe")
+    })
+
+    test('#when creating the filter with "(.*a){25}" #then it rejects before matching', () => {
+      // given
+      const pattern = "(.*a){25}"
+
+      // when
+      const result = createMonitorFilter(pattern, { patternMaxLength: 512 })
+
+      // then
+      expect(result.filter).toBeNull()
+      expect(result.error).toContain("unsafe")
+    })
+
+    test("#when a rejected pattern would otherwise hang #then matching never runs the unsafe regex", () => {
+      // given
+      const result = createMonitorFilter("(a+)+$", { patternMaxLength: 512 })
+      const adversarial = `${"a".repeat(40)}!`
+
+      // when
+      const start = performance.now()
+      const matched = result.filter?.matches(adversarial) ?? false
+      const elapsedMs = performance.now() - start
+
+      // then
+      expect(matched).toBe(false)
+      expect(elapsedMs).toBeLessThan(50)
+    })
+  })
+
+  describe("#given a safe quantified pattern", () => {
+    test('#when creating the filter with "(ERROR|FAIL)+" #then it is accepted', () => {
+      // given
+      const pattern = "(ERROR|FAIL)+"
+
+      // when
+      const result = createMonitorFilter(pattern, { patternMaxLength: 512 })
+
+      // then
+      expect(result.error).toBeUndefined()
+      expect(result.filter?.matches("ERRORFAIL")).toBe(true)
+    })
+
+    test('#when creating the filter with "\\\\d+ failed" #then it is accepted', () => {
+      // given
+      const pattern = "\\d+ failed"
+
+      // when
+      const result = createMonitorFilter(pattern, { patternMaxLength: 512 })
+
+      // then
+      expect(result.error).toBeUndefined()
+      expect(result.filter?.matches("12 failed")).toBe(true)
+    })
+  })
 })

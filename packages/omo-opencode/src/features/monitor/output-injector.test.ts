@@ -91,7 +91,6 @@ function createHarness(opts: {
     pendingRetryMs: 25,
     acceptedMessageSkewMs: 50,
     userMessageInProgressWindowMs: 500,
-    parentSessionActivityInProgressWindowMs: 500,
     postDispatchHoldMs: 250,
     now: () => opts.now ?? 1_000,
     settleAfterSessionIdle: async () => {},
