@@ -7,12 +7,6 @@ const packageRoot = join(repoRoot, "packages", "omo-codex")
 
 const retainedPythonFiles = [
   "packages/omo-codex/plugin/components/lsp/test/fixtures/broken.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/go/new-project.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/python/check-no-excuse-rules.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/python/new-project.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/python/new-script.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/rust/check-no-excuse-rules.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/rust/new-project.py",
 ] as const
 const retainedPythonFileSet = new Set<string>(retainedPythonFiles)
 
