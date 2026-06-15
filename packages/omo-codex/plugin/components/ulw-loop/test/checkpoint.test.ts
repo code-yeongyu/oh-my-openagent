@@ -2,7 +2,6 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
@@ -13,7 +12,11 @@ import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSuccessCriter
 import { UlwLoopError } from "../src/types.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
-const QUALITY_GATE_PATH = fileURLToPath(new URL("./fixtures/sample-quality-gate.json", import.meta.url));
+const CODE_REVIEW_PATH = ".omo/ulw-loop/qa/code-review.md";
+const GATE_REVIEW_PATH = ".omo/ulw-loop/qa/gate-review.md";
+const CLI_PASS_PATH = ".omo/ulw-loop/qa/cli-pass.txt";
+const REJECTION_LOG_PATH = ".omo/ulw-loop/qa/rejection.log";
+const MISSING_ARTIFACT_PATH = ".omo/ulw-loop/qa/missing.txt";
 
 function criterion(id: string, status: UlwLoopSuccessCriterion["status"]): UlwLoopSuccessCriterion {
 	return { id, scenario: `${id} scenario`, userModel: "happy", expectedEvidence: `${id} proof`, capturedEvidence: status === "pass" ? `${id} passed` : null, status };
@@ -41,6 +44,35 @@ async function repoWith(seed: UlwLoopPlan): Promise<string> {
 	await mkdir(ulwLoopDir(repo), { recursive: true });
 	await writePlan(repo, seed);
 	return repo;
+}
+
+async function writeQualityGateArtifacts(repo: string): Promise<void> {
+	await mkdir(join(repo, ".omo/ulw-loop/qa"), { recursive: true });
+	await writeFile(join(repo, CODE_REVIEW_PATH), "code review approved\n", "utf8");
+	await writeFile(join(repo, GATE_REVIEW_PATH), "gate review approved\n", "utf8");
+	await writeFile(join(repo, CLI_PASS_PATH), "cli scenario passed\n", "utf8");
+	await writeFile(join(repo, REJECTION_LOG_PATH), "invalid gate rejected\n", "utf8");
+}
+
+async function qualityGateJson(repo: string, cliArtifactPath = CLI_PASS_PATH): Promise<string> {
+	await writeQualityGateArtifacts(repo);
+	return JSON.stringify({
+		codeReview: { by: "lazycodex-code-reviewer", recommendation: "APPROVE", codeQualityStatus: "CLEAR", reportPath: CODE_REVIEW_PATH, evidence: "Reviewed implementation and tests; no blockers remain.", blockers: [] },
+		manualQa: {
+			by: "lazycodex-qa-executor",
+			status: "passed",
+			evidence: "Ran CLI checkpoint validation with artifact-backed evidence.",
+			surfaceEvidence: [{ id: "surface-cli-pass", criterionRef: "C001", surface: "cli", invocation: "omo ulw-loop checkpoint --status complete", verdict: "passed", artifactRefs: ["artifact-cli-pass"] }],
+			adversarialCases: [{ id: "adv-missing-artifact", criterionRef: "C002", scenario: "quality gate references a missing artifact", expectedBehavior: "checkpoint rejects the final completion with ULW_LOOP_QUALITY_GATE_INVALID", verdict: "passed", artifactRefs: ["artifact-cli-reject"] }],
+			artifactRefs: [
+				{ id: "artifact-cli-pass", kind: "cli-transcript", description: "CLI transcript for valid final checkpoint.", path: cliArtifactPath },
+				{ id: "artifact-cli-reject", kind: "log", description: "Log proving invalid final checkpoint rejection.", path: REJECTION_LOG_PATH },
+			],
+		},
+		gateReview: { by: "lazycodex-gate-reviewer", recommendation: "APPROVE", reportPath: GATE_REVIEW_PATH, evidence: "Verified all criteria and artifact evidence.", blockers: [] },
+		iteration: { fullRerun: true, status: "passed", rerunCommands: ["bunx vitest run test/checkpoint.test.ts"], evidence: "Focused checkpoint suite reran cleanly." },
+		criteriaCoverage: { totalCriteria: 2, passCount: 2, adversarialClassesCovered: ["missing_artifact", "role_mismatch"] },
+	});
 }
 
 function snapshot(status: "active" | "complete", objective = ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE): string {
@@ -121,9 +153,18 @@ describe("checkpointUlwLoop final story", () => {
 
 	it("accepts final story when quality gate JSON includes valid criteriaCoverage", async () => {
 		const repo = await repoWith(plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }));
-		const result = await checkpointUlwLoop(repo, { goalId: "G002", status: "complete", evidence: "final work complete and validation passed", codexGoalJson: snapshot("complete"), qualityGateJson: QUALITY_GATE_PATH });
+		const result = await checkpointUlwLoop(repo, { goalId: "G002", status: "complete", evidence: "final work complete and validation passed", codexGoalJson: snapshot("complete"), qualityGateJson: await qualityGateJson(repo) });
 		expect(result.aggregateCompletion?.status).toBe("complete");
 		expect(result.plan.aggregateCompletion?.status).toBe("complete");
+	});
+
+	it("rejects final story when quality gate references a missing manual QA artifact", async () => {
+		const repo = await repoWith(plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }));
+		const gateJson = await qualityGateJson(repo, MISSING_ARTIFACT_PATH);
+		await expectCode(
+			() => checkpointUlwLoop(repo, { goalId: "G002", status: "complete", evidence: "final work complete and validation passed", codexGoalJson: snapshot("complete"), qualityGateJson: gateJson }),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
 	});
 
 	it("ACCEPTS complete when task-scoped completed Codex objective maps to the ulw-loop brief", async () => {
@@ -136,7 +177,7 @@ describe("checkpointUlwLoop final story", () => {
 			status: "complete",
 			evidence: "final implementation complete and quality gate passed",
 			codexGoalJson: snapshot("complete", taskObjective),
-			qualityGateJson: QUALITY_GATE_PATH,
+			qualityGateJson: await qualityGateJson(repo),
 		});
 
 		expect(result.aggregateCompletion?.status).toBe("complete");
@@ -153,7 +194,7 @@ describe("checkpointUlwLoop final story", () => {
 			status: "complete",
 			evidence: "final implementation complete and quality gate passed",
 			codexGoalJson: snapshot("active", taskObjective),
-			qualityGateJson: QUALITY_GATE_PATH,
+			qualityGateJson: await qualityGateJson(repo),
 		});
 
 		expect(result.aggregateCompletion?.status).toBe("complete");
@@ -170,7 +211,7 @@ describe("checkpointUlwLoop final story", () => {
 				status: "complete",
 				evidence: "final implementation complete and quality gate passed",
 				codexGoalJson: snapshot("complete", "unrelated completed task"),
-				qualityGateJson: QUALITY_GATE_PATH,
+				qualityGateJson: await qualityGateJson(repo),
 			}),
 		).rejects.toThrow("Final task-scoped aggregate reconciliation");
 	});

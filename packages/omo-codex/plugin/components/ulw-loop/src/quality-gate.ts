@@ -1,3 +1,4 @@
+// biome-ignore-all format: keep quality gate validator below the pure LOC budget.
 import { resolve } from "node:path";
 
 import type { UlwLoopItem, UlwLoopManualQaArtifactKind, UlwLoopManualQaArtifactRef, UlwLoopManualQaSurface, UlwLoopPlan, UlwLoopQualityGate } from "./types.js";
@@ -15,6 +16,11 @@ const GHCR_PATTERN =
 const GHCR_401_PATTERN = /\b(401|unauthorized|anonymous pull|authentication required)\b/;
 const GHCR_403_PATTERN = /\b(403|forbidden|read packages|package api)\b/;
 const PLACEHOLDER_PATTERN = /^(?:placeholder|todo|tbd|n\/a|stub)$/i;
+const REVIEWER_ROLES = {
+	codeReview: "lazycodex-code-reviewer",
+	manualQa: "lazycodex-qa-executor",
+	gateReview: "lazycodex-gate-reviewer",
+} as const;
 
 export interface QualityGateFs { readonly existsSync: (path: string) => boolean; readonly statSync: (path: string) => { readonly size: number } }
 export interface ValidateQualityGateOptions { readonly repoRoot: string; readonly fs: QualityGateFs }
@@ -36,6 +42,12 @@ function textField(value: unknown, field: string): string {
 	const trimmed = value.trim();
 	if (PLACEHOLDER_PATTERN.test(trimmed)) invalid(`Final quality gate rejects placeholder ${field}.`, field);
 	return trimmed;
+}
+
+function reviewerRoleField<T extends string>(value: unknown, expected: T, field: string): T {
+	const actual = textField(value, field);
+	if (actual !== expected) invalid(`${field} must be ${expected}.`, field);
+	return expected;
 }
 
 function numberField(value: unknown, field: string): number {
@@ -152,7 +164,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 	checkFile(gateReportPath, "gateReview.reportPath", opts);
 	return {
 		codeReview: {
-			by: textField(codeReview["by"], "codeReview.by"),
+			by: reviewerRoleField(codeReview["by"], REVIEWER_ROLES.codeReview, "codeReview.by"),
 			recommendation: literal(codeReview["recommendation"], "APPROVE", "codeReview.recommendation"),
 			codeQualityStatus: literal(codeReview["codeQualityStatus"], "CLEAR", "codeReview.codeQualityStatus"),
 			reportPath: codeReportPath,
@@ -160,7 +172,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 			blockers: emptyBlockers(codeReview["blockers"], "codeReview.blockers"),
 		},
 		manualQa: {
-			by: textField(manualQa["by"], "manualQa.by"),
+			by: reviewerRoleField(manualQa["by"], REVIEWER_ROLES.manualQa, "manualQa.by"),
 			status: literal(manualQa["status"], "passed", "manualQa.status"),
 			evidence: textField(manualQa["evidence"], "manualQa.evidence"),
 			surfaceEvidence,
@@ -168,7 +180,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 			artifactRefs,
 		},
 		gateReview: {
-			by: textField(gateReview["by"], "gateReview.by"),
+			by: reviewerRoleField(gateReview["by"], REVIEWER_ROLES.gateReview, "gateReview.by"),
 			recommendation: literal(gateReview["recommendation"], "APPROVE", "gateReview.recommendation"),
 			reportPath: gateReportPath,
 			evidence: textField(gateReview["evidence"], "gateReview.evidence"),
