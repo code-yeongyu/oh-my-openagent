@@ -161,38 +161,38 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
    - BLOCKED: `omo ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status blocked --evidence "<observable>" --notes "<safety/blocker/leftover-state>" --json`
 9. If actual does not match expected, diagnose, respawn the right-sized worker with the failure context to fix minimally, and rerun the SAME criterion (including a fresh cleanup).
 10. After 3 same-criterion failures, exit the goal with diagnosis.
-11. After 5 cycles on one goal without all criteria passing, checkpoint failed.
+11. After 5 cycles on one goal without required criteria passing, checkpoint failed.
 12. Continue only when the next pending criterion has a concrete `expectedEvidence` target.
 
 ### Goal Completion
-1. Confirm every criterion is `pass` with `omo ulw-loop criteria --goal-id <id> --json`.
+1. Non-final aggregate goal: confirm every `essential` criterion is `pass`; non-essential criteria may remain pending. Final aggregate goal: confirm every criterion across the whole plan is `pass`.
 2. Call `get_goal` for a fresh snapshot.
 3. Run `omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<criteria evidence summary>" --codex-goal-json <snapshot> --json`.
 4. If blocked or failed, checkpoint with `--status blocked` or `--status failed` and include diagnosis evidence.
 5. If this is the final goal, run the final quality gate first and pass `--quality-gate-json`.
 
 ## Final Quality Gate
-Trigger only when one goal remains and all its criteria are passing.
+Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
-2. Run `ai-slop-cleaner` on changed files. If no relevant edits exist, record a passed no-op cleaner report.
-3. Rerun verification after cleanup.
-4. HEAVY tier — or any goal you are unsure is sound — spawns a rigorous reviewer with `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous final verification reviewer. DELIVERABLE: approve or cite blockers. SCOPE: <changed files and goal>. VERIFY: inspect diff and verification evidence.","fork_context":false})`. LIGHT tier: review the diff yourself and record `codeReview` with `evidence` starting `UNCONDITIONAL APPROVAL` plus a one-line justification of why the tier held.
-5. Clean review means `codeReview.recommendation == "APPROVE"` and `codeReview.architectStatus == "CLEAR"`.
-6. If review is non-clean, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
-7. If clean, checkpoint final completion:
+2. Run Manual-QA for every criterion; confirm each artifact exists and is non-empty.
+3. Spawn the three final reviewer roles in parallel with self-contained prompts and `fork_context: false`: `lazycodex-code-reviewer` for diff review, `lazycodex-qa-executor` for scenario/evidence review, and `lazycodex-gate-reviewer` for final criteria/checkpoint review. If unavailable, describe those roles in generic worker prompts.
+4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Fix, rerun affected verification/Manual-QA, and repeat review.
+5. If review remains blocked, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
+6. If clean, checkpoint final completion:
 ```sh
 omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e evidence + manual QA notes>" --codex-goal-json <snapshot> --quality-gate-json <json-or-path> --json
 ```
 `--quality-gate-json` shape:
 ```json
 {
-  "aiSlopCleaner": { "status": "passed", "evidence": "cleaner report" },
-  "verification": { "status": "passed", "commands": ["npm test"], "evidence": "post-cleaner verification" },
-  "codeReview": { "recommendation": "APPROVE", "architectStatus": "CLEAR", "evidence": "review synthesis" },
-  "criteriaCoverage": { "totalCriteria": N, "passCount": N, "adversarialClassesCovered": ["malformed_input", "..."] }
+  "codeReview":{"by":"lazycodex-code-reviewer","recommendation":"APPROVE","codeQualityStatus":"CLEAR","reportPath":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/code-review.md","evidence":"Diff review passed.","blockers":[]},
+  "manualQa":{"by":"lazycodex-qa-executor","status":"passed","evidence":"CLI and data surfaces passed.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"omo ulw-loop checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-diff"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt"},{"id":"artifact-data-diff","kind":"data-diff","description":"Data diff artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/data-diff.txt"}]},
+  "gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md","evidence":"Gate review passed.","blockers":[]},
+  "iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-doc.test.ts"],"evidence":"Focused rerun passed."},
+  "criteriaCoverage":{"totalCriteria":3,"passCount":3,"adversarialClassesCovered":["malformed_input","stale_state"]}
 }
 ```
-A LIGHT goal with no triggered adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
+Artifacts must be non-empty. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
 
 ## Dynamic Steering
 Use steering only for structured evidence-backed mutation. Reject natural-language steering requests.
@@ -214,7 +214,7 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 1. NEVER call `update_goal` mid-aggregate; only on final story after the quality gate passes.
 2. NEVER call `create_goal` when `get_goal` shows a different active goal.
 3. NEVER mark `criterion.status == "pass"` without captured observable evidence in `record-evidence`.
-4. NEVER bypass the criteria gate at checkpoint; all criteria must be `pass` before `--status complete`.
+4. NEVER bypass the criteria gate: non-final aggregate completion requires all essential criteria; final aggregate completion requires all criteria across the whole plan.
 5. Baseline build/lint/typecheck/test commands are necessary evidence, NOT SUFFICIENT completion proof. Criteria coverage with observable evidence is the gate.
 6. Treat `.omo/ulw-loop/ledger.jsonl` as the durable audit trail; checkpoint after every success or failure.
 7. Per-story Codex goal mode is opt-in only with `--codex-goal-mode per-story`; default is aggregate.
@@ -228,9 +228,9 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 15. Every verified work unit that touched git-tracked files must leave either an atomic `git-master`-style commit hash or explicit no-commit blocker evidence before the next unit starts.
 
 ## Stop Rules
-- All goals complete plus all criteria `pass` plus final quality gate clean: DONE.
+- All goals complete plus every plan criterion `pass` plus final quality gate clean: DONE.
 - 3x same criterion failure: checkpoint failed, surface diagnosis.
-- 5 cycles on one goal without all-pass: checkpoint failed, surface.
+- 5 cycles on one goal without required criteria passing: checkpoint failed, surface.
 - Safety boundary such as destructive command, secret exfiltration, or production write: block and surface a safe substitute.
 - Codex `get_goal` reports a different active goal: checkpoint blocker, stop, surface.
 - Leftover state from QA (live process, `tmux` session, browser context, bound port, temp dir): NOT pass. Clean up, append the receipt, then continue.

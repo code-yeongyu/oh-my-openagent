@@ -1,6 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	renameSync,
+	rmSync,
+	statSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { platform } from "node:process";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runSubagentStopHook } from "../src/codex-hook.js";
@@ -63,13 +76,127 @@ describe("lazycodex executor SubagentStop verifier", () => {
 
 		// when
 		const output = runSubagentStopHook(
-			createInput(cwd, { last_assistant_message: `done\nEVIDENCE_RECORDED: ${artifactPath}` }),
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt.txt" }),
 			nodeFileSystem,
 		);
 
 		// then
 		expect(output).toBe("");
 		expect(existsSync(join(cwd, ".omo", "lazycodex-executor-verify", "sess.1-agent_1.json"))).toBe(false);
+	});
+
+	it("#given a zero-byte evidence receipt #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const artifactPath = join(cwd, ".omo", "evidence", "empty.txt");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		writeFileSync(artifactPath, "");
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/empty.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given an evidence receipt directory inside evidence root #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		mkdirSync(join(cwd, ".omo", "evidence", "receipt-dir"), { recursive: true });
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt-dir" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given an evidence receipt symlink targets outside evidence root #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const artifactPath = join(cwd, ".omo", "evidence", "passwd-link");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		symlinkSync(existingReceiptTargetOutsideEvidenceRoot(), artifactPath);
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/passwd-link" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given an evidence receipt traverses a symlinked evidence subdirectory #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const outsideRoot = createWorkspace();
+		const outsideReceipt = join(outsideRoot, "receipt.txt");
+		const linkPath = join(cwd, ".omo", "evidence", "outside-dir");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		writeFileSync(outsideReceipt, "outside\n");
+		symlinkSync(outsideRoot, linkPath, platform === "win32" ? "junction" : "dir");
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/outside-dir/receipt.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given an existing absolute receipt outside evidence root #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const receiptPath = existingAbsoluteReceiptOutsideEvidenceRoot();
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: `done\nEVIDENCE_RECORDED: ${receiptPath}` }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given a parent traversal receipt outside cwd #when lazycodex executor stops #then blocks", () => {
+		// given
+		const { cwd } = createWorkspaceWithParentOutsideReceipt();
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: ../outside.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given a traversal receipt escaping evidence root #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		mkdirSync(join(cwd, ".omo"), { recursive: true });
+		writeFileSync(join(cwd, ".omo", "outside.txt"), "outside\n");
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/../outside.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
 	});
 
 	it("#given three prior attempts #when lazycodex executor stops #then exits and clears stale state", () => {
@@ -132,8 +259,10 @@ type BlockOutput = {
 
 const nodeFileSystem = {
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	statSync,
@@ -144,6 +273,27 @@ function createWorkspace(): string {
 	const root = mkdtempSync(join(tmpdir(), "lazycodex-executor-verify-"));
 	cleanupRoots.push(root);
 	return root;
+}
+
+function createWorkspaceWithParentOutsideReceipt(): { readonly cwd: string } {
+	const root = createWorkspace();
+	const cwd = join(root, "project");
+	mkdirSync(cwd, { recursive: true });
+	writeFileSync(join(root, "outside.txt"), "outside\n");
+	return { cwd };
+}
+
+function existingAbsoluteReceiptOutsideEvidenceRoot(): string {
+	if (existsSync("/etc/passwd") && statSync("/etc/passwd").size > 0) return "/etc/passwd";
+	return existingReceiptTargetOutsideEvidenceRoot();
+}
+
+function existingReceiptTargetOutsideEvidenceRoot(): string {
+	if (existsSync("/etc/passwd") && statSync("/etc/passwd").size > 0) return "/etc/passwd";
+	const root = createWorkspace();
+	const receiptPath = join(root, "outside.txt");
+	writeFileSync(receiptPath, "outside\n");
+	return receiptPath;
 }
 
 function createInput(cwd: string, overrides: Partial<SubagentStopInput> = {}): SubagentStopInput {

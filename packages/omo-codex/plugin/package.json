@@ -8,6 +8,7 @@
 	"workspaces": [
 		"components/comment-checker",
 		"components/git-bash",
+		"components/lazycodex-executor-verify",
 		"components/rules",
 		"components/lsp",
 		"components/telemetry",

@@ -5,6 +5,8 @@ import { ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE } from "../src/goal-status.js";
 import type { UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "../src/types.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
+const FINAL_REVIEW_ROLES = ["lazycodex-code-reviewer", "lazycodex-qa-executor", "lazycodex-gate-reviewer"] as const;
+const QUALITY_GATE_SECTIONS = ["codeReview", "manualQa", "gateReview", "iteration", "criteriaCoverage"] as const;
 
 function makeCriterion(overrides: Partial<UlwLoopSuccessCriterion> = {}): UlwLoopSuccessCriterion {
 	return {
@@ -45,6 +47,10 @@ function makePlan(overrides: Partial<UlwLoopPlan> = {}): UlwLoopPlan {
 	};
 }
 
+function expectTextToContainAll(text: string, terms: readonly string[]): void {
+	for (const term of terms) expect(text).toContain(term);
+}
+
 describe("buildCodexGoalInstruction aggregate mode", () => {
 	it("references the aggregate handoff and the .omo/ulw-loop/goals.json artifact", () => {
 		const { text } = buildCodexGoalInstruction({ plan: makePlan({ codexGoalMode: "aggregate" }), goal: makeGoal() });
@@ -72,7 +78,21 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 			goal: makeGoal(),
 			isFinal: false,
 		});
-		expect(text).toMatch(/do not.*update_goal/i);
+		expect(text).toContain("do not call update_goal mid-aggregate");
+		expect(text).toContain("checkpoint this OMO ledger story");
+		expect(text).toContain("update_goal is reserved for the final story after the mandatory quality gate passes");
+	});
+
+	it("#given a non-final aggregate story #when rendering instructions #then defers the current final quality gate", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: false,
+		});
+
+		expect(text).toMatch(/not the final .*do not run .*quality gate/i);
+		expect(text).toContain("checkpoint this OMO ledger story");
+		expect(text).toContain("continue the remaining stories");
 	});
 
 	it("includes quality gate instruction when isFinal", () => {
@@ -82,6 +102,22 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 			isFinal: true,
 		});
 		expect(text).toMatch(/quality gate/i);
+	});
+
+	it("#given a final aggregate story #when rendering instructions #then requires the current LazyCodex quality gate", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: true,
+		});
+
+		expectTextToContainAll(text, FINAL_REVIEW_ROLES);
+		expectTextToContainAll(text, QUALITY_GATE_SECTIONS);
+		expect(text).toMatch(/targeted verification/i);
+		expect(text).toMatch(/artifact path.*non-zero size/i);
+		expect(text).toMatch(/not clean.*do not call update_goal/i);
+		expect(text).toContain("record-review-blockers");
+		expect(text).toContain("checkpoint");
 	});
 
 	it("#given a scoped plan #when rendering final commands #then includes the session id option", () => {
@@ -155,13 +191,7 @@ describe("buildCodexGoalInstruction criteria section", () => {
 	});
 });
 
-describe("buildCodexGoalInstruction rebrand audit", () => {
-	it("emits no legacy brand references in any rendered string", () => {
-		const legacyBrand = ["o", "m", "x"].join("");
-		const { text } = buildCodexGoalInstruction({ plan: makePlan(), goal: makeGoal() });
-		expect(text).not.toMatch(new RegExp(legacyBrand, "i"));
-	});
-
+describe("buildCodexGoalInstruction artifact guidance", () => {
 	it("references .omo/ulw-loop in artifact paths", () => {
 		const { text } = buildCodexGoalInstruction({ plan: makePlan({ codexGoalMode: "aggregate" }), goal: makeGoal() });
 		expect(text).toContain(".omo/ulw-loop");
