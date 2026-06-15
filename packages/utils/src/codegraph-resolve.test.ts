@@ -72,6 +72,8 @@ describe("resolveCodegraphCommand", () => {
   it("returns the PATH tier with exists false when every detector fails", () => {
     // given
     const missing = {
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-resolve-missing-home",
       provisioned: () => null,
       requireResolve: () => {
         throw new Error("not bundled")
