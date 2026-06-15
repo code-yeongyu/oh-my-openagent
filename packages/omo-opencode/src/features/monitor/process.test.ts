@@ -235,7 +235,7 @@ describe("spawnMonitoredProcess", () => {
 })
 
 describe("spawnMonitoredProcess real subprocess smoke", () => {
-  test("#given printf emits two lines #when monitored #then stdout lines arrive and no process group remains", async () => {
+  test.skipIf(process.platform === "win32")("#given printf emits two lines #when monitored #then stdout lines arrive and no process group remains", async () => {
     // given
     let observedPid: number | undefined
     const recordingSpawn = (
