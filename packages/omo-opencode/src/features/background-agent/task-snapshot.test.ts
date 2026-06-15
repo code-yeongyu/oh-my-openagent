@@ -61,7 +61,6 @@ describe("toBackgroundTaskSnapshots", () => {
   test("returns frozen plain snapshots detached from task references", () => {
     //#given
     const task = createTask({
-      description: "",
       prompt: "fallback prompt",
       progress: {
         toolCalls: 3,
@@ -84,7 +83,7 @@ describe("toBackgroundTaskSnapshots", () => {
 
     //#then
     expect(first).toEqual({
-      title: "fallback prompt",
+      title: "summarize code",
       status: "running",
       toolCalls: 3,
       lastTool: "grep",
@@ -96,11 +95,34 @@ describe("toBackgroundTaskSnapshots", () => {
       Object.assign(first, { title: "mutated" })
     }).toThrow()
     expect(toBackgroundTaskSnapshots([task])).toEqual([{
-      title: "changed after snapshot",
+      title: "summarize code",
       status: "running",
       toolCalls: 3,
       lastTool: "grep",
       agent: "sisyphus",
     }])
+  })
+
+  test("does not expose prompt text when description is empty", () => {
+    //#given
+    const task = createTask({
+      id: "task-secret",
+      description: "",
+      prompt: "SECRET_TOKEN=never-write-this",
+      agent: "atlas",
+    })
+
+    //#when
+    const snapshots = toBackgroundTaskSnapshots([task])
+
+    //#then
+    expect(firstSnapshot(snapshots)).toEqual({
+      title: "atlas background task",
+      status: "running",
+      toolCalls: null,
+      lastTool: null,
+      agent: "atlas",
+    })
+    expect(JSON.stringify(snapshots)).not.toContain("SECRET_TOKEN")
   })
 })
