@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-// components/codegraph/src/cli.ts
+// src/cli.ts
 import { realpathSync as realpathSync3 } from "node:fs";
 import { basename as basename4, resolve as resolve4 } from "node:path";
 import { stderr as processStderr3 } from "node:process";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
-// components/codegraph/src/hook.ts
+// src/hook.ts
 import { execFile as execFile2, spawn } from "node:child_process";
 import { appendFileSync as appendFileSync2, existsSync as existsSync6, mkdirSync as mkdirSync2 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
@@ -14,11 +14,11 @@ import { join as join7 } from "node:path";
 import { cwd as processCwd, env as processEnv, stderr as processStderr, stdin as processStdin, stdout as processStdout } from "node:process";
 import { fileURLToPath } from "node:url";
 
-// ../../utils/src/omo-config/loader.ts
+// ../../../../utils/src/omo-config/loader.ts
 import { existsSync as existsSync2, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 
-// ../../utils/src/deep-merge.ts
+// ../../../../utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 function isUnsafeObjectKey(key) {
   return DANGEROUS_KEYS.has(key);
@@ -27,7 +27,7 @@ function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
 function createScanner(text, ignoreTrivia = false) {
   const len = text.length;
   let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
@@ -442,7 +442,7 @@ var CharacterCodes;
   CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
 })(CharacterCodes || (CharacterCodes = {}));
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
 var cachedSpaces = new Array(20).fill(0).map((_, index) => {
   return " ".repeat(index);
 });
@@ -476,7 +476,7 @@ var cachedBreakLinesWithSpaces = {
   }
 };
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
 var ParseOptions;
 (function(ParseOptions2) {
   ParseOptions2.DEFAULT = {
@@ -779,7 +779,7 @@ function visit(text, visitor, options = ParseOptions.DEFAULT) {
   return true;
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
 var ScanError;
 (function(ScanError2) {
   ScanError2[ScanError2["None"] = 0] = "None";
@@ -868,7 +868,7 @@ function printParseErrorCode(code) {
   return "<unknown ParseErrorCode>";
 }
 
-// ../../utils/src/jsonc-parser.ts
+// ../../../../utils/src/jsonc-parser.ts
 var pluginConfigFileDetectionCache = new Map;
 function stripBom(content) {
   return content.charCodeAt(0) === 65279 ? content.slice(1) : content;
@@ -889,7 +889,7 @@ function parseJsoncSafe(content) {
   };
 }
 
-// ../../utils/src/omo-config.ts
+// ../../../../utils/src/omo-config.ts
 var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
@@ -899,7 +899,7 @@ var SETTING_HARNESS_SUPPORT = {
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
 };
 
-// ../../utils/src/omo-config/env-overrides.ts
+// ../../../../utils/src/omo-config/env-overrides.ts
 var CODEGRAPH_ENV_KEYS = [
   ["auto_provision", "AUTO_PROVISION", "boolean"],
   ["enabled", "ENABLED", "boolean"],
@@ -971,7 +971,7 @@ function buildEnvOverrides(harness, env, warnings, merge) {
   return config;
 }
 
-// ../../utils/src/omo-config/resolve.ts
+// ../../../../utils/src/omo-config/resolve.ts
 import { existsSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 function containsPath(parent, child) {
@@ -1014,7 +1014,7 @@ function toMissingSource(candidate) {
   };
 }
 
-// ../../utils/src/omo-config/loader.ts
+// ../../../../utils/src/omo-config/loader.ts
 var BUILT_IN_DEFAULTS = {
   codegraph: {
     auto_provision: true,
@@ -1237,7 +1237,7 @@ function loadOmoConfig(options) {
   return { config, sources, warnings };
 }
 
-// shared/src/config-loader.ts
+// ../../shared/src/config-loader.ts
 function getCodexOmoConfig(options = {}) {
   const result = loadOmoConfig({
     ...options.cwd === undefined ? {} : { cwd: options.cwd },
@@ -1252,7 +1252,7 @@ function getCodexOmoConfig(options = {}) {
   };
 }
 
-// ../../utils/src/codegraph/env.ts
+// ../../../../utils/src/codegraph/env.ts
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
@@ -1269,7 +1269,7 @@ function buildCodegraphEnv(options = {}) {
   };
 }
 
-// ../../utils/src/codegraph/provision.ts
+// ../../../../utils/src/codegraph/provision.ts
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
@@ -1278,7 +1278,7 @@ import { homedir as homedir3, hostname } from "node:os";
 import { basename, join as join3 } from "node:path";
 import { promisify } from "node:util";
 
-// ../../utils/src/codegraph/manifest.ts
+// ../../../../utils/src/codegraph/manifest.ts
 var CODEGRAPH_PROVISION_MANIFEST = {
   assets: {
     "darwin-arm64": {
@@ -1315,7 +1315,7 @@ var CODEGRAPH_PROVISION_MANIFEST = {
   version: "1.0.1"
 };
 
-// ../../utils/src/codegraph/provision.ts
+// ../../../../utils/src/codegraph/provision.ts
 var DEFAULT_LOCK_WAIT_MS = 5000;
 var DEFAULT_LOCK_STALE_MS = 120000;
 var DEFAULT_DOWNLOAD_TIMEOUT_MS = 60000;
@@ -1488,13 +1488,13 @@ async function ensureCodegraphProvisioned(options) {
   }
 }
 
-// ../../utils/src/codegraph/resolve.ts
+// ../../../../utils/src/codegraph/resolve.ts
 import { existsSync as existsSync4 } from "node:fs";
 import { homedir as homedir4 } from "node:os";
 import { dirname as dirname2, join as join5 } from "node:path";
 import { createRequire } from "node:module";
 
-// ../../utils/src/runtime/which.ts
+// ../../../../utils/src/runtime/which.ts
 import { accessSync, constants } from "node:fs";
 import { delimiter, join as join4 } from "node:path";
 var runtime = globalThis;
@@ -1559,7 +1559,7 @@ function bunWhich(commandName) {
   return null;
 }
 
-// ../../utils/src/codegraph/resolve.ts
+// ../../../../utils/src/codegraph/resolve.ts
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
 var CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN";
@@ -1622,7 +1622,7 @@ function resolveCodegraphCommand(options = {}) {
   };
 }
 
-// ../../utils/src/codegraph/workspace.ts
+// ../../../../utils/src/codegraph/workspace.ts
 import { createHash as createHash2 } from "node:crypto";
 import {
   appendFileSync,
@@ -1718,7 +1718,7 @@ function ensureCodegraphGitignored(workspace) {
   }
 }
 
-// components/codegraph/src/hook.ts
+// src/hook.ts
 var CODEGRAPH_SESSION_START_NOTICE = "LazyCodex CodeGraph bootstrap scheduled in background";
 var CODEGRAPH_VERSION = "1.0.1";
 var COMMAND_TIMEOUT_MS = 60000;
@@ -1871,7 +1871,7 @@ function safeLogOutcome(logOutcome, outcome) {
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join7(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph");
+  const candidate = join7(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
   return existsSync6(candidate) ? candidate : null;
 }
 function resolveExitCode(error) {
@@ -1917,7 +1917,7 @@ function defaultWorkerCliPath() {
   return fileURLToPath(import.meta.url);
 }
 
-// components/codegraph/src/serve.ts
+// src/serve.ts
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync7, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir7 } from "node:os";
@@ -1975,7 +1975,7 @@ function codegraphEnvForConfig(config, homeDir, buildEnv) {
 function provisionedBinFromInstallDir2(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join8(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph");
+  const candidate = join8(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
   return existsSync7(candidate) ? candidate : null;
 }
 async function runCodegraphServeCli() {
@@ -2011,7 +2011,7 @@ function isDirectInvocation(argvPath) {
   return realpathSync2(resolve3(argvPath)) === realpathSync2(modulePath);
 }
 
-// components/codegraph/src/cli.ts
+// src/cli.ts
 async function runCodegraphCli(options = {}) {
   const argv = options.argv ?? process.argv;
   const command = argv[2];

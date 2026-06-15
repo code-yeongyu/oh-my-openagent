@@ -106,7 +106,7 @@ function codegraphEnvForConfig(
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
 	if (installDir === undefined) return null;
-	const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph");
+	const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
 	return existsSync(candidate) ? candidate : null;
 }
 

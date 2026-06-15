@@ -145,55 +145,57 @@ describe("runCodegraphServe", () => {
 		}
 	});
 
-	it("#given Codex SOT install_dir has a provisioned binary #when serving MCP #then it resolves there and exports CODEGRAPH_INSTALL_DIR", async () => {
-		// given
-		const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-"));
-		const installDir = join(tempRoot, "custom-codegraph");
-		const binPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph");
-		const calls: Array<{
-			readonly args: readonly string[];
-			readonly command: string;
-			readonly env: Record<string, string | undefined>;
-		}> = [];
+	it("#given Windows Codex SOT install_dir has codegraph.cmd #when serving MCP #then it resolves there and exports CODEGRAPH_INSTALL_DIR", async () => {
+		await withProcessPlatform("win32", async () => {
+			// given
+			const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-"));
+			const installDir = join(tempRoot, "custom-codegraph");
+			const binPath = join(installDir, "bin", "codegraph.cmd");
+			const calls: Array<{
+				readonly args: readonly string[];
+				readonly command: string;
+				readonly env: Record<string, string | undefined>;
+			}> = [];
 
-		try {
-			mkdirSync(join(installDir, "bin"), { recursive: true });
-			writeFileSync(binPath, "");
+			try {
+				mkdirSync(join(installDir, "bin"), { recursive: true });
+				writeFileSync(binPath, "");
 
-			// when
-			const exitCode = await runCodegraphServe({
-				config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
-				env: { HOME: "/tmp/home" },
-				homeDir: "/tmp/home",
-				resolve: (options) => {
-					const provisioned = options.provisioned?.();
-					return { argsPrefix: [], command: provisioned ?? "missing", exists: provisioned !== null && provisioned !== undefined, source: "provisioned" };
-				},
-				runProcess: (command, args, options) => {
-					calls.push({ args, command, env: options.env });
-					return Promise.resolve(0);
-				},
-				stderr: { write: () => undefined },
-			});
-
-			// then
-			expect(exitCode).toBe(0);
-			expect(calls).toEqual([
-				{
-					args: ["serve", "--mcp"],
-					command: binPath,
-					env: {
-						CODEGRAPH_INSTALL_DIR: installDir,
-						CODEGRAPH_NO_DOWNLOAD: "1",
-						CODEGRAPH_TELEMETRY: "0",
-						DO_NOT_TRACK: "1",
-						HOME: "/tmp/home",
+				// when
+				const exitCode = await runCodegraphServe({
+					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
+					env: { HOME: "/tmp/home" },
+					homeDir: "/tmp/home",
+					resolve: (options) => {
+						const provisioned = options.provisioned?.();
+						return { argsPrefix: [], command: provisioned ?? "missing", exists: provisioned !== null && provisioned !== undefined, source: "provisioned" };
 					},
-				},
-			]);
-		} finally {
-			rmSync(tempRoot, { recursive: true, force: true });
-		}
+					runProcess: (command, args, options) => {
+						calls.push({ args, command, env: options.env });
+						return Promise.resolve(0);
+					},
+					stderr: { write: () => undefined },
+				});
+
+				// then
+				expect(exitCode).toBe(0);
+				expect(calls).toEqual([
+					{
+						args: ["serve", "--mcp"],
+						command: binPath,
+						env: {
+							CODEGRAPH_INSTALL_DIR: installDir,
+							CODEGRAPH_NO_DOWNLOAD: "1",
+							CODEGRAPH_TELEMETRY: "0",
+							DO_NOT_TRACK: "1",
+							HOME: "/tmp/home",
+						},
+					},
+				]);
+			} finally {
+				rmSync(tempRoot, { recursive: true, force: true });
+			}
+		});
 	});
 
 	it("#given built serve entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once", () => {
@@ -260,4 +262,14 @@ function runBuiltWrapper(entryPath: string, tempRoot: string): ReturnType<typeof
 
 function readInvocations(tempRoot: string): readonly string[] {
 	return readFileSync(join(tempRoot, "invocations.log"), "utf8").trim().split("\n");
+}
+
+async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
+	const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
+	Object.defineProperty(process, "platform", { configurable: true, enumerable: true, value: platform });
+	try {
+		await run();
+	} finally {
+		if (descriptor !== undefined) Object.defineProperty(process, "platform", descriptor);
+	}
 }
