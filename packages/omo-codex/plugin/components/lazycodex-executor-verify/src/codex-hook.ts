@@ -1,4 +1,4 @@
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 import { renderDirective } from "./directive.js";
 import { clearAttemptState, MAX_ATTEMPTS, readAttemptState, writeAttemptState } from "./state.js";
@@ -51,13 +51,28 @@ function transcriptHasContextPressureMarker(transcriptPath: string, fs: HookFile
 function hasValidEvidenceReceipt(input: SubagentStopInput, fs: HookFileSystem): boolean {
 	const receiptPath = extractEvidencePath(input.last_assistant_message);
 	if (receiptPath === null) return false;
-	const resolvedPath = isAbsolute(receiptPath) ? receiptPath : join(input.cwd, receiptPath);
+	const evidenceRoot = resolve(input.cwd, ".omo", "evidence");
+	const resolvedPath = isAbsolute(receiptPath) ? resolve(receiptPath) : resolve(input.cwd, receiptPath);
+	if (!isPathInsideDirectory(resolvedPath, evidenceRoot)) return false;
 	try {
-		return fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).size > 0;
+		return isNonEmptyFile(resolvedPath, fs);
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;
 	}
+}
+
+function isPathInsideDirectory(filePath: string, directoryPath: string): boolean {
+	const relativePath = relative(directoryPath, filePath);
+	return relativePath !== "" && !relativePath.startsWith("..") && !isAbsolute(relativePath);
+}
+
+function isNonEmptyFile(filePath: string, fs: HookFileSystem): boolean {
+	if (!fs.existsSync(filePath)) return false;
+	const stat = fs.statSync(filePath);
+	if (stat.size <= 0) return false;
+	if ("isFile" in stat && typeof stat.isFile === "function") return stat.isFile();
+	return true;
 }
 
 function extractEvidencePath(message: string | undefined): string | null {
