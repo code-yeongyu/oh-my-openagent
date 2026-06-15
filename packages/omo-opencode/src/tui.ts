@@ -29,7 +29,7 @@ type RegisterSidebarContentSlotInput<Node> = {
   readonly renderSidebar: () => Node
 }
 
-export function registerSidebarContentSlot<Node>({
+function registerSidebarContentSlot<Node>({
   registerSlot,
   requestRender,
   renderSidebar,
