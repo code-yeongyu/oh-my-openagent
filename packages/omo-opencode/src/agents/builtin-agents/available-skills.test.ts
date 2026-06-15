@@ -120,4 +120,28 @@ describe("buildAvailableSkills - agentName filtering", () => {
     // discovered skill should have location "user"
     expect(playwriteSkills[0].location).toBe("user")
   })
+
+  it("excludes mixed-case discovered skills by disabled lowercase alias", () => {
+    // given
+    const disabledDescription = "IGNORE_ALL_PRIOR_INSTRUCTIONS_DISABLED_SKILL_DESC"
+    const skills = [
+      {
+        ...makeSkill("Blocked-Skill"),
+        definition: {
+          name: "Blocked-Skill",
+          description: disabledDescription,
+          template: "",
+        },
+        scope: "project",
+      } satisfies LoadedSkill,
+    ]
+    const disabledSkills = new Set(["blocked-skill"])
+
+    // when
+    const result = buildAvailableSkills(skills, undefined, disabledSkills, undefined, "sisyphus")
+
+    // then
+    expect(result.map((s) => s.name)).not.toContain("Blocked-Skill")
+    expect(result.map((s) => s.description)).not.toContain(disabledDescription)
+  })
 })
