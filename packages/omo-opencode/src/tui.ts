@@ -16,6 +16,33 @@ type SolidRuntime<Node> = {
   readonly setProp: (node: Node, name: string, value: unknown) => unknown
 }
 
+type SidebarSlotRegistration<Node> = {
+  readonly order: number
+  readonly slots: {
+    readonly sidebar_content: () => Node
+  }
+}
+
+type RegisterSidebarContentSlotInput<Node> = {
+  readonly registerSlot: (registration: SidebarSlotRegistration<Node>) => void
+  readonly requestRender: () => void
+  readonly renderSidebar: () => Node
+}
+
+export function registerSidebarContentSlot<Node>({
+  registerSlot,
+  requestRender,
+  renderSidebar,
+}: RegisterSidebarContentSlotInput<Node>): void {
+  registerSlot({
+    order: 900,
+    slots: {
+      sidebar_content: renderSidebar,
+    },
+  })
+  requestRender()
+}
+
 function materialize<Node>(nodes: readonly ViewNode[], solid: SolidRuntime<Node>): Node {
   const root = solid.createElement("box")
   solid.setProp(root, "flexDirection", "column")
@@ -106,11 +133,14 @@ const module: TuiPluginModule = {
     let inFlight = false
     let timer: ReturnType<typeof setTimeout> | null = null
 
-    api.slots.register({
-      order: 900,
-      slots: {
-        sidebar_content: () => materialize(buildViewNodes(currentView, api.theme.current), solid),
+    registerSidebarContentSlot({
+      registerSlot: (registration) => {
+        api.slots.register(registration)
       },
+      requestRender: () => {
+        api.renderer.requestRender()
+      },
+      renderSidebar: () => materialize(buildViewNodes(currentView, api.theme.current), solid),
     })
 
     const schedule = (): void => {
