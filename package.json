@@ -74,10 +74,11 @@
       "import": "./dist/index.js"
     },
     "./server": "./dist/index.js",
+    "./tui": "./dist/tui.js",
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build:codex-plugin && bun build packages/omo-opencode/src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:shared-skills-assets && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:cli-node && bun run build:codex-install && bun run build:schema",
+    "build": "bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build:codex-plugin && bun build packages/omo-opencode/src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun build packages/omo-opencode/src/tui.ts --outdir dist --target bun --format esm --external @opentui/core --external @opentui/keymap --external @opentui/solid --external @ast-grep/napi && bun run build:shared-skills-assets && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:cli-node && bun run build:codex-install && bun run build:schema",
     "build:cli-node": "bun run script/build-cli-node.ts",
     "build:codex-install": "bun run script/build-codex-install.ts",
     "build:codex-plugin": "npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build",
