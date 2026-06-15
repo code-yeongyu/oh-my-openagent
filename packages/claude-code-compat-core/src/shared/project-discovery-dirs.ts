@@ -59,6 +59,23 @@ function detectWorktreePath(directory: string): string | undefined {
   }
 }
 
+function findGitMarkerAncestor(directory: string): string | undefined {
+  let currentDirectory = normalizePath(directory)
+
+  while (true) {
+    if (existsSync(join(currentDirectory, ".git"))) {
+      return currentDirectory
+    }
+
+    const parentDirectory = dirname(currentDirectory)
+    if (parentDirectory === currentDirectory) {
+      return undefined
+    }
+
+    currentDirectory = normalizePath(parentDirectory)
+  }
+}
+
 function findAncestorDirectories(
   startDirectory: string,
   targetPaths: ReadonlyArray<ReadonlyArray<string>>,
@@ -101,12 +118,14 @@ function findAncestorDirectories(
 }
 
 export function findProjectOpencodeCommandDirs(startDirectory: string, stopDirectory?: string): string[] {
+  const detectedStopDirectory = stopDirectory ?? detectWorktreePath(startDirectory) ?? findGitMarkerAncestor(startDirectory)
+
   return findAncestorDirectories(
     startDirectory,
     [
       [".opencode", "commands"],
       [".opencode", "command"],
     ],
-    stopDirectory ?? detectWorktreePath(startDirectory),
+    detectedStopDirectory,
   )
 }
