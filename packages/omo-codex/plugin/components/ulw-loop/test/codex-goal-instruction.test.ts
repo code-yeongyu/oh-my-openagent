@@ -5,6 +5,8 @@ import { ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE } from "../src/goal-status.js";
 import type { UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "../src/types.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
+const FINAL_REVIEW_ROLES = ["lazycodex-code-reviewer", "lazycodex-qa-executor", "lazycodex-gate-reviewer"] as const;
+const QUALITY_GATE_SECTIONS = ["codeReview", "manualQa", "gateReview", "iteration", "criteriaCoverage"] as const;
 
 function makeCriterion(overrides: Partial<UlwLoopSuccessCriterion> = {}): UlwLoopSuccessCriterion {
 	return {
@@ -45,6 +47,10 @@ function makePlan(overrides: Partial<UlwLoopPlan> = {}): UlwLoopPlan {
 	};
 }
 
+function expectTextToContainAll(text: string, terms: readonly string[]): void {
+	for (const term of terms) expect(text).toContain(term);
+}
+
 describe("buildCodexGoalInstruction aggregate mode", () => {
 	it("references the aggregate handoff and the .omo/ulw-loop/goals.json artifact", () => {
 		const { text } = buildCodexGoalInstruction({ plan: makePlan({ codexGoalMode: "aggregate" }), goal: makeGoal() });
@@ -82,7 +88,9 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 			isFinal: false,
 		});
 
-		expect(text).toContain("final reviewer/manual-QA/gate-review quality gate");
+		expect(text).toMatch(/not the final .*do not run .*quality gate/i);
+		expect(text).not.toContain("quality gate JSON");
+		for (const role of FINAL_REVIEW_ROLES) expect(text).not.toContain(role);
 		expect(text).not.toContain("ai-slop-cleaner");
 	});
 
@@ -102,15 +110,14 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 			isFinal: true,
 		});
 
-		expect(text).toContain("Run targeted verification for changed behavior.");
-		expect(text).toContain("Confirm every manualQa artifact path exists and has non-zero size.");
-		expect(text).toContain("lazycodex-code-reviewer");
-		expect(text).toContain("lazycodex-qa-executor");
-		expect(text).toContain("lazycodex-gate-reviewer");
-		expect(text).toContain("manualQa");
-		expect(text).toContain("gateReview");
+		expectTextToContainAll(text, FINAL_REVIEW_ROLES);
+		expectTextToContainAll(text, QUALITY_GATE_SECTIONS);
+		expect(text).toMatch(/targeted verification/i);
+		expect(text).toMatch(/artifact path.*non-zero size/i);
 		expect(text).toMatch(/not clean.*do not call update_goal/i);
-		expect(text).toContain("Record blocker work first:");
+		expect(text).toContain("record-review-blockers");
+		expect(text).toContain("checkpoint");
+		expect(text).not.toContain("must remain active while later OMO stories remain");
 		expect(text).not.toContain("ai-slop-cleaner");
 		expect(text).not.toContain("codex-ultrawork-reviewer");
 		expect(text).not.toMatch(/architect status/i);
