@@ -183,6 +183,9 @@ export function createManagers(args: {
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during shutdown:", error)
       })
+      await monitorManager?.shutdown().catch((error) => {
+        log("[create-managers] monitor cleanup error during shutdown:", error)
+      })
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
     modelFallbackControllerAccessor,
