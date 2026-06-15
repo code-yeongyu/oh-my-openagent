@@ -1,47 +1,41 @@
-// biome-ignore-all format: keep quality gate validator below the pure LOC budget.
 import { resolve } from "node:path";
+import {
+	emptyBlockers,
+	invalid,
+	literal,
+	numberField,
+	section,
+	stringArray,
+	textField,
+} from "./quality-gate-fields.js";
+import type {
+	UlwLoopManualQaArtifactKind,
+	UlwLoopManualQaArtifactRef,
+	UlwLoopManualQaSurface,
+	UlwLoopQualityGate,
+} from "./types.js";
 
-import type { UlwLoopItem, UlwLoopManualQaArtifactKind, UlwLoopManualQaArtifactRef, UlwLoopManualQaSurface, UlwLoopPlan, UlwLoopQualityGate } from "./types.js";
-import { UlwLoopError } from "./types.js";
-
-const BLOCKER_FIELD_KEYS = "blocker blockerSignature blockerEvidence blockerOccurrences blockedAt".split(" ");
-const URL_PATTERN = /https?:\/\/\S+/g;
-const PUNCTUATION_PATTERN = /[`"'()[\]{}:,;]/g;
-const WHITESPACE_PATTERN = /\s+/g;
-const AUTH_PATTERN = /\b(auth\w*|credential\w*|token|permission\w*|scope\w*|access|unauthorized|forbidden|401|403)\b/;
-const MISSING_PATTERN =
-	/\b(unset|missing|required|requires|without|omit\w*|not set|not available|no read packages|read packages)\b/;
-const GHCR_PATTERN =
-	/\b(ghcr|github container registry|read packages|imagepullsecret|package api|anonymous|container image)\b/;
-const GHCR_401_PATTERN = /\b(401|unauthorized|anonymous pull|authentication required)\b/;
-const GHCR_403_PATTERN = /\b(403|forbidden|read packages|package api)\b/;
-const PLACEHOLDER_PATTERN = /^(?:placeholder|todo|tbd|n\/a|stub)$/i;
 const REVIEWER_ROLES = {
 	codeReview: "lazycodex-code-reviewer",
 	manualQa: "lazycodex-qa-executor",
 	gateReview: "lazycodex-gate-reviewer",
 } as const;
 
-export interface QualityGateFs { readonly existsSync: (path: string) => boolean; readonly statSync: (path: string) => { readonly size: number } }
-export interface ValidateQualityGateOptions { readonly repoRoot: string; readonly fs: QualityGateFs }
+export {
+	classifyExternalAuthorizationBlocker,
+	clearGoalBlockerFields,
+	normalizeBlockerEvidence,
+	sameBlockerOccurrences,
+} from "./quality-gate-blockers.js";
 
-function invalid(message: string, field: string): never {
-	throw new UlwLoopError(message, "ULW_LOOP_QUALITY_GATE_INVALID", { details: { field } });
+export interface QualityGateFs {
+	readonly existsSync: (path: string) => boolean;
+	readonly statSync: (path: string) => { readonly size: number };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function section(value: unknown, field: string): Record<string, unknown> {
-	return isRecord(value) ? value : invalid(`Final quality gate is missing ${field} evidence.`, field);
-}
-
-function textField(value: unknown, field: string): string {
-	if (typeof value !== "string" || value.trim() === "") invalid(`Final quality gate requires non-empty ${field}.`, field);
-	const trimmed = value.trim();
-	if (PLACEHOLDER_PATTERN.test(trimmed)) invalid(`Final quality gate rejects placeholder ${field}.`, field);
-	return trimmed;
+export interface ValidateQualityGateOptions {
+	readonly repoRoot: string;
+	readonly fs: QualityGateFs;
 }
 
 function reviewerRoleField<T extends string>(value: unknown, expected: T, field: string): T {
@@ -50,34 +44,29 @@ function reviewerRoleField<T extends string>(value: unknown, expected: T, field:
 	return expected;
 }
 
-function numberField(value: unknown, field: string): number {
-	return typeof value === "number" && Number.isFinite(value)
-		? value
-		: invalid(`Final quality gate requires numeric ${field}.`, field);
-}
-
-function stringArray(value: unknown, field: string): readonly string[] {
-	if (!Array.isArray(value) || value.length === 0) return invalid(`Final quality gate requires ${field}.`, field);
-	return value.map((item) => textField(item, field));
-}
-
-function emptyBlockers(value: unknown, field: string): readonly [] {
-	if (Array.isArray(value) && value.length === 0) return [];
-	invalid(`${field} must be empty.`, field);
-}
-
-function literal<T extends string | boolean>(value: unknown, expected: T, field: string): T {
-	if (value === expected) return expected;
-	invalid(`${field} must be ${String(expected)}.`, field);
-}
-
 function surfaceField(value: unknown, field: string): UlwLoopManualQaSurface {
-	if (value === "cli" || value === "http" || value === "tmux" || value === "browser" || value === "gui" || value === "data") return value;
+	if (
+		value === "cli" ||
+		value === "http" ||
+		value === "tmux" ||
+		value === "browser" ||
+		value === "gui" ||
+		value === "data"
+	)
+		return value;
 	invalid(`${field} must be a supported manual QA surface.`, field);
 }
 
 function kindField(value: unknown, field: string): UlwLoopManualQaArtifactKind {
-	if (value === "cli-transcript" || value === "log" || value === "screenshot" || value === "image" || value === "http-dump" || value === "data-diff") return value;
+	if (
+		value === "cli-transcript" ||
+		value === "log" ||
+		value === "screenshot" ||
+		value === "image" ||
+		value === "http-dump" ||
+		value === "data-diff"
+	)
+		return value;
 	invalid(`${field} must be a supported artifact kind.`, field);
 }
 
@@ -121,7 +110,8 @@ function artifactMap(refs: readonly UlwLoopManualQaArtifactRef[]): Map<string, U
 }
 
 function parseArtifactRefs(value: unknown, opts?: ValidateQualityGateOptions): readonly UlwLoopManualQaArtifactRef[] {
-	if (!Array.isArray(value) || value.length === 0) invalid("manualQa.artifactRefs must not be empty.", "manualQa.artifactRefs");
+	if (!Array.isArray(value) || value.length === 0)
+		invalid("manualQa.artifactRefs must not be empty.", "manualQa.artifactRefs");
 	return value.map((item, index) => {
 		const ref = section(item, `manualQa.artifactRefs[${index}]`);
 		const path = textField(ref["path"], `manualQa.artifactRefs[${index}].path`);
@@ -135,7 +125,11 @@ function parseArtifactRefs(value: unknown, opts?: ValidateQualityGateOptions): r
 	});
 }
 
-function referencedArtifacts(value: unknown, field: string, byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>): readonly UlwLoopManualQaArtifactRef[] {
+function referencedArtifacts(
+	value: unknown,
+	field: string,
+	byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>,
+): readonly UlwLoopManualQaArtifactRef[] {
 	return stringArray(value, field).map((id) => {
 		const artifact = byId.get(id);
 		if (artifact === undefined) invalid(`${field} references unknown artifact ${id}.`, field);
@@ -203,16 +197,26 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 	};
 }
 
-function parseSurfaceEvidence(value: unknown, byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>): UlwLoopQualityGate["manualQa"]["surfaceEvidence"] {
+function parseSurfaceEvidence(
+	value: unknown,
+	byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>,
+): UlwLoopQualityGate["manualQa"]["surfaceEvidence"] {
 	if (!Array.isArray(value) || value.length === 0)
 		invalid("manualQa.surfaceEvidence must not be empty.", "manualQa.surfaceEvidence");
 	return value.map((item, index) => {
 		const row = section(item, `manualQa.surfaceEvidence[${index}]`);
 		const surface = surfaceField(row["surface"], `manualQa.surfaceEvidence[${index}].surface`);
-		const artifacts = referencedArtifacts(row["artifactRefs"], `manualQa.surfaceEvidence[${index}].artifactRefs`, byId);
+		const artifacts = referencedArtifacts(
+			row["artifactRefs"],
+			`manualQa.surfaceEvidence[${index}].artifactRefs`,
+			byId,
+		);
 		for (const artifact of artifacts) {
 			if (!artifactCompatible(surface, artifact.kind)) {
-				invalid(`manualQa.surfaceEvidence ${surface} artifact ${artifact.kind} is incompatible.`, "manualQa.surfaceEvidence");
+				invalid(
+					`manualQa.surfaceEvidence ${surface} artifact ${artifact.kind} is incompatible.`,
+					"manualQa.surfaceEvidence",
+				);
 			}
 		}
 		return {
@@ -226,12 +230,19 @@ function parseSurfaceEvidence(value: unknown, byId: ReadonlyMap<string, UlwLoopM
 	});
 }
 
-function parseAdversarialCases(value: unknown, byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>): UlwLoopQualityGate["manualQa"]["adversarialCases"] {
+function parseAdversarialCases(
+	value: unknown,
+	byId: ReadonlyMap<string, UlwLoopManualQaArtifactRef>,
+): UlwLoopQualityGate["manualQa"]["adversarialCases"] {
 	if (!Array.isArray(value) || value.length === 0)
 		invalid("manualQa.adversarialCases must not be empty.", "manualQa.adversarialCases");
 	return value.map((item, index) => {
 		const row = section(item, `manualQa.adversarialCases[${index}]`);
-		const artifacts = referencedArtifacts(row["artifactRefs"], `manualQa.adversarialCases[${index}].artifactRefs`, byId);
+		const artifacts = referencedArtifacts(
+			row["artifactRefs"],
+			`manualQa.adversarialCases[${index}].artifactRefs`,
+			byId,
+		);
 		return {
 			id: textField(row["id"], `manualQa.adversarialCases[${index}].id`),
 			criterionRef: textField(row["criterionRef"], `manualQa.adversarialCases[${index}].criterionRef`),
@@ -241,35 +252,4 @@ function parseAdversarialCases(value: unknown, byId: ReadonlyMap<string, UlwLoop
 			artifactRefs: artifacts.map((artifact) => artifact.id),
 		};
 	});
-}
-
-export function normalizeBlockerEvidence(evidence: string): string {
-	const withoutUrls = evidence.toLowerCase().replace(URL_PATTERN, " ");
-	const withoutPunctuation = withoutUrls.replace(PUNCTUATION_PATTERN, " ");
-	return withoutPunctuation.replace(WHITESPACE_PATTERN, " ").trim();
-}
-
-export function classifyExternalAuthorizationBlocker(evidence: string): string | null {
-	const normalized = normalizeBlockerEvidence(evidence);
-	if (!normalized || !AUTH_PATTERN.test(normalized) || !MISSING_PATTERN.test(normalized)) return null;
-	if (!GHCR_PATTERN.test(normalized)) return "EXTERNAL_AUTHORIZATION_REQUIRED";
-	const status401 = GHCR_401_PATTERN.test(normalized) ? "HTTP_401_ANONYMOUS" : null;
-	const status403 = GHCR_403_PATTERN.test(normalized) ? "HTTP_403_NO_READ_PACKAGES" : null;
-	const status = [status401, status403].filter((part): part is string => part !== null).join("+");
-	return `GHCR_PULL_ACCESS:${status || "AUTHORIZATION_REQUIRED"}:GHCR_VISIBILITY_OR_CREDENTIAL_REQUIRED`;
-}
-
-function nestedBlockerSignature(goal: UlwLoopItem): string | null {
-	const blocker = Reflect.get(goal, "blocker");
-	const signature = isRecord(blocker) ? blocker["signature"] : null;
-	return typeof signature === "string" ? signature : null;
-}
-
-export function sameBlockerOccurrences(plan: UlwLoopPlan, signature: string): number {
-	return plan.goals.filter((goal) => goal.blockerSignature === signature || nestedBlockerSignature(goal) === signature)
-		.length;
-}
-
-export function clearGoalBlockerFields(goal: UlwLoopItem): void {
-	for (const key of BLOCKER_FIELD_KEYS) Reflect.deleteProperty(goal, key);
 }
