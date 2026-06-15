@@ -42,6 +42,7 @@ describe("ulw-loop skill contract", () => {
 		expect(workflow).toMatch(/non-essential criteria may remain pending/i);
 		expect(workflow).toMatch(/final aggregate goal[^.]+every criterion across the whole plan/i);
 		expect(workflow).toMatch(/final aggregate completion requires all criteria across the whole plan/i);
+		expect(workflow).toMatch(/5 cycles on one goal without required criteria passing/i);
 	});
 
 	it("#given full workflow #when echo discipline is inspected #then the ultraqa class list is enumerated once and budgets hold", async () => {
