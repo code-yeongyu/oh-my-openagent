@@ -19,7 +19,7 @@ builtin-skills/
 │   ├── playwright.ts                  # MCP variant + agent-browser
 │   ├── playwright-cli.ts              # CLI variant
 │   ├── dev-browser.ts                 # Persistent page state
-│   ├── frontend-ui-ux.ts              # Design-first UI guidance
+│   ├── frontend.ts              # Design-first UI guidance
 │   ├── review-work.ts                 # 5-agent post-implementation review
 │   ├── remove-ai-slops.ts             # Shared skill loader for remove-ai-slops
 │   ├── init-deep.ts                   # Shared skill loader for init-deep
@@ -29,7 +29,7 @@ builtin-skills/
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
-├── frontend-ui-ux/                    # Resources for frontend-ui-ux skill
+├── frontend/                    # Resources for frontend skill
 ├── agent-browser/                     # Resources for agent-browser variant
 ├── dev-browser/                       # Resources for dev-browser
 └── security-research/                 # Resources for security-research
@@ -44,7 +44,7 @@ builtin-skills/
 | `playwright-cli` | 268 | — | Browser automation via shell CLI (no MCP) |
 | `agent-browser` | (in playwright.ts) | — | Browser via `agent-browser:*` Bash commands |
 | `dev-browser` | 221 | — | Persistent page state browser for dev work |
-| `frontend-ui-ux` | 79 | — | Design-first UI development guidance |
+| `frontend` | 79 | — | Design-first UI development guidance |
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
 | `$omo:remove-ai-slops` | — | — | Remove AI-generated code smells |
 | `init-deep` | — | — | Hierarchical AGENTS.md generation |

@@ -324,7 +324,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 | **playwright**     | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
 | **agent-browser**  | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
 | **dev-browser**    | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
-| **frontend-ui-ux** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
+| **frontend** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
 | **review-work**    | "review work", "review my work", "QA my work"         | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                      |
 | **$omo:remove-ai-slops**| "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                             |
 
@@ -351,7 +351,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 /git-master who wrote this authentication code?
 ```
 
-#### frontend-ui-ux Design Process
+#### frontend Design Process
 
 - **Design Process**: Purpose, Tone, Constraints, Differentiation
 - **Aesthetic Direction**: Choose extreme - brutalist, maximalist, retro-futuristic, luxury, playful
@@ -452,7 +452,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 #### The Designer (UI Implementation)
 
 - **Category**: `visual-engineering`
-- **load_skills**: `["frontend-ui-ux", "playwright"]`
+- **load_skills**: `["frontend", "playwright"]`
 - **Effect**: Implements aesthetic UI and verifies rendering results directly in browser.
 
 #### The Architect (Design Review)

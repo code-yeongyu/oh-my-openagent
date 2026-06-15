@@ -312,7 +312,7 @@ project/
 - 必要なときに起動する組み込み MCP サーバー。
 - スコープ制限された権限。エージェントが境界を越えないようにする。
 
-組み込み: `playwright` (ブラウザ自動化)、`git-master` (atomic コミット、rebase 手術)、`frontend-ui-ux` (デザイン重視の UI)。
+組み込み: `playwright` (ブラウザ自動化)、`git-master` (atomic コミット、rebase 手術)、`frontend` (デザイン重視の UI)。
 
 独自に追加するには `.opencode/skills/*/SKILL.md` または `~/.config/opencode/skills/*/SKILL.md` に配置してください。
 
