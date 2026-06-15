@@ -47,6 +47,7 @@ function createClient(statuses: StatusMap): FakeClient {
         data: [
           {
             id: `${path.id}-message`,
+            agent: path.id === "ses-main" ? "Sisyphus" : "Atlas",
             info: { agent: path.id === "ses-main" ? "Sisyphus" : "Atlas", time: { created: 1 } },
             parts: [{ type: "text" }],
           },
