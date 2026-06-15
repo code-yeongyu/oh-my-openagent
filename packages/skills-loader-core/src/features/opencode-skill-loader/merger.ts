@@ -1,15 +1,34 @@
 import type { LoadedSkill } from "./types"
-import type { SkillsConfig } from "../../types"
+import type { SkillDefinition, SkillsConfig } from "../../types"
 import type { BuiltinSkill } from "../builtin-skills/types"
 import { builtinToLoadedSkill } from "./merger/builtin-skill-converter"
 import { configEntryToLoadedSkill } from "./merger/config-skill-entry-loader"
 import { mergeSkillDefinitions } from "./merger/skill-definition-merger"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { SCOPE_PRIORITY } from "./merger/scope-priority"
+import { isDisabledSkillAlias } from "./skill-discovery"
 
 export interface MergeSkillsOptions {
   configDir?: string
   isConfigEntryAllowed?: (name: string) => boolean
+}
+
+function isDisabledConfigEntry(entry: boolean | SkillDefinition): boolean {
+  if (entry === false) return true
+  if (entry === true) return false
+  return entry.disable === true
+}
+
+function collectDisabledSkillNames(
+  normalizedConfig: ReturnType<typeof normalizeSkillsConfig>,
+): Set<string> {
+  const disabledSkillNames = new Set(normalizedConfig.disable)
+  for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
+    if (isDisabledConfigEntry(entry)) {
+      disabledSkillNames.add(name)
+    }
+  }
+  return disabledSkillNames
 }
 
 export function mergeSkills(
@@ -30,6 +49,7 @@ export function mergeSkills(
   }
 
   const normalizedConfig = normalizeSkillsConfig(config)
+  const disabledSkillNames = collectDisabledSkillNames(normalizedConfig)
 
   for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
     if (options.isConfigEntryAllowed && !options.isConfigEntryAllowed(name)) continue
@@ -66,7 +86,9 @@ export function mergeSkills(
 
   for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
     if (options.isConfigEntryAllowed && !options.isConfigEntryAllowed(name)) {
-      skillMap.delete(name)
+      if (isDisabledConfigEntry(entry)) {
+        skillMap.delete(name)
+      }
       continue
     }
     if (entry === true) continue
@@ -85,8 +107,12 @@ export function mergeSkills(
     }
   }
 
-  for (const name of normalizedConfig.disable) {
-    skillMap.delete(name)
+  if (disabledSkillNames.size > 0) {
+    for (const [name, skill] of skillMap) {
+      if (isDisabledSkillAlias(skill, disabledSkillNames)) {
+        skillMap.delete(name)
+      }
+    }
   }
 
   if (normalizedConfig.enable.length > 0) {
