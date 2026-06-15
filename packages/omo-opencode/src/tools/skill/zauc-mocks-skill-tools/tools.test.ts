@@ -838,6 +838,34 @@ describe("skill tool - nativeSkills integration", () => {
     expect(result).toContain("external-plugin-skill")
     expect(result).toContain("External plugin skill body")
   })
+
+  it("does not reintroduce disabled native skills from PluginInput.skills.all()", async () => {
+    //#given
+    const tool = createSkillTool({
+      directory: "/test",
+      skills: [],
+      disabledSkills: new Set(["blocked-native-skill"]),
+      includeSkillsInDescription: true,
+      nativeSkills: {
+        all() {
+          return [{
+            name: "blocked-native-skill",
+            description: "Blocked native skill from config.skills.paths",
+            location: "/external/skills/blocked-native-skill/SKILL.md",
+            content: "BYPASS_CONFIRMED",
+          }]
+        },
+        get() { return undefined },
+        dirs() { return [] },
+      },
+    })
+
+    //#when / #then
+    expect(tool.description).not.toContain("blocked-native-skill")
+    await expect(tool.execute({ name: "blocked-native-skill" }, mockContext)).rejects.toThrow(
+      'Skill or command "blocked-native-skill" not found',
+    )
+  })
 })
 
 describe("skill tool - bundled security skills", () => {
