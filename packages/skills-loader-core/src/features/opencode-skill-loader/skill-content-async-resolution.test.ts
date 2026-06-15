@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import {
 	clearSkillCache,
 	resolveSkillContent,
@@ -11,6 +11,7 @@ import {
 	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
 } from "./skill-content"
+import { getAllSkills } from "./skill-discovery"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
@@ -119,5 +120,34 @@ describe("resolveSkillContentAsync", () => {
 		// then: finds it case-insensitively
 		expect(result).not.toBeNull()
 		expect(result).toContain("case insensitive match")
+	})
+
+	it("#given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources", async () => {
+		// given
+		const requiredResourcePaths = [
+			"references/full-workflow.md",
+			"references/intent-clear.md",
+			"references/intent-unclear.md",
+			"scripts/scaffold-plan.mjs",
+		]
+
+		// when
+		const skills = await getAllSkills({ directory: testConfigDir })
+		const skill = skills.find((candidate) => candidate.name === "ulw-plan")
+
+		// then
+		expect(skill).toBeDefined()
+		if (!skill) {
+			throw new Error("ulw-plan skill was not resolved")
+		}
+		expect(skill.path).toBeDefined()
+		expect(skill.resolvedPath).toBeDefined()
+		if (!skill.path || !skill.resolvedPath) {
+			throw new Error("ulw-plan skill is not path-backed")
+		}
+		expect(skill.path.endsWith("packages/shared-skills/skills/ulw-plan/SKILL.md")).toBe(true)
+		for (const relativePath of requiredResourcePaths) {
+			expect(existsSync(join(skill.resolvedPath, relativePath))).toBe(true)
+		}
 	})
 })

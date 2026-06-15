@@ -70,6 +70,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// given
 	const sharedSkillsRoot = sharedSkillsRootPath();
 	const aggregateSkillsRoot = join(root, "skills");
+	const componentSkillNames = new Set(componentSkillSources.map(([skillName]) => skillName));
 	const sharedSkillNames = (await readdir(sharedSkillsRoot, { withFileTypes: true }))
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => entry.name)
@@ -77,6 +78,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 
 	// when / then
 	for (const skillName of sharedSkillNames) {
+		if (componentSkillNames.has(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -85,6 +87,18 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 			`${skillName} drifted from shared-skills`,
 		);
 	}
+});
+
+test("#given a shared skill name collides with a Codex component skill #when aggregate skills are inspected #then the component skill wins", async () => {
+	// given
+	const sharedSkill = await readFile(join(sharedSkillsRootPath(), "ulw-plan", "SKILL.md"), "utf8");
+	const componentSkill = await readFile(join(root, "components", "ultrawork", "skills", "ulw-plan", "SKILL.md"), "utf8");
+	const aggregateSkill = await readFile(join(root, "skills", "ulw-plan", "SKILL.md"), "utf8");
+
+	// when / then
+	assert.notEqual(removeCodexCompatibilityGuidance(aggregateSkill), removeCodexCompatibilityGuidance(sharedSkill));
+	assert.equal(removeCodexCompatibilityGuidance(aggregateSkill), removeCodexCompatibilityGuidance(componentSkill));
+	assert.match(aggregateSkill, /multi_agent_v1/);
 });
 
 test("#given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged", async () => {

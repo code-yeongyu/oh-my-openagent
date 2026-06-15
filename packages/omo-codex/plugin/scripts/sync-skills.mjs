@@ -15,6 +15,7 @@ const skillSources = [
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
+const componentSkillNames = new Set(skillSources.map(([name]) => name));
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
@@ -175,6 +176,7 @@ async function syncSkills() {
 		.sort();
 
 	for (const skillName of sharedSkillNames) {
+		if (componentSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
 			filter: (source) => !sourceTestFilePattern.test(source),
 			recursive: true,

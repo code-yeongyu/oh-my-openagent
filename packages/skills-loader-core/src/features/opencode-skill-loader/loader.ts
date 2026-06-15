@@ -1,5 +1,6 @@
 import { join } from "path"
 import { homedir } from "os"
+import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
 import {
   findProjectAgentsSkillDirs,
   findProjectClaudeSkillDirs,
@@ -70,10 +71,11 @@ export interface DiscoverSkillsOptions {
 }
 
 export async function discoverAllSkills(directory?: string): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
+  const [opencodeProjectSkills, opencodeGlobalSkills, sharedSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
     await Promise.all([
       discoverOpencodeProjectSkills(directory),
       discoverOpencodeGlobalSkills(),
+      discoverSharedSkills(),
       discoverProjectClaudeSkills(directory),
       discoverUserClaudeSkills(),
       discoverProjectAgentsSkills(directory),
@@ -84,6 +86,7 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
+    ...sharedSkills,
     ...projectSkills,
     ...agentsProjectSkills,
     ...userSkills,
@@ -94,14 +97,15 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
   const { includeClaudeCodePaths = true, directory } = options
 
-  const [opencodeProjectSkills, opencodeGlobalSkills] = await Promise.all([
+  const [opencodeProjectSkills, opencodeGlobalSkills, sharedSkills] = await Promise.all([
     discoverOpencodeProjectSkills(directory),
     discoverOpencodeGlobalSkills(),
+    discoverSharedSkills(),
   ])
 
   if (!includeClaudeCodePaths) {
     // Priority: opencode-project > opencode
-    return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills])
+    return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills, ...sharedSkills])
   }
 
   const [projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] = await Promise.all([
@@ -115,6 +119,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
+    ...sharedSkills,
     ...projectSkills,
     ...agentsProjectSkills,
     ...userSkills,
@@ -158,6 +163,10 @@ export async function discoverOpencodeProjectSkills(directory?: string): Promise
     ),
   )
   return deduplicateSkillsByName(allSkills.flat())
+}
+
+export async function discoverSharedSkills(): Promise<LoadedSkill[]> {
+  return loadSkillsFromDir({ skillsDir: sharedSkillsRootPath(), scope: "opencode" })
 }
 
 export async function discoverProjectAgentsSkills(directory?: string): Promise<LoadedSkill[]> {
