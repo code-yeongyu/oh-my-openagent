@@ -37,6 +37,34 @@ function normalizeSkillAliasName(name: string): string {
   return name.toLowerCase()
 }
 
+function isDisabledSkillConfigEntry(entry: unknown): boolean {
+  if (entry === false) return true
+  if (entry === true) return false
+  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return false
+  return "disable" in entry && entry.disable === true
+}
+
+function collectDisabledSkillAliases(pluginConfig: OhMyOpenCodeConfig): Set<string> {
+  const disabledSkills = new Set<string>(
+    (pluginConfig.disabled_skills ?? []).map(normalizeSkillAliasName),
+  )
+  const skillsConfig = pluginConfig.skills
+  if (!skillsConfig || Array.isArray(skillsConfig)) return disabledSkills
+
+  for (const name of skillsConfig.disable ?? []) {
+    disabledSkills.add(normalizeSkillAliasName(name))
+  }
+
+  for (const [name, entry] of Object.entries(skillsConfig)) {
+    if (name === "sources" || name === "enable" || name === "disable") continue
+    if (isDisabledSkillConfigEntry(entry)) {
+      disabledSkills.add(normalizeSkillAliasName(name))
+    }
+  }
+
+  return disabledSkills
+}
+
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
   if (scope === "project" || scope === "opencode-project") return "project"
@@ -93,9 +121,7 @@ export async function createSkillContext(args: {
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
 
-  const disabledSkills = new Set<string>(
-    (pluginConfig.disabled_skills ?? []).map(normalizeSkillAliasName),
-  )
+  const disabledSkills = collectDisabledSkillAliases(pluginConfig)
 
   const builtinSkills = resolveActiveBuiltinSkills({
     browserProvider,

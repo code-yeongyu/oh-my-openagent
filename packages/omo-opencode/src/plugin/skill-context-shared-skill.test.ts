@@ -9,7 +9,9 @@ import type { ToolContext, ToolResult } from "@opencode-ai/plugin/tool"
 
 import { OhMyOpenCodeConfigSchema } from "../config"
 import { buildSystemContent } from "../tools/delegate-task/prompt-builder"
+import { resolveSkillContent } from "../tools/delegate-task/skill-resolver"
 import { createSkillTool } from "../tools/skill"
+import type { SkillLoadOptions } from "../tools/skill/types"
 import { createSkillContext } from "./skill-context"
 
 const LOCAL_ULW_PLAN_BODY = "LOCAL PROJECT ULW PLAN BODY"
@@ -18,6 +20,8 @@ const POISONED_SHARED_BODY = "POISONED PROJECT SHARED ULW PLAN BODY"
 const POISONED_MIXED_CASE_SHARED_BODY = "POISONED MIXED CASE PROJECT SHARED ULW PLAN BODY"
 const BLOCKED_MIXED_CASE_SKILL_BODY = "BLOCKED_MIXED_CASE_SKILL_BODY"
 const BLOCKED_MIXED_CASE_SKILL_DESCRIPTION = "BLOCKED_MIXED_CASE_SKILL_DESCRIPTION"
+const BLOCKED_NATIVE_SKILL_BODY = "BLOCKED_NATIVE_SKILL_BODY"
+const BLOCKED_NATIVE_SKILL_DESCRIPTION = "BLOCKED_NATIVE_SKILL_DESCRIPTION"
 
 function createToolContext(directory: string): ToolContext {
   return {
@@ -53,6 +57,23 @@ function toolResultToText(result: ToolResult): string {
 
 function toPosixPath(text: string): string {
   return text.split("\\").join("/")
+}
+
+function createNativeSkills(
+  directory: string,
+  skills: Awaited<ReturnType<NonNullable<SkillLoadOptions["nativeSkills"]>["all"]>>,
+): NonNullable<SkillLoadOptions["nativeSkills"]> {
+  return {
+    all() {
+      return skills
+    },
+    get(name: string) {
+      return skills.find((skill) => skill.name === name)
+    },
+    dirs() {
+      return [join(directory, "native-skills")]
+    },
+  }
 }
 
 async function createPluginWiredSkillTool(args: {
@@ -116,6 +137,15 @@ async function expectMixedCaseBlockedSkillFiltered(args: {
   expect(systemContent).not.toContain(BLOCKED_MIXED_CASE_SKILL_DESCRIPTION)
   expect(systemContent).not.toContain(BLOCKED_MIXED_CASE_SKILL_BODY)
   expect(skillTool.description).not.toContain(BLOCKED_MIXED_CASE_SKILL_DESCRIPTION)
+  const resolved = await resolveSkillContent(["Blocked-Skill"], {
+    directory: args.directory,
+    disabledSkills: skillContext.disabledSkills,
+  })
+  expect(resolved.content).toBeUndefined()
+  expect(resolved.contents).toEqual([])
+  expect(resolved.error).toContain("Skills not found: Blocked-Skill")
+  expect(resolved.error).not.toContain(BLOCKED_MIXED_CASE_SKILL_DESCRIPTION)
+  expect(resolved.error).not.toContain(BLOCKED_MIXED_CASE_SKILL_BODY)
   await expectSkillUnavailable(skillTool, createToolContext(args.directory), "Blocked-Skill")
 }
 
@@ -124,7 +154,7 @@ async function expectSkillUnavailable(
   toolContext: ToolContext,
   name: string,
 ): Promise<void> {
-  let caughtError: unknown
+  let caughtError: Error | undefined
   try {
     await skillTool.execute({ name }, toolContext)
   } catch (error) {
@@ -330,6 +360,71 @@ describe("plugin-wired shared skill aliases", () => {
       directory: testDirectory,
       skills: { disable: ["blocked-skill"] },
     })
+  })
+
+  test("#given mixed-case native skill disabled by lowercase skills.disable #when plugin-wired skill surfaces consume context #then it is absent from tool and delegate loads", async () => {
+    // given
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+      skills: { disable: ["blocked-native"] },
+    })
+    const skillContext = await createSkillContext({
+      directory: testDirectory,
+      pluginConfig,
+    })
+    const nativeSkills = createNativeSkills(testDirectory, [
+      {
+        name: "Blocked-Native",
+        description: BLOCKED_NATIVE_SKILL_DESCRIPTION,
+        location: join(testDirectory, "native-skills", "blocked-native", "SKILL.md"),
+        content: BLOCKED_NATIVE_SKILL_BODY,
+      },
+    ])
+    const skillTool = createSkillTool({
+      directory: testDirectory,
+      skills: skillContext.mergedSkills,
+      disabledSkills: skillContext.disabledSkills,
+      browserProvider: skillContext.browserProvider,
+      nativeSkills,
+      includeSkillsInDescription: true,
+    })
+
+    // when
+    const resolved = await resolveSkillContent(["Blocked-Native"], {
+      directory: testDirectory,
+      disabledSkills: skillContext.disabledSkills,
+      nativeSkills,
+    })
+
+    // then
+    expect(skillContext.disabledSkills).toContain("blocked-native")
+    expect(skillTool.description).not.toContain("Blocked-Native")
+    expect(skillTool.description).not.toContain(BLOCKED_NATIVE_SKILL_DESCRIPTION)
+    await expectSkillUnavailable(skillTool, createToolContext(testDirectory), "Blocked-Native")
+    expect(resolved.content).toBeUndefined()
+    expect(resolved.contents).toEqual([])
+    expect(resolved.error).toContain("Skills not found: Blocked-Native")
+    expect(resolved.error).not.toContain(BLOCKED_NATIVE_SKILL_DESCRIPTION)
+    expect(resolved.error).not.toContain(BLOCKED_NATIVE_SKILL_BODY)
+  })
+
+  test("#given skills entries disable aliases through false and disable true #when plugin skill context is built #then disabledSkills exposes normalized aliases", async () => {
+    // given
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+      skills: {
+        "False-Blocked": false,
+        "Object-Blocked": { disable: true },
+      },
+    })
+
+    // when
+    const skillContext = await createSkillContext({
+      directory: testDirectory,
+      pluginConfig,
+    })
+
+    // then
+    expect(skillContext.disabledSkills).toContain("false-blocked")
+    expect(skillContext.disabledSkills).toContain("object-blocked")
   })
 
   test("#given shared ulw-plan is disabled #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {
