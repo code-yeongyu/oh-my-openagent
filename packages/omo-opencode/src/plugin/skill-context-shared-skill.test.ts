@@ -13,6 +13,7 @@ import { createSkillTool } from "../tools/skill"
 import { createSkillContext } from "./skill-context"
 
 const LOCAL_ULW_PLAN_BODY = "LOCAL PROJECT ULW PLAN BODY"
+const LOCAL_INLINE_ULW_PLAN_BODY = "LOCAL_INLINE_ULW_PLAN_BODY"
 const POISONED_SHARED_BODY = "POISONED PROJECT SHARED ULW PLAN BODY"
 const POISONED_MIXED_CASE_SHARED_BODY = "POISONED MIXED CASE PROJECT SHARED ULW PLAN BODY"
 
@@ -84,10 +85,11 @@ async function expectSkillUnavailable(
   try {
     await skillTool.execute({ name }, toolContext)
   } catch (error) {
+    if (!(error instanceof Error)) throw error
     caughtError = error
   }
 
-  if (!(caughtError instanceof Error)) {
+  if (caughtError === undefined) {
     throw new Error(`Expected ${name} to be unavailable`)
   }
   expect(caughtError.message).toContain(`Skill or command "${name}" not found`)
@@ -286,6 +288,33 @@ describe("plugin-wired shared skill aliases", () => {
     // then
     await sharedUnavailable
     expect(plainOutput).toContain(LOCAL_ULW_PLAN_BODY)
+  })
+
+  test("#given shared ulw-plan is disabled with inline bare config #when the plugin-wired skill tool executes #then inline bare remains and shared alias is unavailable", async () => {
+    // given
+    rmSync(join(testDirectory, ".opencode", "skills", "ulw-plan"), {
+      recursive: true,
+      force: true,
+    })
+    const skillTool = await createPluginWiredSkillTool({
+      directory: testDirectory,
+      disabledSkills: ["shared/ulw-plan"],
+      skills: {
+        "ulw-plan": {
+          description: "Inline local ulw-plan",
+          template: LOCAL_INLINE_ULW_PLAN_BODY,
+        },
+      },
+    })
+    const toolContext = createToolContext(testDirectory)
+
+    // when
+    const plainOutput = toolResultToText(await skillTool.execute({ name: "ulw-plan" }, toolContext))
+    const sharedUnavailable = expectSkillUnavailable(skillTool, toolContext, "shared/ulw-plan")
+
+    // then
+    await sharedUnavailable
+    expect(plainOutput).toContain(LOCAL_INLINE_ULW_PLAN_BODY)
   })
 
   test("#given shared ulw-plan is disabled with mixed casing #when the plugin-wired skill tool executes #then local bare remains and shared alias is unavailable", async () => {

@@ -77,13 +77,11 @@ function filterProtectedSharedAliasCollisions(
   })
 }
 
-function isDisabledSkillName(name: string, disabledSkills: ReadonlySet<string>): boolean {
-  const normalizedName = normalizeSkillAliasName(name)
-  if (disabledSkills.has(normalizedName)) return true
-  if (normalizedName.startsWith("shared/")) {
-    return disabledSkills.has(normalizedName.slice("shared/".length))
-  }
-  return disabledSkills.has(`shared/${normalizedName}`)
+function isDisabledConfigSkillEntryName(
+  name: string,
+  disabledSkills: ReadonlySet<string>,
+): boolean {
+  return disabledSkills.has(normalizeSkillAliasName(name))
 }
 
 export async function createSkillContext(args: {
@@ -215,7 +213,7 @@ export async function createSkillContext(args: {
       configDir: directory,
       isConfigEntryAllowed: (name) =>
         !protectedSharedAliasNames.has(normalizeSkillAliasName(name)) &&
-        !isDisabledSkillName(name, disabledSkills),
+        !isDisabledConfigSkillEntryName(name, disabledSkills),
     },
   )
 
