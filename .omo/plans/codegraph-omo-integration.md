@@ -56,7 +56,7 @@ Metis (9 CRITICAL / 7 MINOR / 6 AMBIGUOUS). Resolutions:
 - No forking/patching CodeGraph itself; no running `codegraph serve --mcp` by hand in tests.
 - No opencode config migration to `~/.omo` in this plan (opencode keeps `oh-my-openagent.json`); SOT consumption on the opencode side is OUT (types stay harness-agnostic only).
 - No pi/pionic harness work; no Claude Code (omocc) distribution changes.
-- No writing project files other than the `.codegraph` symlink; never throw out of a session-start path (failures are logged/widgeted, never fatal).
+- No writing tracked project files other than the `.codegraph` symlink; the only allowed untracked project-local metadata write is adding `.codegraph` to `.git/info/exclude` as specified in Todo 3. Never throw out of a session-start path (failures are logged/widgeted, never fatal).
 - No cross-import between `omo-opencode` and `omo-codex` bundles (shared code goes in `packages/utils`).
 - Do not touch the untracked build artifacts under `packages/oh-my-openagent-*/bin/` (dirty_worktree) — out of every task's scope.
 - No `as any`, empty catches, debug prints, or dead code; respect the 250-LOC module ceiling.
@@ -661,6 +661,7 @@ Evidence hygiene note for final reviewers (2026-06-15):
 - The todo evidence references above intentionally point at the dated `.omo/evidence/20260615-codegraph-omo-integration/` tree. Do not resurrect root `.omo/evidence/task-*` paths.
 - `.omo/evidence/final-qa/` remains the tracked F3 cross-harness QA bundle from commit `712972a59` and is intentionally not duplicated under the dated folder; duplicating it would reintroduce the duplicate-evidence problem this cleanup is avoiding.
 - `.omo/evidence/20260615-todo9-codegraph-bootstrap-disabled-hooks/` remains a targeted Todo 9 / F4 gate-repair bundle for the disabled-hooks blocker. It is outside the main dated folder so reviewers can distinguish blocker repair evidence from the original todo evidence.
+- `.omo/evidence/20260615-codegraph-resolution-platforms/` remains a targeted CodeGraph resolver/platform repair bundle for npm platform metadata, Windows shim, invalid env override, focused tests, and OpenCode QA evidence. It is outside the main dated folder so reviewers can distinguish cross-platform resolver repair evidence from the original todo evidence.
 - `.agents/skills/work-with-pr/SKILL.md` and `.opencode/skills/work-with-pr/SKILL.md` are included as an F2 gate repair only: the project-skill reference test expected `task` delegation to use a real category. Evidence: `.omo/evidence/20260615-codegraph-omo-integration/final-f2-work-with-pr-skill-test.txt`.
 - Do not mark F1-F4 complete from this hygiene pass alone; final reviewers must still rerun/approve those boxes.
 
