@@ -9,17 +9,16 @@ COMMAND: git status --short --branch
  M .omo/evidence/20260615-essential-gate-fix/plugin-check.txt
  M .omo/evidence/20260615-essential-gate-fix/test-codex.txt
  M .omo/evidence/20260615-essential-gate-fix/tmux-smoke.txt
- M .omo/evidence/20260615-essential-gate-fix/typecheck.txt
  M .omo/evidence/20260615-essential-gate-fix/verification.txt
 
-COMMAND: git rev-parse --short HEAD
-5c155ab17
+COMMAND: git rev-parse HEAD
+b47269565d6ab50b57c143143e192a31be503869
 
 COMMAND: git diff --check
 working_git_diff_check_exit=0
 
-COMMAND: git diff --check origin/dev
-origin_dev_full_diff_check_exit=0
+COMMAND: git diff --check origin/dev...HEAD
+origin_dev_range_diff_check_exit=0
 
 COMMAND: stale slop scan
 packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts:1:// biome-ignore-all format: smoke test pulls verbatim JSON for structural assertion.

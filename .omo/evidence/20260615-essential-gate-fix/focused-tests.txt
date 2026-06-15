@@ -1,13 +1,13 @@
-COMMAND: bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/skill-contract.test.ts packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-status.test.ts packages/omo-codex/plugin/components/ulw-loop/test/codex-goal-instruction.test.ts packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts
+COMMAND: bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts packages/omo-codex/plugin/components/ulw-loop/test/skill-contract.test.ts packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-status.test.ts packages/omo-codex/plugin/components/ulw-loop/test/codex-goal-instruction.test.ts packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts
 
 
  RUN  v4.1.9 <WORKTREE>
 
 
  Test Files  7 passed (7)
-      Tests  62 passed (62)
-   Start at  20:17:28
-   Duration  173ms (transform 243ms, setup 0ms, import 335ms, tests 45ms, environment 0ms)
+      Tests  63 passed (63)
+   Start at  20:31:12
+   Duration  249ms (transform 407ms, setup 0ms, import 538ms, tests 60ms, environment 0ms)
 
 
 EXIT_CODE=0

@@ -1,9 +1,8 @@
 COMMAND: CODEX_HOME=<TMP>/codex node packages/omo-codex/scripts/install-local.mjs install
 CODEX_HOME=<TMP>/codex
-bash: line 14: $1: unbound variable
-real_config_hash_before=
+real_config_hash_before=242c618ca16cefac9a3fd8f1060a9802bf8db26f39e99b4a0d1fdafb9f552370
 
-up to date, audited 87 packages in 435ms
+up to date, audited 87 packages in 368ms
 
 18 packages are looking for funding
   run `npm fund` for details
@@ -23,7 +22,7 @@ Building components/comment-checker
 > @code-yeongyu/codex-comment-checker@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 11 modules in 3ms
+Bundled 11 modules in 4ms
 
   cli.js  19.23 KB  (entry point)
 
@@ -85,16 +84,16 @@ Building components/telemetry
 > @code-yeongyu/codex-telemetry@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
 
-Bundled 78 modules in 6ms
+Bundled 78 modules in 7ms
 
   cli.js  204.83 KB  (entry point)
 
-Bundled 76 modules in 5ms
+Bundled 76 modules in 7ms
 
   posthog.js  202.41 KB  (entry point)
 
 Bundling components/telemetry/dist/cli.js
-Bundled 78 modules in 5ms
+Bundled 78 modules in 6ms
 
   cli.js  204.57 KB  (entry point)
 
@@ -103,7 +102,7 @@ Building components/start-work-continuation
 > @code-yeongyu/codex-start-work-continuation@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 16 modules in 3ms
+Bundled 16 modules in 4ms
 
   cli.js  14.14 KB  (entry point)
 
@@ -120,14 +119,14 @@ Building components/ulw-loop
 Bundling components/ulw-loop/dist/cli.js
 Bundled 28 modules in 3ms
 
-  cli.js  107.53 KB  (entry point)
+  cli.js  107.45 KB  (entry point)
 
 Building components/ultrawork
 
 > @code-yeongyu/codex-ultrawork@4.10.0 build
 > node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 3 modules in 2ms
+Bundled 3 modules in 3ms
 
   cli.js  5.24 KB  (entry point)
 
@@ -147,14 +146,14 @@ Saved lockfile
 
   dist/cli.js  103.7kb
 
-⚡ Done in 10ms
+⚡ Done in 14ms
 Bundling components/bootstrap/dist/cli.js
-Bundled 36 modules in 5ms
+Bundled 36 modules in 6ms
 
   cli.js  106.58 KB  (entry point)
 
 
-added 13 packages, and audited 31 packages in 579ms
+added 13 packages, and audited 31 packages in 571ms
 
 1 package is looking for funding
   run `npm fund` for details
@@ -162,7 +161,7 @@ added 13 packages, and audited 31 packages in 579ms
 found 0 vulnerabilities
 Installed 1 plugin(s) from sisyphuslabs.
 install_exit=0
-enabled_plugin_lines=
+isolated_config_plugin_lines=
 29:[plugins."omo@sisyphuslabs"]
 32:[plugins."omo@sisyphuslabs".mcp_servers.context7]
 35:[plugins."omo@sisyphuslabs".mcp_servers.git_bash]
@@ -184,135 +183,17 @@ enabled_plugin_lines=
 83:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:stop:0:0"]
 86:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:subagent_stop:0:0"]
 89:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:subagent_stop:1:0"]
-installed_plugin_dirs=
+installed_plugin_root=
+<TMP>/codex/plugins/cache/sisyphuslabs/omo
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/.codex-plugin
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ast-grep-mcp
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ast-grep-mcp/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/manifests
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/.github
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/skills
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash-mcp
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash-mcp/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp-daemon
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp-daemon/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/.github
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/skills
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/.codex-plugin
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/.github
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/bundled-rules
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/skills
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/skills
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/hooks
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/skills
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/.bin
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/@code-yeongyu
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/@code-yeongyu/comment-checker
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/@oh-my-opencode
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/@sisyphuslabs
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/picomatch
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules/picomatch/lib
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/scripts/migrate-codex-config
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/comment-checker
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/debugging
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/debugging/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/frontend
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/frontend/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/frontend/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/git-master
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/git-master/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/init-deep
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-contribute-bug-fix
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-contribute-bug-fix/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-contribute-bug-fix/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-doctor
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-doctor/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-report-bug
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lcx-report-bug/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lsp
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lsp-setup
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lsp-setup/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/lsp-setup/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/programming
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/programming/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/programming/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/refactor
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/remove-ai-slops
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/review-work
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/rules
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/start-work
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ultraresearch
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-loop
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-loop/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-loop/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-plan
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-plan/agents
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-plan/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/ulw-plan/scripts
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/visual-qa
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/visual-qa/references
-<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills/visual-qa/scripts
 <TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test
-bash: line 32: $1: unbound variable
-real_config_hash_after=
+real_config_hash_after=242c618ca16cefac9a3fd8f1060a9802bf8db26f39e99b4a0d1fdafb9f552370
+real_config_unchanged=yes
 cleanup=removed <TMP>; exists_after=no
 EXIT_CODE=0

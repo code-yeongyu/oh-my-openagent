@@ -1,7 +1,7 @@
-COMMAND: isolated install then tmux codex plugin list --json
+COMMAND: isolated install then tmux CODEX_HOME=<TMP>/codex codex plugin list --json
 install_exit=0
 
-up to date, audited 87 packages in 376ms
+up to date, audited 87 packages in 365ms
 
 18 packages are looking for funding
   run `npm fund` for details
@@ -74,7 +74,7 @@ Building components/lsp
 > node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
 
 Bundling components/lsp/dist/cli.js
-Bundled 6 modules in 5ms
+Bundled 6 modules in 4ms
 
   cli.js  124.72 KB  (entry point)
 
@@ -92,7 +92,7 @@ Bundled 76 modules in 5ms
   posthog.js  202.41 KB  (entry point)
 
 Bundling components/telemetry/dist/cli.js
-Bundled 78 modules in 6ms
+Bundled 78 modules in 5ms
 
   cli.js  204.57 KB  (entry point)
 
@@ -101,7 +101,7 @@ Building components/start-work-continuation
 > @code-yeongyu/codex-start-work-continuation@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 16 modules in 3ms
+Bundled 16 modules in 4ms
 
   cli.js  14.14 KB  (entry point)
 
@@ -116,16 +116,16 @@ Building components/ulw-loop
 > tsc -p tsconfig.build.json
 
 Bundling components/ulw-loop/dist/cli.js
-Bundled 28 modules in 4ms
+Bundled 28 modules in 3ms
 
-  cli.js  107.53 KB  (entry point)
+  cli.js  107.45 KB  (entry point)
 
 Building components/ultrawork
 
 > @code-yeongyu/codex-ultrawork@4.10.0 build
 > node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 3 modules in 3ms
+Bundled 3 modules in 2ms
 
   cli.js  5.24 KB  (entry point)
 
@@ -145,21 +145,103 @@ Saved lockfile
 
   dist/cli.js  103.7kb
 
-⚡ Done in 12ms
+⚡ Done in 13ms
 Bundling components/bootstrap/dist/cli.js
 Bundled 36 modules in 5ms
 
   cli.js  106.58 KB  (entry point)
 
 
-added 13 packages, and audited 31 packages in 664ms
+added 13 packages, and audited 31 packages in 569ms
 
 1 package is looking for funding
   run `npm fund` for details
 
 found 0 vulnerabilities
 Installed 1 plugin(s) from sisyphuslabs.
-can't find pane: lcx-gate-87471
-cleanup_tmux=killed lcx-gate-87471; remains=no
+tmux_capture_begin
+{
+  "installed": [
+    {
+      "pluginId": "omo@sisyphuslabs",
+      "name": "omo",
+      "marketplaceName": "sisyphuslabs",
+      "version": "4.10.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "<TMP>/codex/plugins/cache/sisyphuslabs"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    }
+  ],
+  "available": []
+}
+
+TMUX_CMD_EXIT=0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+tmux_capture_exit=0
+tmux_capture_end
+cleanup_tmux=killed lcx-gate-44197; remains=no
 cleanup_tmp=removed <TMP>; exists_after=no
 EXIT_CODE=0
