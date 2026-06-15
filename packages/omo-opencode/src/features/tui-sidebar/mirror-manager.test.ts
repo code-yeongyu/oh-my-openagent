@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
 import { readMirror } from "./mirror-io"
 import { TuiStateMirror } from "./mirror-manager"
+import type { SessionAgentResolver } from "./snapshot-builder"
 import type { BackgroundTaskSnapshot } from "../background-agent/types"
 
 type StatusRow = { readonly type: string }
@@ -43,16 +44,7 @@ function createClient(statuses: StatusMap): FakeClient {
   return {
     session: {
       status: async () => ({ data: statuses }),
-      messages: async ({ path }) => ({
-        data: [
-          {
-            id: `${path.id}-message`,
-            agent: path.id === "ses-main" ? "Sisyphus" : "Atlas",
-            info: { agent: path.id === "ses-main" ? "Sisyphus" : "Atlas", time: { created: 1 } },
-            parts: [{ type: "text" }],
-          },
-        ],
-      }),
+      messages: async () => ({ data: [] }),
     },
   }
 }
@@ -67,13 +59,26 @@ function createMirror(input?: {
   readonly client?: FakeClient
   readonly projectDir?: string
   readonly backgroundManager?: FakeBackgroundManager
+  readonly sessionAgentResolver?: SessionAgentResolver
 }): TuiStateMirror {
   const projectDir = input?.projectDir ?? makeTempDir("project")
   return new TuiStateMirror({
     client: input?.client ?? createClient({}),
     projectDir,
     backgroundManager: input?.backgroundManager ?? createBackgroundManager([]),
+    sessionAgentResolver: input?.sessionAgentResolver ?? resolveTestSessionAgent,
   })
+}
+
+const resolveTestSessionAgent: SessionAgentResolver = async (sessionID) => {
+  switch (sessionID) {
+    case "ses-main":
+      return "sisyphus"
+    case "ses-sub":
+      return "atlas"
+    default:
+      return null
+  }
 }
 
 describe("TuiStateMirror", () => {

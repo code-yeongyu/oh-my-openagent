@@ -25,11 +25,14 @@ export type TuiBackgroundSnapshotProvider = {
   readonly getTasksSnapshot: () => readonly BackgroundTaskSnapshot[]
 }
 
+export type SessionAgentResolver = (sessionID: string, client: TuiMirrorClient) => Promise<string | null>
+
 export type BuildTuiRuntimeSnapshotInput = {
   readonly client: TuiMirrorClient
   readonly projectDir: string
   readonly backgroundManager: TuiBackgroundSnapshotProvider
   readonly getStatuses?: () => Promise<SessionStatusMap>
+  readonly sessionAgentResolver?: SessionAgentResolver
 }
 
 type ActiveAgentStatus = Extract<AgentStatus, "busy" | "retry" | "running">
@@ -44,7 +47,7 @@ export async function buildTuiRuntimeSnapshot(
     version: MIRROR_SCHEMA_VERSION,
     projectDir: resolve(input.projectDir),
     updatedAt: Date.now(),
-    activeAgents: await activeAgentsFromStatuses(statuses, input.client),
+    activeAgents: await activeAgentsFromStatuses(statuses, input.client, input.sessionAgentResolver ?? getLastAgentFromSession),
     jobBoard: input.backgroundManager.getTasksSnapshot().map(toJobRow),
     loop: loop.kind === "live" ? loop : null,
   }
@@ -62,6 +65,7 @@ async function readStatuses(input: BuildTuiRuntimeSnapshotInput): Promise<Sessio
 async function activeAgentsFromStatuses(
   statuses: SessionStatusMap,
   client: TuiMirrorClient,
+  sessionAgentResolver: SessionAgentResolver,
 ): Promise<TuiRuntimeSnapshot["activeAgents"]> {
   const rows = Object.entries(statuses)
     .map(([sessionID, row]) => ({ sessionID, status: activeStatus(row.type) }))
@@ -69,7 +73,7 @@ async function activeAgentsFromStatuses(
 
   return Promise.all(
     rows.map(async (row) => ({
-      name: (await getLastAgentFromSession(row.sessionID, client)) ?? row.sessionID,
+      name: (await sessionAgentResolver(row.sessionID, client)) ?? row.sessionID,
       status: row.status,
     })),
   )
