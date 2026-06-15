@@ -52,15 +52,15 @@ Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-
 
 When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, the pending action `write .omo/plans/<slug>.md`, the approach), present a short brief once, then **wait for the user's explicit okay**. Read their next reply as a decision (approve / scope-change / still-unclear). Full gate mechanics: `references/full-workflow.md`.
 
-## Delegation (Codex-native)
+## Delegation (OpenCode-native)
 
-Fan out read-only research before deciding. Every spawn names DELIVERABLE / SCOPE / VERIFY inside `message`, states the role inside `message` (and passes `agent_type` as a routing hint - do not assume it alone selected a TOML role), and uses `fork_context: false` unless full parent history is truly required:
+Fan out read-only research before deciding. Every delegated prompt names TASK / DELIVERABLE / SCOPE / VERIFY, states the role inside the prompt, and includes only the context the child needs:
 
 ```
-multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
+task(subagent_type="explore", description="Map the implementation surface", prompt="TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...")
 ```
 
-Roles: `explorer` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Full spawn/wait/fallback discipline is in `references/full-workflow.md`.
+Roles: `explore` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Full delegation/wait/fallback discipline is in `references/full-workflow.md`.
 
 ## Stop rules
 

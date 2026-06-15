@@ -45,22 +45,7 @@
     "disabled_skills": {
       "type": "array",
       "items": {
-        "type": "string",
-        "enum": [
-          "playwright",
-          "agent-browser",
-          "dev-browser",
-          "frontend",
-          "git-master",
-          "review-work",
-          "remove-ai-slops",
-          "init-deep",
-          "debugging",
-          "security-research",
-          "security-review",
-          "visual-qa",
-          "team-mode"
-        ]
+        "type": "string"
       }
     },
     "disabled_hooks": {
