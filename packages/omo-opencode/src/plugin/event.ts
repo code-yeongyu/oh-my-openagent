@@ -132,6 +132,7 @@ export function createEventHandler(args: {
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
 
     const { event } = input;
+    managers.tuiStateMirror?.onEvent(event);
     const props = event.properties as Record<string, unknown> | undefined;
 
     if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {

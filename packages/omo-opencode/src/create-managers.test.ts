@@ -25,6 +25,9 @@ const cleanupSessionTeamRunsMock = mock(async () => ({
   removedLayoutTeamRunIds: [],
   errors: [],
 }))
+const tuiMirrorConstructedInputs: unknown[] = []
+let tuiMirrorStartCount = 0
+let tuiMirrorStopCount = 0
 
 class MockBackgroundManager {
   constructor(config: {
@@ -55,6 +58,20 @@ class MockTmuxSessionManager {
   }
 }
 
+class MockTuiStateMirror {
+  constructor(input: unknown) {
+    tuiMirrorConstructedInputs.push(input)
+  }
+
+  start(): void {
+    tuiMirrorStartCount += 1
+  }
+
+  stop(): void {
+    tuiMirrorStopCount += 1
+  }
+}
+
 function createConfigHandler(): ReturnType<typeof import("./plugin-handlers").createConfigHandler> {
   return async () => {}
 }
@@ -72,6 +89,7 @@ function createDeps(): NonNullable<Parameters<typeof createManagers>[0]["deps"]>
     BackgroundManagerClass: MockBackgroundManager as typeof import("./features/background-agent").BackgroundManager,
     SkillMcpManagerClass: MockSkillMcpManager as typeof import("./features/skill-mcp-manager").SkillMcpManager,
     TmuxSessionManagerClass: MockTmuxSessionManager as typeof import("./features/tmux-subagent").TmuxSessionManager,
+    TuiStateMirrorClass: MockTuiStateMirror as typeof import("./features/tui-sidebar/mirror-manager").TuiStateMirror,
     initTaskToastManagerFn: initTaskToastManager,
     registerManagerForCleanupFn: registerManagerForCleanup,
     cleanupSessionTeamRunsFn: cleanupSessionTeamRunsMock as CleanupSessionTeamRunsFn,
@@ -139,6 +157,9 @@ describe("createManagers", () => {
     trackedPaneBySession.clear()
     registeredCleanupManagers.length = 0
     cleanupSessionTeamRunsMock.mockClear()
+    tuiMirrorConstructedInputs.length = 0
+    tuiMirrorStartCount = 0
+    tuiMirrorStopCount = 0
   })
 
   afterEach(() => {
@@ -259,5 +280,49 @@ describe("createManagers", () => {
     })
     expect(cleanupArgs?.tmuxMgr).toBeInstanceOf(MockTmuxSessionManager)
     expect(cleanupArgs?.bgMgr).toBeInstanceOf(MockBackgroundManager)
+  })
+
+  it("#given TuiStateMirror is enabled #when managers are created and cleanup runs #then it starts and stops the mirror", async () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    const managers = createManagers(args)
+
+    await registeredCleanupManagers[0]?.shutdown()
+
+    expect(managers.tuiStateMirror).toBeInstanceOf(MockTuiStateMirror)
+    expect(tuiMirrorConstructedInputs).toHaveLength(1)
+    expect(tuiMirrorConstructedInputs[0]).toMatchObject({
+      client: args.ctx.client,
+      projectDir: "/tmp/project",
+      backgroundManager: managers.backgroundManager,
+    })
+    expect(tuiMirrorStartCount).toBe(1)
+    expect(tuiMirrorStopCount).toBe(1)
+  })
+
+  it("#given TuiStateMirror is disabled #when managers are created #then it is not constructed or started", () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({
+        tui: { sidebar: { enabled: false } },
+      }),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    const managers = createManagers(args)
+
+    expect(managers.tuiStateMirror).toBeUndefined()
+    expect(tuiMirrorConstructedInputs).toHaveLength(0)
+    expect(tuiMirrorStartCount).toBe(0)
   })
 })
