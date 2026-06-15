@@ -39,6 +39,12 @@ function detectWorktreePath(directory: string): string | undefined {
     return worktreePathCache.get(cacheKey)
   }
 
+  const gitMarkerAncestor = findGitMarkerAncestor(resolvedDirectory)
+  if (gitMarkerAncestor !== undefined) {
+    worktreePathCache.set(cacheKey, gitMarkerAncestor)
+    return gitMarkerAncestor
+  }
+
   try {
     const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       cwd: resolvedDirectory,
