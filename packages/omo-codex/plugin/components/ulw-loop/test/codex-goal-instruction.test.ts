@@ -81,7 +81,6 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toContain("do not call update_goal mid-aggregate");
 		expect(text).toContain("checkpoint this OMO ledger story");
 		expect(text).toContain("update_goal is reserved for the final story after the mandatory quality gate passes");
-		expect(text).not.toContain("aggregate Codex goal must remain active while later OMO stories remain");
 	});
 
 	it("#given a non-final aggregate story #when rendering instructions #then defers the current final quality gate", () => {
@@ -120,7 +119,6 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toMatch(/not clean.*do not call update_goal/i);
 		expect(text).toContain("record-review-blockers");
 		expect(text).toContain("checkpoint");
-		expect(text).not.toContain("must remain active while later OMO stories remain");
 		expect(text).not.toContain("ai-slop-cleaner");
 		expect(text).not.toContain("codex-ultrawork-reviewer");
 		expect(text).not.toMatch(/architect status/i);

@@ -1,7 +1,7 @@
 {
 	"name": "@code-yeongyu/codex-ultrawork",
 	"version": "4.10.0",
-	"description": "Codex plugin that injects the ultrawork orchestration directive and syncs the ultrawork reviewer agent role.",
+	"description": "Codex plugin that injects the ultrawork orchestration directive and ships LazyCodex planning, review, QA, and gate agent roles.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
 	"license": "MIT",

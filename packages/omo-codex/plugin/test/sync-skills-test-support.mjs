@@ -35,16 +35,9 @@ export const componentSkillSources = [
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
 
-const legacyAgentListingToolName = ["list", "agents"].join("_");
-const legacyForkModeField = ["fork", "turns"].join("_");
-const legacyNoHistoryForkValue = "none";
-const legacyNoHistoryForkSetting = `${legacyForkModeField}="${legacyNoHistoryForkValue}"`;
-
 const codexCompatibilityEndMarkers = [
 	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
 	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	`For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`wait_agent\` timeout only means no new mailbox update arrived. Treat a running child or latest \`WORKING:\` message as alive. Do not use \`${legacyAgentListingToolName}\` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.\n\n`,
-	`Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained \`message\` and usually should use a non-full-history fork mode such as \`${legacyNoHistoryForkSetting}\`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.\n\n`,
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 ];

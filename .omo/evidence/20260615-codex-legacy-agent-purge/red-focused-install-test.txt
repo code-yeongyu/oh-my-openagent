@@ -13,7 +13,7 @@ error: expect(received).toBe(expected)
 Expected: false
 Received: true
 
-      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/lazycodex-gate-reviewers/packages/omo-codex/src/install/install-codex.test.ts:266:80)
+      at <anonymous> (<WORKTREE>/packages/omo-codex/src/install/install-codex.test.ts:266:80)
 (fail) install-codex > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [448.77ms]
 
  0 pass

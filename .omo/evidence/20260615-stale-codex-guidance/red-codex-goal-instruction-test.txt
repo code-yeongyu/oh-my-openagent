@@ -1,6 +1,6 @@
 $ vitest --run test/codex-goal-instruction.test.ts
 
- RUN  v4.1.8 /Users/yeongyu/local-workspaces/omo-wt/lazycodex-gate-reviewers/packages/omo-codex/plugin/components/ulw-loop
+ RUN  v4.1.8 <WORKTREE>/packages/omo-codex/plugin/components/ulw-loop
 
  ❯ test/codex-goal-instruction.test.ts (12 tests | 1 failed) 7ms
      × instructs not to call update_goal mid-aggregate when not final 4ms

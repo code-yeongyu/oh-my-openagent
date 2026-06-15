@@ -21,9 +21,10 @@ Patch stale Codex orchestration guidance blockers in the lazycodex-gate-reviewer
 - GREEN: `.omo/evidence/20260615-stale-codex-guidance/ulw-loop-typecheck.txt` shows `tsc --noEmit` completed.
 - GREEN: `.omo/evidence/20260615-stale-codex-guidance/plugin-check.txt` shows `bun run --cwd packages/omo-codex/plugin check` passed with 217/217 plugin tests.
 - GREEN: `.omo/evidence/20260615-stale-codex-guidance/test-codex.txt` shows `bun run test:codex` passed with 339/339 Codex tests and 95/95 lsp-tools tests.
-- SCAN: `.omo/evidence/20260615-stale-codex-guidance/final-stale-scan.txt` is empty for the requested stale-token scan.
-- SCAN: `.omo/evidence/20260615-stale-codex-guidance/extra-targeted-stale-scan.txt` is empty for the broader targeted stale-token scan.
+- SCAN: `.omo/evidence/20260615-stale-codex-guidance/final-stale-scan.txt` records no matches for the requested stale-token scan.
+- SCAN: `.omo/evidence/20260615-stale-codex-guidance/extra-targeted-stale-scan.txt` records no matches for the broader targeted stale-token scan.
+- SCAN: `.omo/evidence/20260615-stale-codex-guidance/evidence-path-redaction-scan.txt` shows committed evidence was checked for local home/worktree path leaks after redaction.
 
 ## Self Review
 
-Re-read the diff after verification. The sync marker runtime strings are preserved via token construction, active generated guidance no longer mentions the v2 fork-mode wording, and tests assert behavior rather than the construction detail. The plugin package `check` and full Codex compatibility gate both passed.
+Re-read the diff after verification. The active generated guidance no longer mentions the v2 fork-mode wording, stale compatibility sections are removed by the Markdown section boundary rather than hidden literal-token construction, and tests assert behavior rather than reconstructed implementation tokens. The plugin package `check` and full Codex compatibility gate both passed.

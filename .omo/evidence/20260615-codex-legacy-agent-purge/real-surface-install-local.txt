@@ -1,7 +1,7 @@
 QA_ROOT=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH
 CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH/codex
 CODEX_LOCAL_BIN_DIR=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH/bin
-REAL_CONFIG_BEFORE=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  /Users/yeongyu/.codex/config.toml
+REAL_CONFIG_BEFORE=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  <HOME>/.codex/config.toml
 
 up to date, audited 85 packages in 362ms
 
@@ -157,7 +157,7 @@ added 12 packages, and audited 29 packages in 650ms
 
 found 0 vulnerabilities
 Installed 1 plugin(s) from sisyphuslabs.
-REAL_CONFIG_AFTER=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  /Users/yeongyu/.codex/config.toml
+REAL_CONFIG_AFTER=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  <HOME>/.codex/config.toml
 LEGACY_CONFIG_PRESENT=no
 LEGACY_FILE_PRESENT=no
 USER_FILE_CONTENT=name = "user-custom"|model = "gpt-5.5"|

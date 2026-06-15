@@ -6,7 +6,7 @@
   - `remove-ai-slops`: requested discipline; use as bounded post-change slop/self-review on changed files.
   - `git-master`: required for status/diff-first workflow and atomic commit.
 - Tier: HEAVY. Justification: installer cleanup can delete files under `CODEX_HOME/agents`, so the change touches permissions/destructive behavior and user explicitly requires strict verification.
-- Worktree: `/Users/yeongyu/local-workspaces/omo-wt/lazycodex-gate-reviewers`
+- Worktree: `<WORKTREE>`
 - Initial status: clean (`git status --short` empty).
 - Branch: `fix/lazycodex-final-gate-followup`, upstream `origin/dev`.
 

@@ -56,7 +56,7 @@ Bundled 57 modules in 4ms
 > vitest --run
 
 
- RUN  v4.1.8 /Users/yeongyu/local-workspaces/omo-wt/lazycodex-gate-reviewers/packages/lsp-tools-mcp
+ RUN  v4.1.8 <WORKTREE>/packages/lsp-tools-mcp
 
 
  Test Files  25 passed (25)

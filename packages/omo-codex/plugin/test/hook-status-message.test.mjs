@@ -162,8 +162,8 @@ test("#given LazyCodex appears inside hook label #when normalizing #then product
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-assert.equal(normalized, "Verifying LazyCodex Executor Evidence");
-assert.equal(message, `LazyCodex(${version}): Verifying LazyCodex Executor Evidence`);
+	assert.equal(normalized, "Verifying LazyCodex Executor Evidence");
+	assert.equal(message, `LazyCodex(${version}): Verifying LazyCodex Executor Evidence`);
 });
 
 test("#given MCP appears inside hook label #when normalizing #then protocol casing is preserved", () => {
