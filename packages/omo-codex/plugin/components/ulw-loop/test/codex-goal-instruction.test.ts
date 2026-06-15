@@ -75,6 +75,17 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toMatch(/do not.*update_goal/i);
 	});
 
+	it("#given a non-final aggregate story #when rendering instructions #then defers the current final quality gate", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: false,
+		});
+
+		expect(text).toContain("final reviewer/manual-QA/gate-review quality gate");
+		expect(text).not.toContain("ai-slop-cleaner");
+	});
+
 	it("includes quality gate instruction when isFinal", () => {
 		const { text } = buildCodexGoalInstruction({
 			plan: makePlan({ codexGoalMode: "aggregate" }),
@@ -82,6 +93,27 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 			isFinal: true,
 		});
 		expect(text).toMatch(/quality gate/i);
+	});
+
+	it("#given a final aggregate story #when rendering instructions #then requires the current LazyCodex quality gate", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: true,
+		});
+
+		expect(text).toContain("Run targeted verification for changed behavior.");
+		expect(text).toContain("Confirm every manualQa artifact path exists and has non-zero size.");
+		expect(text).toContain("lazycodex-code-reviewer");
+		expect(text).toContain("lazycodex-qa-executor");
+		expect(text).toContain("lazycodex-gate-reviewer");
+		expect(text).toContain("manualQa");
+		expect(text).toContain("gateReview");
+		expect(text).toMatch(/not clean.*do not call update_goal/i);
+		expect(text).toContain("Record blocker work first:");
+		expect(text).not.toContain("ai-slop-cleaner");
+		expect(text).not.toContain("codex-ultrawork-reviewer");
+		expect(text).not.toMatch(/architect status/i);
 	});
 
 	it("#given a scoped plan #when rendering final commands #then includes the session id option", () => {
