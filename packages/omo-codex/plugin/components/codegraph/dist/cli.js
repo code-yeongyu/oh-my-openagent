@@ -1300,6 +1300,16 @@ var CODEGRAPH_PROVISION_MANIFEST = {
       executableName: "codegraph",
       sha256: "d45a068f44596a85c7ba7d0ef924eaf7103fbbf3cafbeb668127daff60a52228",
       url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-x64.tar.gz"
+    },
+    "win32-arm64": {
+      executableName: "codegraph.cmd",
+      sha256: "8d57ced73b24d35f758f2ede2318e80e1d7241987f37a999e3d80edb6fddf961",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.0.1.tgz"
+    },
+    "win32-x64": {
+      executableName: "codegraph.cmd",
+      sha256: "52607fe73b05e741fd1087da2ceca9d3c8f565e36bf1a7070600bdbdf3931e32",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.0.1.tgz"
     }
   },
   version: "1.0.1"
@@ -1354,7 +1364,7 @@ function forcedBadChecksumOptions(options) {
     installDir: options.installDir ?? join3(options.lockDir, "codegraph-force-bad-checksum"),
     manifest: {
       assets: {
-        [key]: { executableName: process.platform === "win32" ? "codegraph.exe" : "codegraph", sha256: "0000", url: "memory://bad" }
+        [key]: { executableName: process.platform === "win32" ? "codegraph.cmd" : "codegraph", sha256: "0000", url: "memory://bad" }
       },
       version: options.version
     },
@@ -1429,8 +1439,9 @@ async function installAsset(layout) {
     if (actualChecksum !== asset.sha256) {
       throw new Error(`checksum mismatch for ${basename(asset.url)}: expected ${asset.sha256}, got ${actualChecksum}`);
     }
-    if (!asset.url.endsWith(".tar.gz"))
+    if (!asset.url.endsWith(".tar.gz") && !asset.url.endsWith(".tgz")) {
       throw new Error(`unsupported CodeGraph archive type for ${basename(asset.url)}`);
+    }
     await writeFile(archivePath, bytes);
     await extractTarGz(archivePath, extractDir);
     const destination = await installExtractedBundle(extractDir, installDir, asset.executableName);
@@ -1551,6 +1562,7 @@ function bunWhich(commandName) {
 // ../../utils/src/codegraph/resolve.ts
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
+var CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN";
 var requireFromHere = createRequire(import.meta.url);
 function defaultRequireResolve(specifier) {
   return requireFromHere.resolve(specifier);
@@ -1586,11 +1598,11 @@ function resolveBundledShim(requireResolve, fileExists) {
 }
 function resolveCodegraphCommand(options = {}) {
   const env = options.env ?? process.env;
-  const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim();
-  if (configuredBin !== undefined && configuredBin.length > 0) {
-    return { argsPrefix: [], command: configuredBin, exists: true, source: "env" };
-  }
   const fileExists = options.fileExists ?? existsSync4;
+  const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim() || env[CODEGRAPH_LEGACY_ENV_BIN]?.trim();
+  if (configuredBin !== undefined && configuredBin.length > 0) {
+    return { argsPrefix: [], command: configuredBin, exists: fileExists(configuredBin), source: "env" };
+  }
   const nodeRuntime = options.nodeRuntime ?? defaultNodeRuntime;
   const bundled = resolveBundledShim(options.requireResolve ?? defaultRequireResolve, fileExists);
   const runtime2 = nodeRuntime();

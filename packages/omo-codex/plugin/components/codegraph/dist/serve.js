@@ -99,6 +99,7 @@ function bunWhich(commandName) {
 // ../../../../utils/src/codegraph/resolve.ts
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
+var CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN";
 var requireFromHere = createRequire(import.meta.url);
 function defaultRequireResolve(specifier) {
   return requireFromHere.resolve(specifier);
@@ -134,11 +135,11 @@ function resolveBundledShim(requireResolve, fileExists) {
 }
 function resolveCodegraphCommand(options = {}) {
   const env = options.env ?? process.env;
-  const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim();
-  if (configuredBin !== undefined && configuredBin.length > 0) {
-    return { argsPrefix: [], command: configuredBin, exists: true, source: "env" };
-  }
   const fileExists = options.fileExists ?? existsSync;
+  const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim() || env[CODEGRAPH_LEGACY_ENV_BIN]?.trim();
+  if (configuredBin !== undefined && configuredBin.length > 0) {
+    return { argsPrefix: [], command: configuredBin, exists: fileExists(configuredBin), source: "env" };
+  }
   const nodeRuntime = options.nodeRuntime ?? defaultNodeRuntime;
   const bundled = resolveBundledShim(options.requireResolve ?? defaultRequireResolve, fileExists);
   const runtime2 = nodeRuntime();
