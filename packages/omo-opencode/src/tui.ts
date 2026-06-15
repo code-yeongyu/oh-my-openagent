@@ -76,9 +76,12 @@ async function readView(directory: string): Promise<SidebarView> {
   })
 }
 
-export function handleTuiPollError(error: unknown): void {
+export function handleTuiPollError(
+  error: unknown,
+  reportPollError: (error: Error) => void = (pollError) => log("[tui-sidebar] polling failed", { error: pollError }),
+): void {
   if (error instanceof Error) {
-    log("[tui-sidebar] polling failed", { error })
+    reportPollError(error)
     return
   }
   throw error

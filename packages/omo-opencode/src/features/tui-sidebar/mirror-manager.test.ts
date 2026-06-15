@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import * as logger from "../../shared/logger"
 import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
 import { readMirror } from "./mirror-io"
 import { TuiStateMirror } from "./mirror-manager"
@@ -61,6 +60,7 @@ function createMirror(input?: {
   readonly projectDir?: string
   readonly backgroundManager?: FakeBackgroundManager
   readonly sessionAgentResolver?: SessionAgentResolver
+  readonly reportFlushError?: (error: Error) => void
 }): TuiStateMirror {
   const projectDir = input?.projectDir ?? makeTempDir("project")
   return new TuiStateMirror({
@@ -68,6 +68,7 @@ function createMirror(input?: {
     projectDir,
     backgroundManager: input?.backgroundManager ?? createBackgroundManager([]),
     sessionAgentResolver: input?.sessionAgentResolver ?? resolveTestSessionAgent,
+    reportFlushError: input?.reportFlushError,
   })
 }
 
@@ -157,7 +158,7 @@ describe("TuiStateMirror", () => {
     // given
     const projectDir = makeTempDir("throw-project")
     const statusError = new Error("status unavailable")
-    const logSpy = jest.spyOn(logger, "log").mockImplementation(() => {})
+    const reportedErrors: Error[] = []
     const client: FakeClient = {
       session: {
         status: async () => {
@@ -166,15 +167,20 @@ describe("TuiStateMirror", () => {
         messages: async () => ({ data: [] }),
       },
     }
-    const mirror = createMirror({ projectDir, client })
+    const mirror = createMirror({
+      projectDir,
+      client,
+      reportFlushError: (error) => {
+        reportedErrors.push(error)
+      },
+    })
 
     // when
     await expect(mirror.flush()).resolves.toBeUndefined()
 
     // then
     expect(readMirror(projectDir)).toBeNull()
-    expect(logSpy).toHaveBeenCalledWith("[tui-sidebar] mirror flush failed", { error: statusError })
-    logSpy.mockRestore()
+    expect(reportedErrors).toEqual([statusError])
   })
 
   it("#given concurrent flush calls #when the first build is in flight #then it does not double-build", async () => {

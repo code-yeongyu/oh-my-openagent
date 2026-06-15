@@ -17,10 +17,12 @@ export type TuiStateMirrorInput = {
   readonly backgroundManager: TuiBackgroundSnapshotProvider
   readonly getStatuses?: () => Promise<SessionStatusMap>
   readonly sessionAgentResolver?: SessionAgentResolver
+  readonly reportFlushError?: (error: Error) => void
 }
 
 export class TuiStateMirror {
   private readonly snapshotInput: BuildTuiRuntimeSnapshotInput
+  private readonly reportFlushError: (error: Error) => void
   private heartbeatID: ReturnType<typeof setInterval> | null = null
   private debounceID: ReturnType<typeof setTimeout> | null = null
   private pendingFlush: Promise<void> | null = null
@@ -30,6 +32,7 @@ export class TuiStateMirror {
 
   constructor(input: TuiStateMirrorInput) {
     this.snapshotInput = input
+    this.reportFlushError = input.reportFlushError ?? ((error) => log("[tui-sidebar] mirror flush failed", { error }))
   }
 
   buildSnapshot(): Promise<TuiRuntimeSnapshot> {
@@ -124,7 +127,7 @@ export class TuiStateMirror {
       writeMirror(this.snapshotInput.projectDir, snapshot)
     } catch (error) {
       if (error instanceof Error) {
-        log("[tui-sidebar] mirror flush failed", { error })
+        this.reportFlushError(error)
         return
       }
       throw error
