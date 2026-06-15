@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { join } from "node:path"
 import { CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
 import { createCodegraphMcpConfig } from "./codegraph"
 import type { RuntimeExecutable } from "./runtime-executable"
@@ -85,7 +86,7 @@ describe("createCodegraphMcpConfig", () => {
   it("uses configured install_dir for provisioned lookup and MCP environment", () => {
     // given
     const installDir = "/custom/codegraph"
-    const provisionedPath = `${installDir}/bin/${process.platform === "win32" ? "codegraph.cmd" : "codegraph"}`
+    const provisionedPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
 
     // when
     const config = createCodegraphMcpConfig({
