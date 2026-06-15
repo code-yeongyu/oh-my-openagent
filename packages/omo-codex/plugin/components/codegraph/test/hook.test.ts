@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { runCodegraphCli } from "../src/cli.ts";
 import {
 	executeCodegraphSessionStartHook,
+	resolveCodegraphCommandInvocation,
 	runCodegraphSessionStartWorker,
 	type WorkerSpawnInvocation,
 } from "../src/hook.ts";
@@ -348,6 +349,31 @@ describe("CodeGraph SessionStart hook", () => {
 				rmSync(installDir, { recursive: true, force: true });
 			}
 		});
+	});
+
+	it("#given Windows codegraph.cmd #when default worker runner builds invocation #then it runs through cmd.exe", () => {
+		// given
+		const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd";
+
+		// when
+		const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32");
+
+		// then
+		expect(invocation).toEqual({
+			args: ["/d", "/s", "/c", command, "status", "--json"],
+			command: "cmd.exe",
+		});
+	});
+
+	it("#given non-Windows codegraph command #when default worker runner builds invocation #then it executes directly", () => {
+		// given
+		const command = "/home/test/.omo/codegraph/bin/codegraph";
+
+		// when
+		const invocation = resolveCodegraphCommandInvocation(command, ["sync"], "linux");
+
+		// then
+		expect(invocation).toEqual({ args: ["sync"], command });
 	});
 
 	it("#given resolved CodeGraph status #when worker runs #then it runs status before init or sync", async () => {

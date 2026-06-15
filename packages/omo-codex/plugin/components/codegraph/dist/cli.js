@@ -1254,7 +1254,7 @@ function getCodexOmoConfig(options = {}) {
 import { execFile as execFile2 } from "node:child_process";
 import { appendFileSync as appendFileSync2, existsSync as existsSync6, mkdirSync as mkdirSync2 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
-import { join as join7 } from "node:path";
+import { extname, join as join7 } from "node:path";
 import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
 
 // ../../utils/src/codegraph/env.ts
@@ -1727,6 +1727,7 @@ function ensureCodegraphGitignored(workspace) {
 var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 var CODEGRAPH_VERSION = "1.0.1";
 var COMMAND_TIMEOUT_MS = 60000;
+var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 var defaultDeps = {
   ensureGitignored: ensureCodegraphGitignored,
   ensureProvisioned: ensureCodegraphProvisioned,
@@ -1815,8 +1816,9 @@ function jsonSaysInitialized(value) {
   return;
 }
 async function runCodegraphCommand(projectRoot, command, args, options) {
+  const invocation = resolveCodegraphCommandInvocation(command, args);
   return new Promise((resolvePromise) => {
-    execFile2(command, [...args], { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...options.env }, maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+    execFile2(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...options.env }, maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
       if (error === null) {
         resolvePromise({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false });
         return;
@@ -1824,6 +1826,13 @@ async function runCodegraphCommand(projectRoot, command, args, options) {
       resolvePromise({ exitCode: resolveExitCode(error), stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: error.killed === true });
     });
   });
+}
+function resolveCodegraphCommandInvocation(command, args, platform = process.platform) {
+  if (platform !== "win32")
+    return { args: [...args], command };
+  if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase()))
+    return { args: [...args], command };
+  return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
 function appendOutcome(homeDir, outcome) {
   const logDir = join7(homeDir, ".omo", "codegraph");
@@ -1943,7 +1952,7 @@ function defaultWorkerCliPath() {
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync7, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
-import { basename as basename3, extname, join as join8, resolve as resolve3 } from "node:path";
+import { basename as basename3, extname as extname2, join as join8, resolve as resolve3 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
@@ -1955,7 +1964,7 @@ var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. In
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
-var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
 var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv3;
@@ -2027,11 +2036,11 @@ async function runChildProcess(command, args, options) {
 function resolveServeProcessInvocation(command, args, platform = process.platform) {
   if (platform !== "win32")
     return { args: [...args], command };
-  const extension = extname(command).toLowerCase();
+  const extension = extname2(command).toLowerCase();
   if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
     return { args: [command, ...args], command: processExecPath };
   }
-  if (WINDOWS_CMD_EXTENSIONS.has(extension)) {
+  if (WINDOWS_CMD_EXTENSIONS2.has(extension)) {
     return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
   }
   return { args: [...args], command };
