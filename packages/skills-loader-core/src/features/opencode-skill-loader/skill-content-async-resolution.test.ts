@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import {
 	clearSkillCache,
 	resolveSkillContent,
@@ -149,5 +149,8 @@ describe("resolveSkillContentAsync", () => {
 		for (const relativePath of requiredResourcePaths) {
 			expect(existsSync(join(skill.resolvedPath, relativePath))).toBe(true)
 		}
+		const fullWorkflow = readFileSync(join(skill.resolvedPath, "references/full-workflow.md"), "utf8")
+		expect(fullWorkflow).not.toContain("--dangerously-bypass-approvals-and-sandbox")
+		expect(fullWorkflow).not.toContain("dangerously-bypass")
 	})
 })
