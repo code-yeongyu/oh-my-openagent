@@ -173,4 +173,15 @@ describe("tui-sidebar mirror IPC", () => {
     expect(snapshot).toEqual(expected)
     expect(existsSync(mirrorFilePath(projectDir))).toBe(true)
   })
+
+  it("#given mirror storage parent is a file #when writing #then it reports the filesystem failure", () => {
+    // given
+    const blockedDataHome = join(makeTempDir("blocked-parent"), "data-home-file")
+    writeFileSync(blockedDataHome, "not a directory", "utf-8")
+    process.env.XDG_DATA_HOME = blockedDataHome
+    const projectDir = makeTempDir("write-failure")
+    const snapshot = snapshotFor(projectDir, Date.now())
+
+    expect(() => writeMirror(projectDir, snapshot)).toThrow()
+  })
 })

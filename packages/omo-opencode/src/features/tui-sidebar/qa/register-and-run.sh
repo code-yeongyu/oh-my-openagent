@@ -89,6 +89,7 @@ run_with_timeout() {
 
 (cd "$PROJECT" && run_with_timeout 60 opencode run --format json "hi")
 RUN_RC=$?
+FAILED=0
 
 AFTER_COUNT="$BEFORE_COUNT"
 if [ -n "$REALDB" ] && [ -f "$REALDB" ]; then
@@ -101,8 +102,32 @@ if [ "$AFTER_COUNT" = "$BEFORE_COUNT" ]; then
   printf 'ISO=ISO_OK\n'
 else
   printf 'ISO=ISO_LEAK\n'
+  FAILED=1
 fi
 
 if [ "$RUN_RC" -ne 0 ]; then
   printf 'ERROR=opencode_run_failed:%s\n' "$RUN_RC"
+  FAILED=1
 fi
+
+MIRROR_COUNT=0
+if [ -d "$MIRROR_DIR" ]; then
+  MIRROR_COUNT="$(find "$MIRROR_DIR" -type f -name '*.json' | wc -l | tr -d '[:space:]')"
+fi
+printf 'MIRROR_COUNT=%s\n' "$MIRROR_COUNT"
+
+if [ "$DISABLED" -eq 1 ]; then
+  if [ "$MIRROR_COUNT" -ne 0 ]; then
+    printf 'ERROR=mirror_written_when_disabled\n'
+    FAILED=1
+  else
+    printf 'MIRROR=MIRROR_DISABLED_OK\n'
+  fi
+elif [ "$MIRROR_COUNT" -eq 0 ]; then
+  printf 'ERROR=mirror_missing_when_enabled\n'
+  FAILED=1
+else
+  printf 'MIRROR=MIRROR_ENABLED_OK\n'
+fi
+
+exit "$FAILED"
