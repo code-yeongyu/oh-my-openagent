@@ -1,5 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../../../config"
-import { validatePluginConfig } from "../../../features/tui-sidebar/config-validator"
+import { validatePluginConfig } from "../../../config/validate"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"

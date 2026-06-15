@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } f
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadPluginConfig } from "../../plugin-config/layered-config-loader"
-import { validatePluginConfig } from "./config-validator"
+import { loadPluginConfig } from "../plugin-config/layered-config-loader"
+import { validatePluginConfig } from "./validate"
 
 type EnvSnapshot = {
   readonly HOME: string | undefined
@@ -31,7 +31,7 @@ function withIsolatedConfig<T>(name: string, run: (root: string) => T): T {
     OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
     XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
   }
-  const root = join(tmpdir(), `omo-tui-config-${name}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const root = join(tmpdir(), `omo-config-validate-${name}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
   try {
     mkdirSync(root, { recursive: true })
@@ -73,14 +73,11 @@ function pickRenderedConfigFields(config: ReturnType<typeof validatePluginConfig
 describe("validatePluginConfig", () => {
   it("returns defaults with tui sidebar enabled when no config exists", () => {
     withIsolatedConfig("defaults", (root) => {
-      // given
       const project = join(root, "project")
       mkdirSync(project, { recursive: true })
 
-      // when
       const result = validatePluginConfig(project)
 
-      // then
       expect(result.valid).toBe(true)
       expect(result.messages).toEqual([])
       expect(result.path).toBeNull()
@@ -90,16 +87,13 @@ describe("validatePluginConfig", () => {
 
   it("allows tui sidebar to be disabled by config", () => {
     withIsolatedConfig("disabled", (root) => {
-      // given
       const project = join(root, "project")
       writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
         tui: { sidebar: { enabled: false } },
       })
 
-      // when
       const result = validatePluginConfig(project)
 
-      // then
       expect(result.valid).toBe(true)
       expect(result.config.tui?.sidebar.enabled).toBe(false)
     })
@@ -107,7 +101,6 @@ describe("validatePluginConfig", () => {
 
   it("detects invalid ancestor configs from a child directory", () => {
     withIsolatedConfig("ancestor-invalid", (root) => {
-      // given
       const project = join(root, "project")
       const child = join(project, "child", "deep")
       mkdirSync(child, { recursive: true })
@@ -115,10 +108,8 @@ describe("validatePluginConfig", () => {
         agents: { sisyphus: { model: 123 } },
       })
 
-      // when
       const result = validatePluginConfig(child)
 
-      // then
       expect(result.valid).toBe(false)
       expect(result.messages.some((message: string) => message.includes("agents.sisyphus.model"))).toBe(true)
     })
@@ -126,7 +117,6 @@ describe("validatePluginConfig", () => {
 
   it("uses nearest ancestor precedence and matches the runtime rendered config fields", () => {
     withIsolatedConfig("precedence", (root) => {
-      // given
       const far = join(root, "project")
       const near = join(far, "near")
       const child = join(near, "child")
@@ -140,11 +130,9 @@ describe("validatePluginConfig", () => {
         team_mode: { enabled: true },
       })
 
-      // when
       const readonlyResult = validatePluginConfig(child)
       const runtimeConfig = loadPluginConfig(child, {})
 
-      // then
       expect(readonlyResult.config.tui?.sidebar.enabled).toBe(true)
       expect(pickRenderedConfigFields(readonlyResult.config)).toEqual(pickRenderedConfigFields(runtimeConfig))
     })
@@ -152,17 +140,14 @@ describe("validatePluginConfig", () => {
 
   it("keeps valid config sections from a partially invalid layer", () => {
     withIsolatedConfig("partial", (root) => {
-      // given
       const project = join(root, "project")
       writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
         agents: { sisyphus: { model: 123 } },
         tui: { sidebar: { enabled: false } },
       })
 
-      // when
       const result = validatePluginConfig(project)
 
-      // then
       expect(result.valid).toBe(false)
       expect(result.config.tui?.sidebar.enabled).toBe(false)
       expect(result.messages.some((message: string) => message.includes("agents.sisyphus.model"))).toBe(true)
@@ -171,7 +156,6 @@ describe("validatePluginConfig", () => {
 
   it("applies disabled provider substitutions like the runtime loader", () => {
     withIsolatedConfig("disabled-provider", (root) => {
-      // given
       const project = join(root, "project")
       writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
         disabled_providers: ["blocked"],
@@ -183,11 +167,9 @@ describe("validatePluginConfig", () => {
         },
       })
 
-      // when
       const readonlyResult = validatePluginConfig(project)
       const runtimeConfig = loadPluginConfig(project, {})
 
-      // then
       expect(readonlyResult.config.agents?.sisyphus?.model).toBe("allowed/fallback")
       expect(readonlyResult.config.agents?.sisyphus?.model).toBe(runtimeConfig.agents?.sisyphus?.model)
     })
@@ -195,7 +177,6 @@ describe("validatePluginConfig", () => {
 
   it("does not migrate or rewrite legacy config files", () => {
     withIsolatedConfig("no-write", (root) => {
-      // given
       const project = join(root, "project")
       const configDir = join(project, ".opencode")
       mkdirSync(configDir, { recursive: true })
@@ -204,10 +185,8 @@ describe("validatePluginConfig", () => {
       })
       const before = snapshotFiles(configDir)
 
-      // when
       const result = validatePluginConfig(project)
 
-      // then
       expect(result.valid).toBe(true)
       expect(result.config.tui?.sidebar.enabled).toBe(false)
       expect(snapshotFiles(configDir)).toEqual(before)

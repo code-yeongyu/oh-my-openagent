@@ -1,7 +1,7 @@
 import { getModelResolutionInfoWithOverrides } from "../../cli/doctor/checks/model-resolution"
 import type { OmoConfig } from "../../cli/doctor/checks/model-resolution-types"
 import type { OhMyOpenCodeConfig } from "../../config"
-import { validatePluginConfig } from "./config-validator"
+import { validatePluginConfig } from "../../config/validate"
 import type { RosterRow } from "./state-types"
 
 type ResolutionEntry = {
