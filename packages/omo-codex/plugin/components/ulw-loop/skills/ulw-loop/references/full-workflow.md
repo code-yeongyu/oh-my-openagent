@@ -185,14 +185,14 @@ omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e eviden
 `--quality-gate-json` shape:
 ```json
 {
-  "codeReview": { "recommendation": "APPROVE", "reviewer": "lazycodex-code-reviewer", "evidence": "diff review synthesis" },
-  "manualQa": { "status": "passed", "reviewer": "lazycodex-qa-executor", "artifacts": ["path/to/non-empty-artifact"] },
-  "gateReview": { "recommendation": "APPROVE", "reviewer": "lazycodex-gate-reviewer", "evidence": "final gate synthesis" },
-  "iteration": { "status": "complete", "reruns": 0, "blockersResolved": [] },
-  "criteriaCoverage": { "totalCriteria": N, "passCount": N, "adversarialClassesCovered": ["malformed_input", "..."] }
+  "codeReview":{"by":"lazycodex-code-reviewer","recommendation":"APPROVE","codeQualityStatus":"CLEAR","reportPath":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/code-review.md","evidence":"Diff review passed.","blockers":[]},
+  "manualQa":{"by":"lazycodex-qa-executor","status":"passed","evidence":"CLI and data surfaces passed.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"omo ulw-loop checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-diff"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.log"},{"id":"artifact-data-diff","kind":"data-diff","description":"Data diff artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/data-diff.txt"}]},
+  "gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md","evidence":"Gate review passed.","blockers":[]},
+  "iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-doc.test.ts"],"evidence":"Focused rerun passed."},
+  "criteriaCoverage":{"totalCriteria":3,"passCount":3,"adversarialClassesCovered":["malformed_input","stale_state"]}
 }
 ```
-At the final checkpoint, every path in `manualQa.artifacts` must exist and have non-zero size. A LIGHT goal with no triggered adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
+Artifacts must be non-empty. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
 
 ## Dynamic Steering
 Use steering only for structured evidence-backed mutation. Reject natural-language steering requests.
