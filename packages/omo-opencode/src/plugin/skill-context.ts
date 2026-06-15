@@ -73,6 +73,12 @@ function filterProtectedSharedAliasCollisions(
   })
 }
 
+function isDisabledSkillName(name: string, disabledSkills: ReadonlySet<string>): boolean {
+  if (disabledSkills.has(name)) return true
+  if (name.startsWith("shared/")) return disabledSkills.has(name.slice("shared/".length))
+  return disabledSkills.has(`shared/${name}`)
+}
+
 export async function createSkillContext(args: {
   directory: string
   pluginConfig: OhMyOpenCodeConfig
@@ -176,7 +182,6 @@ export async function createSkillContext(args: {
     filterProviderGatedSkills(sharedSkillAliases, browserProvider),
     disabledSkills,
   )
-
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
@@ -195,7 +200,11 @@ export async function createSkillContext(args: {
       protectedSharedAliasNames,
     ),
     filterProtectedSharedAliasCollisions(activeOpencodeProjectSkills, protectedSharedAliasNames),
-    { configDir: directory },
+    {
+      configDir: directory,
+      isConfigEntryAllowed: (name) =>
+        !protectedSharedAliasNames.has(name) && !isDisabledSkillName(name, disabledSkills),
+    },
   )
 
   const availableSkills: AvailableSkill[] = mergedSkills.map((skill) => ({

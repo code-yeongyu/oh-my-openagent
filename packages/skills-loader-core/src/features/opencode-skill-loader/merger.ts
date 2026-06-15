@@ -9,6 +9,7 @@ import { SCOPE_PRIORITY } from "./merger/scope-priority"
 
 export interface MergeSkillsOptions {
   configDir?: string
+  isConfigEntryAllowed?: (name: string) => boolean
 }
 
 export function mergeSkills(
@@ -31,6 +32,7 @@ export function mergeSkills(
   const normalizedConfig = normalizeSkillsConfig(config)
 
   for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
+    if (options.isConfigEntryAllowed && !options.isConfigEntryAllowed(name)) continue
     if (entry === false) continue
     if (entry === true) continue
 
@@ -63,6 +65,10 @@ export function mergeSkills(
   }
 
   for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
+    if (options.isConfigEntryAllowed && !options.isConfigEntryAllowed(name)) {
+      skillMap.delete(name)
+      continue
+    }
     if (entry === true) continue
     if (entry === false) {
       skillMap.delete(name)
