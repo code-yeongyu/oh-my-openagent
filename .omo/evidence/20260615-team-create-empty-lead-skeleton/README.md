@@ -17,6 +17,9 @@ GIT_MASTER=1 git diff --check
 bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
 bash .agents/skills/opencode-qa/scripts/server-smoke.sh
 bash .omo/evidence/20260615-team-create-empty-lead-skeleton/team-create-opencode-run.sh
+export CODEX_HOME="$(mktemp -d)/codex"; node packages/omo-codex/scripts/install-local.mjs install
+codex --help
+bun run test:codex
 ```
 
 ## Results
@@ -31,6 +34,9 @@ bash .omo/evidence/20260615-team-create-empty-lead-skeleton/team-create-opencode
 - `opencode-qa` isolated server smoke: passed. See `server-smoke.txt` in this directory.
 - Real OpenCode `opencode run --format json` team-mode QA: passed. See `opencode-run-team-create.jsonl`, `team-create-assertions.txt`, and `fake-llm-team-create.log` in this directory.
 - Real OpenCode DB isolation proof: passed. `db-isolation.txt` records `SELECT count(*) FROM session` before and after the isolated run, unchanged real session count, stable real DB path, and a distinct sandbox DB path.
+- Isolated Codex local install QA: passed after exporting `CODEX_HOME`. See `codex-isolated-install-exported.txt` for local build install, `omo@sisyphuslabs` config registration, hook manifest coverage, and unchanged real `~/.codex/config.toml` hash during the valid isolated run.
+- Codex CLI surface smoke: passed. See `codex-cli-help.txt` for the real `codex --help` command output from codex-cli 0.139.0.
+- `bun run test:codex`: passed with 336 tests, 336 pass, 0 fail. See `codex-test-gate.txt`.
 - `lsp_diagnostics`: clean for `team-spec-input-normalizer.ts` and `team-spec-input-normalizer.test.ts`. The existing `lifecycle-inline-spec.test.ts` file-level LSP diagnostics still report stale type issues already contradicted by `bun run typecheck:packages` passing.
 
 ## OpenCode QA output
@@ -89,6 +95,34 @@ sandbox_db_distinct_from_real=yes
 ```
 
 This proves the spawned `opencode run` wrote to the isolated XDG database, not the real `~/.local/share/opencode/opencode.db`.
+
+## Codex QA output
+
+### Isolated local Codex install
+
+`codex-isolated-install-exported.txt` records the Codex package QA required by `packages/omo-codex/AGENTS.md` for the `packages/omo-codex/plugin/test/scaffold-plan.test.mjs` path change:
+
+- `CODEX_HOME` was exported to a fresh temporary directory before running `node packages/omo-codex/scripts/install-local.mjs install`;
+- the local plugin build installed into that sandbox and wrote a sandbox `config.toml`;
+- the sandbox config registered the local `sisyphuslabs` marketplace and enabled `omo@sisyphuslabs`;
+- the installed plugin cache contained hook registrations for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostCompact`, `Stop`, and `SubagentStop`;
+- the real `~/.codex/config.toml` hash was unchanged before and after the valid isolated run.
+
+`codex-invalid-attempt-note.txt` records one discarded QA attempt where `CODEX_HOME` was assigned as a shell variable but not exported. That attempt is explicitly not used as isolation proof; the exported rerun above is the valid Codex QA evidence.
+
+### Codex CLI smoke
+
+`codex-cli-help.txt` records a real Codex CLI surface check. It confirmed codex-cli 0.139.0 starts and exposes the expected top-level command surface, including `exec`, `review`, `plugin`, `doctor`, and `help`.
+
+### Canonical Codex gate
+
+`codex-test-gate.txt` records the required `bun run test:codex` gate. It rebuilt the Codex installer/plugin surfaces and ran the Codex compatibility suite, including `packages/omo-codex/plugin/test/scaffold-plan.test.mjs`; the final summary was:
+
+```text
+tests 336
+pass 336
+fail 0
+```
 
 ## QA boundary
 

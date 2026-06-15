@@ -1,0 +1,506 @@
+codex_cli=/home/leejunwoo/.nvm/versions/node/v24.15.0/bin/codex
+codex_version=WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir "/tmp" (codex_home: AbsolutePathBuf("/tmp/tmp.zGnLCXOLVj/codex"))
+codex-cli 0.139.0
+repo=/tmp/opencode/pr-5298-work/oh-my-openagent
+codex_home=/tmp/tmp.zGnLCXOLVj/codex
+real_config_hash_before=4b1cfdbf0807bde49e0bf295d0903b22a96b237a39211874b051861f5e6e7974
+
+up to date, audited 84 packages in 332ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+> @sisyphuslabs/omo-codex-plugin@4.10.0 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 4.10.0 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled ast-grep-mcp dist
+Using bundled git-bash-mcp dist
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 11 modules in 4ms
+
+  cli.js  19.23 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 11 modules in 4ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 3ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 52 modules in 5ms
+
+  cli.js  159.1 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 52 modules in 6ms
+
+  cli.js  159.32 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.10.0 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.10.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
+
+Bundling components/lsp/dist/cli.js
+Bundled 6 modules in 6ms
+
+  cli.js  124.72 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 6ms
+
+  cli.js  204.83 KB  (entry point)
+
+Bundled 76 modules in 6ms
+
+  posthog.js  202.41 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 6ms
+
+  cli.js  204.57 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 16 modules in 4ms
+
+  cli.js  14.14 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 16 modules in 4ms
+
+  cli.js  14.32 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 23 modules in 5ms
+
+  cli.js  103.0 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.10.0 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 3 modules in 4ms
+
+  cli.js  5.24 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 3 modules in 3ms
+
+  cli.js  5.34 KB  (entry point)
+
+Building components/bootstrap (standalone)
+
+> @sisyphuslabs/codex-bootstrap@4.10.0 build
+> node scripts/build.mjs
+
+
+  dist/cli.js  101.9kb
+
+⚡ Done in 4ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 35 modules in 5ms
+
+  cli.js  104.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify (standalone)
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  6.90 KB  (entry point)
+
+
+added 12 packages, and audited 29 packages in 516ms
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+Installed 1 plugin(s) from sisyphuslabs.
+sandbox_config_exists=yes
+sandbox_config_path=/tmp/tmp.zGnLCXOLVj/codex/config.toml
+sandbox_plugin_enabled_lines:
+24:[marketplaces.sisyphuslabs]
+27:source = "/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs"
+29:[plugins."omo@sisyphuslabs"]
+32:[plugins."omo@sisyphuslabs".mcp_servers.context7]
+35:[plugins."omo@sisyphuslabs".mcp_servers.git_bash]
+38:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:0:0"]
+41:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:1:0"]
+44:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:2:0"]
+47:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:3:0"]
+50:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:user_prompt_submit:0:0"]
+53:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:user_prompt_submit:1:0"]
+56:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:user_prompt_submit:2:0"]
+59:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:pre_tool_use:0:0"]
+62:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:pre_tool_use:1:0"]
+65:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0"]
+68:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:1"]
+71:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:1:0"]
+74:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_compact:0:0"]
+77:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_compact:1:0"]
+80:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_compact:2:0"]
+83:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:stop:0:0"]
+86:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:subagent_stop:0:0"]
+sandbox_cache_listing:
+합계 12
+drwxrwxr-x 3 leejunwoo leejunwoo 4096 Jun 15 19:23 .
+drwxrwxr-x 4 leejunwoo leejunwoo 4096 Jun 15 19:23 ..
+drwxrwxr-x 9 leejunwoo leejunwoo 4096 Jun 15 19:23 4.10.0
+sandbox_hooks_manifest_events:
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/scripts/auto-update.mjs:331:					hookEventName: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:3:		"SessionStart": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:47:		"UserPromptSubmit": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:79:		"PreToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:103:		"PostToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:133:		"PostCompact": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:168:		"Stop": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json:180:		"SubagentStop": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/aggregate-hooks.test.mjs:49:			hook.eventName === "PostCompact" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/aggregate-hooks.test.mjs:143:		.filter(({ eventName }) => eventName === "SessionStart")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/src/hook.ts:71:				hookEventName: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/bootstrap-orchestration.test.mjs:82:				hookEventName: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/scripts/bootstrap.ps1:268:			hookEventName = "SessionStart"
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:11:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:21:				assert.equal(output.hookSpecificOutput.hookEventName, "SessionStart");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:30:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:47:				hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:60:					"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:73:				hook_event_name: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:86:				assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:99:				hook_event_name: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:113:				assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:125:				hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:146:				hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/component-hook-contract-cases.mjs:163:				hook_event_name: "Stop",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:1995:  ["PreToolUse", "pre_tool_use"],
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:1997:  ["PostToolUse", "post_tool_use"],
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:1999:  ["PostCompact", "post_compact"],
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:2000:  ["SessionStart", "session_start"],
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:2001:  ["UserPromptSubmit", "user_prompt_submit"],
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:2003:  ["SubagentStop", "subagent_stop"],
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:2004:  ["Stop", "stop"]
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/dist/cli.js:2648:      hookEventName: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test/auto-update-restart-notice.test.mjs:184:	assert.equal(parsed.hookSpecificOutput.hookEventName, "SessionStart");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/bootstrap/hooks/hooks.json:3:		"SessionStart": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:7:	readonly hook_event_name: "PreToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:25:	readonly hook_event_name: "PostCompact";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:33:		readonly hookEventName: "PreToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:65:	if (payload.hook_event_name !== "PreToolUse") return "";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:76:			hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:84:	if (payload.hook_event_name !== "PostCompact") return "";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:141:		value["hook_event_name"] === "PreToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/src/codex-hook.ts:157:		value["hook_event_name"] === "PostCompact" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.d.ts:3:    readonly hook_event_name: "PreToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.d.ts:19:    readonly hook_event_name: "PostCompact";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/cli.js:34:  if (payload.hook_event_name !== "PreToolUse")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/cli.js:48:      hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/cli.js:56:  if (payload.hook_event_name !== "PostCompact")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/cli.js:105:  return value["hook_event_name"] === "PreToolUse" && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["session_id"] === "string" && typeof value["tool_name"] === "string" && typeof value["tool_use_id"] === "string" && (value["transcript_path"] === null || typeof value["transcript_path"] === "string") && typeof value["turn_id"] === "string" && Object.hasOwn(value, "tool_input");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/cli.js:110:  return value["hook_event_name"] === "PostCompact" && typeof value["session_id"] === "string" && (value["transcript_path"] === undefined || value["transcript_path"] === null || typeof value["transcript_path"] === "string") && (value["trigger"] === undefined || typeof value["trigger"] === "string");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.js:33:    if (payload.hook_event_name !== "PreToolUse")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.js:46:            hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.js:53:    if (payload.hook_event_name !== "PostCompact")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.js:103:    return (value["hook_event_name"] === "PreToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/dist/codex-hook.js:117:    return (value["hook_event_name"] === "PostCompact" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/hooks/hooks.json:3:		"PreToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/hooks/hooks.json:16:		"PostCompact": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:18:type HookCliEventName = "SessionStart" | "UserPromptSubmit" | "PostToolUse" | "PostCompact";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:21:	await runHookCli("SessionStart");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:23:	await runHookCli("UserPromptSubmit");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:25:	await runHookCli("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:27:	await runHookCli("PostCompact");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:46:		case "SessionStart":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:48:		case "UserPromptSubmit":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:50:		case "PostToolUse":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:52:		case "PostCompact":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:69:		value["hook_event_name"] === "SessionStart" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:82:		value["hook_event_name"] === "UserPromptSubmit" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:96:		value["hook_event_name"] === "PostToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/cli.ts:111:		value["hook_event_name"] === "PostCompact" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/hook-output.ts:1:export type ContextInjectionHookEventName = "SessionStart" | "UserPromptSubmit" | "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/test/codex-hook.test.ts:32:		hook_event_name: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/test/codex-hook.test.ts:46:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/git-bash/test/codex-hook.test.ts:83:			hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:32:	hook_event_name: "SessionStart";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:43:	hook_event_name: "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:54:	hook_event_name: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:68:	hook_event_name: "PostCompact";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:99:		"SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:135:		"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:148:	const debugTimer = createHookDebugTimer("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/codex-hook.ts:237:	const output = formatAdditionalContextOutput("PostToolUse", block);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/static-injection.ts:22:	eventName: "SessionStart" | "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/static-injection.ts:50:	const effectiveConfig = eventName === "UserPromptSubmit" ? withPromptBudget(config) : config;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/src/static-injection.ts:86:	eventName: "SessionStart" | "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/src/types.ts:1:export const SUBAGENT_STOP_EVENT = "SubagentStop";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/scripts/bench-codex-rules.mjs:104:			hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/dist/cli.js:65:var SUBAGENT_STOP_EVENT = "SubagentStop";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4126:  const effectiveConfig = eventName === "UserPromptSubmit" ? withPromptBudget(config) : config;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4404:  return runStaticInjection(input.cwd, transcriptPath, "SessionStart", cachePath, options, completedPostCompactKind, { latestCompactedReplacementOnly: completedPostCompactKind !== undefined }, input.model);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4423:  return runStaticInjection(input.cwd, input.transcript_path, "UserPromptSubmit", cachePath, options, completedPostCompactKind, { latestCompactedReplacementOnly: completedPostCompactKind !== undefined }, input.model);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4426:  const debugTimer = createHookDebugTimer("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4496:  const output = formatAdditionalContextOutput("PostToolUse", block);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4505:  await runHookCli("SessionStart");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4507:  await runHookCli("UserPromptSubmit");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4509:  await runHookCli("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4511:  await runHookCli("PostCompact");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4531:    case "SessionStart":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4533:    case "UserPromptSubmit":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4535:    case "PostToolUse":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4537:    case "PostCompact":
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4550:  return isRecord5(value) && value["hook_event_name"] === "SessionStart" && typeof value["session_id"] === "string" && isStringOrNull(value["transcript_path"]) && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["source"] === "string";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4553:  return isRecord5(value) && value["hook_event_name"] === "UserPromptSubmit" && typeof value["session_id"] === "string" && typeof value["turn_id"] === "string" && isStringOrNull(value["transcript_path"]) && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["prompt"] === "string";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4556:  return isRecord5(value) && value["hook_event_name"] === "PostToolUse" && typeof value["session_id"] === "string" && typeof value["turn_id"] === "string" && isStringOrNull(value["transcript_path"]) && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["tool_name"] === "string" && typeof value["tool_use_id"] === "string";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/dist/cli.js:4559:  return isRecord5(value) && value["hook_event_name"] === "PostCompact" && typeof value["session_id"] === "string" && typeof value["turn_id"] === "string" && isStringOrNull(value["transcript_path"]) && typeof value["cwd"] === "string" && typeof value["model"] === "string" && (value["trigger"] === "manual" || value["trigger"] === "auto");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/dist/types.js:1:export const SUBAGENT_STOP_EVENT = "SubagentStop";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/README.md:114:printf '%s\n' '{"session_id":"s","transcript_path":null,"cwd":"/path/to/project","hook_event_name":"SessionStart","model":"gpt-5.5","permission_mode":"default","source":"startup"}' \
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/dist/types.d.ts:1:export declare const SUBAGENT_STOP_EVENT = "SubagentStop";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/src/cli.ts:39:		value["hook_event_name"] === "SessionStart" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/hooks/hooks.json:3:		"SessionStart": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/hooks/hooks.json:15:		"UserPromptSubmit": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/hooks/hooks.json:27:		"PostToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/hooks/hooks.json:40:		"PostCompact": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/src/codex-hook.ts:17:	hook_event_name: "SessionStart";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/agent-doc-sources.test.ts:66:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/agent-doc-sources.test.ts:79:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/hooks/hooks.json:3:		"SubagentStop": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/src/codex-hook.ts:40:		hookEventName: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/src/codex-hook.ts:99:			hookEventName: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-directive.test.ts:156:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-directive.test.ts:168:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-directive.test.ts:181:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-directive.test.ts:193:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-directive.test.ts:206:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/test/cli.test.ts:112:		hook_event_name: "SubagentStop",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/test/codex-hook.test.ts:106:		const malformedOutput = runSubagentStopHook({ hook_event_name: "SubagentStop", session_id: 123 }, nodeFileSystem);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/test/codex-hook.test.ts:151:		hook_event_name: "SubagentStop",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lazycodex-executor-verify/test/codex-hook.test.ts:167:		hook_event_name: "Stop",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/README.md:14:    "SessionStart": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/package-smoke.test.ts:60:			hookConfig["SessionStart"]?.[0]?.hooks[0]?.command,
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/package-smoke.test.ts:61:			hookConfig["UserPromptSubmit"]?.[0]?.hooks[0]?.command,
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/package-smoke.test.ts:62:			hookConfig["PostToolUse"]?.[0]?.hooks[0]?.command,
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/package-smoke.test.ts:63:			hookConfig["PostCompact"]?.[0]?.hooks[0]?.command,
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/package-smoke.test.ts:65:		const postToolUseMatcher = hookConfig["PostToolUse"]?.[0]?.matcher ?? "";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/dist/cli.js:5869:  return isRecord2(value) && value["hook_event_name"] === "SessionStart" && typeof value["session_id"] === "string" && isStringOrNull(value["transcript_path"]) && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["source"] === "string";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/hooks/hooks.json:3:		"SessionStart": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/test/codex-hook-diagnostics.test.ts:30:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/event-budget.test.ts:122:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/event-budget.test.ts:135:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/event-budget.test.ts:148:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/windows-git-bash-bundled-rule.test.ts:43:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/telemetry/test/codex-hook.test.ts:44:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/hooks/hooks.json:3:		"UserPromptSubmit": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/hooks/hooks.json:15:		"PreToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-performance.test.ts:45:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/src/codex-hook.ts:78:	return value === "Stop" || value === "SubagentStop";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/bundled-rules.test.ts:101:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/bundled-rules.test.ts:114:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/bundled-rules.test.ts:126:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/bundled-rules.test.ts:164:		expect(output).toContain('"hookEventName":"SessionStart"');
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/src/types.ts:1:export const STOP_HOOK_EVENTS = ["Stop", "SubagentStop"] as const;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-budget.test.ts:83:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-budget.test.ts:96:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-budget.test.ts:108:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/AGENTS.md:35:PAYLOAD='{"cwd":"/tmp","hook_event_name":"UserPromptSubmit","model":"gpt-5.5","permission_mode":"default","session_id":"x","transcript_path":"","turn_id":"y","prompt":"please ultrawork"}'
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/AGENTS.md:40:echo '{"hook_event_name":"UserPromptSubmit","prompt":"refactor ulw_helper.ts"}' | node dist/cli.js hook user-prompt-submit | grep -c '<ultrawork-mode>'
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/README.md:45:PAYLOAD='{"cwd":"/tmp","hook_event_name":"UserPromptSubmit","model":"gpt-5.5","permission_mode":"default","session_id":"x","transcript_path":"","turn_id":"y","prompt":"please ultrawork"}'
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-context-pressure.test.ts:126:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-context-pressure.test.ts:143:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.d.ts:3:    readonly hook_event_name: "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.d.ts:13:    readonly hook_event_name: "PreToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/hook-output.test.ts:11:		const output = formatAdditionalContextOutput("PostToolUse", context);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/hook-output.test.ts:24:		const output = formatAdditionalContextOutput("SessionStart", context);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/hook-output.test.ts:35:		const output = formatAdditionalContextOutput("SessionStart", context);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/hooks/hooks.json:3:		"UserPromptSubmit": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/dist/cli.js:353:  return value === "Stop" || value === "SubagentStop";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/src/codex-hook.ts:19:	readonly hook_event_name: "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/src/codex-hook.ts:26:		readonly hookEventName: "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/src/codex-hook.ts:58:			if (hookSpecificOutput["hookEventName"] !== "UserPromptSubmit") {
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/src/codex-hook.ts:106:			hookEventName: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/src/codex-hook.ts:136:		value["hook_event_name"] === "UserPromptSubmit" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/README.md:37:PAYLOAD='{"session_id":"smoke-session","turn_id":"t1","transcript_path":"","cwd":"'"$TMP"'","hook_event_name":"Stop","model":"gpt-5.5","permission_mode":"default","stop_hook_active":false}'
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/README.md:41:PAYLOAD_LOOP='{"session_id":"smoke-session","turn_id":"t1","transcript_path":"","cwd":"'"$TMP"'","hook_event_name":"Stop","model":"gpt-5.5","permission_mode":"default","stop_hook_active":true}'
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-test-helpers.ts:9:		readonly hookEventName: "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-test-helpers.ts:94:		hookSpecificOutput["hookEventName"] === "UserPromptSubmit" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/hooks/hooks.json:3:		"Stop": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/hooks/hooks.json:15:		"SubagentStop": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/fixtures/user-prompt-submit.json:3:	"hook_event_name": "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:6:	readonly hook_event_name: "UserPromptSubmit";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:17:	readonly hook_event_name: "PreToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:30:		readonly hookEventName: "PreToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:65:		if (payload.hook_event_name !== "UserPromptSubmit") return "";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:87:	if (payload.hook_event_name !== "PreToolUse") return "";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:92:			hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:131:		value["hook_event_name"] === "UserPromptSubmit" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/src/codex-hook.ts:142:		value["hook_event_name"] === "PreToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:16:		const outputs = prompts.map((prompt) => runUserPromptSubmitHook({ hook_event_name: "UserPromptSubmit", prompt }));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:20:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:21:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:22:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:38:		const outputs = prompts.map((prompt) => runUserPromptSubmitHook({ hook_event_name: "UserPromptSubmit", prompt }));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:42:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:43:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:44:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:45:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:46:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:56:		const outputs = prompts.map((prompt) => runUserPromptSubmitHook({ hook_event_name: "UserPromptSubmit", prompt }));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:60:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:61:			"UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:82:		const output = runUserPromptSubmitHook({ hook_event_name: "UserPromptSubmit", prompt });
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:86:		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook-trigger-policy.test.ts:94:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/cli.js:2045:    if (payload.hook_event_name !== "UserPromptSubmit")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/cli.js:2069:  if (payload.hook_event_name !== "PreToolUse")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/cli.js:2077:      hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/cli.js:2117:  return value["hook_event_name"] === "UserPromptSubmit" && typeof value["cwd"] === "string" && typeof value["prompt"] === "string" && typeof value["session_id"] === "string" && ["model", "permission_mode", "transcript_path", "turn_id"].every((key) => optionalString(value[key]));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/cli.js:2122:  return value["hook_event_name"] === "PreToolUse" && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["session_id"] === "string" && typeof value["tool_name"] === "string" && typeof value["tool_use_id"] === "string" && (value["transcript_path"] === null || typeof value["transcript_path"] === "string") && typeof value["turn_id"] === "string" && Object.hasOwn(value, "tool_input");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:79:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:108:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:136:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:164:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:192:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:219:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:246:				hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:274:					hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:290:					hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/sparkshell-awareness.test.ts:314:		const output = formatAdditionalContextOutput("SessionStart", context);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:20:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:29:		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:38:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:52:		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:59:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:64:						hookEventName: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:81:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:102:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:122:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:137:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:152:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:169:		const inputs = [undefined, {}, { hook_event_name: "UserPromptSubmit", prompt: "" }] as const;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:181:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:207:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:228:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/test/codex-hook.test.ts:250:			hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/package-smoke.test.ts:87:		const events = (hooks["hooks"] as Record<string, unknown>)["UserPromptSubmit"] as readonly Record<string, unknown>[];
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/package-smoke.test.ts:98:		expect(text).toContain('"PreToolUse"');
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/dist/cli.js:3547:      hookEventName: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/dist/cli.js:54:      if (hookSpecificOutput["hookEventName"] !== "UserPromptSubmit") {
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/dist/cli.js:96:      hookEventName: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ultrawork/dist/cli.js:123:  return isRecord(value) && value["hook_event_name"] === "UserPromptSubmit" && typeof value["prompt"] === "string" && (value["transcript_path"] === undefined || value["transcript_path"] === null || typeof value["transcript_path"] === "string");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/post-compact-test-fixture.ts:49:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/post-compact-test-fixture.ts:65:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/post-compact-test-fixture.ts:78:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/post-compact-test-fixture.ts:94:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/cli.test.ts:18:		const payload = JSON.stringify(makePayload(cwd, false, "Stop"));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/cli.test.ts:32:		const payload = JSON.stringify(makePayload(cwd, false, "SubagentStop"));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/cli.test.ts:46:		const payload = JSON.stringify(makePayload(cwd, true, "Stop"));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/cli.test.ts:60:		const payload = JSON.stringify(makePayload(cwd, false, "Stop"));
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/cli.test.ts:111:	eventName: "Stop" | "SubagentStop",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-dedup.test.ts:179:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-dedup.test.ts:200:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-dedup.test.ts:212:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook-post-compact-dedup.test.ts:225:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/codex-hook.test.ts:206:		const output = runStopHook({ hook_event_name: "Stop", session_id: 123 }, fs);
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/start-work-continuation/test/codex-hook.test.ts:226:		hook_event_name: "Stop",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:110:		hook_event_name: "SessionStart",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:123:		hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:138:		hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:151:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:219:		expect(parsed.hookSpecificOutput?.hookEventName).toBe("SessionStart");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:285:				hook_event_name: "UserPromptSubmit",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:358:		expect(parsed.hookSpecificOutput?.hookEventName).toBe("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:391:		expect(parsed.hookSpecificOutput?.hookEventName).toBe("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:722:		expect(result.stderr).toContain("PostToolUse");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/rules/test/codex-hook.test.ts:732:		const input = `${JSON.stringify({ hook_event_name: "PostCompact", session_id: "s", turn_id: "t" })}\n`;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/dist/codex-hook.js:55:            hookEventName: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/codex-hook.test.ts:54:	return { cwd, hook_event_name: "UserPromptSubmit", prompt, session_id: DEFAULT_SESSION_ID };
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/codex-hook.test.ts:60:		hook_event_name: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/codex-hook.test.ts:96:		expect(parsed?.hook_event_name).toBe("UserPromptSubmit");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/codex-hook.test.ts:171:		expect(await applyUserPromptUlwLoopSteering(payloadWithRuntimeEvent("PostToolUse"))).toBe("");
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/test/codex-hook.test.ts:228:				hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/hooks/hooks.json:3:		"PostToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/hooks/hooks.json:16:		"PostCompact": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/fixtures/post-tool-use.json:6:	"hook_event_name": "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook-errors.test.ts:36:		readonly hookEventName: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook-errors.test.ts:48:		hookSpecificOutput["hookEventName"] === "PostToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/package-smoke.test.ts:64:		const postToolUseCommand = hooksJson.hooks["PostToolUse"]?.[0]?.hooks[0]?.command;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/package-smoke.test.ts:65:		const postCompactCommand = hooksJson.hooks["PostCompact"]?.[0]?.hooks[0]?.command;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook-unavailable.test.ts:73:				hook_event_name: "PostCompact",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook-unavailable.test.ts:218:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook-unavailable.test.ts:255:		readonly hookEventName: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook-unavailable.test.ts:267:		hookSpecificOutput["hookEventName"] === "PostToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook.test.ts:72:				hookEventName: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook.test.ts:193:				hookEventName: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook.test.ts:339:		readonly hookEventName: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/lsp/test/codex-hook.test.ts:351:		hookSpecificOutput["hookEventName"] === "PostToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.js:32:        if (payload.hook_event_name !== "UserPromptSubmit")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.js:57:    if (payload.hook_event_name !== "PreToolUse")
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.js:65:            hookEventName: "PreToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.js:106:    return (value["hook_event_name"] === "UserPromptSubmit" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/ulw-loop/dist/codex-hook.js:115:    return (value["hook_event_name"] === "PreToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/src/hook-input.ts:16:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/src/codex-hook.ts:19:	hook_event_name: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/src/codex-hook.ts:180:		value["hook_event_name"] === "PostToolUse" &&
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/src/types.ts:39:	hook_event_name: "PostToolUse";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/dist/cli.js:156:    hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/dist/cli.js:589:  return isRecord(value) && value["hook_event_name"] === "PostToolUse" && typeof value["session_id"] === "string" && typeof value["turn_id"] === "string" && (typeof value["transcript_path"] === "string" || value["transcript_path"] === null) && typeof value["cwd"] === "string" && typeof value["model"] === "string" && typeof value["permission_mode"] === "string" && typeof value["tool_name"] === "string" && isRecord(value["tool_input"]) && typeof value["tool_use_id"] === "string";
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/hooks/hooks.json:3:		"PostToolUse": [
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test/codex-hook-newline.test.ts:11:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test/fixtures/post-tool-use.json:6:	"hook_event_name": "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test/codex-hook.test.ts:58:		hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test/core.test.ts:136:			hook_event_name: "PostToolUse",
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test/package-smoke.test.ts:44:		const command = hooksJson.hooks["PostToolUse"]?.[0]?.hooks[0]?.command;
+/tmp/tmp.zGnLCXOLVj/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/comment-checker/test/runner.test.ts:52:				hook_event_name: "PostToolUse",
+real_config_hash_after=4b1cfdbf0807bde49e0bf295d0903b22a96b237a39211874b051861f5e6e7974
+real_config_unchanged=yes
