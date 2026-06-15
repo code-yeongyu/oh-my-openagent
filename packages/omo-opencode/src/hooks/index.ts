@@ -4,7 +4,6 @@ export { sendSessionNotification, playSessionNotificationSound, detectPlatform, 
 export { buildWindowsToastScript, escapeAppleScriptText, escapePowerShellSingleQuotedText } from "./session-notification-formatting";
 export { hasIncompleteTodos } from "./session-todo-status";
 export { createIdleNotificationScheduler } from "./session-notification-scheduler";
-export { createSessionRecoveryHook, type SessionRecoveryHook, type SessionRecoveryOptions } from "./session-recovery";
 export { createCommentCheckerHooks } from "./comment-checker";
 export { createToolOutputTruncatorHook } from "./tool-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
@@ -67,3 +66,4 @@ export { createLegacyPluginToastHook } from "./legacy-plugin-toast"
 export { createFsyncSkipWarningHook } from "./fsync-skip-warning"
 export { createNotepadWriteGuardHook } from "./notepad-write-guard"
 export { createPlanFormatValidatorHook } from "./plan-format-validator"
+export { createMonitorStatusInjectorHook } from "./monitor-status-injector"

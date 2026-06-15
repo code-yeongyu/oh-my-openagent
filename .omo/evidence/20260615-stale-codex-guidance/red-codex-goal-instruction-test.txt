@@ -1,0 +1,64 @@
+$ vitest --run test/codex-goal-instruction.test.ts
+
+ RUN  v4.1.8 <WORKTREE>/packages/omo-codex/plugin/components/ulw-loop
+
+ ❯ test/codex-goal-instruction.test.ts (12 tests | 1 failed) 7ms
+     × instructs not to call update_goal mid-aggregate when not final 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/codex-goal-instruction.test.ts > buildCodexGoalInstruction aggregate mode > instructs not to call update_goal mid-aggregate when not final
+AssertionError: expected 'UlwLoop aggregate-goal handoff\nMode:…' to contain 'do not call update_goal mid-aggregate'
+
+- Expected
++ Received
+
+- do not call update_goal mid-aggregate
++ UlwLoop aggregate-goal handoff
++ Mode: aggregate
++ Plan: .omo/ulw-loop/goals.json
++ Ledger: .omo/ulw-loop/ledger.jsonl
++ Goal: G001 — Goal one
++
++ Active goal:
++ - id: G001
++ - title: Goal one
++ - objective: Complete goal one
++
++ Success criteria:
++ - No success criteria recorded for this goal.
++
++ Codex goal integration constraints:
++ - Use the create_goal payload exactly as rendered: objective only.
++ - Goals are unlimited. Do not add numeric limits.
++ - Codex goal = the whole omo ulw-loop run; OMO G001/G002/etc. = ledger stories.
++ - First call get_goal. If no active goal exists, call create_goal with the aggregate payload below.
++ - If get_goal reports the same aggregate objective as active, continue this OMO story without creating a new Codex goal.
++ - If a different active or incomplete Codex goal exists, finish/checkpoint that goal before starting this ulw-loop.
++ - This is not the final story: do not call update_goal yet; the aggregate Codex goal must remain active while later OMO stories remain.
++ - This is not the final ulw-loop story; do not run the final reviewer/manual-QA/gate-review quality gate yet.
++ - Checkpoint this OMO story with a fresh get_goal snapshot whose objective matches the aggregate payload.
++ - If blocked or failed, checkpoint with --status failed and the failure evidence; rerun complete-goals --retry-failed to resume.
++
++ create_goal payload:
++ {
++   "objective": "Complete the durable ulw-loop plan in .omo/ulw-loop/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/ledger.jsonl as the audit trail."
++ }
+
+ ❯ test/codex-goal-instruction.test.ts:81:16
+     79|    isFinal: false,
+     80|   });
+     81|   expect(text).toContain("do not call update_goal mid-aggregate");
+       |                ^
+     82|   expect(text).toContain("checkpoint this OMO ledger story");
+     83|   expect(text).toContain("update_goal is reserved for the final story …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+   Start at  17:22:55
+   Duration  95ms (transform 23ms, setup 0ms, import 31ms, tests 7ms, environment 0ms)
+
+error: script "test" exited with code 1

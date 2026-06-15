@@ -38,6 +38,33 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	assert.equal(await exists("scripts/migrate-codex-config.mjs"), true);
 });
 
+test("#given aggregate SubagentStop hooks #when inspected #then start-work and LazyCodex executor verifier are separate groups", async () => {
+	// given
+	const hooks = await readJson("hooks/hooks.json");
+	const aggregateVersion = await readPluginVersion();
+
+	// when
+	const subagentStopGroups = hooks.hooks.SubagentStop;
+	const verifierGroups = collectCommandHooks(hooks, "hooks/hooks.json").filter(
+		(hook) =>
+			hook.eventName === "SubagentStop" &&
+			hook.handler.command ===
+				'node "${PLUGIN_ROOT}/components/lazycodex-executor-verify/dist/cli.js" hook subagent-stop',
+	);
+
+	// then
+	assert.equal(subagentStopGroups.length, 2);
+	assert.equal(subagentStopGroups[0]?.matcher, undefined);
+	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-executor$");
+	assert.equal(verifierGroups.length, 1);
+	assert.equal(verifierGroups[0]?.groupIndex, 1);
+	assert.equal(verifierGroups[0]?.handler.timeout, 10);
+	assert.equal(
+		verifierGroups[0]?.handler.statusMessage,
+		`LazyCodex(${aggregateVersion}): Verifying LazyCodex Executor Evidence`,
+	);
+});
+
 test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered", async () => {
 	// given
 	const hooks = await readJson("hooks/hooks.json");
@@ -125,9 +152,9 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 
 	// then
 	assert.match(text, /components\/git-bash\/dist\/cli\.js/);
-	assert.match(text, /Recommending Git Bash Mcp/);
+	assert.match(text, /Recommending Git Bash MCP/);
 	assert.match(text, /hook post-compact/);
-	assert.match(text, /Resetting Git Bash Mcp Reminder/);
+	assert.match(text, /Resetting Git Bash MCP Reminder/);
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
 	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);

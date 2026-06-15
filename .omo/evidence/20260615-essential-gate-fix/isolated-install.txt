@@ -1,0 +1,199 @@
+COMMAND: CODEX_HOME=<TMP>/codex node packages/omo-codex/scripts/install-local.mjs install
+CODEX_HOME=<TMP>/codex
+real_config_hash_before=242c618ca16cefac9a3fd8f1060a9802bf8db26f39e99b4a0d1fdafb9f552370
+
+up to date, audited 87 packages in 388ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @sisyphuslabs/omo-codex-plugin@4.10.0 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 4.10.0 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled ast-grep-mcp dist
+Using bundled git-bash-mcp dist
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 11 modules in 4ms
+
+  cli.js  19.23 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 11 modules in 3ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 2ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  8.26 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 52 modules in 6ms
+
+  cli.js  159.1 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 52 modules in 5ms
+
+  cli.js  159.32 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.10.0 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.10.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
+
+Bundling components/lsp/dist/cli.js
+Bundled 6 modules in 4ms
+
+  cli.js  124.72 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 7ms
+
+  cli.js  204.83 KB  (entry point)
+
+Bundled 76 modules in 6ms
+
+  posthog.js  202.41 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 5ms
+
+  cli.js  204.57 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 16 modules in 3ms
+
+  cli.js  14.14 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 16 modules in 2ms
+
+  cli.js  14.32 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 28 modules in 4ms
+
+  cli.js  107.52 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.10.0 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 3 modules in 3ms
+
+  cli.js  5.24 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 3 modules in 2ms
+
+  cli.js  5.34 KB  (entry point)
+
+Building components/bootstrap (standalone)
+
+> @sisyphuslabs/codex-bootstrap@4.10.0 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+
+  dist/cli.js  103.7kb
+
+⚡ Done in 12ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 36 modules in 5ms
+
+  cli.js  106.58 KB  (entry point)
+
+
+added 13 packages, and audited 31 packages in 576ms
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+Installed 1 plugin(s) from sisyphuslabs.
+install_exit=0
+isolated_config_plugin_lines=
+29:[plugins."omo@sisyphuslabs"]
+32:[plugins."omo@sisyphuslabs".mcp_servers.context7]
+35:[plugins."omo@sisyphuslabs".mcp_servers.git_bash]
+38:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:0:0"]
+41:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:1:0"]
+44:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:2:0"]
+47:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:session_start:3:0"]
+50:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:user_prompt_submit:0:0"]
+53:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:user_prompt_submit:1:0"]
+56:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:user_prompt_submit:2:0"]
+59:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:pre_tool_use:0:0"]
+62:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:pre_tool_use:1:0"]
+65:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0"]
+68:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:1"]
+71:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:1:0"]
+74:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_compact:0:0"]
+77:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_compact:1:0"]
+80:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_compact:2:0"]
+83:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:stop:0:0"]
+86:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:subagent_stop:0:0"]
+89:[hooks.state."omo@sisyphuslabs:hooks/hooks.json:subagent_stop:1:0"]
+installed_plugin_root=
+<TMP>/codex/plugins/cache/sisyphuslabs/omo
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/.codex-plugin
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/node_modules
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/scripts
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/skills
+<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0/test
+real_config_hash_after=242c618ca16cefac9a3fd8f1060a9802bf8db26f39e99b4a0d1fdafb9f552370
+real_config_unchanged=yes
+cleanup=removed <TMP>; exists_after=no
+EXIT_CODE=0

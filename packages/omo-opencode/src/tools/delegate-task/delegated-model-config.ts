@@ -16,5 +16,6 @@ export function applyCategoryParams(
     ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
+    ...(config.tools !== undefined ? { tools: config.tools } : {}),
   }
 }

@@ -11,6 +11,7 @@ import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/s
 import {
   getSessionAgent,
   registerAgentName,
+  setSessionAgent,
   _resetForTesting as resetClaudeCodeSessionState,
   subagentSessions,
 } from "../claude-code-session-state"
@@ -2372,6 +2373,77 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     // #then
     expect(abortedSessionIDs).toEqual(["session-1"])
+  })
+
+  test("should fire onSubagentSessionDeleted callback on completion", async () => {
+    // #given
+    const deletedSessionIDs: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      onSubagentSessionDeleted: async (event) => {
+        deletedSessionIDs.push(event.sessionID)
+      },
+    })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-deleted-callback",
+      sessionId: "session-deleted-cb",
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "test task for deleted callback",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+
+    // #then
+    expect(deletedSessionIDs).toEqual(["session-deleted-cb"])
+  })
+
+  test("should immediately clear completed subagent runtime-fallback eligibility", async () => {
+    // #given
+    resetClaudeCodeSessionState()
+    const sessionID = "session-completed-runtime-fallback"
+    subagentSessions.add(sessionID)
+    setSessionAgent(sessionID, "explore")
+
+    const task: BackgroundTask = {
+      id: "task-completed-runtime-fallback",
+      sessionId: sessionID,
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "completed task should not be retried by runtime fallback",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    try {
+      // #when
+      await tryCompleteTaskForTest(manager, task)
+
+      // #then
+      expect(task.status).toBe("completed")
+      expect(subagentSessions.has(sessionID)).toBe(false)
+      expect(getSessionAgent(sessionID)).toBeUndefined()
+    } finally {
+      resetClaudeCodeSessionState()
+    }
   })
 
   test("should clean pendingByParent even when promptAsync notification fails", async () => {

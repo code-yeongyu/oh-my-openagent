@@ -1,65 +1,49 @@
 ---
 name: prometheus-agent
-description: Developer reference for the Prometheus strategic planner agent prompt loaders, prompts-core markdown variants, and model routing.
+description: Developer reference for the Prometheus strategic planner agent thin prompt adapter and ulw-plan skill dependency.
 ---
 
 # src/agents/prometheus/ -- Strategic Planner
 
-**Generated:** 2026-05-24 | **Updated:** 2026-06-11 (Claude per-model variants)
+**Generated:** 2026-05-24 | **Updated:** 2026-06-15 (single thin prompt)
 
 ## OVERVIEW
 
-3 TypeScript files plus 7 markdown prompt variants in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/). Prometheus remains the interview-mode strategic planner, but this directory is now a thin adapter layer. Prompt content lives in `packages/prompts-core`; `src/agents/prometheus/` routes model variants and applies runtime tool gating.
+Prometheus is the interview-mode strategic planner. This directory is a thin OpenCode adapter over one harness-neutral prompt asset:
+[`packages/prompts-core/prompts/prometheus/default.md`](../../../../prompts-core/prompts/prometheus/default.md).
 
-This shape follows the package layering refactor in [`ROADMAP.md`](file:///Users/yeongyu/local-workspaces/omo/ROADMAP.md): prompts are harness-neutral core assets, while the OpenCode adapter keeps only model routing and runtime integration.
+The prompt is intentionally small. It identifies Prometheus as the planner, keeps plan mode sticky, and requires the path-backed [`ulw-plan`](../../../../shared-skills/skills/ulw-plan/SKILL.md) skill for the planning mechanics: exploration, clear/unclear intent routing, approval gate, plan scaffold, review flow, and final `.omo` plan output.
+
+This shape follows the package layering refactor in [`ROADMAP.md`](../../../../../ROADMAP.md): prompts are harness-neutral core assets, shared planning behavior lives in the skill layer, and the OpenCode adapter keeps only runtime integration.
 
 ## FILES
 
 | File | Purpose |
 |------|---------|
 | `index.ts` | Barrel exports |
-| `system-prompt.ts` | Thin loader using `loadPromptSync()` and `prometheusPromptVariants` from `@oh-my-opencode/prompts-core`; exports prompt source routing and disabled-tool filtering |
-| `system-prompt.test.ts` | Runtime behavior tests for Question tool filtering |
-| `packages/prompts-core/prompts/prometheus/default.md` | Default/Claude markdown prompt variant |
-| `packages/prompts-core/prompts/prometheus/claude-fable-5.md` | Claude Fable 5 variant (default + Fable `<self_knowledge>` tuning block) |
-| `packages/prompts-core/prompts/prometheus/claude-opus-4-8.md` | Claude Opus 4.8 variant (default + 4.8 `<self_knowledge>` tuning block) |
-| `packages/prompts-core/prompts/prometheus/claude-opus-4-7.md` | Claude Opus 4.7 variant (default + 4.7 `<self_knowledge>` tuning block) |
-| `packages/prompts-core/prompts/prometheus/claude-opus-4-6.md` | Claude Opus 4.6 variant (default + 4.6 `<self_knowledge>` tuning block) |
-| `packages/prompts-core/prompts/prometheus/gpt.md` | GPT-optimized markdown prompt variant |
-| `packages/prompts-core/prompts/prometheus/gemini.md` | Gemini-optimized markdown prompt variant |
+| `system-prompt.ts` | Thin loader using `loadPromptSync()` from `@oh-my-opencode/prompts-core`; `getPrometheusPrompt()` always loads the same `default.md` prompt body |
+| `system-prompt.test.ts` | Runtime behavior tests for the single-prompt loader contract |
+| `packages/prompts-core/prompts/prometheus/default.md` | The single Prometheus markdown prompt asset |
+| `packages/shared-skills/skills/ulw-plan/SKILL.md` | Path-backed skill containing the full planning workflow |
 
-## MODEL VARIANT ROUTING
+## PROMPT LOADING
 
-[`system-prompt.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/agents/prometheus/system-prompt.ts) exposes `getPrometheusPromptSource(model)` (checked in this order):
+`getPrometheusPrompt(model, disabledTools)` ignores model family for prompt selection and always loads `packages/prompts-core/prompts/prometheus/default.md`. The `model` parameter is accepted for compatibility with the agent config path, but it does not choose different prompt text.
 
-- Claude Fable 5 (`isClaudeFable5Model`) routes to `"claude-fable-5"`.
-- Claude Opus 4.8 (`isClaudeOpus48Model`) routes to `"claude-opus-4-8"`.
-- Claude Opus 4.7 (`isClaudeOpus47Model`) routes to `"claude-opus-4-7"`.
-- Claude Opus 4.6 (`isClaudeOpus46Model`) routes to `"claude-opus-4-6"`.
-- GPT family models, as detected by `isGptModel(model)`, route to `"gpt"`.
-- Gemini family models, as detected by `isGeminiModel(model)`, route to `"gemini"`.
-- Missing models and all other families (including Sonnet/Haiku) route to `"default"`.
+Keep prompt edits in `default.md`. Do not add model-specific markdown files, copied prompt bodies, or adapter-side routing. If the planning workflow changes, update the `ulw-plan` skill and its references rather than expanding the Prometheus prompt.
 
-`getPrometheusPrompt(model, disabledTools)` then loads the selected markdown through `loadPromptSync({ source: prometheusPromptVariants[variant], name: "prometheus", variant })` and returns the loaded body.
+## ULW-PLAN DEPENDENCY
 
-## CLAUDE PER-MODEL TUNING (design principles)
+The prompt requires Prometheus to load `ulw-plan` as its first action with the skill tool. The skill is the source of truth for:
 
-The four Claude variants are byte-copies of `default.md` plus ONE inserted `<self_knowledge>` block after the Prometheus identity paragraph (same pattern as the Sisyphus per-model variants in [`src/agents/sisyphus/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/agents/sisyphus/)). Principles are distilled from the Anthropic per-model prompting guides:
+- Explore-first planning and when to ask the user
+- Clear versus unclear intent routing
+- Approval-gated plan generation
+- Plan/draft scaffold creation under `.omo/`
+- High-accuracy review expectations
+- Worker-ready task graphs and verification criteria
 
-| Variant | Defaults countered |
-|---------|--------------------|
-| `claude-opus-4-6` | Over-exploration (bound to one 2-3 agent wave per question), subagent overuse (distinct angle per dispatch), overengineered plans (extras go to Must NOT Have), premature context-budget wrap-up |
-| `claude-opus-4-7` | Research under-triggering (favors recall over tool calls — fire explore/librarian), subagent under-spawning (dispatch full wave in one response), literal instruction following (plans must state scope explicitly), bounded exploration (one wave per question) |
-| `claude-opus-4-8` | 4.7 set, plus capability under-reach (dispatch NOW, no "worth it" debate), over-asking the user (research first, then ask the informed question), narration (lean interview turns) |
-| `claude-fable-5` | DELEGATED DISCOVERY MANDATE (Fable never greps/reads source itself — every discovery question becomes an explore/librarian dispatch), wide fan-out (3-6 agents per wave, one angle each), follow-up waves on gaps, stay async (never block on a wave), grounded claims only, no overplanning |
-
-When editing `default.md`, replicate content changes into the four Claude variants (only the `<self_knowledge>` block may differ). Behavior coverage (variant routing, tuning-block inclusion/exclusion, Question-tool stripping) lives in `system-prompt.test.ts`.
-
-## DISABLED TOOL HANDLING
-
-Prometheus normally includes `Question({ ... })` examples because interview mode uses the Question tool to clarify scope. When the runtime passes `disabledTools` containing `"question"`, `getPrometheusPrompt()` strips fenced TypeScript `Question({ ... })` examples with `QUESTION_TOOL_BLOCK_RE` before returning the prompt.
-
-This filtering is runtime adapter behavior. Do not duplicate stripped markdown variants in `packages/prompts-core`; keep one source of truth per model family and let `system-prompt.ts` remove Question examples only when the tool is disabled.
+Prometheus itself stays a planner. It reads, searches, and writes planning artifacts only; implementation belongs to downstream workers after explicit start-work approval.
 
 ## KEY CONSTRAINTS
 
@@ -68,11 +52,12 @@ This filtering is runtime adapter behavior. Do not duplicate stripped markdown v
 - Must explore codebase before planning (NEVER plan blind)
 - Plans saved to `.omo/plans/`
 - Acceptance criteria requiring "user manually tests" are FORBIDDEN
-- Prompt edits belong in [`packages/prompts-core/prompts/prometheus/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/prometheus/), not in TypeScript section files
+- Prompt edits belong in [`packages/prompts-core/prompts/prometheus/default.md`](../../../../prompts-core/prompts/prometheus/default.md), not in TypeScript section files
+- Planning mechanics belong in the path-backed [`ulw-plan`](../../../../shared-skills/skills/ulw-plan/SKILL.md) skill
 
 ## PLAN OUTPUT FORMAT
 
-The markdown variants instruct Prometheus to produce YAML plans with a parallel task graph:
+The `ulw-plan` skill instructs Prometheus to produce `.omo` markdown plans with a parallel task graph:
 
 - Waves (parallel execution groups)
 - Tasks with dependencies, category, skills

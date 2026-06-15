@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
-import { existsSync, readdirSync, realpathSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { findNewestCachedCodexComponentCli, resolveCodexComponentBinCandidates, resolveDefaultCodexHome } from "@oh-my-opencode/omo-codex/install"
 
 export type CodexUlwLoopCommand = {
   readonly executable: string
@@ -20,7 +20,10 @@ export function resolveCodexUlwLoopCommand(input: ResolveCodexUlwLoopCommandInpu
   const localComponentBin = resolveLocalUlwLoopBin(env, homeDir)
   if (localComponentBin !== null) return { executable: localComponentBin, argsPrefix: [] }
 
-  const componentCli = resolveNewestCachedUlwLoopCli(env.CODEX_HOME ?? join(homeDir, ".codex"))
+  const componentCli = findNewestCachedCodexComponentCli({
+    codexHome: env.CODEX_HOME ?? resolveDefaultCodexHome(homeDir),
+    componentName: "ulw-loop",
+  })
   if (componentCli !== null) return { executable: process.execPath, argsPrefix: [componentCli] }
 
   const legacyLocalBin = resolveLegacyLocalOmoBin(
@@ -51,22 +54,12 @@ export async function codexUlwLoop(args: readonly string[]): Promise<number> {
 }
 
 function resolveLocalUlwLoopBin(env: NodeJS.ProcessEnv, homeDir: string): string | null {
-  const candidates = [
-    env.CODEX_LOCAL_BIN_DIR ? join(env.CODEX_LOCAL_BIN_DIR, "omo-ulw-loop") : undefined,
-    join(homeDir, ".local", "bin", "omo-ulw-loop"),
-    join(homeDir, ".codex", "bin", "omo-ulw-loop"),
-  ].filter((value): value is string => typeof value === "string")
-
+  const candidates = resolveCodexComponentBinCandidates({ executableName: "omo-ulw-loop", env, homeDir })
   return candidates.find((candidate) => existsSync(candidate)) ?? null
 }
 
 function resolveLegacyLocalOmoBin(env: NodeJS.ProcessEnv, homeDir: string, currentExecutablePaths: readonly string[]): string | null {
-  const candidates = [
-    env.CODEX_LOCAL_BIN_DIR ? join(env.CODEX_LOCAL_BIN_DIR, "omo") : undefined,
-    join(homeDir, ".local", "bin", "omo"),
-    join(homeDir, ".codex", "bin", "omo"),
-  ].filter((value): value is string => typeof value === "string")
-
+  const candidates = resolveCodexComponentBinCandidates({ executableName: "omo", env, homeDir })
   return candidates.find((candidate) => existsSync(candidate) && !isCurrentExecutable(candidate, currentExecutablePaths)) ?? null
 }
 
@@ -82,33 +75,4 @@ function realpathOrSelf(path: string): string {
     if (error instanceof Error) return path
     return path
   }
-}
-
-function resolveNewestCachedUlwLoopCli(codexHome: string): string | null {
-  const versionsRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo")
-  if (!existsSync(versionsRoot)) return null
-
-  const versions = readdirSync(versionsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort(compareVersionNames)
-    .reverse()
-
-  for (const version of versions) {
-    const candidate = join(versionsRoot, version, "components", "ulw-loop", "dist", "cli.js")
-    if (existsSync(candidate)) return candidate
-  }
-  return null
-}
-
-function compareVersionNames(left: string, right: string): number {
-  const leftParts = left.split(".").map((part) => Number.parseInt(part, 10))
-  const rightParts = right.split(".").map((part) => Number.parseInt(part, 10))
-  const length = Math.max(leftParts.length, rightParts.length)
-  for (let index = 0; index < length; index += 1) {
-    const leftValue = Number.isFinite(leftParts[index] ?? Number.NaN) ? leftParts[index] ?? 0 : 0
-    const rightValue = Number.isFinite(rightParts[index] ?? Number.NaN) ? rightParts[index] ?? 0 : 0
-    if (leftValue !== rightValue) return leftValue - rightValue
-  }
-  return left.localeCompare(right)
 }

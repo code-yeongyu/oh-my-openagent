@@ -121,6 +121,8 @@ export interface LaunchInput {
   category?: string
   sessionPermission?: SessionPermissionRule[]
   onSessionCreated?: (sessionId: string) => void | Promise<void>
+  /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
+  userPermission?: Record<string, "ask" | "allow" | "deny">
 }
 
 export interface ResumeInput {

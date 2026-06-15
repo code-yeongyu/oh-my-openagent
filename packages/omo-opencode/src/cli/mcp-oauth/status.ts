@@ -1,4 +1,4 @@
-import { listAllTokens, listTokensByHost } from "../../features/mcp-oauth/storage"
+import { listAllTokens, listTokensByHost } from "@oh-my-opencode/mcp-client-core/mcp-oauth/storage"
 
 export async function status(serverName: string | undefined): Promise<number> {
   try {

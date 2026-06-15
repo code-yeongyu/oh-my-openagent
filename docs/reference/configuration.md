@@ -192,6 +192,8 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
 | `providerOptions` | object        | Provider-specific options                              |
 
+Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `shared/ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
+
 #### Anthropic Extended Thinking
 
 ```json
@@ -262,6 +264,8 @@ Object entries support: `model`, `variant`, `reasoningEffort`, `temperature`, `t
 #### File URIs for Prompts
 
 Both `prompt` and `prompt_append` support loading content from files via `file://` URIs. Category-level `prompt_append` supports the same URI forms.
+
+For Prometheus, file-backed `prompt` content is appended after the mandatory base prompt; it does not replace the base prompt.
 
 ```jsonc
 {
@@ -484,7 +488,7 @@ To disable the task system entirely, set `experimental.task_system` to `false`:
 
 Skills bring domain-specific expertise and embedded MCPs.
 
-Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend-ui-ux`
+Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend`
 
 Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 
@@ -530,7 +534,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-recovery`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
 
 Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, `tool-pair-validator`, and `thinking-block-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
@@ -539,7 +543,6 @@ Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-
 - `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
 - `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 and GPT-5.5 prompt paths.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
-- `session-recovery` - automatically recovers from recoverable session errors (missing tool results, unavailable tools, thinking block violations). Shows toast notifications during recovery. Enable `experimental.auto_resume` for automatic retry after recovery.
 
 ### Commands
 
@@ -955,7 +958,6 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
   "experimental": {
     "truncate_all_tool_outputs": false,
     "aggressive_truncation": false,
-    "auto_resume": false,
     "disable_omo_env": false,
     "task_system": true,
     "dynamic_context_pruning": {
@@ -985,7 +987,6 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | ---------------------------------------- | ---------- | ------------------------------------------------------------------------------------ |
 | `truncate_all_tool_outputs`              | `false`    | Truncate all tool outputs (not just whitelisted)                                     |
 | `aggressive_truncation`                  | `false`    | Aggressively truncate when token limit exceeded                                      |
-| `auto_resume`                            | `false`    | Auto-resume after thinking block recovery                                            |
 | `disable_omo_env`                        | `false`    | Disable auto-injected `<omo-env>` block (date/time/locale). Improves cache hit rate. |
 | `task_system`                            | `false`    | Enable Sisyphus task system                                                          |
 | `dynamic_context_pruning.enabled`        | `false`    | Auto-prune old tool outputs to manage context window                                 |
@@ -1040,6 +1041,45 @@ The installer prepares Git Bash with normal detection, `OMO_CODEX_GIT_BASH_PATH`
 #### Google Auth
 
 Install [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) for Google Gemini. Provides multi-account load balancing, dual quota, and variant-based thinking.
+
+##### Split Claude Routing
+
+Provider path affects the effective Claude context limit. Antigravity Claude
+models are the stable 200k lane. Direct Anthropic Claude models are the 1M lane
+for accounts and model IDs that support long context.
+
+Use Antigravity for cheaper or quota-balanced work where 200k context is enough.
+Use direct Anthropic for long-context planning, review, and research sessions
+where early compaction would lose important context.
+
+```jsonc
+{
+  "agents": {
+    // 200k lane: Google Antigravity Claude.
+    "explore": {
+      "model": "google/antigravity-claude-sonnet-4-6"
+    },
+    "librarian": {
+      "model": "google/antigravity-claude-sonnet-4-6"
+    },
+
+    // 1M lane: direct Anthropic, only for eligible long-context accounts/models.
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max"
+    },
+    "oracle": {
+      "model": "anthropic/claude-opus-4-6"
+    }
+  }
+}
+```
+
+If you see an error like `prompt is too long ... > 200000`, check whether the
+agent is routed through `google/antigravity-*`. Move that agent to a direct
+`anthropic/*` model only when the account, model, and required beta/header setup
+support 1M context. Keep the Antigravity lane explicit when you want predictable
+200k behavior.
 
 #### Ollama
 

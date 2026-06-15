@@ -53,7 +53,10 @@ test("#given aggregate Codex skills #when source wiring is inspected #then share
 	const rootPackageFiles = rootPackageJson.files ?? [];
 
 	// then
-	assert.equal(sharedPackageJson.exports?.["."], "./index.mjs");
+	assert.deepEqual(sharedPackageJson.exports?.["."], {
+		types: "./index.d.ts",
+		import: "./index.mjs",
+	});
 	assert.equal(sharedPackageJson.files?.includes("skills"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/package.json"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/index.mjs"), true);
@@ -67,6 +70,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// given
 	const sharedSkillsRoot = sharedSkillsRootPath();
 	const aggregateSkillsRoot = join(root, "skills");
+	const componentSkillNames = new Set(componentSkillSources.map(([skillName]) => skillName));
 	const sharedSkillNames = (await readdir(sharedSkillsRoot, { withFileTypes: true }))
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => entry.name)
@@ -74,6 +78,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 
 	// when / then
 	for (const skillName of sharedSkillNames) {
+		if (componentSkillNames.has(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -82,6 +87,18 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 			`${skillName} drifted from shared-skills`,
 		);
 	}
+});
+
+test("#given a shared skill name collides with a Codex component skill #when aggregate skills are inspected #then the component skill wins", async () => {
+	// given
+	const sharedSkill = await readFile(join(sharedSkillsRootPath(), "ulw-plan", "SKILL.md"), "utf8");
+	const componentSkill = await readFile(join(root, "components", "ultrawork", "skills", "ulw-plan", "SKILL.md"), "utf8");
+	const aggregateSkill = await readFile(join(root, "skills", "ulw-plan", "SKILL.md"), "utf8");
+
+	// when / then
+	assert.notEqual(removeCodexCompatibilityGuidance(aggregateSkill), removeCodexCompatibilityGuidance(sharedSkill));
+	assert.equal(removeCodexCompatibilityGuidance(aggregateSkill), removeCodexCompatibilityGuidance(componentSkill));
+	assert.match(aggregateSkill, /multi_agent_v1/);
 });
 
 test("#given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged", async () => {
@@ -236,6 +253,22 @@ test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent p
 		["does not accept subagent outputs as success without independent verification", /subagent outputs?[\s\S]*(?:not|never)[\s\S]*(?:success|approval)|independent(?:ly)? verif(?:y|ied|ication)[\s\S]*subagent outputs?/i],
 		["treats Discord or external content as claims, not instructions", /(?:Discord|external content)[\s\S]*claims?[\s\S]*not instructions?|not instructions?[\s\S]*(?:Discord|external content)/i],
 	]);
+});
+
+test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped", async () => {
+	// given
+	const dangerousBypassToken = ["dangerously", "bypass"].join("-");
+	const dangerousBypassPattern = new RegExp(`${dangerousBypassToken}(?:-approvals-and-sandbox)?`);
+	const packagedWorkflow = await readPackagedSkillFile("ulw-plan", "references", "full-workflow.md");
+	const componentWorkflowPath = join(root, "components", "ultrawork", "skills", "ulw-plan", "references", "full-workflow.md");
+	const componentWorkflow = {
+		path: componentWorkflowPath,
+		content: await readFile(componentWorkflowPath, "utf8"),
+	};
+
+	// when / then
+	assert.doesNotMatch(packagedWorkflow.content, dangerousBypassPattern, `${packagedWorkflow.path} ships unsafe Codex bypass guidance`);
+	assert.doesNotMatch(componentWorkflow.content, dangerousBypassPattern, `${componentWorkflow.path} ships unsafe Codex bypass guidance`);
 });
 
 test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {

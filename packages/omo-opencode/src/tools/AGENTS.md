@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/tool-registry.ts) in `src/plugin/`. Native tools are factory-based (`createXXXTool`) except `interactive_bash` (`ToolDefinition`). LSP and AST-grep tools are no longer native `src/tools/` implementations; they are served by Tier-1 built-in MCPs `lsp` and `ast_grep` and keep the same exposed names (`lsp_diagnostics`, `ast_grep_search`, etc.).
+Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `src/plugin/`. Native tools are factory-based (`createXXXTool`) except `interactive_bash` (`ToolDefinition`). LSP and AST-grep tools are no longer native `src/tools/` implementations; they are served by Tier-1 built-in MCPs `lsp` and `ast_grep` and keep the same exposed names (`lsp_diagnostics`, `ast_grep_search`, etc.).
 
 ## TOOL CATALOG
 
@@ -49,7 +49,7 @@ Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-worksp
 
 ## DELEGATION CATEGORIES (built-in 8)
 
-`task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
+`task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](../shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
 | Category | Default Model | Source File | Domain |
 |----------|---------------|-------------|--------|

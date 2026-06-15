@@ -1,5 +1,1 @@
-export * from "./types"
-export * from "./loader"
-export * from "./agent-definitions-loader"
-export * from "./opencode-config-agents-reader"
-export * from "./json-agent-loader"
+export * from "@oh-my-opencode/claude-code-compat-core/claude-code-agent-loader"

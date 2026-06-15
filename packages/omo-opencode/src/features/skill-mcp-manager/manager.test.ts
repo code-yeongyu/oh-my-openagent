@@ -1,12 +1,18 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { describe, it, expect, beforeEach, afterEach, afterAll, mock, spyOn } from "bun:test"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
+import * as connectionModule from "./connection"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import type { OAuthTokenData } from "../mcp-oauth/storage"
 import { setHttpClientDependenciesForTesting } from "./http-client"
 import { setStdioClientDependenciesForTesting } from "./stdio-client"
-import { SkillMcpManager } from "./manager"
+import { SkillMcpManager, buildSkillMcpClientKey } from "./manager"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+
+function createMockClient(name: string): Client {
+  return new Client({ name, version: "1.0.0" }, { capabilities: {} })
+}
 
 const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))
 const mockHttpClose = mock(() => Promise.resolve())
@@ -99,6 +105,7 @@ describe("SkillMcpManager", () => {
     await manager.disconnectAll()
     setHttpClientDependenciesForTesting()
     setStdioClientDependenciesForTesting()
+    mock.restore()
   })
 
   describe("getOrCreateClient", () => {
@@ -969,6 +976,206 @@ describe("SkillMcpManager", () => {
       // when / #then
       await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(/403/)
       expect(mockLogin).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("CDP-aware cache keys and config injection", () => {
+    it("builds the default cache key without a cdpUrl suffix", () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+
+      // when
+      const clientKey = buildSkillMcpClientKey(info)
+
+      // then
+      expect(clientKey).toBe("session-1:browser-skill:playwright")
+    })
+
+    it("builds a cache key with a cdpUrl suffix when provided", () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+
+      // when
+      const clientKey = buildSkillMcpClientKey(info, { cdpUrl: "http://localhost:9222" })
+
+      // then
+      expect(clientKey).toBe("session-1:browser-skill:playwright::cdp=http://localhost:9222")
+    })
+
+    it("reuses the cached client for the same cdpUrl", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
+      }
+      const clientsByKey = new Map<string, Client>()
+      const getOrCreateSpy = spyOn(connectionModule, "getOrCreateClient")
+      getOrCreateSpy.mockImplementation(async ({ clientKey }) => {
+        const existingClient = clientsByKey.get(clientKey)
+        if (existingClient) {
+          return existingClient
+        }
+
+        const newClient = createMockClient(`client-${clientsByKey.size + 1}`)
+        clientsByKey.set(clientKey, newClient)
+        return newClient
+      })
+
+      // when
+      const firstClient = await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9222" })
+      const secondClient = await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9222" })
+
+      // then
+      expect(firstClient).toBe(secondClient)
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(2)
+      expect(getOrCreateSpy.mock.calls[0]?.[0].clientKey).toBe(
+        "session-1:browser-skill:playwright::cdp=http://localhost:9222"
+      )
+      expect(getOrCreateSpy.mock.calls[1]?.[0].clientKey).toBe(
+        "session-1:browser-skill:playwright::cdp=http://localhost:9222"
+      )
+    })
+
+    it("creates separate clients for different cdpUrl values", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
+      }
+      const clientsByKey = new Map<string, Client>()
+      const getOrCreateSpy = spyOn(connectionModule, "getOrCreateClient")
+      getOrCreateSpy.mockImplementation(async ({ clientKey }) => {
+        const existingClient = clientsByKey.get(clientKey)
+        if (existingClient) {
+          return existingClient
+        }
+
+        const newClient = createMockClient(`client-${clientsByKey.size + 1}`)
+        clientsByKey.set(clientKey, newClient)
+        return newClient
+      })
+
+      // when
+      const firstClient = await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9222" })
+      const secondClient = await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9333" })
+
+      // then
+      expect(firstClient).not.toBe(secondClient)
+      expect(Array.from(clientsByKey.keys())).toEqual([
+        "session-1:browser-skill:playwright::cdp=http://localhost:9222",
+        "session-1:browser-skill:playwright::cdp=http://localhost:9333",
+      ])
+    })
+
+    it("keeps the default client and cdpUrl client separate", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
+      }
+      const clientsByKey = new Map<string, Client>()
+      const getOrCreateSpy = spyOn(connectionModule, "getOrCreateClient")
+      getOrCreateSpy.mockImplementation(async ({ clientKey }) => {
+        const existingClient = clientsByKey.get(clientKey)
+        if (existingClient) {
+          return existingClient
+        }
+
+        const newClient = createMockClient(`client-${clientsByKey.size + 1}`)
+        clientsByKey.set(clientKey, newClient)
+        return newClient
+      })
+
+      // when
+      const defaultClient = await manager.getOrCreateClient(info, config)
+      const cdpClient = await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9222" })
+
+      // then
+      expect(defaultClient).not.toBe(cdpClient)
+      expect(getOrCreateSpy.mock.calls[0]?.[0].clientKey).toBe("session-1:browser-skill:playwright")
+      expect(getOrCreateSpy.mock.calls[1]?.[0].clientKey).toBe(
+        "session-1:browser-skill:playwright::cdp=http://localhost:9222"
+      )
+    })
+
+    it("appends the cdp-endpoint args when cdpUrl is provided", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
+      }
+      const getOrCreateSpy = spyOn(connectionModule, "getOrCreateClient")
+      getOrCreateSpy.mockResolvedValue(createMockClient("client-1"))
+
+      // when
+      await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9222" })
+
+      // then
+      const passedConfig = getOrCreateSpy.mock.calls[0]?.[0].config
+      expect(passedConfig).toEqual({
+        command: "npx",
+        args: ["@playwright/mcp@latest", "--cdp-endpoint", "http://localhost:9222"],
+      })
+      expect(passedConfig).not.toBe(config)
+      expect(config.args).toEqual(["@playwright/mcp@latest"])
+    })
+
+    it("leaves args unchanged when no cdpUrl is provided", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "playwright",
+        skillName: "browser-skill",
+        sessionID: "session-1",
+        scope: "builtin",
+      }
+      const config: ClaudeCodeMcpServer = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
+      }
+      const getOrCreateSpy = spyOn(connectionModule, "getOrCreateClient")
+      getOrCreateSpy.mockResolvedValue(createMockClient("client-1"))
+
+      // when
+      await manager.getOrCreateClient(info, config)
+
+      // then
+      const passedConfig = getOrCreateSpy.mock.calls[0]?.[0].config
+      expect(passedConfig).toBe(config)
+      expect(passedConfig.args).toEqual(["@playwright/mcp@latest"])
     })
   })
 })

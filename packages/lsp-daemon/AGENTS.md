@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE long-lived LSP process per user and fans many short-lived agent sessions into it over a unix socket (Windows named pipe). Built for the **Codex** edition where every tool call spawns a fresh process: instead of cold-starting a language server each time, sessions launch a thin stdio MCP **proxy** that forwards to the warm **daemon**. Reuses [`@code-yeongyu/lsp-tools-mcp`](file:///Users/yeongyu/local-workspaces/omo/packages/lsp-tools-mcp) for the actual LSP manager + MCP request handler — this package only adds the daemon/proxy/transport layer. Built with `npm` + vitest + biome (NOT Bun); `engines.node >= 20`.
+Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE long-lived LSP process per user and fans many short-lived agent sessions into it over a unix socket (Windows named pipe). Built for the **Codex** edition where every tool call spawns a fresh process: instead of cold-starting a language server each time, sessions launch a thin stdio MCP **proxy** that forwards to the warm **daemon**. Reuses [`@code-yeongyu/lsp-tools-mcp`](../lsp-tools-mcp) for the actual LSP manager + MCP request handler — this package only adds the daemon/proxy/transport layer. Built with `npm` + vitest + biome (NOT Bun); `engines.node >= 20`.
 
 ## KEY FILES
 

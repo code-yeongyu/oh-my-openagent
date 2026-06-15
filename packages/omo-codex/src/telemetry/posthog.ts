@@ -1,23 +1,22 @@
-import { createHash } from "node:crypto"
-import os from "node:os"
-
-import { PostHog } from "posthog-node"
-import packageJson from "../../package.json" with { type: "json" }
-
 import {
-  type TelemetryDiagnosticErrorKind,
-  type TelemetryDiagnosticEvent,
-  type TelemetryDiagnosticSource,
-  writeTelemetryDiagnostic,
-} from "./diagnostics"
-import { getPostHogApiKey, getPostHogHost, hasPostHogApiKey, shouldDisablePostHog } from "./env-flags"
+  createTelemetryClient,
+  getDefaultTelemetryOsProvider,
+  getDailyActiveCaptureState,
+  getTelemetryDistinctId,
+} from "@oh-my-opencode/telemetry-core"
+import type {
+  PostHogActivityCaptureState,
+  TelemetryOsProvider,
+  TelemetryTransportFactory,
+} from "@oh-my-opencode/telemetry-core"
+
+import { writeTelemetryDiagnostic } from "./diagnostics"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
 import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
-  EVENT_NAME,
-  PACKAGE_NAME,
-  PRODUCT_NAME,
+  MACHINE_ID_PREFIX,
+  createCodexTelemetryProductConfig,
 } from "./product-identity"
 
 export { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST }
@@ -26,14 +25,22 @@ export type PostHogSource = "cli" | "plugin" | "install"
 export type PostHogActivityReason = "install_started" | "install_completed" | "cli_run" | "session_start"
 
 export type PostHogClient = {
-  trackActive: (distinctId: string, reason: PostHogActivityReason) => void
-  shutdown: () => Promise<void>
+  readonly trackActive: (distinctId: string, reason: PostHogActivityReason) => void
+  readonly shutdown: () => Promise<void>
 }
 
-type OsProvider = Pick<typeof os, "arch" | "cpus" | "hostname" | "platform" | "release" | "totalmem" | "type">
-type ActivityStateProvider = typeof getPostHogActivityCaptureState
+type ActivityStateProvider = () => PostHogActivityCaptureState
 
-let osProviderOverride: OsProvider | null = null
+type CreatePostHogClientOptions = {
+  readonly activityStateProvider?: ActivityStateProvider
+  readonly env?: NodeJS.ProcessEnv
+  readonly now?: Date
+  readonly osProvider?: TelemetryOsProvider
+  readonly stateDir?: string
+  readonly transportFactory?: TelemetryTransportFactory
+}
+
+let osProviderOverride: TelemetryOsProvider | null = null
 let activityStateProviderOverride: ActivityStateProvider | null = null
 
 const NO_OP_POSTHOG: PostHogClient = {
@@ -41,175 +48,105 @@ const NO_OP_POSTHOG: PostHogClient = {
   shutdown: async () => undefined,
 }
 
-type PostHogCaptureEvent = Parameters<PostHog["capture"]>[0]
-
-function resolveOsProvider(): OsProvider {
-  return osProviderOverride ?? os
+function resolveOsProvider(): TelemetryOsProvider {
+  return osProviderOverride ?? getDefaultTelemetryOsProvider()
 }
 
-function resolveActivityStateProvider(): ActivityStateProvider {
-  return activityStateProviderOverride ?? getPostHogActivityCaptureState
-}
-
-function writePostHogDiagnostic(
-  event: TelemetryDiagnosticEvent,
-  source: TelemetryDiagnosticSource,
-  error: unknown,
-  errorKind: TelemetryDiagnosticErrorKind,
-): void {
-  writeTelemetryDiagnostic({ event, source, error, errorKind })
-}
-
-function getSafeCpuInfo(): { readonly count: number; readonly model: string | undefined } {
-  try {
-    const cpuInfo = resolveOsProvider().cpus()
-    return {
-      count: cpuInfo.length,
-      model: cpuInfo[0]?.model,
-    }
-  } catch (error) {
-    writePostHogDiagnostic("telemetry_cpu_info_unavailable", "shared", error, error instanceof Error ? "error" : "non_error")
-    return {
-      count: 0,
-      model: undefined,
-    }
+function resolveActivityStateProvider(options: CreatePostHogClientOptions): ActivityStateProvider {
+  if (options.activityStateProvider !== undefined) {
+    return options.activityStateProvider
   }
-}
 
-function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureEvent["properties"]> {
-  const osProvider = resolveOsProvider()
-  const cpuInfo = getSafeCpuInfo()
-
-  return {
-    platform: "omo-codex",
-    product_name: PRODUCT_NAME,
-    package_name: PACKAGE_NAME,
-    package_version: packageJson.version,
-    runtime: "bun",
-    runtime_version: process.versions.bun ?? process.version,
-    source,
-    $os: osProvider.platform(),
-    $os_version: osProvider.release(),
-    os_arch: osProvider.arch(),
-    os_type: osProvider.type(),
-    cpu_count: cpuInfo.count,
-    cpu_model: cpuInfo.model,
-    total_memory_gb: Math.round(osProvider.totalmem() / 1024 / 1024 / 1024),
-    locale: Intl.DateTimeFormat().resolvedOptions().locale,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    shell: process.env.SHELL,
-    ci: Boolean(process.env.CI),
-    terminal: process.env.TERM_PROGRAM,
+  if (activityStateProviderOverride !== null) {
+    return activityStateProviderOverride
   }
+
+  if (options.now === undefined && options.stateDir === undefined) {
+    return getPostHogActivityCaptureState
+  }
+
+  return () => getPostHogActivityCaptureState(options.now ?? new Date())
 }
 
 function createPostHogClient(
   source: PostHogSource,
-  options: ConstructorParameters<typeof PostHog>[1],
+  options: CreatePostHogClientOptions = {},
 ): PostHogClient {
-  if (shouldDisablePostHog() || !hasPostHogApiKey()) {
+  const client = createTelemetryClient({
+    diagnostics: writeTelemetryDiagnostic,
+    env: options.env ?? process.env,
+    osProvider: options.osProvider ?? resolveOsProvider(),
+    product: createCodexTelemetryProductConfig(),
+    source,
+    transportFactory: options.transportFactory,
+  })
+
+  if (!client.enabled) {
     return NO_OP_POSTHOG
   }
 
-  let client: PostHog
-  try {
-    client = new PostHog(getPostHogApiKey(), {
-      ...options,
-      host: getPostHogHost(),
-      disableGeoip: false,
-    })
-  } catch (error) {
-    writePostHogDiagnostic("telemetry_posthog_init_failed", source, error, error instanceof Error ? "error" : "non_error")
-    return NO_OP_POSTHOG
-  }
-
-  const sharedProperties = getSharedProperties(source)
+  const activityStateProvider = resolveActivityStateProvider(options)
 
   return {
     trackActive: (distinctId, reason) => {
-      const activityState = resolveActivityStateProvider()()
+      const activityState = options.stateDir === undefined
+        ? activityStateProvider()
+        : getDailyActiveCaptureState({
+            diagnostics: writeTelemetryDiagnostic,
+            now: options.now,
+            stateDir: options.stateDir,
+          })
       if (!activityState.captureDaily) {
         return
       }
 
-      try {
-        client.capture({
-          distinctId,
-          event: EVENT_NAME,
-          properties: {
-            ...sharedProperties,
-            $process_person_profile: false,
-            day_utc: activityState.dayUTC,
-            reason,
-          },
-        })
-      } catch (error) {
-        writePostHogDiagnostic("telemetry_capture_failed", source, error, error instanceof Error ? "error" : "non_error")
-      }
+      client.trackActive({
+        dayUTC: activityState.dayUTC,
+        distinctId,
+        reason,
+      })
     },
     shutdown: async () => {
-      try {
-        await client.shutdown()
-      } catch (error) {
-        writePostHogDiagnostic("telemetry_shutdown_failed", source, error, error instanceof Error ? "error" : "non_error")
-      }
+      await client.shutdown()
     },
   }
 }
 
 export function getPostHogDistinctId(): string {
-  return createHash("sha256").update(`omo-codex:${resolveOsProvider().hostname()}`).digest("hex")
+  return getTelemetryDistinctId(MACHINE_ID_PREFIX, resolveOsProvider())
 }
 
 export function createCliPostHog(): PostHogClient {
-  return createPostHogClient("cli", {
-    enableExceptionAutocapture: false,
-    enableLocalEvaluation: false,
-    strictLocalEvaluation: true,
-    disableRemoteConfig: true,
-    flushAt: 1,
-    flushInterval: 0,
-  })
+  return createPostHogClient("cli")
 }
 
 export function createInstallPostHog(): PostHogClient {
-  return createPostHogClient("install", {
-    enableExceptionAutocapture: false,
-    enableLocalEvaluation: false,
-    strictLocalEvaluation: true,
-    disableRemoteConfig: true,
-    flushAt: 1,
-    flushInterval: 0,
-  })
+  return createPostHogClient("install")
 }
 
 export function createPluginPostHog(): PostHogClient {
-  return createPostHogClient("plugin", {
-    enableExceptionAutocapture: false,
-    enableLocalEvaluation: false,
-    strictLocalEvaluation: true,
-    disableRemoteConfig: true,
-    flushAt: 1,
-    flushInterval: 0,
-  })
+  return createPostHogClient("plugin")
 }
 
-/** @internal test-only */
-export function __setOsProviderForTesting(provider: OsProvider): void {
+export function __createPostHogForTesting(
+  source: PostHogSource,
+  options: CreatePostHogClientOptions,
+): PostHogClient {
+  return createPostHogClient(source, options)
+}
+
+export function __setOsProviderForTesting(provider: TelemetryOsProvider): void {
   osProviderOverride = provider
 }
 
-/** @internal test-only */
 export function __resetOsProviderForTesting(): void {
   osProviderOverride = null
 }
 
-/** @internal test-only */
 export function __setActivityStateProviderForTesting(provider: ActivityStateProvider): void {
   activityStateProviderOverride = provider
 }
 
-/** @internal test-only */
 export function __resetActivityStateProviderForTesting(): void {
   activityStateProviderOverride = null
 }

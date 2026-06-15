@@ -1,0 +1,9 @@
+$ vitest --run test/codex-goal-instruction.test.ts
+
+ RUN  v4.1.8 <WORKTREE>/packages/omo-codex/plugin/components/ulw-loop
+
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  17:26:47
+   Duration  85ms (transform 23ms, setup 0ms, import 31ms, tests 3ms, environment 0ms)

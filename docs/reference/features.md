@@ -71,6 +71,32 @@ task(subagent_type="explore", load_skills=[], prompt="Find auth implementations"
 background_output(task_id="bg_abc123")
 ```
 
+#### Background Agent Work Directories
+
+Background agents inherit the session working directory from OpenCode and OMO when
+the task tool starts them. OMO does not force the model's own shell commands to
+stay inside that directory after launch. If a model decides to clone a repo,
+download docs, or create scratch files under `/tmp` or macOS `/var/folders/...`,
+the filesystem prompt comes from that command, not from a separate OMO storage
+root.
+
+`APP_DIR` is an OpenCode process environment value. Treat it as process context,
+not as a guarantee that every background agent artifact will land there.
+
+For projects that must keep all agent scratch work under the repository, add a
+project `AGENTS.md` rule with an explicit writable path:
+
+```md
+Use ./.omo/session-work/ for clones, downloaded docs, scratch files, and
+temporary outputs. Do not write under /tmp, /var, or other OS temp directories
+unless the user approves it.
+```
+
+If you use tmux panes for background agents, each pane still follows the same
+model instructions. A project rule is more reliable than repeating the
+constraint in one prompt, because every subagent receives the rule with the
+project context.
+
 #### Visual Multi-Agent with Tmux
 
 Enable `tmux.enabled` to see background agents in separate tmux panes:
@@ -298,7 +324,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 | **playwright**     | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
 | **agent-browser**  | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
 | **dev-browser**    | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
-| **frontend-ui-ux** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
+| **frontend** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
 | **review-work**    | "review work", "review my work", "QA my work"         | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                      |
 | **$omo:remove-ai-slops**| "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                             |
 
@@ -325,7 +351,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 /git-master who wrote this authentication code?
 ```
 
-#### frontend-ui-ux Design Process
+#### frontend Design Process
 
 - **Design Process**: Purpose, Tone, Constraints, Differentiation
 - **Aesthetic Direction**: Choose extreme - brutalist, maximalist, retro-futuristic, luxury, playful
@@ -426,7 +452,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 #### The Designer (UI Implementation)
 
 - **Category**: `visual-engineering`
-- **load_skills**: `["frontend-ui-ux", "playwright"]`
+- **load_skills**: `["frontend", "playwright"]`
 - **Effect**: Implements aesthetic UI and verifies rendering results directly in browser.
 
 #### The Architect (Design Review)
@@ -652,6 +678,32 @@ These user-facing tool names are served by the built-in local `ast_grep` MCP bac
 | **session_search** | Full-text search across session messages |
 | **session_info**   | Get session metadata and statistics      |
 
+#### Finding older sessions hidden by `/sessions`
+
+OpenCode's built-in `/sessions` picker can omit older sessions even when they still exist in the local session store. Use OMO's session tools to find the ID, then continue it from the TUI.
+
+```ts
+session_list({
+  from_date: "2026-01-01T00:00:00Z",
+  to_date: "2026-02-11T00:00:00Z",
+  project_path: "/absolute/path/to/project",
+  limit: 50,
+})
+```
+
+After you find the session ID, type this in OpenCode:
+
+```text
+/continue <session_id>
+```
+
+If you remember text from the conversation but not the date, search first and then read the matching session:
+
+```ts
+session_search({ query: "migration bug", limit: 20 })
+session_read({ session_id: "ses_...", limit: 200 })
+```
+
 ### Task Management Tools
 
 Requires `experimental.task_system: true` in config.
@@ -813,7 +865,6 @@ Current composition counts:
 
 | Hook                                        | Event           | Description                                                                                                                                                                                                                                                 |
 | ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **session-recovery**                        | Event           | Recovers from session errors — missing tool results, thinking block issues, empty messages.                                                                                                                                                                 |
 | **anthropic-context-window-limit-recovery** | Event           | Handles Claude context window limits gracefully.                                                                                                                                                                                                            |
 | **runtime-fallback**                        | Event + Message | Automatically switches to backup models on retryable API errors (e.g., 429, 500, 502, 503, 504), provider key misconfiguration errors (e.g., missing API key), and provider retry signals. `message.updated` retry-signal detection requires `timeout_seconds > 0`; structured `session.status` retry events can still trigger fallback. |
 | **model-fallback**                          | Event + Message | Manages model fallback chain when primary model is unavailable.                                                                                                                                                                                             |

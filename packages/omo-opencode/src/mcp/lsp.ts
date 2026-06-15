@@ -2,7 +2,8 @@ import { existsSync } from "node:fs"
 import { delimiter, dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { hasCliSuffix } from "./cli-suffix"
-import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable"
+import { resolveRuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable"
+import { createAncestorCliCandidates, resolveJavaScriptRuntime, type AncestorCliCandidate } from "./shared/ancestor-cli-resolver"
 
 const PACKAGE_REL = "packages/lsp-daemon"
 const LSP_TOOLS_PACKAGE_REL = "packages/lsp-tools-mcp"
@@ -38,62 +39,11 @@ type LspMcpConfigOptions = {
   readonly resolveExecutable?: RuntimeExecutableResolver
 }
 
-type LspCommandCandidate = {
-  readonly command: string[]
-  readonly root: string
-  readonly path: string
-  readonly exists: boolean
-}
-
 export type LocalMcpConfig = {
   type: "local"
   command: string[]
   enabled: boolean
   environment?: Record<string, string>
-}
-
-function addAncestorCommandCandidates(
-  startDirectory: string,
-  target: LspCommandCandidate[],
-  seenPaths: Set<string>,
-  pathExists: (path: string) => boolean,
-  resolveExecutable: RuntimeExecutableResolver,
-): void {
-  let currentDirectory = resolve(startDirectory)
-
-  while (true) {
-    const distCliPath = resolve(currentDirectory, PACKAGE_REL, DIST_CLI_REL)
-    if (!seenPaths.has(distCliPath)) {
-      const runtime = resolveJavaScriptRuntime(resolveExecutable)
-      seenPaths.add(distCliPath)
-      target.push({
-        command: [runtime.command, distCliPath, "mcp"],
-        root: currentDirectory,
-        path: distCliPath,
-        exists: runtime.available && pathExists(distCliPath),
-      })
-    }
-
-    const sourceCliPath = resolve(currentDirectory, PACKAGE_REL, SOURCE_CLI_REL)
-    if (!seenPaths.has(sourceCliPath)) {
-      const runtime = resolveExecutable("bun")
-      const engineDistPath = resolve(currentDirectory, LSP_TOOLS_PACKAGE_REL, DIST_CLI_REL)
-      seenPaths.add(sourceCliPath)
-      target.push({
-        command: [runtime.command, sourceCliPath, "mcp"],
-        root: currentDirectory,
-        path: sourceCliPath,
-        exists: runtime.available && pathExists(sourceCliPath) && pathExists(engineDistPath),
-      })
-    }
-
-    const parentDirectory = resolve(currentDirectory, "..")
-    if (parentDirectory === currentDirectory) {
-      return
-    }
-
-    currentDirectory = parentDirectory
-  }
 }
 
 function getModuleDirectory(moduleUrl: string): string | null {
@@ -105,20 +55,15 @@ function getModuleDirectory(moduleUrl: string): string | null {
   }
 }
 
-function findBootstrapRoot(candidates: readonly LspCommandCandidate[], pathExists: (path: string) => boolean): string {
+function findBootstrapRoot(candidates: readonly AncestorCliCandidate[], pathExists: (path: string) => boolean): string {
   return candidates.find((candidate) => pathExists(resolve(candidate.root, "package.json")))?.root ?? process.cwd()
-}
-
-function resolveJavaScriptRuntime(resolveExecutable: RuntimeExecutableResolver): RuntimeExecutable {
-  const node = resolveExecutable("node")
-  return node.available ? node : resolveExecutable("bun")
 }
 
 function createBootstrapCandidate(
   root: string,
   pathExists: (path: string) => boolean,
   resolveExecutable: RuntimeExecutableResolver,
-): LspCommandCandidate {
+): AncestorCliCandidate {
   const runtime = resolveJavaScriptRuntime(resolveExecutable)
   const bun = resolveExecutable("bun")
   const npm = resolveExecutable("npm")
@@ -129,19 +74,26 @@ function createBootstrapCandidate(
     root,
     path: resolve(root, PACKAGE_REL, DIST_CLI_REL),
     exists: runtime.available && npm.available && pathExists(packageManifestPath),
+    runtimeAvailable: runtime.available,
   }
 }
 
-function resolveLspCommand(options: LspMcpConfigOptions = {}): LspCommandCandidate {
+function resolveLspCommand(options: LspMcpConfigOptions = {}): AncestorCliCandidate {
   const pathExists = options.exists ?? existsSync
   const resolveExecutable = options.resolveExecutable ?? resolveRuntimeExecutable
-  const candidates: LspCommandCandidate[] = []
-  const seenPaths = new Set<string>()
   const moduleDirectory = getModuleDirectory(options.moduleUrl ?? import.meta.url)
 
-  if (moduleDirectory) {
-    addAncestorCommandCandidates(moduleDirectory, candidates, seenPaths, pathExists, resolveExecutable)
-  }
+  const candidates = moduleDirectory
+    ? createAncestorCliCandidates({
+        startDirectory: moduleDirectory,
+        packageRel: PACKAGE_REL,
+        distCliRel: DIST_CLI_REL,
+        sourceCliRel: SOURCE_CLI_REL,
+        pathExists,
+        resolveExecutable,
+        isSourceCandidateAvailable: ({ root }) => pathExists(resolve(root, LSP_TOOLS_PACKAGE_REL, DIST_CLI_REL)),
+      })
+    : []
 
   const distCandidate = candidates.find((candidate) => hasCliSuffix(candidate.path, DIST_CLI_REL) && candidate.exists)
   if (distCandidate) {

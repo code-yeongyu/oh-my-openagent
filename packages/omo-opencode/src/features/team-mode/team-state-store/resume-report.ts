@@ -1,7 +1,1 @@
-export interface ResumeReport {
-  resumed: number
-  marked_failed: number
-  marked_orphaned: number
-  cleaned: number
-  errors: Error[]
-}
+export * from "@oh-my-opencode/team-core/team-state-store/resume-report"

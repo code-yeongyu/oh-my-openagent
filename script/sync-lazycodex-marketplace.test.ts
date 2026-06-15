@@ -30,6 +30,20 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   })
   await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "hooks", "hooks.json"), {
     hooks: {
+      SessionStart: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: 'node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start',
+              commandWindows:
+                'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\bootstrap.ps1"',
+              timeout: 30,
+              statusMessage: "LazyCodex(1.2.3): Checking Bootstrap Provisioning",
+            },
+          ],
+        },
+      ],
       PostToolUse: [
         {
           hooks: [
@@ -41,6 +55,29 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
           ],
         },
       ],
+    },
+  })
+  await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "hooks", "hooks.json"), {
+    hooks: {
+      SessionStart: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: 'node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start',
+              commandWindows:
+                'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\bootstrap.ps1"',
+              timeout: 30,
+              statusMessage: "LazyCodex(1.2.3): Checking Bootstrap Provisioning",
+            },
+          ],
+        },
+      ],
+    },
+  })
+  await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", ".mcp.json"), {
+    mcpServers: {
+      lsp: { command: "node", args: ["../../../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." },
     },
   })
   await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
@@ -62,6 +99,10 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts", "bootstrap.ps1"), "exit 0\n")
   await mkdir(join(sourceRoot, "packages", "ast-grep-mcp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "ast-grep-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "git-bash-mcp", "dist"), { recursive: true })
@@ -290,6 +331,111 @@ describe("sync-lazycodex-marketplace", () => {
     }
     expect(daemonDistMissing).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
+  })
+
+  test("#given complete tree with bootstrap command and commandWindows targets #when syncing marketplace #then bundle validation passes", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-complete-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-complete-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+
+    // when
+    await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+
+    // then
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "bootstrap", "dist", "cli.js"))).isFile()).toBe(true)
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "bootstrap", "scripts", "bootstrap.ps1"))).isFile()).toBe(true)
+    const nestedMcpManifest = JSON.parse(
+      await readFile(join(lazycodexRoot, "plugins", "omo", "components", "lsp", ".mcp.json"), "utf8"),
+    )
+    expect(nestedMcpManifest.mcpServers.lsp.args[0]).toBe("../../../../lsp-daemon/dist/cli.js")
+  })
+
+  test("#given missing bootstrap commandWindows target #when syncing marketplace #then rejects naming the bootstrap.ps1 path", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-missing-ps1-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-missing-ps1-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await rm(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts", "bootstrap.ps1"))
+
+    // when
+    let message = ""
+    try {
+      await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+
+    // then
+    expect(message).toContain("missing hook command target")
+    expect(message).toContain("components/bootstrap/scripts/bootstrap.ps1")
+  })
+
+  test("#given a zero-byte component dist #when syncing marketplace #then rejects it as zero bytes", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-zero-byte-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-zero-byte-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist", "cli.js"), "")
+
+    // when
+    let message = ""
+    try {
+      await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+
+    // then
+    expect(message).toContain("missing hook command target")
+    expect(message).toContain("components/comment-checker/dist/cli.js")
+    expect(message).toContain("zero bytes")
+  })
+
+  test("#given nested component .mcp.json referencing an absent in-bundle runtime #when syncing marketplace #then rejects the broken bundle", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-nested-mcp-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-nested-mcp-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", ".mcp.json"), {
+      mcpServers: {
+        lsp: { command: "node", args: ["./packages/lsp-tools-mcp/dist/cli.js", "mcp"], cwd: "." },
+      },
+    })
+
+    // when
+    let message = ""
+    try {
+      await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+
+    // then
+    expect(message).toContain("missing MCP runtime path for lsp")
+    expect(message).toContain("packages/lsp-tools-mcp/dist/cli.js")
+  })
+
+  test("#given multiple missing referenced targets #when syncing marketplace #then reports the full list", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-multi-missing-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-multi-missing-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await rm(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist"), { recursive: true, force: true })
+    await rm(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts"), { recursive: true, force: true })
+
+    // when
+    let message = ""
+    try {
+      await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+
+    // then
+    expect(message).toContain("missing hook command target")
+    expect(message).toContain("components/bootstrap/dist/cli.js")
+    expect(message).toContain("components/bootstrap/scripts/bootstrap.ps1")
   })
 
   test("#given a missing lsp-daemon dist without the flag #then still hard-throws", async () => {

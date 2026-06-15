@@ -50,7 +50,7 @@
 **Decision Factors:**
 - Delegation overhead ≈ 10-15 seconds. If task takes less, do it yourself.
 - If you already have full context loaded, do it yourself.
-- If task requires specialized expertise (frontend-ui-ux, git operations), delegate.
+- If task requires specialized expertise (frontend, git operations), delegate.
 - If you need information from multiple sources, fire parallel background agents.
 
 ## AVAILABLE RESOURCES
@@ -88,7 +88,7 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNO
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
-read_file(filePath="known/important/file.ts")
+read_file(filePath="known/important/file")
 
 // Collect background results when ready
 deep_context = background_output(task_id=...)

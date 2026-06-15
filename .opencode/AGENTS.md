@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Project-scope OpenCode configuration: 5 skills and 5 slash commands committed alongside the source. Picked up by [`packages/omo-opencode/src/features/opencode-skill-loader/`](packages/omo-opencode/src/features/opencode-skill-loader/) and the slash-command discovery pipeline.
+Project-scope OpenCode configuration: 5 skills and 5 slash commands committed alongside the source. Picked up by [`packages/omo-opencode/src/features/opencode-skill-loader/`](../packages/omo-opencode/src/features/opencode-skill-loader/) and the slash-command discovery pipeline.
 
 **Relationship to `.agents/`:** `.agents/` is the migration target during the `oh-my-opencode` → `oh-my-openagent` rename. It is a SUPERSET of `.opencode/` (mirrors all 5 skills + adds 5 more, mirrors the 5 commands). Both directories load during the transition; consumers should prefer `.agents/`.
 
@@ -38,7 +38,7 @@ Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `refer
 
 ## CONVENTIONS
 
-- **Skill YAML frontmatter is mandatory.** [`opencode-skill-loader`](packages/omo-opencode/src/features/opencode-skill-loader/) rejects skills without `name` + `description`.
+- **Skill YAML frontmatter is mandatory.** [`opencode-skill-loader`](../packages/omo-opencode/src/features/opencode-skill-loader/) rejects skills without `name` + `description`.
 - **Project-scope > user-scope.** A skill at `.opencode/skills/X/` overrides `~/.config/opencode/skills/X/` of the same name.
 - **Trigger words** in the skill description determine when OpenCode loads the skill. Be specific.
 - **Commands are user-visible.** Name them with a leading `/` (the loader normalizes filename → command).

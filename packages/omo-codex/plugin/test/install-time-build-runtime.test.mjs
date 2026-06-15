@@ -6,17 +6,16 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test("#given aggregate build scripts #when inspected #then install-time build does not invoke Bun", async () => {
+test("#given aggregate build scripts #when inspected #then component CLIs are bundled with Bun", async () => {
 	// given
 	const buildComponentsScript = await readFile(join(root, "scripts", "build-components.mjs"), "utf8");
-	const buildBundledMcpRuntimesScript = await readFile(join(root, "scripts", "build-bundled-mcp-runtimes.mjs"), "utf8");
 
 	// when
-	const installTimeBuildScripts = [buildComponentsScript, buildBundledMcpRuntimesScript].join("\n");
+	const componentBuildScript = buildComponentsScript;
 
 	// then
-	assert.doesNotMatch(installTimeBuildScripts, /spawnSync\("bun"/);
-	assert.doesNotMatch(installTimeBuildScripts, /\bbun\s+run\b/);
+	assert.match(componentBuildScript, /run\("bun", \["build", entry, "--target", "node", "--format", "esm", "--outfile", output\]/);
+	assert.doesNotMatch(componentBuildScript, /\bbun\s+run\b/);
 });
 
 test("#given aggregate build scripts #when inspected #then npm subprocesses resolve on Windows", async () => {

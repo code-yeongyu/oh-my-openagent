@@ -5,7 +5,8 @@ import * as builtinCommands from "../features/builtin-commands";
 import * as commandLoader from "../features/claude-code-command-loader";
 import * as mcpLoader from "../features/claude-code-mcp-loader";
 import * as skillLoader from "../features/opencode-skill-loader";
-import type { OhMyOpenCodeConfig } from "../config";
+import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../config";
+import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 import type { PluginComponents } from "./plugin-components-loader";
 import { applyCommandConfig } from "./command-config-handler";
 import {
@@ -33,6 +34,13 @@ function createPluginConfig(): OhMyOpenCodeConfig {
       git_env_prefix: "GIT_MASTER=1",
     },
   };
+}
+
+function createParsedPluginConfig(overrides: Record<string, unknown>): OhMyOpenCodeConfig {
+  return OhMyOpenCodeConfigSchema.parse({
+    ...createPluginConfig(),
+    ...overrides,
+  });
 }
 
 describe("applyCommandConfig", () => {
@@ -308,6 +316,63 @@ describe("applyCommandConfig", () => {
     });
     const controlCommandConfig = controlConfig.command as Record<string, unknown>;
     expect(controlCommandConfig["debugging"]).toBeDefined();
+  });
+
+  for (const [label, skills] of [
+    ["skills.disable", { disable: ["debugging"] }],
+    ["skills.<name>: false", { debugging: false }],
+    ["skills.<name>.disable: true", { debugging: { disable: true } }],
+  ] as const) {
+    test(`#given ${label} disables debugging #then no /debugging command registers`, async () => {
+      // given
+      const pluginConfig = createParsedPluginConfig({
+        skills,
+      });
+      const config: Record<string, unknown> = { command: {} };
+
+      // when
+      await applyCommandConfig({
+        config,
+        pluginConfig,
+        ctx: { directory: "/tmp" },
+        pluginComponents: createPluginComponents(),
+      });
+
+      // then
+      const commandConfig = config.command as Record<string, unknown>;
+      expect(commandConfig["debugging"]).toBeUndefined();
+    });
+  }
+
+  test("#given mixed-case config-source skill disabled by skills.disable #then no hostile slash command registers", async () => {
+    // given
+    const poisonedSkill: LoadedSkill = {
+      name: "Project-Poison",
+      definition: {
+        name: "Project-Poison",
+        description: "HOSTILE DESCRIPTION TEXT should never reach command config",
+        template: "poisoned template",
+      },
+      scope: "config",
+    };
+    discoverConfigSourceSkillsSpy.mockResolvedValueOnce([poisonedSkill]).mockResolvedValueOnce([]);
+    const pluginConfig = createParsedPluginConfig({
+      skills: { disable: ["project-poison"] },
+    });
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then
+    const commandConfig = config.command as Record<string, unknown>;
+    expect(commandConfig["Project-Poison"]).toBeUndefined();
+    expect(JSON.stringify(commandConfig)).not.toContain("HOSTILE DESCRIPTION TEXT");
   });
 
   test("includes host config skills declared in config.skills.paths by other plugins", async () => {

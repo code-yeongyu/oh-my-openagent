@@ -16,12 +16,16 @@ test("#given synced lcx-report-bug skill #when inspected #then it files LazyCode
 
 	// then
 	assert.match(skill, /^---\r?\nname: lcx-report-bug\r?\n/m);
+	assert.match(skill, /Never create a PR or push a branch against `code-yeongyu\/lazycodex`/);
+	assert.match(skill, /gh pr create --repo openai\/codex/);
+	assert.doesNotMatch(skill, /gh pr create --repo "\$TARGET_REPO"/);
+	assert.doesNotMatch(skill, /gh pr create --repo code-yeongyu\/lazycodex/);
 	assert.match(interfaceMetadata, /display_name: "lcx-report-bug \(omo\)"/);
 	assert.match(interfaceMetadata, /- "lazycodex bug"/);
 	assert.match(interfaceMetadata, /- "openai codex bug"/);
 });
 
-test("#given synced lcx-contribute-bug-fix skill #when inspected #then it contributes LazyCodex bug-fix PRs from fresh temp workspaces", async () => {
+test("#given synced lcx-contribute-bug-fix skill #when inspected #then it delivers LazyCodex fixes as issues and upstream fixes as fork PRs", async () => {
 	// given
 	const skillRoot = join(root, "skills", "lcx-contribute-bug-fix");
 
@@ -31,6 +35,11 @@ test("#given synced lcx-contribute-bug-fix skill #when inspected #then it contri
 
 	// then
 	assert.match(skill, /^---\r?\nname: lcx-contribute-bug-fix\r?\n/m);
+	assert.match(skill, /NEVER open a PR or push a branch against this repo/);
+	assert.match(skill, /gh issue create --repo code-yeongyu\/lazycodex/);
+	assert.match(skill, /gh pr create --repo openai\/codex/);
+	assert.doesNotMatch(skill, /gh pr create --repo "\$TARGET_REPO"/);
+	assert.doesNotMatch(skill, /gh pr create --repo code-yeongyu\/lazycodex/);
 	assert.match(interfaceMetadata, /display_name: "lcx-contribute-bug-fix \(omo\)"/);
 	assert.match(interfaceMetadata, /- "contribute a bug fix"/);
 	assert.match(interfaceMetadata, /- "fix bug pr"/);

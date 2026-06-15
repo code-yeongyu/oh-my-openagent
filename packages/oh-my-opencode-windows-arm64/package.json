@@ -1,0 +1,19 @@
+{
+  "name": "oh-my-opencode-windows-arm64",
+  "version": "4.10.0",
+  "description": "Platform-specific binary for oh-my-opencode (windows-arm64)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/code-yeongyu/oh-my-openagent"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin"
+  ]
+}

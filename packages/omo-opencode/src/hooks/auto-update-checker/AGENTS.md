@@ -47,5 +47,5 @@ Three `zauc-mocks-*` directories in `src/hooks/` exist specifically to test this
 
 ## CROSS-REFERENCES
 
-- Parent: [`src/hooks/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/AGENTS.md) -- Session Tier hook list
-- [`src/cli/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/cli/AGENTS.md) -- CLI uses the same npm dist-tag helpers
+- Parent: [`src/hooks/AGENTS.md`](../AGENTS.md) -- Session Tier hook list
+- [`src/cli/AGENTS.md`](../../cli/AGENTS.md) -- CLI uses the same npm dist-tag helpers

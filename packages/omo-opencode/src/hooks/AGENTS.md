@@ -21,14 +21,13 @@
 
 Total exposed hooks: **53 base, 60 with team-mode** (counts the 4 team-session-events handlers individually).
 
-Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
+Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](../config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
 
-### Tier 1: Session Hooks (24)
+### Tier 1: Session Hooks (23)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
 | `preemptiveCompaction` | session.idle | Trigger compaction before limit |
-| `sessionRecovery` | session.error | Recover from structural errors (tool_result_missing, thinking_block_order) |
 | `sessionNotification` | session.idle | OS notifications on completion |
 | `thinkMode` | chat.params | Model variant switching for extended thinking |
 | `anthropicContextWindowLimitRecovery` | session.error | Multi-strategy context recovery (truncation, compaction, dedup) |
@@ -105,13 +104,13 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 
 | Hook | Tier | Registered In | Purpose |
 |------|------|---------------|---------|
-| `team-mode-status-injector` | Transform | [`create-transform-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/hooks/create-transform-hooks.ts) | Inject `<team_mode_status>` block into messages |
-| `team-mailbox-injector` | Transform | [`create-transform-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/hooks/create-transform-hooks.ts) | Pull pending team mailbox messages into agent context |
-| `team-tool-gating` | Tool Guard | [`create-tool-guard-hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/hooks/create-tool-guard-hooks.ts) | Restrict `team_*` tools based on member role + permissions |
-| `team-idle-wake-hint` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/event.ts) | Nudge idle team members back to work |
-| `team-lead-orphan-handler` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/event.ts) | Detect lead departure → orphan members |
-| `team-member-error-handler` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/event.ts) | React to member session errors |
-| `team-member-status-handler` | event handler | [`src/plugin/event.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/plugin/event.ts) | Track member status transitions |
+| `team-mode-status-injector` | Transform | [`create-transform-hooks.ts`](../plugin/hooks/create-transform-hooks.ts) | Inject `<team_mode_status>` block into messages |
+| `team-mailbox-injector` | Transform | [`create-transform-hooks.ts`](../plugin/hooks/create-transform-hooks.ts) | Pull pending team mailbox messages into agent context |
+| `team-tool-gating` | Tool Guard | [`create-tool-guard-hooks.ts`](../plugin/hooks/create-tool-guard-hooks.ts) | Restrict `team_*` tools based on member role + permissions |
+| `team-idle-wake-hint` | event handler | [`src/plugin/event.ts`](../plugin/event.ts) | Nudge idle team members back to work |
+| `team-lead-orphan-handler` | event handler | [`src/plugin/event.ts`](../plugin/event.ts) | Detect lead departure → orphan members |
+| `team-member-error-handler` | event handler | [`src/plugin/event.ts`](../plugin/event.ts) | React to member session errors |
+| `team-member-status-handler` | event handler | [`src/plugin/event.ts`](../plugin/event.ts) | Track member status transitions |
 
 The 4 `team-session-events/` handlers live in `src/hooks/team-session-events/` (separate files: `team-idle-wake-hint.ts`, `team-lead-orphan-handler.ts`, `team-member-error-handler.ts`, `team-member-status-handler.ts`) and are wired into `src/plugin/event.ts` directly, not through a tier composer.
 
@@ -139,7 +138,7 @@ hooks/
    - Continuation/idle? → `create-continuation-hooks.ts`
    - Skill awareness? → `create-skill-hooks.ts`
    - Team-mode-only? → register inside the team-mode conditional block
-3. Add hook name to [`config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/config/schema/hooks.ts) `HookNameSchema`
+3. Add hook name to [`config/schema/hooks.ts`](../config/schema/hooks.ts) `HookNameSchema`
 4. Cover with co-located `*.test.ts` (given/when/then style)
 
 ## NOTES

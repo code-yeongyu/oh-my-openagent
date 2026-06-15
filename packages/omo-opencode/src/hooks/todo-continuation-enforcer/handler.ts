@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { handedBackSyncSessions } from "../../features/claude-code-session-state"
 import {
   clearContinuationMarker,
 } from "../../features/run-continuation-state"
@@ -132,6 +133,7 @@ export function createTodoContinuationHandler(args: {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         clearContinuationMarker(ctx.directory, sessionID)
+        handedBackSyncSessions.delete(sessionID)
       }
     }
 

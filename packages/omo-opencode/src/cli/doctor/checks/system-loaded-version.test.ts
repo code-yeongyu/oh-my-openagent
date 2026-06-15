@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { PACKAGE_NAME } from "../constants"
+import { PACKAGE_NAME } from "../framework/constants"
 import { ACCEPTED_PACKAGE_NAMES, PLUGIN_NAME } from "../../../shared/plugin-identity"
 import { resolveSymlink } from "../../../shared/file-utils"
 
@@ -131,6 +131,61 @@ describe("system loaded version", () => {
       expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(configDir, "node_modules", PLUGIN_NAME, "package.json")))
       expect(loadedVersion.expectedVersion).toBe("5.6.7")
       expect(loadedVersion.loadedVersion).toBe("5.6.7")
+    })
+
+    it("detects installs under OpenCode's packages/<name>@<tag> directory", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-")
+      const cacheDir = join(cacheHome, "opencode")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      const taggedInstallDir = join(cacheDir, "packages", `${PLUGIN_NAME}@latest`)
+      writeJson(join(taggedInstallDir, "package.json"), {
+        dependencies: { [PLUGIN_NAME]: "8.8.8" },
+      })
+      writeJson(join(taggedInstallDir, "node_modules", PLUGIN_NAME, "package.json"), {
+        version: "8.8.8",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(taggedInstallDir, "node_modules", PLUGIN_NAME, "package.json")))
+      expect(loadedVersion.cachePackagePath).toBe(expectedPath(join(taggedInstallDir, "package.json")))
+      expect(loadedVersion.expectedVersion).toBe("8.8.8")
+      expect(loadedVersion.loadedVersion).toBe("8.8.8")
+    })
+
+    it("prefers the flat node_modules install over a packages/<name>@<tag> install in the same root", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-")
+      const cacheDir = join(cacheHome, "opencode")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      writeJson(join(cacheDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "3.3.3" },
+      })
+      writeJson(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "3.3.3",
+      })
+      const taggedInstallDir = join(cacheDir, "packages", `${PLUGIN_NAME}@latest`)
+      writeJson(join(taggedInstallDir, "node_modules", PLUGIN_NAME, "package.json"), {
+        version: "8.8.8",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")))
+      expect(loadedVersion.loadedVersion).toBe("3.3.3")
     })
 
     it("falls back to require.resolve when neither config nor cache directory has an install", () => {

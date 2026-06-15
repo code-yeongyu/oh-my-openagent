@@ -1,0 +1,165 @@
+QA_ROOT=<QA_ROOT>
+CODEX_HOME=<QA_ROOT>/codex
+CODEX_LOCAL_BIN_DIR=<QA_ROOT>/bin
+REAL_CONFIG_BEFORE=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  <HOME>/.codex/config.toml
+
+up to date, audited 85 packages in 362ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @sisyphuslabs/omo-codex-plugin@4.10.0 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 4.10.0 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled ast-grep-mcp dist
+Using bundled git-bash-mcp dist
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 11 modules in 3ms
+
+  cli.js  19.23 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 11 modules in 3ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 2ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 52 modules in 6ms
+
+  cli.js  159.1 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 52 modules in 5ms
+
+  cli.js  159.32 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.10.0 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.10.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
+
+Bundling components/lsp/dist/cli.js
+Bundled 6 modules in 5ms
+
+  cli.js  124.72 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 9ms
+
+  cli.js  204.83 KB  (entry point)
+
+Bundled 76 modules in 7ms
+
+  posthog.js  202.41 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 6ms
+
+  cli.js  204.57 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 16 modules in 4ms
+
+  cli.js  14.14 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 16 modules in 4ms
+
+  cli.js  14.32 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 23 modules in 4ms
+
+  cli.js  103.35 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.10.0 build
+> node scripts/sync-directive.mjs && tsc -p tsconfig.build.json
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 3 modules in 2ms
+
+  cli.js  5.31 KB  (entry point)
+
+Building components/bootstrap (standalone)
+
+> @sisyphuslabs/codex-bootstrap@4.10.0 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+
+  dist/cli.js  102.8kb
+
+⚡ Done in 5ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 35 modules in 4ms
+
+  cli.js  105.69 KB  (entry point)
+
+Building components/lazycodex-executor-verify (standalone)
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 2ms
+
+  cli.js  8.26 KB  (entry point)
+
+
+added 12 packages, and audited 29 packages in 650ms
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+Installed 1 plugin(s) from sisyphuslabs.
+REAL_CONFIG_AFTER=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  <HOME>/.codex/config.toml
+LEGACY_CONFIG_PRESENT=no
+LEGACY_FILE_PRESENT=no
+USER_FILE_CONTENT=name = "user-custom"|model = "gpt-5.5"|
+OMO_PLUGIN_ENABLED=yes
+REAL_SURFACE_RESULT=PASS

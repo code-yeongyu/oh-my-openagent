@@ -4,9 +4,9 @@
 
 ## OVERVIEW
 
-Transform Tier hook on `messages.transform`. Scans the first user message for mode keywords and injects mode-specific system prompts. The detector and routing logic stay in `src/hooks/keyword-detector/`; prompt bodies now live in [`packages/prompts-core/prompts/`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/) so they can be shared by future harness adapters.
+Transform Tier hook on `messages.transform`. Scans the first user message for mode keywords and injects mode-specific system prompts. The detector and routing logic stay in `src/hooks/keyword-detector/`; prompt bodies now live in [`packages/prompts-core/prompts/`](../../../../prompts-core/prompts) so they can be shared by future harness adapters.
 
-This matches the package layering direction in [`ROADMAP.md`](file:///Users/yeongyu/local-workspaces/omo/ROADMAP.md): `packages/prompts-core` owns static prompt content, while this OpenCode hook owns keyword detection, model routing, and message injection.
+This matches the package layering direction in [`ROADMAP.md`](../../../../../ROADMAP.md): `packages/prompts-core` owns static prompt content, while this OpenCode hook owns keyword detection, model routing, and message injection.
 
 ## KEYWORDS
 
@@ -45,25 +45,25 @@ keyword-detector/
 
 | Prompt family | Markdown source |
 |---------------|-----------------|
-| Ultrawork default | [`packages/prompts-core/prompts/ultrawork/default.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/default.md) |
-| Ultrawork GPT | [`packages/prompts-core/prompts/ultrawork/gpt.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/gpt.md) |
-| Ultrawork Gemini | [`packages/prompts-core/prompts/ultrawork/gemini.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/gemini.md) |
-| Ultrawork planner | [`packages/prompts-core/prompts/ultrawork/planner.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/ultrawork/planner.md) |
-| Team mode | [`packages/prompts-core/prompts/mode/team.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/mode/team.md) |
-| Hyperplan mode | [`packages/prompts-core/prompts/mode/hyperplan.md`](file:///Users/yeongyu/local-workspaces/omo/packages/prompts-core/prompts/mode/hyperplan.md) |
+| Ultrawork default | [`packages/prompts-core/prompts/ultrawork/default.md`](../../../../prompts-core/prompts/ultrawork/default.md) |
+| Ultrawork GPT | [`packages/prompts-core/prompts/ultrawork/gpt.md`](../../../../prompts-core/prompts/ultrawork/gpt.md) |
+| Ultrawork Gemini | [`packages/prompts-core/prompts/ultrawork/gemini.md`](../../../../prompts-core/prompts/ultrawork/gemini.md) |
+| Ultrawork planner | [`packages/prompts-core/prompts/ultrawork/planner.md`](../../../../prompts-core/prompts/ultrawork/planner.md) |
+| Team mode | [`packages/prompts-core/prompts/mode/team.md`](../../../../prompts-core/prompts/mode/team.md) |
+| Hyperplan mode | [`packages/prompts-core/prompts/mode/hyperplan.md`](../../../../prompts-core/prompts/mode/hyperplan.md) |
 
 The `src/hooks/keyword-detector/{team,hyperplan}/default.ts` files keep the regex triggers in the hook layer and import the markdown-backed constants from `@oh-my-opencode/prompts-core`. The ultrawork files import markdown with Bun's `.md` text loader so the exact prompt bytes are bundled into `dist/index.js`.
 
 ## ULTRAWORK VARIANT ROUTING
 
-[`ultrawork/source-detector.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/keyword-detector/ultrawork/source-detector.ts) decides the ultrawork source in priority order:
+[`ultrawork/source-detector.ts`](ultrawork/source-detector.ts) decides the ultrawork source in priority order:
 
 1. Planner agents (`prometheus`, `planner`, or normalized `plan`) route to `planner.md`.
 2. GPT family models, as detected by `isGptModel(modelID)`, route to `gpt.md`.
 3. Gemini family models, as detected by `isGeminiModel(modelID)`, route to `gemini.md`.
 4. Everything else routes to `default.md`.
 
-[`ultrawork/index.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/hooks/keyword-detector/ultrawork/index.ts) exposes `getUltraworkMessage(agentName, modelID)`, switches on that source, and returns the loaded markdown body.
+[`ultrawork/index.ts`](ultrawork/index.ts) exposes `getUltraworkMessage(agentName, modelID)`, switches on that source, and returns the loaded markdown body.
 
 ## DETECTION LOGIC
 
@@ -89,7 +89,7 @@ chat.message (user input)
 }
 ```
 
-Default: empty/missing means every detector is active. Schema lives at [`src/config/schema/keyword-detector.ts`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-opencode/src/config/schema/keyword-detector.ts).
+Default: empty/missing means every detector is active. Schema lives at [`src/config/schema/keyword-detector.ts`](../../config/schema/keyword-detector.ts).
 
 ## GUARDS
 

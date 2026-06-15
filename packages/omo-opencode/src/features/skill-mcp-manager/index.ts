@@ -1,2 +1,1 @@
-export * from "./types"
-export { SkillMcpManager } from "./manager"
+export * from "@oh-my-opencode/mcp-client-core/skill-mcp-manager"

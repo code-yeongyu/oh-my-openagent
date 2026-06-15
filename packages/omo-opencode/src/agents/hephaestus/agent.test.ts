@@ -5,6 +5,7 @@ import {
   getHephaestusPromptSource,
   getHephaestusPrompt,
   createHephaestusAgent,
+  UnsupportedHephaestusModelError,
 } from "./index";
 
 describe("getHephaestusPromptSource", () => {
@@ -56,11 +57,11 @@ describe("getHephaestusPromptSource", () => {
     expect(source2).toBe("gpt-5-5");
   });
 
-  test("returns 'gpt' for generic GPT models", () => {
+  test("returns 'gpt' for GPT 5.3 Codex models", () => {
     // given
-    const model1 = "openai/gpt-4o";
-    const model2 = "github-copilot/gpt-4o";
-    const model3 = "openai/gpt-4o";
+    const model1 = "openai/gpt-5.3-codex";
+    const model2 = "github-copilot/gpt-5-3-codex";
+    const model3 = "opencode/gpt-5.3-codex-spark";
 
     // when
     const source1 = getHephaestusPromptSource(model1);
@@ -73,18 +74,27 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt");
   });
 
-  test("returns 'gpt' for non-GPT models and undefined", () => {
+  test("throws for generic GPT, unsupported GPT 5.x, non-GPT, and undefined models", () => {
     // given
-    const model1 = "anthropic/claude-opus-4-7";
-    const model2 = undefined;
+    const model1 = "openai/gpt-4o";
+    const model2 = "openai/gpt-5.9";
+    const model3 = "openai/gpt-5.10";
+    const model4 = "anthropic/claude-opus-4-7";
+    const model5 = undefined;
 
     // when
-    const source1 = getHephaestusPromptSource(model1);
-    const source2 = getHephaestusPromptSource(model2);
+    const getSource1 = () => getHephaestusPromptSource(model1);
+    const getSource2 = () => getHephaestusPromptSource(model2);
+    const getSource3 = () => getHephaestusPromptSource(model3);
+    const getSource4 = () => getHephaestusPromptSource(model4);
+    const getSource5 = () => getHephaestusPromptSource(model5);
 
     // then
-    expect(source1).toBe("gpt");
-    expect(source2).toBe("gpt");
+    expect(getSource1).toThrow(UnsupportedHephaestusModelError);
+    expect(getSource2).toThrow(UnsupportedHephaestusModelError);
+    expect(getSource3).toThrow(UnsupportedHephaestusModelError);
+    expect(getSource4).toThrow(UnsupportedHephaestusModelError);
+    expect(getSource5).toThrow(UnsupportedHephaestusModelError);
   });
 });
 
@@ -130,9 +140,9 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("Autonomy and Persistence");
   });
 
-  test("generic GPT model returns generic GPT prompt", () => {
+  test("GPT 5.3 Codex model returns generic GPT prompt", () => {
     // given
-    const model = "openai/gpt-4o";
+    const model = "openai/gpt-5.3-codex";
 
     // when
     const prompt = getHephaestusPrompt(model);
@@ -143,16 +153,15 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).not.toContain("intent_extraction");
   });
 
-  test("Claude model returns generic GPT prompt (Hephaestus default)", () => {
+  test("Claude model is rejected", () => {
     // given
     const model = "anthropic/claude-opus-4-7";
 
     // when
-    const prompt = getHephaestusPrompt(model);
+    const getPrompt = () => getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("autonomous deep worker");
-    expect(prompt).toContain("Hephaestus");
+    expect(getPrompt).toThrow(UnsupportedHephaestusModelError);
   });
 
   test("useTaskSystem=true includes Task Discipline for GPT models", () => {
@@ -168,9 +177,9 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("task_update");
   });
 
-  test("useTaskSystem=false includes Todo Discipline for Claude models", () => {
+  test("useTaskSystem=false includes Todo Discipline for supported GPT models", () => {
     // given
-    const model = "anthropic/claude-opus-4-7";
+    const model = "openai/gpt-5.4";
 
     // when
     const prompt = getHephaestusPrompt(model, false);
@@ -213,8 +222,8 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("You build context by examining");
     expect(config.prompt).toContain("Never chain together bash commands");
     expect(config.prompt).toContain("<tool_usage_rules>");
-    expect(config.prompt).toContain("Do not use `apply_patch`");
-    expect(config.prompt).toContain("`edit` and `write`");
+    expect(config.prompt).toContain("Use `apply_patch`");
+    expect(config.prompt).not.toContain("Do not use `apply_patch`");
   });
 
   test("GPT 5.5 model includes GPT-5.5 specific prompt content", () => {
@@ -228,8 +237,8 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("based on GPT-5.5");
     expect(config.prompt).toContain("Manual QA Gate");
     expect(config.prompt).toContain("Forbidden stops");
-    expect(config.prompt).toContain("Do not use `apply_patch`");
-    expect(config.prompt).toContain("`edit` and `write`");
+    expect(config.prompt).toContain("Use `apply_patch`");
+    expect(config.prompt).not.toContain("Do not use `apply_patch`");
   });
 
   test("includes Hephaestus identity in prompt", () => {
@@ -244,33 +253,29 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("autonomous deep worker");
   });
 
-  test("generic GPT model includes apply_patch workaround guidance", () => {
+  test("generic GPT model is rejected", () => {
     // given
     const model = "openai/gpt-4o";
 
     // when
-    const config = createHephaestusAgent(model);
+    const createAgent = () => createHephaestusAgent(model);
 
     // then
-    expect(config.prompt).toContain("Do not use `apply_patch`");
-    expect(config.prompt).toContain("`edit` and `write`");
+    expect(createAgent).toThrow(UnsupportedHephaestusModelError);
   });
 
-  test("GPT models deny apply_patch while non-GPT models do not", () => {
+  test("supported GPT models do not force-deny apply_patch", () => {
     // given
     const gpt54Model = "openai/gpt-5.4";
-    const gptGenericModel = "openai/gpt-4o";
-    const claudeModel = "anthropic/claude-opus-4-7";
+    const gpt53CodexModel = "openai/gpt-5.3-codex";
 
     // when
     const gpt54Config = createHephaestusAgent(gpt54Model);
-    const gptGenericConfig = createHephaestusAgent(gptGenericModel);
-    const claudeConfig = createHephaestusAgent(claudeModel);
+    const gpt53CodexConfig = createHephaestusAgent(gpt53CodexModel);
 
     // then
-    expect(gpt54Config.permission ?? {}).toHaveProperty("apply_patch", "deny");
-    expect(gptGenericConfig.permission ?? {}).toHaveProperty("apply_patch", "deny");
-    expect(claudeConfig.permission ?? {}).not.toHaveProperty("apply_patch");
+    expect(gpt54Config.permission ?? {}).not.toHaveProperty("apply_patch");
+    expect(gpt53CodexConfig.permission ?? {}).not.toHaveProperty("apply_patch");
   });
 
   test("useTaskSystem=true produces Task Discipline prompt", () => {
@@ -303,9 +308,9 @@ import { maybeCreateHephaestusConfig } from "../builtin-agents/hephaestus-agent"
 import type { AgentOverrides } from "../types";
 import type { CategoryConfig } from "../../config/schema";
 
-describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
+describe("maybeCreateHephaestusConfig apply_patch permission", () => {
   describe("#given GPT model with user override allowing apply_patch", () => {
-    test("#when config is created #then apply_patch is still denied", () => {
+    test("#when config is created #then user override is respected", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -334,12 +339,12 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       // then
       expect(config).toBeDefined();
       expect(config?.model).toBe("openai/gpt-5.4");
-      expect(config?.permission).toHaveProperty("apply_patch", "deny");
+      expect(config?.permission).toHaveProperty("apply_patch", "allow");
     });
   });
 
   describe("#given non-GPT model with user override allowing apply_patch", () => {
-    test("#when config is created #then user override is respected", () => {
+    test("#when config is created #then Hephaestus is not registered", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -366,14 +371,12 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       });
 
       // then
-      expect(config).toBeDefined();
-      expect(config?.model).toBe("anthropic/claude-opus-4-7");
-      expect(config?.permission).toHaveProperty("apply_patch", "allow");
+      expect(config).toBeUndefined();
     });
   });
 
   describe("#given generic GPT model with user override allowing apply_patch", () => {
-    test("#when config is created #then apply_patch is still denied", () => {
+    test("#when config is created #then Hephaestus is not registered", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -400,14 +403,12 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       });
 
       // then
-      expect(config).toBeDefined();
-      expect(config?.model).toBe("openai/gpt-4o");
-      expect(config?.permission).toHaveProperty("apply_patch", "deny");
+      expect(config).toBeUndefined();
     });
   });
 
   describe("#given Opus 4.7 model with user override allowing grep and glob", () => {
-    test("#when config is created #then grep and glob are still denied", () => {
+    test("#when config is created #then Hephaestus is not registered", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -435,13 +436,12 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       });
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
+      expect(config).toBeUndefined();
     });
   });
 
   describe("#given dotted Opus 4.7 model with user override allowing grep and glob", () => {
-    test("#when config is created #then grep and glob are still denied", () => {
+    test("#when config is created #then Hephaestus is not registered", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
@@ -469,8 +469,7 @@ describe("maybeCreateHephaestusConfig GPT apply_patch guard", () => {
       });
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
+      expect(config).toBeUndefined();
     });
   });
 

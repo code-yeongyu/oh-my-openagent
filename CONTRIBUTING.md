@@ -86,15 +86,15 @@ After making changes, you can test your local build in OpenCode:
 
    ```json
    {
-     "plugin": ["file:///absolute/path/to/oh-my-opencode/dist/index.js"]
+     "plugin": ["file://./oh-my-opencode/dist/index.js"]
    }
    ```
 
-   For example, if your project is at `/Users/yourname/projects/oh-my-opencode`:
+   For example, if your config is in the parent directory of `oh-my-opencode`:
 
    ```json
    {
-     "plugin": ["file:///Users/yourname/projects/oh-my-opencode/dist/index.js"]
+     "plugin": ["file://./oh-my-opencode/dist/index.js"]
    }
    ```
 
