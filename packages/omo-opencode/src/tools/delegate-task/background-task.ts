@@ -12,6 +12,7 @@ import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { getPersistedBackgroundTaskDescription } from "./background-task-description"
 
 function registerBackgroundSessionContext(args: {
   sessionId: string
@@ -114,8 +115,9 @@ export async function executeBackgroundTask(
     const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
     const normalizedAgent = stripAgentListSortPrefix(agentToUse)
     const effectivePrompt = buildTaskPrompt(args.prompt, normalizedAgent, tddEnabled)
+    const persistedDescription = getPersistedBackgroundTaskDescription(args, normalizedAgent)
     const task = await manager.launch({
-      description: args.description,
+      description: persistedDescription,
       prompt: effectivePrompt,
       agent: normalizedAgent,
       parentSessionId: parentContext.sessionID,
