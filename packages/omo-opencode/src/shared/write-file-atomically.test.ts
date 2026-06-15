@@ -58,6 +58,11 @@ describe("writeFileAtomically", () => {
     })
 
     // then
+    expect(readFileSync(filePath, "utf-8")).toBe("private")
+    if (process.platform === "win32") {
+      expect(tempModes).toHaveLength(1)
+      return
+    }
     expect(tempModes).toEqual([0o600])
     expect(statSync(filePath).mode & 0o777).toBe(0o600)
   })

@@ -183,6 +183,10 @@ describe("tui-sidebar mirror IPC", () => {
     writeMirror(projectDir, expected)
 
     // then
+    expect(readMirror(projectDir)).toEqual(expected)
+    if (process.platform === "win32") {
+      return
+    }
     expect(statSync(mirrorFilePath(projectDir)).mode & 0o777).toBe(0o600)
   })
 
