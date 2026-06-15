@@ -1,7 +1,7 @@
 real_config_hash_before=242c618ca16cefac9a3fd8f1060a9802bf8db26f39e99b4a0d1fdafb9f552370
 isolated_codex_home=<TMP>
 
-up to date, audited 87 packages in 357ms
+up to date, audited 87 packages in 373ms
 
 18 packages are looking for funding
   run `npm fund` for details
@@ -118,14 +118,14 @@ Building components/ulw-loop
 Bundling components/ulw-loop/dist/cli.js
 Bundled 28 modules in 3ms
 
-  cli.js  107.1 KB  (entry point)
+  cli.js  107.53 KB  (entry point)
 
 Building components/ultrawork
 
 > @code-yeongyu/codex-ultrawork@4.10.0 build
 > node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 3 modules in 3ms
+Bundled 3 modules in 2ms
 
   cli.js  5.24 KB  (entry point)
 
@@ -145,7 +145,7 @@ Bundled 36 modules in 5ms
   cli.js  106.58 KB  (entry point)
 
 
-added 13 packages, and audited 31 packages in 577ms
+added 13 packages, and audited 31 packages in 586ms
 
 1 package is looking for funding
   run `npm fund` for details

@@ -4,9 +4,11 @@ Scope:
 - Added essential success-criterion semantics for ulw-loop checkpoints.
 - Non-final aggregate checkpoints require essential criteria only.
 - Final aggregate completion still requires all criteria and the full quality gate.
+- Final aggregate completion checks unresolved criteria across the whole plan, including non-essential criteria left pending by earlier non-final checkpoints.
 - Replaced formatter-ignore/LOC-gaming pressure with cohesive module splits.
 - Reworked stale prompt tests into positive semantic assertions.
 - Repaired component test isolation for temp quality-gate artifacts and Codex session env leakage.
+- Removed the reviewer-flagged deleted-literal rebrand absence test.
 
 Raw command evidence:
 - biome.txt: component Biome lint via `npm run lint`; exit 0.
