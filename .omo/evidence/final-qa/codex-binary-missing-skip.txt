@@ -24,7 +24,7 @@ STDERR: <empty>
 
 Observed worker outcome:
 ```json
-null
+{"error":"codegraph binary unavailable and auto_provision is disabled","projectRoot":"<temp>/missing-workspace","source":"path","action":"skipped-unavailable","timestamp":"2026-06-15T09:16:59.717Z"}
 ```
 
 ## Checks

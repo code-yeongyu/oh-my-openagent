@@ -211,9 +211,16 @@ Saved lockfile
 
 
 INSTALLED_PLUGIN_ROOT=<temp>/codex/plugins/cache/sisyphuslabs/omo/4.10.0
-ISOLATED_CONFIG_EXISTS=false
-ISOLATED_CONFIG_SHA256=missing
+ISOLATED_LEGACY_HOME_CONFIG_EXISTS=false
+ISOLATED_LEGACY_HOME_CONFIG_SHA256=missing
+CODEX_HOME_CONFIG_EXISTS=true
+CODEX_HOME_CONFIG_PATH=<temp>/codex/config.toml
 ```
+
+Note: the `ISOLATED_LEGACY_HOME_CONFIG_*` fields refer to `<temp>/home/.codex/config.toml`.
+That legacy HOME location being absent is expected because this QA installs through the isolated
+`CODEX_HOME=<temp>/codex` path. The installed plugin and hook trust checks below inspect the
+sanitized `CODEX_HOME_CONFIG_PATH`, not the legacy HOME fallback.
 
 ## Real ~/.codex/config.toml after cleanup
 
