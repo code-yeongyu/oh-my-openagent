@@ -7381,13 +7381,17 @@ function parseLeadingJsonString(value) {
 }
 
 // packages/omo-codex/src/install/codex-config-agents.ts
-var MANAGED_CODEX_AGENT_NAMES = [
-  "codex-ultrawork-reviewer",
+var LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"];
+var CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
   "librarian",
   "metis",
   "momus",
   "plan"
+];
+var MANAGED_CODEX_AGENT_NAMES = [
+  ...LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE,
+  ...CURRENT_MANAGED_CODEX_AGENT_NAMES
 ];
 function removeStaleManagedAgentBlocks(config, keepAgentNames) {
   const managedAgentNames = new Set(MANAGED_CODEX_AGENT_NAMES);
@@ -8103,15 +8107,10 @@ async function restorePreservedReasoning(input) {
   const bundledEffort = extractReasoningEffort(content);
   if (bundledEffort === input.value)
     return;
-  if (shouldUseBundledReasoning({ agentName: input.agentName, bundledEffort, preservedEffort: input.value }))
-    return;
   const replacement = replaceReasoningEffort(content, input.value);
   if (!replacement.replaced)
     return;
   await writeFile6(input.linkPath, replacement.content);
-}
-function shouldUseBundledReasoning(input) {
-  return input.agentName === "codex-ultrawork-reviewer" && input.bundledEffort === "high" && input.preservedEffort === "xhigh";
 }
 async function readTextIfExists(path) {
   try {

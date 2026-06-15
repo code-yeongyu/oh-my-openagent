@@ -167,7 +167,7 @@ describe("linkCachedPluginAgents", () => {
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
   })
 
-  test("migrates old reviewer default reasoning to the bundled reviewer default", async () => {
+  test("preserves legacy reviewer reasoning like any other compatibility fixture", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
     const agentsDir = join(codexHome, "agents")
@@ -187,8 +187,8 @@ describe("linkCachedPluginAgents", () => {
 
     // then
     const content = await readFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), "utf8")
-    expect(content).toContain('model_reasoning_effort = "high"')
-    expect(content).not.toContain('model_reasoning_effort = "xhigh"')
+    expect(content).toContain('model_reasoning_effort = "xhigh"')
+    expect(content).not.toContain('model_reasoning_effort = "high"')
   })
 
   test("writes a manifest under the plugin cache listing installed agent paths for clean uninstall", async () => {

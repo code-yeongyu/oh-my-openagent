@@ -66,7 +66,6 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 		.sort();
 
 	assert.deepEqual(entries, [
-		"codex-ultrawork-reviewer.toml",
 		"explorer.toml",
 		"lazycodex-clone-fidelity-reviewer.toml",
 		"lazycodex-code-reviewer.toml",
@@ -104,19 +103,6 @@ test("#given planner agent prompt #when inspected #then generated artifacts stay
 	assert.doesNotMatch(prompt, /(?<!\.omo\/)evidence\/task-/);
 });
 
-test("#given reviewer agent prompt #when inspected #then default model uses bounded reasoning", async () => {
-	const prompt = await readFile(
-		join(root, "components", "ultrawork", "agents", "codex-ultrawork-reviewer.toml"),
-		"utf8",
-	);
-
-	assert.match(prompt, /^model\s*=\s*"gpt-5\.5"$/m);
-	assert.match(prompt, /^model_reasoning_effort\s*=\s*"high"$/m);
-	assert.doesNotMatch(prompt, /^model_reasoning_effort\s*=\s*"xhigh"$/m);
-	assert.doesNotMatch(prompt, /^model\s*=\s*"gpt-5\.2"$/m);
-	assert.match(prompt, /ChatGPT account/);
-});
-
 test("#given lazycodex agent prompts #when inspected #then each role pins model effort and evidence discipline", async () => {
 	const agentsDir = join(root, "components", "ultrawork", "agents");
 
@@ -147,6 +133,7 @@ test("#given LazyCodex reviewer prompts #when inspected #then anti-slop review c
 	assert.match(codeReviewer, /violates either skill perspective/);
 	assert.match(codeReviewer, /overfit\/slop review pass/);
 	assert.match(codeReviewer, /deletion-only tests/);
+	assert.match(codeReviewer, /tests that merely verify a requested removal/);
 	assert.match(codeReviewer, /tautological tests/);
 	assert.match(codeReviewer, /mirror implementation constants/);
 	assert.match(codeReviewer, /unnecessary production data extraction, parsing, or normalization/);
@@ -157,6 +144,9 @@ test("#given LazyCodex reviewer prompts #when inspected #then anti-slop review c
 	assert.match(gateReviewer, /skill-perspective check occurred/);
 	assert.match(gateReviewer, /explain why unavailable/);
 	assert.match(gateReviewer, /code review report explicitly covers the overfit\/slop criterion/);
-	assert.match(gateReviewer, /deletion-only, tautological, implementation-mirroring tests/);
+	assert.match(gateReviewer, /tests that merely verify a requested removal/);
+	assert.match(gateReviewer, /deletion-only/);
+	assert.match(gateReviewer, /tautological/);
+	assert.match(gateReviewer, /implementation-mirroring tests/);
 	assert.match(gateReviewer, /unnecessary production extraction, parsing, or normalization/);
 });

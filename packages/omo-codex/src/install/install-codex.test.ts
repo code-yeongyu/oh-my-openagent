@@ -17,7 +17,6 @@ const STALE_CODEX_COMPONENT_BINS = [
 ] as const
 
 const EXPECTED_CODEX_AGENT_NAMES = [
-  "codex-ultrawork-reviewer",
   "explorer",
   "lazycodex-clone-fidelity-reviewer",
   "lazycodex-code-reviewer",

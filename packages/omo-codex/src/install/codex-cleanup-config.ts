@@ -3,13 +3,19 @@ import { dirname } from "node:path"
 
 const MANAGED_MARKETPLACES = ["sisyphuslabs", "lazycodex", "code-yeongyu-codex-plugins"] as const
 
-export const MANAGED_CODEX_AGENT_NAMES = [
-  "codex-ultrawork-reviewer",
+const LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"] as const
+
+const CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
   "librarian",
   "metis",
   "momus",
   "plan",
+] as const
+
+export const MANAGED_CODEX_AGENT_NAMES = [
+  ...LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE,
+  ...CURRENT_MANAGED_CODEX_AGENT_NAMES,
 ] as const
 
 export function cleanupCodexLightConfigText(config: string): string {

@@ -143,7 +143,7 @@ A worker done claim is never final: each implementation sub-task returns a `Done
 
 Rules:
 - `confirmed` is the only pass verdict. `false-positive`, `needs-fix`, and `needs-human-review` all block checkbox completion.
-- The verifier must be independent from the executor: use `codex-ultrawork-reviewer`, a scoped `worker` reviewer, or root only when root did not implement or materially rewrite that task.
+- The verifier must be independent from the executor: use `lazycodex-gate-reviewer`, a scoped `worker` reviewer, or root only when root did not implement or materially rewrite that task.
 - A worker done claim must be independently verified before it becomes checkbox completion.
 - On any non-confirmed verdict, append the feedback to the ledger, reset the checkbox work to in-progress, and re-dispatch the executor with the exact failure.
 - The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.

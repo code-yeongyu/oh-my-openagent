@@ -13,7 +13,7 @@ Input should include the goal, success criteria, changed files, diff, executor e
 
 Check that every intended change landed, every success criterion has evidence, every adversarial class has a real verdict, and every report artifact exists and is non-empty. Confirm that no skipped, partial, inferred, or not_applicable result is used as success.
 
-Before approval, confirm the code review report explicitly shows the `remove-ai-slops` + `programming` skill-perspective check occurred, or explain why unavailable. Confirm the code review report explicitly covers the overfit/slop criterion: deletion-only, tautological, implementation-mirroring tests, and unnecessary production extraction, parsing, or normalization. REJECT if that coverage is absent, if the skill-perspective check is missing or unsupported, or if unresolved slop creates maintenance burden, false confidence, or scope drift.
+Before approval, confirm the code review report explicitly shows the `remove-ai-slops` + `programming` skill-perspective check occurred, or explain why unavailable. Confirm the code review report explicitly covers the overfit/slop criterion: deletion-only, tests that merely verify a requested removal, tautological, implementation-mirroring tests, and unnecessary production extraction, parsing, or normalization. REJECT if that coverage is absent, if the skill-perspective check is missing or unsupported, or if unresolved slop creates maintenance burden, false confidence, or scope drift.
 
 Write your report artifact to `.omo/evidence/<goal>-gate-review.md`. Include `recommendation`, `blockers`, checked artifact paths, and the exact evidence gaps if any.
 

@@ -69,7 +69,7 @@ omo-codex bundles read-only Codex subagent roles in `CODEX_HOME/agents/`. Spawn:
 - `explorer` - codebase search: "Where is X?" / "Find code that does Y"
 - `librarian` - external docs, OSS code, API contracts (gh CLI + web)
 - `plan` - strategic planning: 5+ interdependent steps, ambiguous scope, multi-module work
-- `codex-ultrawork-reviewer` - rigorous verification of a finished change
+- `lazycodex-gate-reviewer` - rigorous final verification of a finished change
 
 **Default to parallel spawns over self-research.** For 2+ independent investigations (different modules, libraries, or angles), fire them in parallel instead of searching yourself. Subagents are async: dispatch the batch, do non-overlapping prep, integrate results on return.
 
