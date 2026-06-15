@@ -132,7 +132,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       try {
         ensureTuiPluginEntry()
       } catch (error) {
-        void error
+        deps.log("[tui-sidebar] tui.json self-heal failed", {
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
     deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: input.client })

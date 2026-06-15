@@ -52,7 +52,7 @@ type PluginValidation = {
 }
 
 async function loadPluginValidation(directory: string): Promise<PluginValidation> {
-  const { validatePluginConfig } = await import("./features/tui-sidebar/config-validator")
+  const { validatePluginConfig } = await import("./config/validate")
   return validatePluginConfig(directory)
 }
 
