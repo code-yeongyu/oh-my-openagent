@@ -2,6 +2,16 @@ import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:f
 import { basename, join } from "node:path"
 
 const MANIFEST_FILE = ".installed-agents.json"
+const RETIRED_MANAGED_AGENT_FILES = [
+  {
+    fileName: "codex-ultrawork-reviewer.toml",
+    requiredMarkers: [
+      'name = "codex-ultrawork-reviewer"',
+      'description = "Strict ultrawork verification reviewer.',
+      'developer_instructions = """You are the ultrawork verification reviewer.',
+    ],
+  },
+] as const
 
 export interface LinkedAgent {
   readonly name: string
@@ -54,6 +64,7 @@ export async function linkCachedPluginAgents(input: {
   readonly preservedServiceTier?: ReadonlyMap<string, string | null>
 }): Promise<readonly LinkedAgent[]> {
   const bundledAgents = await discoverBundledAgents(input.pluginRoot)
+  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome })
   if (bundledAgents.length === 0) {
     await writeManifest(input.pluginRoot, [])
     return []
@@ -84,6 +95,21 @@ export async function linkCachedPluginAgents(input: {
     linked.map((entry) => entry.path),
   )
   return linked
+}
+
+async function purgeRetiredManagedAgentFiles(input: { readonly codexHome: string }): Promise<void> {
+  const agentsDir = join(input.codexHome, "agents")
+  if (!(await exists(agentsDir))) return
+
+  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
+    const agentPath = join(agentsDir, retiredAgent.fileName)
+    if (!(await exists(agentPath))) continue
+    const agentStat = await lstat(agentPath)
+    if (agentStat.isDirectory() && !agentStat.isSymbolicLink()) continue
+    const content = await readTextIfExists(agentPath)
+    if (content === null || !retiredAgent.requiredMarkers.every((marker) => content.includes(marker))) continue
+    await rm(agentPath, { force: true })
+  }
 }
 
 async function restorePreservedServiceTier(input: {

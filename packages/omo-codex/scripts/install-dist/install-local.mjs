@@ -7984,6 +7984,16 @@ function toCodexResolution(resolution) {
 import { copyFile, lstat as lstat6, mkdir as mkdir6, readFile as readFile11, readdir as readdir4, rm as rm5, writeFile as writeFile6 } from "node:fs/promises";
 import { basename as basename4, join as join14 } from "node:path";
 var MANIFEST_FILE = ".installed-agents.json";
+var RETIRED_MANAGED_AGENT_FILES = [
+  {
+    fileName: "codex-ultrawork-reviewer.toml",
+    requiredMarkers: [
+      'name = "codex-ultrawork-reviewer"',
+      'description = "Strict ultrawork verification reviewer.',
+      'developer_instructions = """You are the ultrawork verification reviewer.'
+    ]
+  }
+];
 async function capturePreservedAgentReasoning(input) {
   const agentsDir = join14(input.codexHome, "agents");
   if (!await exists3(agentsDir))
@@ -8020,6 +8030,7 @@ async function capturePreservedAgentServiceTier(input) {
 }
 async function linkCachedPluginAgents(input) {
   const bundledAgents = await discoverBundledAgents(input.pluginRoot);
+  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome });
   if (bundledAgents.length === 0) {
     await writeManifest(input.pluginRoot, []);
     return [];
@@ -8047,6 +8058,23 @@ async function linkCachedPluginAgents(input) {
   }
   await writeManifest(input.pluginRoot, linked.map((entry) => entry.path));
   return linked;
+}
+async function purgeRetiredManagedAgentFiles(input) {
+  const agentsDir = join14(input.codexHome, "agents");
+  if (!await exists3(agentsDir))
+    return;
+  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
+    const agentPath = join14(agentsDir, retiredAgent.fileName);
+    if (!await exists3(agentPath))
+      continue;
+    const agentStat = await lstat6(agentPath);
+    if (agentStat.isDirectory() && !agentStat.isSymbolicLink())
+      continue;
+    const content = await readTextIfExists(agentPath);
+    if (content === null || !retiredAgent.requiredMarkers.every((marker) => content.includes(marker)))
+      continue;
+    await rm5(agentPath, { force: true });
+  }
 }
 async function restorePreservedServiceTier(input) {
   if (!input.preserved)
