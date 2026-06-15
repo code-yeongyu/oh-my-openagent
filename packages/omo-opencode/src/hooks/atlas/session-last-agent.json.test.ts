@@ -113,4 +113,32 @@ describe("getLastAgentFromSession JSON backend", () => {
     // then
     expect(result).toBe("sisyphus-junior")
   })
+
+  test("falls back to SDK messages when JSON message directory lookup fails", async () => {
+    // given
+    const sessionID = "ses_json_missing_message_dir"
+    const missingMessageDir = join(TEST_MESSAGE_STORAGE, sessionID)
+    rmSync(missingMessageDir, { recursive: true, force: true })
+    const client = {
+      session: {
+        messages: async () => ({
+          data: [
+            { id: "msg_0001", info: { agent: "sisyphus", time: { created: 100 } } },
+            { id: "msg_0002", info: { agent: "atlas", time: { created: 200 } } },
+          ],
+        }),
+      },
+    }
+
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
+
+    // when
+    const result = await getLastAgentFromSession(sessionID, client, {
+      isSqliteBackend: () => false,
+      getMessageDir: () => missingMessageDir,
+    })
+
+    // then
+    expect(result).toBe("atlas")
+  })
 })

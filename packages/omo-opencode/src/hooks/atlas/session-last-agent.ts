@@ -122,6 +122,9 @@ export async function getLastAgentFromSession(
     }
   } catch (error) {
     if (!(error instanceof Error)) throw error
+    if (client) {
+      return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+    }
     return null
   }
 
