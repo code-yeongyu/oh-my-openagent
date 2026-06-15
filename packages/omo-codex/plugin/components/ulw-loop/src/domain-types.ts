@@ -69,10 +69,17 @@ export interface UlwLoopPlan {
 	goals: UlwLoopItem[];
 }
 
+export interface UlwLoopCriteriaCoverage {
+	totalCriteria: number;
+	passCount: number;
+	adversarialClassesCovered: string[];
+}
+
 export interface UlwLoopQualityGate {
 	aiSlopCleaner: { status: "passed"; evidence: string };
 	verification: { status: "passed"; commands: string[]; evidence: string };
 	codeReview: { recommendation: "APPROVE"; architectStatus: "CLEAR"; evidence: string };
+	criteriaCoverage: UlwLoopCriteriaCoverage;
 }
 
 export interface UlwLoopLedgerEntry {

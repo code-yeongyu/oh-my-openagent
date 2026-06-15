@@ -129,8 +129,8 @@ export function validateQualityGate(input: unknown): UlwLoopQualityGate {
 		aiSlopCleaner: { status: "passed", evidence: cleanerEvidence },
 		verification: { status: "passed", commands, evidence: verificationEvidence },
 		codeReview: { recommendation, architectStatus, evidence: reviewEvidence },
+		criteriaCoverage: { totalCriteria, passCount, adversarialClassesCovered: covered },
 	};
-	Object.assign(result, { criteriaCoverage: { totalCriteria, passCount, adversarialClassesCovered: covered } });
 	return result;
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-
+import { validateQualityGate } from "../src/quality-gate.ts";
+import type { UlwLoopCriteriaCoverage } from "../src/types.ts";
 import {
 	iso,
 	ULW_LOOP_BRIEF,
@@ -74,6 +75,28 @@ describe("iso()", () => {
 			const s = iso();
 
 			expect(s).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+		});
+	});
+});
+
+describe("UlwLoopQualityGate.criteriaCoverage", () => {
+	const VALID_GATE = {
+		aiSlopCleaner: { status: "passed", evidence: "no slop after cleaner run" },
+		verification: { status: "passed", commands: ["npm test"], evidence: "all tests pass" },
+		codeReview: { recommendation: "APPROVE", architectStatus: "CLEAR", evidence: "ship it" },
+		criteriaCoverage: { totalCriteria: 2, passCount: 2, adversarialClassesCovered: ["malformed_input"] },
+	};
+
+	describe("when a validated gate is inspected", () => {
+		it("then criteriaCoverage is a typed member of the quality gate, not a bolted-on cast", () => {
+			// when
+			const gate = validateQualityGate(VALID_GATE);
+
+			// then — a typed read locks the interface field; reverting it fails `tsc --noEmit`.
+			const coverage: UlwLoopCriteriaCoverage = gate.criteriaCoverage;
+			expect(coverage.totalCriteria).toBe(2);
+			expect(coverage.passCount).toBe(2);
+			expect(coverage.adversarialClassesCovered).toContain("malformed_input");
 		});
 	});
 });
