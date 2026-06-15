@@ -126,7 +126,7 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
       if (entry.name === "dist" || entry.name === "node_modules") continue
       files.push(...(await collectFiles(path, predicate)))
     } else if (entry.isFile() && predicate(path)) {
-      files.push(path)
+      files.push(path.replace(/\\/g, "/"))
     }
   }
 
