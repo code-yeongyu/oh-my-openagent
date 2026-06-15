@@ -37,12 +37,16 @@ test("#given component directories #when scanned #then only intentional resource
 	// given
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
 	const packageJson = await readJson("package.json");
-	const expectedComponentNames = [
-		"bootstrap",
-		...packageJson.workspaces
+	const standaloneComponentNames = ["bootstrap", "lazycodex-executor-verify"];
+	const expectedComponentNameSet = new Set(
+		packageJson.workspaces
 			.filter((workspace) => typeof workspace === "string" && workspace.startsWith("components/"))
 			.map((workspace) => workspace.slice("components/".length)),
-	].sort();
+	);
+	for (const name of standaloneComponentNames) {
+		if (await exists(join("components", name, "package.json"))) expectedComponentNameSet.add(name);
+	}
+	const expectedComponentNames = [...expectedComponentNameSet].sort();
 	const expectedComponentManifests = new Map([["rules", { hooks: "./hooks/hooks.json" }]]);
 
 	// when
