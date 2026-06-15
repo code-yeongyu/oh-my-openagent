@@ -52,6 +52,7 @@ export type OpencodeClient = OmoAgentClient
 
 export interface DelegateTaskArgs {
   description: string
+  descriptionSource?: "explicit" | "generated"
   prompt: string
   category?: string
   subagent_type?: string

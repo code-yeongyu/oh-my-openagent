@@ -106,6 +106,7 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import { toBackgroundTaskSnapshots } from "./task-snapshot"
 import {
   archiveBackgroundTask,
   forgetBackgroundTask,
@@ -115,6 +116,7 @@ import {
 import type {
   BackgroundTask,
   BackgroundTaskAttempt,
+  BackgroundTaskSnapshot,
   LaunchInput,
   ResumeInput,
 } from "./types"
@@ -1049,6 +1051,8 @@ The fallback retry session is now created and can be inspected directly.
   getTask(id: string): BackgroundTask | undefined {
     return this.tasks.get(id) ?? this.completedTaskArchive.get(id) ?? getRegisteredBackgroundTask(id)
   }
+
+  getTasksSnapshot(): BackgroundTaskSnapshot[] { return toBackgroundTaskSnapshots(this.tasks.values()) }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
     const taskIDs = this.tasksByParentSession.get(sessionID)

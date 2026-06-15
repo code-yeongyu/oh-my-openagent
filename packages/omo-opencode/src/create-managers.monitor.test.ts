@@ -21,7 +21,15 @@ const monitorShutdown = mock(async () => {
 let createMonitorManagerOptions: Parameters<typeof createMonitorManager>[0] | undefined
 
 class MockBackgroundManager {
-  constructor(_config: unknown) {}
+  private readonly onShutdown?: () => void | Promise<void>
+
+  constructor(config: { readonly onShutdown?: () => void | Promise<void> }) {
+    this.onShutdown = config.onShutdown
+  }
+
+  async shutdown(): Promise<void> {
+    await this.onShutdown?.()
+  }
 }
 
 class MockSkillMcpManager {
@@ -203,6 +211,22 @@ describe("createManagers monitor", () => {
     })
 
     await registeredCleanupManagers[0]?.shutdown()
+
+    expect(monitorShutdown).toHaveBeenCalledTimes(1)
+    expect(cleanupCalls).toEqual(["tmux", "monitor"])
+  })
+
+  it("#given monitor is enabled #when normal background shutdown runs #then the monitor manager shuts down once", async () => {
+    const managers = createManagers({
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({ monitor: { enabled: true } }),
+      tmuxConfig: createTmuxConfig(),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    })
+
+    await managers.backgroundManager.shutdown()
 
     expect(monitorShutdown).toHaveBeenCalledTimes(1)
     expect(cleanupCalls).toEqual(["tmux", "monitor"])

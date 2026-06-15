@@ -9,6 +9,7 @@ import { createMonitorManager } from "./features/monitor"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { cleanupSessionTeamRuns } from "./features/team-mode/team-runtime/session-cleanup"
 import { lookupTeamSession } from "./features/team-mode/team-session-registry"
+import { TuiStateMirror } from "./features/tui-sidebar/mirror-manager"
 import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
@@ -23,6 +24,7 @@ type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
   SkillMcpManagerClass: typeof SkillMcpManager
   TmuxSessionManagerClass: typeof TmuxSessionManager
+  TuiStateMirrorClass: typeof TuiStateMirror
   createMonitorManagerFn: typeof createMonitorManager
   initTaskToastManagerFn: typeof initTaskToastManager
   registerManagerForCleanupFn: typeof registerManagerForCleanup
@@ -35,6 +37,7 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   BackgroundManagerClass: BackgroundManager,
   SkillMcpManagerClass: SkillMcpManager,
   TmuxSessionManagerClass: TmuxSessionManager,
+  TuiStateMirrorClass: TuiStateMirror,
   createMonitorManagerFn: createMonitorManager,
   initTaskToastManagerFn: initTaskToastManager,
   registerManagerForCleanupFn: registerManagerForCleanup,
@@ -49,6 +52,7 @@ export type Managers = {
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
   modelFallbackControllerAccessor: ModelFallbackControllerAccessor
+  tuiStateMirror?: TuiStateMirror
   monitorManager?: MonitorManager
 }
 
@@ -85,6 +89,7 @@ export function createManagers(args: {
   })
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
   let backgroundManager: BackgroundManager | undefined
+  let tuiStateMirror: TuiStateMirror | undefined
 
   const monitorManager = pluginConfig.monitor?.enabled
     ? deps.createMonitorManagerFn({
@@ -107,6 +112,7 @@ export function createManagers(args: {
 
   deps.registerManagerForCleanupFn({
     shutdown: async () => {
+      tuiStateMirror?.stop()
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during process shutdown:", error)
       })
@@ -170,16 +176,29 @@ export function createManagers(args: {
       log("[create-managers] onSubagentSessionDeleted callback completed")
     },
     onShutdown: async () => {
+      tuiStateMirror?.stop()
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during shutdown:", error)
       })
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during shutdown:", error)
       })
+      await monitorManager?.shutdown().catch((error) => {
+        log("[create-managers] monitor cleanup error during shutdown:", error)
+      })
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
     modelFallbackControllerAccessor,
   })
+
+  if (pluginConfig.tui?.sidebar?.enabled !== false) {
+    tuiStateMirror = new deps.TuiStateMirrorClass({
+      client: ctx.client,
+      projectDir: ctx.directory,
+      backgroundManager,
+    })
+    tuiStateMirror.start()
+  }
 
   deps.initTaskToastManagerFn(ctx.client)
 
@@ -197,6 +216,7 @@ export function createManagers(args: {
     skillMcpManager,
     configHandler,
     modelFallbackControllerAccessor,
+    tuiStateMirror,
     monitorManager,
   }
 }
