@@ -55,13 +55,8 @@ function stdoutJson(): Record<string, unknown> {
 function codexSnapshot(status: "active" | "complete" = "active"): string {
 	return JSON.stringify({ goal: { objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE, status } });
 }
-function qualityGate(): string {
-	return JSON.stringify({
-		aiSlopCleaner: { status: "passed", evidence: "no-op" },
-		verification: { status: "passed", commands: ["vitest"], evidence: "green" },
-		codeReview: { recommendation: "APPROVE", architectStatus: "CLEAR", evidence: "small test fixture" },
-		criteriaCoverage: { totalCriteria: 3, passCount: 3, adversarialClassesCovered: ["stale_state"] },
-	});
+async function qualityGate(): Promise<string> {
+	return readFile(new URL("./fixtures/sample-quality-gate.json", import.meta.url), "utf8");
 }
 
 async function createPlan(brief = "- Goal A\n- Goal B"): Promise<Record<string, unknown>> {
@@ -124,7 +119,7 @@ describe("ulwLoopCommand create-goals", () => {
 				"--codex-goal-json",
 				codexSnapshot("complete"),
 				"--quality-gate-json",
-				qualityGate(),
+				await qualityGate(),
 			]),
 		).toBe(0);
 		resetOutput();
