@@ -17,7 +17,7 @@ $ git diff --check origin/dev..HEAD && git diff --check
 Result: PASS
 Output: no whitespace errors.
 
-$ git ls-files .omo/evidence | xargs rg -n '(local absolute path patterns for /Users, /home, /private/var, /var/folders, and /tmp)' || true
+$ git ls-files .omo/evidence | xargs rg -n '(local absolute path patterns)' || true
 
 Result: PASS
 Output: no matches.

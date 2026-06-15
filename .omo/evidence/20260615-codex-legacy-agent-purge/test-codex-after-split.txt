@@ -714,7 +714,7 @@ Ran 286 tests across 48 files. [4.70s]
 ✔ #given aggregate build scripts #when inspected #then npm subprocesses resolve on Windows (2.676125ms)
 ✔ #given synced lcx-report-bug skill #when inspected #then it files LazyCodex bug issues with generated labels (5.263125ms)
 ✔ #given synced lcx-contribute-bug-fix skill #when inspected #then it delivers LazyCodex fixes as issues and upstream fixes as fork PRs (1.109208ms)
-✔ #given synced lcx-doctor skill #when inspected #then it diagnoses installs against latest /tmp sources without mutating them (4.351708ms)
+✔ #given synced lcx-doctor skill #when inspected #then it diagnoses installs against latest <TMP> sources without mutating them (4.351708ms)
 ✔ #given complete bug-fix evidence #when creating a PR body #then required LazyCodex sections and label are emitted (1.313167ms)
 ✔ #given missing bug-fix evidence #when creating a PR body #then the script rejects the incomplete payload (0.231ms)
 ✔ #given a JSON payload path #when running the PR body script #then markdown is written to the requested file (65.476292ms)
