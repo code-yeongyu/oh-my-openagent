@@ -174,25 +174,25 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ## Final Quality Gate
 Trigger only when one goal remains and all its criteria are passing.
 1. Run targeted verification for changed behavior.
-2. Run `ai-slop-cleaner` on changed files. If no relevant edits exist, record a passed no-op cleaner report.
-3. Rerun verification after cleanup.
-4. HEAVY tier — or any goal you are unsure is sound — spawns a rigorous reviewer with `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous final verification reviewer. DELIVERABLE: approve or cite blockers. SCOPE: <changed files and goal>. VERIFY: inspect diff and verification evidence.","fork_context":false})`. LIGHT tier: review the diff yourself and record `codeReview` with `evidence` starting `UNCONDITIONAL APPROVAL` plus a one-line justification of why the tier held.
-5. Clean review means `codeReview.recommendation == "APPROVE"` and `codeReview.architectStatus == "CLEAR"`.
-6. If review is non-clean, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
-7. If clean, checkpoint final completion:
+2. Run the Manual-QA scenario for every criterion and confirm each evidence artifact path exists and is non-empty.
+3. Spawn the three final reviewer roles in parallel with self-contained prompts and `fork_context: false`: `lazycodex-code-reviewer` for diff and implementation review, `lazycodex-qa-executor` for scenario/evidence execution review, and `lazycodex-gate-reviewer` for final criteria and checkpoint review. If selectable roles are unavailable, describe the same roles in generic worker prompts.
+4. Treat any timeout, missing deliverable, ack-only response, `BLOCKED:`, or inconclusive review as a blocker. Fix the blocker, rerun the affected verification and Manual-QA scenario, and repeat the reviewer pass.
+5. If review remains blocked, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
+6. If clean, checkpoint final completion:
 ```sh
 omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e evidence + manual QA notes>" --codex-goal-json <snapshot> --quality-gate-json <json-or-path> --json
 ```
 `--quality-gate-json` shape:
 ```json
 {
-  "aiSlopCleaner": { "status": "passed", "evidence": "cleaner report" },
-  "verification": { "status": "passed", "commands": ["npm test"], "evidence": "post-cleaner verification" },
-  "codeReview": { "recommendation": "APPROVE", "architectStatus": "CLEAR", "evidence": "review synthesis" },
+  "codeReview": { "recommendation": "APPROVE", "reviewer": "lazycodex-code-reviewer", "evidence": "diff review synthesis" },
+  "manualQa": { "status": "passed", "reviewer": "lazycodex-qa-executor", "artifacts": ["path/to/non-empty-artifact"] },
+  "gateReview": { "recommendation": "APPROVE", "reviewer": "lazycodex-gate-reviewer", "evidence": "final gate synthesis" },
+  "iteration": { "status": "complete", "reruns": 0, "blockersResolved": [] },
   "criteriaCoverage": { "totalCriteria": N, "passCount": N, "adversarialClassesCovered": ["malformed_input", "..."] }
 }
 ```
-A LIGHT goal with no triggered adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
+At the final checkpoint, every path in `manualQa.artifacts` must exist and have non-zero size. A LIGHT goal with no triggered adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
 
 ## Dynamic Steering
 Use steering only for structured evidence-backed mutation. Reject natural-language steering requests.
