@@ -736,6 +736,7 @@ export function createEventHandler(args: {
         }
         deleteSessionTools(sessionID);
         await managers.skillMcpManager.disconnectSession(sessionID);
+        await managers.monitorManager?.stopSessionMonitors(sessionID);
         if (tmuxIntegrationEnabled) {
           await managers.tmuxSessionManager.onSessionDeleted({
             sessionID,
@@ -770,6 +771,10 @@ export function createEventHandler(args: {
 
     if (event.type === "session.idle") {
       await dispatchIdleOnlyHooks(input);
+      await Promise.resolve().then(() => managers.monitorManager?.handleEvent({
+        type: "session.idle",
+        sessionId: resolveSessionEventID(props) ?? "",
+      }));
     }
 
     if (event.type === "message.updated") {
