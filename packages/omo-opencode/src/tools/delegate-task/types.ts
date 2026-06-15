@@ -89,6 +89,7 @@ export interface DelegateTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
   directory: string
+  pluginContext?: PluginInput
   /**
    * Test hook: bypass global cache reads (Bun runs tests in parallel).
    * If provided, resolveCategoryExecution/resolveSubagentExecution uses this instead of reading from disk cache.

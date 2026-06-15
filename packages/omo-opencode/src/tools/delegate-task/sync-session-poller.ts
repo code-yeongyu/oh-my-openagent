@@ -9,6 +9,7 @@ const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
+const ACTIVE_STATUS_MESSAGE_CHECK_GRACE_MS = 5_000
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -100,6 +101,7 @@ export async function pollSyncSession(
   const childWakeGraceMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
   let childWaitAssistantId: string | undefined
   let childWaitStartedAt = 0
+  let activeStatusStartedAt = 0
   const shouldWaitForChildTasks = (currentAssistantId: string | undefined): boolean => {
     if (input.hasActiveChildBackgroundTasks?.(input.sessionID)) {
       childWaitAssistantId = currentAssistantId
@@ -179,9 +181,15 @@ export async function pollSyncSession(
       })
     }
 
-    if (isActiveSessionStatus(sessionStatus)) {
-      inactiveStart = Date.now()
-      continue
+    const activeStatus = isActiveSessionStatus(sessionStatus)
+    if (activeStatus) {
+      activeStatusStartedAt ||= Date.now()
+      if (Date.now() - activeStatusStartedAt < ACTIVE_STATUS_MESSAGE_CHECK_GRACE_MS) {
+        inactiveStart = Date.now()
+        continue
+      }
+    } else {
+      activeStatusStartedAt = 0
     }
 
     let messages: SessionMessage[]
@@ -245,8 +253,13 @@ export async function pollSyncSession(
       log("[task] Poll complete - assistant text detected (fallback)", {
         sessionID: input.sessionID,
         pollCount,
+        sessionStatus: sessionStatus?.type ?? "not_in_status",
       })
       break
+    }
+
+    if (activeStatus) {
+      inactiveStart = Date.now()
     }
   }
 

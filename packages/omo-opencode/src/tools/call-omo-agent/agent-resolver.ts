@@ -9,8 +9,9 @@ export function clearCallableAgentsCache(): void {
  * Resolves the set of callable agent names for call_omo_agent.
  *
  * This tool is deliberately narrower than delegate-task: it may only launch
- * the research lookup agents used by worker-style agents while they continue
- * local work. Dynamic agents and other built-ins must go through task().
+ * research lookup agents and the plan agent direct path used to avoid wrapping
+ * plan in delegate-task's sync poller. Dynamic agents and other built-ins must
+ * go through task().
  */
 export async function resolveCallableAgents(
   _client?: PluginInput["client"],

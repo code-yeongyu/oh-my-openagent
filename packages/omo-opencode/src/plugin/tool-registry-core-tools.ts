@@ -37,6 +37,7 @@ export function createCoreTools(args: {
     manager: managers.backgroundManager,
     client: ctx.client,
     directory: ctx.directory,
+    pluginContext: ctx,
     userCategories: pluginConfig.categories,
     agentOverrides: pluginConfig.agents,
     gitMasterConfig: pluginConfig.git_master,
