@@ -142,6 +142,20 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
+test("#given LazyCodex appears inside hook status label #when normalizing #then product casing is preserved", async () => {
+	// given
+	const version = (await readRepoJson("package.json")).version;
+	const label = "Verifying LazyCodex Executor Evidence";
+
+	// when
+	const normalized = normalizeLazyCodexHookStatusLabel(label);
+	const message = formatLazyCodexHookStatusMessage(version, label);
+
+	// then
+	assert.equal(normalized, "Verifying LazyCodex Executor Evidence");
+	assert.equal(message, `LazyCodex(${version}): Verifying LazyCodex Executor Evidence`);
+});
+
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
 	const aggregateVersion = await readPluginVersion();
