@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
@@ -172,6 +172,18 @@ describe("tui-sidebar mirror IPC", () => {
     // then
     expect(snapshot).toEqual(expected)
     expect(existsSync(mirrorFilePath(projectDir))).toBe(true)
+  })
+
+  it("#given a valid snapshot #when writing #then the mirror file is private to the user", () => {
+    // given
+    const projectDir = makeTempDir("private-mode")
+    const expected = snapshotFor(projectDir, Date.now())
+
+    // when
+    writeMirror(projectDir, expected)
+
+    // then
+    expect(statSync(mirrorFilePath(projectDir)).mode & 0o777).toBe(0o600)
   })
 
   it("#given mirror storage parent is a file #when writing #then it reports the filesystem failure", () => {
