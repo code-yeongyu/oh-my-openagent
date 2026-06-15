@@ -196,6 +196,20 @@ export function requireAllCriteriaPass(goal: UlwLoopItem): void {
 	});
 }
 
+export function requireAllPlanCriteriaPass(plan: UlwLoopPlan): void {
+	const unresolved = plan.goals.flatMap((goal) =>
+		unresolvedCriteriaOf(goal).map((criterion) => ({
+			goalId: goal.id,
+			id: criterion.id,
+			status: criterion.status,
+		})),
+	);
+	if (unresolved.length === 0) return;
+	throw new UlwLoopError("Ulw-loop aggregate has unresolved success criteria.", "ulw_loop_criteria_not_all_pass", {
+		details: { unresolved },
+	});
+}
+
 export function requireEssentialCriteriaPass(goal: UlwLoopItem): void {
 	if (hasEssentialCriteriaPass(goal)) return;
 	throw new UlwLoopError(

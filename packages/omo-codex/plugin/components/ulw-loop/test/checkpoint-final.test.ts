@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
 import { ulwLoopBriefPath } from "../src/paths.js";
-import { expectCode, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
+import { criterion, expectCode, goal, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
 import { MISSING_ARTIFACT_PATH, qualityGateJson } from "./fixtures/quality-gate-builder.js";
 
 describe("checkpointUlwLoop final story", () => {
@@ -38,6 +38,31 @@ describe("checkpointUlwLoop final story", () => {
 
 		expect(result.aggregateCompletion?.status).toBe("complete");
 		expect(result.plan.aggregateCompletion?.status).toBe("complete");
+	});
+
+	it("rejects final story until earlier non-essential criteria pass", async () => {
+		const earlier = goal({
+			id: "G001",
+			status: "complete",
+			successCriteria: [
+				criterion("C001", "pass", { essential: true }),
+				criterion("C002", "pending", { essential: false }),
+			],
+		});
+		const repo = await repoWith(plan([earlier, passGoal("G002")], { activeGoalId: "G002" }));
+		const gateJson = await qualityGateJson(repo);
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+					qualityGateJson: gateJson,
+				}),
+			"ulw_loop_criteria_not_all_pass",
+		);
 	});
 
 	it("rejects final story when quality gate references a missing manual QA artifact", async () => {

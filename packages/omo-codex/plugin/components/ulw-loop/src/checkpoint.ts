@@ -11,7 +11,7 @@ import {
 	readCodexGoalSnapshotInput,
 	reconcileCodexGoalSnapshot,
 } from "./codex-goal-snapshot.js";
-import { requireAllCriteriaPass, requireEssentialCriteriaPass } from "./evidence.js";
+import { requireAllCriteriaPass, requireAllPlanCriteriaPass, requireEssentialCriteriaPass } from "./evidence.js";
 import {
 	codexGoalMode,
 	compatibleCodexObjectives,
@@ -167,8 +167,10 @@ export async function checkpointUlwLoop(
 		if (args.status === "complete") {
 			const aggregate = codexGoalMode(plan) === "aggregate";
 			const final = isFinalRunCompletionCandidate(plan, goal);
-			if (final) requireAllCriteriaPass(goal);
-			else requireEssentialCriteriaPass(goal);
+			if (final) {
+				requireAllCriteriaPass(goal);
+				requireAllPlanCriteriaPass(plan);
+			} else requireEssentialCriteriaPass(goal);
 			const snapshot = await readCodexGoalSnapshotInput(args.codexGoalJson, repoRoot);
 			const reconciliation = reconcileCodexGoalSnapshot(snapshot, {
 				expectedObjective: expectedCodexObjective(plan, goal),

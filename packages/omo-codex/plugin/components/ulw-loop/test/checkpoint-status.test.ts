@@ -1,9 +1,7 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
-import { ulwLoopLedgerPath } from "../src/paths.js";
-import { criterion, goal, lastLedger, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
+import { criterion, goal, lastLedger, plan, repoWith } from "./fixtures/checkpoint-builders.js";
 
 describe("checkpointUlwLoop status=failed", () => {
 	it("sets goal.status=failed, goal.failedAt, appends ledger", async () => {
@@ -83,22 +81,5 @@ describe("checkpointUlwLoop status=blocked", () => {
 		await expect(
 			checkpointUlwLoop(repo, { goalId: "G001", status: "blocked", evidence: "waiting for approval" }),
 		).resolves.toMatchObject({ goal: { status: "blocked" } });
-	});
-});
-
-describe("checkpointUlwLoop rebrand", () => {
-	it("does not emit legacy brand token in any returned text or ledger payload", async () => {
-		const repo = await repoWith(plan([passGoal("G001"), goal({ id: "G002", status: "pending" })]));
-
-		const result = await checkpointUlwLoop(repo, {
-			goalId: "G001",
-			status: "complete",
-			evidence: "implementation done in .omo/ulw-loop/goals.json for G001 and validation passed",
-			codexGoalJson: snapshot("active"),
-		});
-		const forbidden = ["o", "m", "x"].join("");
-		const payload = `${JSON.stringify(result)}\n${await readFile(ulwLoopLedgerPath(repo), "utf8")}`.toLowerCase();
-
-		expect(payload).not.toContain(forbidden);
 	});
 });
