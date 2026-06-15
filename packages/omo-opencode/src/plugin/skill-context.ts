@@ -33,6 +33,10 @@ export type SkillContext = {
 
 const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "dev-browser", "playwright"])
 
+function normalizeSkillAliasName(name: string): string {
+  return name.toLowerCase()
+}
+
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
   if (scope === "project" || scope === "opencode-project") return "project"
@@ -69,14 +73,17 @@ function filterProtectedSharedAliasCollisions(
 
   return skills.filter((skill) => {
     if (skill.scope === "shared") return true
-    return !protectedSharedAliasNames.has(skill.name)
+    return !protectedSharedAliasNames.has(normalizeSkillAliasName(skill.name))
   })
 }
 
 function isDisabledSkillName(name: string, disabledSkills: ReadonlySet<string>): boolean {
-  if (disabledSkills.has(name)) return true
-  if (name.startsWith("shared/")) return disabledSkills.has(name.slice("shared/".length))
-  return disabledSkills.has(`shared/${name}`)
+  const normalizedName = normalizeSkillAliasName(name)
+  if (disabledSkills.has(normalizedName)) return true
+  if (normalizedName.startsWith("shared/")) {
+    return disabledSkills.has(normalizedName.slice("shared/".length))
+  }
+  return disabledSkills.has(`shared/${normalizedName}`)
 }
 
 export async function createSkillContext(args: {
@@ -88,7 +95,9 @@ export async function createSkillContext(args: {
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
 
-  const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? [])
+  const disabledSkills = new Set<string>(
+    (pluginConfig.disabled_skills ?? []).map(normalizeSkillAliasName),
+  )
 
   const builtinSkills = resolveActiveBuiltinSkills({
     browserProvider,
@@ -173,7 +182,9 @@ export async function createSkillContext(args: {
     disabledSkills,
   )
   const sharedSkillAliases = createSharedCanonicalAliases(sharedSkills)
-  const protectedSharedAliasNames = new Set(sharedSkillAliases.map((skill) => skill.name))
+  const protectedSharedAliasNames = new Set(
+    sharedSkillAliases.map((skill) => normalizeSkillAliasName(skill.name)),
+  )
   const filteredSharedSkills = filterDisabledSkills(
     filterProviderGatedSkills(sharedSkills, browserProvider),
     disabledSkills,
@@ -203,7 +214,8 @@ export async function createSkillContext(args: {
     {
       configDir: directory,
       isConfigEntryAllowed: (name) =>
-        !protectedSharedAliasNames.has(name) && !isDisabledSkillName(name, disabledSkills),
+        !protectedSharedAliasNames.has(normalizeSkillAliasName(name)) &&
+        !isDisabledSkillName(name, disabledSkills),
     },
   )
 
