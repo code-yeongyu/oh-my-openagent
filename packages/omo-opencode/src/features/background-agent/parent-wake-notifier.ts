@@ -81,6 +81,10 @@ export class ParentWakeNotifier {
     return this.dispatchedTracker.getTimers()
   }
 
+  hasInFlightParentWakeDispatch(sessionID: string): boolean {
+    return this.dispatchedTracker.hasInFlight(sessionID)
+  }
+
   recordParentSessionActivity(sessionID: string): void {
     this.sessionInspector.recordActivity(sessionID)
   }

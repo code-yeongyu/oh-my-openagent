@@ -172,26 +172,37 @@ export class ParentWakeFlushRunner {
       readonly retainPendingWake?: boolean
     },
   ): Promise<void> {
-    if (options.retainPendingWake !== true) {
-      this.deps.pendingQueue.deleteWake(sessionID)
-    }
+    // Mark the dispatch in-flight BEFORE the pending entry is deleted so there is
+    // never an observable instant where neither the pending queue, the dispatched
+    // tracker, nor this marker reports an owed wake. The dispatch await below can
+    // run for many seconds (prompt-gate status/message checks + dispatch); by the
+    // time it resolves the wake is either tracked as dispatched or requeued back
+    // into pending, so clearing the marker in `finally` cannot reopen the gap.
+    this.deps.dispatchedTracker.markInFlight(sessionID)
+    try {
+      if (options.retainPendingWake !== true) {
+        this.deps.pendingQueue.deleteWake(sessionID)
+      }
 
-    await sendParentWakePrompt({
-      client: this.deps.notifierDeps.client,
-      directory: this.deps.notifierDeps.directory,
-      sessionID,
-      latestWake,
-      ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
-      ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
-      emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
-      toolWaitDecision: options.toolWaitDecision,
-      getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
-      hasRecordedPromptAfterDispatch: (wake) =>
-        this.deps.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(sessionID, wake),
-      trackDispatchedWake: (wake, dispatchedAt) => this.deps.dispatchedTracker.trackWake(sessionID, wake, dispatchedAt),
-      requeueWake: (wake) => this.requeueWake(sessionID, wake),
-      scheduleFlush: (delayMs) => this.schedulePendingParentWakeFlush(sessionID, delayMs),
-    })
+      await sendParentWakePrompt({
+        client: this.deps.notifierDeps.client,
+        directory: this.deps.notifierDeps.directory,
+        sessionID,
+        latestWake,
+        ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
+        ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
+        emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
+        toolWaitDecision: options.toolWaitDecision,
+        getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
+        hasRecordedPromptAfterDispatch: (wake) =>
+          this.deps.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(sessionID, wake),
+        trackDispatchedWake: (wake, dispatchedAt) => this.deps.dispatchedTracker.trackWake(sessionID, wake, dispatchedAt),
+        requeueWake: (wake) => this.requeueWake(sessionID, wake),
+        scheduleFlush: (delayMs) => this.schedulePendingParentWakeFlush(sessionID, delayMs),
+      })
+    } finally {
+      this.deps.dispatchedTracker.clearInFlight(sessionID)
+    }
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {

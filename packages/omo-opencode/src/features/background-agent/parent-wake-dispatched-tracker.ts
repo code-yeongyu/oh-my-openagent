@@ -9,6 +9,13 @@ type ParentWakeDispatchedTrackerOptions = {
 export class ParentWakeDispatchedTracker {
   private dispatchedParentWakes: Map<string, PendingParentWake> = new Map()
   private dispatchedParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  // Sessions whose wake has left the pending queue but is still mid-dispatch
+  // (the `await dispatchInternalPrompt(...)` window, which can span the prompt
+  // gate's status/message checks plus the dispatch itself). The pending entry is
+  // already deleted and the dispatched entry is not yet tracked, so without this
+  // marker `hasPendingParentWake` would briefly report "no wake owed" and let the
+  // sync poller settle on a stale pre-results turn.
+  private inFlightDispatches: Set<string> = new Set()
 
   constructor(private readonly options: ParentWakeDispatchedTrackerOptions) {}
 
@@ -18,6 +25,18 @@ export class ParentWakeDispatchedTracker {
 
   getTimers(): Map<string, ReturnType<typeof setTimeout>> {
     return this.dispatchedParentWakeTimers
+  }
+
+  markInFlight(sessionID: string): void {
+    this.inFlightDispatches.add(sessionID)
+  }
+
+  clearInFlight(sessionID: string): void {
+    this.inFlightDispatches.delete(sessionID)
+  }
+
+  hasInFlight(sessionID: string): boolean {
+    return this.inFlightDispatches.has(sessionID)
   }
 
   getWake(sessionID: string): PendingParentWake | undefined {
@@ -75,5 +94,6 @@ export class ParentWakeDispatchedTracker {
     }
     this.dispatchedParentWakeTimers.clear()
     this.dispatchedParentWakes.clear()
+    this.inFlightDispatches.clear()
   }
 }

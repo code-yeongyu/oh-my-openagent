@@ -1074,14 +1074,18 @@ The fallback retry session is now created and can be inspected directly.
 
   /**
    * Return whether a parent-wake notification for this session is queued, scheduled,
-   * or dispatched-but-not-yet-consumed. Lets a sync poll loop keep waiting across the
-   * gap between "all children finished" and "the notification-triggered turn started",
-   * instead of declaring the task complete during that window.
+   * mid-dispatch, or dispatched-but-not-yet-consumed. Lets a sync poll loop keep
+   * waiting across the gap between "all children finished" and "the
+   * notification-triggered turn started", instead of declaring the task complete
+   * during that window. The in-flight check is essential: while a wake is being
+   * dispatched the pending entry is already deleted and the dispatched entry is not
+   * yet tracked, so the other three maps would all report false for several seconds.
    */
   hasPendingParentWake(sessionID: string): boolean {
     return (
       this.parentWakeNotifier.getPendingParentWakes().has(sessionID) ||
       this.parentWakeNotifier.getPendingParentWakeTimers().has(sessionID) ||
+      this.parentWakeNotifier.hasInFlightParentWakeDispatch(sessionID) ||
       this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
     )
   }
