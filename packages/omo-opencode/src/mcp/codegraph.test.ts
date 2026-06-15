@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
 import { CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils"
 import { createCodegraphMcpConfig } from "./codegraph"
@@ -43,6 +45,25 @@ describe("createCodegraphMcpConfig", () => {
     expect(config.enabled).toBe(false)
   })
 
+  it("keeps the registration disabled when OMO_CODEGRAPH_BIN points to a missing path", () => {
+    // given
+    const resolveExecutable = createResolver({ codegraph: "/usr/local/bin/codegraph" })
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { enabled: true },
+      env: { OMO_CODEGRAPH_BIN: "/nonexistent" },
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      resolveExecutable,
+    })
+
+    // then
+    expect(config.command).toEqual(["/nonexistent", "serve", "--mcp"])
+    expect(config.enabled).toBe(false)
+  })
+
   it("forces telemetry off in the MCP environment", () => {
     // given
     const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
@@ -64,7 +85,7 @@ describe("createCodegraphMcpConfig", () => {
   it("uses configured install_dir for provisioned lookup and MCP environment", () => {
     // given
     const installDir = "/custom/codegraph"
-    const provisionedPath = `${installDir}/bin/${process.platform === "win32" ? "codegraph.exe" : "codegraph"}`
+    const provisionedPath = `${installDir}/bin/${process.platform === "win32" ? "codegraph.cmd" : "codegraph"}`
 
     // when
     const config = createCodegraphMcpConfig({

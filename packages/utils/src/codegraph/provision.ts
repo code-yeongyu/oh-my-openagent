@@ -96,7 +96,7 @@ function forcedBadChecksumOptions(options: EnsureCodegraphProvisionedOptions): {
     installDir: options.installDir ?? join(options.lockDir, "codegraph-force-bad-checksum"),
     manifest: {
       assets: {
-        [key]: { executableName: process.platform === "win32" ? "codegraph.exe" : "codegraph", sha256: "0000", url: "memory://bad" },
+        [key]: { executableName: process.platform === "win32" ? "codegraph.cmd" : "codegraph", sha256: "0000", url: "memory://bad" },
       },
       version: options.version,
     },
@@ -180,7 +180,9 @@ async function installAsset(layout: {
       throw new Error(`checksum mismatch for ${basename(asset.url)}: expected ${asset.sha256}, got ${actualChecksum}`)
     }
 
-    if (!asset.url.endsWith(".tar.gz")) throw new Error(`unsupported CodeGraph archive type for ${basename(asset.url)}`)
+    if (!asset.url.endsWith(".tar.gz") && !asset.url.endsWith(".tgz")) {
+      throw new Error(`unsupported CodeGraph archive type for ${basename(asset.url)}`)
+    }
     await writeFile(archivePath, bytes)
     await extractTarGz(archivePath, extractDir)
     const destination = await installExtractedBundle(extractDir, installDir, asset.executableName)

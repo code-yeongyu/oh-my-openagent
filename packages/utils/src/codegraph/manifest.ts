@@ -22,6 +22,16 @@ export const CODEGRAPH_PROVISION_MANIFEST: CodegraphProvisionManifest = {
       sha256: "d45a068f44596a85c7ba7d0ef924eaf7103fbbf3cafbeb668127daff60a52228",
       url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-x64.tar.gz",
     },
+    "win32-arm64": {
+      executableName: "codegraph.cmd",
+      sha256: "8d57ced73b24d35f758f2ede2318e80e1d7241987f37a999e3d80edb6fddf961",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.0.1.tgz",
+    },
+    "win32-x64": {
+      executableName: "codegraph.cmd",
+      sha256: "52607fe73b05e741fd1087da2ceca9d3c8f565e36bf1a7070600bdbdf3931e32",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.0.1.tgz",
+    },
   },
   version: "1.0.1",
 }

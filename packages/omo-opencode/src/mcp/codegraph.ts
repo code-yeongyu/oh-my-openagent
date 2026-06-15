@@ -36,7 +36,7 @@ function provisionedBinFromInstallDir(
   fileExists: (filePath: string) => boolean,
 ): string | null {
   if (installDir === undefined) return null
-  const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph")
+  const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
   return fileExists(candidate) ? candidate : null
 }
 
