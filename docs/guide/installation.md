@@ -625,7 +625,7 @@ If the user wants to override which model an agent uses, edit the plugin config 
 }
 ```
 
-**Safe overrides** (same family): Sisyphus Opus → Sonnet/Kimi K2.6/GLM 5; Prometheus Opus → GPT-5.5 (same prompt, different model); Atlas Kimi K2.6 → Sonnet/GPT-5.5 (auto-switch).
+**Lower-risk overrides** (compatible behavior): Sisyphus Opus → Sonnet/Kimi K2.6/GLM 5; Prometheus Opus → GPT-5.5 (same prompt, different model); Atlas Kimi K2.6 → Sonnet/GPT-5.5 (auto-switch).
 
 **Dangerous overrides** (no prompt support): Sisyphus → older GPT models (only 5.4/5.5 have dedicated GPT paths); Hephaestus → Claude (built for Codex); Explore → Opus (massive cost waste); Librarian → Opus (same).
 
