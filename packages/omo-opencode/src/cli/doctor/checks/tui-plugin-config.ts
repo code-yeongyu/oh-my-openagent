@@ -79,7 +79,7 @@ function packageExportsTuiForServerEntry(entry: string): boolean | null {
 // satisfies the TUI plugin registration even without an explicit
 // `oh-my-openagent/tui` entry. Mirrors the helper used in
 // add-tui-plugin-to-tui-config.ts during installation.
-function isOurFilePluginEntry(entry: string): boolean {
+export function isOurFilePluginEntry(entry: string): boolean {
   if (!entry.startsWith("file:")) return false
   try {
     const pkgJsonPath = fileEntryPackageJsonPath(entry)
@@ -93,14 +93,14 @@ function isOurFilePluginEntry(entry: string): boolean {
   }
 }
 
-function isServerPluginEntry(entry: string): boolean {
+export function isServerPluginEntry(entry: string): boolean {
   if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) return true
   if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) return true
   if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
   return false
 }
 
-function isTuiPluginEntry(entry: string): boolean {
+export function isTuiPluginEntry(entry: string): boolean {
   if (isNamedTuiPluginEntry(entry)) return true
   // file: entries pointing at our package already expose the ./tui subpath via
   // package.json `exports`, so the TUI plugin loads without a separate entry.
@@ -108,7 +108,7 @@ function isTuiPluginEntry(entry: string): boolean {
   return false
 }
 
-function isNamedTuiPluginEntry(entry: string): boolean {
+export function isNamedTuiPluginEntry(entry: string): boolean {
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
   const legacyPrefix = `${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}`
   if (entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)) return true
