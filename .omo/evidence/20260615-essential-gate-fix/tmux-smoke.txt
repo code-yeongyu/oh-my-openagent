@@ -1,7 +1,7 @@
 COMMAND: isolated install then tmux CODEX_HOME=<TMP>/codex codex plugin list --json
 install_exit=0
 
-up to date, audited 87 packages in 365ms
+up to date, audited 87 packages in 378ms
 
 18 packages are looking for funding
   run `npm fund` for details
@@ -21,7 +21,7 @@ Building components/comment-checker
 > @code-yeongyu/codex-comment-checker@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 11 modules in 3ms
+Bundled 11 modules in 4ms
 
   cli.js  19.23 KB  (entry point)
 
@@ -74,7 +74,7 @@ Building components/lsp
 > node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
 
 Bundling components/lsp/dist/cli.js
-Bundled 6 modules in 4ms
+Bundled 6 modules in 5ms
 
   cli.js  124.72 KB  (entry point)
 
@@ -101,7 +101,7 @@ Building components/start-work-continuation
 > @code-yeongyu/codex-start-work-continuation@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 16 modules in 4ms
+Bundled 16 modules in 3ms
 
   cli.js  14.14 KB  (entry point)
 
@@ -118,7 +118,7 @@ Building components/ulw-loop
 Bundling components/ulw-loop/dist/cli.js
 Bundled 28 modules in 3ms
 
-  cli.js  107.45 KB  (entry point)
+  cli.js  107.52 KB  (entry point)
 
 Building components/ultrawork
 
@@ -145,14 +145,14 @@ Saved lockfile
 
   dist/cli.js  103.7kb
 
-⚡ Done in 13ms
+⚡ Done in 11ms
 Bundling components/bootstrap/dist/cli.js
 Bundled 36 modules in 5ms
 
   cli.js  106.58 KB  (entry point)
 
 
-added 13 packages, and audited 31 packages in 569ms
+added 13 packages, and audited 31 packages in 577ms
 
 1 package is looking for funding
   run `npm fund` for details
@@ -242,6 +242,6 @@ TMUX_CMD_EXIT=0
 
 tmux_capture_exit=0
 tmux_capture_end
-cleanup_tmux=killed lcx-gate-44197; remains=no
+cleanup_tmux=killed lcx-gate-73952; remains=no
 cleanup_tmp=removed <TMP>; exists_after=no
 EXIT_CODE=0

@@ -12,7 +12,7 @@ COMMAND: git status --short --branch
  M .omo/evidence/20260615-essential-gate-fix/verification.txt
 
 COMMAND: git rev-parse HEAD
-b47269565d6ab50b57c143143e192a31be503869
+ab880e862d7dbfb76aec460b2440c8109b92b490
 
 COMMAND: git diff --check
 working_git_diff_check_exit=0

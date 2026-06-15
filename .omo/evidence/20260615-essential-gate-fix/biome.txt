@@ -21,7 +21,7 @@ biome.json:2:13 deserialize ━━━━━━━━━━━━━━━━━�
   i Run the command biome migrate to migrate the configuration file.
 
 
-Checked 61 files in 20ms. No fixes applied.
+Checked 61 files in 13ms. No fixes applied.
 Found 1 info.
 
 EXIT_CODE=0

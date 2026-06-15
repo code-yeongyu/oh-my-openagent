@@ -2,7 +2,7 @@ COMMAND: CODEX_HOME=<TMP>/codex node packages/omo-codex/scripts/install-local.mj
 CODEX_HOME=<TMP>/codex
 real_config_hash_before=242c618ca16cefac9a3fd8f1060a9802bf8db26f39e99b4a0d1fdafb9f552370
 
-up to date, audited 87 packages in 368ms
+up to date, audited 87 packages in 388ms
 
 18 packages are looking for funding
   run `npm fund` for details
@@ -47,7 +47,7 @@ Building components/lazycodex-executor-verify
 > tsc -p tsconfig.build.json
 
 Bundling components/lazycodex-executor-verify/dist/cli.js
-Bundled 5 modules in 2ms
+Bundled 5 modules in 3ms
 
   cli.js  8.26 KB  (entry point)
 
@@ -56,7 +56,7 @@ Building components/rules
 > @code-yeongyu/codex-rules@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 52 modules in 5ms
+Bundled 52 modules in 6ms
 
   cli.js  159.1 KB  (entry point)
 
@@ -88,12 +88,12 @@ Bundled 78 modules in 7ms
 
   cli.js  204.83 KB  (entry point)
 
-Bundled 76 modules in 7ms
+Bundled 76 modules in 6ms
 
   posthog.js  202.41 KB  (entry point)
 
 Bundling components/telemetry/dist/cli.js
-Bundled 78 modules in 6ms
+Bundled 78 modules in 5ms
 
   cli.js  204.57 KB  (entry point)
 
@@ -102,12 +102,12 @@ Building components/start-work-continuation
 > @code-yeongyu/codex-start-work-continuation@4.10.0 build
 > node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
 
-Bundled 16 modules in 4ms
+Bundled 16 modules in 3ms
 
   cli.js  14.14 KB  (entry point)
 
 Bundling components/start-work-continuation/dist/cli.js
-Bundled 16 modules in 3ms
+Bundled 16 modules in 2ms
 
   cli.js  14.32 KB  (entry point)
 
@@ -117,9 +117,9 @@ Building components/ulw-loop
 > tsc -p tsconfig.build.json
 
 Bundling components/ulw-loop/dist/cli.js
-Bundled 28 modules in 3ms
+Bundled 28 modules in 4ms
 
-  cli.js  107.45 KB  (entry point)
+  cli.js  107.52 KB  (entry point)
 
 Building components/ultrawork
 
@@ -146,14 +146,14 @@ Saved lockfile
 
   dist/cli.js  103.7kb
 
-⚡ Done in 14ms
+⚡ Done in 12ms
 Bundling components/bootstrap/dist/cli.js
-Bundled 36 modules in 6ms
+Bundled 36 modules in 5ms
 
   cli.js  106.58 KB  (entry point)
 
 
-added 13 packages, and audited 31 packages in 571ms
+added 13 packages, and audited 31 packages in 576ms
 
 1 package is looking for funding
   run `npm fund` for details
