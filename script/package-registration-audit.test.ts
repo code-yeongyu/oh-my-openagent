@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
-import { $ } from "bun"
 import { describe, expect, test } from "bun:test"
 
 const corePackagePaths: readonly string[] = [
@@ -34,7 +33,6 @@ const mcpPackagePaths: readonly string[] = [
 ] as const
 const adapterPackagePaths: readonly string[] = ["packages/omo-codex", "packages/omo-opencode"] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
-const rootAdapterPackagePaths: readonly string[] = ["packages/omo-opencode"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
 const reExportShimFirstLinePattern = /^export (\*|\{).*from ["'](@oh-my-opencode\/[^/"']+)/
 
@@ -136,11 +134,7 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
 }
 
 async function collectTrackedFiles(roots: readonly string[], predicate: (path: string) => boolean): Promise<readonly string[]> {
-  const output = await $`git ls-files ${roots}`.text()
-  return output
-    .split(/\r?\n/)
-    .filter((path) => path.length > 0 && predicate(path))
-    .toSorted()
+  return (await Promise.all(roots.map((root) => collectFiles(root, predicate)))).flat().toSorted()
 }
 
 async function discoverPackagePaths(): Promise<readonly string[]> {
@@ -212,7 +206,7 @@ describe("package registration audit", () => {
     const expectedDevDependencyNames = (
       await Promise.all(
         managedWorkspacePaths
-          .filter((path) => !rootAdapterPackagePaths.includes(path))
+          .filter((path) => path !== "packages/omo-opencode")
           .map((path) => readManifest(join(path, "package.json")).then((manifest) => manifest.name)),
       )
     ).toSorted()
