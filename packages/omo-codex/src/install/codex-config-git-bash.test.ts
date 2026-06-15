@@ -86,7 +86,9 @@ describe("Codex config Git Bash MCP policy", () => {
       // then
       const content = await readFile(configPath, "utf8")
       expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+      expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.codegraph]')
       expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = false/)
+      expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.codegraph\][\s\S]*?enabled = true/)
       expect(content).toContain('[plugins."omo@sisyphuslabs"]')
       expect(content).toContain("enabled = true")
     }

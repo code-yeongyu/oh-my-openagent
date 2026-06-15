@@ -50,6 +50,7 @@ test("#given component directories #when scanned #then only intentional resource
 	// then
 	assert.deepEqual(componentNames, [
 		"bootstrap",
+		"codegraph",
 		"comment-checker",
 		"git-bash",
 		"lazycodex-executor-verify",

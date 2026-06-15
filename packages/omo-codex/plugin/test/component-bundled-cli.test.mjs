@@ -20,6 +20,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	ultrawork: "user-prompt-submit",
 	"ulw-loop": "pre-tool-use",
 };
+const MCP_ONLY_COMPONENTS = new Set(["codegraph"]);
 const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;
 
 test("#given required component CLI contracts #when workspaces are inspected #then every contract component is covered", async () => {
@@ -116,6 +117,7 @@ test("#given aggregate hook manifest #when command hooks are inspected #then com
 	// when
 	const missingContracts = components.filter(
 		(component) =>
+			!MCP_ONLY_COMPONENTS.has(component) &&
 			!commands.some((command) =>
 				command.startsWith(`node "\${PLUGIN_ROOT}/components/${component}/dist/cli.js" hook `),
 			),
@@ -130,6 +132,7 @@ async function workspaceComponents() {
 	return packageJson.workspaces
 		.filter((workspace) => workspace.startsWith("components/"))
 		.map((workspace) => workspace.slice("components/".length))
+		.filter((component) => !MCP_ONLY_COMPONENTS.has(component))
 		.sort();
 }
 
