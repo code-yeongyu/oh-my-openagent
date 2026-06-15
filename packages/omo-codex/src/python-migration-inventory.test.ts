@@ -9,6 +9,10 @@ const requiredRetainedPythonFiles = [
   "packages/omo-codex/plugin/components/lsp/test/fixtures/broken.py",
 ] as const
 const optionalGeneratedPythonFiles = [
+  "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/core.py",
+  "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/design_system.py",
+  "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/search.py",
+  "packages/omo-codex/plugin/skills/frontend/scripts/perfection/lighthouse-audit.py",
   "packages/omo-codex/plugin/skills/programming/scripts/go/new-project.py",
   "packages/omo-codex/plugin/skills/programming/scripts/python/check-no-excuse-rules.py",
   "packages/omo-codex/plugin/skills/programming/scripts/python/new-project.py",
