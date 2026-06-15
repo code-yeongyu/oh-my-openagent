@@ -51,6 +51,30 @@ describe("paths", () => {
     expect(resolvedBaseDir).toBe("/tmp/test-abc")
   })
 
+  test("resolveBaseDir expands a leading ~ in base_dir to the home directory", () => {
+    // given — regression for #5331: raw "~/.omo" must not reach mkdir unexpanded
+    const config = TeamModeConfigSchema.parse({ base_dir: "~/.omo" })
+
+    // when
+    const resolvedBaseDir = resolveBaseDir(config)
+
+    // then
+    expect(resolvedBaseDir).toBe(path.join(homedir(), ".omo"))
+    expect(resolvedBaseDir).not.toBe("~/.omo")
+  })
+
+  test("resolveBaseDir expands a leading ~ for an arbitrary base_dir path", () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: "~/some/custom/team-root" })
+
+    // when
+    const resolvedBaseDir = resolveBaseDir(config)
+
+    // then
+    expect(resolvedBaseDir).toBe(path.join(homedir(), "some/custom/team-root"))
+    expect(resolvedBaseDir.startsWith("~")).toBe(false)
+  })
+
   test("#given team runtime ids contain traversal #when runtime paths are built #then they are rejected before escaping base dir", () => {
     // given
     const baseDir = "/tmp/omo-contained"

@@ -66,7 +66,8 @@ function resolveContainedPath(baseDir: string, pathSegments: readonly string[]):
 }
 
 export function resolveBaseDir(config: TeamModeConfig): string {
-  return config.base_dir ?? path.join(homedir(), ".omo")
+  const resolved = config.base_dir ?? path.join(homedir(), ".omo")
+  return resolved.startsWith("~") ? path.join(homedir(), resolved.slice(1)) : resolved
 }
 
 export function getTeamSpecPath(
