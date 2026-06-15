@@ -56,4 +56,6 @@ session-ses_*.md
 pr-*.md
 plans/
 .ulw/
-.claude/
+.claude/*
+!.claude/skills
+!.claude/commands
