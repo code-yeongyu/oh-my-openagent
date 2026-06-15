@@ -51,12 +51,18 @@ export function componentHookContractCases(tempRoot) {
 				cwd: tempRoot,
 				model: "gpt-5.5",
 				permission_mode: "default",
-				prompt: "please ultrawork this",
+				prompt: "ulw this",
 			},
 			assertOutput(stdout) {
 				const output = JSON.parse(stdout);
-				assert.equal(output.hookSpecificOutput.hookEventName, "UserPromptSubmit");
-				assert.match(output.hookSpecificOutput.additionalContext, /<ultrawork-mode>/);
+				assert.equal(
+					output.hookSpecificOutput.hookEventName,
+					"UserPromptSubmit",
+				);
+				assert.match(
+					output.hookSpecificOutput.additionalContext,
+					/<ultrawork-mode>/,
+				);
 			},
 		},
 		{
@@ -79,7 +85,10 @@ export function componentHookContractCases(tempRoot) {
 				const output = JSON.parse(stdout);
 				assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
 				assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
-				assert.match(output.hookSpecificOutput.additionalContext, /Omit token_budget/);
+				assert.match(
+					output.hookSpecificOutput.additionalContext,
+					/Omit token_budget/,
+				);
 			},
 		},
 		{
@@ -102,7 +111,10 @@ export function componentHookContractCases(tempRoot) {
 			assertOutput(stdout) {
 				const output = JSON.parse(stdout);
 				assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
-				assert.match(output.hookSpecificOutput.additionalContext, /git_bash MCP/);
+				assert.match(
+					output.hookSpecificOutput.additionalContext,
+					/git_bash MCP/,
+				);
 			},
 		},
 		{

@@ -52,6 +52,7 @@ test("#given component directories #when scanned #then only intentional resource
 		"bootstrap",
 		"comment-checker",
 		"git-bash",
+		"lazycodex-executor-verify",
 		"lsp",
 		"rules",
 		"start-work-continuation",
