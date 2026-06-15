@@ -47,7 +47,7 @@ describe("shared builtin skill file loader", () => {
     expect(reads).toHaveLength(1)
   })
 
-  test("#given source and bundled layouts #when loading shared skill templates #then both package-relative paths resolve", () => {
+  test("#given shared skills root #when loading shared skill templates #then the package root path resolves", () => {
     // given
     const expectedContent = "---\nname: layout\n---\nLayout body"
     const createMissingFileError = (): Error => {
@@ -56,19 +56,17 @@ describe("shared builtin skill file loader", () => {
       return error
     }
     const readFile = (path: string): string => {
-      if (normalize(path).endsWith(normalize("/packages/shared-skills/skills/layout/SKILL.md"))) {
+      if (normalize(path).endsWith(normalize("/shared-skills/skills/layout/SKILL.md"))) {
         return expectedContent
       }
       throw createMissingFileError()
     }
 
     // when
-    const bundledLoader = createSharedSkillTemplateLoader(readFile, "/workspace/dist")
-    const sourceLoader = createSharedSkillTemplateLoader(readFile, "/workspace/packages/omo-opencode/src/features/builtin-skills")
+    const loader = createSharedSkillTemplateLoader(readFile, "/workspace/packages/shared-skills/skills")
 
     // then
-    expect(bundledLoader("layout")).toBe("Layout body")
-    expect(sourceLoader("layout")).toBe("Layout body")
+    expect(loader("layout")).toBe("Layout body")
   })
 
   test("#given a missing shared skill file #when loading the template #then the loader fails fast", () => {

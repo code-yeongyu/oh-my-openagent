@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { log } from "../../shared/logger"
 
 export interface TaskLink {
@@ -8,9 +9,7 @@ export interface TaskLink {
   category?: string
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function readString(value: unknown): string | undefined {
   if (typeof value !== "string") {

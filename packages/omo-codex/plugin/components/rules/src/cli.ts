@@ -38,9 +38,7 @@ async function runHookCli(eventName: HookCliEventName): Promise<void> {
 	const pluginDataRoot = process.env["PLUGIN_DATA"];
 	const options: CodexRulesHookOptions = pluginDataRoot === undefined ? {} : { pluginDataRoot };
 	const output = await runHook(eventName, parsed, options);
-	if (output.length > 0) {
-		processStdout.write(output);
-	}
+	await writeStdout(output);
 }
 
 async function runHook(eventName: HookCliEventName, parsed: unknown, options: CodexRulesHookOptions): Promise<string> {
@@ -137,7 +135,22 @@ function readStdin(): Promise<string> {
 		});
 		processStdin.once("error", reject);
 		processStdin.once("end", () => {
+			processStdin.pause();
 			resolve(data);
+		});
+		processStdin.resume();
+	});
+}
+
+function writeStdout(output: string): Promise<void> {
+	if (output.length === 0) return Promise.resolve();
+	return new Promise((resolve, reject) => {
+		processStdout.write(output, (error: Error | null | undefined) => {
+			if (error) {
+				reject(error);
+				return;
+			}
+			resolve();
 		});
 	});
 }

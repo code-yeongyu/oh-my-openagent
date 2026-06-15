@@ -1,7 +1,7 @@
-import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./types"
+import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./framework/types"
 import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherCodexSummary } from "./checks"
-import { EXIT_CODES } from "./constants"
-import { formatDoctorOutput, formatJsonOutput } from "./formatter"
+import { EXIT_CODES } from "./framework/constants"
+import { formatDoctorOutput, formatJsonOutput } from "./framework/formatter"
 
 const DOCTOR_TIMEOUT_MS = 30_000
 

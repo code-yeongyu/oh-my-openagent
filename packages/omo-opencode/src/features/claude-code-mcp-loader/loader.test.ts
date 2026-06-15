@@ -12,13 +12,8 @@ describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_HOME, { recursive: true })
-    mock.module("os", () => ({
-      homedir: () => TEST_HOME,
-      tmpdir,
-    }))
-    mock.module("../../shared/claude-config-dir", () => ({
-      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
-    }))
+    process.env.HOME = TEST_HOME
+    process.env.CLAUDE_CONFIG_DIR = join(TEST_HOME, ".claude")
   })
 
   afterEach(() => {
@@ -318,13 +313,8 @@ describe("loadMcpConfigs", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_HOME, { recursive: true })
-    mock.module("os", () => ({
-      homedir: () => TEST_HOME,
-      tmpdir,
-    }))
-    mock.module("../../shared/claude-config-dir", () => ({
-      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
-    }))
+    process.env.HOME = TEST_HOME
+    process.env.CLAUDE_CONFIG_DIR = join(TEST_HOME, ".claude")
     mock.module("../../shared/logger", () => ({
       log: () => {},
     }))

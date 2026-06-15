@@ -3,9 +3,9 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { extractSemverFromOutput } from "../../../shared/extract-semver"
 import { bunWhich } from "../../../shared/bun-which-shim"
-import { spawnWithTimeout } from "../spawn-with-timeout"
+import { spawnWithTimeout } from "../framework/spawn-with-timeout"
 
-import { OPENCODE_BINARIES } from "../constants"
+import { OPENCODE_BINARIES } from "../framework/constants"
 
 export { extractSemverFromOutput }
 

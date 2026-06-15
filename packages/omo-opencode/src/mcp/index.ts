@@ -4,7 +4,6 @@ import { grep_app } from "./grep-app"
 import { createAstGrepMcpConfig } from "./ast-grep"
 import { createLspMcpConfig, type LocalMcpConfig } from "./lsp"
 import type { RuntimeExecutableResolver } from "./runtime-executable"
-import type { OhMyOpenCodeConfig } from "../config/schema"
 
 export { McpNameSchema, type McpName } from "./types"
 
@@ -23,7 +22,12 @@ type BuiltinMcpOptions = {
   readonly resolveExecutable?: RuntimeExecutableResolver
 }
 
-export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpenCodeConfig, options: BuiltinMcpOptions = {}) {
+type BuiltinMcpSourceConfig = {
+  readonly disabled_tools?: readonly string[]
+  readonly websearch?: Parameters<typeof createWebsearchConfig>[0]
+}
+
+export function createBuiltinMcps(disabledMcps: string[] = [], config?: BuiltinMcpSourceConfig, options: BuiltinMcpOptions = {}) {
   const mcps: Record<string, BuiltinMcpConfig> = {}
 
   if (!disabledMcps.includes("websearch")) {

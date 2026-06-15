@@ -53,7 +53,10 @@ test("#given aggregate Codex skills #when source wiring is inspected #then share
 	const rootPackageFiles = rootPackageJson.files ?? [];
 
 	// then
-	assert.equal(sharedPackageJson.exports?.["."], "./index.mjs");
+	assert.deepEqual(sharedPackageJson.exports?.["."], {
+		types: "./index.d.ts",
+		import: "./index.mjs",
+	});
 	assert.equal(sharedPackageJson.files?.includes("skills"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/package.json"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/index.mjs"), true);

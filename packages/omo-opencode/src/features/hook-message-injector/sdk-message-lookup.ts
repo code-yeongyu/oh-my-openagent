@@ -1,10 +1,13 @@
-import type { PluginInput } from "@opencode-ai/plugin"
 import { isCompactionMessage } from "../../shared/compaction-marker"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import type { StoredMessage, ToolPermission } from "./types"
 
-export type OpencodeClient = PluginInput["client"]
+export type OpencodeClient = {
+  readonly session: {
+    readonly messages: (input: { readonly path: { readonly id: string } }) => Promise<unknown>
+  }
+}
 
 export interface SDKMessage {
   readonly id?: string

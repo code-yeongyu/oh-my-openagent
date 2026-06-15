@@ -101,26 +101,35 @@ export function createAutoRetryDispatcher(
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
       }
 
-      const promptResult = await dispatchInternalPrompt({
+      const retryPromptInput = {
+        path: { id: sessionID },
+        body: {
+          ...(launchAgent ? { agent: launchAgent } : {}),
+          ...retryModelPayload,
+          ...(retryPayload.system ? { system: retryPayload.system } : {}),
+          ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
+          ...(retryMessageID ? { messageID: retryMessageID } : {}),
+          parts: retryParts,
+        },
+        query: { directory: ctx.directory },
+      }
+      const dispatchRetryPrompt = (retrySource: string, queueBehavior?: "defer") => dispatchInternalPrompt({
         mode: "async",
         client: ctx.client,
         sessionID,
-        source: `runtime-fallback:${source}`,
+        source: retrySource,
         settleMs: 0,
-        queueBehavior: "defer",
-        input: {
-          path: { id: sessionID },
-          body: {
-            ...(launchAgent ? { agent: launchAgent } : {}),
-            ...retryModelPayload,
-            ...(retryPayload.system ? { system: retryPayload.system } : {}),
-            ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
-            ...(retryMessageID ? { messageID: retryMessageID } : {}),
-            parts: retryParts,
-          },
-          query: { directory: ctx.directory },
-        },
+        ...(queueBehavior ? { queueBehavior } : {}),
+        input: retryPromptInput,
       })
+
+      let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
+      if (promptResult.status === "active") {
+        log(`[${HOOK_NAME}] Session active, queueing fallback dispatch (${source})`, {
+          sessionID,
+        })
+        promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}:active-queue`)
+      }
       if (promptResult.status === "failed") {
         if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
           retryMayHaveBeenAccepted = true
@@ -145,26 +154,10 @@ export function createAutoRetryDispatcher(
             maxAttempts: MAX_RESERVED_RETRIES,
           })
           await new Promise((r) => setTimeout(r, delay))
-          reservedResult = await dispatchInternalPrompt({
-            mode: "async",
-            client: ctx.client,
-            sessionID,
-            source: `runtime-fallback:${source}:reserved-retry-${attempt + 1}`,
-            settleMs: 0,
-            queueBehavior: "defer",
-            input: {
-              path: { id: sessionID },
-              body: {
-                ...(launchAgent ? { agent: launchAgent } : {}),
-                ...retryModelPayload,
-                ...(retryPayload.system ? { system: retryPayload.system } : {}),
-                ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
-                ...(retryMessageID ? { messageID: retryMessageID } : {}),
-                parts: retryParts,
-              },
-              query: { directory: ctx.directory },
-            },
-          })
+          reservedResult = await dispatchRetryPrompt(
+            `runtime-fallback:${source}:reserved-retry-${attempt + 1}`,
+            "defer",
+          )
           if (reservedResult.status !== "reserved") break
         }
         if (reservedResult.status === "failed") {

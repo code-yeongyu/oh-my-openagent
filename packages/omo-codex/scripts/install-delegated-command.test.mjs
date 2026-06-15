@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./install/delegated-command.mjs";
+import { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./install-local.mjs";
 
 test("#given a lazycodex passthrough command #when delegating to omo #then resets OMO_INVOCATION_NAME so the delegate does not re-enter the lazycodex path", async () => {
 	// given

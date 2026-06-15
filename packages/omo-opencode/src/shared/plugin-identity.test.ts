@@ -3,6 +3,7 @@ import {
   ACCEPTED_PACKAGE_NAMES,
   CACHE_DIR_NAME,
   CONFIG_BASENAME,
+  LEGACY_CONFIG_BASENAME,
   LEGACY_PLUGIN_NAME,
   LOG_FILENAME,
   PLUGIN_NAME,
@@ -60,6 +61,28 @@ describe("plugin-identity constants", () => {
 
       // then
       expect(CONFIG_BASENAME).toBe("oh-my-openagent")
+    })
+  })
+
+  describe("LEGACY_CONFIG_BASENAME", () => {
+    it("equals oh-my-opencode", () => {
+      // given
+
+      // when
+
+      // then
+      expect(LEGACY_CONFIG_BASENAME).toBe("oh-my-opencode")
+    })
+  })
+
+  describe("LEGACY_PLUGIN_NAME", () => {
+    it("equals oh-my-opencode", () => {
+      // given
+
+      // when
+
+      // then
+      expect(LEGACY_PLUGIN_NAME).toBe("oh-my-opencode")
     })
   })
 

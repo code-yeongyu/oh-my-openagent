@@ -5,9 +5,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
 	cleanupTelemetryDiagnostics,
-	getTelemetryDiagnosticsFilePath,
-	writeTelemetryDiagnostic,
-} from "../src/diagnostics.js";
+} from "@oh-my-opencode/telemetry-core";
+import {
+	getComponentTelemetryDiagnosticsFilePath,
+	getComponentTelemetryStateDir,
+	writeComponentTelemetryDiagnostic,
+} from "../src/product-identity.js";
 import { CACHE_DIR_NAME } from "../src/product-identity.js";
 
 const originalXdgDataHome = process.env["XDG_DATA_HOME"];
@@ -54,7 +57,7 @@ describe("telemetry diagnostics", () => {
 		const dataHomePath = createDataHomePath();
 		process.env["XDG_DATA_HOME"] = dataHomePath;
 
-		writeTelemetryDiagnostic(
+		writeComponentTelemetryDiagnostic(
 			{
 				event: "telemetry_capture_failed",
 				error: new Error("capture failed"),
@@ -63,7 +66,7 @@ describe("telemetry diagnostics", () => {
 			new Date("2026-06-04T01:02:03.000Z"),
 		);
 
-		const diagnosticsFilePath = getTelemetryDiagnosticsFilePath();
+		const diagnosticsFilePath = getComponentTelemetryDiagnosticsFilePath();
 		expect(diagnosticsFilePath).toBe(path.join(dataHomePath, CACHE_DIR_NAME, "telemetry-diagnostics.jsonl"));
 
 		const entries = readDiagnosticEntries(diagnosticsFilePath);
@@ -99,8 +102,11 @@ describe("telemetry diagnostics", () => {
 			].join("\n")}\n`,
 		);
 
-		cleanupTelemetryDiagnostics(new Date("2026-06-04T00:00:00.000Z"));
-		writeTelemetryDiagnostic(
+		cleanupTelemetryDiagnostics({
+			diagnosticsDir: getComponentTelemetryStateDir(),
+			now: new Date("2026-06-04T00:00:00.000Z"),
+		});
+		writeComponentTelemetryDiagnostic(
 			{
 				event: "telemetry_capture_failed",
 				error: new Error("next failure"),

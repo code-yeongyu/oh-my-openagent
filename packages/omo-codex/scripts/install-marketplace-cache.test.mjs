@@ -77,7 +77,7 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.equal((await stat(join(alphaCacheRoot, "dist", "cli.js"))).isFile(), true);
 	assert.equal(await readlink(join(binDir, "alpha")), join(alphaCacheRoot, "dist", "cli.js"));
 	const alphaMcp = JSON.parse(await readFile(join(alphaCacheRoot, ".mcp.json"), "utf8"));
-	const sharedMcpCli = join(alphaCacheRoot, "mcp", "shared", "dist", "cli.js");
+	const sharedMcpCli = join(codexPackageRoot, "shared-lsp", "dist", "cli.js");
 	assert.deepEqual(alphaMcp.mcpServers.alpha.args, [join(alphaCacheRoot, "dist", "cli.js"), "mcp"]);
 	assert.deepEqual(alphaMcp.mcpServers.shared.args, [sharedMcpCli, "mcp"]);
 	assert.equal((await stat(sharedMcpCli)).isFile(), true);
@@ -152,11 +152,11 @@ test("#given sisyphuslabs marketplace #when installing #then registers the local
 	);
 	assert.deepEqual(marketplace.plugins, [{ name: "omo", source: { source: "local", path: "./omo/0.1.0" } }]);
 	const cachedMcp = JSON.parse(await readFile(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", ".mcp.json"), "utf8"));
-	assert.equal(cachedMcp.mcpServers.lsp.args[0], join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "mcp", "lsp", "dist", "cli.js"));
+	assert.equal(cachedMcp.mcpServers.lsp.args[0], join(repoRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"));
 	assert.equal((await stat(cachedMcp.mcpServers.lsp.args[0])).isFile(), true);
 	const snapshotPluginRoot = join(codexHome, ".tmp", "marketplaces", "sisyphuslabs", "plugins", "omo");
 	const snapshotMcp = JSON.parse(await readFile(join(snapshotPluginRoot, ".mcp.json"), "utf8"));
-	assert.equal(snapshotMcp.mcpServers.lsp.args[0], join(snapshotPluginRoot, "mcp", "lsp", "dist", "cli.js"));
+	assert.equal(snapshotMcp.mcpServers.lsp.args[0], join(repoRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"));
 	assert.equal((await stat(snapshotMcp.mcpServers.lsp.args[0])).isFile(), true);
 	await assert.rejects(stat(join(codexHome, "plugins", "cache", legacyCodexPluginMarketplace, "omo")), /code: 'ENOENT'|ENOENT/);
 });

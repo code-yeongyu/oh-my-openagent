@@ -1,13 +1,17 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { runStopHook } from "../src/codex-hook.js";
 import type { ReadonlyFileSystem, StopInput } from "../src/types.js";
 
-const WORKSPACE = "/repo";
-const BOULDER_PATH = join(WORKSPACE, ".omo", "boulder.json");
-const PLAN_PATH = join(WORKSPACE, ".omo", "plans", "plan.md");
-const LEDGER_PATH = join(WORKSPACE, ".omo", "start-work", "ledger.jsonl");
+const DEFAULT_WORKSPACE = "/repo";
+const cleanupRoots: string[] = [];
+
+afterEach(() => {
+	for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 describe("start-work Stop hook", () => {
 	it("#given stop hook is already active #when hook runs #then returns empty output", () => {
@@ -39,28 +43,29 @@ describe("start-work Stop hook", () => {
 
 	it("#given active codex work with remaining top-level tasks #when hook runs #then returns block JSON", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({
 				sessionIds: ["codex:sess_abc"],
 				status: "active",
 				worktreePath: "/tmp/worktree",
 			}),
-			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First", "- [x] Done", "- [ ] Second"].join("\n"),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First", "- [x] Done", "- [ ] Second"].join("\n"),
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		const parsed = parseBlockOutput(output);
 		expect(parsed.decision).toBe("block");
 		expect(parsed.reason).toContain("- Plan: `launch-plan`");
-		expect(parsed.reason).toContain(`- Plan file: \`${PLAN_PATH}\``);
-		expect(parsed.reason).toContain(`- Boulder state: \`${BOULDER_PATH}\``);
+		expect(parsed.reason).toContain(`- Plan file: \`${join(workspace, ".omo", "plans", "plan.md")}\``);
+		expect(parsed.reason).toContain(`- Boulder state: \`${join(workspace, ".omo", "boulder.json")}\``);
 		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `2` of `3`");
 		expect(parsed.reason).toContain("- Next incomplete task: `First`");
 		expect(parsed.reason).toContain("- Worktree: `/tmp/worktree`");
-		expect(parsed.reason).toContain(`- Ledger: \`${LEDGER_PATH}\``);
+		expect(parsed.reason).toContain(`- Ledger: \`${join(workspace, ".omo", "start-work", "ledger.jsonl")}\``);
 		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
 	});
 
@@ -68,11 +73,6 @@ describe("start-work Stop hook", () => {
 		// given
 		const transcriptPath = "/repo/transcript.jsonl";
 		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({
-				sessionIds: ["codex:sess_abc"],
-				status: "active",
-			}),
-			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
 			[transcriptPath]: [
 				JSON.stringify({
 					type: "message",
@@ -98,16 +98,14 @@ describe("start-work Stop hook", () => {
 
 	it("#given active codex work #when continuation directive is emitted #then subagent guidance is reliable", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({
-				sessionIds: ["codex:sess_abc"],
-				status: "active",
-			}),
-			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		const parsed = parseBlockOutput(output);
@@ -121,16 +119,14 @@ describe("start-work Stop hook", () => {
 
 	it("#given active codex work #when continuation directive is emitted #then QA weight is tier-scoped without echo bloat", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({
-				sessionIds: ["codex:sess_abc"],
-				status: "active",
-			}),
-			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		const parsed = parseBlockOutput(output);
@@ -144,13 +140,14 @@ describe("start-work Stop hook", () => {
 
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({ sessionIds: ["opencode:sess_abc"], status: "active" }),
-			[PLAN_PATH]: "- [ ] First",
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["opencode:sess_abc"], status: "active" }),
+			planMarkdown: "- [ ] First",
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		expect(output).toBe("");
@@ -158,13 +155,14 @@ describe("start-work Stop hook", () => {
 
 	it("#given bare legacy session id #when hook runs #then returns empty output", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({ sessionIds: ["sess_abc"], status: "active" }),
-			[PLAN_PATH]: "- [ ] First",
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["sess_abc"], status: "active" }),
+			planMarkdown: "- [ ] First",
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		expect(output).toBe("");
@@ -172,13 +170,14 @@ describe("start-work Stop hook", () => {
 
 	it("#given completed boulder work #when hook runs #then returns empty output", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "completed" }),
-			[PLAN_PATH]: "- [ ] First",
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "completed" }),
+			planMarkdown: "- [ ] First",
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		expect(output).toBe("");
@@ -186,12 +185,14 @@ describe("start-work Stop hook", () => {
 
 	it("#given malformed boulder JSON #when hook runs #then returns empty output", () => {
 		// given
-		const fs = createMemoryFs({
-			[BOULDER_PATH]: "{",
+		const workspace = createWorkspace({
+			boulderJson: "{",
+			planMarkdown: "- [ ] First",
 		});
+		const fs = createMemoryFs();
 
 		// when
-		const output = runStopHook(createStopInput(), fs);
+		const output = runStopHook(createStopInput(workspace), fs);
 
 		// then
 		expect(output).toBe("");
@@ -215,18 +216,32 @@ type BoulderInput = {
 	readonly worktreePath?: string;
 };
 
-function createStopInput(): StopInput {
+type WorkspaceInput = {
+	readonly boulderJson: string;
+	readonly planMarkdown: string;
+};
+
+function createStopInput(cwd = DEFAULT_WORKSPACE): StopInput {
 	return {
 		hook_event_name: "Stop",
 		session_id: "sess_abc",
 		turn_id: "turn_1",
 		transcript_path: "",
-		cwd: WORKSPACE,
+		cwd,
 		model: "gpt-5.5",
 		permission_mode: "default",
 		stop_hook_active: false,
 		last_assistant_message: "done",
 	};
+}
+
+function createWorkspace(input: WorkspaceInput): string {
+	const root = mkdtempSync(join(tmpdir(), "codex-continuation-hook-"));
+	cleanupRoots.push(root);
+	mkdirSync(join(root, ".omo", "plans"), { recursive: true });
+	writeFileSync(join(root, ".omo", "plans", "plan.md"), input.planMarkdown);
+	writeFileSync(join(root, ".omo", "boulder.json"), input.boulderJson);
+	return root;
 }
 
 function createBoulderJson(input: BoulderInput): string {
@@ -235,10 +250,20 @@ function createBoulderJson(input: BoulderInput): string {
 		active_plan: ".omo/plans/plan.md",
 		plan_name: "launch-plan",
 		status: input.status,
+		started_at: "2026-06-13T00:00:00.000Z",
 		session_ids: input.sessionIds,
 		...(input.worktreePath === undefined ? {} : { worktree_path: input.worktreePath }),
 	};
-	return JSON.stringify({ schema_version: 2, active_work_id: "work_1", works: { work_1: work } });
+	return JSON.stringify({
+		schema_version: 2,
+		active_work_id: "work_1",
+		works: { work_1: work },
+		active_plan: ".omo/plans/plan.md",
+		plan_name: "legacy-launch-plan",
+		started_at: "2026-06-13T00:00:00.000Z",
+		status: input.status,
+		session_ids: input.sessionIds,
+	});
 }
 
 function createMemoryFs(files: Record<string, string> = {}): ReadonlyFileSystem {

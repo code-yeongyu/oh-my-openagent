@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { stampGitBashMcpEnv } from "./install/git-bash-mcp-env.mjs";
+import { stampGitBashMcpEnv } from "./install-dist/install-local.mjs";
 
 const MANIFEST = `${JSON.stringify(
 	{

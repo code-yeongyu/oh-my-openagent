@@ -1,3 +1,4 @@
+import { isPlainRecord, parseConfigSections } from "@oh-my-opencode/utils"
 import * as fs from "fs";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../config";
 import {
@@ -8,9 +9,7 @@ import {
 } from "../shared";
 import { addAgentOrderWarnings } from "./agent-order-warnings";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
+
 
 export function loadExplicitGitMasterOverrides(configPath: string): Record<string, unknown> | undefined {
   try {
@@ -22,7 +21,7 @@ export function loadExplicitGitMasterOverrides(configPath: string): Record<strin
     const rawConfig = parseJsonc<Record<string, unknown>>(content);
     const gitMaster = rawConfig.git_master;
 
-    if (isRecord(gitMaster)) {
+    if (isPlainRecord(gitMaster)) {
       return gitMaster;
     }
   } catch (error) {
@@ -38,37 +37,11 @@ export function loadExplicitGitMasterOverrides(configPath: string): Record<strin
 export function parseConfigPartially(
   rawConfig: Record<string, unknown>
 ): Partial<OhMyOpenCodeConfig> | null {
-  const fullResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
-  if (fullResult.success) {
-    return fullResult.data;
-  }
-
-  const partialConfig: Partial<OhMyOpenCodeConfig> = {};
-  const invalidSections: string[] = [];
-
-  for (const key of Object.keys(rawConfig)) {
-    const sectionResult = OhMyOpenCodeConfigSchema.safeParse({ [key]: rawConfig[key] });
-    if (sectionResult.success) {
-      const parsedEntry = Object.entries(sectionResult.data).find(([entryKey]) => entryKey === key);
-      if (parsedEntry?.[1] !== undefined) {
-        Object.assign(partialConfig, { [key]: parsedEntry[1] });
-      }
-    } else {
-      const sectionErrors = sectionResult.error.issues
-        .filter((i) => i.path[0] === key)
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join(", ");
-      if (sectionErrors) {
-        invalidSections.push(`${key}: ${sectionErrors}`);
-      }
-    }
-  }
-
-  if (invalidSections.length > 0) {
-    log("Partial config loaded - invalid sections skipped:", invalidSections);
-  }
-
-  return partialConfig;
+  return parseConfigSections(OhMyOpenCodeConfigSchema, rawConfig, {
+    onInvalidSections: (invalidSections) => {
+      log("Partial config loaded - invalid sections skipped:", invalidSections);
+    },
+  });
 }
 
 export function loadConfigFromPath(
