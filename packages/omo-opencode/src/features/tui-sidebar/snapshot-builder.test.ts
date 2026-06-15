@@ -6,6 +6,7 @@ import { join, resolve } from "node:path"
 import { LOOP_FRESH_MS } from "./constants"
 import { buildTuiRuntimeSnapshot } from "./snapshot-builder"
 import { TuiRuntimeSnapshotSchema } from "./snapshot-schema"
+import type { SessionAgentResolver } from "./snapshot-builder"
 import type { BackgroundTaskSnapshot } from "../background-agent/types"
 
 type StatusRow = { readonly type: string }
@@ -54,16 +55,7 @@ function createClient(statuses: StatusMap): FakeClient {
   return {
     session: {
       status: async () => ({ data: statuses }),
-      messages: async ({ path }) => ({
-        data: [
-          {
-            id: `${path.id}-message`,
-            agent: path.id === "ses-main" ? "Sisyphus" : "Atlas",
-            info: { agent: path.id === "ses-main" ? "Sisyphus" : "Atlas", time: { created: 1 } },
-            parts: [{ type: "text" }],
-          },
-        ],
-      }),
+      messages: async () => ({ data: [] }),
     },
   }
 }
@@ -71,6 +63,17 @@ function createClient(statuses: StatusMap): FakeClient {
 function createBackgroundManager(tasks: readonly BackgroundTaskSnapshot[]): FakeBackgroundManager {
   return {
     getTasksSnapshot: () => tasks,
+  }
+}
+
+const resolveTestSessionAgent: SessionAgentResolver = async (sessionID) => {
+  switch (sessionID) {
+    case "ses-main":
+      return "sisyphus"
+    case "ses-sub":
+      return "atlas"
+    default:
+      return null
   }
 }
 
@@ -107,6 +110,7 @@ describe("buildTuiRuntimeSnapshot", () => {
           agent: "sisyphus",
         },
       ]),
+      sessionAgentResolver: resolveTestSessionAgent,
     })
 
     // then

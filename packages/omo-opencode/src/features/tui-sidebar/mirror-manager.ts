@@ -3,6 +3,7 @@ import { writeMirror } from "./mirror-io"
 import { buildTuiRuntimeSnapshot } from "./snapshot-builder"
 import type {
   BuildTuiRuntimeSnapshotInput,
+  SessionAgentResolver,
   SessionStatusMap,
   TuiBackgroundSnapshotProvider,
   TuiMirrorClient,
@@ -14,6 +15,7 @@ export type TuiStateMirrorInput = {
   readonly projectDir: string
   readonly backgroundManager: TuiBackgroundSnapshotProvider
   readonly getStatuses?: () => Promise<SessionStatusMap>
+  readonly sessionAgentResolver?: SessionAgentResolver
 }
 
 export class TuiStateMirror {
