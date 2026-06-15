@@ -28,9 +28,9 @@ function isExecutable(filePath: string): boolean {
 }
 
 function resolvePathValue(): string | undefined {
-  if (process.platform === "win32") return process.env.Path ?? process.env.PATH
+  if (process.platform === "win32") return process.env["Path"] ?? process.env["PATH"]
 
-  return process.env.PATH
+  return process.env["PATH"]
 }
 
 function getWindowsCandidates(commandName: string): string[] {

@@ -42,6 +42,16 @@
 						"statusMessage": "LazyCodex(4.10.0): Checking Bootstrap Provisioning"
 					}
 				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/codegraph/dist/cli.js\" hook session-start",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(4.10.0): Checking Codegraph Bootstrap"
+					}
+				]
 			}
 		],
 		"UserPromptSubmit": [

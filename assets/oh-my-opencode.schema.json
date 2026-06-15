@@ -6540,6 +6540,34 @@
       ],
       "additionalProperties": false
     },
+    "codegraph": {
+      "type": "object",
+      "properties": {
+        "auto_provision": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "install_dir": {
+          "type": "string"
+        },
+        "telemetry": {
+          "type": "boolean"
+        },
+        "watch_debounce_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "auto_provision",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "team_mode": {
       "type": "object",
       "properties": {

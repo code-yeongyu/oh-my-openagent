@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,6 +20,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	ultrawork: "user-prompt-submit",
 	"ulw-loop": "pre-tool-use",
 };
+const MCP_ONLY_COMPONENTS = new Set(["codegraph"]);
 const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;
 
 test("#given required component CLI contracts #when workspaces are inspected #then every contract component is covered", async () => {
@@ -71,6 +72,38 @@ test("#given built workspace component CLIs #when dynamically imported with hook
 	assert.deepEqual(failures, []);
 });
 
+test("#given built MCP-only CodeGraph entries #when executed with a fake binary #then each entry is self-contained", () => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-mcp-wrapper-"));
+	try {
+		const fakeBinaryPath = join(tempRoot, "codegraph-fake.cjs");
+		const invocationLogPath = join(tempRoot, "invocations.log");
+		writeFileSync(
+			fakeBinaryPath,
+			[
+				"#!/usr/bin/env node",
+				"const fs = require('node:fs');",
+				"fs.appendFileSync(process.env.CODEGRAPH_FAKE_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');",
+				"",
+			].join("\n"),
+		);
+		chmodSync(fakeBinaryPath, 0o755);
+
+		const serveResult = runCodegraphMcpEntry("serve.js", tempRoot, fakeBinaryPath, invocationLogPath);
+		const cliResult = runCodegraphMcpEntry("cli.js", tempRoot, fakeBinaryPath, invocationLogPath);
+
+		assert.equal(serveResult.status, 0, `serve.js stderr: ${serveResult.stderr}`);
+		assert.equal(cliResult.status, 0, `cli.js stderr: ${cliResult.stderr}`);
+		assert.equal(serveResult.stderr, "");
+		assert.equal(cliResult.stderr, "");
+		assert.deepEqual(readFileSync(invocationLogPath, "utf8").trim().split("\n"), [
+			'["serve","--mcp"]',
+			'["serve","--mcp"]',
+		]);
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
 test("#given representative component hook payloads #when executed through dist CLI contract #then current hook behavior is preserved", async () => {
 	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-cli-contract-"));
 	try {
@@ -116,6 +149,7 @@ test("#given aggregate hook manifest #when command hooks are inspected #then com
 	// when
 	const missingContracts = components.filter(
 		(component) =>
+			!MCP_ONLY_COMPONENTS.has(component) &&
 			!commands.some((command) =>
 				command.startsWith(`node "\${PLUGIN_ROOT}/components/${component}/dist/cli.js" hook `),
 			),
@@ -130,6 +164,7 @@ async function workspaceComponents() {
 	return packageJson.workspaces
 		.filter((workspace) => workspace.startsWith("components/"))
 		.map((workspace) => workspace.slice("components/".length))
+		.filter((component) => !MCP_ONLY_COMPONENTS.has(component))
 		.sort();
 }
 
@@ -154,6 +189,20 @@ function collectHookCommands(hooksByEvent) {
 
 function componentCliPath(component) {
 	return join(root, "components", component, "dist", "cli.js");
+}
+
+function runCodegraphMcpEntry(entryName, tempRoot, fakeBinaryPath, invocationLogPath) {
+	return spawnSync(process.execPath, [join(root, "components", "codegraph", "dist", entryName)], {
+		cwd: root,
+		encoding: "utf8",
+		env: {
+			...process.env,
+			CODEGRAPH_FAKE_LOG: invocationLogPath,
+			HOME: tempRoot,
+			OMO_CODEGRAPH_BIN: fakeBinaryPath,
+		},
+		timeout: HOOK_CLI_TEST_TIMEOUT_MS,
+	});
 }
 
 function runHookCli(component, event, payload, tempRoot, extraEnv = {}) {

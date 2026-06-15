@@ -184,6 +184,32 @@ describe("install-codex", () => {
     expect(legacyCacheMissing).toBe(true)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
+  test("#given codex installer #when installing omo #then seeds OMO SOT through local migration script", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-sot-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-sot-"))
+    const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-sot-"))
+    const repoRoot = process.cwd()
+    const invocations: Array<{ readonly command: string; readonly args: readonly string[]; readonly home: string | undefined }> = []
+
+    // when
+    await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot,
+      env: { HOME: home },
+      runCommand: async (command, args, options) => {
+        invocations.push({ command, args: [...args], home: options.env?.HOME })
+      },
+    })
+
+    // then
+    const sotInvocation = invocations.find((invocation) => invocation.args.some((arg) => arg.endsWith("migrate-omo-sot.mjs")))
+    expect(sotInvocation?.command).toBe(process.execPath)
+    expect(sotInvocation?.args).toContain("--seed")
+    expect(sotInvocation?.home).toBe(home)
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
   test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
