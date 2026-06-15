@@ -1,3 +1,5 @@
+import { splitProvidersAndModel } from "../../shared/model-string-parser"
+
 export function resolveRunModel(
   modelString?: string
 ): { providerID: string; modelID: string } | undefined {
@@ -10,20 +12,10 @@ export function resolveRunModel(
     throw new Error("Model string cannot be empty")
   }
 
-  const parts = trimmed.split("/")
-  if (parts.length < 2) {
-    throw new Error("Model string must be in 'provider/model' format")
+  const { providers, modelID } = splitProvidersAndModel(trimmed)
+  if (providers.length === 0 || !modelID) {
+    throw new Error("Model string must be in 'provider/model' or 'provider1|provider2/name' format")
   }
 
-  const providerID = parts[0]
-  if (providerID.length === 0) {
-    throw new Error("Provider cannot be empty")
-  }
-
-  const modelID = parts.slice(1).join("/")
-  if (modelID.length === 0) {
-    throw new Error("Model ID cannot be empty")
-  }
-
-  return { providerID, modelID }
+  return { providerID: providers[0], modelID }
 }

@@ -1,3 +1,5 @@
+import { splitProvidersAndModel } from "./model-string-parser"
+
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
@@ -88,23 +90,28 @@ export function resolveModelPipeline(
 
   const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
   if (normalizedUiModel) {
-    log("Model resolved via UI selection", { model: normalizedUiModel })
-    return { model: normalizedUiModel, provenance: "override" }
+    const { providers: uiProviders, modelID: uiModelID } = splitProvidersAndModel(normalizedUiModel)
+    const normalizedModel = uiProviders.length > 0 && uiModelID ? `${uiProviders[0]}/${uiModelID}` : normalizedUiModel
+    log("Model resolved via UI selection", { model: normalizedModel })
+    return { model: normalizedModel, provenance: "override" }
   }
 
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
-    log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+    const { providers: userProviders, modelID: userModelID } = splitProvidersAndModel(normalizedUserModel)
+    const normalizedModel = userProviders.length > 0 && userModelID ? `${userProviders[0]}/${userModelID}` : normalizedUserModel
+    log("Model resolved via config override", { model: normalizedModel })
+    return { model: normalizedModel, provenance: "override" }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
   if (normalizedCategoryDefault) {
     attempted.push(normalizedCategoryDefault)
     if (availableModels.size > 0) {
-      const parts = normalizedCategoryDefault.split("/")
-      const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-      const match = deps.fuzzyMatchModel(normalizedCategoryDefault, availableModels, providerHint)
+      const { providers: catProviders, modelID: catModelID } = splitProvidersAndModel(normalizedCategoryDefault)
+      const fusedModel = catProviders.length > 0 && catModelID ? `${catProviders[0]}/${catModelID}` : normalizedCategoryDefault
+      const providerHint = catProviders.length > 0 ? [catProviders[0]] : undefined
+      const match = deps.fuzzyMatchModel(fusedModel, availableModels, providerHint)
       if (match) {
         log("Model resolved via category default (fuzzy matched)", {
           original: normalizedCategoryDefault,
@@ -120,12 +127,11 @@ export function resolveModelPipeline(
         })
         return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
       }
-      const parts = normalizedCategoryDefault.split("/")
-      if (parts.length >= 2) {
-        const provider = parts[0]
-        if (connectedProviders.includes(provider)) {
-          const modelName = parts.slice(1).join("/")
-          const transformedModel = `${provider}/${deps.transformModelForProvider(provider, modelName)}`
+      const { providers: catProviders, modelID: catModelID } = splitProvidersAndModel(normalizedCategoryDefault)
+      if (catProviders.length > 0 && catModelID) {
+        const matchedProvider = catProviders.find(p => connectedProviders.includes(p))
+        if (matchedProvider) {
+          const transformedModel = `${matchedProvider}/${deps.transformModelForProvider(matchedProvider, catModelID)}`
           log("Model resolved via category default (connected provider)", {
             model: transformedModel,
             original: normalizedCategoryDefault,
@@ -149,12 +155,11 @@ export function resolveModelPipeline(
       if (connectedSet !== null) {
         for (const model of userFallbackModels) {
           attempted.push(model)
-          const parts = model.split("/")
-          if (parts.length >= 2) {
-            const provider = parts[0]
-            if (connectedSet.has(provider)) {
-              const modelName = parts.slice(1).join("/")
-              const transformedModel = `${provider}/${deps.transformModelForProvider(provider, modelName)}`
+          const { providers: fbProviders, modelID: fbModelID } = splitProvidersAndModel(model)
+          if (fbProviders.length > 0 && fbModelID) {
+            const matchedProvider = fbProviders.find(p => connectedSet.has(p))
+            if (matchedProvider) {
+              const transformedModel = `${matchedProvider}/${deps.transformModelForProvider(matchedProvider, fbModelID)}`
               log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
               return { model: transformedModel, provenance: "provider-fallback", attempted }
             }
@@ -165,9 +170,10 @@ export function resolveModelPipeline(
     } else {
       for (const model of userFallbackModels) {
         attempted.push(model)
-        const parts = model.split("/")
-        const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-        const match = deps.fuzzyMatchModel(model, availableModels, providerHint)
+        const { providers: fbProviders, modelID: fbModelID } = splitProvidersAndModel(model)
+        const providerHint = fbProviders.length > 0 ? [fbProviders[0]] : undefined
+        const fusedModel = fbProviders.length > 0 && fbModelID ? `${fbProviders[0]}/${fbModelID}` : model
+        const match = deps.fuzzyMatchModel(fusedModel, availableModels, providerHint)
         if (match) {
           log("Model resolved via user fallback_models (availability confirmed)", { model: model, match })
           return { model: match, provenance: "provider-fallback", attempted }

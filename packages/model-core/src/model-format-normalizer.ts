@@ -1,3 +1,5 @@
+import { splitProvidersAndModel } from "./model-string-parser"
+
 export function normalizeModelFormat(
   model: string | { providerID: string; modelID: string } | null | undefined
 ): { providerID: string; modelID: string } | undefined {
@@ -10,9 +12,9 @@ export function normalizeModelFormat(
   }
 
   if (typeof model === "string") {
-    const parts = model.split("/")
-    if (parts.length >= 2) {
-      return { providerID: parts[0], modelID: parts.slice(1).join("/") }
+    const { providers, modelID } = splitProvidersAndModel(model)
+    if (providers.length > 0 && modelID) {
+      return { providerID: providers[0], modelID }
     }
   }
 

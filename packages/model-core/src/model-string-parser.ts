@@ -45,23 +45,44 @@ export function parseModelString(
   const trimmedModel = model.trim()
   if (!trimmedModel) return undefined
 
-  const separatorIndex = trimmedModel.indexOf("/")
-  if (separatorIndex === -1) {
-    return undefined
-  }
+  const { providers, modelID } = splitProvidersAndModel(model)
+  if (providers.length === 0) return undefined
+  if (!modelID) return undefined
 
-  const providerID = trimmedModel.slice(0, separatorIndex).trim()
-  const rawModelID = trimmedModel.slice(separatorIndex + 1).trim()
-  if (!providerID || !rawModelID) {
-    return undefined
-  }
+  const parsedModel = parseVariantFromModelID(modelID)
+  if (!parsedModel.modelID) return undefined
 
-  const parsedModel = parseVariantFromModelID(rawModelID)
-  if (!parsedModel.modelID) {
-    return undefined
-  }
-
+  const providerID = providers[0]
   return parsedModel.variant
     ? { providerID, modelID: parsedModel.modelID, variant: parsedModel.variant }
     : { providerID, modelID: parsedModel.modelID }
+}
+
+/**
+ * Split a model string into providers and model ID.
+ * Supports pipe syntax: `"cpa|opencode-go/kimi-k2.6"` → providers: [`cpa`, `opencode-go`], modelID: `kimi-k2.6`
+ * Falls back to existing format: `"cpa/kimi-k2.6"` → providers: [`cpa`], modelID: `kimi-k2.6`
+ * No slash: `"model-name"` → providers: [], modelID: `model-name`
+ */
+export function splitProvidersAndModel(
+  s: string,
+): { providers: string[]; modelID: string } {
+  const trimmed = s.trim()
+  if (!trimmed) return { providers: [], modelID: "" }
+
+  const hasPipe = trimmed.includes("|")
+  const slashIndex = hasPipe ? trimmed.lastIndexOf("/") : trimmed.indexOf("/")
+
+
+  if (slashIndex === -1) {
+    return { providers: [], modelID: trimmed }
+  }
+
+  const providersPart = trimmed.slice(0, slashIndex)
+  const modelID = trimmed.slice(slashIndex + 1).trim()
+  const providers = hasPipe
+    ? providersPart.split("|").map(p => p.trim()).filter(Boolean)
+    : [providersPart.trim()].filter(Boolean)
+
+  return { providers, modelID }
 }

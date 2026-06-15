@@ -1,3 +1,5 @@
+import { splitProvidersAndModel } from "../shared/model-string-parser"
+
 import type { OhMyOpenCodeConfig } from "../config"
 import type { AgentOverrides } from "../config/schema/agent-overrides"
 import { getSessionAgent } from "../features/claude-code-session-state"
@@ -83,13 +85,12 @@ export function resolveUltraworkOverride(
   if (!ultraworkConfig.model) {
     return { variant: ultraworkConfig.variant }
   }
-
-  const modelParts = ultraworkConfig.model.split("/")
-  if (modelParts.length < 2) return null
+  const { providers, modelID } = splitProvidersAndModel(ultraworkConfig.model)
+  if (providers.length === 0 || !modelID) return null
 
   return {
-    providerID: modelParts[0],
-    modelID: modelParts.slice(1).join("/"),
+    providerID: providers[0],
+    modelID,
     variant: ultraworkConfig.variant,
   }
 }

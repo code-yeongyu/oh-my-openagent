@@ -1,1 +1,1 @@
-export { parseVariantFromModelID, parseModelString } from "@oh-my-opencode/model-core"
+export { parseVariantFromModelID, parseModelString, splitProvidersAndModel } from "@oh-my-opencode/model-core"

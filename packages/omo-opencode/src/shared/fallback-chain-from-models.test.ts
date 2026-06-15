@@ -456,4 +456,79 @@ describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
       },
     ])
   })
+
+})
+describe("buildFallbackChainFromModels with pipe syntax", () => {
+  it("expands cpa|opencode-go/kimi-k2.6 to two entries", () => {
+    const result = buildFallbackChainFromModels(
+      ["cpa|opencode-go/kimi-k2.6"],
+      undefined,
+    )
+    expect(result).toEqual([
+      { providers: ["cpa"], model: "kimi-k2.6" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+    ])
+  })
+
+  it("expands object entry with pipe syntax in model field", () => {
+    const result = buildFallbackChainFromModels(
+      [{ model: "cpa|opencode-go/kimi-k2.6", variant: "medium", reasoningEffort: "high" }],
+      undefined,
+    )
+    expect(result).toEqual([
+      { providers: ["cpa"], model: "kimi-k2.6", variant: "medium", reasoningEffort: "high" },
+      { providers: ["opencode-go"], model: "kimi-k2.6", variant: "medium", reasoningEffort: "high" },
+    ])
+  })
+
+  it("mixed array of pipe and standard entries", () => {
+    const result = buildFallbackChainFromModels(
+      [
+        "cpa|opencode-go/kimi-k2.6",
+        "google/gemini-3-flash",
+        { model: "cpa/glm-5", variant: "low" },
+      ],
+      undefined,
+    )
+    expect(result).toEqual([
+      { providers: ["cpa"], model: "kimi-k2.6" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+      { providers: ["google"], model: "gemini-3-flash" },
+      { providers: ["cpa"], model: "glm-5", variant: "low" },
+    ])
+  })
+
+  it("standard provider/model still works alongside pipe entries", () => {
+    const result = buildFallbackChainFromModels(
+      ["cpa/kimi-k2.5", "opencode-go/big-pickle"],
+      undefined,
+    )
+    expect(result).toEqual([
+      { providers: ["cpa"], model: "kimi-k2.5" },
+      { providers: ["opencode-go"], model: "big-pickle" },
+    ])
+  })
+
+  it("object entry parses inline variant from pipe-syntax model", () => {
+    const result = buildFallbackChainFromModels(
+      [{ model: "cpa|opencode-go/kimi-k2.6 high" }],
+      undefined,
+    )
+    expect(result).toEqual([
+      { providers: ["cpa"], model: "kimi-k2.6", variant: "high" },
+      { providers: ["opencode-go"], model: "kimi-k2.6", variant: "high" },
+    ])
+  })
+})
+
+describe("parseFallbackModelEntry with pipe syntax", () => {
+  it("uses first provider from pipe syntax", () => {
+    const result = parseFallbackModelEntry("cpa|opencode-go/kimi-k2.6", undefined)
+    expect(result).toEqual({ providers: ["cpa"], model: "kimi-k2.6" })
+  })
+
+  it("parses variant from pipe-syntax model", () => {
+    const result = parseFallbackModelEntry("cpa|opencode-go/kimi-k2.6 high", undefined)
+    expect(result).toEqual({ providers: ["cpa"], model: "kimi-k2.6", variant: "high" })
+  })
 })
