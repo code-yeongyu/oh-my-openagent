@@ -105,7 +105,7 @@ function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, ag
 	const checkpointCommand = `omo ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<tests/files/PR evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
 	return joinLines([
 		"Final story — run mandatory quality gate before update_goal:",
-		"- Run ai-slop-cleaner on changed files even when it is a no-op, rerun verification, then run the code review (multi_agent_v1.spawn_agent(agent_type=\"codex-ultrawork-reviewer\", fork_context=false, ...); fall back to agent_type=\"worker\" with a scoped reviewer assignment if unavailable).",
+		'- Run ai-slop-cleaner on changed files even when it is a no-op, rerun verification, then run the code review (multi_agent_v1.spawn_agent(agent_type="codex-ultrawork-reviewer", fork_context=false, ...); fall back to agent_type="worker" with a scoped reviewer assignment if unavailable).',
 		"- If the final review is not APPROVE with architect status CLEAR, do not call update_goal. Record blocker work first:",
 		`  ${blockerCommand}`,
 		aggregate
