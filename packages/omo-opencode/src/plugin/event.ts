@@ -172,6 +172,10 @@ export function createEventHandler(args: {
         await dispatchOpenClawSessionEvent({ pluginConfig, pluginContext, managers, rawEvent: event.type, sessionID });
       }
       await dispatchIdleOnlyHooks(input);
+      await Promise.resolve().then(() => managers.monitorManager?.handleEvent({
+        type: "session.idle",
+        sessionId: resolveSessionEventID(props) ?? "",
+      }));
     }
 
     if (event.type === "message.updated") {

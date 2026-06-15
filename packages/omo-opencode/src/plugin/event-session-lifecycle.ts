@@ -96,6 +96,7 @@ export async function handleSessionDeletedEvent(args: {
   if (sessionID === getMainSessionID()) setMainSession(undefined);
   if (!sessionID) return;
 
+  await args.managers.monitorManager?.stopSessionMonitors(sessionID);
   const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
   clearSessionAgent(sessionID);
   args.clearModelFallbackSession(sessionID);
