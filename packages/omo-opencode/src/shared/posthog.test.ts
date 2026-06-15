@@ -234,6 +234,15 @@ describe("posthog trackActive emission contract", () => {
     const captured: CapturedPostHogMessage[] = []
     const posthogModule = usePostHogModule(await importPostHogModule())
     posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setOsProviderForTesting({
+      arch: () => "arm64",
+      cpus: () => [{ model: "Test CPU" }],
+      hostname: () => "test-host",
+      platform: () => "linux",
+      release: () => "6.8.0-test",
+      totalmem: () => 16 * 1024 * 1024 * 1024,
+      type: () => "Linux",
+    })
     posthogModule.__setActivityStateProviderForTesting(() => ({
       dayUTC: "2026-04-18",
       captureDaily: true,
@@ -258,9 +267,16 @@ describe("posthog trackActive emission contract", () => {
     expect(Object.keys(properties).sort()).toEqual(expectedPropertyKeys.sort())
     expect(properties).toMatchObject({
       platform: "oh-my-opencode",
-      package_name: "oh-my-opencode",
+      package_name: "oh-my-openagent",
       plugin_name: "oh-my-openagent",
       source: "cli",
+      $os: "linux",
+      $os_version: "6.8.0-test",
+      os_arch: "arm64",
+      os_type: "Linux",
+      cpu_count: 1,
+      cpu_model: "Test CPU",
+      total_memory_gb: 16,
       $process_person_profile: false,
       day_utc: "2026-04-18",
       reason: "run_started",
