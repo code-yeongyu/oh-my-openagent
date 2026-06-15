@@ -47,7 +47,7 @@ const BASE_GATE = {
 				id: "artifact-cli-reject",
 				kind: "log",
 				description: "Log proving invalid gate rejection.",
-				path: "rejection.log",
+				path: "rejection.txt",
 			},
 		],
 	},

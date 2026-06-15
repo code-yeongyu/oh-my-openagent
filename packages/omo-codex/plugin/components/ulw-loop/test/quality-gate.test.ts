@@ -51,7 +51,7 @@ const VALID_GATE = {
 				id: "artifact-cli-reject",
 				kind: "log",
 				description: "Log proving malformed quality gate rejection.",
-				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.log",
+				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt",
 			},
 		],
 	},

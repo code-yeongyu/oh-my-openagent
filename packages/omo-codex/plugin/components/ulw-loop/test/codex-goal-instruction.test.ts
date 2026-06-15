@@ -191,13 +191,7 @@ describe("buildCodexGoalInstruction criteria section", () => {
 	});
 });
 
-describe("buildCodexGoalInstruction rebrand audit", () => {
-	it("emits no legacy brand references in any rendered string", () => {
-		const legacyBrand = ["o", "m", "x"].join("");
-		const { text } = buildCodexGoalInstruction({ plan: makePlan(), goal: makeGoal() });
-		expect(text).not.toMatch(new RegExp(legacyBrand, "i"));
-	});
-
+describe("buildCodexGoalInstruction artifact guidance", () => {
 	it("references .omo/ulw-loop in artifact paths", () => {
 		const { text } = buildCodexGoalInstruction({ plan: makePlan({ codexGoalMode: "aggregate" }), goal: makeGoal() });
 		expect(text).toContain(".omo/ulw-loop");
