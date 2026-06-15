@@ -59,7 +59,18 @@ test("#given component directories #when scanned #then only intentional resource
 	componentNames.sort();
 
 	// then
-	assert.deepEqual(componentNames, expectedComponentNames);
+	assert.deepEqual(componentNames, [
+		"bootstrap",
+		"comment-checker",
+		"git-bash",
+		"lazycodex-executor-verify",
+		"lsp",
+		"rules",
+		"start-work-continuation",
+		"telemetry",
+		"ultrawork",
+		"ulw-loop",
+	]);
 	for (const name of componentNames) {
 		const expectedManifest = expectedComponentManifests.get(name);
 		if (expectedManifest !== undefined) {

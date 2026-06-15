@@ -1,6 +1,7 @@
 const PRODUCT_NAME = "LazyCodex";
 
 const WORD_OVERRIDES = new Map([
+	["lazycodex", "LazyCodex"],
 	["lsp", "LSP"],
 	["ulw-loop", "Ulw-Loop"],
 ]);

@@ -10,7 +10,7 @@ type PackageJson = {
 };
 
 describe("codex ultrawork package metadata", () => {
-	it("#given package metadata #when inspected #then hook ships as built TypeScript", () => {
+	it("#given package metadata #when inspected #then hook ships as bundled CLI", () => {
 		// given
 		const packageJson = readPackageJson("package.json");
 		const hooksJson = readJson("hooks/hooks.json");
@@ -25,7 +25,9 @@ describe("codex ultrawork package metadata", () => {
 		expect(packageJson.type).toBe("module");
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
 		expect(packageJson.bin["omo-ultrawork"]).toBe("./dist/cli.js");
-		expect(packageJson.scripts["build"]).toBe("node scripts/sync-directive.mjs && tsc -p tsconfig.build.json");
+		expect(packageJson.scripts["build"]).toBe(
+			"node scripts/sync-directive.mjs && node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
+		);
 		expect(packageJson.scripts["test"]).toBe("vitest --run");
 		expect(packageFiles).toContain("dist");
 		expect(packageFiles).toContain("directive.md");
