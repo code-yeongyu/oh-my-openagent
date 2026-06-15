@@ -187,7 +187,7 @@ describe("runCliInstaller", () => {
       const result = await runCliInstaller(args, "3.4.0")
 
       expect(result).toBe(0)
-      expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`${PLUGIN_NAME}/tui`)
+      expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
 
       for (const spy of restoreSpies) {
         spy.mockRestore()

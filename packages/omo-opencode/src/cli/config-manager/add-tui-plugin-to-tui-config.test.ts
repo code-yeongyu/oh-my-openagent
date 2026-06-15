@@ -36,7 +36,7 @@ afterEach(() => {
 })
 
 describe("ensureTuiPluginEntry", () => {
-  it("#given named server entry #when ensuring TUI config #then it adds canonical entry once and preserves others", () => {
+  it("#given named server entry #when ensuring TUI config #then it adds package entry once and preserves others", () => {
     // given
     const dir = tempConfigDir()
     writeConfig(dir, "opencode.json", { plugin: [PLUGIN_NAME] })
@@ -49,8 +49,21 @@ describe("ensureTuiPluginEntry", () => {
     // then
     expect(first).toEqual({ changed: true, reason: "added" })
     expect(second).toEqual({ changed: false, reason: "already-present" })
-    expect(readTuiPlugins(dir)).toEqual(["some-other/tui", `${PLUGIN_NAME}/tui`])
+    expect(readTuiPlugins(dir)).toEqual(["some-other/tui", PLUGIN_NAME])
     expect(readFileSync(join(dir, "tui.json"), "utf-8")).toContain('"theme": "dark"')
+  })
+
+  it("#given versioned named server entry #when ensuring TUI config #then it reuses the package spec", () => {
+    // given
+    const dir = tempConfigDir()
+    writeConfig(dir, "opencode.json", { plugin: [`${PLUGIN_NAME}@4.9.2`] })
+
+    // when
+    const result = ensureTuiPluginEntry({ configDir: dir })
+
+    // then
+    expect(result).toEqual({ changed: true, reason: "added" })
+    expect(readTuiPlugins(dir)).toEqual([`${PLUGIN_NAME}@4.9.2`])
   })
 
   it("#given file server entry and stale named TUI entry #when ensuring #then it adds the matching file entry", () => {
@@ -67,21 +80,21 @@ describe("ensureTuiPluginEntry", () => {
     // then
     expect(first).toEqual({ changed: true, reason: "added" })
     expect(second).toEqual({ changed: false, reason: "already-present" })
-    expect(readTuiPlugins(dir)).toEqual([`${PLUGIN_NAME}/tui`, fileEntry])
+    expect(readTuiPlugins(dir)).toEqual([fileEntry])
   })
 
   it("#given legacy server entry #when legacy TUI entry already exists #then it does not duplicate", () => {
     // given
     const dir = tempConfigDir()
     writeConfig(dir, "opencode.json", { plugin: [LEGACY_PLUGIN_NAME] })
-    writeConfig(dir, "tui.json", { plugin: [`${LEGACY_PLUGIN_NAME}/tui`] })
+    writeConfig(dir, "tui.json", { plugin: [LEGACY_PLUGIN_NAME] })
 
     // when
     const result = ensureTuiPluginEntry({ configDir: dir })
 
     // then
     expect(result).toEqual({ changed: false, reason: "already-present" })
-    expect(readTuiPlugins(dir)).toEqual([`${LEGACY_PLUGIN_NAME}/tui`])
+    expect(readTuiPlugins(dir)).toEqual([LEGACY_PLUGIN_NAME])
   })
 
   it("#given missing or source-only server entry #when ensuring #then it does not write", () => {
