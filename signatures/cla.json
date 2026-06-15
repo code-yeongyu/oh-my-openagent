@@ -3823,6 +3823,14 @@
       "created_at": "2026-06-13T15:08:19Z",
       "repoId": 1108837393,
       "pullRequestNo": 5256
+    },
+    {
+      "name": "yeongjunyoo",
+      "id": 47925973,
+      "comment_id": 4704101232,
+      "created_at": "2026-06-15T02:58:37Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 5302
     }
   ]
 }
