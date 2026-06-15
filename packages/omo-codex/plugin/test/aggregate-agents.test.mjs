@@ -134,3 +134,29 @@ test("#given lazycodex agent prompts #when inspected #then each role pins model 
 		}
 	}
 });
+
+test("#given LazyCodex reviewer prompts #when inspected #then anti-slop review coverage is required", async () => {
+	const agentsDir = join(root, "components", "ultrawork", "agents");
+	const codeReviewer = await readFile(join(agentsDir, "lazycodex-code-reviewer.toml"), "utf8");
+	const gateReviewer = await readFile(join(agentsDir, "lazycodex-gate-reviewer.toml"), "utf8");
+
+	assert.match(codeReviewer, /remove-ai-slops/);
+	assert.match(codeReviewer, /programming/);
+	assert.match(codeReviewer, /load or consult/);
+	assert.match(codeReviewer, /documented criteria/);
+	assert.match(codeReviewer, /violates either skill perspective/);
+	assert.match(codeReviewer, /overfit\/slop review pass/);
+	assert.match(codeReviewer, /deletion-only tests/);
+	assert.match(codeReviewer, /tautological tests/);
+	assert.match(codeReviewer, /mirror implementation constants/);
+	assert.match(codeReviewer, /unnecessary production data extraction, parsing, or normalization/);
+	assert.match(codeReviewer, /false confidence/);
+
+	assert.match(gateReviewer, /remove-ai-slops/);
+	assert.match(gateReviewer, /programming/);
+	assert.match(gateReviewer, /skill-perspective check occurred/);
+	assert.match(gateReviewer, /explain why unavailable/);
+	assert.match(gateReviewer, /code review report explicitly covers the overfit\/slop criterion/);
+	assert.match(gateReviewer, /deletion-only, tautological, implementation-mirroring tests/);
+	assert.match(gateReviewer, /unnecessary production extraction, parsing, or normalization/);
+});
