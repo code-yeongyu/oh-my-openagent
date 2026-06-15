@@ -88,9 +88,7 @@ export class MonitorOutputInjector {
       this.pendingOutputs.set(record.id, { record, batches: [batch] })
     }
 
-    if (record.mode === "live_safe") {
-      this.scheduleFlush(record.id, 0)
-    }
+    this.scheduleFlush(record.id, 0)
   }
 
   getPendingBatches(monitorId: string): OutputBatch[] {

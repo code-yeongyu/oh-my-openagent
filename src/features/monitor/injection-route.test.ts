@@ -186,7 +186,7 @@ describe("MonitorOutputInjector injection route", () => {
       // then
       expect(harness.calls).toHaveLength(1)
       expect(harness.calls[0]?.source).toBe("monitor-output:mon_route:batch-1")
-      expect(harness.scheduledFlushes).toHaveLength(1)
+      expect(harness.scheduledFlushes).toHaveLength(2)
       expect(harness.injector.getPendingBatches(record.id)).toEqual([])
     })
   })
@@ -274,7 +274,25 @@ describe("MonitorOutputInjector injection route", () => {
 
       // then
       expect(harness.calls.map((call) => call.source)).toEqual(["monitor-output:mon_route:batch-5"])
+      expect(harness.scheduledFlushes).toHaveLength(2)
+      expect(harness.injector.getPendingBatches(record.id)).toEqual([])
+    })
+  })
+
+  describe("#given idle-mode output arrives with no explicit flush trigger", () => {
+    test("#when queueBatch runs for an idle-mode record #then it schedules a flush that delivers exactly once without any session.idle", async () => {
+      // given
+      const record = createRecord({ mode: "idle" })
+      const batch = createBatch(6)
+      const harness = createHarness({ active: false })
+
+      // when: only queueBatch runs - no explicit flushMonitor, no session.idle event
+      harness.injector.queueBatch(record, batch)
+
+      // then: the queue itself scheduled a flush, and running it delivers exactly once
       expect(harness.scheduledFlushes).toHaveLength(1)
+      await harness.scheduledFlushes[0]?.operation()
+      expect(harness.calls.map((call) => call.source)).toEqual(["monitor-output:mon_route:batch-6"])
       expect(harness.injector.getPendingBatches(record.id)).toEqual([])
     })
   })

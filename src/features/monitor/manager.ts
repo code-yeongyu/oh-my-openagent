@@ -396,16 +396,27 @@ export class MonitorManager implements MonitorManagerContract {
       state.batcher.flushNow()
       state.batcher.destroy()
       state.pipeline.stop()
-      this.clearScheduledFlush(state.record.id)
+      void state.injector.flushMonitor(state.record.id).catch((flushError) => {
+        this.logger("[monitor] Failed to flush monitor output after process exit", {
+          monitorId: state.record.id,
+          error: flushError,
+        })
+      })
     }).catch((error) => {
       if (state.record.status === "stopped") {
         return
       }
 
       state.record.status = "failed"
+      state.batcher.flushNow()
       state.batcher.destroy()
       state.pipeline.stop()
-      this.clearScheduledFlush(state.record.id)
+      void state.injector.flushMonitor(state.record.id).catch((flushError) => {
+        this.logger("[monitor] Failed to flush monitor output after process failure", {
+          monitorId: state.record.id,
+          error: flushError,
+        })
+      })
       this.logger("[monitor] monitored process failed", { monitorId: state.record.id, error })
     })
   }

@@ -175,6 +175,12 @@ function createCounters(): MonitorCounters {
   }
 }
 
+async function drainMicrotasks(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
 afterEach(() => {
   subagentSessions.clear()
   resetProcessCleanupForTesting()
@@ -330,6 +336,87 @@ describe("MonitorManager", () => {
       expect(manager).toBeInstanceOf(MonitorManager)
       expect(registerManagerForCleanup).toHaveBeenCalledTimes(1)
       expect(manager.getOutput("missing", { stream: "all" })).toEqual({ lines: [], counters: createCounters() })
+    })
+  })
+
+  describe("#given a monitor whose process exits", () => {
+    function createExitHarness() {
+      let resolveExit!: (result: { code: number | null; signal: string | null }) => void
+      let rejectExit!: (error: unknown) => void
+      const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
+        resolveExit = resolve
+        rejectExit = reject
+      })
+      const flushed: string[] = []
+      const scheduler = createFakeScheduler()
+      const manager = new MonitorManager({
+        pluginContext: unsafeTestValue({ client: {}, directory: "/repo" }),
+        config: {
+          max_monitors_per_session: 3,
+          max_runtime_ms: 60_000,
+          batch_max_lines: 3,
+          batch_max_bytes: 1024,
+          flush_interval_ms: 1000,
+          ring_max_lines: 20,
+          line_max_bytes: 1024,
+          pattern_max_length: 512,
+        },
+        deps: {
+          randomId: () => "mon_exit",
+          spawnMonitoredProcess() {
+            return {
+              kill() {},
+              exited,
+              stdout: createEmptyStream(),
+              stderr: createEmptyStream(),
+            }
+          },
+          createInjector() {
+            return {
+              queueBatch() {},
+              async flushMonitor(monitorId: string) {
+                flushed.push(monitorId)
+              },
+              requeueMonitor() {},
+            }
+          },
+          scheduler: {
+            setTimer: scheduler.setTimer,
+            clearTimer: scheduler.clearTimer,
+            now: () => 0,
+          },
+          registerManagerForCleanup: () => {},
+          unregisterManagerForCleanup: () => {},
+          log: () => {},
+        },
+      })
+      return { manager, resolveExit, rejectExit, flushed }
+    }
+
+    test("#when the process exits naturally #then the manager flushes the injector for final delivery", async () => {
+      // given
+      const { manager, resolveExit, flushed } = createExitHarness()
+      const record = await startMonitor(manager, "exiting-cmd", "s1")
+
+      // when
+      resolveExit({ code: 0, signal: null })
+      await drainMicrotasks()
+
+      // then
+      expect(flushed).toContain(record.id)
+    })
+
+    test("#when the process exit rejects #then the manager still flushes the injector for final delivery", async () => {
+      // given
+      const { manager, rejectExit, flushed } = createExitHarness()
+      const record = await startMonitor(manager, "failing-cmd", "s1")
+
+      // when
+      rejectExit(new Error("spawn failure"))
+      await drainMicrotasks()
+
+      // then
+      expect(flushed).toContain(record.id)
     })
   })
 })
