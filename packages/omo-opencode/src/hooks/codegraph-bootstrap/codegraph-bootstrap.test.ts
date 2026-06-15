@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 import { prepareCodegraphWorkspace } from "@oh-my-opencode/utils"
 
@@ -89,6 +89,7 @@ describe("createCodegraphBootstrapHook", () => {
   test("#given session.created includes a worktree path #when it fires #then bootstrap runs once for that project", async () => {
     // given
     const events: string[] = []
+    const projectRoot = resolve("/repo")
     const hook = createCodegraphBootstrapHook({ directory: "/fallback" }, { auto_provision: true, enabled: true }, createDeps(events))
 
     // when
@@ -97,7 +98,7 @@ describe("createCodegraphBootstrapHook", () => {
     await waitForBackground()
 
     // then
-    expect(events.filter((event) => event === "prepare:/repo")).toHaveLength(1)
+    expect(events.filter((event) => event === `prepare:${projectRoot}`)).toHaveLength(1)
     expect(events).toContain("run:/bin/codegraph:status --json")
     expect(events).toContain("run:/bin/codegraph:init")
   })
@@ -105,6 +106,7 @@ describe("createCodegraphBootstrapHook", () => {
   test("#given the scheduler holds work #when session.created fires #then the event handler returns before bootstrap work starts", async () => {
     // given
     const events: string[] = []
+    const projectRoot = resolve("/repo")
     const scheduledTasks: Array<() => Promise<void>> = []
     const hook = createCodegraphBootstrapHook(
       { directory: "/repo" },
@@ -124,7 +126,7 @@ describe("createCodegraphBootstrapHook", () => {
     expect(events).toEqual(["scheduled"])
 
     await scheduledTasks[0]?.()
-    expect(events).toContain("prepare:/repo")
+    expect(events).toContain(`prepare:${projectRoot}`)
   })
 
   test("#given status says initialized #when background work runs #then it syncs instead of init", async () => {
