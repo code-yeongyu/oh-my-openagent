@@ -169,6 +169,14 @@ function isManagedWorkspacePackage(path: string): boolean {
   )
 }
 
+function isNestedCodexPluginPackage(path: string): boolean {
+  return path.startsWith("packages/omo-codex/plugin/")
+}
+
+function isRootManagedTypecheckPackage(path: string): boolean {
+  return !isNestedCodexPluginPackage(path)
+}
+
 function packageLayer(path: string): keyof typeof layerRanks | undefined {
   if (corePackagePaths.includes(path)) return "core"
   if (mcpPackagePaths.includes(path)) return "mcp"
@@ -213,7 +221,9 @@ describe("package registration audit", () => {
 
     // when
     const actualWorkspacePaths = root.workspaces.filter(isManagedWorkspacePackage).toSorted()
-    const actualTypecheckPaths = extractTypecheckPackagePaths(root.scripts["typecheck:packages"] ?? "")
+    const actualTypecheckPaths = extractTypecheckPackagePaths(root.scripts["typecheck:packages"] ?? "").filter(
+      isRootManagedTypecheckPackage,
+    )
     const actualDevDependencyNames = Object.entries(root.devDependencies)
       .filter((entry) => entry[1] === "workspace:*" && entry[0].startsWith("@oh-my-opencode/"))
       .map((entry) => entry[0])

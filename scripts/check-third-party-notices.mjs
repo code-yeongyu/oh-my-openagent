@@ -2,9 +2,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { spawnSync } from "node:child_process"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
+const WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"])
 
 const CODEGRAPH_COMPONENTS = [
   "@colbymchenry/codegraph",
@@ -248,7 +249,9 @@ function runShipCheck() {
 }
 
 function readRootDryRunPackFiles() {
-  const result = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+  const npmPackArgs = ["pack", "--dry-run", "--json", "--ignore-scripts"]
+  const invocation = resolveSpawnSyncInvocation("npm", npmPackArgs)
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: repoRoot,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 20,
@@ -261,6 +264,16 @@ function readRootDryRunPackFiles() {
   }
   const packJson = parseNpmPackJson(result.stdout)
   return new Set(packJson[0].files.map((file) => file.path))
+}
+
+export function resolveSpawnSyncInvocation(command, args, platform = process.platform) {
+  const invocation = { command, args: Array.from(args) }
+  if (platform !== "win32" || !WINDOWS_CMD_SHIM_COMMANDS.has(command.toLowerCase())) return invocation
+
+  return {
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", `${command}.cmd`, ...invocation.args],
+  }
 }
 
 function parseNpmPackJson(output) {
@@ -276,11 +289,20 @@ function parseNpmPackJson(output) {
   throw new Error("npm pack --dry-run --json did not produce a parseable file list")
 }
 
-const args = process.argv.slice(2)
-if (args.includes("--ship")) {
-  runShipCheck()
-} else if (args.includes("--codex")) {
-  runScope("codex")
-} else {
-  runScope("root")
+function isMainModule() {
+  return process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href
+}
+
+function main(args = process.argv.slice(2)) {
+  if (args.includes("--ship")) {
+    runShipCheck()
+  } else if (args.includes("--codex")) {
+    runScope("codex")
+  } else {
+    runScope("root")
+  }
+}
+
+if (isMainModule()) {
+  main()
 }
