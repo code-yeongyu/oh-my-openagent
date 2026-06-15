@@ -162,4 +162,25 @@ describe("checkpointUlwLoop final story", () => {
 		expect(result.ledgerEntry.kind).toBe("goal_completed");
 		expect(next).toMatchObject({ goal: { id: "G002", status: "in_progress" } });
 	});
+
+	it("requires all criteria for per-story completion", async () => {
+		const current = goal({
+			successCriteria: [
+				criterion("C001", "pass", { essential: true }),
+				criterion("C002", "pending", { essential: false }),
+			],
+		});
+		const repo = await repoWith(plan([current], { codexGoalMode: "per_story", activeGoalId: "G001" }));
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G001",
+					status: "complete",
+					evidence: "per-story implementation complete and validation passed",
+					codexGoalJson: snapshot("complete", current.objective),
+				}),
+			"ulw_loop_criteria_not_all_pass",
+		);
+	});
 });
