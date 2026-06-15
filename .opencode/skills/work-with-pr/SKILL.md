@@ -1,23 +1,25 @@
 ---
 name: work-with-pr
-description: "Full PR lifecycle: git worktree → implement → atomic commits → PR creation → verification loop (CI + review-work + Cubic approval) → merge. Keeps iterating until ALL gates pass and PR is merged. Worktree auto-cleanup after merge. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
+description: "Full PR lifecycle in an isolated git worktree: implement via the ulw-loop skill with mandatory evidence-bound manual QA → detailed English PR → verification loop (CI + review-work reviewers + Cubic, where Cubic is skipped only when its quota is exhausted) → merge by default → worktree cleanup. Unbounded loop: any failing gate sends you back to fix-and-re-QA inside the worktree. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
 ---
 
 # Work With PR — Full PR Lifecycle
 
-You are executing a complete PR lifecycle: from isolated worktree setup through implementation, PR creation, and an unbounded verification loop until the PR is merged. The loop has three gates — CI, review-work, and Cubic — and you keep fixing and pushing until all three pass simultaneously.
+You are executing a complete PR lifecycle: from isolated worktree setup, through `ulw-loop`-driven implementation with evidence-bound manual QA, PR creation, and an unbounded verification loop until the PR is merged. The loop has three gates — CI, review-work, and Cubic — and a failing gate sends you back into the worktree to fix and re-QA. You keep cycling until every active gate passes at once.
 
 <architecture>
 
 ```
 Phase 0: Setup         → Branch + worktree in sibling directory
-Phase 1: Implement     → Do the work, atomic commits
-Phase 2: PR Creation   → Push, create PR targeting dev
-Phase 3: Verify Loop   → Unbounded iteration until ALL gates pass:
+Phase 1: Implement     → Drive the work through the ulw-loop skill:
+                         evidence-bound manual QA per success criterion, atomic commits
+Phase 2: PR Creation   → Push, create a detailed English PR targeting dev
+Phase 3: Verify Loop   → Unbounded iteration; a failing gate routes back to Phase 1:
   ├─ Gate A: CI         → gh pr checks (bun test, typecheck, build)
-  ├─ Gate B: review-work → 5-agent parallel review
+  ├─ Gate B: review-work → 5-agent parallel review (the reviewer subagents)
   └─ Gate C: Cubic      → cubic-dev-ai[bot] "No issues found"
-Phase 4: Merge         → Squash merge, worktree cleanup
+                         (SKIPPED, not failed, when Cubic's quota is exhausted)
+Phase 4: Merge         → Merge by default, then worktree cleanup
 ```
 
 </architecture>
@@ -75,15 +77,19 @@ cd "$WORKTREE_PATH"
 
 ## Phase 1: Implement
 
-Do the actual implementation work inside the worktree. The agent using this skill does the work directly — no subagent delegation for the implementation itself.
+Drive all implementation through the `ulw-loop` skill (your harness's native ultrawork loop) from inside the worktree. Do not free-hand the work: `ulw-loop` decomposes the brief into goals with binary success criteria, delegates code edits and QA to right-sized subagents, and — the reason it is mandatory here — forces every success criterion to be proven with evidence-bound **manual QA on a real surface**, not just a green test suite.
 
-**Scope discipline**: For bug fixes, stay minimal. Fix the bug, add a test for it, done. Do not refactor surrounding code, add config options, or "improve" things that aren't broken. The verification loop will catch regressions — trust the process.
+**Manual QA is the gate, not the tests.** This repo's rule is absolute: a change that reaches OpenCode or Codex is not done until you have driven the real harness (tmux / HTTP / browser / GUI — use the manual-QA channel table in the `ulw-loop` skill) AND written the evidence to disk. No evidence file means the QA did not happen, and you may NOT commit or push. "It typechecks" and "`bun test` is green" are NOT QA.
 
 <implementation>
 
+### Scope discipline
+
+For bug fixes, stay minimal: fix the bug, add a test, prove it, stop. Do not refactor surrounding code, add config options, or "improve" things that aren't broken — the verification loop catches regressions, and scope creep makes failures harder to isolate.
+
 ### Commit strategy
 
-Use the git-master skill's atomic commit principles. The reason for atomic commits: if CI fails on one change, you can isolate and fix it without unwinding everything.
+`ulw-loop` commits through `git-master`. Keep commits atomic so that if CI fails on one change you can isolate and fix it without unwinding everything:
 
 ```
 3+ files changed  → 2+ commits minimum
@@ -91,15 +97,11 @@ Use the git-master skill's atomic commit principles. The reason for atomic commi
 10+ files changed → 5+ commits minimum
 ```
 
-Each commit should pair implementation with its tests. Load `git-master` skill when committing:
-
-```
-task(category="quick", load_skills=["git-master"], prompt="Commit the changes atomically following git-master conventions. Repository is at {WORKTREE_PATH}.")
-```
+Each commit pairs implementation with its tests, and you commit a criterion only after its QA evidence is on disk.
 
 ### Pre-push local validation
 
-Before pushing, run the same checks CI will run. Catching failures locally saves a full CI round-trip (~3-5 min):
+Before pushing, run the same checks CI will run — a cheap pre-filter that saves a ~3-5 min CI round-trip, NOT a substitute for the manual QA above:
 
 ```bash
 bun run typecheck
@@ -107,7 +109,7 @@ bun test
 bun run build
 ```
 
-Fix any failures before pushing. Each fix-commit cycle should be atomic.
+Fix any failure before pushing; each fix is its own atomic commit.
 
 </implementation>
 
@@ -123,7 +125,7 @@ Fix any failures before pushing. Each fix-commit cycle should be atomic.
 git push -u origin "$BRANCH_NAME"
 ```
 
-Create the PR using the project's template structure:
+Write the PR body in English, detailed enough that a reviewer understands the change without reading the diff. The Verification section is where the manual-QA evidence from Phase 1 earns its place — cite what you actually drove and where the artifact lives, not just that tests passed.
 
 ```bash
 gh pr create \
@@ -132,15 +134,14 @@ gh pr create \
   --title "$PR_TITLE" \
   --body "$(cat <<'EOF'
 ## Summary
-[1-3 sentences describing what this PR does and why]
+[2-4 sentences: what this PR does, why it's needed, and the approach taken]
 
 ## Changes
-[Bullet list of key changes]
+[Bullet list of key changes, grouped by area; enough that a reviewer can map each bullet to the diff]
 
-## Testing
-- `bun run typecheck` ✅
-- `bun test` ✅
-- `bun run build` ✅
+## Verification
+**Automated:** `bun run typecheck` ✅ · `bun test` ✅ · `bun run build` ✅
+**Manual QA:** [per success criterion — the channel driven (tmux/HTTP/browser/GUI), what you observed, and the evidence artifact path]
 
 ## Related Issues
 [Link to issue if applicable]
@@ -160,19 +161,20 @@ PR_NUMBER=$(gh pr view --json number -q .number)
 
 ## Phase 3: Verification Loop
 
-This is the core of the skill. Three gates must ALL pass for the PR to be ready. The loop has no iteration cap — keep going until done. Gate ordering is intentional: CI is cheapest/fastest, review-work is most thorough, Cubic is external and asynchronous.
+This is the core of the skill. Every active gate must pass for the PR to be ready. The loop has no iteration cap — keep going until done. Gate ordering is intentional: CI is cheapest/fastest, review-work is most thorough, Cubic is external and asynchronous. Gate C (Cubic) is the one gate that can be SKIPPED rather than satisfied — only when its quota is exhausted; it is never skipped just because it found issues. A failing gate is not a patch-and-push: route back to Phase 1, where fixes get the same scope discipline and, if behavior changed, fresh manual-QA evidence before you re-enter the loop.
 
 <verify_loop>
 
 ```
 while true:
   1. Wait for CI          → Gate A
-  2. If CI fails          → read logs, fix, commit, push, continue
-  3. Run review-work      → Gate B
-  4. If review fails      → fix blocking issues, commit, push, continue
+  2. If CI fails          → back to Phase 1: read logs, fix + re-QA, commit, push, continue
+  3. Run review-work      → Gate B (the reviewer subagents)
+  4. If review fails      → back to Phase 1: fix blocking issues + re-QA, commit, push, continue
   5. Check Cubic          → Gate C
-  6. If Cubic has issues   → fix issues, commit, push, continue
-  7. All three pass       → break
+  6. If Cubic has issues   → back to Phase 1: fix + re-QA, commit, push, continue
+  7. If Cubic quota out    → record Gate C SKIPPED, stop waiting on it
+  8. All active gates pass → break
 ```
 
 ### Gate A: CI Checks
@@ -195,7 +197,7 @@ RUN_ID=$(gh run list --branch "$BRANCH_NAME" --status failure --json databaseId 
 gh run view "$RUN_ID" --log-failed
 ```
 
-Read the logs, fix the issue, commit atomically, push, and re-enter the loop.
+Read the logs, then fix per the iteration discipline below.
 
 ### Gate B: review-work
 
@@ -213,7 +215,7 @@ task(
 )
 ```
 
-**On failure**: review-work reports blocking issues with specific files and line numbers. Fix each blocking issue, commit, push, and re-enter the loop from Gate A (since code changed, CI must re-run).
+**On failure**: review-work reports blocking issues with specific files and line numbers. Fix each blocking issue per the iteration discipline below.
 
 ### Gate C: Cubic Approval
 
@@ -223,45 +225,49 @@ Cubic (`cubic-dev-ai[bot]`) is an automated review bot that comments on PRs. It 
 
 **Issue signal**: The comment lists issues with file-level detail.
 
+**Quota-exhausted signal**: Cubic posts a usage/quota/limit message instead of a review, or no Cubic review appears within the bounded wait below. This is the ONLY case where you skip Gate C and proceed — record it as SKIPPED in the final report, never silently. Issues are never a reason to skip.
+
 ```bash
 # Get the latest Cubic review
 CUBIC_REVIEW=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
   --jq '[.[] | select(.user.login == "cubic-dev-ai[bot]")] | last | .body')
 
-# Check if approved
 if echo "$CUBIC_REVIEW" | grep -q "No issues found"; then
   echo "Cubic: APPROVED"
+elif echo "$CUBIC_REVIEW" | grep -qiE "quota|usage limit|rate limit|out of (credits|reviews)|upgrade your plan"; then
+  echo "Cubic: SKIPPED (quota exhausted)"   # Gate C satisfied-by-skip; do not loop on it
 else
   echo "Cubic: ISSUES FOUND"
   echo "$CUBIC_REVIEW"
 fi
 ```
 
-**On issues**: Cubic's review body contains structured issue descriptions. Parse them, determine which are valid (some may be false positives), fix the valid ones, commit, push, re-enter from Gate A.
+**On issues**: Cubic's review body contains structured issue descriptions. Parse them, determine which are valid (some may be false positives), and fix the valid ones per the iteration discipline below.
 
 Cubic reviews are triggered automatically on PR updates. After pushing a fix, wait for the new review to appear before checking again. Use `gh api` polling with a conditional loop:
 
 ```bash
-# Wait for new Cubic review after push
+# Wait for a NEW Cubic review after push. If none arrives within the bound,
+# Cubic is out of quota (or not running) → skip Gate C rather than spin forever.
 PUSH_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-while true; do
+for _ in $(seq 1 30); do
   LATEST_REVIEW_TIME=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
     --jq '[.[] | select(.user.login == "cubic-dev-ai[bot]")] | last | .submitted_at')
-  if [[ "$LATEST_REVIEW_TIME" > "$PUSH_TIME" ]]; then
-    break
-  fi
-  # Use gh api call itself as the delay mechanism — each call takes ~1-2s
-  # For longer waits, use: timeout 30 gh pr checks "$PR_NUMBER" --watch 2>/dev/null || true
+  [[ "$LATEST_REVIEW_TIME" > "$PUSH_TIME" ]] && break
+  timeout 20 gh pr checks "$PR_NUMBER" --watch >/dev/null 2>&1 || true  # spend the interval usefully
 done
+# Loop exhausted without a newer review → treat Gate C as SKIPPED (quota exhausted)
+[[ "$LATEST_REVIEW_TIME" > "$PUSH_TIME" ]] || echo "Cubic: SKIPPED (no review within bound — quota exhausted)"
 ```
 
 ### Iteration discipline
 
 Each iteration through the loop:
 1. Fix ONLY the issues identified by the failing gate
-2. Commit atomically (one logical fix per commit)
-3. Push
-4. Re-enter from Gate A (code changed → full re-verification)
+2. If the fix changes runtime behavior, capture fresh manual-QA evidence (Phase 1)
+3. Commit atomically (one logical fix per commit)
+4. Push
+5. Re-enter from Gate A (code changed → full re-verification)
 
 Avoid the temptation to "improve" unrelated code during fix iterations. Scope creep in the fix loop makes debugging harder and can introduce new failures.
 
@@ -271,15 +277,17 @@ Avoid the temptation to "improve" unrelated code during fix iterations. Scope cr
 
 ## Phase 4: Merge & Cleanup
 
-Once all three gates pass:
+Once all active gates pass (Cubic may be SKIPPED on quota):
 
 <merge_cleanup>
 
 ### Merge the PR
 
+Merging is the default — do it unless the user explicitly told you not to. If they opted out, skip this step and report the green, ready-to-merge PR, but STILL run the cleanup below: the worktree is removed either way.
+
 ```bash
-# Squash merge to keep history clean
-gh pr merge "$PR_NUMBER" --squash --delete-branch
+# This repository requires merge commits. Never use --squash or --rebase here.
+gh pr merge "$PR_NUMBER" --merge --delete-branch
 ```
 
 ### Sync .omo state back to main repo
@@ -310,12 +318,13 @@ git worktree prune
 Summarize what happened:
 
 ```
-## PR Merged ✅
+## PR Complete
 
 - **PR**: #{PR_NUMBER} — {PR_TITLE}
 - **Branch**: {BRANCH_NAME} → {BASE_BRANCH}
 - **Iterations**: {N} verification loops
-- **Gates passed**: CI ✅ | review-work ✅ | Cubic ✅
+- **Gates**: CI pass | review-work pass | Cubic {pass | SKIPPED (quota exhausted)}
+- **Merged**: {yes | no — left for you to merge, as requested}
 - **Worktree**: cleaned up
 ```
 
@@ -351,8 +360,10 @@ git rebase "origin/$BASE_BRANCH"
 | Violation | Why it fails | Severity |
 |-----------|-------------|----------|
 | Working in main worktree instead of isolated worktree | Pollutes user's working directory, may destroy uncommitted work | CRITICAL |
+| Committing or pushing without manual-QA evidence on disk | "Tests pass" never proves the feature works; the repo forbids it for OpenCode/Codex-touching changes | CRITICAL |
 | Pushing directly to dev/master | Bypasses review entirely | CRITICAL |
 | Skipping CI gate after code changes | review-work and Cubic may pass on stale code | CRITICAL |
+| Skipping Cubic because it found issues | Only an exhausted quota justifies a skip; real issues must be fixed and re-pushed | HIGH |
 | Fixing unrelated code during verification loop | Scope creep causes new failures | HIGH |
 | Deleting worktree on failure | User loses ability to inspect/resume | HIGH |
 | Ignoring Cubic false positives without justification | Cubic issues should be evaluated, not blindly dismissed | MEDIUM |
