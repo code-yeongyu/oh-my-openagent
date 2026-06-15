@@ -16,6 +16,15 @@ export class ParentWakeDispatchedTracker {
   // marker `hasPendingParentWake` would briefly report "no wake owed" and let the
   // sync poller settle on a stale pre-results turn.
   private inFlightDispatches: Set<string> = new Set()
+  // Parent sessions whose final child has been marked terminal but whose wake has
+  // not yet been queued, because the completion path is still awaiting the child's
+  // session teardown (abort with a 10s timeout, plus the tmux callback). During
+  // that window the child no longer counts as active and the wake is not yet in any
+  // of the maps above, so without this reservation `hasPendingParentWake` would
+  // report "no wake owed" and let a parent sync poller settle on a stale turn. A
+  // counter (not a set) so concurrent child teardowns for the same parent each hold
+  // their own slot and the predicate only clears once every one has queued its wake.
+  private notificationPreparations: Map<string, number> = new Map()
 
   constructor(private readonly options: ParentWakeDispatchedTrackerOptions) {}
 
@@ -37,6 +46,26 @@ export class ParentWakeDispatchedTracker {
 
   hasInFlight(sessionID: string): boolean {
     return this.inFlightDispatches.has(sessionID)
+  }
+
+  reserveNotificationPreparation(sessionID: string): void {
+    this.notificationPreparations.set(sessionID, (this.notificationPreparations.get(sessionID) ?? 0) + 1)
+  }
+
+  releaseNotificationPreparation(sessionID: string): void {
+    const count = this.notificationPreparations.get(sessionID)
+    if (count === undefined) {
+      return
+    }
+    if (count <= 1) {
+      this.notificationPreparations.delete(sessionID)
+    } else {
+      this.notificationPreparations.set(sessionID, count - 1)
+    }
+  }
+
+  hasNotificationPreparation(sessionID: string): boolean {
+    return (this.notificationPreparations.get(sessionID) ?? 0) > 0
   }
 
   getWake(sessionID: string): PendingParentWake | undefined {
@@ -95,5 +124,6 @@ export class ParentWakeDispatchedTracker {
     this.dispatchedParentWakeTimers.clear()
     this.dispatchedParentWakes.clear()
     this.inFlightDispatches.clear()
+    this.notificationPreparations.clear()
   }
 }

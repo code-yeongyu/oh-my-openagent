@@ -116,3 +116,57 @@ describe("ParentWakeNotifier — in-flight dispatch tracking (P1 race)", () => {
     }
   })
 })
+
+describe("ParentWakeNotifier — notification-preparation reservation (teardown gap)", () => {
+  test("#given two concurrent child teardowns reserve the same parent #when only one releases #then the reservation still reports an owed wake", () => {
+    const { notifier } = createNotifier(async () => ({ data: {} }))
+    const sessionID = "parent-notification-prep"
+    try {
+      // given: nothing reserved.
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(false)
+
+      // when: two children of the same parent each begin their teardown.
+      notifier.reserveNotificationPreparation(sessionID)
+      notifier.reserveNotificationPreparation(sessionID)
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(true)
+
+      // when: only the first child finishes queuing its wake.
+      notifier.releaseNotificationPreparation(sessionID)
+      // then: the second child is still preparing, so a wake is still owed — a
+      // Set would have cleared here and reopened the race.
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(true)
+
+      // when: the second child finishes too.
+      notifier.releaseNotificationPreparation(sessionID)
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given more releases than reserves #then the counter never underflows into a stuck reservation", () => {
+    const { notifier } = createNotifier(async () => ({ data: {} }))
+    const sessionID = "parent-notification-prep-underflow"
+    try {
+      // A stray release before any reserve must be a no-op.
+      notifier.releaseNotificationPreparation(sessionID)
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(false)
+
+      // A reserve/release pair plus an extra release must not leave a negative
+      // counter that a later reserve could never clear.
+      notifier.reserveNotificationPreparation(sessionID)
+      notifier.releaseNotificationPreparation(sessionID)
+      notifier.releaseNotificationPreparation(sessionID)
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(false)
+
+      notifier.reserveNotificationPreparation(sessionID)
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(true)
+      notifier.releaseNotificationPreparation(sessionID)
+      expect(notifier.hasNotificationPreparation(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})

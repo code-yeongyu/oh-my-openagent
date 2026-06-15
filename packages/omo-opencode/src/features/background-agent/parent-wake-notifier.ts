@@ -85,6 +85,18 @@ export class ParentWakeNotifier {
     return this.dispatchedTracker.hasInFlight(sessionID)
   }
 
+  reserveNotificationPreparation(sessionID: string): void {
+    this.dispatchedTracker.reserveNotificationPreparation(sessionID)
+  }
+
+  releaseNotificationPreparation(sessionID: string): void {
+    this.dispatchedTracker.releaseNotificationPreparation(sessionID)
+  }
+
+  hasNotificationPreparation(sessionID: string): boolean {
+    return this.dispatchedTracker.hasNotificationPreparation(sessionID)
+  }
+
   recordParentSessionActivity(sessionID: string): void {
     this.sessionInspector.recordActivity(sessionID)
   }
