@@ -1,0 +1,25 @@
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 lint
+> biome check .
+
+Checked 61 files in 15ms. No fixes applied.
+Found 1 info.
+��━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The configuration schema version does not match the CLI version 2.4.16
+  
+    1 │ {
+  > 2 │ 	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+      │ 	           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    3 │ 	"linter": {
+    4 │ 		"enabled": true,
+  
+  i   Expected:                     2.4.16
+      Found:                        2.4.15
+  
+  
+  i Run the command biome migrate to migrate the configuration file.
+  
+
+
+EXIT_CODE=0

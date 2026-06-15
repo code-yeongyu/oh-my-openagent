@@ -1,0 +1,26 @@
+ 235 packages/omo-codex/plugin/components/ulw-loop/src/cli-subcommands.ts
+ 232 packages/omo-codex/plugin/components/ulw-loop/src/checkpoint.ts
+ 227 packages/omo-codex/plugin/components/ulw-loop/test/goal-status.test.ts
+ 218 packages/omo-codex/plugin/components/ulw-loop/test/plan-crud.test.ts
+ 201 packages/omo-codex/plugin/components/ulw-loop/src/evidence.ts
+ 195 packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts
+ 194 packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts
+ 192 packages/omo-codex/plugin/components/ulw-loop/test/cli-checkpoint.test.ts
+ 182 packages/omo-codex/plugin/components/ulw-loop/test/codex-goal-instruction.test.ts
+ 148 packages/omo-codex/plugin/components/ulw-loop/src/domain-types.ts
+ 147 packages/omo-codex/plugin/components/ulw-loop/test/cli-create-goals.test.ts
+ 141 packages/omo-codex/plugin/components/ulw-loop/test/checkpoint.test.ts
+ 124 packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts
+ 114 packages/omo-codex/plugin/components/ulw-loop/src/plan-goal-factory.ts
+ 100 packages/omo-codex/plugin/components/ulw-loop/test/evidence-criteria-gate.test.ts
+  95 packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts
+  94 packages/omo-codex/plugin/components/ulw-loop/src/cli-commands.ts
+  90 packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts
+  88 packages/omo-codex/plugin/components/ulw-loop/test/fixtures/checkpoint-builders.ts
+  87 packages/omo-codex/plugin/components/ulw-loop/src/goal-status.ts
+  85 packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts
+  84 packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-status.test.ts
+  83 packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-blockers.test.ts
+  75 packages/omo-codex/plugin/components/ulw-loop/test/cli-complete-goals.test.ts
+
+EXIT_CODE=0

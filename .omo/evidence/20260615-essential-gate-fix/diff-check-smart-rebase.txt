@@ -1,0 +1,42 @@
+fix/lazycodex-final-gate-followup
+{"baseRefName":"dev","headRefName":"fix/lazycodex-final-gate-followup","isDraft":false,"mergeStateStatus":"UNSTABLE","state":"OPEN","url":"https://github.com/code-yeongyu/oh-my-openagent/pull/5318"}
+From https://github.com/code-yeongyu/oh-my-openagent
+ * branch                dev        -> FETCH_HEAD
+0	30
+## fix/lazycodex-final-gate-followup...origin/fix/lazycodex-final-gate-followup
+ M packages/omo-codex/plugin/components/ulw-loop/src/checkpoint.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/cli-commands.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/domain-types.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/evidence.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/goal-status.ts
+ M packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/checkpoint.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-checkpoint.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-complete-goals.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/cli-create-goals.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/codex-goal-instruction.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/evidence-criteria-gate.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/goal-status.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/plan-crud.test.ts
+ M packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts
+?? packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts
+?? packages/omo-codex/plugin/components/ulw-loop/src/cli-subcommands.ts
+?? packages/omo-codex/plugin/components/ulw-loop/src/plan-goal-factory.ts
+?? packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts
+?? packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-status.test.ts
+?? packages/omo-codex/plugin/components/ulw-loop/test/fixtures/checkpoint-builders.ts
+?? packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts
+?? packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-blockers.test.ts
+
+EXIT_CODE=0
+
+--- actual smart-rebase after commits ---
+## fix/lazycodex-final-gate-followup...origin/fix/lazycodex-final-gate-followup [ahead 2]
+From https://github.com/code-yeongyu/oh-my-openagent
+ * branch                dev        -> FETCH_HEAD
+Current branch fix/lazycodex-final-gate-followup is up to date.
+0	32
+## fix/lazycodex-final-gate-followup...origin/fix/lazycodex-final-gate-followup [ahead 2]
+
+EXIT_CODE_ACTUAL_REBASE=0

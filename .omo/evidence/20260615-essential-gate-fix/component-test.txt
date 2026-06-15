@@ -1,0 +1,15 @@
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 test
+> vitest --run
+
+
+ RUN  v4.1.8 <WORKTREE>/packages/omo-codex/plugin/components/ulw-loop
+
+
+ Test Files  29 passed (29)
+      Tests  312 passed (312)
+   Start at  19:47:41
+   Duration  1.07s (transform 821ms, setup 0ms, import 1.27s, tests 1.68s, environment 2ms)
+
+
+EXIT_CODE=0

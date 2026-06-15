@@ -1,0 +1,56 @@
+tmux_session=lcx-gate-2267
+isolated_codex_home=<TMP>
+install_for_tmux_exit=0
+{
+  "installed": [
+    {
+      "pluginId": "omo@sisyphuslabs",
+      "name": "omo",
+      "marketplaceName": "sisyphuslabs",
+      "version": "4.10.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "<TMP>"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "<TMP>"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    }
+  ],
+  "available": []
+}
+CMD_EXIT=0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cleanup_tmux=killed lcx-gate-2267; remains=no
+cleanup_tmp=removed <TMP>; exists_after=no
+EXIT_CODE=0

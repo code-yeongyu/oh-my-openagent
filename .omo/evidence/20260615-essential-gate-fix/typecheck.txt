@@ -1,0 +1,6 @@
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 typecheck
+> tsc --noEmit
+
+
+EXIT_CODE=0

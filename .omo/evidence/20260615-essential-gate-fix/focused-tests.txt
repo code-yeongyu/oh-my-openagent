@@ -1,0 +1,11 @@
+
+ RUN  v4.1.9 <WORKTREE>
+
+
+ Test Files  14 passed (14)
+      Tests  115 passed (115)
+   Start at  19:47:40
+   Duration  300ms (transform 697ms, setup 0ms, import 998ms, tests 161ms, environment 1ms)
+
+
+EXIT_CODE=0
