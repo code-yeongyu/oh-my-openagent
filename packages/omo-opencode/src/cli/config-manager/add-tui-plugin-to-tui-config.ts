@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import {
   isOurFilePluginEntry,
+  isNamedTuiPluginEntry,
   isServerPluginEntry,
 } from "../doctor/checks/tui-plugin-config"
 import {
@@ -53,10 +54,10 @@ function pluginEntries(config: ConfigShape): string[] {
 
 function desiredTuiEntry(serverEntry: string): string | null {
   if (serverEntry === PLUGIN_NAME || serverEntry.startsWith(`${PLUGIN_NAME}@`)) {
-    return `${PLUGIN_NAME}/tui`
+    return serverEntry
   }
   if (serverEntry === LEGACY_PLUGIN_NAME || serverEntry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
-    return `${LEGACY_PLUGIN_NAME}/tui`
+    return serverEntry
   }
   if (serverEntry.startsWith("file:") && isOurFilePluginEntry(serverEntry)) {
     return serverEntry
@@ -95,7 +96,7 @@ export function ensureTuiPluginEntry(opts: { configDir?: string } = {}): EnsureT
     return { changed: false, reason: "malformed" }
   }
 
-  const plugins = pluginEntries(config)
+  const plugins = pluginEntries(config).filter((entry) => !isNamedTuiPluginEntry(entry))
   if (plugins.includes(desiredEntry)) {
     return { changed: false, reason: "already-present" }
   }
