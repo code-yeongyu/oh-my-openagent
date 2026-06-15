@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -56,6 +56,42 @@ test("#given resolveSafeOmoPath #when the target escapes .omo or the workspace #
 	assert.throws(() => resolveSafeOmoPath(cwd, "src/x.md"));
 	assert.throws(() => resolveSafeOmoPath(cwd, ".omo/plans/x.txt"));
 	assert.throws(() => resolveSafeOmoPath(cwd, "/etc/passwd.md"));
+});
+
+test("#given scaffold #when .omo/plans is a symlink outside the workspace #then it refuses before the plan write escapes", async () => {
+	// given
+	const { scaffold } = await import(scriptUrl);
+	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
+	const outside = await mkdtemp(join(tmpdir(), "ulwp-outside-"));
+	try {
+		await mkdir(join(dir, ".omo"), { recursive: true });
+		await symlink(outside, join(dir, ".omo", "plans"), "dir");
+
+		// when / then
+		await assert.rejects(() => scaffold(dir, { slug: "demo", intent: "clear" }), /refused/);
+		assert.deepEqual(await readdir(outside), []);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+		await rm(outside, { recursive: true, force: true });
+	}
+});
+
+test("#given scaffold #when .omo/drafts is a symlink outside the workspace #then it refuses before the draft write escapes", async () => {
+	// given
+	const { scaffold } = await import(scriptUrl);
+	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
+	const outside = await mkdtemp(join(tmpdir(), "ulwp-outside-"));
+	try {
+		await mkdir(join(dir, ".omo"), { recursive: true });
+		await symlink(outside, join(dir, ".omo", "drafts"), "dir");
+
+		// when / then
+		await assert.rejects(() => scaffold(dir, { slug: "demo", intent: "clear" }), /refused/);
+		assert.deepEqual(await readdir(outside), []);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+		await rm(outside, { recursive: true, force: true });
+	}
 });
 
 test("#given parseArgs #when the slug is missing or unsafe #then it throws, and valid flags parse", async () => {

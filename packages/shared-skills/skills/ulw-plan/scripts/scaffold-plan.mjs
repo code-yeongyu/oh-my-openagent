@@ -20,7 +20,7 @@
 // commands; it only guarantees the mandated generator never escapes .omo). Mirrors
 // packages/omo-opencode/src/hooks/prometheus-md-only/path-policy.ts.
 
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { lstat, mkdir, writeFile, readFile, realpath } from "node:fs/promises";
 import { dirname, join, relative, resolve, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -83,6 +83,60 @@ export function resolveSafeOmoPath(cwd, relPath) {
 		throw new Error(`refused: ulw-plan may only write .md files: ${relPath}`);
 	}
 	return resolved;
+}
+
+function assertContainedPath(parent, child, message) {
+	const rel = relative(parent, child);
+	if (rel.startsWith("..") || isAbsolute(rel)) {
+		throw new Error(message);
+	}
+}
+
+async function mkdirWithoutSymlinks(dir, stopAt) {
+	if (dir === stopAt) return;
+	const parent = dirname(dir);
+	if (parent === dir || relative(stopAt, dir).startsWith("..") || isAbsolute(relative(stopAt, dir))) {
+		throw new Error(`refused: path escapes the workspace root: ${dir}`);
+	}
+	await mkdirWithoutSymlinks(parent, stopAt);
+	const stat = await lstat(dir).catch((err) => {
+		if (err && err.code === "ENOENT") return null;
+		throw err;
+	});
+	if (stat) {
+		if (stat.isSymbolicLink()) {
+			throw new Error(`refused: path component is a symlink: ${dir}`);
+		}
+		if (!stat.isDirectory()) {
+			throw new Error(`refused: path component is not a directory: ${dir}`);
+		}
+		return;
+	}
+	await mkdir(dir);
+}
+
+async function assertSafeWriteParent(cwd, target) {
+	const workspaceReal = await realpath(cwd);
+	const workspaceRoot = resolve(cwd);
+	const omoRoot = resolve(cwd, ".omo");
+	const parent = dirname(target);
+	assertContainedPath(workspaceRoot, parent, `refused: path escapes the workspace root: ${target}`);
+	assertContainedPath(omoRoot, parent, `refused: ulw-plan may only write under .omo/: ${target}`);
+	await mkdirWithoutSymlinks(parent, workspaceRoot);
+	const omoReal = await realpath(omoRoot);
+	const parentReal = await realpath(parent);
+	assertContainedPath(workspaceReal, parentReal, `refused: path escapes the workspace root through symlinks: ${target}`);
+	assertContainedPath(omoReal, parentReal, `refused: ulw-plan may only write under .omo/ through real paths: ${target}`);
+}
+
+async function assertSafeWriteTarget(target) {
+	const stat = await lstat(target).catch((err) => {
+		if (err && err.code === "ENOENT") return null;
+		throw err;
+	});
+	if (stat?.isSymbolicLink()) {
+		throw new Error(`refused: target is a symlink: ${target}`);
+	}
 }
 
 // A file this script previously emitted (plan skeleton or draft), used to make a
@@ -203,6 +257,8 @@ ${FINAL_VERIFICATION_ITEMS.map((item) => `- [ ] ${item}`).join("\n")}
 // --force is also passed.
 export async function writeGuarded(cwd, relPath, content, { reset = false, force = false } = {}) {
 	const target = resolveSafeOmoPath(cwd, relPath);
+	await assertSafeWriteParent(cwd, target);
+	await assertSafeWriteTarget(target);
 	const existing = await readFile(target, "utf8").catch(() => null);
 	if (existing && existing.trim() !== "") {
 		if (!reset) {
@@ -213,7 +269,6 @@ export async function writeGuarded(cwd, relPath, content, { reset = false, force
 			throw new Error(`refused: ${relPath} has edits that differ from a fresh skeleton; pass --reset --force to discard them`);
 		}
 	}
-	await mkdir(dirname(target), { recursive: true });
 	await writeFile(target, content, "utf8");
 	return { relPath, status: existing ? "reset" : "created" };
 }
