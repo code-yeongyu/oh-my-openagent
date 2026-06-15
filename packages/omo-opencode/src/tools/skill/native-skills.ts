@@ -2,6 +2,8 @@ import type { SkillInfo } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { isDisabledSkillAlias } from "../../features/opencode-skill-loader/skill-discovery"
 
+const SHARED_SKILL_PREFIX = "shared/"
+
 export type NativeSkillEntry = {
   name: string
   description: string
@@ -22,6 +24,19 @@ export function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   }
 }
 
+function normalizeSkillName(name: string): string {
+  return name.toLowerCase()
+}
+
+function normalizeDisabledSkills(disabledSkills: ReadonlySet<string> | undefined): ReadonlySet<string> | undefined {
+  if (!disabledSkills) return undefined
+  return new Set(Array.from(disabledSkills, normalizeSkillName))
+}
+
+function nativeSkillScope(native: NativeSkillEntry): LoadedSkill["scope"] {
+  return normalizeSkillName(native.name).startsWith(SHARED_SKILL_PREFIX) ? "shared" : "config"
+}
+
 function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
   return {
     name: native.name,
@@ -31,7 +46,20 @@ function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
       description: native.description,
       template: native.content,
     },
-    scope: "config",
+    scope: nativeSkillScope(native),
+  }
+}
+
+function nativeSkillToAliasCheckSkill(native: NativeSkillEntry): LoadedSkill {
+  const name = normalizeSkillName(native.name)
+  return {
+    ...nativeSkillToLoadedSkill(native),
+    name,
+    definition: {
+      name,
+      description: native.description,
+      template: native.content,
+    },
   }
 }
 
@@ -40,13 +68,15 @@ export function mergeNativeSkills(
   nativeSkills: NativeSkillEntry[],
   disabledSkills?: ReadonlySet<string>,
 ): void {
-  const knownNames = new Set(skills.map((skill) => skill.name))
+  const knownNames = new Set(skills.map((skill) => normalizeSkillName(skill.name)))
+  const disabledSkillAliases = normalizeDisabledSkills(disabledSkills)
   for (const native of nativeSkills) {
-    if (knownNames.has(native.name)) continue
+    const nativeName = normalizeSkillName(native.name)
+    if (knownNames.has(nativeName)) continue
     const loadedSkill = nativeSkillToLoadedSkill(native)
-    if (disabledSkills && isDisabledSkillAlias(loadedSkill, disabledSkills)) continue
+    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases)) continue
     skills.push(loadedSkill)
-    knownNames.add(native.name)
+    knownNames.add(nativeName)
   }
 }
 
@@ -55,17 +85,19 @@ export function mergeNativeSkillInfos(
   nativeSkills: NativeSkillEntry[],
   disabledSkills?: ReadonlySet<string>,
 ): void {
-  const knownNames = new Set(skillInfos.map((skill) => skill.name))
+  const knownNames = new Set(skillInfos.map((skill) => normalizeSkillName(skill.name)))
+  const disabledSkillAliases = normalizeDisabledSkills(disabledSkills)
   for (const native of nativeSkills) {
-    if (knownNames.has(native.name)) continue
-    if (disabledSkills && isDisabledSkillAlias(nativeSkillToLoadedSkill(native), disabledSkills)) continue
+    const nativeName = normalizeSkillName(native.name)
+    if (knownNames.has(nativeName)) continue
+    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases)) continue
     skillInfos.push({
       name: native.name,
       description: native.description,
       location: native.location,
-      scope: "config",
+      scope: nativeSkillScope(native),
     })
-    knownNames.add(native.name)
+    knownNames.add(nativeName)
   }
 }
 
