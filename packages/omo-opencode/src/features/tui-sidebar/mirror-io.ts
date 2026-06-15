@@ -11,15 +11,8 @@ export function writeMirror(projectDir: string, snapshot: TuiRuntimeSnapshot): v
   const filePath = mirrorFilePath(projectDir)
   const content = JSON.stringify(snapshot)
 
-  try {
-    mkdirSync(dirname(filePath), { recursive: true })
-    writeFileAtomically(filePath, content)
-  } catch (error) {
-    if (error instanceof Error) {
-      return
-    }
-    throw error
-  }
+  mkdirSync(dirname(filePath), { recursive: true })
+  writeFileAtomically(filePath, content)
 }
 
 export function readMirror(projectDir: string): TuiRuntimeSnapshot | null {

@@ -4,6 +4,8 @@ import type { PluginContext, TmuxConfig } from "./plugin/types"
 
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
+import type { MonitorManager } from "./features/monitor"
+import { createMonitorManager } from "./features/monitor"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { cleanupSessionTeamRuns } from "./features/team-mode/team-runtime/session-cleanup"
 import { lookupTeamSession } from "./features/team-mode/team-session-registry"
@@ -23,6 +25,7 @@ type CreateManagersDeps = {
   SkillMcpManagerClass: typeof SkillMcpManager
   TmuxSessionManagerClass: typeof TmuxSessionManager
   TuiStateMirrorClass: typeof TuiStateMirror
+  createMonitorManagerFn: typeof createMonitorManager
   initTaskToastManagerFn: typeof initTaskToastManager
   registerManagerForCleanupFn: typeof registerManagerForCleanup
   cleanupSessionTeamRunsFn: typeof cleanupSessionTeamRuns
@@ -35,6 +38,7 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   SkillMcpManagerClass: SkillMcpManager,
   TmuxSessionManagerClass: TmuxSessionManager,
   TuiStateMirrorClass: TuiStateMirror,
+  createMonitorManagerFn: createMonitorManager,
   initTaskToastManagerFn: initTaskToastManager,
   registerManagerForCleanupFn: registerManagerForCleanup,
   cleanupSessionTeamRunsFn: cleanupSessionTeamRuns,
@@ -49,6 +53,7 @@ export type Managers = {
   configHandler: ReturnType<typeof createConfigHandler>
   modelFallbackControllerAccessor: ModelFallbackControllerAccessor
   tuiStateMirror?: TuiStateMirror
+  monitorManager?: MonitorManager
 }
 
 export function createManagers(args: {
@@ -86,6 +91,13 @@ export function createManagers(args: {
   let backgroundManager: BackgroundManager | undefined
   let tuiStateMirror: TuiStateMirror | undefined
 
+  const monitorManager = pluginConfig.monitor?.enabled
+    ? deps.createMonitorManagerFn({
+      pluginContext: { client: ctx.client, directory: ctx.directory },
+      config: pluginConfig.monitor,
+    })
+    : undefined
+
   const cleanupTeamModeRuns = async (): Promise<void> => {
     if (!pluginConfig.team_mode?.enabled) return
     const report = await deps.cleanupSessionTeamRunsFn({
@@ -106,6 +118,9 @@ export function createManagers(args: {
       })
       await tmuxSessionManager.cleanup().catch((error) => {
         log("[create-managers] tmux cleanup error during process shutdown:", error)
+      })
+      await monitorManager?.shutdown().catch((error) => {
+        log("[create-managers] monitor cleanup error during process shutdown:", error)
       })
     },
   })
@@ -199,5 +214,6 @@ export function createManagers(args: {
     configHandler,
     modelFallbackControllerAccessor,
     tuiStateMirror,
+    monitorManager,
   }
 }

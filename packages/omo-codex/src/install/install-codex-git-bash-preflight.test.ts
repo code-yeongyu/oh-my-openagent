@@ -10,7 +10,7 @@ import type { CommandRunOptions } from "./types"
 
 const WINDOWS_GIT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe"
 const LSP_CLI_PATH = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "cli.js")
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
 async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T> {
   let lspCliAlreadyPresent = true

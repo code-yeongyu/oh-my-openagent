@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -181,6 +181,29 @@ describe("TuiStateMirror", () => {
     // then
     expect(readMirror(projectDir)).toBeNull()
     expect(reportedErrors).toEqual([statusError])
+  })
+
+  it("#given mirror write fails #when flushing #then the write error is reported", async () => {
+    // given
+    const blockedDataHome = join(makeTempDir("blocked-parent"), "data-home-file")
+    writeFileSync(blockedDataHome, "not a directory", "utf-8")
+    process.env.XDG_DATA_HOME = blockedDataHome
+    const projectDir = makeTempDir("write-failure")
+    const reportedErrors: Error[] = []
+    const mirror = createMirror({
+      projectDir,
+      client: createClient({ "ses-main": { type: "running" } }),
+      reportFlushError: (error) => {
+        reportedErrors.push(error)
+      },
+    })
+
+    // when
+    await expect(mirror.flush()).resolves.toBeUndefined()
+
+    // then
+    expect(reportedErrors).toHaveLength(1)
+    expect(reportedErrors[0]?.message).toContain("not a directory")
   })
 
   it("#given concurrent flush calls #when the first build is in flight #then it does not double-build", async () => {
