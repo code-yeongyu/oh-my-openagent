@@ -87,3 +87,73 @@ test("#given ulw-plan approval gate #when inspected #then it is a durable decisi
 	// then — the still-unclear path is a single prompt, never a re-exploration loop
 	assert.match(combined, /do not re-explore/i);
 });
+
+test("#given ulw-plan skill #when intent routing is inspected #then it splits clear vs unclear into two references with the on-the-fence tie-break", async () => {
+	// given
+	const skill = await readFile(skillPath, "utf8");
+
+	// then — one judgment, one reference; the tie-break defends against silently mis-routing CLEAR to UNCLEAR
+	assert.match(skill, /references\/intent-clear\.md/);
+	assert.match(skill, /references\/intent-unclear\.md/);
+	assert.match(skill, /on the fence/i);
+	assert.match(skill, /treat it as CLEAR/i);
+});
+
+test("#given ulw-plan skill #when the generator mandate is inspected #then it runs the cross-platform scaffold script and appends, never hand-building", async () => {
+	// given
+	const skill = await readFile(skillPath, "utf8");
+
+	// then
+	assert.match(skill, /scaffold-plan\.mjs/);
+	assert.match(skill, /APPEND[^.]{0,80}Todos/);
+	assert.match(skill, /never rewrite[^.]{0,40}headers/i);
+	assert.match(skill, /## TL;DR \(For humans\)/);
+});
+
+test("#given the unclear-intent reference #when inspected #then it forbids interrogation, auto-runs high accuracy, and suppresses it on Trivial", async () => {
+	// given
+	const unclear = await readFile(join(root, "skills", "ulw-plan", "references", "intent-unclear.md"), "utf8");
+
+	// then — when the human cannot steer, research + announced defaults replace the interview, and adversarial review substitutes for it
+	assert.match(unclear, /do NOT interrogate/);
+	assert.match(unclear, /announce/i);
+	assert.match(unclear, /AUTOMATICALLY/);
+	assert.match(unclear, /Trivial[^.]{0,80}SUPPRESS/i);
+
+	// then — the reference is an agent-facing prose file too, so it must stay Codex-native (no opencode-only tools leak)
+	assert.doesNotMatch(unclear, opencodeOnlyToolPattern);
+});
+
+test("#given the clear-intent reference #when inspected #then it asks the surviving forks with WHY and keeps Momus optional", async () => {
+	// given
+	const clear = await readFile(join(root, "skills", "ulw-plan", "references", "intent-clear.md"), "utf8");
+
+	// then
+	assert.match(clear, /ASK WITH WHY/);
+	assert.match(clear, /two filters/i);
+	assert.match(clear, /never automatic/i);
+	assert.doesNotMatch(clear, opencodeOnlyToolPattern);
+});
+
+test("#given the plan template in full-workflow #when inspected #then the human TL;DR leads above the AI detail and the script is the source", async () => {
+	// given
+	const workflow = await readFile(workflowPath, "utf8");
+
+	// then — the documented template, not just the emitted skeleton, must keep the human TL;DR above the AI detail
+	assert.match(workflow, /## TL;DR \(For humans\)/);
+	assert.match(workflow, /scaffold-plan\.mjs/);
+	assert.ok(workflow.indexOf("## TL;DR (For humans)") < workflow.indexOf("## Scope"));
+	// then — the HR6 hand-build backstop is regression-locked, not just prose that a future shrink can drop
+	assert.match(workflow, /HR6 backstop/i);
+});
+
+test("#given the high-accuracy review #when inspected #then it is a dual Momus where both passes must return OKAY", async () => {
+	// given
+	const workflow = await readFile(workflowPath, "utf8");
+
+	// then — every Momus plan review runs twice (native momus + codex-CLI gpt-5.5 xhigh); both must approve before handoff
+	assert.match(workflow, /dual/i);
+	assert.match(workflow, /momus/i);
+	assert.match(workflow, /gpt-5\.5/);
+	assert.match(workflow, /both[^.]{0,40}OKAY/i);
+});

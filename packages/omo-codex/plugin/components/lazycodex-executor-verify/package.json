@@ -1,0 +1,44 @@
+{
+	"name": "@code-yeongyu/codex-lazycodex-executor-verify",
+	"version": "4.10.0",
+	"description": "Codex SubagentStop evidence verifier for LazyCodex executor completions.",
+	"type": "module",
+	"packageManager": "npm@11.12.1",
+	"license": "MIT",
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"lazycodex",
+		"hooks",
+		"evidence"
+	],
+	"bin": {
+		"lazycodex-executor-verify": "./dist/cli.js"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "npm run build --silent && vitest --run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"check": "tsc --noEmit && biome check . && npm run build"
+	},
+	"files": [
+		"dist",
+		"directive.md",
+		"hooks",
+		"README.md",
+		"LICENSE",
+		"NOTICE"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "2.4.16",
+		"@types/node": "^25.9.3",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}
