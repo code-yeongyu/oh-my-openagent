@@ -85,7 +85,7 @@ describe("createBuiltinSkills", () => {
 		expect(playwrightSkill).toBeUndefined()
 	})
 
-	test("always includes frontend-ui-ux, git-master, review-work, shared skills, and runtime security skills", () => {
+	test("always includes frontend, git-master, review-work, shared skills, and runtime security skills", () => {
 		// given - both provider options
 
 		// when
@@ -95,7 +95,7 @@ describe("createBuiltinSkills", () => {
 
 		// then
 		for (const skills of [defaultSkills, agentBrowserSkills, devBrowserSkills]) {
-			expect(skills.find((s) => s.name === "frontend-ui-ux")).toBeDefined()
+			expect(skills.find((s) => s.name === "frontend")).toBeDefined()
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
 			expect(skills.find((s) => s.name === "remove-ai-slops")).toBeDefined()
@@ -141,7 +141,7 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(skills.map((s) => s.name)).not.toContain("playwright")
-		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
+		expect(skills.map((s) => s.name)).toContain("frontend")
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
@@ -164,7 +164,7 @@ describe("createBuiltinSkills", () => {
 		// #then
 		expect(skills.map((s) => s.name)).not.toContain("playwright")
 		expect(skills.map((s) => s.name)).not.toContain("git-master")
-		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
+		expect(skills.map((s) => s.name)).toContain("frontend")
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("remove-ai-slops")
@@ -181,7 +181,7 @@ describe("createBuiltinSkills", () => {
 		const options = {
 			disabledSkills: new Set([
 				"playwright",
-				"frontend-ui-ux",
+				"frontend",
 				"git-master",
 				"review-work",
 				"remove-ai-slops",

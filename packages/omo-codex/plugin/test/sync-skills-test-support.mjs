@@ -7,7 +7,7 @@ export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 export const expectedSkills = [
 	"comment-checker",
 	"debugging",
-	"frontend-ui-ux",
+	"frontend",
 	"git-master",
 	"init-deep",
 	"lcx-contribute-bug-fix",
