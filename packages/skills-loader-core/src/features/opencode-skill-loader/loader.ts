@@ -82,15 +82,15 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
       discoverGlobalAgentsSkills(),
     ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
+  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents) > shared
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
-    ...sharedSkills,
     ...projectSkills,
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...sharedSkills,
   ])
 }
 
@@ -115,15 +115,15 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverGlobalAgentsSkills(),
   ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
+  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents) > shared
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
-    ...sharedSkills,
     ...projectSkills,
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...sharedSkills,
   ])
 }
 
