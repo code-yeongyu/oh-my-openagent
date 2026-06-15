@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.ts";
 import { ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE } from "../src/goal-status.js";
+import { qualityGateJson } from "./fixtures/quality-gate-builder.js";
 
 let testDir: string;
 let out: string[];
@@ -59,7 +60,7 @@ function codexSnapshot(status: "active" | "complete" = "active"): string {
 }
 
 async function qualityGate(): Promise<string> {
-	return readFile(new URL("./fixtures/sample-quality-gate.json", import.meta.url), "utf8");
+	return qualityGateJson(testDir);
 }
 
 async function createPlan(brief = "- Goal A\n- Goal B"): Promise<Record<string, unknown>> {

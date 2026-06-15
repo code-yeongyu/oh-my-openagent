@@ -1,0 +1,110 @@
+import { writeFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+
+import { checkpointUlwLoop } from "../src/checkpoint.js";
+import { ulwLoopBriefPath } from "../src/paths.js";
+import { expectCode, passGoal, plan, repoWith, snapshot } from "./fixtures/checkpoint-builders.js";
+import { MISSING_ARTIFACT_PATH, qualityGateJson } from "./fixtures/quality-gate-builder.js";
+
+describe("checkpointUlwLoop final story", () => {
+	it("requires quality-gate-json for the final goal complete", async () => {
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+				}),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
+	});
+
+	it("accepts final story when quality gate JSON includes valid criteriaCoverage", async () => {
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G002",
+			status: "complete",
+			evidence: "final work complete and validation passed",
+			codexGoalJson: snapshot("complete"),
+			qualityGateJson: await qualityGateJson(repo),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect(result.plan.aggregateCompletion?.status).toBe("complete");
+	});
+
+	it("rejects final story when quality gate references a missing manual QA artifact", async () => {
+		const repo = await repoWith(
+			plan([passGoal("G001", { status: "complete" }), passGoal("G002")], { activeGoalId: "G002" }),
+		);
+		const gateJson = await qualityGateJson(repo, MISSING_ARTIFACT_PATH);
+
+		await expectCode(
+			() =>
+				checkpointUlwLoop(repo, {
+					goalId: "G002",
+					status: "complete",
+					evidence: "final work complete and validation passed",
+					codexGoalJson: snapshot("complete"),
+					qualityGateJson: gateJson,
+				}),
+			"ULW_LOOP_QUALITY_GATE_INVALID",
+		);
+	});
+
+	it("ACCEPTS complete when task-scoped completed Codex objective maps to the ulw-loop brief", async () => {
+		const taskObjective = "Fix ulw-loop objective mismatch and install local ulw";
+		const repo = await repoWith(plan([passGoal("G001")], { activeGoalId: "G001" }));
+		await writeFile(ulwLoopBriefPath(repo), `${taskObjective}\n`, "utf8");
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G001",
+			status: "complete",
+			evidence: "final implementation complete and quality gate passed",
+			codexGoalJson: snapshot("complete", taskObjective),
+			qualityGateJson: await qualityGateJson(repo),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect(result.ledgerEntry.kind).toBe("aggregate_completed");
+	});
+
+	it("ACCEPTS complete when active task-scoped Codex objective maps to the ulw-loop brief", async () => {
+		const taskObjective = "Create only research artifacts with source evidence";
+		const repo = await repoWith(plan([passGoal("G001")], { activeGoalId: "G001" }));
+		await writeFile(ulwLoopBriefPath(repo), `${taskObjective}\n`, "utf8");
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G001",
+			status: "complete",
+			evidence: "final implementation complete and quality gate passed",
+			codexGoalJson: snapshot("active", taskObjective),
+			qualityGateJson: await qualityGateJson(repo),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect(result.ledgerEntry.kind).toBe("aggregate_completed");
+	});
+
+	it("explains final task-scoped objective mapping when completed Codex objective is unrelated", async () => {
+		const repo = await repoWith(plan([passGoal("G001")], { activeGoalId: "G001" }));
+		await writeFile(ulwLoopBriefPath(repo), "Fix ulw-loop objective mismatch and install local ulw\n", "utf8");
+
+		await expect(
+			checkpointUlwLoop(repo, {
+				goalId: "G001",
+				status: "complete",
+				evidence: "final implementation complete and quality gate passed",
+				codexGoalJson: snapshot("complete", "unrelated completed task"),
+				qualityGateJson: await qualityGateJson(repo),
+			}),
+		).rejects.toThrow("Final task-scoped aggregate reconciliation");
+	});
+});

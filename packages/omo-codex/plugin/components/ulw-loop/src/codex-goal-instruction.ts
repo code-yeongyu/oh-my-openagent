@@ -1,4 +1,9 @@
-import { codexGoalMode, expectedCodexObjective, isFinalRunCompletionCandidate } from "./goal-status.js";
+import {
+	codexGoalMode,
+	expectedCodexObjective,
+	isEssentialCriterion,
+	isFinalRunCompletionCandidate,
+} from "./goal-status.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 
 export interface CodexCreateGoalPayload {
@@ -94,7 +99,8 @@ function successCriteriaLines(criteria: readonly UlwLoopSuccessCriterion[]): rea
 
 function formatCriterionLine(criterion: UlwLoopSuccessCriterion): string {
 	const remainingWork = criterion.status === "pending" ? " remaining work:" : "";
-	return `-${remainingWork} [${criterion.id}] (${criterion.userModel}) ${criterion.scenario} — expect: ${criterion.expectedEvidence} — status: ${criterion.status}`;
+	const marker = isEssentialCriterion(criterion) ? "essential" : "non-essential";
+	return `-${remainingWork} [${criterion.id}] [${marker}] (${criterion.userModel}) ${criterion.scenario} — expect: ${criterion.expectedEvidence} — status: ${criterion.status}`;
 }
 
 function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, aggregate: boolean): string {
