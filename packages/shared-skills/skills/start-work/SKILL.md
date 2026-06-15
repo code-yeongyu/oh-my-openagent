@@ -13,9 +13,10 @@ Translate any OpenCode-only tool name in an inherited example to its Codex equiv
 
 | OpenCode example | Codex tool to use |
 | --- | --- |
-| `task(subagent_type="<role>", ...)` or `task(category="...", ...)` | `spawn_agent({"task_name":"...","message":"TASK: act as <role: explorer, librarian, planner, reviewer, implementation or QA worker>. ...","fork_turns":"none"})` |
-| `background_output(task_id="...")` | `wait_agent(...)` for mailbox signals |
-| `team_*(...)` | `spawn_agent` + `send_message` + `followup_task` + `wait_agent` + `close_agent` |
+| final-review `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})` |
+| worker `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as <role>. ...","fork_context":false})` |
+| `background_output(task_id="...")` | `multi_agent_v1.wait_agent(...)` for mailbox signals |
+| `team_*(...)` | `multi_agent_v1.spawn_agent` + `multi_agent_v1.send_input` + `multi_agent_v1.wait_agent` + `multi_agent_v1.close_agent` |
 
 When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
 

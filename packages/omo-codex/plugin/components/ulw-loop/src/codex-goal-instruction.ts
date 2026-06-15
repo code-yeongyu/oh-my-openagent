@@ -70,7 +70,7 @@ function modeConstraintLines(mode: UlwLoopCodexGoalMode, isFinal: boolean): read
 		"- If a different active or incomplete Codex goal exists, finish/checkpoint that goal before starting this ulw-loop.",
 		isFinal
 			? "- This is the final story; update_goal is allowed only after the mandatory quality gate passes."
-			: "- This is not the final story: do not call update_goal yet; the aggregate Codex goal must remain active while later OMO stories remain.",
+			: "- This is not the final story: do not call update_goal mid-aggregate; checkpoint this OMO ledger story and continue the remaining stories. update_goal is reserved for the final story after the mandatory quality gate passes.",
 	];
 }
 
