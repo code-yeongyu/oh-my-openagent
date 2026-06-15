@@ -44,7 +44,7 @@ function isDisabledSkillConfigEntry(entry: unknown): boolean {
   return "disable" in entry && entry.disable === true
 }
 
-function collectDisabledSkillAliases(pluginConfig: OhMyOpenCodeConfig): Set<string> {
+export function collectDisabledSkillAliases(pluginConfig: OhMyOpenCodeConfig): Set<string> {
   const disabledSkills = new Set<string>(
     (pluginConfig.disabled_skills ?? []).map(normalizeSkillAliasName),
   )
