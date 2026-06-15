@@ -9,9 +9,9 @@ COMMAND: npm --prefix packages/omo-codex/plugin/components/ulw-loop test
 
 
  Test Files  29 passed (29)
-      Tests  311 passed (311)
-   Start at  20:17:08
-   Duration  1.05s (transform 726ms, setup 0ms, import 1.18s, tests 1.63s, environment 2ms)
+      Tests  312 passed (312)
+   Start at  20:31:13
+   Duration  1.19s (transform 953ms, setup 0ms, import 1.54s, tests 1.89s, environment 2ms)
 
 
 EXIT_CODE=0
