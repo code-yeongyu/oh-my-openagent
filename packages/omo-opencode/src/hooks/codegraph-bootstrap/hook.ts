@@ -126,15 +126,14 @@ async function runBootstrap(
   deps: CodegraphBootstrapDeps,
 ): Promise<void> {
   try {
-    const workspace = deps.prepareWorkspace(projectRoot)
-    deps.ensureGitignored(projectRoot)
-
     const command = await resolveOrProvisionCommand(deps, config)
     if (command === null) {
       deps.log("[codegraph-bootstrap] CodeGraph unavailable; skipping bootstrap", { projectRoot })
       return
     }
 
+    const workspace = deps.prepareWorkspace(projectRoot)
+    deps.ensureGitignored(projectRoot)
     const env = codegraphEnv(deps, config)
     const status = await deps.runCommand(projectRoot, command.command, [...command.argsPrefix, "status", "--json"], {
       env,

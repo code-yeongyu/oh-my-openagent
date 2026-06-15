@@ -1,6 +1,11 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { prepareCodegraphWorkspace } from "@oh-my-opencode/utils"
 
 import {
   clearCodegraphBootstrapProjectsForTesting,
@@ -164,6 +169,46 @@ describe("createCodegraphBootstrapHook", () => {
     // then
     expect(events).toContain("log:[codegraph-bootstrap] CodeGraph unavailable; skipping bootstrap")
     expect(events.some((event) => event.startsWith("run:"))).toBe(false)
+    expect(events.some((event) => event.startsWith("prepare:"))).toBe(false)
+    expect(events.some((event) => event.startsWith("gitignore:"))).toBe(false)
+  })
+
+  test("#given CodeGraph is unavailable and auto provisioning is disabled #when background work runs #then it leaves the project untouched", async () => {
+    // given
+    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unavailable-"))
+    const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unavailable-home-"))
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: workspace },
+      { auto_provision: false, enabled: true },
+      {
+        log: (message) => {
+          events.push(`log:${message}`)
+        },
+        prepareWorkspace: (projectRoot) => prepareCodegraphWorkspace(projectRoot, { homeDir }),
+        resolveCommand: () => ({ argsPrefix: [], command: "missing-codegraph", exists: false, source: "path" }),
+        runCommand: async () => {
+          throw new Error("codegraph command should not run")
+        },
+        schedule: (task) => {
+          void task()
+        },
+      },
+    )
+
+    try {
+      // when
+      hook.event({ event: { type: "session.created", properties: { worktree: workspace } } })
+      await waitForBackground()
+
+      // then
+      expect(events).toContain("log:[codegraph-bootstrap] CodeGraph unavailable; skipping bootstrap")
+      expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
+      expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+      rmSync(homeDir, { recursive: true, force: true })
+    }
   })
 
   test("#given a dependency throws #when session.created fires #then the error is logged and never escapes", async () => {

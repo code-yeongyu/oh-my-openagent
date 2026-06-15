@@ -158,13 +158,13 @@ async function runBootstrap(
 	logOutcome: (outcome: CodegraphSessionStartOutcome) => void,
 ): Promise<{ readonly action: WorkerAction }> {
 	try {
-		deps.prepareWorkspace(projectRoot, { homeDir });
-		deps.ensureGitignored(projectRoot);
 		const command = await resolveOrProvisionCommand(deps, config, env, homeDir);
 		if (command.kind === "unavailable") {
 			return finish("skipped-unavailable", { error: command.error, projectRoot, source: command.source }, logOutcome);
 		}
 
+		deps.prepareWorkspace(projectRoot, { homeDir });
+		deps.ensureGitignored(projectRoot);
 		const codegraphEnv = config.install_dir === undefined ? buildCodegraphEnv({ homeDir }) : { ...buildCodegraphEnv({ homeDir }), CODEGRAPH_INSTALL_DIR: config.install_dir };
 		const status = await deps.runCommand(projectRoot, command.resolution.command, [...command.resolution.argsPrefix, "status", "--json"], { env: codegraphEnv, timeoutMs: COMMAND_TIMEOUT_MS });
 		const decision = decideStartupAction(status);

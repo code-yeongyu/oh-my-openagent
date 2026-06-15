@@ -171,9 +171,12 @@ export function pruneCodegraphStore(options: PruneCodegraphStoreOptions): PruneC
 }
 
 export function ensureCodegraphGitignored(workspace: string): boolean {
-  const excludePath = join(workspace, ".git", "info", "exclude")
+  const gitDir = join(workspace, ".git")
+  if (!existsSync(gitDir)) return false
+
+  const excludePath = join(gitDir, "info", "exclude")
   try {
-    mkdirSync(join(workspace, ".git", "info"), { recursive: true })
+    mkdirSync(join(gitDir, "info"), { recursive: true })
     const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf8") : ""
     if (existing.split(/\r?\n/).includes(".codegraph")) return true
     appendFileSync(excludePath, `${existing.endsWith("\n") || existing.length === 0 ? "" : "\n"}.codegraph\n`)

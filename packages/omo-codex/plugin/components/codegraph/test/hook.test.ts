@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Readable } from "node:stream";
@@ -235,11 +235,53 @@ describe("CodeGraph SessionStart hook", () => {
 
 			// then
 			expect(result).toEqual({ action: "skipped-unavailable" });
-			expect(calls).toEqual(["prepareWorkspace", "ensureGitignored"]);
+			expect(calls).toEqual([]);
 			expect(outcomes).toEqual([
 				{
 					action: "skipped-unavailable",
 					error: "offline",
+					projectRoot: workspace,
+					source: "path",
+				},
+			]);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
+
+	it("#given CodeGraph is unavailable and auto provisioning is disabled #when worker runs #then it leaves the project untouched", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-unavailable-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-unavailable-home-"));
+		const outcomes: unknown[] = [];
+
+		try {
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				config: { codegraph: { auto_provision: false, enabled: true }, sources: [], warnings: [] },
+				cwd: workspace,
+				env: { HOME: homeDir },
+				logOutcome: (outcome) => outcomes.push(outcome),
+				deps: {
+					ensureProvisioned: () => {
+						throw new Error("auto provision should not run");
+					},
+					resolveCommand: () => ({ argsPrefix: [], command: "missing-codegraph", exists: false, source: "path" }),
+					runCommand: () => {
+						throw new Error("codegraph command should not run");
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "skipped-unavailable" });
+			expect(existsSync(join(workspace, ".codegraph"))).toBe(false);
+			expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false);
+			expect(outcomes).toEqual([
+				{
+					action: "skipped-unavailable",
+					error: "codegraph binary unavailable and auto_provision is disabled",
 					projectRoot: workspace,
 					source: "path",
 				},

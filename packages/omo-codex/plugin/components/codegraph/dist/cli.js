@@ -1685,9 +1685,12 @@ function prepareCodegraphWorkspace(workspace, options = {}) {
   }
 }
 function ensureCodegraphGitignored(workspace) {
-  const excludePath = join6(workspace, ".git", "info", "exclude");
+  const gitDir = join6(workspace, ".git");
+  if (!existsSync5(gitDir))
+    return false;
+  const excludePath = join6(gitDir, "info", "exclude");
   try {
-    mkdirSync(join6(workspace, ".git", "info"), { recursive: true });
+    mkdirSync(join6(gitDir, "info"), { recursive: true });
     const existing = existsSync5(excludePath) ? readFileSync2(excludePath, "utf8") : "";
     if (existing.split(/\r?\n/).includes(".codegraph"))
       return true;
@@ -1749,12 +1752,12 @@ async function runCodegraphSessionStartWorker(options = {}) {
 }
 async function runBootstrap(projectRoot, config, env, homeDir, deps, logOutcome) {
   try {
-    deps.prepareWorkspace(projectRoot, { homeDir });
-    deps.ensureGitignored(projectRoot);
     const command = await resolveOrProvisionCommand(deps, config, env, homeDir);
     if (command.kind === "unavailable") {
       return finish("skipped-unavailable", { error: command.error, projectRoot, source: command.source }, logOutcome);
     }
+    deps.prepareWorkspace(projectRoot, { homeDir });
+    deps.ensureGitignored(projectRoot);
     const codegraphEnv = config.install_dir === undefined ? buildCodegraphEnv({ homeDir }) : { ...buildCodegraphEnv({ homeDir }), CODEGRAPH_INSTALL_DIR: config.install_dir };
     const status = await deps.runCommand(projectRoot, command.resolution.command, [...command.resolution.argsPrefix, "status", "--json"], { env: codegraphEnv, timeoutMs: COMMAND_TIMEOUT_MS });
     const decision = decideStartupAction(status);

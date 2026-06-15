@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -113,6 +113,21 @@ describe("CodeGraph workspace helpers", () => {
     // then
     expect(result).toBe(true)
     expect(readFileSync(join(workspace, ".git", "info", "exclude"), "utf8")).toContain(".codegraph")
+
+    rmSync(workspace, { force: true, recursive: true })
+  })
+
+  it("does not synthesize git info exclude for non-git workspaces", () => {
+    // given
+    const workspace = tempDir("codegraph-non-git")
+    mkdirSync(workspace, { recursive: true })
+
+    // when
+    const result = ensureCodegraphGitignored(workspace)
+
+    // then
+    expect(result).toBe(false)
+    expect(existsSync(join(workspace, ".git"))).toBe(false)
 
     rmSync(workspace, { force: true, recursive: true })
   })
