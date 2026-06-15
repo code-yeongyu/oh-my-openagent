@@ -6716,6 +6716,36 @@
       ],
       "additionalProperties": false
     },
+    "tui": {
+      "default": {
+        "sidebar": {
+          "enabled": true
+        }
+      },
+      "type": "object",
+      "properties": {
+        "sidebar": {
+          "default": {
+            "enabled": true
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "sidebar"
+      ],
+      "additionalProperties": false
+    },
     "sisyphus": {
       "type": "object",
       "properties": {
