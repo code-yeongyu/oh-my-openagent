@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// scaffold-plan.mjs — generate the ulw-plan draft + plan skeleton deterministically.
+// scaffold-plan.mjs - generate the ulw-plan draft + plan skeleton deterministically.
 //
 // Zero external dependencies (node:fs/path/process/url builtins only) so it runs
 // byte-identically under `node` and `bun` on macOS, Linux, and Windows with no uv
-// bootstrap, no npm/pip install, and no POSIX-shell or python3 precondition — the
+// bootstrap, no npm/pip install, and no POSIX-shell or python3 precondition - the
 // two things genuinely not guaranteed on native Windows across the omo harnesses.
 //
 // Usage:  node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear] [--reset [--force]]
@@ -63,12 +63,12 @@ export function parseArgs(argv) {
 	}
 	if (!slug) throw new Error('usage: scaffold-plan.mjs <slug> [--clear|--unclear] [--reset [--force]]');
 	if (!SLUG_PATTERN.test(slug)) {
-		throw new Error(`invalid slug "${slug}" — use lowercase letters, digits, and hyphens only`);
+		throw new Error(`invalid slug "${slug}" - use lowercase letters, digits, and hyphens only`);
 	}
 	return { slug, intent, reset, force };
 }
 
-// Resolve a project-relative path and confine it under .omo/ — the script's own
+// Resolve a project-relative path and confine it under .omo/ - the script's own
 // enforcement of the prometheus planner write boundary.
 export function resolveSafeOmoPath(cwd, relPath) {
 	const resolved = resolve(cwd, relPath);
@@ -170,7 +170,7 @@ approach: <fill: the approach you intend to plan>
 <!-- ${assumptionsNote} -->
 <!-- assumption | adopted default | rationale | reversible? -->
 
-## Findings (cited — path:lines)
+## Findings (cited - path:lines)
 
 ## Decisions (with rationale)
 
@@ -190,36 +190,36 @@ status: drafting
 export function buildPlanSkeleton(slug, intent) {
 	const decisionsLine =
 		intent === "unclear"
-			? "**Decisions I made for you:** <fill last — the best-practice defaults you adopted; the user vetoes any here>"
-			: "**Decisions to sanity-check:** <fill last — the few choices worth a human glance>";
-	return `# ${slug} — Work Plan
+			? "**Decisions I made for you:** <fill last - the best-practice defaults you adopted; the user vetoes any here>"
+			: "**Decisions to sanity-check:** <fill last - the few choices worth a human glance>";
+	return `# ${slug} - Work Plan
 
 ## TL;DR (For humans)
 <!-- Fill this LAST, after the detailed plan below is written, so it summarizes the REAL plan. -->
 <!-- Plain English for a non-engineer: NO file paths, NO todo numbers, NO wave/agent/tool names. -->
 
-**What you'll get:** <fill last — deliverables in human terms, 1-2 sentences>
+**What you'll get:** <fill last - deliverables in human terms, 1-2 sentences>
 
-**Why this approach:** <fill last — the one or two load-bearing decisions and why>
+**Why this approach:** <fill last - the one or two load-bearing decisions and why>
 
-**What it will NOT do:** <fill last — 1-3 plain lines mirroring Must NOT have>
+**What it will NOT do:** <fill last - 1-3 plain lines mirroring Must NOT have>
 
 **Effort:** <Quick | Short | Medium | Large | XL>
 **Risk:** <Low | Medium | High> - <one-line driver>
 ${decisionsLine}
 
-Your next move: <fill — e.g. approve, or run a high-accuracy review>. Full execution detail follows below.
+Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execution detail follows below.
 
 ---
 
-> TL;DR (machine): <1 line — effort, risk, deliverables>
+> TL;DR (machine): <1 line - effort, risk, deliverables>
 
 ## Scope
 ### Must have
 ### Must NOT have (guardrails, anti-slop, scope boundaries)
 
 ## Verification strategy
-> Zero human intervention — all verification is agent-executed.
+> Zero human intervention - all verification is agent-executed.
 - Test decision: <TDD | tests-after | none> + framework
 - Evidence: .omo/evidence/task-<N>-${slug}.<ext>
 
@@ -233,11 +233,11 @@ Your next move: <fill — e.g. approve, or run a high-accuracy review>. Full exe
 
 ## Todos
 > Implementation + Test = ONE todo. Never separate.
-<!-- APPEND TASK BATCHES BELOW THIS LINE WITH edit/apply_patch — never rewrite the headers above. -->
+<!-- APPEND TASK BATCHES BELOW THIS LINE WITH edit/apply_patch - never rewrite the headers above. -->
 - [ ] 1. <title>
   What to do / Must NOT do: <...>
   Parallelization: Wave <N> | Blocked by: <...> | Blocks: <...>
-  References (executor has NO interview context — be exhaustive): <src/path:lines>
+  References (executor has NO interview context - be exhaustive): <src/path:lines>
   Acceptance criteria (agent-executable): <exact command or assertion>
   QA scenarios (name the exact tool + invocation): happy + failure, Evidence .omo/evidence/task-1-${slug}.<ext>
   Commit: <Y/N> | <type>(<scope>): <summary>
@@ -289,7 +289,7 @@ async function main() {
 	process.stdout.write(
 		created
 			? `next: record findings/decisions in the draft, then APPEND task batches into the "## Todos" region of the plan; fill "## TL;DR (For humans)" LAST.\n`
-			: `skeleton already present — left untouched. APPEND task batches into the "## Todos" region; the human "## TL;DR (For humans)" stays on top.\n`,
+			: `skeleton already present - left untouched. APPEND task batches into the "## Todos" region; the human "## TL;DR (For humans)" stays on top.\n`,
 	);
 }
 

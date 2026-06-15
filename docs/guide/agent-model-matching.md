@@ -183,7 +183,7 @@ There are two separate systems:
 
 Two things move at different speeds, and the difference explains why "Opus 4.7" still appears as a default below:
 
-- **The current top models** are Claude **Fable 5** and **Opus 4.8**, and Kimi **K2.7**. Sisyphus and Atlas have dedicated tuned prompt paths for these models; Prometheus keeps one `ulw-plan`-backed prompt. Pin one in your config — `"anthropic/claude-opus-4-8"`, `"anthropic/claude-fable-5"`, `"opencode-go/kimi-k2.7"` — when you want to opt into the newer model explicitly.
+- **The current top models** are Claude **Fable 5** and **Opus 4.8**, and Kimi **K2.7**. Sisyphus and Atlas have dedicated tuned prompt paths for these models; Prometheus keeps one `ulw-plan`-backed prompt. Pin one in your config: `"anthropic/claude-opus-4-8"`, `"anthropic/claude-fable-5"`, `"opencode-go/kimi-k2.7"`. Use that when you want to opt into the newer model explicitly.
 - **The auto-resolution fallback chains** below still lead with **Opus 4.7** and **Kimi K2.6**. That is intentional, not stale: the chains only auto-select models the bundled capability snapshot is built against, so variant and context-window resolution stay correct. They promote Opus 4.8 / K2.7 to chain defaults once those land in the model catalog; until then you opt into the newer models — and their prompts — by naming them explicitly.
 
 So an "Opus 4.7 (max)" entry in the chains below is the snapshot-backed floor, not a recommendation to prefer 4.7 over 4.8.
@@ -196,7 +196,7 @@ Used by: Sisyphus, Atlas, Sisyphus-Junior, Metis (Claude path), Prometheus (prim
 |---|---|---|---|
 | 1 | `claude-fable-5` / `claude-opus-4-8` / `claude-opus-4-7` (max) | `anthropic`, `github-copilot`, `opencode`, `vercel` | Best overall compliance with the ~1,100-line Sisyphus prompt. Sisyphus carries per-version prompts for all three; Prometheus uses its single `ulw-plan`-backed prompt. Opus 4.7 is the hardcoded chain default for budget stability. |
 | 2 | `claude-sonnet-4-6` | same | Faster, cheaper, still Claude. |
-| 3 | **`kimi-k2.7` — RECOMMENDED ALTERNATIVE (newest)** | `opencode-go`, `kimi-for-coding`, `moonshotai`, `opencode`, `vercel` | Restrained, outcome-first, and the top Kimi when Anthropic isn't connected. Agents with Kimi-specific prompt paths use their K2.7 tuning; Prometheus keeps its `ulw-plan`-backed prompt. |
+| 3 | **`kimi-k2.7` - RECOMMENDED ALTERNATIVE (newest)** | `opencode-go`, `kimi-for-coding`, `moonshotai`, `opencode`, `vercel` | Restrained, outcome-first, and the top Kimi when Anthropic isn't connected. Agents with Kimi-specific prompt paths use their K2.7 tuning; Prometheus keeps its `ulw-plan`-backed prompt. |
 | 4 | **`kimi-k2.6` or `kimi-k2.5` — RECOMMENDED ALTERNATIVE** | same as K2.7 | Instruction-following mirrors Claude closely. Current default Kimi in the chains. |
 | 5 | **`glm-5` or `glm-5.1` — ACCEPTABLE ALTERNATIVE** | `opencode-go`, `zai-coding-plan`, `opencode`, `vercel` | Claude-like, slightly looser on long nested workflows. Solid fallback. |
 | 6 | `big-pickle` (GLM 4.6) | `opencode` | Free-tier safety net. |

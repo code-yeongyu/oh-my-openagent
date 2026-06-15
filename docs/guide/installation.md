@@ -608,7 +608,7 @@ Priority: **Claude > GPT > Claude-like models**
 - **Claude models** respond well to **mechanics-driven** prompts — detailed checklists, templates, step-by-step procedures. More rules = more compliance.
 - **GPT models** (especially 5.2+) respond better to **principle-driven** prompts — concise principles, XML-tagged structure, explicit decision criteria. More rules = more contradiction surface = more drift.
 
-Key insight from Codex Plan Mode analysis: plan quality comes from making the plan **"Decision Complete"** — it must leave ZERO decisions to the implementer. Prometheus now uses one thin prompt backed by `ulw-plan` for that behavior instead of maintaining separate model-family prompt files.
+Key insight from Codex Plan Mode analysis: plan quality comes from making the plan **"Decision Complete"**: it must leave ZERO decisions to the implementer. Prometheus now uses one thin prompt backed by `ulw-plan` for that behavior instead of maintaining separate model-family prompt files.
 
 Atlas still has model-family-specific prompt behavior. Prometheus does not switch prompts when its model changes; the fallback chain changes capacity, cost, and availability, not the prompt text.
 
