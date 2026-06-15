@@ -12,6 +12,7 @@ import {
 	resolveMultipleSkillsAsync,
 } from "./skill-content"
 import { getAllSkills } from "./skill-discovery"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
@@ -67,6 +68,57 @@ describe("resolveSkillContentAsync", () => {
 		const result = await resolveSkillContentAsync("frontend", options)
 
 		// then: returns null
+		expect(result).toBeNull()
+	})
+
+	it("#given the shared ulw-plan canonical alias is disabled #when resolving it async #then it does not fall back to the plain shared alias", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
+
+		// then
+		expect(result).toBeNull()
+	})
+
+	it("#given the shared ulw-plan canonical alias is disabled #when matching against all skills #then no shared fallback match remains", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+
+		// when
+		const skills = await getAllSkills(options)
+		const matchedSkill = matchSkillByName(skills, "shared/ulw-plan")
+
+		// then
+		expect(matchedSkill).toBeUndefined()
+	})
+
+	it("#given a local ulw-plan override exists #when only the shared canonical alias is disabled #then the local plain override still resolves", async () => {
+		// given
+		const localSkillDir = join(testConfigDir, ".opencode", "skills", "ulw-plan")
+		mkdirSync(localSkillDir, { recursive: true })
+		writeFileSync(
+			join(localSkillDir, "SKILL.md"),
+			"---\nname: ulw-plan\ndescription: Local ulw-plan override\n---\nlocal ulw-plan body"
+		)
+		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("ulw-plan", options)
+
+		// then
+		expect(result).toBe("local ulw-plan body")
+	})
+
+	it("#given the plain ulw-plan name is disabled #when resolving the shared canonical alias #then the shared alias is disabled too", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
+
+		// then
 		expect(result).toBeNull()
 	})
 

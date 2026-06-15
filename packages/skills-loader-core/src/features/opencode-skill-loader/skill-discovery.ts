@@ -6,12 +6,20 @@ import type { SkillResolutionOptions } from "./skill-resolution-options"
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
 const SHARED_SKILL_PREFIX = "shared/"
 
-function isDisabledSkillAlias(skill: LoadedSkill, disabledSkills: ReadonlySet<string>): boolean {
+export function isDisabledSkillAlias(skill: LoadedSkill, disabledSkills: ReadonlySet<string>): boolean {
 	if (disabledSkills.has(skill.name)) {
 		return true
 	}
 
-	return skill.scope === "shared" && skill.name.startsWith(SHARED_SKILL_PREFIX) && disabledSkills.has(skill.name.slice(SHARED_SKILL_PREFIX.length))
+	if (skill.scope !== "shared") {
+		return false
+	}
+
+	if (skill.name.startsWith(SHARED_SKILL_PREFIX)) {
+		return disabledSkills.has(skill.name.slice(SHARED_SKILL_PREFIX.length))
+	}
+
+	return disabledSkills.has(`${SHARED_SKILL_PREFIX}${skill.name}`)
 }
 
 export function clearSkillCache(): void {
