@@ -97,8 +97,9 @@ function mergeCodegraphConfig(
 }
 
 function mergeOmoConfig(base: OmoConfig, override: OmoConfig): OmoConfig {
+  const codegraph = mergeCodegraphConfig(base.codegraph, override.codegraph)
   return {
-    codegraph: mergeCodegraphConfig(base.codegraph, override.codegraph),
+    ...(codegraph === undefined ? {} : { codegraph }),
   }
 }
 
@@ -254,7 +255,7 @@ export function validateHarnessApplicability(config: OmoConfig, harness: Harness
 
 export function loadOmoConfig(options: LoadOmoConfigOptions): LoadOmoConfigResult {
   const cwd = options.cwd ?? process.cwd()
-  const homeDir = options.homeDir ?? process.env.HOME ?? process.env.USERPROFILE ?? homedir()
+  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir()
   const env = options.env ?? process.env
   let config = BUILT_IN_DEFAULTS
   const sources: OmoConfigSource[] = []

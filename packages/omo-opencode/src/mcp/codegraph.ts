@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import { buildCodegraphEnv, resolveCodegraphCommand } from "@oh-my-opencode/utils"
 import type { ResolveCodegraphCommandOptions } from "@oh-my-opencode/utils"
 import type { CodegraphConfig } from "../config/schema/codegraph"
@@ -29,14 +31,29 @@ function createNodeRuntimeResolver(resolveExecutable: RuntimeExecutableResolver)
   }
 }
 
+function provisionedBinFromInstallDir(
+  installDir: string | undefined,
+  fileExists: (filePath: string) => boolean,
+): string | null {
+  if (installDir === undefined) return null
+  const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph")
+  return fileExists(candidate) ? candidate : null
+}
+
+function codegraphEnvForConfig(config: Partial<CodegraphConfig> | undefined, homeDir: string | undefined): Record<string, string> {
+  const env = buildCodegraphEnv({ homeDir })
+  return config?.install_dir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.install_dir }
+}
+
 export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}): LocalMcpConfig {
   const resolveExecutable = options.resolveExecutable ?? resolveRuntimeExecutable
+  const fileExists = options.fileExists ?? existsSync
   const resolvedCommand = resolveCodegraphCommand({
     env: options.env,
-    fileExists: options.fileExists,
+    fileExists,
     homeDir: options.homeDir,
     nodeRuntime: createNodeRuntimeResolver(resolveExecutable),
-    provisioned: options.provisioned,
+    provisioned: options.provisioned ?? (() => provisionedBinFromInstallDir(options.config?.install_dir, fileExists)),
     requireResolve: options.requireResolve,
     which: createWhichResolver(resolveExecutable),
   })
@@ -45,6 +62,6 @@ export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}
     type: "local",
     command: [resolvedCommand.command, ...resolvedCommand.argsPrefix, "serve", "--mcp"],
     enabled: resolvedCommand.exists,
-    environment: buildCodegraphEnv({ homeDir: options.homeDir }),
+    environment: codegraphEnvForConfig(options.config, options.homeDir),
   }
 }

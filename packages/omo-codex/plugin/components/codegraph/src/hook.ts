@@ -1,14 +1,28 @@
-import { createHash, randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { cwd as processCwd, env as processEnv, stderr as processStderr, stdin as processStdin, stdout as processStdout } from "node:process";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { buildCodegraphEnv } from "./codegraph-env.js";
-import { resolveCodegraphCommand, type CodegraphCommandResolution, type ResolveCodegraphCommandOptions } from "./codegraph-resolve.js";
+import { getCodexOmoConfig, type CodexOmoConfig as SharedCodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import {
+	ensureCodegraphProvisioned,
+	type CodegraphProvisionResult as SharedCodegraphProvisionResult,
+} from "../../../../../utils/src/codegraph/provision.ts";
+import {
+	resolveCodegraphCommand,
+	type CodegraphCommandResolution,
+	type ResolveCodegraphCommandOptions,
+} from "../../../../../utils/src/codegraph/resolve.ts";
+import {
+	ensureCodegraphGitignored,
+	prepareCodegraphWorkspace,
+	type CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparation,
+} from "../../../../../utils/src/codegraph/workspace.ts";
+import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 
 export const CODEGRAPH_SESSION_START_NOTICE = "LazyCodex CodeGraph bootstrap scheduled in background";
 
@@ -37,42 +51,11 @@ export interface CodegraphCommandResult {
 	readonly timedOut: boolean;
 }
 
-export interface CodegraphConfig {
-	readonly auto_provision?: boolean;
-	readonly enabled?: boolean;
-	readonly install_dir?: string;
-	readonly telemetry?: boolean;
-}
-
-export interface CodexOmoConfig {
-	readonly codegraph?: CodegraphConfig;
-	readonly sources: readonly OmoConfigSource[];
-	readonly warnings: readonly string[];
-}
-
-export interface OmoConfigSource {
-	readonly exists: boolean;
-	readonly loaded: boolean;
-	readonly path: string;
-	readonly scope: "global" | "project";
-}
-
-export type CodegraphWorkspaceMode = "global-linked" | "in-place-fallback" | "in-project";
-
-export interface CodegraphWorkspacePreparation {
-	readonly dataDir: string;
-	readonly dataRoot: string;
-	readonly linked: boolean;
-	readonly mode: CodegraphWorkspaceMode;
-	readonly projectLink: string;
-	readonly reason?: string;
-}
-
-export interface CodegraphProvisionResult {
-	readonly binPath?: string;
-	readonly error?: string;
-	readonly provisioned: boolean;
-}
+export type CodegraphConfig = Partial<SharedCodegraphConfig>;
+export type CodexOmoConfig = SharedCodexOmoConfig;
+export type OmoConfigSource = CodexOmoConfig["sources"][number];
+export type CodegraphProvisionResult = SharedCodegraphProvisionResult;
+export type CodegraphWorkspacePreparation = SharedCodegraphWorkspacePreparation;
 
 export interface CodegraphSessionStartOutcome {
 	readonly action: WorkerAction;
@@ -120,9 +103,9 @@ const COMMAND_TIMEOUT_MS = 60_000;
 const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 
 const defaultDeps: CodegraphSessionStartDeps = {
-	ensureGitignored,
-	ensureProvisioned,
-	prepareWorkspace,
+	ensureGitignored: ensureCodegraphGitignored,
+	ensureProvisioned: ensureCodegraphProvisioned,
+	prepareWorkspace: prepareCodegraphWorkspace,
 	resolveCommand: resolveCodegraphCommand,
 	runCommand: runCodegraphCommand,
 };
@@ -294,109 +277,6 @@ function toOutputText(value: string | Buffer): string {
 	return Buffer.isBuffer(value) ? value.toString("utf8") : value;
 }
 
-function getCodexOmoConfig(options: { readonly cwd: string; readonly env: Record<string, string | undefined>; readonly homeDir: string }): CodexOmoConfig {
-	const globalPath = join(options.homeDir, ".omo", "config.jsonc");
-	const sources: OmoConfigSource[] = [];
-	let codegraph: CodegraphConfig = { auto_provision: true, enabled: true, telemetry: false };
-	if (existsSync(globalPath)) {
-		const loaded = loadCodegraphConfig(globalPath);
-		sources.push({ exists: true, loaded: loaded.loaded, path: globalPath, scope: "global" });
-		codegraph = { ...codegraph, ...loaded.config.codegraph, ...loaded.config.codexCodegraph };
-	} else {
-		sources.push({ exists: false, loaded: false, path: globalPath, scope: "global" });
-	}
-
-	const envCodegraph = loadCodegraphEnv(options.env);
-	return { codegraph: { ...codegraph, ...envCodegraph }, sources, warnings: [] };
-}
-
-function loadCodegraphConfig(path: string): { readonly config: { readonly codegraph?: CodegraphConfig; readonly codexCodegraph?: CodegraphConfig }; readonly loaded: boolean } {
-	const parsed = parseJson(stripJsonComments(readFileSync(path, "utf8")));
-	if (!isRecord(parsed)) return { config: {}, loaded: false };
-	const codegraph = readCodegraphSection(parsed["codegraph"]);
-	const codexCodegraph = isRecord(parsed["[codex]"]) ? readCodegraphSection(parsed["[codex]"]["codegraph"]) : undefined;
-	return {
-		config: {
-			...(codegraph === undefined ? {} : { codegraph }),
-			...(codexCodegraph === undefined ? {} : { codexCodegraph }),
-		},
-		loaded: true,
-	};
-}
-
-function stripJsonComments(text: string): string {
-	let output = "";
-	let inString = false;
-	let escaped = false;
-	for (let index = 0; index < text.length; index += 1) {
-		const char = text[index];
-		const next = text[index + 1];
-		if (char === undefined) continue;
-		if (inString) {
-			output += char;
-			escaped = char === "\\" && !escaped;
-			if (char === "\"" && !escaped) inString = false;
-			if (char !== "\\") escaped = false;
-			continue;
-		}
-		if (char === "\"") {
-			inString = true;
-			output += char;
-			continue;
-		}
-		if (char === "/" && next === "/") {
-			while (index < text.length && text[index] !== "\n") index += 1;
-			output += "\n";
-			continue;
-		}
-		if (char === "/" && next === "*") {
-			index += 2;
-			while (index < text.length && !(text[index] === "*" && text[index + 1] === "/")) index += 1;
-			index += 1;
-			continue;
-		}
-		output += char;
-	}
-	return output.replace(/,\s*([}\]])/g, "$1");
-}
-
-function readCodegraphSection(value: unknown): CodegraphConfig | undefined {
-	if (!isRecord(value)) return undefined;
-	const config: { auto_provision?: boolean; enabled?: boolean; install_dir?: string; telemetry?: boolean } = {};
-	if (typeof value["auto_provision"] === "boolean") config.auto_provision = value["auto_provision"];
-	if (typeof value["enabled"] === "boolean") config.enabled = value["enabled"];
-	if (typeof value["install_dir"] === "string") config.install_dir = value["install_dir"];
-	if (typeof value["telemetry"] === "boolean") config.telemetry = value["telemetry"];
-	return Object.keys(config).length === 0 ? undefined : config;
-}
-
-function loadCodegraphEnv(env: Record<string, string | undefined>): CodegraphConfig {
-	const config: { auto_provision?: boolean; enabled?: boolean; install_dir?: string; telemetry?: boolean } = {};
-	const omoAutoProvision = readBooleanValue(env["OMO_CODEGRAPH_AUTO_PROVISION"]);
-	const codexAutoProvision = readBooleanValue(env["CODEX_CODEGRAPH_AUTO_PROVISION"]);
-	const omoEnabled = readBooleanValue(env["OMO_CODEGRAPH_ENABLED"]);
-	const codexEnabled = readBooleanValue(env["CODEX_CODEGRAPH_ENABLED"]);
-	const omoTelemetry = readBooleanValue(env["OMO_CODEGRAPH_TELEMETRY"]);
-	const codexTelemetry = readBooleanValue(env["CODEX_CODEGRAPH_TELEMETRY"]);
-	if (omoAutoProvision !== undefined) config.auto_provision = omoAutoProvision;
-	if (codexAutoProvision !== undefined) config.auto_provision = codexAutoProvision;
-	if (omoEnabled !== undefined) config.enabled = omoEnabled;
-	if (codexEnabled !== undefined) config.enabled = codexEnabled;
-	if (env["OMO_CODEGRAPH_INSTALL_DIR"] !== undefined) config.install_dir = env["OMO_CODEGRAPH_INSTALL_DIR"];
-	if (env["CODEX_CODEGRAPH_INSTALL_DIR"] !== undefined) config.install_dir = env["CODEX_CODEGRAPH_INSTALL_DIR"];
-	if (omoTelemetry !== undefined) config.telemetry = omoTelemetry;
-	if (codexTelemetry !== undefined) config.telemetry = codexTelemetry;
-	return config;
-}
-
-function readBooleanValue(value: string | undefined): boolean | undefined {
-	if (value === undefined) return undefined;
-	const normalized = value.trim().toLowerCase();
-	if (["1", "true", "yes", "on"].includes(normalized)) return true;
-	if (["0", "false", "no", "off"].includes(normalized)) return false;
-	return undefined;
-}
-
 function resolveHomeDir(env: Record<string, string | undefined>): string {
 	return env["HOME"] ?? env["USERPROFILE"] ?? homedir();
 }
@@ -426,139 +306,6 @@ function parseJson(text: string): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
-}
-
-function ensureGitignored(projectRoot: string): boolean {
-	const excludePath = join(projectRoot, ".git", "info", "exclude");
-	try {
-		mkdirSync(dirname(excludePath), { recursive: true });
-		const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf8") : "";
-		if (existing.split(/\r?\n/).includes(".codegraph")) return true;
-		appendFileSync(excludePath, `${existing.length === 0 || existing.endsWith("\n") ? "" : "\n"}.codegraph\n`);
-		return true;
-	} catch (error) {
-		if (error instanceof Error) return false;
-		throw error;
-	}
-}
-
-function prepareWorkspace(projectRoot: string, options: { readonly homeDir: string }): CodegraphWorkspacePreparation {
-	const resolvedRoot = resolve(projectRoot);
-	const dataRoot = join(options.homeDir, ".omo", "codegraph");
-	const dataDir = join(dataRoot, "projects", workspaceStorageName(resolvedRoot));
-	const projectLink = join(resolvedRoot, ".codegraph");
-	try {
-		mkdirSync(dataDir, { recursive: true });
-		if (existsSync(projectLink)) return inspectExistingWorkspace(dataRoot, dataDir, projectLink);
-		if (statSync(resolvedRoot).dev !== statSync(dataRoot).dev) return createInPlaceWorkspace(dataRoot, projectLink, "workspace and OMO store are on different filesystems");
-		symlinkSync(dataDir, projectLink, process.platform === "win32" ? "junction" : "dir");
-		return { dataDir, dataRoot, linked: true, mode: "global-linked", projectLink };
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		return createInPlaceWorkspace(dataRoot, projectLink, reason);
-	}
-}
-
-function inspectExistingWorkspace(dataRoot: string, dataDir: string, projectLink: string): CodegraphWorkspacePreparation {
-	const linkStat = lstatSync(projectLink);
-	if (!linkStat.isSymbolicLink()) return { dataDir: projectLink, dataRoot, linked: false, mode: "in-project", projectLink };
-	if (realpathSync(projectLink) === realpathSync(dataDir)) return { dataDir, dataRoot, linked: true, mode: "global-linked", projectLink };
-	return createInPlaceWorkspace(dataRoot, projectLink, "existing .codegraph symlink points outside OMO store");
-}
-
-function createInPlaceWorkspace(dataRoot: string, projectLink: string, reason: string): CodegraphWorkspacePreparation {
-	if (!existsSync(projectLink)) mkdirSync(projectLink, { recursive: true });
-	return { dataDir: projectLink, dataRoot, linked: false, mode: "in-place-fallback", projectLink, reason };
-}
-
-function workspaceStorageName(projectRoot: string): string {
-	const name = basename(projectRoot).replace(/[^A-Za-z0-9._-]/g, "-").replace(/-+/g, "-") || "workspace";
-	const hash = createHash("sha256").update(projectRoot).digest("hex").slice(0, 16);
-	return `${name}-${hash}`;
-}
-
-async function ensureProvisioned(options: { readonly installDir?: string; readonly lockDir: string; readonly version: "1.0.1" }): Promise<CodegraphProvisionResult> {
-	const installDir = options.installDir ?? join(homedir(), ".omo", "codegraph");
-	const existing = readProvisionMarker(installDir, options.version);
-	if (existing !== null) return { binPath: existing, provisioned: true };
-	const asset = codegraphAsset();
-	if (asset === null) return { error: `no CodeGraph ${options.version} asset for ${process.platform}-${process.arch}`, provisioned: false };
-	try {
-		mkdirSync(options.lockDir, { recursive: true });
-		const bytes = await downloadAsset(asset.url);
-		const actual = createHash("sha256").update(bytes).digest("hex");
-		if (actual !== asset.sha256) return { error: `checksum mismatch for ${basename(asset.url)}: expected ${asset.sha256}, got ${actual}`, provisioned: false };
-		const stagingDir = join(installDir, ".staging", randomUUID());
-		const archivePath = join(stagingDir, basename(asset.url));
-		const extractDir = join(stagingDir, "extract");
-		mkdirSync(extractDir, { recursive: true });
-		try {
-			writeFileSync(archivePath, bytes);
-			await execFilePromise("tar", ["-xzf", archivePath, "-C", extractDir]);
-			const binPath = installExtractedBundle(extractDir, installDir, asset.executableName, options.version);
-			return { binPath, provisioned: true };
-		} finally {
-			rmSync(stagingDir, { force: true, recursive: true });
-		}
-	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error), provisioned: false };
-	}
-}
-
-function readProvisionMarker(installDir: string, version: string): string | null {
-	const marker = join(installDir, ".provisioned", `codegraph-${version}.json`);
-	if (!existsSync(marker)) return null;
-	const parsed = parseJson(readFileSync(marker, "utf8"));
-	if (!isRecord(parsed) || typeof parsed["binPath"] !== "string") return null;
-	return existsSync(parsed["binPath"]) ? parsed["binPath"] : null;
-}
-
-interface CodegraphAsset {
-	readonly executableName: string;
-	readonly sha256: string;
-	readonly url: string;
-}
-
-function codegraphAsset(): CodegraphAsset | null {
-	const key = `${process.platform}-${process.arch}`;
-	const assets: Record<string, CodegraphAsset> = {
-		"darwin-arm64": { executableName: "codegraph", sha256: "95bb27bf6382b69659e158e0c04d71cc394778951e1317d582be7807e7866908", url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-darwin-arm64.tar.gz" },
-		"darwin-x64": { executableName: "codegraph", sha256: "3311cc1d1f0f0ad742709b6a43d8a9187b1ef0af0dd30e0b58008dc673e29478", url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-darwin-x64.tar.gz" },
-		"linux-arm64": { executableName: "codegraph", sha256: "e16f612bc96c2ebccd04574cbed500c9939147c80666ad6bb024398dff7992ae", url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-arm64.tar.gz" },
-		"linux-x64": { executableName: "codegraph", sha256: "d45a068f44596a85c7ba7d0ef924eaf7103fbbf3cafbeb668127daff60a52228", url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-x64.tar.gz" },
-	};
-	return assets[key] ?? null;
-}
-
-async function downloadAsset(url: string): Promise<Uint8Array> {
-	const response = await fetch(url, { signal: AbortSignal.timeout(COMMAND_TIMEOUT_MS) });
-	if (!response.ok) throw new Error(`download failed with HTTP ${response.status}`);
-	return new Uint8Array(await response.arrayBuffer());
-}
-
-function installExtractedBundle(extractDir: string, installDir: string, executableName: string, version: string): string {
-	const roots = readdirSync(extractDir);
-	const bundleRoot = roots.length === 1 ? roots[0] : undefined;
-	if (bundleRoot === undefined) throw new Error(`CodeGraph archive should contain one root directory, found ${roots.length}`);
-	for (const entry of readdirSync(join(extractDir, bundleRoot))) {
-		rmSync(join(installDir, entry), { force: true, recursive: true });
-		renameSync(join(extractDir, bundleRoot, entry), join(installDir, entry));
-	}
-	const binPath = join(installDir, "bin", executableName);
-	if (!existsSync(binPath)) throw new Error(`CodeGraph archive did not contain bin/${executableName}`);
-	chmodSync(binPath, 0o755);
-	mkdirSync(join(installDir, ".provisioned"), { recursive: true });
-	writeFileSync(join(installDir, ".provisioned", `codegraph-${version}.json`), `${JSON.stringify({ binPath, version })}\n`);
-	return binPath;
-}
-
-function execFilePromise(command: string, args: readonly string[]): Promise<void> {
-	return new Promise((resolvePromise, reject) => {
-		execFile(command, [...args], (error) => {
-			if (error === null) resolvePromise();
-			else reject(error);
-		});
-	});
 }
 
 function defaultWorkerCliPath(): string {

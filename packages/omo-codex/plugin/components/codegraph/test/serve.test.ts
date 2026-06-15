@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -108,6 +108,92 @@ describe("runCodegraphServe", () => {
 		expect(stderr).toEqual([
 			"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n",
 		]);
+	});
+
+	it("#given Codex SOT disables CodeGraph #when serving MCP #then exits non-zero with a disabled hint", async () => {
+		// given
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-disabled-home-"));
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-disabled-workspace-"));
+		const stderr: string[] = [];
+		const spawned: string[] = [];
+		try {
+			mkdirSync(join(homeDir, ".omo"), { recursive: true });
+			mkdirSync(join(workspace, ".omo"), { recursive: true });
+			writeFileSync(join(homeDir, ".omo", "config.jsonc"), '{ "codegraph": { "enabled": true } }\n');
+			writeFileSync(join(workspace, ".omo", "config.jsonc"), '{ "[codex]": { "codegraph": { "enabled": false } } }\n');
+
+			// when
+			const exitCode = await runCodegraphServe({
+				cwd: workspace,
+				env: { HOME: homeDir },
+				runProcess: (command: string) => {
+					spawned.push(command);
+					return Promise.resolve(0);
+				},
+				stderr: { write: (chunk: string) => stderr.push(chunk) },
+			});
+
+			// then
+			expect(exitCode).toBe(1);
+			expect(spawned).toEqual([]);
+			expect(stderr).toEqual([
+				"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n",
+			]);
+		} finally {
+			rmSync(homeDir, { recursive: true, force: true });
+			rmSync(workspace, { recursive: true, force: true });
+		}
+	});
+
+	it("#given Codex SOT install_dir has a provisioned binary #when serving MCP #then it resolves there and exports CODEGRAPH_INSTALL_DIR", async () => {
+		// given
+		const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-"));
+		const installDir = join(tempRoot, "custom-codegraph");
+		const binPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph");
+		const calls: Array<{
+			readonly args: readonly string[];
+			readonly command: string;
+			readonly env: Record<string, string | undefined>;
+		}> = [];
+
+		try {
+			mkdirSync(join(installDir, "bin"), { recursive: true });
+			writeFileSync(binPath, "");
+
+			// when
+			const exitCode = await runCodegraphServe({
+				config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
+				env: { HOME: "/tmp/home" },
+				homeDir: "/tmp/home",
+				resolve: (options) => {
+					const provisioned = options.provisioned?.();
+					return { argsPrefix: [], command: provisioned ?? "missing", exists: provisioned !== null && provisioned !== undefined, source: "provisioned" };
+				},
+				runProcess: (command, args, options) => {
+					calls.push({ args, command, env: options.env });
+					return Promise.resolve(0);
+				},
+				stderr: { write: () => undefined },
+			});
+
+			// then
+			expect(exitCode).toBe(0);
+			expect(calls).toEqual([
+				{
+					args: ["serve", "--mcp"],
+					command: binPath,
+					env: {
+						CODEGRAPH_INSTALL_DIR: installDir,
+						CODEGRAPH_NO_DOWNLOAD: "1",
+						CODEGRAPH_TELEMETRY: "0",
+						DO_NOT_TRACK: "1",
+						HOME: "/tmp/home",
+					},
+				},
+			]);
+		} finally {
+			rmSync(tempRoot, { recursive: true, force: true });
+		}
 	});
 
 	it("#given built serve entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once", () => {

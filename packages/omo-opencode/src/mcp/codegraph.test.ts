@@ -60,6 +60,32 @@ describe("createCodegraphMcpConfig", () => {
     expect(config.environment?.[CODEGRAPH_TELEMETRY_ENV]).toBe("0")
     expect(config.environment?.[DO_NOT_TRACK_ENV]).toBe("1")
   })
+
+  it("uses configured install_dir for provisioned lookup and MCP environment", () => {
+    // given
+    const installDir = "/custom/codegraph"
+    const provisionedPath = `${installDir}/bin/${process.platform === "win32" ? "codegraph.exe" : "codegraph"}`
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { enabled: true, install_dir: installDir },
+      fileExists: (filePath) => filePath === provisionedPath,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      requireResolve: () => {
+        throw new Error("bundled package absent")
+      },
+      resolveExecutable: createResolver({}),
+    })
+
+    // then
+    expect(config).toMatchObject({
+      type: "local",
+      command: [provisionedPath, "serve", "--mcp"],
+      enabled: true,
+    })
+    expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
+  })
 })
 
 function createResolver(commands: Readonly<Record<string, string>>) {

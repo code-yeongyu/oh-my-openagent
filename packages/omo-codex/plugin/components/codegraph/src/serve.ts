@@ -2,13 +2,18 @@
 import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, resolve } from "node:path";
-import { env as processEnv, stderr as processStderr } from "node:process";
+import { basename, join, resolve } from "node:path";
+import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { buildCodegraphEnv } from "./codegraph-env.js";
-import { resolveCodegraphCommand } from "./codegraph-resolve.js";
-import type { CodegraphCommandResolution } from "./codegraph-resolve.js";
+import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import {
+	resolveCodegraphCommand,
+	type CodegraphCommandResolution,
+	type ResolveCodegraphCommandOptions,
+} from "../../../../../utils/src/codegraph/resolve.ts";
+import { getCodexOmoConfig, type CodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import type { CodegraphConfig } from "./hook.js";
 
 export type ServeStdio = "inherit";
 
@@ -30,27 +35,43 @@ export interface CodegraphServeStderr {
 export interface RunCodegraphServeOptions {
 	readonly buildEnv?: (options: { readonly homeDir: string }) => Record<string, string>;
 	readonly commandExists?: (filePath: string) => boolean;
+	readonly config?: CodexOmoConfig;
+	readonly cwd?: string;
 	readonly env?: Record<string, string | undefined>;
 	readonly homeDir?: string;
-	readonly resolve?: (options: { readonly env: Record<string, string | undefined>; readonly homeDir: string }) => CodegraphCommandResolution;
+	readonly resolve?: (options: ResolveCodegraphCommandOptions) => ReturnType<typeof resolveCodegraphCommand>;
 	readonly runProcess?: CodegraphServeProcessRunner;
 	readonly stderr?: CodegraphServeStderr;
 }
 
 const CODEGRAPH_SKIP_HINT =
 	"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n";
+const CODEGRAPH_DISABLED_HINT =
+	"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n";
 
 export async function runCodegraphServe(options: RunCodegraphServeOptions = {}): Promise<number> {
 	const env = options.env ?? processEnv;
 	const homeDir = options.homeDir ?? homedir();
-	const resolution = options.resolve?.({ env, homeDir }) ?? resolveCodegraphCommand({ env, homeDir });
+	const config = options.config ?? getCodexOmoConfig({ cwd: options.cwd ?? processCwd(), env, homeDir });
+	const codegraphConfig = config.codegraph ?? {};
+	if (codegraphConfig.enabled === false) {
+		(options.stderr ?? processStderr).write(CODEGRAPH_DISABLED_HINT);
+		return 1;
+	}
+
+	const resolutionOptions = {
+		env,
+		homeDir,
+		provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir),
+	} satisfies ResolveCodegraphCommandOptions;
+	const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
 	if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync)) {
 		(options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
 		return 1;
 	}
 
 	const runProcess = options.runProcess ?? runChildProcess;
-	const codegraphEnv = options.buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
+	const codegraphEnv = codegraphEnvForConfig(codegraphConfig, homeDir, options.buildEnv);
 	const mergedEnv = {
 		...env,
 		...codegraphEnv,
@@ -72,6 +93,21 @@ function shouldSkipResolvedCommand(
 
 function looksLikePath(command: string): boolean {
 	return command.includes("/") || command.includes("\\");
+}
+
+function codegraphEnvForConfig(
+	config: CodegraphConfig,
+	homeDir: string,
+	buildEnv: ((options: { readonly homeDir: string }) => Record<string, string>) | undefined,
+): Record<string, string> {
+	const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
+	return config.install_dir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.install_dir };
+}
+
+function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
+	if (installDir === undefined) return null;
+	const candidate = join(installDir, "bin", process.platform === "win32" ? "codegraph.exe" : "codegraph");
+	return existsSync(candidate) ? candidate : null;
 }
 
 export async function runCodegraphServeCli(): Promise<void> {

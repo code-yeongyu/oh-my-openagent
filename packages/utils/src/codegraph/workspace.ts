@@ -67,7 +67,6 @@ function workspaceStorageName(workspace: string): string {
 
 function fallbackResult(
   dataRoot: string,
-  dataDir: string,
   projectLink: string,
   reason: string,
 ): CodegraphWorkspacePreparation {
@@ -105,12 +104,12 @@ export function prepareCodegraphWorkspace(
         return { dataDir, dataRoot, linked: true, mode: "global-linked", projectLink }
       }
 
-      return fallbackResult(dataRoot, dataDir, projectLink, "existing .codegraph symlink points outside OMO store")
+      return fallbackResult(dataRoot, projectLink, "existing .codegraph symlink points outside OMO store")
     }
 
     if (!isSameFilesystem(resolvedWorkspace, dataRoot, options.sameFilesystem)) {
       ensureInPlaceFallback(projectLink)
-      return fallbackResult(dataRoot, dataDir, projectLink, "workspace and OMO store are on different filesystems")
+      return fallbackResult(dataRoot, projectLink, "workspace and OMO store are on different filesystems")
     }
 
     const symlink = options.symlink ?? symlinkSync
@@ -121,9 +120,9 @@ export function prepareCodegraphWorkspace(
     try {
       ensureInPlaceFallback(projectLink)
     } catch (fallbackError) {
-      return fallbackResult(dataRoot, dataDir, projectLink, `${reason}; fallback failed: ${String(fallbackError)}`)
+      return fallbackResult(dataRoot, projectLink, `${reason}; fallback failed: ${String(fallbackError)}`)
     }
-    return fallbackResult(dataRoot, dataDir, projectLink, reason)
+    return fallbackResult(dataRoot, projectLink, reason)
   }
 }
 

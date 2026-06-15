@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parse, ParseError, printParseErrorCode } from "jsonc-parser"
+import { parse, printParseErrorCode } from "jsonc-parser"
+import type { ParseError } from "jsonc-parser"
 
 export interface JsoncParseResult<T> {
   data: T | null
@@ -116,7 +117,7 @@ export function detectPluginConfigFile(
   if (canonicalResult.format !== "none") {
     detectionResult = {
       ...canonicalResult,
-      legacyPath: firstExistingLegacyResult?.path,
+      ...(firstExistingLegacyResult === undefined ? {} : { legacyPath: firstExistingLegacyResult.path }),
     }
   } else if (firstExistingLegacyResult) {
     detectionResult = firstExistingLegacyResult

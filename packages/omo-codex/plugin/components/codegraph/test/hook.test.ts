@@ -103,6 +103,37 @@ describe("CodeGraph SessionStart hook", () => {
 		}
 	});
 
+	it("#given project Codex SOT disables global CodeGraph enablement #when SessionStart fires #then project config wins", async () => {
+		// given
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-project-sot-home-"));
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-project-sot-workspace-"));
+		const stdout: string[] = [];
+		const spawned: WorkerSpawnInvocation[] = [];
+		try {
+			mkdirSync(join(homeDir, ".omo"), { recursive: true });
+			mkdirSync(join(workspace, ".omo"), { recursive: true });
+			writeFileSync(join(homeDir, ".omo", "config.jsonc"), '{ "codegraph": { "enabled": true } }\n');
+			writeFileSync(join(workspace, ".omo", "config.jsonc"), '{ "[codex]": { "codegraph": { "enabled": false } } }\n');
+
+			// when
+			const result = await executeCodegraphSessionStartHook({
+				cwd: workspace,
+				env: { HOME: homeDir },
+				stdin: Readable.from(["{}"]),
+				stdout: { write: (chunk) => stdout.push(chunk) },
+				spawnWorker: (invocation) => spawned.push(invocation),
+			});
+
+			// then
+			expect(result).toEqual({ action: "skipped-disabled", exitCode: 0 });
+			expect(spawned).toEqual([]);
+			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+		} finally {
+			rmSync(homeDir, { recursive: true, force: true });
+			rmSync(workspace, { recursive: true, force: true });
+		}
+	});
+
 	it("#given env disables CodeGraph over SOT enablement #when SessionStart fires #then it skips without spawning", async () => {
 		// given
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-env-home-"));
