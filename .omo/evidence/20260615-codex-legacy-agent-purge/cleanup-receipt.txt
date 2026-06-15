@@ -1,1 +1,1 @@
-MANUAL_QA_TEMP_CLEANUP=PASS /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH removed
+MANUAL_QA_TEMP_CLEANUP=PASS <QA_ROOT> removed

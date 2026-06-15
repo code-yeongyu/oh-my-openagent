@@ -1,7 +1,7 @@
 COMMAND: isolated CODEX_HOME install-local real-surface purge check
 
-tmp_root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-codex-real-surface-SneN2Q
-CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T//omo-codex-real-surface-SneN2Q/codex
+tmp_root=<QA_ROOT>
+CODEX_HOME=<QA_ROOT>/codex
 real_config_before_sha256=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c
 
 up to date, audited 85 packages in 359ms

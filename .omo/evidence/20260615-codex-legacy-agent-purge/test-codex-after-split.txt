@@ -720,8 +720,8 @@ Ran 286 tests across 48 files. [4.70s]
 ✔ #given a JSON payload path #when running the PR body script #then markdown is written to the requested file (65.476292ms)
 ✔ #given the installed cache layout #when running build-lsp-tools #then uses the bundled dist and exits 0 (113.524458ms)
 ✔ #given the installed cache layout #when running build-lsp-daemon #then uses the bundled dist and exits 0 (74.844625ms)
-lsp-tools-mcp package metadata is missing at /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/lsp-tools-mcp/package.json; build packages/lsp-tools-mcp before codex-lsp
-probed: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/lsp-tools-mcp/package.json, /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lsp-prebuild-none-MRuWq7/components/lsp-tools-mcp/package.json
+lsp-tools-mcp package metadata is missing at <LSP_REPO_SIBLING>/lsp-tools-mcp/package.json; build packages/lsp-tools-mcp before codex-lsp
+probed: <LSP_REPO_SIBLING>/lsp-tools-mcp/package.json, <LSP_PREBUILD_TMP>/components/lsp-tools-mcp/package.json
 ✔ #given neither layout #when running build-lsp-tools #then fails listing every probed path (65.123083ms)
 ✔ #given the repo sibling layout with fresh outputs #when running build-lsp-tools #then exits 0 without building (66.970667ms)
 ✔ #given aggregate MCP config #when inspected #then registers research and structural-search MCPs (3.809833ms)

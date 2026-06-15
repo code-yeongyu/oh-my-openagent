@@ -1,6 +1,6 @@
-QA_ROOT=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH
-CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH/codex
-CODEX_LOCAL_BIN_DIR=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MfTTLWOFYH/bin
+QA_ROOT=<QA_ROOT>
+CODEX_HOME=<QA_ROOT>/codex
+CODEX_LOCAL_BIN_DIR=<QA_ROOT>/bin
 REAL_CONFIG_BEFORE=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c  <HOME>/.codex/config.toml
 
 up to date, audited 85 packages in 362ms

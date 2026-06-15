@@ -1,5 +1,5 @@
-$ rg -n '<local-home-path-pattern>' .omo/evidence/20260615-codex-legacy-agent-purge .omo/evidence/20260615-stale-codex-guidance
+$ tracked evidence broad local absolute-path scan
 
 Result: PASS
-Exit status: 1
+Exit status: 0
 Output: no matches.
