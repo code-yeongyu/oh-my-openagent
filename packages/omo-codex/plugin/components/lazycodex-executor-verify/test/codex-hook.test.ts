@@ -85,6 +85,38 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		expect(existsSync(join(cwd, ".omo", "lazycodex-executor-verify", "sess.1-agent_1.json"))).toBe(false);
 	});
 
+	it("#given a zero-byte evidence receipt #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		const artifactPath = join(cwd, ".omo", "evidence", "empty.txt");
+		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
+		writeFileSync(artifactPath, "");
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/empty.txt" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
+	it("#given an evidence receipt directory inside evidence root #when lazycodex executor stops #then blocks", () => {
+		// given
+		const cwd = createWorkspace();
+		mkdirSync(join(cwd, ".omo", "evidence", "receipt-dir"), { recursive: true });
+
+		// when
+		const output = runSubagentStopHook(
+			createInput(cwd, { last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt-dir" }),
+			nodeFileSystem,
+		);
+
+		// then
+		expect(parseBlockOutput(output).decision).toBe("block");
+	});
+
 	it("#given an evidence receipt symlink targets outside evidence root #when lazycodex executor stops #then blocks", () => {
 		// given
 		const cwd = createWorkspace();
