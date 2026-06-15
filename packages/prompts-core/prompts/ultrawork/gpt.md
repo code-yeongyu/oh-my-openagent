@@ -50,7 +50,7 @@
 **Decision Factors:**
 - Delegation overhead ≈ 10-15 seconds. If task takes less, do it yourself.
 - If you already have full context loaded, do it yourself.
-- If task requires specialized expertise (frontend-ui-ux, git operations), delegate.
+- If task requires specialized expertise (frontend, git operations), delegate.
 - If you need information from multiple sources, fire parallel background agents.
 
 ## AVAILABLE RESOURCES

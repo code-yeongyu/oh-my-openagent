@@ -248,7 +248,7 @@ describe("AgentOverrideConfigSchema", () => {
   describe("skills field", () => {
     test("accepts skills as optional string array", () => {
       // given
-      const config = { skills: ["frontend-ui-ux", "code-reviewer"] }
+      const config = { skills: ["frontend", "code-reviewer"] }
 
       // when
       const result = AgentOverrideConfigSchema.safeParse(config)
@@ -256,7 +256,7 @@ describe("AgentOverrideConfigSchema", () => {
       // then
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.skills).toEqual(["frontend-ui-ux", "code-reviewer"])
+        expect(result.data.skills).toEqual(["frontend", "code-reviewer"])
       }
     })
 
@@ -287,7 +287,7 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("rejects non-array skills", () => {
       // given
-      const config = { skills: "frontend-ui-ux" }
+      const config = { skills: "frontend" }
 
       // when
       const result = AgentOverrideConfigSchema.safeParse(config)
@@ -336,7 +336,7 @@ describe("AgentOverrideConfigSchema", () => {
       // given
       const config = { 
         category: "visual-engineering",
-        skills: ["frontend-ui-ux"]
+        skills: ["frontend"]
       }
 
       // when
@@ -346,7 +346,7 @@ describe("AgentOverrideConfigSchema", () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.category).toBe("visual-engineering")
-        expect(result.data.skills).toEqual(["frontend-ui-ux"])
+        expect(result.data.skills).toEqual(["frontend"])
       }
     })
 

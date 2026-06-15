@@ -47,9 +47,9 @@ afterEach(() => {
 
 describe("resolveSkillContentAsync", () => {
 	it("should return template for builtin skill async", async () => {
-		// given: builtin skill 'frontend-ui-ux'
+		// given: builtin skill 'frontend'
 		// when: resolving content async
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		const options = { disabledSkills: new Set(["frontend"]) }
 		const result = await resolveSkillContentAsync("git-master", options)
 
 		// then: returns template string
@@ -59,11 +59,11 @@ describe("resolveSkillContentAsync", () => {
 	})
 
 	it("should return null for disabled skill async", async () => {
-		// given: frontend-ui-ux disabled
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		// given: frontend disabled
+		const options = { disabledSkills: new Set(["frontend"]) }
 
 		// when: resolving content async for disabled skill
-		const result = await resolveSkillContentAsync("frontend-ui-ux", options)
+		const result = await resolveSkillContentAsync("frontend", options)
 
 		// then: returns null
 		expect(result).toBeNull()

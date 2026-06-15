@@ -89,7 +89,7 @@ Snapshot date: 2026-06-13. Total shim exports found: 316.
 | `packages/omo-opencode/src/features/builtin-skills/skills/agent-browser-template.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/builtin-skills/skills/debugging.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/builtin-skills/skills/dev-browser.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/builtin-skills/skills/frontend-ui-ux.ts` | `@oh-my-opencode/skills-loader-core` |
+| `packages/omo-opencode/src/features/builtin-skills/skills/frontend.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-atomic-planning.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-context-analysis.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/builtin-skills/skills/git-master-sections/commit-execution-verification.ts` | `@oh-my-opencode/skills-loader-core` |

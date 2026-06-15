@@ -47,14 +47,14 @@ afterEach(() => {
 
 describe("resolveSkillContent", () => {
 	it("should return template for existing skill", () => {
-		// given: builtin skills with 'frontend-ui-ux' skill
-		// when: resolving content for 'frontend-ui-ux'
-		const result = resolveSkillContent("frontend-ui-ux")
+		// given: builtin skills with 'frontend' skill
+		// when: resolving content for 'frontend'
+		const result = resolveSkillContent("frontend")
 
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Role: Designer-Turned-Developer")
+		expect(result).toContain("router, not a rulebook")
 	})
 
 	it("should return template for 'playwright' skill", () => {
@@ -78,11 +78,11 @@ describe("resolveSkillContent", () => {
 	})
 
 	it("should return null for disabled skill", () => {
-		// given: frontend-ui-ux skill disabled
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		// given: frontend skill disabled
+		const options = { disabledSkills: new Set(["frontend"]) }
 
 		// when: resolving content for disabled skill
-		const result = resolveSkillContent("frontend-ui-ux", options)
+		const result = resolveSkillContent("frontend", options)
 
 		// then: returns null
 		expect(result).toBeNull()
@@ -92,7 +92,7 @@ describe("resolveSkillContent", () => {
 describe("resolveMultipleSkills", () => {
 	it("should resolve all existing skills", () => {
 		// given: list of existing skill names
-		const skillNames = ["frontend-ui-ux", "playwright"]
+		const skillNames = ["frontend", "playwright"]
 
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
@@ -100,13 +100,13 @@ describe("resolveMultipleSkills", () => {
 		// then: all skills resolved, none not found
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("frontend-ui-ux")).toContain("Designer-Turned-Developer")
+		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
 		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
 	it("should handle partial success - some skills not found", () => {
 		// given: list with existing and non-existing skills
-		const skillNames = ["frontend-ui-ux", "nonexistent", "playwright", "another-missing"]
+		const skillNames = ["frontend", "nonexistent", "playwright", "another-missing"]
 
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
@@ -114,7 +114,7 @@ describe("resolveMultipleSkills", () => {
 		// then: resolves existing skills, lists not found skills
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual(["nonexistent", "another-missing"])
-		expect(result.resolved.get("frontend-ui-ux")).toContain("Designer-Turned-Developer")
+		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
 		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 
@@ -143,38 +143,38 @@ describe("resolveMultipleSkills", () => {
 	})
 
 	it("should treat disabled skills as not found", () => {
-		// #given: frontend-ui-ux disabled, playwright not disabled
-		const skillNames = ["frontend-ui-ux", "playwright"]
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		// #given: frontend disabled, playwright not disabled
+		const skillNames = ["frontend", "playwright"]
+		const options = { disabledSkills: new Set(["frontend"]) }
 
 		// #when: resolving multiple skills with disabled one
 		const result = resolveMultipleSkills(skillNames, options)
 
-		// #then: frontend-ui-ux in notFound, playwright resolved
+		// #then: frontend in notFound, playwright resolved
 		expect(result.resolved.size).toBe(1)
 		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.notFound).toEqual(["frontend-ui-ux"])
+		expect(result.notFound).toEqual(["frontend"])
 	})
 
 	it("should preserve skill order in resolved map", () => {
 		// given: list of skill names in specific order
-		const skillNames = ["playwright", "frontend-ui-ux"]
+		const skillNames = ["playwright", "frontend"]
 
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
 		// then: map contains skills with expected keys
 		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.resolved.has("frontend-ui-ux")).toBe(true)
+		expect(result.resolved.has("frontend")).toBe(true)
 		expect(result.resolved.size).toBe(2)
 	})
 })
 
 describe("resolveSkillContentAsync", () => {
 	it("should return template for builtin skill async", async () => {
-		// given: builtin skill 'frontend-ui-ux'
+		// given: builtin skill 'frontend'
 		// when: resolving content async
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		const options = { disabledSkills: new Set(["frontend"]) }
 		const result = await resolveSkillContentAsync("git-master", options)
 
 		// then: returns template string
@@ -184,11 +184,11 @@ describe("resolveSkillContentAsync", () => {
 	})
 
 	it("should return null for disabled skill async", async () => {
-		// given: frontend-ui-ux disabled
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		// given: frontend disabled
+		const options = { disabledSkills: new Set(["frontend"]) }
 
 		// when: resolving content async for disabled skill
-		const result = await resolveSkillContentAsync("frontend-ui-ux", options)
+		const result = await resolveSkillContentAsync("frontend", options)
 
 		// then: returns null
 		expect(result).toBeNull()
@@ -276,17 +276,17 @@ describe("resolveMultipleSkillsAsync", () => {
 	})
 
 	it("should treat disabled skills as not found async", async () => {
-		// #given: frontend-ui-ux disabled
-		const skillNames = ["frontend-ui-ux", "playwright"]
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		// #given: frontend disabled
+		const skillNames = ["frontend", "playwright"]
+		const options = { disabledSkills: new Set(["frontend"]) }
 
 		// #when: resolving multiple skills async with disabled one
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// #then: frontend-ui-ux in notFound, playwright resolved
+		// #then: frontend in notFound, playwright resolved
 		expect(result.resolved.size).toBe(1)
 		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.notFound).toEqual(["frontend-ui-ux"])
+		expect(result.notFound).toEqual(["frontend"])
 	})
 
 	it("should NOT inject watermark when both options are disabled", async () => {

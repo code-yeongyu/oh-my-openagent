@@ -74,17 +74,17 @@ describe("resolveMultipleSkillsAsync", () => {
 	})
 
 	it("should treat disabled skills as not found async", async () => {
-		// #given: frontend-ui-ux disabled
-		const skillNames = ["frontend-ui-ux", "playwright"]
-		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		// #given: frontend disabled
+		const skillNames = ["frontend", "playwright"]
+		const options = { disabledSkills: new Set(["frontend"]) }
 
 		// #when: resolving multiple skills async with disabled one
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// #then: frontend-ui-ux in notFound, playwright resolved
+		// #then: frontend in notFound, playwright resolved
 		expect(result.resolved.size).toBe(1)
 		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.notFound).toEqual(["frontend-ui-ux"])
+		expect(result.notFound).toEqual(["frontend"])
 	})
 
 	it("should NOT inject watermark when both options are disabled", async () => {
