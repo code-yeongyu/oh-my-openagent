@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isRecord } from "@oh-my-opencode/utils"
 import { log } from "../../shared/logger"
 import type { AutoUpdateCheckerOptions } from "./types"
 import { getBundledVersion, getCachedVersion, getLocalDevVersion } from "./checker"
@@ -37,10 +38,6 @@ const defaultDeps: AutoUpdateCheckerDeps = {
   showVersionToast,
   runBackgroundUpdateCheck,
   log,
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null
 }
 
 const getParentID = (properties: unknown): string | undefined => {

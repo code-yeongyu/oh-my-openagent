@@ -313,7 +313,7 @@ Skill은 단순 프롬프트가 아닙니다. 각 스킬은:
 - MCP 서버를 필요할 때 함께 데려오며,
 - 권한 범위가 지정되어 에이전트가 선을 넘지 않습니다.
 
-빌트인: `playwright`(브라우저 자동화), `git-master`(atomic 커밋, rebase 수술), `frontend-ui-ux`(디자인 우선 UI).
+빌트인: `playwright`(브라우저 자동화), `git-master`(atomic 커밋, rebase 수술), `frontend`(디자인 우선 UI).
 
 직접 추가하려면 `.opencode/skills/*/SKILL.md` 또는 `~/.config/opencode/skills/*/SKILL.md` 아래에 넣으세요.
 

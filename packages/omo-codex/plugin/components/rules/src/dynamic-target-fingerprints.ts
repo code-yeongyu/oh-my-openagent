@@ -1,12 +1,12 @@
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { isSameOrChildPath, toPosixPath, uniqueStrings } from "./path-utils.js";
-import { createRuleDiscoveryCache, findRuleCandidates } from "./rules/finder.js";
-import { hashContent } from "./rules/matcher.js";
-import { sortCandidates } from "./rules/ordering.js";
-import { findProjectRoot } from "./rules/project-root.js";
-import { disabledSourcesFromConfig } from "./rules/sources.js";
-import type { PiRulesConfig, RuleCandidate } from "./rules/types.js";
+import { createRuleDiscoveryCache, findRuleCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { hashContent } from "@oh-my-opencode/rules-engine/engine";
+import { sortCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { findProjectRoot } from "@oh-my-opencode/rules-engine/engine";
+import { disabledSourcesFromConfig } from "@oh-my-opencode/rules-engine/engine";
+import type { PiRulesConfig, RuleCandidate } from "@oh-my-opencode/rules-engine/engine";
 
 export interface DynamicTargetFingerprint {
 	targetPath: string;

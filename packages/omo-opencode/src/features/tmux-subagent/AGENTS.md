@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-32 files. State-first tmux integration managing panes for background agent sessions. Handles split decisions, grid planning, polling, and lifecycle events.
+This module provides state-first tmux integration for background agent sessions. It handles split decisions, grid planning, polling, and lifecycle events. Reusable tmux command, layout, and pane primitives are extracted to [`packages/tmux-core/`](../../../../../packages/tmux-core); this directory is the OpenCode session adapter.
 
 ## CORE ARCHITECTURE
 
@@ -16,7 +16,7 @@ TmuxSessionManager (manager.ts)
   └─→ EventHandlers: React to session create/delete
 ```
 
-All tmux command execution is centralized through `src/shared/tmux/runner.ts` (`runTmuxCommand`). Do NOT add direct `Bun.spawn([tmux,...])` calls in this module. They will drift from the retry/timeout/terminal-error discipline.
+All tmux command execution is centralized through the shared `runTmuxCommand` runner (via the local adapter shim). Do NOT add direct `Bun.spawn([tmux,...])` calls in this module. They will drift from the retry/timeout/terminal-error discipline.
 
 ## KEY FILES
 

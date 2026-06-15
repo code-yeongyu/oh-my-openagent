@@ -412,7 +412,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.sisyphus.prompt).not.toContain("playwright")
-    expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
+    expect(agents.sisyphus.prompt).toContain("frontend")
     expect(agents.sisyphus.prompt).toContain("git-master")
     providerModelsSpy.mockRestore()
     connectedSpy.mockRestore()
@@ -1239,7 +1239,7 @@ describe("buildAgent with category and skills", () => {
       "test-agent": () =>
         ({
           description: "Test agent",
-          skills: ["frontend-ui-ux"],
+          skills: ["frontend"],
           prompt: "Original prompt content",
         }) as AgentConfig,
     }
@@ -1248,9 +1248,9 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
-    expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
+    expect(agent.prompt).toContain("router, not a rulebook")
     expect(agent.prompt).toContain("Original prompt content")
-    expect(agent.prompt).toMatch(/Designer-Turned-Developer[\s\S]*Original prompt content/s)
+    expect(agent.prompt).toMatch(/router, not a rulebook[\s\S]*Original prompt content/s)
   })
 
   test("agent with multiple skills has all content prepended", () => {
@@ -1259,7 +1259,7 @@ describe("buildAgent with category and skills", () => {
       "test-agent": () =>
         ({
           description: "Test agent",
-          skills: ["frontend-ui-ux"],
+          skills: ["frontend"],
           prompt: "Agent prompt",
         }) as AgentConfig,
     }
@@ -1268,7 +1268,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
-    expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
+    expect(agent.prompt).toContain("router, not a rulebook")
     expect(agent.prompt).toContain("Agent prompt")
   })
 
@@ -1300,7 +1300,7 @@ describe("buildAgent with category and skills", () => {
         ({
           description: "Test agent",
           category: "ultrabrain",
-          skills: ["frontend-ui-ux"],
+          skills: ["frontend"],
           prompt: "Task description",
         }) as AgentConfig,
     }
@@ -1311,7 +1311,7 @@ describe("buildAgent with category and skills", () => {
     // #then - category's built-in model and skills are applied
     expect(agent.model).toBe("openai/gpt-5.5")
     expect(agent.variant).toBe("xhigh")
-    expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
+    expect(agent.prompt).toContain("router, not a rulebook")
     expect(agent.prompt).toContain("Task description")
   })
 
@@ -1342,7 +1342,7 @@ describe("buildAgent with category and skills", () => {
       "test-agent": () =>
         ({
           description: "Test agent",
-          skills: ["frontend-ui-ux", "non-existent-skill"],
+          skills: ["frontend", "non-existent-skill"],
           prompt: "Base prompt",
         }) as AgentConfig,
     }
@@ -1351,7 +1351,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then
-    expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
+    expect(agent.prompt).toContain("router, not a rulebook")
     expect(agent.prompt).toContain("Base prompt")
   })
 
@@ -1417,7 +1417,7 @@ describe("createBuiltinAgents with skill overrides", () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
     const overrides = {
-      librarian: { skills: ["frontend-ui-ux"] },
+      librarian: { skills: ["frontend"] },
     } as AgentOverrides
 
     try {
@@ -1425,7 +1425,7 @@ describe("createBuiltinAgents with skill overrides", () => {
       const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
       // #then
-      expect(agents.librarian.prompt).toContain("Role: Designer-Turned-Developer")
+      expect(agents.librarian.prompt).toContain("router, not a rulebook")
       expect(agents.librarian.prompt).toContain("THE LIBRARIAN")
       expect("skills" in agents.librarian).toBe(false)
     } finally {

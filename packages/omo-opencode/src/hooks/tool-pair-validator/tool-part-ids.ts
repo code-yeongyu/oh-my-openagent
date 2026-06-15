@@ -1,10 +1,9 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { TransformPart } from "./types"
 
-const TERMINAL_OPENCODE_TOOL_STATUSES = new Set(["completed", "error"])
+export { isRecord }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+const TERMINAL_OPENCODE_TOOL_STATUSES = new Set(["completed", "error"])
 
 function isTerminalOpenCodeToolPart(part: TransformPart): boolean {
   if (!isRecord(part)) {

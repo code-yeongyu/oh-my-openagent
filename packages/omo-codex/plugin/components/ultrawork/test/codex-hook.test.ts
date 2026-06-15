@@ -258,6 +258,25 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/timeout only means no new mailbox update arrived/i);
 		expect(directive).toMatch(/WORKING:/);
 	});
+
+	it("#given directive #when inspected #then keeps impact-proportional sizing invariants", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ultrawork",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/\bXS\b/);
+		expect(directive).toMatch(/ratchet UP/i);
+		expect(directive).toMatch(/PROOF RULE/);
+		expect(directive).toMatch(/`plan` agent/);
+	});
 });
 
 interface UserPromptSubmitHookOutput {

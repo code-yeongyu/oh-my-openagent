@@ -45,6 +45,10 @@ export type {
   ModelResolutionResult as PipelineModelResolutionResult,
 } from "./model-resolution-pipeline"
 export * from "./model-error-classifier"
+export * from "./runtime-fallback-auto-retry-signal"
+export * from "./runtime-fallback-error-classifier"
+export * from "./runtime-fallback-error-shape"
+export * from "./runtime-fallback-model"
 export * from "./model-capabilities"
 export * from "./context-limit-resolver"
 export * from "./model-capabilities-snapshot"

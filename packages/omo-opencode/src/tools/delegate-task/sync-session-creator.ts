@@ -12,9 +12,7 @@ export async function createSyncSession(
     categoryModel?: DelegatedModelConfig
   }
 ): Promise<{ ok: true; sessionID: string; parentDirectory: string } | { ok: false; error: string }> {
-  const parentSession = client.session.get
-    ? await client.session.get({ path: { id: input.parentSessionID } }).catch(() => null)
-    : null
+  const parentSession = await client.session.get({ path: { id: input.parentSessionID } }).catch(() => null)
   const parentDirectory = parentSession?.data?.directory ?? input.defaultDirectory
 
   const createResult = await client.session.create({
@@ -37,8 +35,11 @@ export async function createSyncSession(
     },
   })
 
-  if (createResult.error) {
+  if (createResult.error !== undefined) {
     return { ok: false, error: `Failed to create session: ${createResult.error}` }
+  }
+  if (createResult.data === undefined) {
+    return { ok: false, error: "Failed to create session: missing session data" }
   }
 
   return { ok: true, sessionID: createResult.data.id, parentDirectory }

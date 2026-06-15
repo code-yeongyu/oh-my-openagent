@@ -10,7 +10,7 @@ import {
 	runSessionStartHook,
 	runUserPromptSubmitHook,
 } from "../src/codex-hook.js";
-import { createRuleDiscoveryCache, findRuleCandidates } from "../src/rules/finder.js";
+import { createRuleDiscoveryCache, findRuleCandidates } from "@oh-my-opencode/rules-engine/engine";
 
 interface FixtureOptions {
 	readonly writeProjectDuplicate?: boolean;

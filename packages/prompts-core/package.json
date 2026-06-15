@@ -8,7 +8,8 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./src/index.ts"
-    }
+    },
+    "./prompts/ultrawork/codex.md": "./prompts/ultrawork/codex.md"
   },
   "types": "./index.d.ts",
   "scripts": {

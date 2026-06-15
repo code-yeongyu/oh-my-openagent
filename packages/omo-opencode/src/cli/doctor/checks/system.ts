@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
+import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, DoctorIssue, SystemInfo } from "../framework/types"
 import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"

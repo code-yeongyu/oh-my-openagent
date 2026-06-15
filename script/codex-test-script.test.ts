@@ -34,13 +34,33 @@ describe("Codex compatibility test script", () => {
     expect(testsLspAfterBuild, "test:codex must run the vendored LSP package test suite after building it").toBe(true)
   })
 
+  test("builds lsp-daemon before installer tests copy packaged runtimes", () => {
+    // #given
+    const packageManifest = readFileSync(packageManifestPath, "utf8")
+
+    // #when
+    const lspDaemonBuildIndex = packageManifest.indexOf("bun run build:lsp-daemon")
+    const pluginBuildIndex = packageManifest.indexOf("bun run --cwd packages/omo-codex/plugin build")
+    const installerTestIndex = packageManifest.indexOf("packages/omo-codex/src/install/install-codex-packaged.test.ts")
+    const buildsLspDaemonBeforePluginAndInstallerTests =
+      lspDaemonBuildIndex >= 0 &&
+      pluginBuildIndex > lspDaemonBuildIndex &&
+      installerTestIndex > lspDaemonBuildIndex
+
+    // #then
+    expect(
+      buildsLspDaemonBeforePluginAndInstallerTests,
+      "test:codex must build lsp-daemon before plugin build and installer tests assert packaged runtime files",
+    ).toBe(true)
+  })
+
   test("builds git-bash MCP before installer tests copy packaged runtimes", () => {
     // #given
     const packageManifest = readFileSync(packageManifestPath, "utf8")
 
     // #when
     const gitBashBuildIndex = packageManifest.indexOf("bun run build:git-bash-mcp")
-    const installerTestIndex = packageManifest.indexOf("packages/omo-opencode/src/cli/install-codex/install-codex.test.ts")
+    const installerTestIndex = packageManifest.indexOf("packages/omo-codex/src/install/install-codex-packaged.test.ts")
     const buildsGitBashBeforeInstallerTests = gitBashBuildIndex >= 0 && installerTestIndex > gitBashBuildIndex
 
     // #then

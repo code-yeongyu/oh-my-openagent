@@ -1,13 +1,54 @@
-import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
+import type { SessionPromptAsyncData, SessionPromptData, SessionStatusData } from "@opencode-ai/sdk"
 import type {
   AvailableCategory,
   AvailableSkill,
 } from "../../agents/dynamic-agent-prompt-builder"
 
-export type OpencodeClient = PluginInput["client"]
+type SessionPathInput = { readonly path: { readonly id: string } }
+type SessionMessagesQuery = { readonly directory?: string; readonly limit?: number }
+type SessionPromptInput = Omit<SessionPromptData | SessionPromptAsyncData, "url"> & {
+  readonly signal?: AbortSignal | null
+  readonly [key: string]: unknown
+}
+type SessionStatusInput = Omit<SessionStatusData, "url">
+
+type SessionCreateResult =
+  | { readonly data: { readonly id: string }; readonly error?: undefined }
+  | { readonly data?: undefined; readonly error: unknown }
+
+type SessionGetResult = {
+  readonly data?: { readonly directory?: string }
+  readonly error?: unknown
+}
+
+export interface OmoAgentClient {
+  readonly app: {
+    readonly agents: () => Promise<unknown>
+  }
+  readonly config: {
+    readonly get: () => Promise<unknown>
+  }
+  readonly model?: {
+    readonly list?: () => Promise<unknown>
+  }
+  readonly session: {
+    readonly abort: (input: SessionPathInput) => Promise<unknown>
+    readonly create: (input: {
+      readonly body: Record<string, unknown>
+      readonly query?: { readonly directory?: string }
+    }) => Promise<SessionCreateResult>
+    readonly get: (input: SessionPathInput) => Promise<SessionGetResult>
+    readonly messages: (input: SessionPathInput | (SessionPathInput & { readonly query?: SessionMessagesQuery })) => Promise<unknown>
+    readonly prompt?: (input: SessionPromptInput) => Promise<unknown>
+    readonly promptAsync?: (input: SessionPromptInput) => Promise<unknown>
+    readonly status: (input?: SessionStatusInput) => Promise<unknown>
+  }
+}
+
+export type OpencodeClient = OmoAgentClient
 
 export interface DelegateTaskArgs {
   description: string

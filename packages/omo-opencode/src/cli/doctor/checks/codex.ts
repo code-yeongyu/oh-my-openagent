@@ -1,11 +1,12 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
 import { existsSync } from "node:fs"
 import { lstat, readdir, readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import { detectCodexInstallation, type CodexInstallationDetection } from "../../install-codex"
 import { resolveCodexInstallerBinDir } from "../../install-codex/install-codex"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, CodexConfigSummary, CodexDoctorSummary, DoctorIssue } from "../types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, CodexConfigSummary, CodexDoctorSummary, DoctorIssue } from "../framework/types"
 import packageJson from "../../../../package.json" with { type: "json" }
 
 type DetectCodexInstallation = () => Promise<CodexInstallationDetection>
@@ -195,7 +196,7 @@ async function readLinkedAgents(codexHome: string): Promise<readonly string[]> {
 async function readJson(path: string): Promise<JsonRecord | null> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
-    return isRecord(parsed) ? parsed : null
+    return isPlainRecord(parsed) ? parsed : null
   } catch (error) {
     if (error instanceof Error) return null
     throw error
@@ -234,9 +235,7 @@ function compareVersionsDescending(left: string, right: string): number {
   return right.localeCompare(left)
 }
 
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
+
 
 async function pathExists(path: string): Promise<boolean> {
   try {
