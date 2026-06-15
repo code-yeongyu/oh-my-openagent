@@ -82,7 +82,7 @@ Runs in parallel; ALL must APPROVE; surface results and wait for the user's expl
 - UNCLEAR: run Metis plus the high-accuracy review AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
 
 ### High-accuracy review (dual Momus)
-The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent codex-CLI pass on gpt-5.5 at xhigh reasoning — `codex exec --dangerously-bypass-approvals-and-sandbox -m gpt-5.5 -c model_reasoning_effort=xhigh` given the plan path. Fix every cited issue and resubmit BOTH fresh until each approves. CLEAR: runs only if the user opts in at delivery. UNCLEAR: runs automatically unless Classify=Trivial.
+The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Codex CLI review on gpt-5.5 at xhigh reasoning, run in a disposable isolated workspace and `CODEX_HOME` with the harness's normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. Fix every cited issue and resubmit BOTH fresh until each approves. CLEAR: runs only if the user opts in at delivery. UNCLEAR: runs automatically unless Classify=Trivial.
 
 ## Delegation discipline (Codex-native)
 Every spawn starts with `TASK:`, then DELIVERABLE / SCOPE / VERIFY inside `message`; state the role inside `message` (agent_type is a routing hint, not a guaranteed TOML selection); use `fork_context: false` unless full history is truly required:

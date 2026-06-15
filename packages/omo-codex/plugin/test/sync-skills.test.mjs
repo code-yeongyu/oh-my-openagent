@@ -255,6 +255,22 @@ test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent p
 	]);
 });
 
+test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped", async () => {
+	// given
+	const dangerousBypassToken = ["dangerously", "bypass"].join("-");
+	const dangerousBypassPattern = new RegExp(`${dangerousBypassToken}(?:-approvals-and-sandbox)?`);
+	const packagedWorkflow = await readPackagedSkillFile("ulw-plan", "references", "full-workflow.md");
+	const componentWorkflowPath = join(root, "components", "ultrawork", "skills", "ulw-plan", "references", "full-workflow.md");
+	const componentWorkflow = {
+		path: componentWorkflowPath,
+		content: await readFile(componentWorkflowPath, "utf8"),
+	};
+
+	// when / then
+	assert.doesNotMatch(packagedWorkflow.content, dangerousBypassPattern, `${packagedWorkflow.path} ships unsafe Codex bypass guidance`);
+	assert.doesNotMatch(componentWorkflow.content, dangerousBypassPattern, `${componentWorkflow.path} ships unsafe Codex bypass guidance`);
+});
+
 test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
