@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { ULTRAWORK_DIRECTIVE } from "./directive.js";
 
-const ULTRAWORK_PATTERN = /\b(?:ultrawork|ulw)\b/i;
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i;
 const ULTRAWORK_DIRECTIVE_MARKER = "<ultrawork-mode>";
 const TRANSCRIPT_SEARCH_BYTES = 512_000;
 const CONTEXT_PRESSURE_MARKERS = [
@@ -80,7 +80,7 @@ function readTranscriptTail(transcriptPath: string): string {
 }
 
 export function isUltraworkPrompt(prompt: string): boolean {
-	return ULTRAWORK_PATTERN.test(prompt);
+	return ULTRAWORK_CURRENT_PROMPT_PATTERN.test(prompt);
 }
 
 function isContextPressureRecoveryPrompt(prompt: string): boolean {
