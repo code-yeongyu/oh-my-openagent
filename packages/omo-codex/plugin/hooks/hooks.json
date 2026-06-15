@@ -84,7 +84,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/git-bash/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(4.10.0): Recommending Git Bash Mcp"
+						"statusMessage": "LazyCodex(4.10.0): Recommending Git Bash MCP"
 					}
 				]
 			},
@@ -138,7 +138,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/git-bash/dist/cli.js\" hook post-compact",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(4.10.0): Resetting Git Bash Mcp Reminder"
+						"statusMessage": "LazyCodex(4.10.0): Resetting Git Bash MCP Reminder"
 					}
 				]
 			},

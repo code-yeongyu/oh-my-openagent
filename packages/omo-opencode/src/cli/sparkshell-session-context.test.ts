@@ -29,7 +29,7 @@ function sessionMetaLine(): string {
       cwd: "/work/repo",
       originator: "codex-tui",
       agent_nickname: "Verifier the 2nd",
-      agent_role: "codex-ultrawork-reviewer",
+      agent_role: "lazycodex-gate-reviewer",
     },
   })
 }
@@ -141,7 +141,7 @@ describe("sparkshell session context", () => {
     expect(block).toContain(`thread: ${SESSION_ID}`)
     expect(block).toContain("workspace: /work/repo")
     expect(block).toContain("originator: codex-tui")
-    expect(block).toContain("subagent: Verifier the 2nd (codex-ultrawork-reviewer)")
+    expect(block).toContain("subagent: Verifier the 2nd (lazycodex-gate-reviewer)")
     expect(block).toContain("[first user request]\nfirst request: fix the flaky login test")
     expect(block).toContain("[latest user request]\nlatest request: ship it after green tests")
     expect(block).toContain("[last 5 conversation message(s), oldest first]")
