@@ -667,10 +667,10 @@ Evidence hygiene note for final reviewers (2026-06-15):
 - `.agents/skills/work-with-pr/SKILL.md` and `.opencode/skills/work-with-pr/SKILL.md` are included as an F2 gate repair only: the project-skill reference test expected `task` delegation to use a real category. Evidence: `.omo/evidence/20260615-codegraph-omo-integration/final-f2-work-with-pr-skill-test.txt`.
 - Do not mark F1-F4 complete from this hygiene pass alone; final reviewers must still rerun/approve those boxes.
 
-- [ ] F1. Plan compliance audit - read the plan end-to-end; verify every Must Have exists (read file / run command), every Must NOT Have is absent (search, reject with file:line), every `.omo/evidence/` file exists.
-- [ ] F2. Code quality review - typecheck + lint + full test suite (both bundles + packages/utils); review changed files for `as any` / empty catches / debug prints / dead code / slop / 250-LOC ceiling.
-- [ ] F3. Real manual QA - from clean state, execute EVERY QA scenario from EVERY todo plus cross-harness integration (fresh-repo first-session→second-session tool activation; binary-missing skip; symlink conflict) and save evidence to `.omo/evidence/final-qa/`. Opencode-spawning QA runs in an isolated XDG sandbox with the before/after `opencode.db` session-count isolation proof; codex-spawning QA runs under an isolated `CODEX_HOME` (AGENTS.md §OPENCODE/§CODEX).
-- [ ] F4. Scope fidelity check - per todo, diff spec vs actual changes: nothing missing, nothing beyond spec (esp. no opencode SOT migration, no cross-bundle import), no unaccounted files.
+- [x] F1. Plan compliance audit - read the plan end-to-end; verify every Must Have exists (read file / run command), every Must NOT Have is absent (search, reject with file:line), every `.omo/evidence/` file exists.
+- [x] F2. Code quality review - typecheck + lint + full test suite (both bundles + packages/utils); review changed files for `as any` / empty catches / debug prints / dead code / slop / 250-LOC ceiling.
+- [x] F3. Real manual QA - from clean state, execute EVERY QA scenario from EVERY todo plus cross-harness integration (fresh-repo first-session→second-session tool activation; binary-missing skip; symlink conflict) and save evidence to `.omo/evidence/final-qa/`. Opencode-spawning QA runs in an isolated XDG sandbox with the before/after `opencode.db` session-count isolation proof; codex-spawning QA runs under an isolated `CODEX_HOME` (AGENTS.md §OPENCODE/§CODEX).
+- [x] F4. Scope fidelity check - per todo, diff spec vs actual changes: nothing missing, nothing beyond spec (esp. no opencode SOT migration, no cross-bundle import), no unaccounted files.
 
 ## Commit strategy
 - See each todo's **Commit** line. One atomic commit per todo on a feature branch off `dev`; pre-commit runs the todo's acceptance commands. Do not commit the dirty_worktree `bin/` artifacts.
@@ -692,6 +692,6 @@ bun -e "const m=await import('./packages/utils/src/index.ts'); console.log(JSON.
 tar -tf "$(npm pack --silent)" | grep THIRD-PARTY-NOTICES   # Expected: file present in tarball
 ```
 ### Final checklist
-- [ ] All Must Have present
-- [ ] All Must NOT Have absent
-- [ ] All QA evidence captured under .omo/evidence/
+- [x] All Must Have present
+- [x] All Must NOT Have absent
+- [x] All QA evidence captured under .omo/evidence/
