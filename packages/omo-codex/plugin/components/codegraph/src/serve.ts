@@ -2,8 +2,13 @@
 import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
-import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
+import { basename, extname, join, resolve } from "node:path";
+import {
+	cwd as processCwd,
+	env as processEnv,
+	execPath as processExecPath,
+	stderr as processStderr,
+} from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
@@ -28,6 +33,11 @@ export type CodegraphServeProcessRunner = (
 	options: CodegraphServeProcessOptions,
 ) => Promise<number>;
 
+export interface ServeProcessInvocation {
+	readonly args: readonly string[];
+	readonly command: string;
+}
+
 export interface CodegraphServeStderr {
 	readonly write: (chunk: string) => void;
 }
@@ -48,6 +58,8 @@ const CODEGRAPH_SKIP_HINT =
 	"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n";
 const CODEGRAPH_DISABLED_HINT =
 	"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n";
+const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 
 export async function runCodegraphServe(options: RunCodegraphServeOptions = {}): Promise<number> {
 	const env = options.env ?? processEnv;
@@ -119,7 +131,8 @@ async function runChildProcess(
 	args: readonly string[],
 	options: CodegraphServeProcessOptions,
 ): Promise<number> {
-	const child = spawn(command, args, { env: options.env, stdio: options.stdio });
+	const invocation = resolveServeProcessInvocation(command, args);
+	const child = spawn(invocation.command, invocation.args, { env: options.env, stdio: options.stdio });
 	return new Promise<number>((resolve, reject) => {
 		child.once("error", reject);
 		child.once("exit", (code, signal) => {
@@ -130,6 +143,25 @@ async function runChildProcess(
 			resolve(signal === null ? 0 : 1);
 		});
 	});
+}
+
+export function resolveServeProcessInvocation(
+	command: string,
+	args: readonly string[],
+	platform: NodeJS.Platform = process.platform,
+): ServeProcessInvocation {
+	if (platform !== "win32") return { args: [...args], command };
+
+	const extension = extname(command).toLowerCase();
+	if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
+		return { args: [command, ...args], command: processExecPath };
+	}
+
+	if (WINDOWS_CMD_EXTENSIONS.has(extension)) {
+		return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
+	}
+
+	return { args: [...args], command };
 }
 
 if (isDirectInvocation(process.argv[1])) {

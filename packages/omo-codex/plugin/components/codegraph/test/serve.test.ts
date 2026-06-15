@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { runCodegraphServe } from "../src/serve.ts";
+import { resolveServeProcessInvocation, runCodegraphServe } from "../src/serve.ts";
 
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -195,6 +195,34 @@ describe("runCodegraphServe", () => {
 			} finally {
 				rmSync(tempRoot, { recursive: true, force: true });
 			}
+		});
+	});
+
+	it("#given Windows OMO_CODEGRAPH_BIN is a Node script #when resolving serve invocation #then Node executes the script path", () => {
+		// given
+		const scriptPath = "C:\\Users\\runner\\codegraph-fake.cjs";
+
+		// when
+		const invocation = resolveServeProcessInvocation(scriptPath, ["serve", "--mcp"], "win32");
+
+		// then
+		expect(invocation).toEqual({
+			args: [scriptPath, "serve", "--mcp"],
+			command: process.execPath,
+		});
+	});
+
+	it("#given Windows CodeGraph resolves to a cmd shim #when resolving serve invocation #then cmd.exe executes the shim", () => {
+		// given
+		const shimPath = "C:\\Users\\runner\\.omo\\codegraph\\bin\\codegraph.cmd";
+
+		// when
+		const invocation = resolveServeProcessInvocation(shimPath, ["serve", "--mcp"], "win32");
+
+		// then
+		expect(invocation).toEqual({
+			args: ["/d", "/s", "/c", shimPath, "serve", "--mcp"],
+			command: "cmd.exe",
 		});
 	});
 

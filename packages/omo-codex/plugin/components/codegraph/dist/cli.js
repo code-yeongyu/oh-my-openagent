@@ -1943,13 +1943,20 @@ function defaultWorkerCliPath() {
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync7, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
-import { basename as basename3, join as join8, resolve as resolve3 } from "node:path";
-import { cwd as processCwd3, env as processEnv3, stderr as processStderr2 } from "node:process";
+import { basename as basename3, extname, join as join8, resolve as resolve3 } from "node:path";
+import {
+  cwd as processCwd3,
+  env as processEnv3,
+  execPath as processExecPath,
+  stderr as processStderr2
+} from "node:process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
+var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv3;
   const homeDir = options.homeDir ?? homedir8();
@@ -2004,7 +2011,8 @@ async function runCodegraphServeCli() {
   process.exitCode = await runCodegraphServe();
 }
 async function runChildProcess(command, args, options) {
-  const child = spawn2(command, args, { env: options.env, stdio: options.stdio });
+  const invocation = resolveServeProcessInvocation(command, args);
+  const child = spawn2(invocation.command, invocation.args, { env: options.env, stdio: options.stdio });
   return new Promise((resolve4, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => {
@@ -2015,6 +2023,18 @@ async function runChildProcess(command, args, options) {
       resolve4(signal === null ? 0 : 1);
     });
   });
+}
+function resolveServeProcessInvocation(command, args, platform = process.platform) {
+  if (platform !== "win32")
+    return { args: [...args], command };
+  const extension = extname(command).toLowerCase();
+  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
+    return { args: [command, ...args], command: processExecPath };
+  }
+  if (WINDOWS_CMD_EXTENSIONS.has(extension)) {
+    return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
+  }
+  return { args: [...args], command };
 }
 if (isDirectInvocation(process.argv[1])) {
   runCodegraphServeCli().catch((error) => {
