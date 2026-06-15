@@ -3,15 +3,16 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const scriptPath = join(root, "skills", "ulw-plan", "scripts", "scaffold-plan.mjs");
+const scriptUrl = pathToFileURL(scriptPath).href;
 const workflowPath = join(root, "skills", "ulw-plan", "references", "full-workflow.md");
 
 test("#given the scaffold script and the workflow reference #when compared #then every plan header the script emits is documented in full-workflow.md (no drift)", async () => {
 	// given
-	const { PLAN_SECTION_HEADERS } = await import(scriptPath);
+	const { PLAN_SECTION_HEADERS } = await import(scriptUrl);
 	const workflow = await readFile(workflowPath, "utf8");
 
 	// then — the script is the single source of the plan shape; the reference must document the same headers
@@ -23,7 +24,7 @@ test("#given the scaffold script and the workflow reference #when compared #then
 
 test("#given buildPlanSkeleton #when intent is unclear #then the human TL;DR leads the plan and surfaces the decisions veto block", async () => {
 	// given
-	const { buildPlanSkeleton, PLAN_SECTION_HEADERS } = await import(scriptPath);
+	const { buildPlanSkeleton, PLAN_SECTION_HEADERS } = await import(scriptUrl);
 	const plan = buildPlanSkeleton("demo", "unclear");
 
 	// then — the human-readable summary is on top, above the AI detail
@@ -36,7 +37,7 @@ test("#given buildPlanSkeleton #when intent is unclear #then the human TL;DR lea
 
 test("#given buildPlanSkeleton #when intent is clear #then it surfaces a decisions-to-sanity-check block instead", async () => {
 	// given
-	const { buildPlanSkeleton } = await import(scriptPath);
+	const { buildPlanSkeleton } = await import(scriptUrl);
 	const plan = buildPlanSkeleton("demo", "clear");
 
 	// then
@@ -46,7 +47,7 @@ test("#given buildPlanSkeleton #when intent is clear #then it surfaces a decisio
 
 test("#given resolveSafeOmoPath #when the target escapes .omo or the workspace #then it is refused (the script never escapes .omo)", async () => {
 	// given
-	const { resolveSafeOmoPath } = await import(scriptPath);
+	const { resolveSafeOmoPath } = await import(scriptUrl);
 	const cwd = "/tmp/ws";
 
 	// then — the prometheus-md-only hook gates Write/Edit but not Bash, so the script self-guards its own writes
@@ -59,7 +60,7 @@ test("#given resolveSafeOmoPath #when the target escapes .omo or the workspace #
 
 test("#given parseArgs #when the slug is missing or unsafe #then it throws, and valid flags parse", async () => {
 	// given
-	const { parseArgs } = await import(scriptPath);
+	const { parseArgs } = await import(scriptUrl);
 
 	// then
 	assert.throws(() => parseArgs(["node", "s"]));
@@ -77,7 +78,7 @@ test("#given parseArgs #when the slug is missing or unsafe #then it throws, and 
 
 test("#given an already-scaffolded plan #when the script is re-run plain #then it is a no-op that preserves appended todos (resume-safe, no crash, no clobber)", async () => {
 	// given
-	const { scaffold } = await import(scriptPath);
+	const { scaffold } = await import(scriptUrl);
 	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
 	try {
 		await scaffold(dir, { slug: "demo", intent: "unclear" });
@@ -104,7 +105,7 @@ test("#given an already-scaffolded plan #when the script is re-run plain #then i
 
 test("#given a hand-edited plan #when --reset is used #then it refuses without --force and overwrites with --force", async () => {
 	// given
-	const { scaffold } = await import(scriptPath);
+	const { scaffold } = await import(scriptUrl);
 	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
 	try {
 		await scaffold(dir, { slug: "demo", intent: "clear" });
