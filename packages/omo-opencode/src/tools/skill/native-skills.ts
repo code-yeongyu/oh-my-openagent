@@ -1,5 +1,6 @@
 import type { SkillInfo } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import { isDisabledSkillAlias } from "../../features/opencode-skill-loader/skill-discovery"
 
 export type NativeSkillEntry = {
   name: string
@@ -34,19 +35,30 @@ function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
   }
 }
 
-export function mergeNativeSkills(skills: LoadedSkill[], nativeSkills: NativeSkillEntry[]): void {
+export function mergeNativeSkills(
+  skills: LoadedSkill[],
+  nativeSkills: NativeSkillEntry[],
+  disabledSkills?: ReadonlySet<string>,
+): void {
   const knownNames = new Set(skills.map((skill) => skill.name))
   for (const native of nativeSkills) {
     if (knownNames.has(native.name)) continue
-    skills.push(nativeSkillToLoadedSkill(native))
+    const loadedSkill = nativeSkillToLoadedSkill(native)
+    if (disabledSkills && isDisabledSkillAlias(loadedSkill, disabledSkills)) continue
+    skills.push(loadedSkill)
     knownNames.add(native.name)
   }
 }
 
-export function mergeNativeSkillInfos(skillInfos: SkillInfo[], nativeSkills: NativeSkillEntry[]): void {
+export function mergeNativeSkillInfos(
+  skillInfos: SkillInfo[],
+  nativeSkills: NativeSkillEntry[],
+  disabledSkills?: ReadonlySet<string>,
+): void {
   const knownNames = new Set(skillInfos.map((skill) => skill.name))
   for (const native of nativeSkills) {
     if (knownNames.has(native.name)) continue
+    if (disabledSkills && isDisabledSkillAlias(nativeSkillToLoadedSkill(native), disabledSkills)) continue
     skillInfos.push({
       name: native.name,
       description: native.description,

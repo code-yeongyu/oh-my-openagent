@@ -61,7 +61,7 @@ export async function resolveSkillContent(
   // OMO wins on collisions, matching the existing mergeNativeSkills semantics.
   const baseSkills: LoadedSkill[] = [...(await getAllSkills(options))]
   const nativeEntries = await loadNativeSkillEntries(options.nativeSkills, options.nativeSkillEntries)
-  mergeNativeSkills(baseSkills, nativeEntries)
+  mergeNativeSkills(baseSkills, nativeEntries, options.disabledSkills)
 
   const resolved = new Map<string, string>()
   const notFound: string[] = []

@@ -154,6 +154,29 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(nativeSkills.all).not.toHaveBeenCalled()
   })
 
+  it("#given a disabled native skill #when delegate load_skills requests it #then it is unavailable", async () => {
+    // given
+    const native = makeNativeSkill(
+      "blocked-native-skill",
+      "blocked desc",
+      "DELEGATE_BYPASS_CONFIRMED",
+    )
+    const nativeSkills = makeNativeAccessor([native])
+
+    // when
+    const result = await resolveSkillContent(["blocked-native-skill"], {
+      nativeSkills,
+      directory: TEST_DIR,
+      disabledSkills: new Set(["blocked-native-skill"]),
+    })
+
+    // then
+    expect(result.content).toBeUndefined()
+    expect(result.contents).toEqual([])
+    expect(result.error).toContain("Skills not found: blocked-native-skill")
+    expect(result.error).not.toContain("DELEGATE_BYPASS_CONFIRMED")
+  })
+
   it("#given a namespaced OMO skill #when requested by unique short name with different case #then resolves it", async () => {
     // given
     const skillsDir = join(TEST_DIR, ".opencode", "skills", "toolkit", "systematic-debugging")
