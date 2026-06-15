@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -32,6 +32,69 @@ const ROOT_BUNDLED_COMPONENTS = [
   ...CODEGRAPH_COMPONENTS,
 ]
 
+const CODEX_AGGREGATE_COMPONENTS = [
+  "@ast-grep/cli binary payload",
+  "@code-yeongyu/comment-checker",
+  "@code-yeongyu/codex-comment-checker",
+  "@code-yeongyu/codex-lsp",
+  "@code-yeongyu/codex-rules",
+  "@code-yeongyu/codex-start-work-continuation",
+  "@code-yeongyu/codex-telemetry",
+  "@code-yeongyu/codex-ultrawork",
+  "@code-yeongyu/codex-ulw-loop",
+  "@code-yeongyu/lsp-daemon",
+  "@code-yeongyu/lsp-tools-mcp",
+  "@oh-my-opencode/ast-grep-mcp",
+  "@oh-my-opencode/boulder-state",
+  "@oh-my-opencode/comment-checker-core",
+  "@oh-my-opencode/git-bash-mcp",
+  "@oh-my-opencode/prompts-core",
+  "@oh-my-opencode/rules-engine",
+  "@oh-my-opencode/shared-skills",
+  "@oh-my-opencode/telemetry-core",
+  "@oh-my-opencode/utils",
+  "@sisyphuslabs/codex-bootstrap",
+  "@sisyphuslabs/codex-git-bash-hook",
+  "@sisyphuslabs/omo-codex-plugin",
+  "Node.js runtime bootstrap payload",
+  "pi-comment-checker",
+  "pi-lsp-client",
+  "pi-rules",
+  "picomatch",
+  "posthog-node",
+]
+
+const CODEX_COMPONENT_NOTICE_REQUIREMENTS = [
+  {
+    path: "packages/omo-codex/plugin/components/comment-checker",
+    requiredTerms: ["pi-comment-checker", "@code-yeongyu/comment-checker"],
+  },
+  {
+    path: "packages/omo-codex/plugin/components/lsp",
+    requiredTerms: ["pi-lsp-client"],
+  },
+  {
+    path: "packages/omo-codex/plugin/components/rules",
+    requiredTerms: ["pi-rules", "picomatch"],
+  },
+  {
+    path: "packages/omo-codex/plugin/components/start-work-continuation",
+    requiredTerms: [],
+  },
+  {
+    path: "packages/omo-codex/plugin/components/telemetry",
+    requiredTerms: ["posthog-node", "@oh-my-opencode/telemetry-core"],
+  },
+  {
+    path: "packages/omo-codex/plugin/components/ultrawork",
+    requiredTerms: [],
+  },
+  {
+    path: "packages/omo-codex/plugin/components/ulw-loop",
+    requiredTerms: [],
+  },
+]
+
 const scopes = {
   root: {
     noticePath: "THIRD-PARTY-NOTICES.md",
@@ -39,6 +102,21 @@ const scopes = {
       const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"))
       return [...Object.keys(packageJson.dependencies ?? {}), ...ROOT_BUNDLED_COMPONENTS]
     },
+  },
+  codex: {
+    noticePath: "packages/omo-codex/THIRD-PARTY-NOTICES.md",
+    requiredComponents() {
+      const componentsPath = join(repoRoot, "packages/omo-codex/plugin/components")
+      const componentPackageNames = readdirSync(componentsPath, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => {
+          const packagePath = join(componentsPath, entry.name, "package.json")
+          return JSON.parse(readFileSync(packagePath, "utf8")).name
+        })
+
+      return [...componentPackageNames, ...CODEX_AGGREGATE_COMPONENTS]
+    },
+    checkComponents: checkCodexComponentNotices,
   },
 }
 
@@ -53,6 +131,31 @@ function headingExists(noticeText, component) {
 
 function unique(values) {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right))
+}
+
+function checkCodexComponentNotices() {
+  const failures = []
+
+  for (const requirement of CODEX_COMPONENT_NOTICE_REQUIREMENTS) {
+    const noticePath = join(repoRoot, requirement.path, "NOTICE")
+    const licensePath = join(repoRoot, requirement.path, "LICENSE")
+    if (!existsSync(noticePath)) {
+      failures.push(`${requirement.path}/NOTICE is missing`)
+      continue
+    }
+    if (!existsSync(licensePath)) {
+      failures.push(`${requirement.path}/LICENSE is missing`)
+    }
+
+    const noticeText = readFileSync(noticePath, "utf8")
+    for (const term of requirement.requiredTerms) {
+      if (!noticeText.includes(term)) {
+        failures.push(`${requirement.path}/NOTICE is missing required term: ${term}`)
+      }
+    }
+  }
+
+  return failures
 }
 
 function runScope(scopeName) {
@@ -73,10 +176,14 @@ function runScope(scopeName) {
   const noticeText = readFileSync(resolvedNoticePath, "utf8")
   const requiredComponents = unique(scope.requiredComponents())
   const missing = requiredComponents.filter((component) => !headingExists(noticeText, component))
+  const componentFailures = scope.checkComponents?.() ?? []
 
-  if (missing.length > 0) {
-    console.error(`${scope.noticePath} is missing ${missing.length} required notice entries:`)
+  if (missing.length > 0 || componentFailures.length > 0) {
+    if (missing.length > 0) {
+      console.error(`${scope.noticePath} is missing ${missing.length} required notice entries:`)
+    }
     for (const component of missing) console.error(`- ${component}`)
+    for (const failure of componentFailures) console.error(`- ${failure}`)
     process.exitCode = 1
     return
   }
@@ -86,8 +193,7 @@ function runScope(scopeName) {
 
 const args = process.argv.slice(2)
 if (args.includes("--codex")) {
-  console.error("--codex notice checks are reserved for task 6")
-  process.exit(2)
+  runScope("codex")
+} else {
+  runScope("root")
 }
-
-runScope("root")
