@@ -84,14 +84,14 @@ Runs in parallel; ALL must APPROVE; surface results and wait for the user's expl
 ### High-accuracy review (dual Momus)
 The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Codex CLI review on gpt-5.5 at xhigh reasoning, run in a disposable isolated workspace and `CODEX_HOME` with the harness's normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. Fix every cited issue and resubmit BOTH fresh until each approves. CLEAR: runs only if the user opts in at delivery. UNCLEAR: runs automatically unless Classify=Trivial.
 
-## Delegation discipline (Codex-native)
-Every spawn starts with `TASK:`, then DELIVERABLE / SCOPE / VERIFY inside `message`; state the role inside `message` (agent_type is a routing hint, not a guaranteed TOML selection); use `fork_context: false` unless full history is truly required:
+## Delegation discipline (OpenCode-native)
+Every delegated prompt starts with `TASK:`, then DELIVERABLE / SCOPE / VERIFY; state the role inside the prompt and include only the context the child needs:
 
 ```
-multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
+task(subagent_type="explore", description="Map the implementation surface", prompt="TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...")
 ```
 
-Roles: `explorer`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background and poll with short waits; require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A wait timeout only means no new mailbox update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller `fork_context: false` job. Close each agent after integrating its result.
+Roles: `explore`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background and poll with short waits through the OpenCode task surface; require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A timeout only means no new update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller delegated job. Close each agent after integrating its result.
 
 ## Stop rules
 - Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent: present the summary, ask the start-or-high-accuracy question (CLEAR) or lead with the best-practice brief (UNCLEAR), and stop. Execution belongs to the worker, never to you.

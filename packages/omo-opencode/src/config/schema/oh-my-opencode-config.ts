@@ -1,6 +1,5 @@
 import { z } from "zod"
 import { AnyMcpNameSchema } from "../../mcp/types"
-import { BuiltinSkillNameSchema } from "./agent-names"
 import { AgentDefinitionsConfigSchema } from "./agent-definitions"
 import { AgentOverridesSchema } from "./agent-overrides"
 import { BabysittingConfigSchema } from "./babysitting"
@@ -41,7 +40,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   agent_definitions: AgentDefinitionsConfigSchema,
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(z.string()).optional(),
-  disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
+  disabled_skills: z.array(z.string()).optional(),
   disabled_hooks: z.array(z.string()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */

@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import {
 	clearSkillCache,
 	resolveSkillContent,
@@ -11,12 +11,23 @@ import {
 	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
 } from "./skill-content"
+import { getAllSkills } from "./skill-discovery"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
+import type { LoadedSkill } from "./types"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
 	mkdirSync(dir, { recursive: true })
 	const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
 	writeFileSync(join(dir, "SKILL.md"), yaml)
+}
+
+function createLoadedSkill(name: string, scope: LoadedSkill["scope"]): LoadedSkill {
+	return {
+		name,
+		definition: { name, description: `${name} description`, template: `${name} body` },
+		scope,
+	}
 }
 
 let originalEnv: Record<string, string | undefined>
@@ -66,6 +77,69 @@ describe("resolveSkillContentAsync", () => {
 		const result = await resolveSkillContentAsync("frontend", options)
 
 		// then: returns null
+		expect(result).toBeNull()
+	})
+
+	it("#given the shared ulw-plan canonical alias is disabled #when resolving it async #then it does not fall back to the plain shared alias", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
+
+		// then
+		expect(result).toBeNull()
+	})
+
+	it("#given the shared ulw-plan canonical alias is disabled #when matching against all skills #then no shared fallback match remains", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+
+		// when
+		const skills = await getAllSkills(options)
+		const matchedSkill = matchSkillByName(skills, "shared/ulw-plan")
+
+		// then
+		expect(matchedSkill).toBeUndefined()
+	})
+
+	it("#given a project skill whose literal name starts with shared slash #when matching by exact name #then the project skill remains reachable", () => {
+		// given
+		const skills = [createLoadedSkill("shared/custom", "project")]
+
+		// when
+		const matchedSkill = matchSkillByName(skills, "shared/custom")
+
+		// then
+		expect(matchedSkill?.scope).toBe("project")
+		expect(matchedSkill?.name).toBe("shared/custom")
+	})
+
+	it("#given a local ulw-plan override exists #when only the shared canonical alias is disabled #then the local plain override still resolves", async () => {
+		// given
+		const localSkillDir = join(testConfigDir, ".opencode", "skills", "ulw-plan")
+		mkdirSync(localSkillDir, { recursive: true })
+		writeFileSync(
+			join(localSkillDir, "SKILL.md"),
+			"---\nname: ulw-plan\ndescription: Local ulw-plan override\n---\nlocal ulw-plan body"
+		)
+		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("ulw-plan", options)
+
+		// then
+		expect(result).toBe("local ulw-plan body")
+	})
+
+	it("#given the plain ulw-plan name is disabled #when resolving the shared canonical alias #then the shared alias is disabled too", async () => {
+		// given
+		const options = { directory: testConfigDir, disabledSkills: new Set(["ulw-plan"]) }
+
+		// when
+		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
+
+		// then
 		expect(result).toBeNull()
 	})
 
@@ -119,5 +193,37 @@ describe("resolveSkillContentAsync", () => {
 		// then: finds it case-insensitively
 		expect(result).not.toBeNull()
 		expect(result).toContain("case insensitive match")
+	})
+
+	it("#given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources", async () => {
+		// given
+		const requiredResourcePaths = [
+			"references/full-workflow.md",
+			"references/intent-clear.md",
+			"references/intent-unclear.md",
+			"scripts/scaffold-plan.mjs",
+		]
+
+		// when
+		const skills = await getAllSkills({ directory: testConfigDir })
+		const skill = skills.find((candidate) => candidate.name === "ulw-plan")
+
+		// then
+		expect(skill).toBeDefined()
+		if (!skill) {
+			throw new Error("ulw-plan skill was not resolved")
+		}
+		expect(skill.path).toBeDefined()
+		expect(skill.resolvedPath).toBeDefined()
+		if (!skill.path || !skill.resolvedPath) {
+			throw new Error("ulw-plan skill is not path-backed")
+		}
+		expect(skill.path.replaceAll("\\", "/").endsWith("packages/shared-skills/skills/ulw-plan/SKILL.md")).toBe(true)
+		for (const relativePath of requiredResourcePaths) {
+			expect(existsSync(join(skill.resolvedPath, relativePath))).toBe(true)
+		}
+		const fullWorkflow = readFileSync(join(skill.resolvedPath, "references/full-workflow.md"), "utf8")
+		expect(fullWorkflow).not.toContain("--dangerously-bypass-approvals-and-sandbox")
+		expect(fullWorkflow).not.toContain("dangerously-bypass")
 	})
 })

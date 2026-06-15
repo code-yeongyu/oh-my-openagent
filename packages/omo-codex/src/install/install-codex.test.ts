@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
 function formatTomlString(value: string): string {
   return JSON.stringify(value)

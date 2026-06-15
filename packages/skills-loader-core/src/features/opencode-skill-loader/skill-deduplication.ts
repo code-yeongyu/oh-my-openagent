@@ -1,11 +1,17 @@
 import type { LoadedSkill } from "./types"
 
+function deduplicationKey(skillName: string): string {
+  const lowerName = skillName.toLowerCase()
+  return lowerName.startsWith("shared/") ? lowerName : skillName
+}
+
 export function deduplicateSkillsByName(skills: LoadedSkill[]): LoadedSkill[] {
   const seen = new Set<string>()
   const result: LoadedSkill[] = []
   for (const skill of skills) {
-    if (!seen.has(skill.name)) {
-      seen.add(skill.name)
+    const key = deduplicationKey(skill.name)
+    if (!seen.has(key)) {
+      seen.add(key)
       result.push(skill)
     }
   }

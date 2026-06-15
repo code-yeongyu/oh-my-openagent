@@ -49,17 +49,7 @@ const PROMPT_SIGNATURES = [
   {
     path: "packages/prompts-core/prompts/prometheus/default.md",
     label: "Prometheus default",
-    signature: "YOU ARE A PLANNER. YOU ARE NOT AN IMPLEMENTER. YOU DO NOT WRITE CODE. YOU DO NOT EXECUTE TASKS.",
-  },
-  {
-    path: "packages/prompts-core/prompts/prometheus/gemini.md",
-    label: "Prometheus Gemini",
-    signature: "If you feel the urge to write code or implement something - STOP. That is NOT your job.",
-  },
-  {
-    path: "packages/prompts-core/prompts/prometheus/gpt.md",
-    label: "Prometheus GPT",
-    signature: "YOU ARE A PLANNER. NOT AN IMPLEMENTER. NOT A CODE WRITER.",
+    signature: "Your FIRST action in every planning session is to LOAD the shared ulw-plan skill",
   },
   {
     path: "packages/prompts-core/prompts/mode/team.md",
