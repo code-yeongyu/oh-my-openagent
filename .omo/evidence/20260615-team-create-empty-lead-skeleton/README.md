@@ -19,6 +19,7 @@ bash .agents/skills/opencode-qa/scripts/server-smoke.sh
 bash .omo/evidence/20260615-team-create-empty-lead-skeleton/team-create-opencode-run.sh
 export CODEX_HOME="$(mktemp -d)/codex"; node packages/omo-codex/scripts/install-local.mjs install
 codex --help
+codex exec --json --dangerously-bypass-hook-trust --skip-git-repo-check --oss --local-provider ollama -C "$PWD" 'please ultrawork; respond with exactly: hook qa ok'
 bun run test:codex
 ```
 
@@ -36,6 +37,7 @@ bun run test:codex
 - Real OpenCode DB isolation proof: passed. `db-isolation.txt` records `SELECT count(*) FROM session` before and after the isolated run, unchanged real session count, stable real DB path, and a distinct sandbox DB path.
 - Isolated Codex local install QA: passed after exporting `CODEX_HOME`. See `codex-isolated-install-exported.txt` for local build install, `omo@sisyphuslabs` config registration, hook manifest coverage, and unchanged real `~/.codex/config.toml` hash during the valid isolated run.
 - Codex CLI surface smoke: passed. See `codex-cli-help.txt` for the real `codex --help` command output from codex-cli 0.139.0.
+- Real Codex hook firing QA: passed. See `codex-real-hook-firing.txt`; it records an isolated `CODEX_HOME`, local install, `codex exec --json --dangerously-bypass-hook-trust`, `thread.started` / `turn.started`, the hook-trust warning from Codex, and a `UserPromptSubmit` hook output injecting `<ultrawork-mode>` into the live session transcript. The same receipt records `real_config_hash_unchanged_after_rerun=yes`.
 - `bun run test:codex`: passed with 336 tests, 336 pass, 0 fail. See `codex-test-gate.txt`.
 - `lsp_diagnostics`: clean for `team-spec-input-normalizer.ts` and `team-spec-input-normalizer.test.ts`. The existing `lifecycle-inline-spec.test.ts` file-level LSP diagnostics still report stale type issues already contradicted by `bun run typecheck:packages` passing.
 
@@ -113,6 +115,17 @@ This proves the spawned `opencode run` wrote to the isolated XDG database, not t
 ### Codex CLI smoke
 
 `codex-cli-help.txt` records a real Codex CLI surface check. It confirmed codex-cli 0.139.0 starts and exposes the expected top-level command surface, including `exec`, `review`, `plugin`, `doctor`, and `help`.
+
+### Real Codex hook firing
+
+`codex-real-hook-firing.txt` records the live Codex surface check requested by the Codex review:
+
+- a fresh exported `CODEX_HOME` was installed from this checkout with `node packages/omo-codex/scripts/install-local.mjs install`;
+- the sandbox config enabled `plugins`, `plugin_hooks`, and `omo@sisyphuslabs`;
+- `codex exec --json --dangerously-bypass-hook-trust --skip-git-repo-check --oss --local-provider ollama -C "$PWD" 'please ultrawork; respond with exactly: hook qa ok'` started a real Codex thread and turn;
+- the Codex JSONL stream recorded the hook-trust warning, proving hooks were enabled for that invocation;
+- the persisted Codex session JSONL includes the `UserPromptSubmit` hook output: `hookSpecificOutput.additionalContext` begins with `<ultrawork-mode>` and references the saved hook output path;
+- `real_config_hash_unchanged_after_rerun=yes` proves the real `~/.codex/config.toml` stayed untouched.
 
 ### Canonical Codex gate
 
