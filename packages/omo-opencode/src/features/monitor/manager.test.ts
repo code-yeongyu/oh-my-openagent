@@ -21,10 +21,8 @@ interface FakeTimer {
 interface FakeInjector {
   queueBatch(record: MonitorRecord, batch: OutputBatch): void
   flushMonitor(monitorId: string): Promise<void>
-  requeueMonitor(monitorId: string): void
   queued: Array<{ record: MonitorRecord; batch: OutputBatch }>
   flushed: string[]
-  requeued: string[]
 }
 
 function createEmptyStream(): ReadableStream<Uint8Array> {
@@ -79,15 +77,11 @@ function createFakeInjector(): FakeInjector {
   return {
     queued: [],
     flushed: [],
-    requeued: [],
     queueBatch(record, batch) {
       this.queued.push({ record, batch })
     },
     async flushMonitor(monitorId) {
       this.flushed.push(monitorId)
-    },
-    requeueMonitor(monitorId) {
-      this.requeued.push(monitorId)
     },
   }
 }
@@ -237,20 +231,6 @@ describe("MonitorManager", () => {
       expect(injectorsByMonitorId.get(s2Record.id)?.flushed).toEqual([])
     })
 
-    test("#when session.error is handled #then it requeues only that session's injectors", async () => {
-      // given
-      const { manager, injectorsByMonitorId } = createManagerHarness()
-      const s1Record = await startMonitor(manager, "s1-error", "s1")
-      const s2Record = await startMonitor(manager, "s2-error", "s2")
-
-      // when
-      manager.handleEvent({ type: "session.error", sessionId: "s1" })
-
-      // then
-      expect(injectorsByMonitorId.get(s1Record.id)?.requeued).toEqual([s1Record.id])
-      expect(injectorsByMonitorId.get(s2Record.id)?.requeued).toEqual([])
-    })
-
     test("#when stopSessionMonitors runs #then it kills every monitor for that session only", async () => {
       // given
       const { manager, killCallsByCommand } = createManagerHarness()
@@ -265,8 +245,42 @@ describe("MonitorManager", () => {
       expect(killCallsByCommand.get("s1-a")).toEqual(["SIGTERM"])
       expect(killCallsByCommand.get("s1-b")).toEqual(["SIGTERM"])
       expect(killCallsByCommand.get("s2-a")).toEqual([])
-      expect(manager.list("s1").map((record) => record.status)).toEqual(["stopped", "stopped"])
+      expect(manager.list("s1")).toEqual([])
       expect(manager.list("s2").map((record) => record.status)).toEqual(["running"])
+    })
+
+    test("#when stopSessionMonitors runs #then it purges the session's monitor records from memory", async () => {
+      // given
+      const { manager } = createManagerHarness()
+      await startMonitor(manager, "p1", "s1")
+      await startMonitor(manager, "p2", "s1")
+      await startMonitor(manager, "p3", "s1")
+      const internal = manager as unknown as {
+        monitors: Map<string, unknown>
+        monitorsByParentSession: Map<string, Set<string>>
+      }
+
+      // when
+      await manager.stopSessionMonitors("s1")
+
+      // then
+      expect(internal.monitors.size).toBe(0)
+      expect(internal.monitorsByParentSession.get("s1")).toBeUndefined()
+    })
+
+    test("#when many monitors are started and stopped in one live session #then terminal records stay bounded", async () => {
+      // given
+      const { manager } = createManagerHarness({ maxMonitorsPerSession: 2 })
+      const internal = manager as unknown as { monitors: Map<string, unknown> }
+
+      // when
+      for (let index = 0; index < 6; index += 1) {
+        const record = await startMonitor(manager, `short-${index}`, "s1")
+        await manager.stop(record.id)
+      }
+
+      // then
+      expect(internal.monitors.size).toBeLessThanOrEqual(2)
     })
   })
 
@@ -377,7 +391,6 @@ describe("MonitorManager", () => {
               async flushMonitor(monitorId: string) {
                 flushed.push(monitorId)
               },
-              requeueMonitor() {},
             }
           },
           scheduler: {

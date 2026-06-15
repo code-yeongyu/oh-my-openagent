@@ -1,16 +1,19 @@
-import type { PluginInput } from "@opencode-ai/plugin"
-
-import type { MonitorConfig } from "../../config/schema/monitor"
 import { subagentSessions } from "../claude-code-session-state"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "../background-agent/process-cleanup"
 import { log } from "../../shared"
-import type { InternalPromptDispatchArgs, PromptAsyncInput, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
-import { MonitorBatcher, type SchedulerDeps, type TimerHandle } from "./batcher"
+import type { SchedulerDeps, TimerHandle } from "./batcher"
+import { MonitorBatcher } from "./batcher"
 import { createMonitorFilter } from "./filter"
-import { LineStream } from "./line-stream"
-import { MonitorOutputInjector } from "./output-injector"
-import { createMonitorPipeline } from "./pipeline"
-import { spawnMonitoredProcess, type MonitoredProcess } from "./process"
+import {
+  DEFAULT_MONITOR_CONFIG,
+  createEmptyCounters,
+  createMonitorId,
+  createRealScheduler,
+  type InternalMonitorState,
+  type MonitorManagerDeps,
+  type MonitorManagerOptions,
+} from "./manager-internals"
+import { createMonitorInjector, createMonitorState, observeProcessExit, spawnMonitorProcess } from "./monitor-state-factory"
 import { MonitorRingBuffer } from "./ring-buffer"
 import type {
   MonitorId,
@@ -20,93 +23,10 @@ import type {
   MonitorOutputResult,
   MonitorRecord,
   MonitorStartOpts,
-  OutputBatch,
+  MonitorStatus,
 } from "./types"
 
-type MonitorPipeline = ReturnType<typeof createMonitorPipeline>
-type MonitorPromptClient = PromptDispatchClient & InternalPromptDispatchArgs<PromptAsyncInput>["client"]
-
-interface MonitorInjector {
-  queueBatch(record: MonitorRecord, batch: OutputBatch): void
-  flushMonitor(monitorId: string): Promise<void>
-  requeueMonitor?(monitorId: string): void
-}
-
-interface InternalMonitorState {
-  record: MonitorRecord
-  process: MonitoredProcess
-  ring: MonitorRingBuffer
-  batcher: MonitorBatcher
-  pipeline: MonitorPipeline
-  injector: MonitorInjector
-  stopped: boolean
-}
-
-export interface MonitorManagerDeps {
-  randomId?: () => MonitorId
-  isBackgroundSession?: (sessionId: string) => boolean
-  spawnMonitoredProcess?: typeof spawnMonitoredProcess
-  createInjector?: (record: MonitorRecord, scheduleFlush: (monitorId: string, delayMs: number, operation: () => Promise<void>) => void) => MonitorInjector
-  scheduler?: SchedulerDeps
-  registerManagerForCleanup?: typeof registerManagerForCleanup
-  unregisterManagerForCleanup?: typeof unregisterManagerForCleanup
-  log?: typeof log
-}
-
-export interface MonitorManagerOptions {
-  pluginContext: Pick<PluginInput, "client" | "directory">
-  config?: Partial<MonitorConfig>
-  deps?: MonitorManagerDeps
-}
-
-const DEFAULT_MONITOR_CONFIG = {
-  max_monitors_per_session: 3,
-  max_runtime_ms: 1800000,
-  batch_max_lines: 50,
-  batch_max_bytes: 16384,
-  flush_interval_ms: 1000,
-  ring_max_lines: 1000,
-  line_max_bytes: 8192,
-  pattern_max_length: 512,
-}
-
-const MONITOR_OUTPUT_PENDING_RETRY_MS = 1_000
-const MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS = 5_000
-const MONITOR_OUTPUT_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
-const MONITOR_OUTPUT_PARENT_ACTIVITY_WINDOW_MS = 2_000
-const MONITOR_OUTPUT_POST_DISPATCH_HOLD_MS = 250
-
-function createEmptyCounters() {
-  return {
-    totalLines: 0,
-    matchedLines: 0,
-    unmatchedLines: 0,
-    droppedMatched: 0,
-    droppedUnmatched: 0,
-    bytesDropped: 0,
-    lastSequence: 0,
-  }
-}
-
-function createRealScheduler(): SchedulerDeps {
-  return {
-    setTimer(fn: () => void, delayMs: number): TimerHandle {
-      const timer = setTimeout(fn, delayMs)
-      timer.unref?.()
-      return timer
-    },
-    clearTimer(handle: TimerHandle): void {
-      clearTimeout(handle as ReturnType<typeof setTimeout>)
-    },
-    now(): number {
-      return Date.now()
-    },
-  }
-}
-
-function createMonitorId(): MonitorId {
-  return `mon_${crypto.randomUUID().slice(0, 8)}`
-}
+export type { MonitorManagerDeps, MonitorManagerOptions }
 
 export class MonitorManager implements MonitorManagerContract {
   private readonly monitors = new Map<MonitorId, InternalMonitorState>()
@@ -143,7 +63,7 @@ export class MonitorManager implements MonitorManagerContract {
       throw new Error(`monitor_start match_pattern rejected: ${filterResult.error ?? "invalid pattern"}`)
     }
 
-    const monitoredProcess = this.spawnProcess(opts.command)
+    const monitoredProcess = spawnMonitorProcess(this.options.deps, opts.command, this.config.max_runtime_ms)
     const ring = new MonitorRingBuffer({ ringMaxLines: this.config.ring_max_lines })
     const batcher = new MonitorBatcher({
       batchMaxLines: this.config.batch_max_lines,
@@ -163,50 +83,25 @@ export class MonitorManager implements MonitorManagerContract {
       counters: ring.getCounters(),
     }
 
-    const injector = this.createInjector(record)
-    const pipeline = createMonitorPipeline(
-      {
-        lineStream: {
-          stdout: new LineStream({ lineMaxBytes: this.config.line_max_bytes }),
-          stderr: new LineStream({ lineMaxBytes: this.config.line_max_bytes }),
-        },
-        filter: filterResult.filter,
-        ring,
-        batcher,
-      },
-      {
-        stdout: monitoredProcess.stdout,
-        stderr: monitoredProcess.stderr,
-        log: (error) => this.logger("[monitor] pipeline error", error),
-      },
-    )
-
-    const state: InternalMonitorState = {
+    const injector = createMonitorInjector(
+      this.options.deps,
+      this.options.pluginContext,
       record,
-      process: monitoredProcess,
+      (monitorId, delayMs, operation) => this.scheduleFlush(monitorId, delayMs, operation),
+    )
+    const state = createMonitorState({
+      record,
+      monitoredProcess,
+      filter: filterResult.filter,
       ring,
       batcher,
-      pipeline,
       injector,
-      stopped: false,
-    }
-
-    pipeline.onBatch((batch) => {
-      if (state.stopped || state.record.status === "stopped") {
-        return
-      }
-
-      const outputBatch: OutputBatch = {
-        ...batch,
-        monitorId: state.record.id,
-        stillRunning: state.record.status === "running" || state.record.status === "starting",
-      }
-      state.record.counters = state.ring.getCounters()
-      state.injector.queueBatch(state.record, outputBatch)
+      config: this.config,
+      logger: this.logger,
     })
 
     this.addMonitor(state)
-    this.observeProcessExit(state)
+    observeProcessExit(state, this.logger, (parentSessionId) => this.enforceTerminalRetention(parentSessionId))
     return { ...record }
   }
 
@@ -227,6 +122,7 @@ export class MonitorManager implements MonitorManagerContract {
     state.batcher.destroy()
     state.pipeline.stop()
     state.process.kill("SIGTERM")
+    this.enforceTerminalRetention(state.record.parentSessionId)
   }
 
   list(sessionId: string): MonitorRecord[] {
@@ -258,16 +154,14 @@ export class MonitorManager implements MonitorManagerContract {
   async stopSessionMonitors(sessionId: string): Promise<void> {
     const ids = [...this.monitorsByParentSession.get(sessionId) ?? []]
     await Promise.all(ids.map((id) => this.stop(id)))
+    for (const id of ids) {
+      this.removeMonitor(id)
+    }
   }
 
   handleEvent(event: MonitorManagerEvent): void {
     if (event.type === "session.idle") {
       this.flushSessionMonitors(event.sessionId)
-      return
-    }
-
-    if (event.type === "session.error") {
-      this.requeueSessionMonitors(event.sessionId)
       return
     }
 
@@ -297,40 +191,6 @@ export class MonitorManager implements MonitorManagerContract {
 
   private createId(): MonitorId {
     return this.options.deps?.randomId?.() ?? createMonitorId()
-  }
-
-  private spawnProcess(command: string): MonitoredProcess {
-    const spawn = this.options.deps?.spawnMonitoredProcess ?? spawnMonitoredProcess
-    return spawn({ command, maxRuntimeMs: this.config.max_runtime_ms }, {
-      setTimer(fn, ms) {
-        const timer = setTimeout(fn, ms)
-        timer.unref?.()
-        return timer
-      },
-      clearTimer(handle) {
-        clearTimeout(handle)
-      },
-    })
-  }
-
-  private createInjector(record: MonitorRecord): MonitorInjector {
-    const scheduleFlush = (monitorId: string, delayMs: number, operation: () => Promise<void>): void => {
-      this.scheduleFlush(monitorId, delayMs, operation)
-    }
-    if (this.options.deps?.createInjector) {
-      return this.options.deps.createInjector(record, scheduleFlush)
-    }
-
-    return new MonitorOutputInjector({
-      client: this.options.pluginContext.client as unknown as MonitorPromptClient,
-      directory: this.options.pluginContext.directory,
-      pendingRetryMs: MONITOR_OUTPUT_PENDING_RETRY_MS,
-      acceptedMessageSkewMs: MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS,
-      userMessageInProgressWindowMs: MONITOR_OUTPUT_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
-      parentSessionActivityInProgressWindowMs: MONITOR_OUTPUT_PARENT_ACTIVITY_WINDOW_MS,
-      postDispatchHoldMs: MONITOR_OUTPUT_POST_DISPATCH_HOLD_MS,
-      scheduleFlush,
-    })
   }
 
   private scheduleFlush(monitorId: string, delayMs: number, operation: () => Promise<void>): void {
@@ -379,46 +239,44 @@ export class MonitorManager implements MonitorManagerContract {
     return subagentSessions.has(sessionId)
   }
 
-  private observeProcessExit(state: InternalMonitorState): void {
-    void state.process.exited.then((result) => {
-      if (state.record.status === "stopped") {
-        return
-      }
+  private isTerminalStatus(status: MonitorStatus): boolean {
+    return status === "stopped" || status === "exited" || status === "failed"
+  }
 
-      state.record.status = "exited"
-      if (result.code !== null) {
-        state.record.exitCode = result.code
-      }
-      if (result.signal !== null) {
-        state.record.signal = result.signal
-      }
-      state.record.counters = state.ring.getCounters()
-      state.batcher.flushNow()
-      state.batcher.destroy()
-      state.pipeline.stop()
-      void state.injector.flushMonitor(state.record.id).catch((flushError) => {
-        this.logger("[monitor] Failed to flush monitor output after process exit", {
-          monitorId: state.record.id,
-          error: flushError,
-        })
-      })
-    }).catch((error) => {
-      if (state.record.status === "stopped") {
-        return
-      }
+  private removeMonitor(id: MonitorId): void {
+    this.clearScheduledFlush(id)
+    const state = this.monitors.get(id)
+    this.monitors.delete(id)
+    if (!state) {
+      return
+    }
+    const ids = this.monitorsByParentSession.get(state.record.parentSessionId)
+    if (!ids) {
+      return
+    }
+    ids.delete(id)
+    if (ids.size === 0) {
+      this.monitorsByParentSession.delete(state.record.parentSessionId)
+    }
+  }
 
-      state.record.status = "failed"
-      state.batcher.flushNow()
-      state.batcher.destroy()
-      state.pipeline.stop()
-      void state.injector.flushMonitor(state.record.id).catch((flushError) => {
-        this.logger("[monitor] Failed to flush monitor output after process failure", {
-          monitorId: state.record.id,
-          error: flushError,
-        })
-      })
-      this.logger("[monitor] monitored process failed", { monitorId: state.record.id, error })
-    })
+  private enforceTerminalRetention(sessionId: string): void {
+    const ids = this.monitorsByParentSession.get(sessionId)
+    if (!ids) {
+      return
+    }
+    const terminalIds: MonitorId[] = []
+    for (const [id, state] of this.monitors) {
+      if (ids.has(id) && this.isTerminalStatus(state.record.status)) {
+        terminalIds.push(id)
+      }
+    }
+    while (terminalIds.length > this.config.max_monitors_per_session) {
+      const oldest = terminalIds.shift()
+      if (oldest) {
+        this.removeMonitor(oldest)
+      }
+    }
   }
 
   private flushSessionMonitors(sessionId: string): void {
@@ -432,18 +290,6 @@ export class MonitorManager implements MonitorManagerContract {
       void state.injector.flushMonitor(id).catch((error) => {
         this.logger("[monitor] Failed to flush monitor output on session idle", { sessionId, monitorId: id, error })
       })
-    }
-  }
-
-  private requeueSessionMonitors(sessionId: string): void {
-    const ids = [...this.monitorsByParentSession.get(sessionId) ?? []]
-    for (const id of ids) {
-      const state = this.monitors.get(id)
-      if (!state || state.record.status === "stopped") {
-        continue
-      }
-
-      state.injector.requeueMonitor?.(id)
     }
   }
 }

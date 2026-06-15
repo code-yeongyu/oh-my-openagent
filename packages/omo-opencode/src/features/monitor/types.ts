@@ -74,7 +74,6 @@ export interface MonitorOutputResult {
 
 export type MonitorManagerEvent =
   | { type: "session.idle"; sessionId: string }
-  | { type: "session.error"; sessionId: string }
   | { type: "session.deleted"; sessionId: string }
 
 export interface MonitorStartArgs {

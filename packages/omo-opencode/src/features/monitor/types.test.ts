@@ -117,11 +117,9 @@ describe("#given MonitorManagerEvent", () => {
     describe("#then", () => {
       it("compiles without error", () => {
         const idleEvent = { type: "session.idle", sessionId: "ses_test" } satisfies MonitorManagerEvent
-        const errorEvent = { type: "session.error", sessionId: "ses_test" } satisfies MonitorManagerEvent
         const deletedEvent = { type: "session.deleted", sessionId: "ses_test" } satisfies MonitorManagerEvent
 
         void idleEvent
-        void errorEvent
         void deletedEvent
       })
     })
