@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { log } from "./logger"
 import * as dataPath from "./data-path"
 import { createJsonFileCacheStore } from "./json-file-cache-store"
@@ -43,9 +44,7 @@ export interface ProviderModelsCache {
 	updatedAt: string
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null
-}
+
 
 function mergeConnectedProviders(
 	previous: string[] | null | undefined,

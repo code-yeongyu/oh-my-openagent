@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 
-import type { ToolExecutionResult } from "@code-yeongyu/lsp-tools-mcp/dist/tools.js";
+import type { ToolExecutionResult } from "@oh-my-opencode/lsp-core/tools";
 
 import { ensureDaemonRunning } from "./ensure-daemon.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
@@ -128,7 +128,9 @@ function sendToolCall(
 		});
 		socket.on("data", (chunk) => decoder.push(chunk));
 		socket.once("error", (error) => finish(() => reject(new DaemonRequestError(error.message, requestWritten))));
-		socket.once("close", () => finish(() => reject(new DaemonRequestError("daemon connection closed", requestWritten))));
+		socket.once("close", () =>
+			finish(() => reject(new DaemonRequestError("daemon connection closed", requestWritten))),
+		);
 	});
 }
 

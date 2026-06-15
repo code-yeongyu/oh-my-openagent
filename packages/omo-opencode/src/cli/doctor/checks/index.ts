@@ -1,5 +1,5 @@
-import type { CheckDefinition } from "../types"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
+import type { CheckDefinition } from "../framework/types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import { checkSystem, gatherSystemInfo } from "./system"
 import { checkConfig } from "./config"
 import { checkTools, gatherToolsSummary } from "./tools"

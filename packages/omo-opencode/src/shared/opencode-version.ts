@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { execSync } from "child_process"
 import { existsSync, readFileSync, realpathSync } from "fs"
 import { dirname, join } from "path"
@@ -77,9 +78,7 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   return 0
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function parsePackageVersion(content: string): string | null {
   try {

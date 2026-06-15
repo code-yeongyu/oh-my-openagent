@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises"
 import { dirname, join, resolve, sep } from "node:path"
+import { isPlainRecord } from "@oh-my-opencode/utils"
 
 export async function validateLazycodexPluginBundle(pluginRoot: string): Promise<void> {
   const issues: string[] = []
@@ -22,12 +23,18 @@ async function validatePluginMcpManifests(pluginRoot: string, issues: string[]):
 
 async function validatePluginMcpManifest(pluginRoot: string, manifestPath: string, issues: string[]): Promise<void> {
   const parsed: unknown = JSON.parse(await readFile(manifestPath, "utf8"))
-  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return
+  if (!isPlainRecord(parsed)) {
+    throw new Error("invalid MCP manifest: expected object")
+  }
+  if (parsed.mcpServers === undefined) return
+  if (!isPlainRecord(parsed.mcpServers)) {
+    throw new Error("invalid MCP manifest: mcpServers must be object")
+  }
 
   const manifestRoot = dirname(manifestPath)
   const isRootManifest = resolve(manifestRoot) === resolve(pluginRoot)
   for (const [serverName, server] of Object.entries(parsed.mcpServers)) {
-    if (!isRecord(server) || !Array.isArray(server.args)) continue
+    if (!isPlainRecord(server) || !Array.isArray(server.args)) continue
     for (const arg of server.args) {
       if (typeof arg !== "string" || !isPluginRuntimePathArg(arg)) continue
       await collectBundleFileIssue(pluginRoot, manifestRoot, arg, `missing MCP runtime path for ${serverName}`, issues, {
@@ -88,7 +95,7 @@ function collectHookCommands(value: unknown, commands: string[]): void {
     return
   }
 
-  if (!isRecord(value)) return
+  if (!isPlainRecord(value)) return
   if (value.type === "command") {
     if (typeof value.command === "string") commands.push(value.command)
     if (typeof value.commandWindows === "string") commands.push(value.commandWindows)
@@ -159,8 +166,4 @@ async function fileSize(path: string): Promise<number | undefined> {
     if (error instanceof Error) return undefined
     return undefined
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

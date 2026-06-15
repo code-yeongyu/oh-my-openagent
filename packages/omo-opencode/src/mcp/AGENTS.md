@@ -19,6 +19,7 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 ## VENDORED LSP ARCHITECTURE
 
 - The local `lsp` MCP is vendored at `packages/lsp-tools-mcp/`.
+- `packages/lsp-tools-mcp/` consumes extracted `packages/lsp-core/` + `packages/mcp-stdio-core/`; this directory only builds the OpenCode MCP config.
 - Upstream project: https://github.com/code-yeongyu/lsp-tools-mcp
 - OMO resolves the CLI path dynamically in `src/mcp/lsp.ts` so both `src/` and `dist/` runtime layouts work.
 - `lsp` and `ast_grep` are registered whenever they are not listed in `disabled_mcps`, even if their CLI artifacts have not been built yet. Source checkouts fall back to the Bun source CLI; packaged builds prefer the Node dist CLI.

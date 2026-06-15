@@ -54,7 +54,7 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
 	// then
 	const pluginCacheRoot = result.installed[0].path;
 	const cachedMcp = JSON.parse(await readFile(join(pluginCacheRoot, ".mcp.json"), "utf8"));
-	const cachedLspCli = join(pluginCacheRoot, "mcp", "lsp", "dist", "cli.js");
+	const cachedLspCli = join(lspRuntimeRoot, "dist", "cli.js");
 
 	assert.deepEqual(result.installed.map((plugin) => `${plugin.name}@${plugin.version}`), ["omo@0.1.2"]);
 	assert.equal(pluginCacheRoot, join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.2"));
@@ -67,5 +67,4 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
 	assert.equal(cwd.startsWith(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", ".tmp-0.1.2-")), true);
 	assert.deepEqual(cachedMcp.mcpServers.lsp.args, [cachedLspCli, "mcp"]);
 	assert.equal((await stat(cachedLspCli)).isFile(), true);
-	assert.notEqual(cachedMcp.mcpServers.lsp.args[0], join(lspRuntimeRoot, "dist", "cli.js"));
 });

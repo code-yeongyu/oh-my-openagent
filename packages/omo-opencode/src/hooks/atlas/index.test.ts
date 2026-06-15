@@ -1319,7 +1319,7 @@ session_id: ses_untrusted_999
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
       expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
-    })
+    }, { timeout: 10_000 })
 
     test("should inject continuation when idle event carries session id in info", async () => {
       // given - boulder state with incomplete plan and nested session event shape

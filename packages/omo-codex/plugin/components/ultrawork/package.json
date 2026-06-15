@@ -25,7 +25,7 @@
 		"omo-ultrawork": "./dist/cli.js"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "node scripts/sync-directive.mjs && tsc -p tsconfig.build.json",
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
@@ -44,6 +44,7 @@
 	],
 	"devDependencies": {
 		"@biomejs/biome": "2.4.16",
+		"@oh-my-opencode/prompts-core": "file:../../../../prompts-core",
 		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"

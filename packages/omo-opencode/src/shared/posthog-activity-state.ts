@@ -1,85 +1,45 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import {
+  getDailyActiveCaptureState,
+  getTelemetryActivityStateFilePath,
+  resolveTelemetryStateDir,
+} from "@oh-my-opencode/telemetry-core"
+import type { TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
 
-import { getDataDir } from "./data-path"
 import { log } from "./logger"
 import { CACHE_DIR_NAME } from "./plugin-identity"
-import { writeFileAtomically } from "./write-file-atomically"
-
-type PostHogActivityState = {
-  lastActiveDayUTC?: string
-}
 
 type PostHogActivityCaptureState = {
   dayUTC: string
   captureDaily: boolean
 }
 
-const POSTHOG_ACTIVITY_STATE_FILE = "posthog-activity.json"
-
-function getPostHogActivityStateFilePath(): string {
-  return join(getDataDir(), CACHE_DIR_NAME, POSTHOG_ACTIVITY_STATE_FILE)
+function getPostHogActivityStateDir(): string {
+  return resolveTelemetryStateDir({ cacheDirName: CACHE_DIR_NAME })
 }
 
-function getUtcDayString(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
+function logActivityStateDiagnostic(input: TelemetryDiagnosticInput): void {
+  const stateFilePath = getTelemetryActivityStateFilePath(getPostHogActivityStateDir())
 
-function isPostHogActivityState(value: unknown): value is PostHogActivityState {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
-function readPostHogActivityState(): PostHogActivityState {
-  const stateFilePath = getPostHogActivityStateFilePath()
-  if (!existsSync(stateFilePath)) {
-    return {}
-  }
-
-  try {
-    const content = readFileSync(stateFilePath, "utf-8")
-    const parsed: unknown = JSON.parse(content)
-    if (!isPostHogActivityState(parsed)) {
-      return {}
-    }
-    return parsed
-  } catch (error) {
+  if (input.event === "telemetry_activity_state_read_failed") {
     log("[posthog-activity-state] Failed to read activity state", {
-      error: String(error),
+      error: String(input.error),
       stateFilePath,
     })
-    return {}
+    return
   }
-}
 
-function writePostHogActivityState(nextState: PostHogActivityState): void {
-  const stateFilePath = getPostHogActivityStateFilePath()
-
-  try {
-    mkdirSync(join(getDataDir(), CACHE_DIR_NAME), { recursive: true })
-    writeFileAtomically(stateFilePath, `${JSON.stringify(nextState, null, 2)}\n`)
-  } catch (error) {
+  if (input.event === "telemetry_activity_state_write_failed") {
     log("[posthog-activity-state] Failed to write activity state", {
-      error: String(error),
+      error: String(input.error),
       stateFilePath,
     })
   }
 }
 
 export function getPostHogActivityCaptureState(now: Date = new Date()): PostHogActivityCaptureState {
-  const state = readPostHogActivityState()
-  const dayUTC = getUtcDayString(now)
-
-  const captureDaily = state.lastActiveDayUTC !== dayUTC
-
-  if (captureDaily) {
-    writePostHogActivityState({
-      ...state,
-      lastActiveDayUTC: dayUTC,
-    })
-  }
-
-  return {
-    dayUTC,
-    captureDaily,
-  }
+  return getDailyActiveCaptureState({
+    diagnostics: logActivityStateDiagnostic,
+    now,
+    stateDir: getPostHogActivityStateDir(),
+  })
 }

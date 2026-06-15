@@ -25,7 +25,7 @@ describe("createRuntimeTmuxConfig", () => {
 
       try {
         const build = await Bun.build({
-          entrypoints: [join(import.meta.dir, "create-runtime-tmux-config.ts")],
+          entrypoints: [join(import.meta.dir, "interactive-bash-availability.ts")],
           outdir,
           target: "bun",
           format: "esm",
@@ -41,7 +41,7 @@ console.log(String(mod.isInteractiveBashEnabled()));`,
         ], {
           env: {
             ...process.env,
-            MODULE_PATH: join(outdir, "create-runtime-tmux-config.js"),
+            MODULE_PATH: join(outdir, "interactive-bash-availability.js"),
           },
           encoding: "utf8",
         })

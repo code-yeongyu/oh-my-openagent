@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY } from "@oh-my-opencode/telemetry-core"
 
 type CapturedPostHogMessage = {
   readonly distinctId: string
@@ -218,16 +219,20 @@ describe("omo-codex posthog telemetry", () => {
     expect(capturedMessages).toHaveLength(0)
   })
 
-  it("uses API key exactly matching omodex source bytes", async () => {
+  it("uses API key exactly matching telemetry-core source bytes", async () => {
     // given
     const posthog = await importPostHogModule()
-    const omodexPosthog = readFileSync(join(import.meta.dir, "../../../../packages/omo-opencode/src/shared/posthog.ts"), "utf-8")
-    const match = omodexPosthog.match(/DEFAULT_POSTHOG_API_KEY = "(phc_[a-zA-Z0-9]+)"/)
+    const telemetryCoreConstants = readFileSync(
+      join(import.meta.dir, "../../../../packages/telemetry-core/src/constants.ts"),
+      "utf-8",
+    )
+    const match = telemetryCoreConstants.match(/DEFAULT_POSTHOG_API_KEY = "(phc_[a-zA-Z0-9]+)"/)
 
     // when
     const sourceKey = match?.[1]
 
     // then
-    expect(sourceKey).toBe(posthog.DEFAULT_POSTHOG_API_KEY)
+    expect(sourceKey).toBe(TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY)
+    expect(posthog.DEFAULT_POSTHOG_API_KEY).toBe(TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY)
   })
 })

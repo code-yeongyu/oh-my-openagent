@@ -18,6 +18,10 @@ function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function toPosixPath(value) {
+	return value.replaceAll("\\", "/");
+}
+
 test("#given default CODEX_HOME #when resolving local installer bin dir without override #then preserves user local bin precedence", () => {
 	const homeDir = join(tmpdir(), "omo-codex-home-default");
 	const codexHome = join(homeDir, ".codex");
@@ -60,7 +64,10 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 	assert.equal(result.installed.length, 1);
 	const wrapper = await readFile(join(codexHome, "bin", "omo"), "utf8");
 	assert.match(wrapper, /OMO_GENERATED_RUNTIME_WRAPPER/);
-	assert.match(wrapper, new RegExp(escapeRegExp(escapePosixDoubleQuoted(join(repoRoot, "dist", "cli", "index.js")))));
+	assert.match(
+		wrapper,
+		new RegExp(escapeRegExp(escapePosixDoubleQuoted(toPosixPath(join(repoRoot, "dist", "cli", "index.js"))))),
+	);
 	assert.match(wrapper, /CODEX_HOME/);
 	assert.match(wrapper, /OMO_SPARKSHELL_APP_SERVER_SOCKET/);
 	assert.match(wrapper, /omo-ulw-loop/);

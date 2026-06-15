@@ -19,6 +19,8 @@
 	},
 	"dependencies": {
 		"@oh-my-opencode/ast-grep-core": "workspace:*",
+		"@oh-my-opencode/mcp-stdio-core": "workspace:*",
+		"@oh-my-opencode/utils": "workspace:*",
 		"@ast-grep/cli": "^0.42.2"
 	},
 	"devDependencies": {

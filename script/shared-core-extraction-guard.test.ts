@@ -5,21 +5,39 @@ import { describe, expect, test } from "bun:test"
 const corePackages = [
   "packages/utils",
   "packages/model-core",
+  "packages/delegate-core",
   "packages/prompts-core",
   "packages/rules-engine",
   "packages/agents-md-core",
   "packages/ast-grep-core",
+  "packages/lsp-core",
+  "packages/mcp-stdio-core",
+  "packages/mcp-client-core",
   "packages/comment-checker-core",
   "packages/hashline-core",
+  "packages/tmux-core",
+  "packages/team-core",
+  "packages/openclaw-core",
   "packages/boulder-state",
+  "packages/telemetry-core",
+  "packages/claude-code-compat-core",
+  "packages/skills-loader-core",
 ] as const
 
-const forbiddenSourcePatterns = [
-  /@opencode-ai\//,
-  /packages\/omo-codex\/plugin/,
-  /plugin\/components/,
-  /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
-  /\bsession\.prompt(?:Async)?\s*\(/,
+type ForbiddenSourcePattern = {
+  readonly pattern: RegExp
+  readonly allowPackagePaths?: readonly string[]
+}
+
+const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
+  { pattern: /@opencode-ai\// },
+  { pattern: /packages\/omo-codex\/plugin/ },
+  { pattern: /plugin\/components/ },
+  {
+    pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
+    allowPackagePaths: ["packages/claude-code-compat-core"],
+  },
+  { pattern: /\bsession\.prompt(?:Async)?\s*\(/ },
 ] as const
 
 const requiredPlanKeys = ["F", "1", "2", "3", "4", "5", "6", "7"] as const
@@ -43,6 +61,10 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
   return files
 }
 
+function toPosixPath(filePath: string): string {
+  return filePath.replaceAll("\\", "/")
+}
+
 describe("shared core extraction guardrails", () => {
   test("#given core package production sources #when scanned #then they stay harness-neutral", async () => {
     // given
@@ -58,9 +80,13 @@ describe("shared core extraction guardrails", () => {
     const offenders: string[] = []
     for (const file of files) {
       const source = await readFile(file, "utf8")
-      for (const pattern of forbiddenSourcePatterns) {
-        if (pattern.test(source)) {
-          offenders.push(`${relative(process.cwd(), file)} matches ${pattern}`)
+      const relativeFilePath = toPosixPath(relative(process.cwd(), file))
+      for (const forbidden of forbiddenSourcePatterns) {
+        const allowedByPackage = forbidden.allowPackagePaths?.some((packagePath) =>
+          relativeFilePath.startsWith(`${packagePath}/`),
+        ) ?? false
+        if (!allowedByPackage && forbidden.pattern.test(source)) {
+          offenders.push(`${relativeFilePath} matches ${forbidden.pattern}`)
         }
       }
     }
@@ -78,7 +104,7 @@ describe("shared core extraction guardrails", () => {
     for (const file of packageJsonFiles) {
       const manifest = await readFile(file, "utf8")
       if (manifest.includes("@opencode-ai/") || manifest.includes("@oh-my-opencode/omo-codex")) {
-        offenders.push(relative(process.cwd(), file))
+        offenders.push(toPosixPath(relative(process.cwd(), file)))
       }
     }
 

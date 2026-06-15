@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { configFromEnvironment } from "../src/config.js";
-import { SOURCE_PRIORITY } from "../src/rules/constants.js";
-import { createEngine, defaultConfig, type EngineDeps } from "../src/rules/engine.js";
-import { resolvePluginRulesRoot } from "../src/rules/plugin-root.js";
-import type { RuleCandidate } from "../src/rules/types.js";
+import { SOURCE_PRIORITY } from "@oh-my-opencode/rules-engine/engine";
+import { createEngine, defaultConfig, type EngineDeps } from "@oh-my-opencode/rules-engine/engine";
+import { resolvePluginRulesRoot } from "@oh-my-opencode/rules-engine/engine";
+import type { RuleCandidate } from "@oh-my-opencode/rules-engine/engine";
 
 const projectRoot = "/tmp/codex-rules-bundled-priority";
 const bundledPath = join(projectRoot, "bundled-rules", "hephaestus.md");

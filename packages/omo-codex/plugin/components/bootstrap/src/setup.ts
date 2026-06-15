@@ -4,21 +4,20 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
-// inlines the install modules into dist/cli.js so PLUGIN_ROOT ships nothing
-// beyond the bundle.
+// inlines the installer source modules into dist/cli.js so PLUGIN_ROOT ships
+// nothing beyond the bundle.
 import {
 	capturePreservedAgentReasoning,
 	capturePreservedAgentServiceTier,
 	linkCachedPluginAgents,
-} from "../../../../scripts/install/agents.mjs";
-import { resolveCodexInstallerBinDir } from "../../../../scripts/install/bin-dir.mjs";
-import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../scripts/install/bin-links.mjs";
-import { updateCodexConfig } from "../../../../scripts/install/config.mjs";
-import type { CodexAgentConfig } from "../../../../scripts/install/config.mjs";
-import { stampGitBashMcpEnv } from "../../../../scripts/install/git-bash-mcp-env.mjs";
-import { prepareGitBashForInstall } from "../../../../scripts/install/git-bash.mjs";
-import type { GitBashResolution } from "../../../../scripts/install/git-bash.mjs";
-import { trustedHookStatesForPlugin } from "../../../../scripts/install/hook-trust.mjs";
+} from "../../../../src/install/link-cached-plugin-agents.ts";
+import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../src/install/codex-cache-bins.ts";
+import { updateCodexConfig } from "../../../../src/install/codex-config-toml.ts";
+import { stampGitBashMcpEnv } from "../../../../src/install/codex-git-bash-mcp-env.ts";
+import { trustedHookStatesForPlugin } from "../../../../src/install/codex-hook-trust.ts";
+import { resolveCodexInstallerBinDir } from "../../../../src/install/codex-installer-bin-dir.ts";
+import { prepareGitBashForInstall } from "../../../../src/install/git-bash.ts";
+import type { CodexAgentConfig, GitBashResolution } from "../../../../src/install/types.ts";
 import { appendBootstrapLog, BOOTSTRAP_DOCTOR_HINT } from "./worker.ts";
 import type { BootstrapDegradedEntry, BootstrapStepOutcome } from "./worker.ts";
 
@@ -166,6 +165,7 @@ async function updateConfigStep(
 			configPath,
 			gitBashEnabled: inputs.gitBashEnabled,
 			marketplaceName: SETUP_MARKETPLACE_NAME,
+			marketplaceSource: { sourceType: "local", source: options.pluginRoot },
 			platform: options.platform,
 			pluginNames: [SETUP_PLUGIN_NAME],
 			preserveMarketplaceSource: true,

@@ -17,6 +17,10 @@ function __repoRootFrom(start: string): string {
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
 const WORKSPACE_ROOT = __repoRootFrom(import.meta.dir)
 const PROMPT_GATE_FILE = path.join(SOURCE_ROOT, "shared", "prompt-async-gate.ts")
+const PROMPT_GATE_FILES = new Set([
+  PROMPT_GATE_FILE,
+  path.join(WORKSPACE_ROOT, "packages", "utils", "src", "prompt-async-gate.ts"),
+])
 const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   [
     path.join(SOURCE_ROOT, "plugin", "event.ts"),
@@ -375,7 +379,7 @@ await dispatchInternalPrompt(options)
 
     // when
     for (const filePath of files) {
-      if (filePath === PROMPT_GATE_FILE || RAW_PROMPT_ALLOWLIST.has(filePath)) {
+      if (PROMPT_GATE_FILES.has(filePath) || RAW_PROMPT_ALLOWLIST.has(filePath)) {
         continue
       }
 

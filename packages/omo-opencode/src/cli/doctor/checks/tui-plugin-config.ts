@@ -9,8 +9,8 @@ import {
   getOpenCodeConfigPaths,
   parseJsonc,
 } from "../../../shared"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue } from "../types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, DoctorIssue } from "../framework/types"
 
 const TUI_SUBPATH = "tui"
 const TUI_EXPORT_SUBPATH = `./${TUI_SUBPATH}`

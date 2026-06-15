@@ -287,4 +287,21 @@ describe("startCallbackServer", () => {
       await close(secondServer)
     }
   }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+
+  it("#given default callback port is occupied #when starting callback server #then it binds a fallback port", async () => {
+    const occupiedDefaultPort = await startCallbackServer(19877)
+
+    try {
+      const fallbackServer = await startCallbackServer()
+      try {
+        expect(fallbackServer.port).toBeGreaterThan(19877)
+        const response = await request(`http://${HOSTNAME}:${fallbackServer.port}/other`)
+        expect(response.status).toBe(404)
+      } finally {
+        await close(fallbackServer)
+      }
+    } finally {
+      await close(occupiedDefaultPort)
+    }
+  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
 })

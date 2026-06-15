@@ -1,4 +1,17 @@
 import type { Readable, Writable } from "node:stream";
+import {
+  errorResponse,
+  isPlainRecord,
+  jsonRpcId,
+  messageFromError,
+  successResponse,
+  type JsonRpcError,
+  type JsonRpcId,
+  type JsonRpcResponse,
+  type JsonRpcResult,
+  type McpToolDescriptor,
+  type TextContent,
+} from "@oh-my-opencode/mcp-stdio-core";
 import { CLI_LANGUAGES } from "./constants";
 import { runJsonRpcStdioServer, type McpStdioServerOptions } from "./mcp-stdio-server";
 import { getPatternHint } from "./pattern-hints";
@@ -8,42 +21,7 @@ import { AST_GREP_REPLACE_DESCRIPTION, AST_GREP_SEARCH_DESCRIPTION, AST_GREP_SEA
 import type { CliLanguage, SgResult } from "./types";
 import { normalizeWorkspaceDirectory, resolveWorkspacePaths } from "./workspace-paths";
 
-export type JsonRpcId = string | number | null;
-
-export interface TextContent {
-  readonly type: "text";
-  readonly text: string;
-}
-
-export interface McpToolDescriptor {
-  readonly name: string;
-  readonly title: string;
-  readonly description: string;
-  readonly inputSchema: unknown;
-}
-
-export interface JsonRpcError {
-  readonly code: number;
-  readonly message: string;
-  readonly data?: unknown;
-}
-
-export interface JsonRpcResult {
-  readonly capabilities?: Record<string, unknown>;
-  readonly serverInfo?: Record<string, unknown>;
-  readonly protocolVersion?: string;
-  readonly tools?: readonly McpToolDescriptor[];
-  readonly content?: readonly TextContent[];
-  readonly isError?: boolean;
-  readonly [key: string]: unknown;
-}
-
-export interface JsonRpcResponse {
-  readonly jsonrpc: "2.0";
-  readonly id: JsonRpcId;
-  readonly result?: JsonRpcResult;
-  readonly error?: JsonRpcError;
-}
+export type { JsonRpcError, JsonRpcId, JsonRpcResponse, JsonRpcResult, McpToolDescriptor, TextContent };
 
 export interface AstGrepMcpOptions {
   readonly workspaceDirectory?: string;
@@ -100,20 +78,20 @@ const AST_GREP_MCP_TOOLS = [
 ] as const satisfies readonly McpToolDescriptor[];
 
 export async function handleAstGrepMcpRequest(input: unknown, options: AstGrepMcpOptions = {}): Promise<JsonRpcResponse | undefined> {
-  if (!isRecord(input)) return errorResponse(null, -32600, "Invalid Request");
-  const id = jsonRpcId(input.id);
-  if (input.method === "notifications/initialized") return undefined;
-  if (input.method === "ping") return successResponse(id, {});
-  if (input.method === "initialize") {
+  if (!isPlainRecord(input)) return errorResponse(null, -32600, "Invalid Request");
+  const id = jsonRpcId(input["id"]);
+  if (input["method"] === "notifications/initialized") return undefined;
+  if (input["method"] === "ping") return successResponse(id, {});
+  if (input["method"] === "initialize") {
     return successResponse(id, {
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-      protocolVersion: requestedProtocolVersion(input.params),
+      protocolVersion: requestedProtocolVersion(input["params"]),
     });
   }
-  if (input.method === "tools/list") return successResponse(id, { tools: enabledTools(options) });
-  if (input.method === "tools/call") return handleToolCall(id, input.params, options);
-  return errorResponse(id, -32601, `Method not found: ${String(input.method)}`);
+  if (input["method"] === "tools/list") return successResponse(id, { tools: enabledTools(options) });
+  if (input["method"] === "tools/call") return handleToolCall(id, input["params"], options);
+  return errorResponse(id, -32601, `Method not found: ${String(input["method"])}`);
 }
 
 export async function runMcpStdioServer(
@@ -126,9 +104,9 @@ export async function runMcpStdioServer(
 }
 
 async function handleToolCall(id: JsonRpcId, params: unknown, options: AstGrepMcpOptions): Promise<JsonRpcResponse> {
-  if (!isRecord(params) || typeof params.name !== "string") return errorResponse(id, -32602, "tools/call requires params.name");
+  if (!isPlainRecord(params) || typeof params["name"] !== "string") return errorResponse(id, -32602, "tools/call requires params.name");
   try {
-    const result = await executeAstGrepTool(params.name, params.arguments, options);
+    const result = await executeAstGrepTool(params["name"], params["arguments"], options);
     return successResponse(id, { content: result.content, isError: result.isError ?? false });
   } catch (error) {
     return successResponse(id, { content: [{ type: "text", text: messageFromError(error) }], isError: true });
@@ -187,7 +165,7 @@ function parseReplaceArgs(args: unknown, workspaceDirectory: string): { readonly
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) throw new Error("Tool arguments must be an object");
+  if (!isPlainRecord(value)) throw new Error("Tool arguments must be an object");
   return value;
 }
 
@@ -214,7 +192,7 @@ function optionalStringArray(input: Record<string, unknown>, key: string): strin
   return value;
 }
 
-function enabledTools(options: AstGrepMcpOptions): readonly McpToolDescriptor[] {
+function enabledTools(options: AstGrepMcpOptions): McpToolDescriptor[] {
   const disabled = disabledToolNames(options);
   return AST_GREP_MCP_TOOLS.filter((tool) => !disabled.has(tool.name));
 }
@@ -239,27 +217,7 @@ function optionalBoolean(input: Record<string, unknown>, key: string): boolean |
   return value;
 }
 
-function successResponse(id: JsonRpcId, result: JsonRpcResult): JsonRpcResponse {
-  return { jsonrpc: "2.0", id, result };
-}
-
-function errorResponse(id: JsonRpcId, code: number, message: string, data?: unknown): JsonRpcResponse {
-  return { jsonrpc: "2.0", id, error: data === undefined ? { code, message } : { code, message, data } };
-}
-
 function requestedProtocolVersion(params: unknown): string {
-  if (!isRecord(params) || typeof params.protocolVersion !== "string") return "2024-11-05";
-  return params.protocolVersion;
-}
-
-function jsonRpcId(value: unknown): JsonRpcId {
-  return typeof value === "string" || typeof value === "number" || value === null ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function messageFromError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (!isPlainRecord(params) || typeof params["protocolVersion"] !== "string") return "2024-11-05";
+  return params["protocolVersion"];
 }
