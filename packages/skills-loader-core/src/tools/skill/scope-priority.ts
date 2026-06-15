@@ -3,6 +3,7 @@ export const SCOPE_PRIORITY: Record<string, number> = {
   user: 3,
   opencode: 2,
   "opencode-project": 2,
+  shared: 1,
   plugin: 1,
   config: 1,
   builtin: 1,

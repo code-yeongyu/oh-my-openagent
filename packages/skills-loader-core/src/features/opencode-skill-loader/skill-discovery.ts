@@ -4,6 +4,15 @@ import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
+const SHARED_SKILL_PREFIX = "shared/"
+
+function isDisabledSkillAlias(skill: LoadedSkill, disabledSkills: ReadonlySet<string>): boolean {
+	if (disabledSkills.has(skill.name)) {
+		return true
+	}
+
+	return skill.scope === "shared" && skill.name.startsWith(SHARED_SKILL_PREFIX) && disabledSkills.has(skill.name.slice(SHARED_SKILL_PREFIX.length))
+}
 
 export function clearSkillCache(): void {
 	cachedSkillsByProvider.clear()
@@ -68,7 +77,10 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 
 	// Filter discovered skills by disabledSkills (builtin skills are already filtered by createBuiltinSkills)
 	if (hasDisabledSkills) {
-		allSkills = allSkills.filter((skill) => !options!.disabledSkills!.has(skill.name))
+		const disabledSkills = options?.disabledSkills
+		if (disabledSkills) {
+			allSkills = allSkills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
+		}
 	} else {
 		cachedSkillsByProvider.set(cacheKey, allSkills)
 	}

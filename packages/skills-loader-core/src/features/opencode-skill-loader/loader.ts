@@ -70,6 +70,20 @@ export interface DiscoverSkillsOptions {
   directory?: string
 }
 
+function createSharedCanonicalAliases(skills: LoadedSkill[]): LoadedSkill[] {
+  return skills.map((skill) => {
+    const name = `shared/${skill.name}`
+    return {
+      ...skill,
+      name,
+      definition: {
+        ...skill.definition,
+        name,
+      },
+    }
+  })
+}
+
 export async function discoverAllSkills(directory?: string): Promise<LoadedSkill[]> {
   const [opencodeProjectSkills, opencodeGlobalSkills, sharedSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
     await Promise.all([
@@ -82,8 +96,8 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
       discoverGlobalAgentsSkills(),
     ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents) > shared
   return deduplicateSkillsByName([
+    ...createSharedCanonicalAliases(sharedSkills),
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
     ...projectSkills,
@@ -104,8 +118,12 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
   ])
 
   if (!includeClaudeCodePaths) {
-    // Priority: opencode-project > opencode
-    return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills, ...sharedSkills])
+    return deduplicateSkillsByName([
+      ...createSharedCanonicalAliases(sharedSkills),
+      ...opencodeProjectSkills,
+      ...opencodeGlobalSkills,
+      ...sharedSkills,
+    ])
   }
 
   const [projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] = await Promise.all([
@@ -115,8 +133,8 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverGlobalAgentsSkills(),
   ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents) > shared
   return deduplicateSkillsByName([
+    ...createSharedCanonicalAliases(sharedSkills),
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
     ...projectSkills,
@@ -166,7 +184,7 @@ export async function discoverOpencodeProjectSkills(directory?: string): Promise
 }
 
 export async function discoverSharedSkills(): Promise<LoadedSkill[]> {
-  return loadSkillsFromDir({ skillsDir: sharedSkillsRootPath(), scope: "opencode" })
+  return loadSkillsFromDir({ skillsDir: sharedSkillsRootPath(), scope: "shared" })
 }
 
 export async function discoverProjectAgentsSkills(directory?: string): Promise<LoadedSkill[]> {
