@@ -145,7 +145,7 @@ describe("resolveSkillContentAsync", () => {
 		if (!skill.path || !skill.resolvedPath) {
 			throw new Error("ulw-plan skill is not path-backed")
 		}
-		expect(skill.path.endsWith("packages/shared-skills/skills/ulw-plan/SKILL.md")).toBe(true)
+		expect(skill.path.replaceAll("\\", "/").endsWith("packages/shared-skills/skills/ulw-plan/SKILL.md")).toBe(true)
 		for (const relativePath of requiredResourcePaths) {
 			expect(existsSync(join(skill.resolvedPath, relativePath))).toBe(true)
 		}
