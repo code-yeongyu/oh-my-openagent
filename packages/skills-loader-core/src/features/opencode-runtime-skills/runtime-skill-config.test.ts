@@ -7,15 +7,20 @@ import {
 } from "./runtime-skill-config"
 
 type DisabledSkillName = NonNullable<OhMyOpenCodeConfig["disabled_skills"]>[number]
+type SkillsConfig = OhMyOpenCodeConfig["skills"]
 
-function createPluginConfig(disabledSkills?: readonly DisabledSkillName[]): OhMyOpenCodeConfig {
+function createPluginConfig(args?: {
+  readonly disabledSkills?: readonly DisabledSkillName[]
+  readonly skills?: SkillsConfig
+}): OhMyOpenCodeConfig {
   return {
     git_master: {
       commit_footer: true,
       include_co_authored_by: true,
       git_env_prefix: "GIT_MASTER=1",
     },
-    disabled_skills: disabledSkills ? [...disabledSkills] : undefined,
+    disabled_skills: args?.disabledSkills ? [...args.disabledSkills] : undefined,
+    skills: args?.skills,
   }
 }
 
@@ -70,7 +75,9 @@ describe("OpenCode runtime skill source config", () => {
     // when
     applyRuntimeSkillSourceConfig({
       config,
-      pluginConfig: createPluginConfig(["security-research", "security-review"]),
+      pluginConfig: createPluginConfig({
+        disabledSkills: ["security-research", "security-review"],
+      }),
       sourceUrl: "http://127.0.0.1:49152/",
     })
 
@@ -80,7 +87,7 @@ describe("OpenCode runtime skill source config", () => {
 
   test("security-research disablement keeps security-review enabled", () => {
     // given
-    const pluginConfig = createPluginConfig(["security-research"])
+    const pluginConfig = createPluginConfig({ disabledSkills: ["security-research"] })
 
     // when
     const skills = selectRuntimeSecuritySkills(pluginConfig)
@@ -91,7 +98,50 @@ describe("OpenCode runtime skill source config", () => {
 
   test("security-review disablement suppresses only the review alias", () => {
     // given
-    const pluginConfig = createPluginConfig(["security-review"])
+    const pluginConfig = createPluginConfig({ disabledSkills: ["security-review"] })
+
+    // when
+    const skills = selectRuntimeSecuritySkills(pluginConfig)
+
+    // then
+    expect(skills.map((skill) => skill.name)).toEqual(["security-research"])
+  })
+
+  test("skills.disable suppresses every runtime security skill", () => {
+    // given
+    const config: OpenCodeSkillHostConfig = {}
+
+    // when
+    applyRuntimeSkillSourceConfig({
+      config,
+      pluginConfig: createPluginConfig({
+        skills: { disable: ["security-research", "security-review"] },
+      }),
+      sourceUrl: "http://127.0.0.1:49152/",
+    })
+
+    // then
+    expect(config.skills).toBeUndefined()
+  })
+
+  test("skills.<name>: false suppresses security-research only", () => {
+    // given
+    const pluginConfig = createPluginConfig({
+      skills: { "security-research": false },
+    })
+
+    // when
+    const skills = selectRuntimeSecuritySkills(pluginConfig)
+
+    // then
+    expect(skills.map((skill) => skill.name)).toEqual(["security-review"])
+  })
+
+  test("skills.<name>.disable: true suppresses security-review only", () => {
+    // given
+    const pluginConfig = createPluginConfig({
+      skills: { "security-review": { disable: true } },
+    })
 
     // when
     const skills = selectRuntimeSecuritySkills(pluginConfig)

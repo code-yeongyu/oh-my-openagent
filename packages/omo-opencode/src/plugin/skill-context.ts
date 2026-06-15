@@ -16,8 +16,10 @@ import {
   discoverGlobalAgentsSkills,
   discoverSharedSkills,
   createSharedCanonicalAliases,
+  collectDisabledSkillAliases,
   isDisabledSkillAlias,
   mergeSkills,
+  normalizeSkillAliasName,
   readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
 import { resolveActiveBuiltinSkills } from "../features/builtin-skills"
@@ -31,39 +33,9 @@ export type SkillContext = {
   disabledSkills: Set<string>
 }
 
+export { collectDisabledSkillAliases }
+
 const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "dev-browser", "playwright"])
-
-function normalizeSkillAliasName(name: string): string {
-  return name.toLowerCase()
-}
-
-function isDisabledSkillConfigEntry(entry: unknown): boolean {
-  if (entry === false) return true
-  if (entry === true) return false
-  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return false
-  return "disable" in entry && entry.disable === true
-}
-
-export function collectDisabledSkillAliases(pluginConfig: OhMyOpenCodeConfig): Set<string> {
-  const disabledSkills = new Set<string>(
-    (pluginConfig.disabled_skills ?? []).map(normalizeSkillAliasName),
-  )
-  const skillsConfig = pluginConfig.skills
-  if (!skillsConfig || Array.isArray(skillsConfig)) return disabledSkills
-
-  for (const name of skillsConfig.disable ?? []) {
-    disabledSkills.add(normalizeSkillAliasName(name))
-  }
-
-  for (const [name, entry] of Object.entries(skillsConfig)) {
-    if (name === "sources" || name === "enable" || name === "disable") continue
-    if (isDisabledSkillConfigEntry(entry)) {
-      disabledSkills.add(normalizeSkillAliasName(name))
-    }
-  }
-
-  return disabledSkills
-}
 
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
