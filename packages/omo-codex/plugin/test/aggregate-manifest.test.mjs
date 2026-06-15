@@ -36,6 +36,13 @@ test("#given aggregate plugin metadata #when inspected #then ulw-loop is the pub
 test("#given component directories #when scanned #then only intentional resource roots declare plugin manifests", async () => {
 	// given
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
+	const packageJson = await readJson("package.json");
+	const expectedComponentNames = [
+		"bootstrap",
+		...packageJson.workspaces
+			.filter((workspace) => typeof workspace === "string" && workspace.startsWith("components/"))
+			.map((workspace) => workspace.slice("components/".length)),
+	].sort();
 	const expectedComponentManifests = new Map([["rules", { hooks: "./hooks/hooks.json" }]]);
 
 	// when
@@ -48,17 +55,7 @@ test("#given component directories #when scanned #then only intentional resource
 	componentNames.sort();
 
 	// then
-	assert.deepEqual(componentNames, [
-		"bootstrap",
-		"comment-checker",
-		"git-bash",
-		"lsp",
-		"rules",
-		"start-work-continuation",
-		"telemetry",
-		"ultrawork",
-		"ulw-loop",
-	]);
+	assert.deepEqual(componentNames, expectedComponentNames);
 	for (const name of componentNames) {
 		const expectedManifest = expectedComponentManifests.get(name);
 		if (expectedManifest !== undefined) {
