@@ -99,8 +99,6 @@ For bug fixes, stay minimal: fix the bug, add a test, prove it, stop. Do not ref
 
 Each commit pairs implementation with its tests, and you commit a criterion only after its QA evidence is on disk.
 
-For commit-only delegation, use `task(category="quick", load_skills=["git-master"], prompt="Commit the changes atomically following git-master conventions. Repository is at {WORKTREE_PATH}.")`.
-
 ### Pre-push local validation
 
 Before pushing, run the same checks CI will run — a cheap pre-filter that saves a ~3-5 min CI round-trip, NOT a substitute for the manual QA above:
