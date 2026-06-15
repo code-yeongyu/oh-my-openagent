@@ -1,3 +1,5 @@
+import { extname } from "node:path"
+
 export interface CodegraphCommandResult {
   readonly exitCode: number
   readonly stderr?: string
@@ -9,6 +11,13 @@ export interface RunCodegraphCommandOptions {
   readonly env: Record<string, string>
   readonly timeoutMs: number
 }
+
+export interface CodegraphCommandInvocation {
+  readonly args: readonly string[]
+  readonly command: string
+}
+
+const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"])
 
 function toOutputText(value: string | Buffer): string {
   return Buffer.isBuffer(value) ? value.toString("utf8") : value
@@ -29,11 +38,12 @@ export async function runCodegraphCommand(
   options: RunCodegraphCommandOptions,
 ): Promise<CodegraphCommandResult> {
   const { execFile } = await import("node:child_process")
+  const invocation = resolveCodegraphCommandInvocation(command, args)
 
   return new Promise((resolve) => {
     execFile(
-      command,
-      [...args],
+      invocation.command,
+      [...invocation.args],
       {
         cwd: projectRoot,
         encoding: "utf8",
@@ -57,4 +67,14 @@ export async function runCodegraphCommand(
       },
     )
   })
+}
+
+export function resolveCodegraphCommandInvocation(
+  command: string,
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): CodegraphCommandInvocation {
+  if (platform !== "win32") return { args: [...args], command }
+  if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase())) return { args: [...args], command }
+  return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" }
 }
