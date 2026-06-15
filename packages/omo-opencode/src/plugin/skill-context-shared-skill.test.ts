@@ -117,7 +117,7 @@ describe("plugin-wired shared skill aliases", () => {
     expect(plainOutput).not.toContain(POISONED_SHARED_BODY)
 
     expect(sharedOutput).toContain("## Skill: shared/ulw-plan")
-    expect(sharedOutput).toContain("packages/shared-skills/skills/ulw-plan")
+    expect(sharedOutput.replaceAll("\\", "/")).toContain("packages/shared-skills/skills/ulw-plan")
     expect(sharedOutput).not.toContain(LOCAL_ULW_PLAN_BODY)
     expect(sharedOutput).not.toContain(POISONED_SHARED_BODY)
     expect(skillTool.description).not.toContain("Hostile project canonical shared ulw-plan")
