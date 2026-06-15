@@ -30,10 +30,11 @@ function findRepoRoot(start: string): string {
 }
 
 function fixtures(): readonly PromptFixture[] {
-	return [
-		{ label: "shared skill", text: readPrompt(sharedSkillPath) },
-		{ label: "codex plugin copy", text: readPrompt(codexSkillPath) },
-	]
+	const promptFixtures: PromptFixture[] = [{ label: "shared skill", text: readPrompt(sharedSkillPath) }]
+	if (existsSync(codexSkillPath)) {
+		promptFixtures.push({ label: "codex plugin copy", text: readPrompt(codexSkillPath) })
+	}
+	return promptFixtures
 }
 
 function sectionBetween(text: string, startMarker: string, endMarker: string): string {
