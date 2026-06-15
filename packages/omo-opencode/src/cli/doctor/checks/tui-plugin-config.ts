@@ -7,6 +7,7 @@ import {
   PLUGIN_NAME,
   getOpenCodeConfigDir,
   getOpenCodeConfigPaths,
+  log,
   parseJsonc,
 } from "../../../shared"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
@@ -53,7 +54,10 @@ function packageJsonExportsTui(pkgJsonPath: string): boolean | null {
     if (parsed.exports == null || typeof parsed.exports !== "object" || Array.isArray(parsed.exports)) return null
     return Object.hasOwn(parsed.exports, TUI_EXPORT_SUBPATH)
   } catch (error) {
-    void error
+    log("[tui-plugin-config] Failed to inspect package exports", {
+      pkgJsonPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return null
   }
 }
@@ -88,7 +92,10 @@ export function isOurFilePluginEntry(entry: string): boolean {
     return typeof parsed.name === "string"
       && (ACCEPTED_PACKAGE_NAMES as readonly string[]).includes(parsed.name)
   } catch (error) {
-    void error
+    log("[tui-plugin-config] Failed to inspect file plugin package", {
+      entry,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return false
   }
 }
@@ -143,7 +150,10 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
       packageExportsTui: serverEntry === undefined ? null : packageExportsTuiForServerEntry(serverEntry),
     }
   } catch (error) {
-    void error
+    log("[tui-plugin-config] Failed to inspect opencode plugin config", {
+      configPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return { registered: false, configPath, packageExportsTui: null }
   }
 }
@@ -165,7 +175,10 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       hasCanonicalNamedTuiEntry: plugins.some(isCanonicalNamedTuiPluginEntry),
     }
   } catch (error) {
-    void error
+    log("[tui-plugin-config] Failed to inspect TUI plugin config", {
+      configPath: tuiJsonPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return { registered: false, configPath: tuiJsonPath, exists: true, hasNamedTuiEntry: false, hasCanonicalNamedTuiEntry: false }
   }
 }
