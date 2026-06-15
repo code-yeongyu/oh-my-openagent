@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -297,9 +298,7 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null
-}
+
 
 function isFalsy(value: string | undefined): boolean {
   if (value === undefined) {

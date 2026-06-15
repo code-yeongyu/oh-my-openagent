@@ -1,6 +1,7 @@
 import * as path from "node:path"
 import * as os from "node:os"
 import { accessSync, constants, mkdirSync } from "node:fs"
+import { resolveXdgDataDir } from "@oh-my-opencode/utils"
 
 import { CACHE_DIR_NAME } from "./plugin-identity"
 
@@ -29,8 +30,7 @@ function resolveWritableDirectory(preferredDir: string, fallbackSuffix: string):
  * including Windows, so we match that behavior exactly.
  */
 export function getDataDir(): string {
-  const preferredDir = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share")
-  return resolveWritableDirectory(preferredDir, "opencode-data")
+  return resolveXdgDataDir("opencode")
 }
 
 /**

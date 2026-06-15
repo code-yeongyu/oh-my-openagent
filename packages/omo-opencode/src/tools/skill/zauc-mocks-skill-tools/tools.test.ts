@@ -114,7 +114,7 @@ describe("skill tool - synchronous description", () => {
     // given
     const loadedSkills = [
       createMockSkill("playwright"),
-      createMockSkill("frontend-ui-ux"),
+      createMockSkill("frontend"),
       createMockSkill("git-master"),
     ]
 
@@ -127,7 +127,7 @@ describe("skill tool - synchronous description", () => {
     // then
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("playwright")
-    expect(tool.description).toContain("frontend-ui-ux")
+    expect(tool.description).toContain("frontend")
     expect(tool.description).toContain("git-master")
   })
 

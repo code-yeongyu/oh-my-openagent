@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook session-start",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(4.9.2): Recording Session Telemetry"
+						"statusMessage": "LazyCodex(4.10.0): Recording Session Telemetry"
 					}
 				]
 			}

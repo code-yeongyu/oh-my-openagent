@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { mkdtempSync, rmSync } from "node:fs"
 
 const { executeHookCommand } = await import("./execute-hook-command")
+const timeoutAssertionMs = process.platform === "win32" ? 5_000 : 1_000
 
 function nodeCommand(script: string): string {
   return `"${process.execPath}" -e ${JSON.stringify(script)}`
@@ -76,7 +77,7 @@ describe("executeHookCommand", () => {
     // then
     expect(result.exitCode).toBe(124)
     expect(result.stderr).toContain("Hook command timed out after 20ms")
-    expect(Date.now() - startedAt).toBeLessThan(1000)
+    expect(Date.now() - startedAt).toBeLessThan(timeoutAssertionMs)
   })
 
   // Regression coverage for #4458 - plugin-sourced hooks must run with

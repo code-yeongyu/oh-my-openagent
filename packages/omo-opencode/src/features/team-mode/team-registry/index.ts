@@ -1,3 +1,1 @@
-export * from "./paths"
-export * from "./loader"
-export * from "./validator"
+export * from "@oh-my-opencode/team-core/team-registry"

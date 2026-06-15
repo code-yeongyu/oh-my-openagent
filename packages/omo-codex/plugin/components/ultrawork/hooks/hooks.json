@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(4.9.2): Checking Ultrawork Trigger"
+						"statusMessage": "LazyCodex(4.10.0): Checking Ultrawork Trigger"
 					}
 				]
 			}

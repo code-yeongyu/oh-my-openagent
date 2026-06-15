@@ -1,3 +1,1 @@
-export { discoverInstalledPlugins } from "./discovery-core"
-export { resolveActualInstallPath } from "./install-path-resolver"
-export { loadPluginManifest } from "./plugin-manifest"
+export * from "@oh-my-opencode/claude-code-compat-core/claude-code-plugin-loader/discovery"

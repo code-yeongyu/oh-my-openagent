@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { ToolResult } from "@opencode-ai/plugin/tool"
 
 import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-registry"
-import type { RuntimeState } from "../types"
+import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 import {
   approveShutdownMock,
   backgroundManager,

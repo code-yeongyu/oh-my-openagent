@@ -23,12 +23,11 @@ Total exposed hooks: **53 base, 60 with team-mode** (counts the 4 team-session-e
 
 Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](../config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
 
-### Tier 1: Session Hooks (24)
+### Tier 1: Session Hooks (23)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
 | `preemptiveCompaction` | session.idle | Trigger compaction before limit |
-| `sessionRecovery` | session.error | Recover from structural errors (tool_result_missing, thinking_block_order) |
 | `sessionNotification` | session.idle | OS notifications on completion |
 | `thinkMode` | chat.params | Model variant switching for extended thinking |
 | `anthropicContextWindowLimitRecovery` | session.error | Multi-strategy context recovery (truncation, compaction, dedup) |

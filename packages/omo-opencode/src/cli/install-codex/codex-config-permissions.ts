@@ -1,1 +1,1 @@
-export { ensureAutonomousPermissions } from "../../../../../packages/omo-codex/scripts/install/permissions.mjs"
+export * from "@oh-my-opencode/omo-codex/install/codex-config-permissions"

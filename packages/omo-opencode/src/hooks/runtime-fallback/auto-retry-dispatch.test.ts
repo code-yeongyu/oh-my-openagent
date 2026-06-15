@@ -67,6 +67,25 @@ function reserveSession(sessionID: string, holdMs: number): void {
   })
 }
 
+function createPromptCallSignal(): {
+  readonly notify: () => void
+  readonly wait: () => Promise<void>
+} {
+  let notify: () => void = () => {}
+  const observed = new Promise<void>((resolve) => {
+    notify = resolve
+  })
+  return {
+    notify,
+    wait: () => Promise.race([
+      observed,
+      new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error("Timed out waiting for queued fallback prompt dispatch")), 1500)
+      }),
+    ]),
+  }
+}
+
 describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
   afterEach(() => {
     releaseAllPromptAsyncReservationsForTesting()
@@ -114,5 +133,57 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     expect(promptCalls.count).toBe(1)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
+  })
+
+  test("#given the failed assistant is still active #when auto retry runs #then the fallback dispatch is queued until the assistant unblocks", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-active-assistant-then-unblocked"
+    let assistantIsActive = true
+    const promptCallSignal = createPromptCallSignal()
+    deps.ctx.client.session.messages = async () => ({
+      data: assistantIsActive
+        ? [
+            {
+              info: { role: "user" },
+              parts: [{ type: "text", text: "retry this" }],
+            },
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "reasoning", text: "still resolving failed stream" }],
+            },
+          ]
+        : [
+            {
+              info: { role: "user" },
+              parts: [{ type: "text", text: "retry this" }],
+            },
+            {
+              info: { role: "assistant", finish: true },
+              parts: [],
+            },
+          ],
+    })
+    deps.ctx.client.session.promptAsync = async () => {
+      promptCalls.count += 1
+      promptCallSignal.notify()
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    expect(promptCalls.count).toBe(0)
+    assistantIsActive = false
+    await promptCallSignal.wait()
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
 })

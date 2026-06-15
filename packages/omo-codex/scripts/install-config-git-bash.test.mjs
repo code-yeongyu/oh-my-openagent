@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
+import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
 test("#given windows platform with Git Bash enabled #when updating config #then enables git_bash plugin mcp policy", async () => {
 	// given

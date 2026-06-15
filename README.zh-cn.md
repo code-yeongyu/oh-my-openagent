@@ -318,7 +318,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 - 按需加载的独立 MCP 服务器。
 - 对 Agent 能力边界的强制约束。
 
-默认内置：`playwright`（极其稳健的浏览器自动化）、`git-master`（全自动的原子级提交及 rebase 手术）、`frontend-ui-ux`（设计感拉满的 UI 实现）。
+默认内置：`playwright`（极其稳健的浏览器自动化）、`git-master`（全自动的原子级提交及 rebase 手术）、`frontend`（设计感拉满的 UI 实现）。
 
 想加你自己的？放进 `.opencode/skills/*/SKILL.md` 或者 `~/.config/opencode/skills/*/SKILL.md` 就行。
 

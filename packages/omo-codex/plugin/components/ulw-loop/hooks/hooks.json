@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(4.9.2): Checking Ulw-Loop Steering"
+						"statusMessage": "LazyCodex(4.10.0): Checking Ulw-Loop Steering"
 					}
 				]
 			}
@@ -20,7 +20,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(4.9.2): Enforcing Unlimited Ulw-Loop Budget"
+						"statusMessage": "LazyCodex(4.10.0): Enforcing Unlimited Ulw-Loop Budget"
 					}
 				]
 			}

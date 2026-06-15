@@ -39,6 +39,10 @@ describe("createSisyphusAgent", () => {
           promptAnchors: ["<re_entry_rule>", "<verification_loop>"],
         },
         {
+          model: "opencode-go/kimi-k2.7",
+          promptAnchors: ["running on Kimi K2.7", "<operating_rules>"],
+        },
+        {
           model: "openai/gpt-5.5",
           promptAnchors: ["## Validating your work", "## Task tracking"],
         },
@@ -72,8 +76,22 @@ describe("createSisyphusAgent", () => {
     });
   });
 
+  describe("#given Kimi K2.7 vs K2.6 models", () => {
+    test("#when creating agents #then K2.7 routes to its own restrained variant, not the K2.6 prompt", () => {
+      // given
+      const k27Agent = createSisyphusAgent("opencode-go/kimi-k2.7");
+      const k26Agent = createSisyphusAgent("opencode-go/kimi-k2.6");
+
+      // then
+      expect(k27Agent.prompt).toContain("running on Kimi K2.7");
+      expect(k27Agent.prompt).not.toContain("Toggle RL");
+      expect(k26Agent.prompt).toContain("Toggle RL");
+      expect(k26Agent.prompt).not.toContain("Kimi K2.7");
+    });
+  });
+
   describe("#given GPT-family Sisyphus models", () => {
-    test("#when creating agents #then preserves reasoning and apply_patch restrictions", () => {
+    test("#when creating agents #then preserves reasoning and leaves apply_patch available", () => {
       // given
       const models = ["openai/gpt-5.5", "openai/gpt-5.4"];
 
@@ -83,7 +101,7 @@ describe("createSisyphusAgent", () => {
 
         // then
         expect(agent.reasoningEffort).toBe("medium");
-        expect(permissionValue(agent.permission, "apply_patch")).toBe("deny");
+        expect(permissionValue(agent.permission, "apply_patch")).toBeUndefined();
         expect(agent.thinking).toBeUndefined();
       }
     });

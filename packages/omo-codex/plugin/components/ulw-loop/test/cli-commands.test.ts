@@ -394,4 +394,10 @@ describe("ulwLoopCommand error handling", () => {
 		expect(await ulwLoopCommand(["status"])).toBe(1);
 		expect(err.join("")).toContain("[ulw-loop]");
 	});
+
+	it("#given no --json #when an error occurs #then writes only to stderr and leaves stdout empty", async () => {
+		expect(await ulwLoopCommand(["status"])).toBe(1);
+		expect(out.join("")).toBe("");
+		expect(err.join("")).toContain("[ulw-loop]");
+	});
 });

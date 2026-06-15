@@ -3,7 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hasCliSuffix } from "./cli-suffix";
 import type { LocalMcpConfig } from "./lsp";
-import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable";
+import { resolveRuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable";
+import { createAncestorCliCandidates, resolveJavaScriptRuntime, type AncestorCliCandidate } from "./shared/ancestor-cli-resolver";
 
 const PACKAGE_REL = "packages/ast-grep-mcp";
 const DIST_CLI_REL = "dist/cli.js";
@@ -24,57 +25,6 @@ type AstGrepMcpConfigOptions = {
   readonly resolveExecutable?: RuntimeExecutableResolver;
 };
 
-type CommandCandidate = {
-  readonly command: string[];
-  readonly path: string;
-  readonly exists: boolean;
-  readonly runtimeAvailable: boolean;
-};
-
-function resolveJavaScriptRuntime(resolveExecutable: RuntimeExecutableResolver): RuntimeExecutable {
-  const node = resolveExecutable("node");
-  return node.available ? node : resolveExecutable("bun");
-}
-
-function addAncestorCommandCandidates(
-  startDirectory: string,
-  target: CommandCandidate[],
-  seenPaths: Set<string>,
-  pathExists: (path: string) => boolean,
-  resolveExecutable: RuntimeExecutableResolver,
-): void {
-  let currentDirectory = resolve(startDirectory);
-  while (true) {
-    const distCliPath = resolve(currentDirectory, PACKAGE_REL, DIST_CLI_REL);
-    if (!seenPaths.has(distCliPath)) {
-      const runtime = resolveJavaScriptRuntime(resolveExecutable);
-      seenPaths.add(distCliPath);
-      target.push({
-        command: [runtime.command, distCliPath, "mcp"],
-        path: distCliPath,
-        exists: runtime.available && pathExists(distCliPath),
-        runtimeAvailable: runtime.available,
-      });
-    }
-
-    const sourceCliPath = resolve(currentDirectory, PACKAGE_REL, SOURCE_CLI_REL);
-    if (!seenPaths.has(sourceCliPath)) {
-      const runtime = resolveExecutable("bun");
-      seenPaths.add(sourceCliPath);
-      target.push({
-        command: [runtime.command, sourceCliPath, "mcp"],
-        path: sourceCliPath,
-        exists: runtime.available && pathExists(sourceCliPath),
-        runtimeAvailable: runtime.available,
-      });
-    }
-
-    const parentDirectory = resolve(currentDirectory, "..");
-    if (parentDirectory === currentDirectory) return;
-    currentDirectory = parentDirectory;
-  }
-}
-
 function getModuleDirectory(moduleUrl: string): string | null {
   try {
     return dirname(fileURLToPath(moduleUrl));
@@ -84,19 +34,32 @@ function getModuleDirectory(moduleUrl: string): string | null {
   }
 }
 
-function createFallbackCandidate(resolveExecutable: RuntimeExecutableResolver): CommandCandidate {
+function createFallbackCandidate(resolveExecutable: RuntimeExecutableResolver): AncestorCliCandidate {
   const runtime = resolveJavaScriptRuntime(resolveExecutable);
   const path = resolve(PACKAGE_REL, DIST_CLI_REL);
-  return { command: [runtime.command, path, "mcp"], path, exists: runtime.available, runtimeAvailable: runtime.available };
+  return {
+    command: [runtime.command, path, "mcp"],
+    root: process.cwd(),
+    path,
+    exists: runtime.available,
+    runtimeAvailable: runtime.available,
+  };
 }
 
-function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): CommandCandidate {
+function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): AncestorCliCandidate {
   const pathExists = options.exists ?? existsSync;
   const resolveExecutable = options.resolveExecutable ?? resolveRuntimeExecutable;
-  const candidates: CommandCandidate[] = [];
-  const seenPaths = new Set<string>();
   const moduleDirectory = getModuleDirectory(options.moduleUrl ?? import.meta.url);
-  if (moduleDirectory) addAncestorCommandCandidates(moduleDirectory, candidates, seenPaths, pathExists, resolveExecutable);
+  const candidates = moduleDirectory
+    ? createAncestorCliCandidates({
+        startDirectory: moduleDirectory,
+        packageRel: PACKAGE_REL,
+        distCliRel: DIST_CLI_REL,
+        sourceCliRel: SOURCE_CLI_REL,
+        pathExists,
+        resolveExecutable,
+      })
+    : [];
 
   const distCandidate = candidates.find((candidate) => hasCliSuffix(candidate.path, DIST_CLI_REL) && candidate.exists);
   if (distCandidate) return distCandidate;

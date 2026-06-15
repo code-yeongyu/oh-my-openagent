@@ -6,6 +6,7 @@ import claudeOpus48Prompt from "../prompts/prometheus/claude-opus-4-8.md"
 import defaultPrompt from "../prompts/prometheus/default.md"
 import geminiPrompt from "../prompts/prometheus/gemini.md"
 import gptPrompt from "../prompts/prometheus/gpt.md"
+import kimiK27Prompt from "../prompts/prometheus/kimi-k2-7.md"
 
 export const prometheusPromptVariants = {
   "claude-fable-5": {
@@ -32,6 +33,11 @@ export const prometheusPromptVariants = {
     kind: "bundled",
     content: gptPrompt,
     filePath: "packages/prompts-core/prompts/prometheus/gpt.md",
+  },
+  "kimi-k2-7": {
+    kind: "bundled",
+    content: kimiK27Prompt,
+    filePath: "packages/prompts-core/prompts/prometheus/kimi-k2-7.md",
   },
   gemini: {
     kind: "bundled",

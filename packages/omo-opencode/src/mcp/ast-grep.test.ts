@@ -67,6 +67,57 @@ describe("createAstGrepMcpConfig", () => {
     expect(config.command).toEqual([bunPath, sourceCliPath, "mcp"])
   })
 
+  it("prefers an ancestor dist cli before an earlier source cli candidate", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-ast-grep-order-root-")
+    const moduleFilePath = join(packageRoot, "nested", "src", "mcp", "ast-grep.ts")
+    const nearerSourceCliPath = join(packageRoot, "nested", "src", "mcp", "packages", "ast-grep-mcp", "src", "cli.ts")
+    const ancestorDistCliPath = join(packageRoot, "packages", "ast-grep-mcp", "dist", "cli.js")
+    const nodePath = join(packageRoot, "bin", "node")
+    const bunPath = join(packageRoot, "bin", "bun")
+    mkdirSync(join(packageRoot, "nested", "src", "mcp"), { recursive: true })
+    mkdirSync(join(packageRoot, "nested", "src", "mcp", "packages", "ast-grep-mcp", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "ast-grep-mcp", "dist"), { recursive: true })
+    writeFileSync(nearerSourceCliPath, "console.log('near-source')\n", "utf-8")
+    writeFileSync(ancestorDistCliPath, "#!/usr/bin/env node\n", "utf-8")
+
+    // when
+    const config = createAstGrepMcpConfig({
+      cwd: createTemporaryDirectory("omo-ast-grep-order-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath, node: nodePath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.command).toEqual([nodePath, ancestorDistCliPath, "mcp"])
+  })
+
+  it("uses the nearest source cli when no dist cli exists in the ancestor walk", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-ast-grep-source-order-root-")
+    const moduleFilePath = join(packageRoot, "nested", "src", "mcp", "ast-grep.ts")
+    const nearerSourceCliPath = join(packageRoot, "nested", "src", "mcp", "packages", "ast-grep-mcp", "src", "cli.ts")
+    const ancestorSourceCliPath = join(packageRoot, "packages", "ast-grep-mcp", "src", "cli.ts")
+    const bunPath = join(packageRoot, "bin", "bun")
+    mkdirSync(join(packageRoot, "nested", "src", "mcp"), { recursive: true })
+    mkdirSync(join(packageRoot, "nested", "src", "mcp", "packages", "ast-grep-mcp", "src"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "ast-grep-mcp", "src"), { recursive: true })
+    writeFileSync(nearerSourceCliPath, "console.log('near-source')\n", "utf-8")
+    writeFileSync(ancestorSourceCliPath, "console.log('ancestor-source')\n", "utf-8")
+
+    // when
+    const config = createAstGrepMcpConfig({
+      cwd: createTemporaryDirectory("omo-ast-grep-source-order-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.command).toEqual([bunPath, nearerSourceCliPath, "mcp"])
+  })
+
   it("still returns a built-in MCP config when the cli has not been built yet", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-ast-grep-missing-root-")
