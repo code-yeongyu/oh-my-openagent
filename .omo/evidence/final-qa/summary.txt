@@ -29,6 +29,7 @@ Evidence files:
 - .omo/evidence/final-review/fix-windows-codex-wrapper-install-dir.txt
 - .omo/evidence/final-review/codegraph-dist-regeneration.txt
 - .omo/evidence/final-review/post-fix-focused-tests.txt
+- .omo/evidence/final-review/fix-final-qa-evidence-consistency.txt
 
 Superseded raw-log note:
 - `.omo/evidence/final-qa/fix-built-codegraph-wrapper.txt` intentionally preserves the raw pre-cleanup
