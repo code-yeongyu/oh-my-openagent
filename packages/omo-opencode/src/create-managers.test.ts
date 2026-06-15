@@ -17,14 +17,19 @@ type CleanupSessionTeamRunsFn = typeof import("./features/team-mode/team-runtime
 const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  onShutdown?: () => void | Promise<void>
 } | null = null
 const trackedPaneBySession = new Map<string, string>()
 const registeredCleanupManagers: CleanupRegistration[] = []
-const cleanupSessionTeamRunsMock = mock(async () => ({
-  cleanedTeamRunIds: [],
-  removedLayoutTeamRunIds: [],
-  errors: [],
-}))
+const cleanupSessionTeamRunsCalls: Array<Parameters<CleanupSessionTeamRunsFn>[0]> = []
+const cleanupSessionTeamRunsMock = mock(async (input: Parameters<CleanupSessionTeamRunsFn>[0]) => {
+  cleanupSessionTeamRunsCalls.push(input)
+  return {
+    cleanedTeamRunIds: [],
+    removedLayoutTeamRunIds: [],
+    errors: [],
+  }
+})
 const tuiMirrorConstructedInputs: unknown[] = []
 let tuiMirrorStartCount = 0
 let tuiMirrorStopCount = 0
@@ -32,8 +37,13 @@ let tuiMirrorStopCount = 0
 class MockBackgroundManager {
   constructor(config: {
     onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+    onShutdown?: () => void | Promise<void>
   }) {
     backgroundManagerOptions = config
+  }
+
+  async shutdown(): Promise<void> {
+    await backgroundManagerOptions?.onShutdown?.()
   }
 }
 
@@ -140,6 +150,7 @@ function createContext(directory: string): PluginInput {
     },
     directory,
     worktree: directory,
+    experimental_workspace: { register: () => {} },
     serverUrl: new URL("http://localhost:4096"),
     $: shell,
     client: {} as PluginInput["client"],
@@ -156,6 +167,7 @@ describe("createManagers", () => {
     backgroundManagerOptions = null
     trackedPaneBySession.clear()
     registeredCleanupManagers.length = 0
+    cleanupSessionTeamRunsCalls.length = 0
     cleanupSessionTeamRunsMock.mockClear()
     tuiMirrorConstructedInputs.length = 0
     tuiMirrorStartCount = 0
@@ -274,7 +286,10 @@ describe("createManagers", () => {
     await registeredCleanupManagers[0]?.shutdown()
 
     expect(cleanupSessionTeamRunsMock).toHaveBeenCalledTimes(1)
-    const cleanupArgs = cleanupSessionTeamRunsMock.mock.calls[0]?.[0]
+    const cleanupArgs = cleanupSessionTeamRunsCalls[0]
+    if (cleanupArgs === undefined) {
+      throw new Error("cleanupSessionTeamRuns was not called")
+    }
     expect(cleanupArgs).toMatchObject({
       config: args.pluginConfig.team_mode,
     })
@@ -303,6 +318,25 @@ describe("createManagers", () => {
       projectDir: "/tmp/project",
       backgroundManager: managers.backgroundManager,
     })
+    expect(tuiMirrorStartCount).toBe(1)
+    expect(tuiMirrorStopCount).toBe(1)
+  })
+
+  it("#given TuiStateMirror is enabled #when normal shutdown runs #then it stops the mirror", async () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    const managers = createManagers(args)
+
+    await managers.backgroundManager.shutdown()
+
+    expect(managers.tuiStateMirror).toBeInstanceOf(MockTuiStateMirror)
     expect(tuiMirrorStartCount).toBe(1)
     expect(tuiMirrorStopCount).toBe(1)
   })

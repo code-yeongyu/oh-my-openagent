@@ -1,4 +1,5 @@
 import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
+import { log } from "../../shared/logger"
 import { writeMirror } from "./mirror-io"
 import { buildTuiRuntimeSnapshot } from "./snapshot-builder"
 import type {
@@ -123,6 +124,7 @@ export class TuiStateMirror {
       writeMirror(this.snapshotInput.projectDir, snapshot)
     } catch (error) {
       if (error instanceof Error) {
+        log("[tui-sidebar] mirror flush failed", { error })
         return
       }
       throw error

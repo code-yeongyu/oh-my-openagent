@@ -161,6 +161,7 @@ export function createManagers(args: {
       log("[create-managers] onSubagentSessionDeleted callback completed")
     },
     onShutdown: async () => {
+      tuiStateMirror?.stop()
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during shutdown:", error)
       })

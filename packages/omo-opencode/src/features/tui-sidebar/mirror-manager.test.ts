@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import * as logger from "../../shared/logger"
 import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
 import { readMirror } from "./mirror-io"
 import { TuiStateMirror } from "./mirror-manager"
@@ -155,10 +156,12 @@ describe("TuiStateMirror", () => {
   it("#given client status throws #when flushing #then status throws no-op with no rejection and no mirror write", async () => {
     // given
     const projectDir = makeTempDir("throw-project")
+    const statusError = new Error("status unavailable")
+    const logSpy = jest.spyOn(logger, "log").mockImplementation(() => {})
     const client: FakeClient = {
       session: {
         status: async () => {
-          throw new Error("status unavailable")
+          throw statusError
         },
         messages: async () => ({ data: [] }),
       },
@@ -170,6 +173,8 @@ describe("TuiStateMirror", () => {
 
     // then
     expect(readMirror(projectDir)).toBeNull()
+    expect(logSpy).toHaveBeenCalledWith("[tui-sidebar] mirror flush failed", { error: statusError })
+    logSpy.mockRestore()
   })
 
   it("#given concurrent flush calls #when the first build is in flight #then it does not double-build", async () => {

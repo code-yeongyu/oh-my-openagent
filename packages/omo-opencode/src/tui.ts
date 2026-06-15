@@ -8,6 +8,7 @@ import { readMirror } from "./features/tui-sidebar/mirror-io"
 import { buildViewNodes } from "./features/tui-sidebar/render-view"
 import type { RosterRow } from "./features/tui-sidebar/state-types"
 import type { SidebarView } from "./features/tui-sidebar/state-types"
+import { log } from "./shared/logger"
 
 type SolidRuntime<Node> = {
   readonly createElement: (tag: string) => Node
@@ -75,6 +76,14 @@ async function readView(directory: string): Promise<SidebarView> {
   })
 }
 
+export function handleTuiPollError(error: unknown): void {
+  if (error instanceof Error) {
+    log("[tui-sidebar] polling failed", { error })
+    return
+  }
+  throw error
+}
+
 const module: TuiPluginModule = {
   id: "oh-my-openagent:tui",
   tui: async (api) => {
@@ -120,9 +129,7 @@ const module: TuiPluginModule = {
           api.renderer.requestRender()
         }
       } catch (error) {
-        if (!(error instanceof Error)) {
-          throw error
-        }
+        handleTuiPollError(error)
       } finally {
         inFlight = false
         if (!disposed) schedule()
