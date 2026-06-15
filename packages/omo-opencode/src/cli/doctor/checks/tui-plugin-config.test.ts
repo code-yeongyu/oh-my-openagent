@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { PLUGIN_NAME } from "../../../shared"
+import { ensureTuiPluginEntry } from "../../config-manager/add-tui-plugin-to-tui-config"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
 
 let testConfigDir: string
@@ -79,6 +80,18 @@ describe("tui-plugin-config check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toHaveLength(0)
     expect(result.name).toBe("TUI Plugin")
+  })
+
+  it("passes after ensureTuiPluginEntry adds the missing named TUI entry", async () => {
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+
+    const ensureResult = ensureTuiPluginEntry({ configDir: testConfigDir })
+    const result = await checkTuiPluginConfig()
+
+    expect(ensureResult).toEqual({ changed: true, reason: "added" })
+    expect(result.status).toBe("pass")
+    expect(result.message).toContain("Server and TUI plugin entries are both registered")
   })
 
   it("warns when server is registered but TUI entry is missing", async () => {

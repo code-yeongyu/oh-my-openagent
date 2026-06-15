@@ -1,6 +1,7 @@
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 import type { HookName } from "../config"
 import { initConfigContext } from "../cli/config-manager/config-context"
+import { ensureTuiPluginEntry } from "../cli/config-manager/add-tui-plugin-to-tui-config"
 
 import { createHooks } from "../create-hooks"
 import { createManagers } from "../create-managers"
@@ -127,6 +128,13 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    if (pluginConfig.tui?.sidebar?.enabled !== false) {
+      try {
+        ensureTuiPluginEntry()
+      } catch (error) {
+        void error
+      }
+    }
     deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: input.client })
     deps.setLiveParentWakeRoutingDisabled(pluginConfig.experimental?.disable_live_parent_wake_routing === true)
     deps.warmLiveServerProbe()
