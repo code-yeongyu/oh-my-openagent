@@ -142,7 +142,8 @@
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.4",
     "posthog-node": "^5.34.3",
-    "vscode-jsonrpc": "^8.2.1"
+    "vscode-jsonrpc": "^8.2.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@oh-my-opencode/ast-grep-core": "workspace:*",
@@ -172,8 +173,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.3",
     "bun-types": "1.3.14",
-    "typescript": "^6.0.3",
-    "zod": "^4.4.3"
+    "typescript": "^6.0.3"
   },
   "optionalDependencies": {
     "oh-my-opencode-darwin-arm64": "4.10.0",
@@ -200,8 +200,5 @@
     "@ast-grep/cli",
     "@ast-grep/napi",
     "@code-yeongyu/comment-checker"
-  ],
-  "peerDependencies": {
-    "zod": "^4.0.0"
-  }
+  ]
 }
