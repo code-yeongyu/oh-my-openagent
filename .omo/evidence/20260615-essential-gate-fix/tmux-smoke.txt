@@ -1,4 +1,4 @@
-tmux_session=lcx-gate-2267
+tmux_session=lcx-gate-38758
 isolated_codex_home=<TMP>
 install_for_tmux_exit=0
 {
@@ -51,6 +51,6 @@ CMD_EXIT=0
 
 
 
-cleanup_tmux=killed lcx-gate-2267; remains=no
+cleanup_tmux=killed lcx-gate-38758; remains=no
 cleanup_tmp=removed <TMP>; exists_after=no
 EXIT_CODE=0
