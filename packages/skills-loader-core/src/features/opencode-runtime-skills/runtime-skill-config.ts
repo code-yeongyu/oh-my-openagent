@@ -1,6 +1,7 @@
 import { isPlainRecord } from "@oh-my-opencode/utils"
 import type { RuntimeSkillConfig } from "../../types"
 import { securityResearchSkill, securityReviewSkill } from "../builtin-skills/skills/index"
+import { collectDisabledSkillAliases } from "../opencode-skill-loader/skill-disable-config"
 import { createOpenCodeSkillMarkdown, type OpenCodeSkillMarkdown } from "./skill-markdown"
 
 export type RuntimeSkillSourceEntry = OpenCodeSkillMarkdown
@@ -30,7 +31,7 @@ function appendUnique(values: readonly string[], next: string): string[] {
 export function selectRuntimeSecuritySkills(
   pluginConfig: RuntimeSkillConfig = {},
 ): RuntimeSkillSourceEntry[] {
-  const disabledSkills = new Set(pluginConfig.disabled_skills ?? [])
+  const disabledSkills = collectDisabledSkillAliases(pluginConfig)
   const includeResearch = !disabledSkills.has("security-research")
   const includeReview = !disabledSkills.has("security-review")
   if (!includeResearch && !includeReview) return []

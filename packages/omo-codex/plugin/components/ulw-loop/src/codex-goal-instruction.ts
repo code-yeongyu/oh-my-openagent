@@ -1,4 +1,9 @@
-import { codexGoalMode, expectedCodexObjective, isFinalRunCompletionCandidate } from "./goal-status.js";
+import {
+	codexGoalMode,
+	expectedCodexObjective,
+	isEssentialCriterion,
+	isFinalRunCompletionCandidate,
+} from "./goal-status.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 
 export interface CodexCreateGoalPayload {
@@ -70,7 +75,7 @@ function modeConstraintLines(mode: UlwLoopCodexGoalMode, isFinal: boolean): read
 		"- If a different active or incomplete Codex goal exists, finish/checkpoint that goal before starting this ulw-loop.",
 		isFinal
 			? "- This is the final story; update_goal is allowed only after the mandatory quality gate passes."
-			: "- This is not the final story: do not call update_goal yet; the aggregate Codex goal must remain active while later OMO stories remain.",
+			: "- This is not the final story: do not call update_goal mid-aggregate; checkpoint this OMO ledger story and continue the remaining stories. update_goal is reserved for the final story after the mandatory quality gate passes.",
 	];
 }
 
@@ -94,23 +99,27 @@ function successCriteriaLines(criteria: readonly UlwLoopSuccessCriterion[]): rea
 
 function formatCriterionLine(criterion: UlwLoopSuccessCriterion): string {
 	const remainingWork = criterion.status === "pending" ? " remaining work:" : "";
-	return `-${remainingWork} [${criterion.id}] (${criterion.userModel}) ${criterion.scenario} — expect: ${criterion.expectedEvidence} — status: ${criterion.status}`;
+	const marker = isEssentialCriterion(criterion) ? "essential" : "non-essential";
+	return `-${remainingWork} [${criterion.id}] [${marker}] (${criterion.userModel}) ${criterion.scenario} — expect: ${criterion.expectedEvidence} — status: ${criterion.status}`;
 }
 
 function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, aggregate: boolean): string {
 	if (!isFinal)
-		return "- This is not the final ulw-loop story; do not run the final ai-slop-cleaner/code-review gate yet.";
+		return "- This is not the final ulw-loop story; do not run the final reviewer/manual-QA/gate-review quality gate yet.";
 	const option = sessionOption(plan);
 	const blockerCommand = `omo ulw-loop record-review-blockers${option} --goal-id ${goal.id} --title "Resolve final code-review blockers" --objective "<blocker-resolution objective>" --evidence "<review findings>" --codex-goal-json "<active get_goal JSON or path>"`;
-	const checkpointCommand = `omo ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<tests/files/PR evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
+	const checkpointCommand = `omo ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<targeted verification/manualQa/gateReview evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
 	return joinLines([
 		"Final story — run mandatory quality gate before update_goal:",
-		"- Run ai-slop-cleaner on changed files even when it is a no-op, rerun verification, then run the code review (multi_agent_v1.spawn_agent(agent_type=\"codex-ultrawork-reviewer\", fork_context=false, ...); fall back to agent_type=\"worker\" with a scoped reviewer assignment if unavailable).",
-		"- If the final review is not APPROVE with architect status CLEAR, do not call update_goal. Record blocker work first:",
+		"- Run targeted verification for changed behavior.",
+		"- Confirm every manualQa artifact path exists and has non-zero size.",
+		"- Spawn the three final reviewer roles with fork_context=false: lazycodex-code-reviewer for implementation review, lazycodex-qa-executor for Manual-QA evidence review, and lazycodex-gate-reviewer for final criteria/checkpoint review. If selectable roles are unavailable, describe the same roles in scoped worker prompts.",
+		"- Require a quality gate JSON with clean codeReview, manualQa, gateReview, iteration, and criteriaCoverage fields.",
+		"- If any reviewer is blocked/inconclusive or the quality gate is not clean, do not call update_goal. Record blocker work first:",
 		`  ${blockerCommand}`,
 		aggregate
-			? '- If the final review is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story:'
-			: '- If the final review is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint:',
+			? '- If the quality gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story:'
+			: '- If the quality gate is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint:',
 		`  ${checkpointCommand}`,
 	]);
 }

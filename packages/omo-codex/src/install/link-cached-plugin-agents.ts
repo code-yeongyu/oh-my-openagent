@@ -1,5 +1,6 @@
 import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
+import { purgeRetiredManagedAgentFiles } from "./retired-managed-agent-purge"
 
 const MANIFEST_FILE = ".installed-agents.json"
 
@@ -54,6 +55,7 @@ export async function linkCachedPluginAgents(input: {
   readonly preservedServiceTier?: ReadonlyMap<string, string | null>
 }): Promise<readonly LinkedAgent[]> {
   const bundledAgents = await discoverBundledAgents(input.pluginRoot)
+  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome })
   if (bundledAgents.length === 0) {
     await writeManifest(input.pluginRoot, [])
     return []
@@ -148,22 +150,9 @@ async function restorePreservedReasoning(input: {
   const content = await readFile(input.target, "utf8")
   const bundledEffort = extractReasoningEffort(content)
   if (bundledEffort === input.value) return
-  if (shouldUseBundledReasoning({ agentName: input.agentName, bundledEffort, preservedEffort: input.value })) return
   const replacement = replaceReasoningEffort(content, input.value)
   if (!replacement.replaced) return
   await writeFile(input.linkPath, replacement.content)
-}
-
-function shouldUseBundledReasoning(input: {
-  readonly agentName: string
-  readonly bundledEffort: string | null
-  readonly preservedEffort: string
-}): boolean {
-  return (
-    input.agentName === "codex-ultrawork-reviewer" &&
-    input.bundledEffort === "high" &&
-    input.preservedEffort === "xhigh"
-  )
 }
 
 async function readTextIfExists(path: string): Promise<string | null> {

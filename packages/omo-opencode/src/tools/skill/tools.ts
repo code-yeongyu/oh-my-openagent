@@ -44,7 +44,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     if (options.nativeSkills) {
       try {
         const nativeAll = await options.nativeSkills.all()
-        mergeNativeSkills(allSkills, nativeAll)
+        mergeNativeSkills(allSkills, nativeAll, options.disabledSkills)
       } catch (error) {
         if (!(error instanceof Error)) throw error
       }
@@ -89,7 +89,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         if (isPromiseLike(nativeAll)) {
           needsAsyncRefresh = true
         } else {
-          mergeNativeSkillInfos(skillInfos, nativeAll)
+          mergeNativeSkillInfos(skillInfos, nativeAll, options.disabledSkills)
         }
       } catch (error) {
         if (!(error instanceof Error)) throw error

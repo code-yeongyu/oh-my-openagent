@@ -1,29 +1,29 @@
 # packages/ — Monorepo Packages
 
-**Generated:** 2026-06-11
+**Generated:** 2026-06-16
 
 ## OVERVIEW
 
-38 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `ast-grep-mcp`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own publication / deployment target.
+39 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `ast-grep-mcp`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own publication / deployment target.
 
 ## ROLE MAP
 
 | Role | Count | Packages |
 |------|-------|----------|
-| **Platform binaries** | 11 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
+| **Platform binaries** | 12 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
 | **MCP packages** | 4 | `lsp-tools-mcp`, `ast-grep-mcp`, `git-bash-mcp`, `lsp-daemon` |
 | **Core packages** | 19 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core` |
 | **Adapters** | 2 | `omo-opencode` (OpenCode Ultimate edition; the former root `src/`, build entry for the main npm dist) + `omo-codex` (Codex CLI Light edition; npm/bin alias `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`). See [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md), [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md) |
 | **Skills** | 1 | `shared-skills` (cross-harness SKILL.md bundle shared between OMO and Codex; shipped via root `files` array) |
 | **Web** | 1 | `web` |
 
-## PLATFORM BINARIES (11)
+## PLATFORM BINARIES (12)
 
-`oh-my-opencode-darwin-arm64`, `oh-my-opencode-darwin-x64`, `oh-my-opencode-darwin-x64-baseline`, `oh-my-opencode-linux-arm64`, `oh-my-opencode-linux-arm64-musl`, `oh-my-opencode-linux-x64`, `oh-my-opencode-linux-x64-baseline`, `oh-my-opencode-linux-x64-musl`, `oh-my-opencode-linux-x64-musl-baseline`, `oh-my-opencode-windows-x64`, `oh-my-opencode-windows-x64-baseline`.
+`oh-my-opencode-darwin-arm64`, `oh-my-opencode-darwin-x64`, `oh-my-opencode-darwin-x64-baseline`, `oh-my-opencode-linux-arm64`, `oh-my-opencode-linux-arm64-musl`, `oh-my-opencode-linux-x64`, `oh-my-opencode-linux-x64-baseline`, `oh-my-opencode-linux-x64-musl`, `oh-my-opencode-linux-x64-musl-baseline`, `oh-my-opencode-windows-x64`, `oh-my-opencode-windows-x64-baseline`, `oh-my-opencode-windows-arm64`.
 
 Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/build-binaries.ts`](../script/build-binaries.ts) via `bun compile`. Published by the `publish-platform.yml` workflow.
 
-`-baseline` variants are pure x86_64 (no AVX2) for older CPUs. `-musl` variants link against musl libc for Alpine. Runtime selection happens in `bin/` and `postinstall.mjs`.
+`-baseline` variants are pure x86_64 (no AVX2) for older CPUs. `-musl` variants link against musl libc for Alpine. The `windows-arm64` entry targets Windows-on-ARM via x64 emulation / node fallback (`bun compile` target `bun-windows-x64`). Runtime selection happens in `bin/` and `postinstall.mjs`.
 
 ## MCP PACKAGES
 

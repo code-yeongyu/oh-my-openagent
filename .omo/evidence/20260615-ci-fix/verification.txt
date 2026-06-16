@@ -1,0 +1,19 @@
+Windows codex-compatibility failure fix
+
+Observed CI failure:
+- Check: codex-compatibility (windows-latest)
+- Root cause: `scaffold-plan.test.mjs` passed a native Windows absolute path directly to dynamic `import(...)`; Node's ESM loader requires a file URL for drive-letter paths.
+
+Fix:
+- Convert the scaffold script path with `pathToFileURL(scriptPath).href` before dynamic import.
+
+Verification:
+- `node --test packages/omo-codex/plugin/test/scaffold-plan.test.mjs`
+  - Result: PASS
+  - Tests: 7 passed, 0 failed.
+- `bun run --cwd packages/omo-codex/plugin check`
+  - Result: PASS
+  - Tests: 217 passed, 0 failed.
+- `git diff --check origin/dev..HEAD && git diff --check`
+  - Result: PASS
+  - Output: no whitespace errors.

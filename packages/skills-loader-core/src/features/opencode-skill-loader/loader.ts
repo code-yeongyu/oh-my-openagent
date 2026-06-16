@@ -1,5 +1,6 @@
 import { join } from "path"
 import { homedir } from "os"
+import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
 import {
   findProjectAgentsSkillDirs,
   findProjectClaudeSkillDirs,
@@ -69,39 +70,60 @@ export interface DiscoverSkillsOptions {
   directory?: string
 }
 
+export function createSharedCanonicalAliases(skills: LoadedSkill[]): LoadedSkill[] {
+  return skills.map((skill) => {
+    const name = `shared/${skill.name}`
+    return {
+      ...skill,
+      name,
+      definition: {
+        ...skill.definition,
+        name,
+      },
+    }
+  })
+}
+
 export async function discoverAllSkills(directory?: string): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
+  const [opencodeProjectSkills, opencodeGlobalSkills, sharedSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
     await Promise.all([
       discoverOpencodeProjectSkills(directory),
       discoverOpencodeGlobalSkills(),
+      discoverSharedSkills(),
       discoverProjectClaudeSkills(directory),
       discoverUserClaudeSkills(),
       discoverProjectAgentsSkills(directory),
       discoverGlobalAgentsSkills(),
     ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
   return deduplicateSkillsByName([
+    ...createSharedCanonicalAliases(sharedSkills),
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
     ...projectSkills,
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...sharedSkills,
   ])
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
   const { includeClaudeCodePaths = true, directory } = options
 
-  const [opencodeProjectSkills, opencodeGlobalSkills] = await Promise.all([
+  const [opencodeProjectSkills, opencodeGlobalSkills, sharedSkills] = await Promise.all([
     discoverOpencodeProjectSkills(directory),
     discoverOpencodeGlobalSkills(),
+    discoverSharedSkills(),
   ])
 
   if (!includeClaudeCodePaths) {
-    // Priority: opencode-project > opencode
-    return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills])
+    return deduplicateSkillsByName([
+      ...createSharedCanonicalAliases(sharedSkills),
+      ...opencodeProjectSkills,
+      ...opencodeGlobalSkills,
+      ...sharedSkills,
+    ])
   }
 
   const [projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] = await Promise.all([
@@ -111,14 +133,15 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverGlobalAgentsSkills(),
   ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
   return deduplicateSkillsByName([
+    ...createSharedCanonicalAliases(sharedSkills),
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
     ...projectSkills,
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...sharedSkills,
   ])
 }
 
@@ -158,6 +181,10 @@ export async function discoverOpencodeProjectSkills(directory?: string): Promise
     ),
   )
   return deduplicateSkillsByName(allSkills.flat())
+}
+
+export async function discoverSharedSkills(): Promise<LoadedSkill[]> {
+  return loadSkillsFromDir({ skillsDir: sharedSkillsRootPath(), scope: "shared" })
 }
 
 export async function discoverProjectAgentsSkills(directory?: string): Promise<LoadedSkill[]> {

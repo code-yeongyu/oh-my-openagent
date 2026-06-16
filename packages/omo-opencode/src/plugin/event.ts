@@ -133,6 +133,7 @@ export function createEventHandler(args: {
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
 
     const { event } = input;
+    managers.tuiStateMirror?.onEvent(event);
     const props = event.properties as Record<string, unknown> | undefined;
 
     if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
@@ -173,6 +174,10 @@ export function createEventHandler(args: {
         await dispatchOpenClawSessionEvent({ pluginConfig, pluginContext, managers, rawEvent: event.type, sessionID });
       }
       await dispatchIdleOnlyHooks(input);
+      await Promise.resolve().then(() => managers.monitorManager?.handleEvent({
+        type: "session.idle",
+        sessionId: resolveSessionEventID(props) ?? "",
+      }));
     }
 
     if (event.type === "message.updated") {

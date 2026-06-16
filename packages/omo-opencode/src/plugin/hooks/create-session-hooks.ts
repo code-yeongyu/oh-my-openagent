@@ -10,6 +10,7 @@ import {
   createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
+  createCodegraphBootstrapHook,
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
@@ -45,6 +46,7 @@ export type SessionHooks = {
   modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
+  codegraphBootstrap: ReturnType<typeof createCodegraphBootstrapHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
@@ -139,6 +141,10 @@ export function createSessionHooks(args: {
         }))
     : null
 
+  const codegraphBootstrap = isHookEnabled("codegraph-bootstrap")
+    ? safeHook("codegraph-bootstrap", () => createCodegraphBootstrapHook(ctx, pluginConfig.codegraph))
+    : null
+
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? safeHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx))
     : null
@@ -229,6 +235,7 @@ export function createSessionHooks(args: {
     modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
+    codegraphBootstrap,
     agentUsageReminder,
     nonInteractiveEnv,
     interactiveBashSession,

@@ -2,13 +2,19 @@ import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-sec
 import { parseAgentHeaderName, splitTomlSections } from "./codex-config-toml-sections"
 import type { CodexAgentConfig } from "./types"
 
-const MANAGED_CODEX_AGENT_NAMES = [
-  "codex-ultrawork-reviewer",
+const LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"] as const
+
+const CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
   "librarian",
   "metis",
   "momus",
   "plan",
+] as const
+
+const MANAGED_CODEX_AGENT_NAMES = [
+  ...LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE,
+  ...CURRENT_MANAGED_CODEX_AGENT_NAMES,
 ] as const
 
 export function removeStaleManagedAgentBlocks(config: string, keepAgentNames: Set<string>): string {

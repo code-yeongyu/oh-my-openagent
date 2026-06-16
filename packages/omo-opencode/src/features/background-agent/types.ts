@@ -101,6 +101,14 @@ export interface BackgroundTask {
   consecutiveMissedPolls?: number
 }
 
+export interface BackgroundTaskSnapshot {
+  readonly title: string
+  readonly status: BackgroundTaskStatus
+  readonly toolCalls: number | null
+  readonly lastTool: string | null
+  readonly agent: string
+}
+
 export interface LaunchInput {
   description: string
   prompt: string

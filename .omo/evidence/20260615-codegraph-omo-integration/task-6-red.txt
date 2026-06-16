@@ -1,0 +1,3 @@
+$ node scripts/check-third-party-notices.mjs --codex
+--codex notice checks are reserved for task 6
+exit=2

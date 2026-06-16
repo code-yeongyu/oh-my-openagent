@@ -156,6 +156,28 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
+			name: "lazycodex executor verifier subagent-stop blocks missing evidence",
+			component: "lazycodex-executor-verify",
+			event: "subagent-stop",
+			payload: {
+				hook_event_name: "SubagentStop",
+				agent_type: "lazycodex-executor",
+				agent_id: "agent-task12",
+				session_id: "s-task12",
+				transcript_path: join(tempRoot, "transcript.jsonl"),
+				cwd: tempRoot,
+				model: "gpt-5.5",
+				permission_mode: "default",
+				stop_hook_active: true,
+				last_assistant_message: "PASS",
+			},
+			assertOutput(stdout) {
+				const output = JSON.parse(stdout);
+				assert.equal(output.decision, "block");
+				assert.match(output.reason, /\.omo\/evidence\//);
+			},
+		},
+		{
 			name: "start-work-continuation stop no state",
 			component: "start-work-continuation",
 			event: "stop",

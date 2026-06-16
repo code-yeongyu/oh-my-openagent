@@ -1,0 +1,3 @@
+$ git diff --name-only origin/dev...HEAD | rg ^\.omo/evidence/task-
+
+$ git status --short -- .omo/evidence/task-*

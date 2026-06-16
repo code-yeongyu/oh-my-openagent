@@ -14,6 +14,7 @@ export interface UlwLoopSuccessCriterion {
 	readonly scenario: string;
 	readonly userModel: UlwLoopSuccessCriterionUserModel;
 	readonly expectedEvidence: string;
+	readonly essential?: boolean;
 	capturedEvidence: string | null;
 	status: UlwLoopCriterionStatus;
 	capturedAt?: string;
