@@ -42,7 +42,7 @@ Run independent calls as one parallel batch, and vary the angle per call - the s
 ## TYPE B (sequence, with parallel acceleration)
 1. Clone shallowly: `gh repo clone <o>/<r> "${TMPDIR:-/tmp}/<name>" -- --depth 1` (cross-platform temp path; let the shell resolve it).
 2. Pin the SHA: `git rev-parse HEAD` in the clone.
-3. Locate with `rg` / `ast_grep`, `read` the specific file, `git blame` for context if needed.
+3. Locate with `rg` or the `ast-grep` skill, `read` the specific file, `git blame` for context if needed.
 4. Build permalinks against the pinned SHA.
 Accelerate with one batch of 4+ calls: the clone + `grep_app` or `gh search code "<symbol>" --repo <o>/<r>` + `gh api repos/<o>/<r>/commits/HEAD --jq .sha` + a `context7` or targeted docs fetch of the same API surface.
 
