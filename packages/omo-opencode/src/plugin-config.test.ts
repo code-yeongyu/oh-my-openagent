@@ -422,6 +422,11 @@ describe("parseConfigPartially", () => {
           include_co_authored_by: true,
           git_env_prefix: "GIT_MASTER=1",
         },
+        tui: {
+          sidebar: {
+            enabled: true,
+          },
+        },
       });
     });
   });

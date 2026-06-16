@@ -1,7 +1,7 @@
 import type { CommandDefinition } from "@oh-my-opencode/claude-code-compat-core/claude-code-command-loader/types"
 import type { SkillMcpConfig } from "../../types"
 
-export type SkillScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project"
+export type SkillScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project" | "shared"
 
 export interface SkillMetadata {
   name?: string

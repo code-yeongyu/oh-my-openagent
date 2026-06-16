@@ -11,6 +11,7 @@ export * from "./skill-definition-record"
 
 export * from "./git-master-template-injection"
 export * from "./skill-discovery"
+export * from "./skill-disable-config"
 export * from "./skill-resolution-options"
 export * from "./loaded-skill-template-extractor"
 export * from "./skill-template-resolver"

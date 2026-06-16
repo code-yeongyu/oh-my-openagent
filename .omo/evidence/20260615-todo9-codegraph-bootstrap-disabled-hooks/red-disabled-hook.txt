@@ -1,0 +1,3 @@
+codegraphBootstrapRegistered=true
+
+EXIT_STATUS=2

@@ -15,6 +15,7 @@ import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompt
 import { detectCodexInstallation, formatCodexInstallationWarning, runCodexInstaller } from "./install-codex"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
+import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -89,6 +90,12 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
       return 1
     }
     spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
+    try {
+      ensureTuiPluginEntry()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      p.log.warn(`Could not update OpenCode TUI config: ${message}`)
+    }
 
     spinner.start(`Writing ${PLUGIN_NAME} configuration`)
     const omoResult = writeOmoConfig(config)

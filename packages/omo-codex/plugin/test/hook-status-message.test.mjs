@@ -17,17 +17,21 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:SessionStart:0:0", "Loading Project Rules"],
 	["hooks/hooks.json:SessionStart:1:0", "Recording Session Telemetry"],
 	["hooks/hooks.json:SessionStart:2:0", "Checking Auto Update"],
+	["hooks/hooks.json:SessionStart:3:0", "Checking Bootstrap Provisioning"],
 	["hooks/hooks.json:UserPromptSubmit:0:0", "Loading Project Rules"],
 	["hooks/hooks.json:UserPromptSubmit:1:0", "Checking Ultrawork Trigger"],
 	["hooks/hooks.json:UserPromptSubmit:2:0", "Checking Ulw-Loop Steering"],
-	["hooks/hooks.json:PreToolUse:0:0", "Enforcing Unlimited Goal Budget"],
+	["hooks/hooks.json:PreToolUse:0:0", "Recommending Git Bash MCP"],
+	["hooks/hooks.json:PreToolUse:1:0", "Enforcing Unlimited Goal Budget"],
 	["hooks/hooks.json:PostToolUse:0:0", "Checking Comments"],
 	["hooks/hooks.json:PostToolUse:0:1", "Checking LSP Diagnostics"],
 	["hooks/hooks.json:PostToolUse:1:0", "Matching Project Rules"],
-	["hooks/hooks.json:PostCompact:0:0", "Resetting Project Rule Cache"],
+	["hooks/hooks.json:PostCompact:0:0", "Resetting Git Bash MCP Reminder"],
+	["hooks/hooks.json:PostCompact:1:0", "Resetting Project Rule Cache"],
 	["hooks/hooks.json:PostCompact:2:0", "Resetting LSP Diagnostics Cache"],
 	["hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
 	["hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
+	["hooks/hooks.json:SubagentStop:1:0", "Verifying LazyCodex Executor Evidence"],
 ]);
 
 const COMPONENT_EXPECTED_LABELS = new Map([
@@ -44,6 +48,12 @@ const COMPONENT_EXPECTED_LABELS = new Map([
 	["components/ulw-loop/hooks/hooks.json:PreToolUse:0:0", "Enforcing Unlimited Ulw-Loop Budget"],
 	["components/start-work-continuation/hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
 	["components/start-work-continuation/hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
+	[
+		"components/lazycodex-executor-verify/hooks/hooks.json:SubagentStop:0:0",
+		"Verifying LazyCodex Executor Evidence",
+	],
+	["components/git-bash/hooks/hooks.json:PreToolUse:0:0", "Recommending Git Bash MCP"],
+	["components/git-bash/hooks/hooks.json:PostCompact:0:0", "Resetting Git Bash MCP Reminder"],
 ]);
 
 async function readJson(relativePath) {
@@ -142,10 +152,10 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
 });
 
-test("#given LazyCodex appears inside hook status label #when normalizing #then product casing is preserved", async () => {
+test("#given LazyCodex appears inside hook label #when normalizing #then product casing is preserved", async () => {
 	// given
 	const version = (await readRepoJson("package.json")).version;
-	const label = "Verifying LazyCodex Executor Evidence";
+	const label = "verifying lazycodex executor evidence";
 
 	// when
 	const normalized = normalizeLazyCodexHookStatusLabel(label);
@@ -156,6 +166,18 @@ test("#given LazyCodex appears inside hook status label #when normalizing #then 
 	assert.equal(message, `LazyCodex(${version}): Verifying LazyCodex Executor Evidence`);
 });
 
+test("#given MCP appears inside hook label #when normalizing #then protocol casing is preserved", () => {
+	// given
+	const label = "recommending git bash mcp";
+
+	// when
+	const normalized = normalizeLazyCodexHookStatusLabel(label);
+	const message = formatLazyCodexHookStatusMessage("4.10.0", label);
+
+	// then
+	assert.equal(normalized, "Recommending Git Bash MCP");
+	assert.equal(message, "LazyCodex(4.10.0): Recommending Git Bash MCP");
+});
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
 	const aggregateVersion = await readPluginVersion();

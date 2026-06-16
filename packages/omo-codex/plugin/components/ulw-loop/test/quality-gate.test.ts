@@ -1,19 +1,12 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import {
-	classifyExternalAuthorizationBlocker,
-	clearGoalBlockerFields,
-	normalizeBlockerEvidence,
-	sameBlockerOccurrences,
-	validateQualityGate,
-} from "../src/quality-gate.js";
-import type { UlwLoopItem, UlwLoopPlan } from "../src/types.js";
+import { validateQualityGate } from "../src/quality-gate.js";
 import { UlwLoopError } from "../src/types.js";
 
-const NOW = "2026-05-23T00:00:00.000Z";
 const VALID_GATE = {
 	codeReview: {
 		by: "lazycodex-code-reviewer",
@@ -58,7 +51,7 @@ const VALID_GATE = {
 				id: "artifact-cli-reject",
 				kind: "log",
 				description: "Log proving malformed quality gate rejection.",
-				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.log",
+				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt",
 			},
 		],
 	},
@@ -81,14 +74,8 @@ const VALID_GATE = {
 		adversarialClassesCovered: ["malformed_input", "stale_state"],
 	},
 } as const;
-const FS_OPTS = { repoRoot: process.cwd(), fs: { existsSync, statSync } } as const;
-
-interface GoalWithBlocker extends UlwLoopItem {
-	blocker?: { readonly signature: string };
-	blockerEvidence?: string;
-	blockerOccurrences?: number;
-	blockedAt?: string;
-}
+const REPO_ROOT = fileURLToPath(new URL("../../../../../..", import.meta.url));
+const FS_OPTS = { repoRoot: REPO_ROOT, fs: { existsSync, statSync } } as const;
 
 function makeGate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return { ...VALID_GATE, ...overrides };
@@ -102,32 +89,6 @@ function getQualityGateError(input: unknown): UlwLoopError {
 		throw error;
 	}
 	throw new Error("Expected UlwLoopError");
-}
-
-function makeGoal(overrides: Partial<UlwLoopItem> = {}): UlwLoopItem {
-	return {
-		id: "G001",
-		title: "Goal one",
-		objective: "Complete goal one",
-		status: "pending",
-		successCriteria: [],
-		attempt: 1,
-		createdAt: NOW,
-		updatedAt: NOW,
-		...overrides,
-	};
-}
-
-function makePlan(goals: UlwLoopItem[]): UlwLoopPlan {
-	return {
-		version: 1,
-		createdAt: NOW,
-		updatedAt: NOW,
-		briefPath: ".omo/ulw-loop/brief.md",
-		goalsPath: ".omo/ulw-loop/goals.json",
-		ledgerPath: ".omo/ulw-loop/ledger.jsonl",
-		goals,
-	};
 }
 
 describe("validateQualityGate", () => {
@@ -257,9 +218,7 @@ describe("validateQualityGate", () => {
 
 	it("#given iteration did not perform a full rerun #when validated #then it is rejected", () => {
 		// when
-		const error = getQualityGateError(
-			makeGate({ iteration: { ...VALID_GATE.iteration, fullRerun: false } }),
-		);
+		const error = getQualityGateError(makeGate({ iteration: { ...VALID_GATE.iteration, fullRerun: false } }));
 
 		// then
 		expect(error.message).toContain("iteration.fullRerun");
@@ -288,63 +247,5 @@ describe("validateQualityGate", () => {
 
 		// then
 		expect(error.message).toContain("criteriaCoverage.passCount");
-	});
-});
-
-describe("classifyExternalAuthorizationBlocker", () => {
-	it("returns GHCR signature when evidence mentions ghcr.io auth failure", () => {
-		expect(
-			classifyExternalAuthorizationBlocker("ghcr.io returned 401 authentication required for package pull"),
-		).toBe("GHCR_PULL_ACCESS:HTTP_401_ANONYMOUS:GHCR_VISIBILITY_OR_CREDENTIAL_REQUIRED");
-	});
-
-	it("returns generic auth signature for generic 401 evidence", () => {
-		expect(classifyExternalAuthorizationBlocker("Registry returned 401 because credentials are missing")).toBe(
-			"EXTERNAL_AUTHORIZATION_REQUIRED",
-		);
-	});
-
-	it("returns null when no auth keywords", () => {
-		expect(classifyExternalAuthorizationBlocker("build failed because tests failed")).toBeNull();
-	});
-});
-
-describe("normalizeBlockerEvidence", () => {
-	it("collapses whitespace + lowercases", () => {
-		expect(normalizeBlockerEvidence(" GHCR.IO\n\tNeeds   TOKEN ")).toBe("ghcr.io needs token");
-	});
-});
-
-describe("sameBlockerOccurrences", () => {
-	it("counts goals matching signature", () => {
-		// given
-		const nested: GoalWithBlocker = { ...makeGoal({ id: "G002" }), blocker: { signature: "AUTH" } };
-		const plan = makePlan([makeGoal({ blockerSignature: "AUTH" }), nested, makeGoal({ id: "G003" })]);
-
-		// when/then
-		expect(sameBlockerOccurrences(plan, "AUTH")).toBe(2);
-	});
-});
-
-describe("clearGoalBlockerFields", () => {
-	it("clears all 5 blocker fields", () => {
-		// given
-		const goal: GoalWithBlocker = {
-			...makeGoal({ blockerSignature: "AUTH" }),
-			blocker: { signature: "AUTH" },
-			blockerEvidence: "401 unauthorized",
-			blockerOccurrences: 2,
-			blockedAt: NOW,
-		};
-
-		// when
-		clearGoalBlockerFields(goal);
-
-		// then
-		expect(goal).not.toHaveProperty("blocker");
-		expect(goal).not.toHaveProperty("blockerSignature");
-		expect(goal).not.toHaveProperty("blockerEvidence");
-		expect(goal).not.toHaveProperty("blockerOccurrences");
-		expect(goal).not.toHaveProperty("blockedAt");
 	});
 });

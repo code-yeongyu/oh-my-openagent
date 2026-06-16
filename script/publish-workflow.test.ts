@@ -46,6 +46,20 @@ function expectBunSetupBeforeLspToolsBuild(workflowSection: string, label: strin
   expect(bunSetupIndex, `${label} must setup Bun before lsp-tools-mcp build`).toBeLessThan(lspBuildIndex)
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function readPackageScript(scriptName: string): string {
+  const parsed: unknown = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+  if (!isRecord(parsed)) throw new Error("package.json must be an object")
+  const scripts = parsed["scripts"]
+  if (!isRecord(scripts)) throw new Error("package.json scripts must be an object")
+  const script = scripts[scriptName]
+  if (typeof script !== "string") throw new Error(`package.json scripts.${scriptName} must be a string`)
+  return script
+}
+
 describe("test workflows", () => {
   test("use pure bun test for workflows", () => {
     for (const workflowCheck of workflowChecks) {
@@ -179,16 +193,29 @@ describe("test workflows", () => {
 
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {
     // #given
-    const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
+    const codexTestScript = readPackageScript("test:codex")
 
     // #when
-    const codexTestScriptBuildsMcpRuntimes =
-      packageManifest.includes(
-        '"test:codex": "bun run build:codex-install && bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
-      )
+    const requiredPrerequisites = [
+      ["generated Codex installer", "bun run build:codex-install"],
+      ["ast-grep MCP runtime", "bun run build:ast-grep-mcp"],
+      ["Git Bash MCP runtime", "bun run build:git-bash-mcp"],
+      ["lsp-tools MCP runtime", "bun run build:lsp-tools-mcp"],
+      ["lsp daemon runtime", "bun run build:lsp-daemon"],
+      ["vendored lsp-tools package tests", "npm --prefix packages/lsp-tools-mcp test"],
+      ["nested Codex plugin npm install", "npm --prefix packages/omo-codex/plugin ci"],
+      ["nested Codex plugin build", "bun run --cwd packages/omo-codex/plugin build"],
+      ["third-party notices ship check", "node scripts/check-third-party-notices.mjs --ship"],
+      ["Codex compatibility Bun tests", "bun test"],
+    ] as const
 
     // #then
-    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must build the generated Codex installer, install nested Codex plugin deps, and build bundled runtimes before installer tests copy them").toBe(true)
+    let previousIndex = -1
+    for (const [description, command] of requiredPrerequisites) {
+      const index = codexTestScript.indexOf(command)
+      expect(index, `test:codex must run ${description}`).toBeGreaterThan(previousIndex)
+      previousIndex = index
+    }
   })
 
   test("runs Git Bash installer regressions in Codex compatibility checks", () => {

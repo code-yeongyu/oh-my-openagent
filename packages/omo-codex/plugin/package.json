@@ -6,8 +6,10 @@
 	"packageManager": "npm@11.12.1",
 	"private": true,
 	"workspaces": [
+		"components/codegraph",
 		"components/comment-checker",
 		"components/git-bash",
+		"components/lazycodex-executor-verify",
 		"components/rules",
 		"components/lsp",
 		"components/telemetry",

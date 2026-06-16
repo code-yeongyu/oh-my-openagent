@@ -6,6 +6,7 @@ export const EXPECTED_OMO_COMPONENT_BINS = [
   { name: "omo", target: join("dist", "cli", "index.js"), kind: "runtime-wrapper" },
   { name: "omo-comment-checker", target: join("components", "comment-checker", "dist", "cli.js") },
   { name: "omo-git-bash-hook", target: join("components", "git-bash", "dist", "cli.js") },
+  { name: "lazycodex-executor-verify", target: join("components", "lazycodex-executor-verify", "dist", "cli.js") },
   { name: "omo-lsp", target: join("components", "lsp", "dist", "cli.js") },
   { name: "omo-rules", target: join("components", "rules", "dist", "cli.js") },
   { name: "omo-start-work-continuation", target: join("components", "start-work-continuation", "dist", "cli.js") },

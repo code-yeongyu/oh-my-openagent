@@ -192,6 +192,8 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
 | `providerOptions` | object        | Provider-specific options                              |
 
+Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `shared/ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
+
 #### Anthropic Extended Thinking
 
 ```json
@@ -262,6 +264,8 @@ Object entries support: `model`, `variant`, `reasoningEffort`, `temperature`, `t
 #### File URIs for Prompts
 
 Both `prompt` and `prompt_append` support loading content from files via `file://` URIs. Category-level `prompt_append` supports the same URI forms.
+
+For Prometheus, file-backed `prompt` content is appended after the mandatory base prompt; it does not replace the base prompt.
 
 ```jsonc
 {
