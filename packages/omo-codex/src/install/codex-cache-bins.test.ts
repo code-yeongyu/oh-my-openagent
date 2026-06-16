@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -63,7 +63,8 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(wrapper).toContain("exit /b 127")
   })
 
-  it("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
+  const posixOnly = process.platform === "win32" ? test.skip : test
+  posixOnly("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
     // given
     const fixture = await createRepoFixture()
     const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
