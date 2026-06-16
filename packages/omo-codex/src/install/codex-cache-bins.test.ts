@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 import { mkdtempSync } from "node:fs"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
@@ -61,5 +61,39 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(wrapper).toMatch(/dist[\\/]cli-node[\\/]index\.js/)
     expect(wrapper.indexOf("OMO_RUNTIME")).toBeLessThan(wrapper.indexOf("where bun"))
     expect(wrapper).toContain("exit /b 127")
+  })
+
+  it("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+    if (link === null) throw new Error("expected runtime wrapper link")
+    await chmod(link.path, 0o755)
+    await rm(join(fixture.repoRoot, "dist", "cli", "index.js"))
+
+    // when
+    const process = Bun.spawn([link.path], { env: { ...Bun.env, BUN_BINARY: "bun" }, stderr: "pipe", stdout: "pipe" })
+    const [stderr, exitCode] = await Promise.all([new Response(process.stderr).text(), process.exited])
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(stderr).toContain(`omo: runtime target missing at ${join(fixture.repoRoot, "dist", "cli", "index.js")}`)
+    expect(stderr).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
+  })
+
+  it("#given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec", async () => {
+    // given
+    const fixture = await createRepoFixture()
+
+    // when
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+
+    // then
+    if (link === null) throw new Error("expected runtime wrapper link")
+    const wrapper = await readFile(link.path, "utf8")
+    const guardIndex = wrapper.indexOf("runtime target missing")
+    expect(guardIndex).toBeGreaterThan(-1)
+    expect(guardIndex).toBeLessThan(wrapper.indexOf('"%BUN_BINARY%"'))
+    expect(wrapper).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
   })
 })
