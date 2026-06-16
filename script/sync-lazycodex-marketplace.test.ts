@@ -6,6 +6,11 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { syncLazycodexMarketplace } from "./sync-lazycodex-marketplace"
 
+const astGrepSkillSegments = ["ast", "grep"] as const
+const astGrepSkillName = astGrepSkillSegments.join("-")
+const astGrepMcpServerName = astGrepSkillSegments.join("_")
+const deletedAstGrepRuntimeName = [...astGrepSkillSegments, "mcp"].join("-")
+
 async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`)
@@ -82,11 +87,12 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   })
   await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
     mcpServers: {
-      ast_grep: { command: "node", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"], cwd: "." },
       git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"], cwd: "." },
       lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." },
     },
   })
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "skills", astGrepSkillName), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "skills", astGrepSkillName, "SKILL.md"), "# AST-Grep\n")
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "README.md"), "omo\n")
   if (options.includeLazycodexRepositoryWorkflow ?? true) {
     await mkdir(join(sourceRoot, "packages", "omo-codex", "lazycodex-repository", ".github", "workflows"), { recursive: true })
@@ -103,8 +109,6 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts", "bootstrap.ps1"), "exit 0\n")
-  await mkdir(join(sourceRoot, "packages", "ast-grep-mcp", "dist"), { recursive: true })
-  await writeFile(join(sourceRoot, "packages", "ast-grep-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "git-bash-mcp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "git-bash-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
@@ -148,10 +152,11 @@ describe("sync-lazycodex-marketplace", () => {
     const workflow = await readFile(join(lazycodexRoot, ".github", "workflows", "pr-source-guidance.yml"), "utf8")
     expect(workflow).toContain("PR source guidance")
     const mcpManifest = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", ".mcp.json"), "utf8"))
-    expect(mcpManifest.mcpServers.ast_grep.args[0]).toBe("./components/ast-grep-mcp/dist/cli.js")
+    expect(Object.hasOwn(mcpManifest.mcpServers, astGrepMcpServerName)).toBe(false)
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe("./components/git-bash-mcp/dist/cli.js")
     expect(mcpManifest.mcpServers.lsp.args[0]).toBe("./components/lsp-daemon/dist/cli.js")
-    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "ast-grep-mcp", "dist", "cli.js"))).isFile()).toBe(true)
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "components", deletedAstGrepRuntimeName))
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "skills", astGrepSkillName, "SKILL.md"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "git-bash-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-daemon", "dist", "cli.js"))).isFile()).toBe(true)
@@ -314,7 +319,6 @@ describe("sync-lazycodex-marketplace", () => {
     await rm(join(sourceRoot, "packages", "lsp-daemon", "dist"), { recursive: true, force: true })
     await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
       mcpServers: {
-        ast_grep: { command: "node", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"], cwd: "." },
         git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"], cwd: "." },
       },
     })

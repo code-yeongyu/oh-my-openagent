@@ -27,7 +27,6 @@ const CODEGRAPH_COMPONENTS = [
 ]
 
 const ROOT_BUNDLED_COMPONENTS = [
-  "@ast-grep/cli binary payload",
   "pi-lsp-client",
   "pi-rules",
   "pi-comment-checker",
@@ -35,7 +34,6 @@ const ROOT_BUNDLED_COMPONENTS = [
 ]
 
 const CODEX_AGGREGATE_COMPONENTS = [
-  "@ast-grep/cli binary payload",
   "@code-yeongyu/comment-checker",
   "@code-yeongyu/codex-comment-checker",
   "@code-yeongyu/codex-lsp",
@@ -46,7 +44,6 @@ const CODEX_AGGREGATE_COMPONENTS = [
   "@code-yeongyu/codex-ulw-loop",
   "@code-yeongyu/lsp-daemon",
   "@code-yeongyu/lsp-tools-mcp",
-  "@oh-my-opencode/ast-grep-mcp",
   "@oh-my-opencode/boulder-state",
   "@oh-my-opencode/comment-checker-core",
   "@oh-my-opencode/git-bash-mcp",

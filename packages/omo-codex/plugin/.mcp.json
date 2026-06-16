@@ -1,10 +1,5 @@
 {
 	"mcpServers": {
-		"ast_grep": {
-			"command": "node",
-			"args": ["../../ast-grep-mcp/dist/cli.js", "mcp"],
-			"cwd": "."
-		},
 		"grep_app": {
 			"url": "https://mcp.grep.app"
 		},

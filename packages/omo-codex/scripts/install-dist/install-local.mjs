@@ -15,6 +15,31 @@ var __export = (target, all) => {
 };
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 
+// packages/utils/src/xdg-data-dir.ts
+import { accessSync, constants, mkdirSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+function resolveXdgDataDir(appName, options = {}) {
+  const osProvider = options.osProvider ?? os;
+  const env = options.env ?? process.env;
+  const preferredDir = env.XDG_DATA_HOME ?? path.join(osProvider.homedir(), ".local", "share");
+  return resolveWritableDirectory(preferredDir, `${appName}-data`, osProvider);
+}
+function resolveWritableDirectory(preferredDir, fallbackSuffix, osProvider) {
+  try {
+    mkdirSync(preferredDir, { recursive: true });
+    accessSync(preferredDir, constants.W_OK);
+    return preferredDir;
+  } catch (error) {
+    if (!(error instanceof Error))
+      throw error;
+    const fallbackDir = path.join(osProvider.tmpdir(), fallbackSuffix);
+    mkdirSync(fallbackDir, { recursive: true });
+    return fallbackDir;
+  }
+}
+var init_xdg_data_dir = () => {};
+
 // packages/utils/src/atomic-write.ts
 import {
   closeSync,
@@ -69,47 +94,22 @@ var init_atomic_write = __esm(() => {
   ]);
 });
 
-// packages/utils/src/xdg-data-dir.ts
-import { accessSync, constants, mkdirSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
-function resolveXdgDataDir(appName, options = {}) {
-  const osProvider = options.osProvider ?? os;
-  const env = options.env ?? process.env;
-  const preferredDir = env.XDG_DATA_HOME ?? path.join(osProvider.homedir(), ".local", "share");
-  return resolveWritableDirectory(preferredDir, `${appName}-data`, osProvider);
-}
-function resolveWritableDirectory(preferredDir, fallbackSuffix, osProvider) {
-  try {
-    mkdirSync(preferredDir, { recursive: true });
-    accessSync(preferredDir, constants.W_OK);
-    return preferredDir;
-  } catch (error) {
-    if (!(error instanceof Error))
-      throw error;
-    const fallbackDir = path.join(osProvider.tmpdir(), fallbackSuffix);
-    mkdirSync(fallbackDir, { recursive: true });
-    return fallbackDir;
-  }
-}
-var init_xdg_data_dir = () => {};
-
 // packages/telemetry-core/src/activity-state.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
-import { basename as basename5, join as join24 } from "node:path";
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
+import { basename as basename5, join as join25 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
   const dataDir = resolveXdgDataDir(product.cacheDirName, {
     env: options.env,
     osProvider: options.osProvider
   });
-  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join24(options.env.XDG_DATA_HOME, product.cacheDirName);
+  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join25(options.env.XDG_DATA_HOME, product.cacheDirName);
   if (dataDir === xdgStateDir || xdgStateDir === undefined && basename5(dataDir) === product.cacheDirName) {
     return dataDir;
   }
-  return join24(dataDir, product.cacheDirName);
+  return join25(dataDir, product.cacheDirName);
 }
 function getTelemetryActivityStateFilePath(stateDir) {
-  return join24(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
+  return join25(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
 }
 function getDailyActiveCaptureState(input) {
   const state = readPostHogActivityState(input.stateDir, input.diagnostics);
@@ -134,7 +134,7 @@ function isPostHogActivityState(value) {
 }
 function readPostHogActivityState(stateDir, diagnostics) {
   const stateFilePath = getTelemetryActivityStateFilePath(stateDir);
-  if (!existsSync3(stateFilePath)) {
+  if (!existsSync4(stateFilePath)) {
     return {};
   }
   try {
@@ -179,10 +179,10 @@ var init_activity_state = __esm(() => {
 var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
 
 // packages/telemetry-core/src/diagnostics.ts
-import { appendFileSync, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { join as join25 } from "node:path";
+import { appendFileSync, existsSync as existsSync5, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
+import { join as join26 } from "node:path";
 function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
-  return join25(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
+  return join26(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
 }
 function writeTelemetryDiagnostic(input, options) {
   const now = options.now ?? new Date;
@@ -200,7 +200,7 @@ function writeTelemetryDiagnostic(input, options) {
 }
 function cleanupTelemetryDiagnostics(options) {
   const diagnosticsFilePath = getTelemetryDiagnosticsFilePath(options.diagnosticsDir);
-  if (!existsSync4(diagnosticsFilePath)) {
+  if (!existsSync5(diagnosticsFilePath)) {
     return;
   }
   try {
@@ -257,7 +257,7 @@ function shouldRetainLine(line, cutoffMs) {
 function parseDiagnosticLine(line) {
   try {
     const parsed = JSON.parse(line);
-    if (!isRecord(parsed)) {
+    if (!isRecord2(parsed)) {
       return null;
     }
     return parsed;
@@ -268,7 +268,7 @@ function parseDiagnosticLine(line) {
     throw error;
   }
 }
-function isRecord(value) {
+function isRecord2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function trimToMaxBytes(lines) {
@@ -311,24 +311,24 @@ function isSendOptOutFlag(value) {
   return includesValue(SEND_OPT_OUT_VALUES, value);
 }
 function shouldDisableTelemetry(input) {
-  const env = input.env ?? process.env;
+  const env2 = input.env ?? process.env;
   const globalPrefix = input.globalEnvPrefix ?? "OMO";
   const prefixes = Array.from(new Set([globalPrefix, input.productEnvPrefix]));
   for (const prefix of prefixes) {
-    if (isDisableFlag(env[`${prefix}_DISABLE_POSTHOG`])) {
+    if (isDisableFlag(env2[`${prefix}_DISABLE_POSTHOG`])) {
       return true;
     }
-    if (isSendOptOutFlag(env[`${prefix}_SEND_ANONYMOUS_TELEMETRY`])) {
+    if (isSendOptOutFlag(env2[`${prefix}_SEND_ANONYMOUS_TELEMETRY`])) {
       return true;
     }
   }
   return false;
 }
-function getTelemetryApiKey(env = process.env, defaultApiKey = DEFAULT_POSTHOG_API_KEY) {
-  return env["POSTHOG_API_KEY"]?.trim() ?? defaultApiKey;
+function getTelemetryApiKey(env2 = process.env, defaultApiKey = DEFAULT_POSTHOG_API_KEY) {
+  return env2["POSTHOG_API_KEY"]?.trim() ?? defaultApiKey;
 }
-function getTelemetryHost(env = process.env, defaultHost = DEFAULT_POSTHOG_HOST) {
-  return env["POSTHOG_HOST"]?.trim() || defaultHost;
+function getTelemetryHost(env2 = process.env, defaultHost = DEFAULT_POSTHOG_HOST) {
+  return env2["POSTHOG_HOST"]?.trim() || defaultHost;
 }
 var TRUTHY_DISABLE_VALUES, SEND_OPT_OUT_VALUES;
 var init_env = __esm(() => {
@@ -665,7 +665,7 @@ function isErrorEvent(event) {
 function isEvent(candidate) {
   return typeof Event != "undefined" && isInstanceOf(candidate, Event);
 }
-function isPlainObject(candidate) {
+function isPlainObject2(candidate) {
   return isBuiltin(candidate, "Object");
 }
 function isInstanceOf(candidate, base) {
@@ -689,23 +689,23 @@ var init_type_utils = __esm(() => {
 });
 
 // node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/number-utils.mjs
-function clampToRange(value, min, max, logger, fallbackValue) {
+function clampToRange(value, min, max, logger3, fallbackValue) {
   if (min > max) {
-    logger.warn("min cannot be greater than max.");
+    logger3.warn("min cannot be greater than max.");
     min = max;
   }
   if (isNumber(value))
     if (value > max) {
-      logger.warn(" cannot be  greater than max: " + max + ". Using max value instead.");
+      logger3.warn(" cannot be  greater than max: " + max + ". Using max value instead.");
       return max;
     } else {
       if (!(value < min))
         return value;
-      logger.warn(" cannot be less than min: " + min + ". Using min value instead.");
+      logger3.warn(" cannot be less than min: " + min + ". Using min value instead.");
       return min;
     }
-  logger.warn(" must be a number. using max or fallback. max: " + max + ", fallback: " + fallbackValue);
-  return clampToRange(fallbackValue || max, min, max, logger);
+  logger3.warn(" must be a number. using max or fallback. max: " + max + ", fallback: " + fallbackValue);
+  return clampToRange(fallbackValue || max, min, max, logger3);
 }
 var init_number_utils = __esm(() => {
   init_type_utils();
@@ -983,7 +983,7 @@ var _createLogger = (prefix, maybeCall, consoleLike) => {
       consoleMethod(prefix, ...args);
     });
   }
-  const logger = {
+  const logger3 = {
     debug: (...args) => {
       _log("debug", ...args);
     },
@@ -1001,7 +1001,7 @@ var _createLogger = (prefix, maybeCall, consoleLike) => {
     },
     createLogger: (additionalPrefix) => _createLogger(`${prefix} ${additionalPrefix}`, maybeCall, consoleLike)
   };
-  return logger;
+  return logger3;
 }, passThrough = (fn) => fn();
 var init_logger = () => {};
 
@@ -3197,14 +3197,14 @@ async function addSourceContext(frames) {
   return frames;
 }
 function getContextLinesFromFile(path2, ranges, output) {
-  return new Promise((resolve8) => {
+  return new Promise((resolve10) => {
     const stream = createReadStream(path2);
     const lineReaded = createInterface({
       input: stream
     });
     function destroyStreamAndResolve() {
       stream.destroy();
-      resolve8();
+      resolve10();
     }
     let lineNumber = 0;
     let currentRangeIndex = 0;
@@ -4676,9 +4676,9 @@ var init_client = __esm(() => {
       if (this.disabled || this.optedOut)
         return;
       if (!this._waitUntilCycle) {
-        let resolve8;
+        let resolve10;
         const promise = new Promise((r) => {
-          resolve8 = r;
+          resolve10 = r;
         });
         try {
           waitUntil(promise);
@@ -4686,7 +4686,7 @@ var init_client = __esm(() => {
           return;
         }
         this._waitUntilCycle = {
-          resolve: resolve8,
+          resolve: resolve10,
           startedAt: Date.now(),
           timer: undefined
         };
@@ -4712,11 +4712,11 @@ var init_client = __esm(() => {
       return cycle?.resolve;
     }
     async resolveWaitUntilFlush() {
-      const resolve8 = this._consumeWaitUntilCycle();
+      const resolve10 = this._consumeWaitUntilCycle();
       try {
         await super.flush();
       } catch {} finally {
-        resolve8?.();
+        resolve10?.();
       }
     }
     getPersistedProperty(key) {
@@ -4816,15 +4816,15 @@ var init_client = __esm(() => {
         return true;
       if (this.featureFlagsPoller === undefined)
         return false;
-      return new Promise((resolve8) => {
+      return new Promise((resolve10) => {
         const timeout = setTimeout(() => {
           cleanup();
-          resolve8(false);
+          resolve10(false);
         }, timeoutMs);
         const cleanup = this._events.on("localEvaluationFlagsLoaded", (count) => {
           clearTimeout(timeout);
           cleanup();
-          resolve8(count > 0);
+          resolve10(count > 0);
         });
       });
     }
@@ -5330,13 +5330,13 @@ var init_client = __esm(() => {
       this.context?.enter(data, options);
     }
     async _shutdown(shutdownTimeoutMs) {
-      const resolve8 = this._consumeWaitUntilCycle();
+      const resolve10 = this._consumeWaitUntilCycle();
       await this.featureFlagsPoller?.stopPoller(shutdownTimeoutMs);
       this.errorTracking.shutdown();
       try {
         return await super._shutdown(shutdownTimeoutMs);
       } finally {
-        resolve8?.();
+        resolve10?.();
       }
     }
     async _requestRemoteConfigPayload(flagKey) {
@@ -5378,7 +5378,7 @@ var init_client = __esm(() => {
       const personProperties = {};
       const groupProperties = {};
       for (const [key, value] of Object.entries(eventProperties))
-        if (isPlainObject(value) && groups && key in groups) {
+        if (isPlainObject2(value) && groups && key in groups) {
           const groupProps = {};
           for (const [groupKey, groupValue] of Object.entries(value))
             groupProps[String(groupKey)] = String(groupValue);
@@ -5741,8 +5741,8 @@ function createDefaultPostHogTransport(apiKey, options) {
   return new PostHogTelemetryTransport(apiKey, options);
 }
 function isTelemetryClientEnabled(input) {
-  const env = input.env ?? process.env;
-  return !shouldDisableTelemetry({ env, productEnvPrefix: input.product.productEnvPrefix }) && getTelemetryApiKey(env, input.product.defaultApiKey).length > 0;
+  const env2 = input.env ?? process.env;
+  return !shouldDisableTelemetry({ env: env2, productEnvPrefix: input.product.productEnvPrefix }) && getTelemetryApiKey(env2, input.product.defaultApiKey).length > 0;
 }
 function createTelemetryClient(input) {
   if (!isTelemetryClientEnabled(input)) {
@@ -5797,17 +5797,17 @@ function createTelemetryClient(input) {
   };
 }
 function createTransport(input) {
-  const env = input.env ?? process.env;
+  const env2 = input.env ?? process.env;
   const factory = input.transportFactory ?? createDefaultPostHogTransport;
   try {
-    return factory(getTelemetryApiKey(env, input.product.defaultApiKey), {
+    return factory(getTelemetryApiKey(env2, input.product.defaultApiKey), {
       enableExceptionAutocapture: false,
       enableLocalEvaluation: false,
       strictLocalEvaluation: true,
       disableRemoteConfig: true,
       flushAt: 1,
       flushInterval: 0,
-      host: getTelemetryHost(env, input.product.defaultHost),
+      host: getTelemetryHost(env2, input.product.defaultHost),
       disableGeoip: false
     });
   } catch (error) {
@@ -6127,7 +6127,7 @@ var init_telemetry = __esm(() => {
 
 // packages/omo-codex/src/install/install-local-cli.ts
 import { readFile as readFile19 } from "node:fs/promises";
-import { dirname as dirname9, join as join30, resolve as resolve9 } from "node:path";
+import { dirname as dirname9, join as join31, resolve as resolve11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -6395,13 +6395,13 @@ var defaultRunCommand = async (command, args, options) => {
 };
 
 // packages/omo-codex/src/install/install-codex.ts
-import { join as join26, resolve as resolve8 } from "node:path";
-import { existsSync as existsSync5 } from "node:fs";
+import { join as join27, resolve as resolve10 } from "node:path";
+import { existsSync as existsSync6 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 
 // packages/omo-codex/src/install/codex-cache-bins.ts
 import { chmod, lstat as lstat3, mkdir, readFile as readFile2, readdir, readlink as readlink2, rm as rm2, stat, symlink, writeFile } from "node:fs/promises";
-import { basename, isAbsolute, join as join3, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join as join2, relative, resolve, sep } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-command-shim.ts
 var COMMAND_SHIM_MARKER = ":: generated by oh-my-openagent Codex installer";
@@ -6489,99 +6489,9 @@ function isNodeErrorWithCode2(error) {
   return typeof error === "object" && error !== null && "code" in error;
 }
 
-// packages/omo-codex/src/install/codex-cache-runtime-wrapper.ts
-import { join as join2 } from "node:path";
-var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";
-function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = toPosixPath(join2(binDir, "omo-ulw-loop"));
-  const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath));
-  const escapedCliPath = escapePosixDoubleQuoted(toPosixPath(cliPath));
-  const escapedCodexHome = escapePosixDoubleQuoted(toPosixPath(codexHome));
-  const escapedUlwLoopBin = escapePosixDoubleQuoted(ulwLoopBin);
-  return [
-    "#!/bin/sh",
-    `# ${RUNTIME_WRAPPER_MARKER}`,
-    `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
-    'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
-    'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
-    "  shift",
-    '  exec "' + escapedUlwLoopBin + '" "$@"',
-    "fi",
-    `if [ "\${OMO_RUNTIME:-}" = "node" ] && [ -f "${nodeCli}" ]; then`,
-    `  exec node "${nodeCli}" "$@"`,
-    "fi",
-    'BUN_BINARY="${BUN_BINARY:-}"',
-    'if [ -z "$BUN_BINARY" ] && command -v bun >/dev/null 2>&1; then',
-    "  BUN_BINARY=bun",
-    "fi",
-    'if [ -z "$BUN_BINARY" ]; then',
-    '  for omo_bun_candidate in "$HOME/.bun/bin/bun" /opt/homebrew/bin/bun /usr/local/bin/bun; do',
-    '    if [ -x "$omo_bun_candidate" ]; then',
-    '      BUN_BINARY="$omo_bun_candidate"',
-    "      break",
-    "    fi",
-    "  done",
-    "fi",
-    'if [ -z "$BUN_BINARY" ]; then',
-    `  if [ -f "${nodeCli}" ] && command -v node >/dev/null 2>&1; then`,
-    `    exec node "${nodeCli}" "$@"`,
-    "  fi",
-    `  echo "omo: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall omo and force the fallback with OMO_RUNTIME=node" >&2`,
-    "  exit 127",
-    "fi",
-    `if [ ! -f "${escapedCliPath}" ]; then`,
-    `  echo "omo: runtime target missing at ${escapedCliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui" >&2`,
-    "  exit 1",
-    "fi",
-    `exec "$BUN_BINARY" "${escapedCliPath}" "$@"`,
-    ""
-  ].join(`
-`);
-}
-function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = join2(binDir, "omo-ulw-loop.cmd");
-  return [
-    "@echo off",
-    `rem ${RUNTIME_WRAPPER_MARKER}`,
-    `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
-    'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
-    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
-    "  shift /1",
-    `  "${ulwLoopBin}" %*`,
-    "  exit /b %ERRORLEVEL%",
-    ")",
-    `if "%OMO_RUNTIME%"=="node" if exist "${nodeCliPath}" (`,
-    `  node "${nodeCliPath}" %*`,
-    "  exit /b %ERRORLEVEL%",
-    ")",
-    'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
-    'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
-    "if not defined BUN_BINARY (",
-    `  if exist "${nodeCliPath}" (`,
-    `    node "${nodeCliPath}" %*`,
-    "    exit /b %ERRORLEVEL%",
-    "  )",
-    `  echo omo: bun runtime not found and the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or reinstall omo and force OMO_RUNTIME=node 1>&2`,
-    "  exit /b 127",
-    ")",
-    `if not exist "${cliPath}" (`,
-    `  echo omo: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
-    "  exit /b 1",
-    ")",
-    `"%BUN_BINARY%" "${cliPath}" %*`,
-    ""
-  ].join(`\r
-`);
-}
-function toPosixPath(path) {
-  return path.replaceAll("\\", "/");
-}
-function escapePosixDoubleQuoted(value) {
-  return value.replaceAll("\\", "\\\\").replaceAll('"', "\\\"").replaceAll("$", "\\$").replaceAll("`", "\\`");
-}
-
 // packages/omo-codex/src/install/codex-cache-bins.ts
 var RESERVED_NESTED_BIN_NAMES = new Set(["omo", "lazycodex", "lazycodex-ai", "oh-my-opencode", "oh-my-openagent"]);
+var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";
 async function linkCachedPluginBins(input) {
   const binLinks = await discoverPackageBins(input.pluginRoot);
   const platform = input.platform ?? process.platform;
@@ -6595,29 +6505,29 @@ async function linkCachedPluginBins(input) {
   return linked;
 }
 async function linkRootRuntimeBin(input) {
-  const cliPath = join3(input.repoRoot, "dist", "cli", "index.js");
+  const cliPath = join2(input.repoRoot, "dist", "cli", "index.js");
   if (!await isFile(cliPath))
     return null;
-  const nodeCliPath = join3(input.repoRoot, "dist", "cli-node", "index.js");
+  const nodeCliPath = join2(input.repoRoot, "dist", "cli-node", "index.js");
   const platform = input.platform ?? process.platform;
   await mkdir(input.binDir, { recursive: true });
   if (platform === "win32") {
-    const linkPath2 = join3(input.binDir, "omo.cmd");
+    const linkPath2 = join2(input.binDir, "omo.cmd");
     await replaceRuntimeWrapper(linkPath2, windowsRuntimeWrapper(cliPath, input.codexHome, input.binDir, nodeCliPath));
     return { name: "omo", path: linkPath2, target: cliPath };
   }
-  const linkPath = join3(input.binDir, "omo");
+  const linkPath = join2(input.binDir, "omo");
   await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(cliPath, input.codexHome, input.binDir, nodeCliPath));
   await chmod(linkPath, 493);
   return { name: "omo", path: linkPath, target: cliPath };
 }
 async function linkCachedPluginBin(binDir, link, platform) {
   if (platform === "win32") {
-    const linkPath2 = join3(binDir, `${link.name}.cmd`);
+    const linkPath2 = join2(binDir, `${link.name}.cmd`);
     await replaceCommandShim(linkPath2, link.target);
     return linkPath2;
   }
-  const linkPath = join3(binDir, link.name);
+  const linkPath = join2(binDir, link.name);
   await replaceSymlink(linkPath, link.target);
   return linkPath;
 }
@@ -6638,14 +6548,14 @@ async function discoverPackageBins(root) {
 async function collectPackageBins(directory, root, links) {
   const entries = await readdir(directory, { withFileTypes: true });
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
-    await appendPackageBinLinks(join3(directory, "package.json"), directory, root, links);
+    await appendPackageBinLinks(join2(directory, "package.json"), directory, root, links);
   }
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist")
       continue;
-    const childPath = join3(directory, entry.name);
+    const childPath = join2(directory, entry.name);
     if (!childPath.startsWith(root))
       continue;
     await collectPackageBins(childPath, root, links);
@@ -6730,6 +6640,85 @@ async function existingNonRuntimeWrapper(path) {
     throw error;
   }
 }
+function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
+  const ulwLoopBin = toPosixPath(join2(binDir, "omo-ulw-loop"));
+  const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath));
+  const escapedCliPath = escapePosixDoubleQuoted(toPosixPath(cliPath));
+  const escapedCodexHome = escapePosixDoubleQuoted(toPosixPath(codexHome));
+  const escapedUlwLoopBin = escapePosixDoubleQuoted(ulwLoopBin);
+  return [
+    "#!/bin/sh",
+    `# ${RUNTIME_WRAPPER_MARKER}`,
+    `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
+    'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
+    'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
+    "  shift",
+    '  exec "' + escapedUlwLoopBin + '" "$@"',
+    "fi",
+    `if [ "\${OMO_RUNTIME:-}" = "node" ] && [ -f "${nodeCli}" ]; then`,
+    `  exec node "${nodeCli}" "$@"`,
+    "fi",
+    'BUN_BINARY="${BUN_BINARY:-}"',
+    'if [ -z "$BUN_BINARY" ] && command -v bun >/dev/null 2>&1; then',
+    "  BUN_BINARY=bun",
+    "fi",
+    'if [ -z "$BUN_BINARY" ]; then',
+    '  for omo_bun_candidate in "$HOME/.bun/bin/bun" /opt/homebrew/bin/bun /usr/local/bin/bun; do',
+    '    if [ -x "$omo_bun_candidate" ]; then',
+    '      BUN_BINARY="$omo_bun_candidate"',
+    "      break",
+    "    fi",
+    "  done",
+    "fi",
+    'if [ -z "$BUN_BINARY" ]; then',
+    `  if [ -f "${nodeCli}" ] && command -v node >/dev/null 2>&1; then`,
+    `    exec node "${nodeCli}" "$@"`,
+    "  fi",
+    `  echo "omo: bun runtime not found (checked PATH, ~/.bun/bin, /opt/homebrew/bin, /usr/local/bin) and the node fallback CLI is missing at ${nodeCli}; install bun from https://bun.sh, or reinstall omo and force the fallback with OMO_RUNTIME=node" >&2`,
+    "  exit 127",
+    "fi",
+    `exec "$BUN_BINARY" "${escapedCliPath}" "$@"`,
+    ""
+  ].join(`
+`);
+}
+function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
+  const ulwLoopBin = join2(binDir, "omo-ulw-loop.cmd");
+  return [
+    "@echo off",
+    `rem ${RUNTIME_WRAPPER_MARKER}`,
+    `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
+    'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
+    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
+    "  shift /1",
+    `  "${ulwLoopBin}" %*`,
+    "  exit /b %ERRORLEVEL%",
+    ")",
+    `if "%OMO_RUNTIME%"=="node" if exist "${nodeCliPath}" (`,
+    `  node "${nodeCliPath}" %*`,
+    "  exit /b %ERRORLEVEL%",
+    ")",
+    'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
+    'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
+    "if not defined BUN_BINARY (",
+    `  if exist "${nodeCliPath}" (`,
+    `    node "${nodeCliPath}" %*`,
+    "    exit /b %ERRORLEVEL%",
+    "  )",
+    `  echo omo: bun runtime not found and the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or reinstall omo and force OMO_RUNTIME=node 1>&2`,
+    "  exit /b 127",
+    ")",
+    `"%BUN_BINARY%" "${cliPath}" %*`,
+    ""
+  ].join(`\r
+`);
+}
+function toPosixPath(p) {
+  return p.replaceAll("\\", "/");
+}
+function escapePosixDoubleQuoted(value) {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', "\\\"").replaceAll("$", "\\$").replaceAll("`", "\\`");
+}
 async function existingNonShim(path) {
   try {
     const stat2 = await lstat3(path);
@@ -6760,19 +6749,12 @@ async function existingNonSymlink(path) {
 }
 // packages/omo-codex/src/install/codex-cache-install.ts
 import { cp as cp2, mkdir as mkdir3, readFile as readFile6, rename, rm as rm3 } from "node:fs/promises";
-import { basename as basename2, dirname as dirname3, join as join8, sep as sep4 } from "node:path";
+import { basename as basename2, dirname as dirname3, join as join7, sep as sep4 } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-bundled-mcps.ts
 import { cp, mkdir as mkdir2, readFile as readFile3, stat as stat2 } from "node:fs/promises";
-import { dirname, join as join4, resolve as resolve2 } from "node:path";
+import { dirname, join as join3, resolve as resolve2 } from "node:path";
 var BUNDLED_MCP_RUNTIMES = [
-  {
-    label: "ast-grep MCP",
-    sourceArg: "../../ast-grep-mcp/dist/cli.js",
-    sourceDistFromPlugin: "../../ast-grep-mcp/dist",
-    destinationArg: "./components/ast-grep-mcp/dist/cli.js",
-    destinationDistFromPlugin: "components/ast-grep-mcp/dist"
-  },
   {
     label: "Git Bash MCP",
     sourceArg: "../../git-bash-mcp/dist/cli.js",
@@ -6789,7 +6771,7 @@ var BUNDLED_MCP_RUNTIMES = [
   }
 ];
 async function copyBundledMcpRuntimeDists(input) {
-  const sourceArgs = await readSourceMcpArgs(join4(input.sourceRoot, ".mcp.json"));
+  const sourceArgs = await readSourceMcpArgs(join3(input.sourceRoot, ".mcp.json"));
   for (const runtime2 of BUNDLED_MCP_RUNTIMES) {
     if (!sourceArgs.has(runtime2.sourceArg))
       continue;
@@ -6798,14 +6780,14 @@ async function copyBundledMcpRuntimeDists(input) {
 }
 function resolveBundledMcpRuntimeArg(pluginRoot, arg) {
   const runtime2 = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg);
-  return runtime2 ? join4(pluginRoot, runtime2.destinationArg) : null;
+  return runtime2 ? join3(pluginRoot, runtime2.destinationArg) : null;
 }
 async function copyBundledMcpRuntimeDist(pluginRoot, sourceRoot, runtime2) {
   const sourcePath = resolve2(sourceRoot, runtime2.sourceDistFromPlugin);
   if (!await isDirectory(sourcePath)) {
     throw new Error(`missing built ${runtime2.label} dist at ${sourcePath}`);
   }
-  const destinationPath = join4(pluginRoot, runtime2.destinationDistFromPlugin);
+  const destinationPath = join3(pluginRoot, runtime2.destinationDistFromPlugin);
   await mkdir2(dirname(destinationPath), { recursive: true });
   await cp(sourcePath, destinationPath, { recursive: true });
 }
@@ -6844,10 +6826,10 @@ async function isDirectory(path) {
 // packages/omo-codex/src/install/codex-cache-local-dependencies.ts
 import { realpathSync } from "node:fs";
 import { readFile as readFile4, readdir as readdir2, writeFile as writeFile2 } from "node:fs/promises";
-import { dirname as dirname2, isAbsolute as isAbsolute3, join as join6, relative as relative3, resolve as resolve4, sep as sep2 } from "node:path";
+import { dirname as dirname2, isAbsolute as isAbsolute3, join as join5, relative as relative3, resolve as resolve4, sep as sep2 } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-paths.ts
-import { isAbsolute as isAbsolute2, join as join5, relative as relative2, resolve as resolve3 } from "node:path";
+import { isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve3 } from "node:path";
 function resolveCachedRuntimePath(pluginRoot, sourceRoot, runtimePath) {
   const targetPath = resolve3(pluginRoot, runtimePath);
   if (isPathInside(targetPath, pluginRoot))
@@ -6870,7 +6852,7 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
     if (!isPlainRecord(parsed))
       continue;
     const packageDir = dirname2(packageJsonPath);
-    const sourcePackageDir = join6(sourceRoot, relative3(pluginRoot, packageDir));
+    const sourcePackageDir = join5(sourceRoot, relative3(pluginRoot, packageDir));
     let changed = false;
     for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
       const dependencies = parsed[field];
@@ -6908,7 +6890,7 @@ async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot)
 `);
 }
 async function readPackageLock(pluginRoot) {
-  const path = join6(pluginRoot, "package-lock.json");
+  const path = join5(pluginRoot, "package-lock.json");
   try {
     const parsed = JSON.parse(await readFile4(path, "utf8"));
     return { path, value: isPlainRecord(parsed) ? parsed : null, changed: false };
@@ -6969,14 +6951,14 @@ function canonicalizeExistingPath(path) {
 async function collectPackageJsonPaths(directory, root, paths) {
   const entries = await readdir2(directory, { withFileTypes: true });
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
-    paths.push(join6(directory, "package.json"));
+    paths.push(join5(directory, "package.json"));
   }
   for (const entry of entries) {
     if (!entry.isDirectory())
       continue;
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist")
       continue;
-    const childPath = join6(directory, entry.name);
+    const childPath = join5(directory, entry.name);
     if (!isPathInside(childPath, root))
       continue;
     await collectPackageJsonPaths(childPath, root, paths);
@@ -6985,9 +6967,9 @@ async function collectPackageJsonPaths(directory, root, paths) {
 
 // packages/omo-codex/src/install/codex-cache-mcp-manifest.ts
 import { readFile as readFile5, writeFile as writeFile3 } from "node:fs/promises";
-import { join as join7, sep as sep3 } from "node:path";
+import { join as join6, sep as sep3 } from "node:path";
 async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot) {
-  const manifestPath = join7(pluginRoot, ".mcp.json");
+  const manifestPath = join6(pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return;
   const raw = await readFile5(manifestPath, "utf8");
@@ -7025,7 +7007,7 @@ async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot) {
 `);
 }
 async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
-  const manifestPath = join7(pluginRoot, ".mcp.json");
+  const manifestPath = join6(pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return;
   const raw = await readFile5(manifestPath, "utf8");
@@ -7065,7 +7047,7 @@ async function installCachedPlugin(input) {
     await maybeRunNpmInstall(input.sourcePath, input.runCommand);
     await maybeRunNpmBuild(input.sourcePath, input.runCommand);
   }
-  const targetPath = join8(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version);
+  const targetPath = join7(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version);
   const tempPath = createTempSiblingPath(targetPath);
   await rm3(tempPath, { recursive: true, force: true });
   try {
@@ -7083,14 +7065,14 @@ async function installCachedPlugin(input) {
   return { name: input.name, version: input.version, path: targetPath };
 }
 async function maybeRunNpmInstall(cwd, runCommand, args = ["install"]) {
-  if (!await fileExistsStrict(join8(cwd, "package.json")))
+  if (!await fileExistsStrict(join7(cwd, "package.json")))
     return;
   await runCommand("npm", args, { cwd });
 }
 async function maybeRunNpmBuild(cwd, runCommand) {
-  if (!await fileExistsStrict(join8(cwd, "package.json")))
+  if (!await fileExistsStrict(join7(cwd, "package.json")))
     return;
-  const packageJson = JSON.parse(await readFile6(join8(cwd, "package.json"), "utf8"));
+  const packageJson = JSON.parse(await readFile6(join7(cwd, "package.json"), "utf8"));
   if (!isPlainRecord(packageJson))
     return;
   const scripts = packageJson.scripts;
@@ -7099,10 +7081,10 @@ async function maybeRunNpmBuild(cwd, runCommand) {
   await runCommand("npm", ["run", "build"], { cwd });
 }
 function createTempSiblingPath(targetPath) {
-  return join8(dirname3(targetPath), `.tmp-${basename2(targetPath)}-${process.pid}-${Date.now()}`);
+  return join7(dirname3(targetPath), `.tmp-${basename2(targetPath)}-${process.pid}-${Date.now()}`);
 }
 function createBackupSiblingPath(targetPath) {
-  return join8(dirname3(targetPath), `.backup-${basename2(targetPath)}-${process.pid}-${Date.now()}`);
+  return join7(dirname3(targetPath), `.backup-${basename2(targetPath)}-${process.pid}-${Date.now()}`);
 }
 async function copyDirectory(sourcePath, targetPath) {
   await mkdir3(dirname3(targetPath), { recursive: true });
@@ -7141,9 +7123,9 @@ function shouldCopyPluginPath(path, root) {
 }
 // packages/omo-codex/src/install/codex-cache-prune.ts
 import { lstat as lstat4, readdir as readdir3, rm as rm4, stat as stat3 } from "node:fs/promises";
-import { join as join9 } from "node:path";
+import { join as join8 } from "node:path";
 async function pruneMarketplaceCache(input) {
-  const cacheRoot = join9(input.codexHome, "plugins", "cache", input.marketplaceName);
+  const cacheRoot = join8(input.codexHome, "plugins", "cache", input.marketplaceName);
   if (!await fileExistsStrict(cacheRoot))
     return;
   const keep = new Set(input.keepPluginNames);
@@ -7151,15 +7133,15 @@ async function pruneMarketplaceCache(input) {
   for (const entry of entries) {
     if (!entry.isDirectory() || keep.has(entry.name))
       continue;
-    await rm4(join9(cacheRoot, entry.name), { recursive: true, force: true });
+    await rm4(join8(cacheRoot, entry.name), { recursive: true, force: true });
   }
 }
 async function pruneMarketplacePluginCaches(input) {
-  const cacheRoot = join9(input.codexHome, "plugins", "cache", input.marketplaceName);
+  const cacheRoot = join8(input.codexHome, "plugins", "cache", input.marketplaceName);
   if (!await fileExistsStrict(cacheRoot))
     return;
   for (const pluginName of input.pluginNames) {
-    await rm4(join9(cacheRoot, pluginName), { recursive: true, force: true });
+    await rm4(join8(cacheRoot, pluginName), { recursive: true, force: true });
   }
   const remainingEntries = await readCacheEntryNames(cacheRoot);
   if (remainingEntries.length === 0) {
@@ -7206,11 +7188,11 @@ async function isBrokenCacheSymlink(path) {
 }
 // packages/omo-codex/src/install/codex-cached-marketplace-manifest.ts
 import { mkdir as mkdir4, writeFile as writeFile4 } from "node:fs/promises";
-import { join as join10 } from "node:path";
+import { join as join9 } from "node:path";
 async function writeCachedMarketplaceManifest(input) {
-  const marketplaceDir = join10(input.marketplaceRoot, ".agents", "plugins");
+  const marketplaceDir = join9(input.marketplaceRoot, ".agents", "plugins");
   await mkdir4(marketplaceDir, { recursive: true });
-  await writeFile4(join10(marketplaceDir, "marketplace.json"), `${JSON.stringify({
+  await writeFile4(join9(marketplaceDir, "marketplace.json"), `${JSON.stringify({
     name: input.marketplaceName,
     plugins: input.plugins.map((plugin) => ({
       name: plugin.name,
@@ -7223,7 +7205,7 @@ async function writeCachedMarketplaceManifest(input) {
 // packages/omo-codex/src/install/codex-package-layout.ts
 import { existsSync as existsSync2 } from "node:fs";
 import { readFile as readFile7 } from "node:fs/promises";
-import { join as join11 } from "node:path";
+import { join as join10 } from "node:path";
 var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
   "@code-yeongyu/lazycodex",
   "@code-yeongyu/lazycodex-ai",
@@ -7233,9 +7215,9 @@ var PACKAGED_CODEX_INSTALLER_NAMES = new Set([
   "oh-my-openagent"
 ]);
 async function shouldBuildSourcePackages(repoRoot) {
-  if (existsSync2(join11(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
+  if (existsSync2(join10(repoRoot, "packages", "omo-opencode", "src", "index.ts")))
     return true;
-  const packageJsonPath = join11(repoRoot, "package.json");
+  const packageJsonPath = join10(repoRoot, "package.json");
   if (!existsSync2(packageJsonPath))
     return true;
   const packageJson = JSON.parse(await readFile7(packageJsonPath, "utf8"));
@@ -7433,12 +7415,12 @@ function tomlKeySegment(value) {
 
 // packages/omo-codex/src/install/codex-config-atomic-write.ts
 import { lstat as lstat5, readlink as readlink3, realpath, rename as rename2, unlink, writeFile as writeFile5 } from "node:fs/promises";
-import { basename as basename3, dirname as dirname4, isAbsolute as isAbsolute4, join as join12, resolve as resolve5 } from "node:path";
+import { basename as basename3, dirname as dirname4, isAbsolute as isAbsolute4, join as join11, resolve as resolve5 } from "node:path";
 var RENAME_RETRY_DELAYS_MS = [10, 25, 50];
 var RETRIABLE_RENAME_CODES = new Set(["EPERM", "EBUSY"]);
 async function writeFileAtomic(targetPath, data) {
   const writeTarget = await resolveSymlinkTarget(targetPath);
-  const temporaryPath = join12(dirname4(writeTarget), `.tmp-${basename3(writeTarget)}-${process.pid}-${Date.now()}`);
+  const temporaryPath = join11(dirname4(writeTarget), `.tmp-${basename3(writeTarget)}-${process.pid}-${Date.now()}`);
   await writeFile5(temporaryPath, data);
   try {
     await renameWithRetry(temporaryPath, writeTarget);
@@ -7709,7 +7691,7 @@ function isRootSetting(line, key) {
 
 // packages/omo-codex/src/install/codex-model-catalog.ts
 import { readFile as readFile8 } from "node:fs/promises";
-import { join as join13 } from "node:path";
+import { join as join12 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
     model: "gpt-5.5",
@@ -7728,7 +7710,7 @@ var FALLBACK_CODEX_MODEL_CATALOG = {
   ]
 };
 async function readCodexModelCatalog(codexPackageRoot) {
-  const catalogPath = join13(codexPackageRoot, "plugin", "model-catalog.json");
+  const catalogPath = join12(codexPackageRoot, "plugin", "model-catalog.json");
   try {
     const parsed = JSON.parse(await readFile8(catalogPath, "utf8"));
     return parseCodexModelCatalog(parsed) ?? FALLBACK_CODEX_MODEL_CATALOG;
@@ -7859,7 +7841,7 @@ async function exists(path) {
 // packages/omo-codex/src/install/codex-hook-trust.ts
 import { createHash } from "node:crypto";
 import { readFile as readFile10 } from "node:fs/promises";
-import { join as join14 } from "node:path";
+import { join as join13 } from "node:path";
 var EVENT_LABELS = new Map([
   ["PreToolUse", "pre_tool_use"],
   ["PermissionRequest", "permission_request"],
@@ -7873,13 +7855,13 @@ var EVENT_LABELS = new Map([
   ["Stop", "stop"]
 ]);
 async function trustedHookStatesForPlugin(input) {
-  const manifestPath = join14(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join13(input.pluginRoot, ".codex-plugin", "plugin.json");
   if (!await exists2(manifestPath))
     return [];
   const manifest = JSON.parse(await readFile10(manifestPath, "utf8"));
   if (!isPlainRecord(manifest) || typeof manifest.hooks !== "string")
     return [];
-  const hooksPath = join14(input.pluginRoot, manifest.hooks);
+  const hooksPath = join13(input.pluginRoot, manifest.hooks);
   if (!await exists2(hooksPath))
     return [];
   const parsed = JSON.parse(await readFile10(hooksPath, "utf8"));
@@ -7994,11 +7976,11 @@ function toCodexResolution(resolution) {
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
 import { copyFile, lstat as lstat7, mkdir as mkdir6, readFile as readFile12, readdir as readdir4, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { basename as basename4, join as join16 } from "node:path";
+import { basename as basename4, join as join15 } from "node:path";
 
 // packages/omo-codex/src/install/retired-managed-agent-purge.ts
 import { lstat as lstat6, readFile as readFile11, rm as rm5 } from "node:fs/promises";
-import { join as join15 } from "node:path";
+import { join as join14 } from "node:path";
 var RETIRED_MANAGED_AGENT_FILES = [
   {
     fileName: "codex-ultrawork-reviewer.toml",
@@ -8010,11 +7992,11 @@ var RETIRED_MANAGED_AGENT_FILES = [
   }
 ];
 async function purgeRetiredManagedAgentFiles(input) {
-  const agentsDir = join15(input.codexHome, "agents");
+  const agentsDir = join14(input.codexHome, "agents");
   if (!await exists3(agentsDir))
     return;
   for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
-    const agentPath = join15(agentsDir, retiredAgent.fileName);
+    const agentPath = join14(agentsDir, retiredAgent.fileName);
     if (!await exists3(agentPath))
       continue;
     const agentStat = await lstat6(agentPath);
@@ -8057,7 +8039,7 @@ function nodeErrorCode(error) {
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
 var MANIFEST_FILE = ".installed-agents.json";
 async function capturePreservedAgentReasoning(input) {
-  const agentsDir = join16(input.codexHome, "agents");
+  const agentsDir = join15(input.codexHome, "agents");
   if (!await exists4(agentsDir))
     return new Map;
   const preserved = new Map;
@@ -8065,7 +8047,7 @@ async function capturePreservedAgentReasoning(input) {
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists2(join16(agentsDir, entry.name));
+    const content = await readTextIfExists2(join15(agentsDir, entry.name));
     if (content === null)
       continue;
     const effort = extractReasoningEffort(content);
@@ -8075,7 +8057,7 @@ async function capturePreservedAgentReasoning(input) {
   return preserved;
 }
 async function capturePreservedAgentServiceTier(input) {
-  const agentsDir = join16(input.codexHome, "agents");
+  const agentsDir = join15(input.codexHome, "agents");
   if (!await exists4(agentsDir))
     return new Map;
   const preserved = new Map;
@@ -8083,7 +8065,7 @@ async function capturePreservedAgentServiceTier(input) {
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists2(join16(agentsDir, entry.name));
+    const content = await readTextIfExists2(join15(agentsDir, entry.name));
     if (content === null)
       continue;
     preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
@@ -8097,13 +8079,13 @@ async function linkCachedPluginAgents(input) {
     await writeManifest(input.pluginRoot, []);
     return [];
   }
-  const agentsDir = join16(input.codexHome, "agents");
+  const agentsDir = join15(input.codexHome, "agents");
   await mkdir6(agentsDir, { recursive: true });
   const linked = [];
   for (const agentPath of bundledAgents) {
     const agentFileName = basename4(agentPath);
     const agentName = agentNameFromToml(agentFileName);
-    const linkPath = join16(agentsDir, agentFileName);
+    const linkPath = join15(agentsDir, agentFileName);
     await replaceWithCopy(linkPath, agentPath);
     await restorePreservedReasoning({
       agentName,
@@ -8133,7 +8115,7 @@ async function restorePreservedServiceTier(input) {
   await writeFile6(input.linkPath, replacement.content);
 }
 async function discoverBundledAgents(pluginRoot) {
-  const componentsRoot = join16(pluginRoot, "components");
+  const componentsRoot = join15(pluginRoot, "components");
   if (!await exists4(componentsRoot))
     return [];
   const componentEntries = await readdir4(componentsRoot, { withFileTypes: true });
@@ -8141,14 +8123,14 @@ async function discoverBundledAgents(pluginRoot) {
   for (const entry of componentEntries) {
     if (!entry.isDirectory())
       continue;
-    const agentsRoot = join16(componentsRoot, entry.name, "agents");
+    const agentsRoot = join15(componentsRoot, entry.name, "agents");
     if (!await exists4(agentsRoot))
       continue;
     const agentEntries = await readdir4(agentsRoot, { withFileTypes: true });
     for (const file2 of agentEntries) {
       if (!file2.isFile() || !file2.name.endsWith(".toml"))
         continue;
-      agents.push(join16(agentsRoot, file2.name));
+      agents.push(join15(agentsRoot, file2.name));
     }
   }
   agents.sort();
@@ -8168,7 +8150,7 @@ async function prepareReplacement(linkPath) {
   await rm6(linkPath, { force: true });
 }
 async function writeManifest(pluginRoot, agentPaths) {
-  const manifestPath = join16(pluginRoot, MANIFEST_FILE);
+  const manifestPath = join15(pluginRoot, MANIFEST_FILE);
   const payload = { agents: [...agentPaths].sort() };
   await writeFile6(manifestPath, `${JSON.stringify(payload, null, "\t")}
 `);
@@ -8296,10 +8278,10 @@ function nodeErrorCode2(error) {
 
 // packages/omo-codex/src/install/codex-marketplace.ts
 import { readFile as readFile13 } from "node:fs/promises";
-import { join as join17 } from "node:path";
+import { join as join16 } from "node:path";
 var DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json";
 async function readMarketplace(repoRoot, options) {
-  const marketplacePath = options?.marketplacePath ?? join17(repoRoot, DEFAULT_MARKETPLACE_PATH);
+  const marketplacePath = options?.marketplacePath ?? join16(repoRoot, DEFAULT_MARKETPLACE_PATH);
   const raw = await readFile13(marketplacePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
@@ -8318,10 +8300,10 @@ async function readMarketplace(repoRoot, options) {
 function resolvePluginSource(repoRoot, plugin, options) {
   const sourcePath = localSourcePath(options?.pathOverride ?? plugin.source);
   const relativePath = sourcePath.slice(2);
-  return join17(repoRoot, ...relativePath.split(/[\\/]/));
+  return join16(repoRoot, ...relativePath.split(/[\\/]/));
 }
 async function readPluginManifest(pluginRoot) {
-  const raw = await readFile13(join17(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
+  const raw = await readFile13(join16(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
     throw new Error(`${pluginRoot} plugin.json must be an object`);
@@ -8391,7 +8373,7 @@ function validateLocalSourcePath(path) {
 
 // packages/omo-codex/src/install/codex-marketplace-snapshot.ts
 import { cp as cp3, mkdir as mkdir7, rename as rename3, rm as rm7, writeFile as writeFile7 } from "node:fs/promises";
-import { join as join18, sep as sep5 } from "node:path";
+import { join as join17, sep as sep5 } from "node:path";
 var INSTALLED_MARKETPLACES_DIR = ".tmp/marketplaces";
 async function writeInstalledMarketplaceSnapshot(input) {
   const marketplaceRoot = installedMarketplaceRoot(input.codexHome, input.marketplace.name);
@@ -8404,21 +8386,21 @@ async function writeInstalledMarketplaceSnapshot(input) {
   return snapshotPlugins;
 }
 function installedMarketplaceRoot(codexHome, marketplaceName) {
-  return join18(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
+  return join17(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
 }
 async function writeMarketplaceManifest(marketplaceRoot, marketplace) {
-  const manifestDir = join18(marketplaceRoot, ".agents", "plugins");
+  const manifestDir = join17(marketplaceRoot, ".agents", "plugins");
   await mkdir7(manifestDir, { recursive: true });
-  const tempPath = join18(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
+  const tempPath = join17(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
   await writeFile7(tempPath, `${JSON.stringify(marketplace, null, "\t")}
 `);
-  await rename3(tempPath, join18(manifestDir, "marketplace.json"));
+  await rename3(tempPath, join17(manifestDir, "marketplace.json"));
 }
 async function writeSnapshotPlugin(marketplaceRoot, plugin) {
-  const pluginsDir = join18(marketplaceRoot, "plugins");
+  const pluginsDir = join17(marketplaceRoot, "plugins");
   await mkdir7(pluginsDir, { recursive: true });
-  const targetPath = join18(pluginsDir, plugin.name);
-  const tempPath = join18(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
+  const targetPath = join17(pluginsDir, plugin.name);
+  const tempPath = join17(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
   await rm7(tempPath, { recursive: true, force: true });
   await cp3(plugin.sourcePath, tempPath, {
     recursive: true,
@@ -8440,10 +8422,10 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 
 // packages/omo-codex/src/install/lazycodex-version-stamp.ts
 import { readdir as readdir5, readFile as readFile14, writeFile as writeFile8 } from "node:fs/promises";
-import { join as join19 } from "node:path";
+import { join as join18 } from "node:path";
 async function readDistributionManifest(repoRoot) {
   try {
-    const parsed = JSON.parse(await readFile14(join19(repoRoot, "package.json"), "utf8"));
+    const parsed = JSON.parse(await readFile14(join18(repoRoot, "package.json"), "utf8"));
     if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0)
       return;
     return {
@@ -8463,15 +8445,15 @@ function resolveLazyCodexPluginVersion(input) {
   return input.manifestVersion ?? "local";
 }
 async function stampLazyCodexPluginVersion(input) {
-  await stampJsonVersion(join19(input.pluginRoot, ".codex-plugin", "plugin.json"), input.version);
-  await stampJsonVersion(join19(input.pluginRoot, "package.json"), input.version);
-  await stampHookStatusMessages(join19(input.pluginRoot, "hooks", "hooks.json"), input.version);
+  await stampJsonVersion(join18(input.pluginRoot, ".codex-plugin", "plugin.json"), input.version);
+  await stampJsonVersion(join18(input.pluginRoot, "package.json"), input.version);
+  await stampHookStatusMessages(join18(input.pluginRoot, "hooks", "hooks.json"), input.version);
   await stampComponentVersions(input);
 }
 async function writeLazyCodexInstallSnapshot(input) {
   if (input.distributionManifest === undefined)
     return;
-  await writeFile8(join19(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
+  await writeFile8(join18(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
     packageName: input.distributionManifest.name,
     version: input.distributionManifest.version
   }, null, "\t")}
@@ -8508,16 +8490,16 @@ async function stampHookStatusMessages(path, version) {
 async function stampComponentVersions(input) {
   let entries;
   try {
-    entries = await readdir5(join19(input.pluginRoot, "components"));
+    entries = await readdir5(join18(input.pluginRoot, "components"));
   } catch (error) {
     if (error instanceof Error)
       return;
     throw error;
   }
   for (const entry of entries) {
-    const componentRoot = join19(input.pluginRoot, "components", entry);
-    await stampJsonVersion(join19(componentRoot, "package.json"), input.version);
-    await stampHookStatusMessages(join19(componentRoot, "hooks", "hooks.json"), input.version);
+    const componentRoot = join18(input.pluginRoot, "components", entry);
+    await stampJsonVersion(join18(componentRoot, "package.json"), input.version);
+    await stampHookStatusMessages(join18(componentRoot, "hooks", "hooks.json"), input.version);
   }
 }
 function stampHookGroups(hooks, version) {
@@ -8543,7 +8525,7 @@ function stampHookStatusMessage(hook, version) {
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
 import { copyFile as copyFile2, lstat as lstat8, readFile as readFile15, writeFile as writeFile9 } from "node:fs/promises";
-import { dirname as dirname6, join as join20, resolve as resolve6 } from "node:path";
+import { dirname as dirname6, join as join19, resolve as resolve6 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 var PROJECT_LOCAL_ARTIFACT_PATHS = [
   ".codex/hooks.json",
@@ -8646,17 +8628,17 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
   if (startDirectoryStat !== null && !startDirectoryStat.isDirectory()) {
     throw new ProjectLocalCleanupStartDirectoryError(startDirectory);
   }
-  const codexHomeConfigPath = codexHome === undefined ? null : join20(resolve6(codexHome), "config.toml");
+  const codexHomeConfigPath = codexHome === undefined ? null : join19(resolve6(codexHome), "config.toml");
   let current = resolve6(startDirectory);
   const configPathsFromCwd = [];
   while (true) {
-    const configPath = join20(current, ".codex", "config.toml");
+    const configPath = join19(current, ".codex", "config.toml");
     if (await isRegularProjectLocalConfig(current, configPath)) {
       if (codexHomeConfigPath === null || resolve6(configPath) !== codexHomeConfigPath) {
         configPathsFromCwd.push(configPath);
       }
     }
-    if (await exists5(join20(current, ".git"))) {
+    if (await exists5(join19(current, ".git"))) {
       return configPathsFromCwd.length === 0 ? null : {
         projectRoot: current,
         configPaths: [...configPathsFromCwd].reverse(),
@@ -8676,7 +8658,7 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
   }
 }
 async function isRegularProjectLocalConfig(directory, configPath) {
-  const codexDirStat = await maybeLstat(join20(directory, ".codex"));
+  const codexDirStat = await maybeLstat(join19(directory, ".codex"));
   if (codexDirStat === null || !codexDirStat.isDirectory() || codexDirStat.isSymbolicLink())
     return false;
   const configStat = await maybeLstat(configPath);
@@ -8696,7 +8678,7 @@ async function collectProjectLocalArtifacts(projectRoots) {
   const seenPaths = new Set;
   for (const projectRoot of projectRoots) {
     for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
-      const artifactPath = join20(projectRoot, relativePath);
+      const artifactPath = join19(projectRoot, relativePath);
       if (seenPaths.has(artifactPath))
         continue;
       const entryStat = await maybeLstat(artifactPath);
@@ -8773,11 +8755,11 @@ function formatUnknownError(error) {
 // packages/omo-codex/src/install/lsp-daemon-reaper.ts
 import { readFile as readFile16, readdir as readdir6, rm as rm8 } from "node:fs/promises";
 import { connect } from "node:net";
-import { join as join21 } from "node:path";
+import { join as join20 } from "node:path";
 async function reapLspDaemons(codexHome, deps = {}) {
   const killProcess = deps.killProcess ?? sendSigterm;
   const isDaemonLive = deps.isDaemonLive ?? probeSocketLive;
-  const daemonRoot = join21(codexHome, "codex-lsp", "daemon");
+  const daemonRoot = join20(codexHome, "codex-lsp", "daemon");
   const reaped = [];
   let entries;
   try {
@@ -8786,9 +8768,9 @@ async function reapLspDaemons(codexHome, deps = {}) {
     return reaped;
   }
   for (const entry of entries) {
-    const versionDir = join21(daemonRoot, entry);
-    const pid = await readPidFile(join21(versionDir, "daemon.pid"));
-    const socketPath = await readEndpointFile(join21(versionDir, "daemon.endpoint"));
+    const versionDir = join20(daemonRoot, entry);
+    const pid = await readPidFile(join20(versionDir, "daemon.pid"));
+    const socketPath = await readEndpointFile(join20(versionDir, "daemon.endpoint"));
     if (pid !== null && socketPath !== null && await isDaemonLive(socketPath) && killProcess(pid)) {
       reaped.push(pid);
     }
@@ -8842,7 +8824,7 @@ function sendSigterm(pid) {
 
 // packages/omo-codex/src/install/codex-installer-bin-dir.ts
 import { homedir } from "node:os";
-import { join as join22, resolve as resolve7 } from "node:path";
+import { join as join21, resolve as resolve7 } from "node:path";
 function resolveCodexInstallerBinDir(input) {
   const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR;
   if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0)
@@ -8851,15 +8833,15 @@ function resolveCodexInstallerBinDir(input) {
   const defaultCodexHome = resolve7(homeDir, ".codex");
   const resolvedCodexHome = resolve7(input.codexHome);
   if (resolvedCodexHome !== defaultCodexHome)
-    return join22(resolvedCodexHome, "bin");
+    return join21(resolvedCodexHome, "bin");
   return resolve7(homeDir, ".local", "bin");
 }
 
 // packages/omo-codex/src/install/omo-sot-migration.ts
-import { join as join23 } from "node:path";
+import { join as join22 } from "node:path";
 async function seedAndMigrateOmoSot(input) {
   const commandEnv = { ...input.env };
-  const scriptPath = join23(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
+  const scriptPath = join22(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
   try {
     await input.runCommand(process.execPath, [scriptPath, "--seed"], {
       cwd: input.repoRoot,
@@ -8872,33 +8854,3843 @@ async function seedAndMigrateOmoSot(input) {
   }
 }
 
+// packages/omo-codex/src/install/install-ast-grep-sg.ts
+import { join as join24 } from "node:path";
+
+// packages/utils/src/deep-merge.ts
+var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+// packages/utils/src/record-type-guard.ts
+function isRecord(value) {
+  return typeof value === "object" && value !== null;
+}
+// node_modules/.bun/js-yaml@4.2.0/node_modules/js-yaml/dist/js-yaml.mjs
+/*! js-yaml 4.2.0 https://github.com/nodeca/js-yaml @license MIT */
+var __create = Object.create;
+var __defProp2 = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function")
+    for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key;i < n; i++) {
+      key = keys[i];
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp2(to, key, {
+          get: ((k) => from[k]).bind(null, key),
+          enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
+        });
+    }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", {
+  value: mod,
+  enumerable: true
+}) : target, mod));
+var require_common = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  function isNothing(subject) {
+    return typeof subject === "undefined" || subject === null;
+  }
+  function isObject(subject) {
+    return typeof subject === "object" && subject !== null;
+  }
+  function toArray(sequence) {
+    if (Array.isArray(sequence))
+      return sequence;
+    else if (isNothing(sequence))
+      return [];
+    return [sequence];
+  }
+  function extend(target, source) {
+    if (source) {
+      const sourceKeys = Object.keys(source);
+      for (let index = 0, length = sourceKeys.length;index < length; index += 1) {
+        const key = sourceKeys[index];
+        target[key] = source[key];
+      }
+    }
+    return target;
+  }
+  function repeat(string, count) {
+    let result = "";
+    for (let cycle = 0;cycle < count; cycle += 1)
+      result += string;
+    return result;
+  }
+  function isNegativeZero(number) {
+    return number === 0 && Number.NEGATIVE_INFINITY === 1 / number;
+  }
+  module.exports.isNothing = isNothing;
+  module.exports.isObject = isObject;
+  module.exports.toArray = toArray;
+  module.exports.repeat = repeat;
+  module.exports.isNegativeZero = isNegativeZero;
+  module.exports.extend = extend;
+});
+var require_exception = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  function formatError(exception, compact) {
+    let where = "";
+    const message = exception.reason || "(unknown reason)";
+    if (!exception.mark)
+      return message;
+    if (exception.mark.name)
+      where += 'in "' + exception.mark.name + '" ';
+    where += "(" + (exception.mark.line + 1) + ":" + (exception.mark.column + 1) + ")";
+    if (!compact && exception.mark.snippet)
+      where += `
+
+` + exception.mark.snippet;
+    return message + " " + where;
+  }
+  function YAMLException(reason, mark) {
+    Error.call(this);
+    this.name = "YAMLException";
+    this.reason = reason;
+    this.mark = mark;
+    this.message = formatError(this, false);
+    if (Error.captureStackTrace)
+      Error.captureStackTrace(this, this.constructor);
+    else
+      this.stack = (/* @__PURE__ */ new Error()).stack || "";
+  }
+  YAMLException.prototype = Object.create(Error.prototype);
+  YAMLException.prototype.constructor = YAMLException;
+  YAMLException.prototype.toString = function toString(compact) {
+    return this.name + ": " + formatError(this, compact);
+  };
+  module.exports = YAMLException;
+});
+var require_snippet = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var common = require_common();
+  function getLine(buffer, lineStart, lineEnd, position, maxLineLength) {
+    let head = "";
+    let tail = "";
+    const maxHalfLength = Math.floor(maxLineLength / 2) - 1;
+    if (position - lineStart > maxHalfLength) {
+      head = " ... ";
+      lineStart = position - maxHalfLength + head.length;
+    }
+    if (lineEnd - position > maxHalfLength) {
+      tail = " ...";
+      lineEnd = position + maxHalfLength - tail.length;
+    }
+    return {
+      str: head + buffer.slice(lineStart, lineEnd).replace(/\t/g, "→") + tail,
+      pos: position - lineStart + head.length
+    };
+  }
+  function padStart(string, max) {
+    return common.repeat(" ", max - string.length) + string;
+  }
+  function makeSnippet(mark, options) {
+    options = Object.create(options || null);
+    if (!mark.buffer)
+      return null;
+    if (!options.maxLength)
+      options.maxLength = 79;
+    if (typeof options.indent !== "number")
+      options.indent = 1;
+    if (typeof options.linesBefore !== "number")
+      options.linesBefore = 3;
+    if (typeof options.linesAfter !== "number")
+      options.linesAfter = 2;
+    const re = /\r?\n|\r|\0/g;
+    const lineStarts = [0];
+    const lineEnds = [];
+    let match;
+    let foundLineNo = -1;
+    while (match = re.exec(mark.buffer)) {
+      lineEnds.push(match.index);
+      lineStarts.push(match.index + match[0].length);
+      if (mark.position <= match.index && foundLineNo < 0)
+        foundLineNo = lineStarts.length - 2;
+    }
+    if (foundLineNo < 0)
+      foundLineNo = lineStarts.length - 1;
+    let result = "";
+    const lineNoLength = Math.min(mark.line + options.linesAfter, lineEnds.length).toString().length;
+    const maxLineLength = options.maxLength - (options.indent + lineNoLength + 3);
+    for (let i = 1;i <= options.linesBefore; i++) {
+      if (foundLineNo - i < 0)
+        break;
+      const line2 = getLine(mark.buffer, lineStarts[foundLineNo - i], lineEnds[foundLineNo - i], mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo - i]), maxLineLength);
+      result = common.repeat(" ", options.indent) + padStart((mark.line - i + 1).toString(), lineNoLength) + " | " + line2.str + `
+` + result;
+    }
+    const line = getLine(mark.buffer, lineStarts[foundLineNo], lineEnds[foundLineNo], mark.position, maxLineLength);
+    result += common.repeat(" ", options.indent) + padStart((mark.line + 1).toString(), lineNoLength) + " | " + line.str + `
+`;
+    result += common.repeat("-", options.indent + lineNoLength + 3 + line.pos) + `^
+`;
+    for (let i = 1;i <= options.linesAfter; i++) {
+      if (foundLineNo + i >= lineEnds.length)
+        break;
+      const line2 = getLine(mark.buffer, lineStarts[foundLineNo + i], lineEnds[foundLineNo + i], mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo + i]), maxLineLength);
+      result += common.repeat(" ", options.indent) + padStart((mark.line + i + 1).toString(), lineNoLength) + " | " + line2.str + `
+`;
+    }
+    return result.replace(/\n$/, "");
+  }
+  module.exports = makeSnippet;
+});
+var require_type = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var YAMLException = require_exception();
+  var TYPE_CONSTRUCTOR_OPTIONS = [
+    "kind",
+    "multi",
+    "resolve",
+    "construct",
+    "instanceOf",
+    "predicate",
+    "represent",
+    "representName",
+    "defaultStyle",
+    "styleAliases"
+  ];
+  var YAML_NODE_KINDS = [
+    "scalar",
+    "sequence",
+    "mapping"
+  ];
+  function compileStyleAliases(map) {
+    const result = {};
+    if (map !== null)
+      Object.keys(map).forEach(function(style) {
+        map[style].forEach(function(alias) {
+          result[String(alias)] = style;
+        });
+      });
+    return result;
+  }
+  function Type(tag, options) {
+    options = options || {};
+    Object.keys(options).forEach(function(name) {
+      if (TYPE_CONSTRUCTOR_OPTIONS.indexOf(name) === -1)
+        throw new YAMLException('Unknown option "' + name + '" is met in definition of "' + tag + '" YAML type.');
+    });
+    this.options = options;
+    this.tag = tag;
+    this.kind = options["kind"] || null;
+    this.resolve = options["resolve"] || function() {
+      return true;
+    };
+    this.construct = options["construct"] || function(data) {
+      return data;
+    };
+    this.instanceOf = options["instanceOf"] || null;
+    this.predicate = options["predicate"] || null;
+    this.represent = options["represent"] || null;
+    this.representName = options["representName"] || null;
+    this.defaultStyle = options["defaultStyle"] || null;
+    this.multi = options["multi"] || false;
+    this.styleAliases = compileStyleAliases(options["styleAliases"] || null);
+    if (YAML_NODE_KINDS.indexOf(this.kind) === -1)
+      throw new YAMLException('Unknown kind "' + this.kind + '" is specified for "' + tag + '" YAML type.');
+  }
+  module.exports = Type;
+});
+var require_schema = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var YAMLException = require_exception();
+  var Type = require_type();
+  function compileList(schema, name) {
+    const result = [];
+    schema[name].forEach(function(currentType) {
+      let newIndex = result.length;
+      result.forEach(function(previousType, previousIndex) {
+        if (previousType.tag === currentType.tag && previousType.kind === currentType.kind && previousType.multi === currentType.multi)
+          newIndex = previousIndex;
+      });
+      result[newIndex] = currentType;
+    });
+    return result;
+  }
+  function compileMap() {
+    const result = {
+      scalar: {},
+      sequence: {},
+      mapping: {},
+      fallback: {},
+      multi: {
+        scalar: [],
+        sequence: [],
+        mapping: [],
+        fallback: []
+      }
+    };
+    function collectType(type) {
+      if (type.multi) {
+        result.multi[type.kind].push(type);
+        result.multi["fallback"].push(type);
+      } else
+        result[type.kind][type.tag] = result["fallback"][type.tag] = type;
+    }
+    for (let index = 0, length = arguments.length;index < length; index += 1)
+      arguments[index].forEach(collectType);
+    return result;
+  }
+  function Schema(definition) {
+    return this.extend(definition);
+  }
+  Schema.prototype.extend = function extend(definition) {
+    let implicit = [];
+    let explicit = [];
+    if (definition instanceof Type)
+      explicit.push(definition);
+    else if (Array.isArray(definition))
+      explicit = explicit.concat(definition);
+    else if (definition && (Array.isArray(definition.implicit) || Array.isArray(definition.explicit))) {
+      if (definition.implicit)
+        implicit = implicit.concat(definition.implicit);
+      if (definition.explicit)
+        explicit = explicit.concat(definition.explicit);
+    } else
+      throw new YAMLException("Schema.extend argument should be a Type, [ Type ], or a schema definition ({ implicit: [...], explicit: [...] })");
+    implicit.forEach(function(type) {
+      if (!(type instanceof Type))
+        throw new YAMLException("Specified list of YAML types (or a single Type object) contains a non-Type object.");
+      if (type.loadKind && type.loadKind !== "scalar")
+        throw new YAMLException("There is a non-scalar type in the implicit list of a schema. Implicit resolving of such types is not supported.");
+      if (type.multi)
+        throw new YAMLException("There is a multi type in the implicit list of a schema. Multi tags can only be listed as explicit.");
+    });
+    explicit.forEach(function(type) {
+      if (!(type instanceof Type))
+        throw new YAMLException("Specified list of YAML types (or a single Type object) contains a non-Type object.");
+    });
+    const result = Object.create(Schema.prototype);
+    result.implicit = (this.implicit || []).concat(implicit);
+    result.explicit = (this.explicit || []).concat(explicit);
+    result.compiledImplicit = compileList(result, "implicit");
+    result.compiledExplicit = compileList(result, "explicit");
+    result.compiledTypeMap = compileMap(result.compiledImplicit, result.compiledExplicit);
+    return result;
+  };
+  module.exports = Schema;
+});
+var require_str = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = new (require_type())("tag:yaml.org,2002:str", {
+    kind: "scalar",
+    construct: function(data) {
+      return data !== null ? data : "";
+    }
+  });
+});
+var require_seq = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = new (require_type())("tag:yaml.org,2002:seq", {
+    kind: "sequence",
+    construct: function(data) {
+      return data !== null ? data : [];
+    }
+  });
+});
+var require_map = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = new (require_type())("tag:yaml.org,2002:map", {
+    kind: "mapping",
+    construct: function(data) {
+      return data !== null ? data : {};
+    }
+  });
+});
+var require_failsafe = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = new (require_schema())({ explicit: [
+    require_str(),
+    require_seq(),
+    require_map()
+  ] });
+});
+var require_null = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  function resolveYamlNull(data) {
+    if (data === null)
+      return true;
+    const max = data.length;
+    return max === 1 && data === "~" || max === 4 && (data === "null" || data === "Null" || data === "NULL");
+  }
+  function constructYamlNull() {
+    return null;
+  }
+  function isNull(object) {
+    return object === null;
+  }
+  module.exports = new Type("tag:yaml.org,2002:null", {
+    kind: "scalar",
+    resolve: resolveYamlNull,
+    construct: constructYamlNull,
+    predicate: isNull,
+    represent: {
+      canonical: function() {
+        return "~";
+      },
+      lowercase: function() {
+        return "null";
+      },
+      uppercase: function() {
+        return "NULL";
+      },
+      camelcase: function() {
+        return "Null";
+      },
+      empty: function() {
+        return "";
+      }
+    },
+    defaultStyle: "lowercase"
+  });
+});
+var require_bool = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  function resolveYamlBoolean(data) {
+    if (data === null)
+      return false;
+    const max = data.length;
+    return max === 4 && (data === "true" || data === "True" || data === "TRUE") || max === 5 && (data === "false" || data === "False" || data === "FALSE");
+  }
+  function constructYamlBoolean(data) {
+    return data === "true" || data === "True" || data === "TRUE";
+  }
+  function isBoolean(object) {
+    return Object.prototype.toString.call(object) === "[object Boolean]";
+  }
+  module.exports = new Type("tag:yaml.org,2002:bool", {
+    kind: "scalar",
+    resolve: resolveYamlBoolean,
+    construct: constructYamlBoolean,
+    predicate: isBoolean,
+    represent: {
+      lowercase: function(object) {
+        return object ? "true" : "false";
+      },
+      uppercase: function(object) {
+        return object ? "TRUE" : "FALSE";
+      },
+      camelcase: function(object) {
+        return object ? "True" : "False";
+      }
+    },
+    defaultStyle: "lowercase"
+  });
+});
+var require_int = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var common = require_common();
+  var Type = require_type();
+  function isHexCode(c) {
+    return c >= 48 && c <= 57 || c >= 65 && c <= 70 || c >= 97 && c <= 102;
+  }
+  function isOctCode(c) {
+    return c >= 48 && c <= 55;
+  }
+  function isDecCode(c) {
+    return c >= 48 && c <= 57;
+  }
+  function resolveYamlInteger(data) {
+    if (data === null)
+      return false;
+    const max = data.length;
+    let index = 0;
+    let hasDigits = false;
+    if (!max)
+      return false;
+    let ch = data[index];
+    if (ch === "-" || ch === "+")
+      ch = data[++index];
+    if (ch === "0") {
+      if (index + 1 === max)
+        return true;
+      ch = data[++index];
+      if (ch === "b") {
+        index++;
+        for (;index < max; index++) {
+          ch = data[index];
+          if (ch !== "0" && ch !== "1")
+            return false;
+          hasDigits = true;
+        }
+        return hasDigits && Number.isFinite(parseYamlInteger(data));
+      }
+      if (ch === "x") {
+        index++;
+        for (;index < max; index++) {
+          if (!isHexCode(data.charCodeAt(index)))
+            return false;
+          hasDigits = true;
+        }
+        return hasDigits && Number.isFinite(parseYamlInteger(data));
+      }
+      if (ch === "o") {
+        index++;
+        for (;index < max; index++) {
+          if (!isOctCode(data.charCodeAt(index)))
+            return false;
+          hasDigits = true;
+        }
+        return hasDigits && Number.isFinite(parseYamlInteger(data));
+      }
+    }
+    for (;index < max; index++) {
+      if (!isDecCode(data.charCodeAt(index)))
+        return false;
+      hasDigits = true;
+    }
+    if (!hasDigits)
+      return false;
+    return Number.isFinite(parseYamlInteger(data));
+  }
+  function parseYamlInteger(data) {
+    let value = data;
+    let sign = 1;
+    let ch = value[0];
+    if (ch === "-" || ch === "+") {
+      if (ch === "-")
+        sign = -1;
+      value = value.slice(1);
+      ch = value[0];
+    }
+    if (value === "0")
+      return 0;
+    if (ch === "0") {
+      if (value[1] === "b")
+        return sign * parseInt(value.slice(2), 2);
+      if (value[1] === "x")
+        return sign * parseInt(value.slice(2), 16);
+      if (value[1] === "o")
+        return sign * parseInt(value.slice(2), 8);
+    }
+    return sign * parseInt(value, 10);
+  }
+  function constructYamlInteger(data) {
+    return parseYamlInteger(data);
+  }
+  function isInteger(object) {
+    return Object.prototype.toString.call(object) === "[object Number]" && object % 1 === 0 && !common.isNegativeZero(object);
+  }
+  module.exports = new Type("tag:yaml.org,2002:int", {
+    kind: "scalar",
+    resolve: resolveYamlInteger,
+    construct: constructYamlInteger,
+    predicate: isInteger,
+    represent: {
+      binary: function(obj) {
+        return obj >= 0 ? "0b" + obj.toString(2) : "-0b" + obj.toString(2).slice(1);
+      },
+      octal: function(obj) {
+        return obj >= 0 ? "0o" + obj.toString(8) : "-0o" + obj.toString(8).slice(1);
+      },
+      decimal: function(obj) {
+        return obj.toString(10);
+      },
+      hexadecimal: function(obj) {
+        return obj >= 0 ? "0x" + obj.toString(16).toUpperCase() : "-0x" + obj.toString(16).toUpperCase().slice(1);
+      }
+    },
+    defaultStyle: "decimal",
+    styleAliases: {
+      binary: [2, "bin"],
+      octal: [8, "oct"],
+      decimal: [10, "dec"],
+      hexadecimal: [16, "hex"]
+    }
+  });
+});
+var require_float = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var common = require_common();
+  var Type = require_type();
+  var YAML_FLOAT_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?(?:[0-9]+)(?:\\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
+  var YAML_FLOAT_SPECIAL_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
+  function resolveYamlFloat(data) {
+    if (data === null)
+      return false;
+    if (!YAML_FLOAT_PATTERN.test(data))
+      return false;
+    if (Number.isFinite(parseFloat(data, 10)))
+      return true;
+    return YAML_FLOAT_SPECIAL_PATTERN.test(data);
+  }
+  function constructYamlFloat(data) {
+    let value = data.toLowerCase();
+    const sign = value[0] === "-" ? -1 : 1;
+    if ("+-".indexOf(value[0]) >= 0)
+      value = value.slice(1);
+    if (value === ".inf")
+      return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+    else if (value === ".nan")
+      return NaN;
+    return sign * parseFloat(value, 10);
+  }
+  var SCIENTIFIC_WITHOUT_DOT = /^[-+]?[0-9]+e/;
+  function representYamlFloat(object, style) {
+    if (isNaN(object))
+      switch (style) {
+        case "lowercase":
+          return ".nan";
+        case "uppercase":
+          return ".NAN";
+        case "camelcase":
+          return ".NaN";
+      }
+    else if (Number.POSITIVE_INFINITY === object)
+      switch (style) {
+        case "lowercase":
+          return ".inf";
+        case "uppercase":
+          return ".INF";
+        case "camelcase":
+          return ".Inf";
+      }
+    else if (Number.NEGATIVE_INFINITY === object)
+      switch (style) {
+        case "lowercase":
+          return "-.inf";
+        case "uppercase":
+          return "-.INF";
+        case "camelcase":
+          return "-.Inf";
+      }
+    else if (common.isNegativeZero(object))
+      return "-0.0";
+    const res = object.toString(10);
+    return SCIENTIFIC_WITHOUT_DOT.test(res) ? res.replace("e", ".e") : res;
+  }
+  function isFloat(object) {
+    return Object.prototype.toString.call(object) === "[object Number]" && (object % 1 !== 0 || common.isNegativeZero(object));
+  }
+  module.exports = new Type("tag:yaml.org,2002:float", {
+    kind: "scalar",
+    resolve: resolveYamlFloat,
+    construct: constructYamlFloat,
+    predicate: isFloat,
+    represent: representYamlFloat,
+    defaultStyle: "lowercase"
+  });
+});
+var require_json = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = require_failsafe().extend({ implicit: [
+    require_null(),
+    require_bool(),
+    require_int(),
+    require_float()
+  ] });
+});
+var require_core = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = require_json();
+});
+var require_timestamp = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  var YAML_DATE_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$");
+  var YAML_TIMESTAMP_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$");
+  function resolveYamlTimestamp(data) {
+    if (data === null)
+      return false;
+    if (YAML_DATE_REGEXP.exec(data) !== null)
+      return true;
+    if (YAML_TIMESTAMP_REGEXP.exec(data) !== null)
+      return true;
+    return false;
+  }
+  function constructYamlTimestamp(data) {
+    let fraction = 0;
+    let delta = null;
+    let match = YAML_DATE_REGEXP.exec(data);
+    if (match === null)
+      match = YAML_TIMESTAMP_REGEXP.exec(data);
+    if (match === null)
+      throw new Error("Date resolve error");
+    const year = +match[1];
+    const month = +match[2] - 1;
+    const day = +match[3];
+    if (!match[4])
+      return new Date(Date.UTC(year, month, day));
+    const hour = +match[4];
+    const minute = +match[5];
+    const second = +match[6];
+    if (match[7]) {
+      fraction = match[7].slice(0, 3);
+      while (fraction.length < 3)
+        fraction += "0";
+      fraction = +fraction;
+    }
+    if (match[9]) {
+      const tzHour = +match[10];
+      const tzMinute = +(match[11] || 0);
+      delta = (tzHour * 60 + tzMinute) * 60000;
+      if (match[9] === "-")
+        delta = -delta;
+    }
+    const date = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+    if (delta)
+      date.setTime(date.getTime() - delta);
+    return date;
+  }
+  function representYamlTimestamp(object) {
+    return object.toISOString();
+  }
+  module.exports = new Type("tag:yaml.org,2002:timestamp", {
+    kind: "scalar",
+    resolve: resolveYamlTimestamp,
+    construct: constructYamlTimestamp,
+    instanceOf: Date,
+    represent: representYamlTimestamp
+  });
+});
+var require_merge = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  function resolveYamlMerge(data) {
+    return data === "<<" || data === null;
+  }
+  module.exports = new Type("tag:yaml.org,2002:merge", {
+    kind: "scalar",
+    resolve: resolveYamlMerge
+  });
+});
+var require_binary = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  var BASE64_MAP = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=
+\r`;
+  function resolveYamlBinary(data) {
+    if (data === null)
+      return false;
+    let bitlen = 0;
+    const max = data.length;
+    const map = BASE64_MAP;
+    for (let idx = 0;idx < max; idx++) {
+      const code = map.indexOf(data.charAt(idx));
+      if (code > 64)
+        continue;
+      if (code < 0)
+        return false;
+      bitlen += 6;
+    }
+    return bitlen % 8 === 0;
+  }
+  function constructYamlBinary(data) {
+    const input = data.replace(/[\r\n=]/g, "");
+    const max = input.length;
+    const map = BASE64_MAP;
+    let bits = 0;
+    const result = [];
+    for (let idx = 0;idx < max; idx++) {
+      if (idx % 4 === 0 && idx) {
+        result.push(bits >> 16 & 255);
+        result.push(bits >> 8 & 255);
+        result.push(bits & 255);
+      }
+      bits = bits << 6 | map.indexOf(input.charAt(idx));
+    }
+    const tailbits = max % 4 * 6;
+    if (tailbits === 0) {
+      result.push(bits >> 16 & 255);
+      result.push(bits >> 8 & 255);
+      result.push(bits & 255);
+    } else if (tailbits === 18) {
+      result.push(bits >> 10 & 255);
+      result.push(bits >> 2 & 255);
+    } else if (tailbits === 12)
+      result.push(bits >> 4 & 255);
+    return new Uint8Array(result);
+  }
+  function representYamlBinary(object) {
+    let result = "";
+    let bits = 0;
+    const max = object.length;
+    const map = BASE64_MAP;
+    for (let idx = 0;idx < max; idx++) {
+      if (idx % 3 === 0 && idx) {
+        result += map[bits >> 18 & 63];
+        result += map[bits >> 12 & 63];
+        result += map[bits >> 6 & 63];
+        result += map[bits & 63];
+      }
+      bits = (bits << 8) + object[idx];
+    }
+    const tail = max % 3;
+    if (tail === 0) {
+      result += map[bits >> 18 & 63];
+      result += map[bits >> 12 & 63];
+      result += map[bits >> 6 & 63];
+      result += map[bits & 63];
+    } else if (tail === 2) {
+      result += map[bits >> 10 & 63];
+      result += map[bits >> 4 & 63];
+      result += map[bits << 2 & 63];
+      result += map[64];
+    } else if (tail === 1) {
+      result += map[bits >> 2 & 63];
+      result += map[bits << 4 & 63];
+      result += map[64];
+      result += map[64];
+    }
+    return result;
+  }
+  function isBinary(obj) {
+    return Object.prototype.toString.call(obj) === "[object Uint8Array]";
+  }
+  module.exports = new Type("tag:yaml.org,2002:binary", {
+    kind: "scalar",
+    resolve: resolveYamlBinary,
+    construct: constructYamlBinary,
+    predicate: isBinary,
+    represent: representYamlBinary
+  });
+});
+var require_omap = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  var _hasOwnProperty = Object.prototype.hasOwnProperty;
+  var _toString = Object.prototype.toString;
+  function resolveYamlOmap(data) {
+    if (data === null)
+      return true;
+    const objectKeys = [];
+    const object = data;
+    for (let index = 0, length = object.length;index < length; index += 1) {
+      const pair = object[index];
+      let pairHasKey = false;
+      if (_toString.call(pair) !== "[object Object]")
+        return false;
+      let pairKey;
+      for (pairKey in pair)
+        if (_hasOwnProperty.call(pair, pairKey))
+          if (!pairHasKey)
+            pairHasKey = true;
+          else
+            return false;
+      if (!pairHasKey)
+        return false;
+      if (objectKeys.indexOf(pairKey) === -1)
+        objectKeys.push(pairKey);
+      else
+        return false;
+    }
+    return true;
+  }
+  function constructYamlOmap(data) {
+    return data !== null ? data : [];
+  }
+  module.exports = new Type("tag:yaml.org,2002:omap", {
+    kind: "sequence",
+    resolve: resolveYamlOmap,
+    construct: constructYamlOmap
+  });
+});
+var require_pairs = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  var _toString = Object.prototype.toString;
+  function resolveYamlPairs(data) {
+    if (data === null)
+      return true;
+    const object = data;
+    const result = new Array(object.length);
+    for (let index = 0, length = object.length;index < length; index += 1) {
+      const pair = object[index];
+      if (_toString.call(pair) !== "[object Object]")
+        return false;
+      const keys = Object.keys(pair);
+      if (keys.length !== 1)
+        return false;
+      result[index] = [keys[0], pair[keys[0]]];
+    }
+    return true;
+  }
+  function constructYamlPairs(data) {
+    if (data === null)
+      return [];
+    const object = data;
+    const result = new Array(object.length);
+    for (let index = 0, length = object.length;index < length; index += 1) {
+      const pair = object[index];
+      const keys = Object.keys(pair);
+      result[index] = [keys[0], pair[keys[0]]];
+    }
+    return result;
+  }
+  module.exports = new Type("tag:yaml.org,2002:pairs", {
+    kind: "sequence",
+    resolve: resolveYamlPairs,
+    construct: constructYamlPairs
+  });
+});
+var require_set = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var Type = require_type();
+  var _hasOwnProperty = Object.prototype.hasOwnProperty;
+  function resolveYamlSet(data) {
+    if (data === null)
+      return true;
+    const object = data;
+    for (const key in object)
+      if (_hasOwnProperty.call(object, key)) {
+        if (object[key] !== null)
+          return false;
+      }
+    return true;
+  }
+  function constructYamlSet(data) {
+    return data !== null ? data : {};
+  }
+  module.exports = new Type("tag:yaml.org,2002:set", {
+    kind: "mapping",
+    resolve: resolveYamlSet,
+    construct: constructYamlSet
+  });
+});
+var require_default = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  module.exports = require_core().extend({
+    implicit: [require_timestamp(), require_merge()],
+    explicit: [
+      require_binary(),
+      require_omap(),
+      require_pairs(),
+      require_set()
+    ]
+  });
+});
+var require_loader = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var common = require_common();
+  var YAMLException = require_exception();
+  var makeSnippet = require_snippet();
+  var DEFAULT_SCHEMA = require_default();
+  var _hasOwnProperty = Object.prototype.hasOwnProperty;
+  var CONTEXT_FLOW_IN = 1;
+  var CONTEXT_FLOW_OUT = 2;
+  var CONTEXT_BLOCK_IN = 3;
+  var CONTEXT_BLOCK_OUT = 4;
+  var CHOMPING_CLIP = 1;
+  var CHOMPING_STRIP = 2;
+  var CHOMPING_KEEP = 3;
+  var PATTERN_NON_PRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/;
+  var PATTERN_NON_ASCII_LINE_BREAKS = /[\x85\u2028\u2029]/;
+  var PATTERN_FLOW_INDICATORS = /[,\[\]{}]/;
+  var PATTERN_TAG_HANDLE = /^(?:!|!!|![0-9A-Za-z-]+!)$/;
+  var PATTERN_TAG_URI = /^(?:!|[^,\[\]{}])(?:%[0-9a-f]{2}|[0-9a-z\-#;/?:@&=+$,_.!~*'()\[\]])*$/i;
+  function _class(obj) {
+    return Object.prototype.toString.call(obj);
+  }
+  function isEol(c) {
+    return c === 10 || c === 13;
+  }
+  function isWhiteSpace(c) {
+    return c === 9 || c === 32;
+  }
+  function isWsOrEol(c) {
+    return c === 9 || c === 32 || c === 10 || c === 13;
+  }
+  function isFlowIndicator(c) {
+    return c === 44 || c === 91 || c === 93 || c === 123 || c === 125;
+  }
+  function fromHexCode(c) {
+    if (c >= 48 && c <= 57)
+      return c - 48;
+    const lc = c | 32;
+    if (lc >= 97 && lc <= 102)
+      return lc - 97 + 10;
+    return -1;
+  }
+  function escapedHexLen(c) {
+    if (c === 120)
+      return 2;
+    if (c === 117)
+      return 4;
+    if (c === 85)
+      return 8;
+    return 0;
+  }
+  function fromDecimalCode(c) {
+    if (c >= 48 && c <= 57)
+      return c - 48;
+    return -1;
+  }
+  function simpleEscapeSequence(c) {
+    switch (c) {
+      case 48:
+        return "\x00";
+      case 97:
+        return "\x07";
+      case 98:
+        return "\b";
+      case 116:
+        return "\t";
+      case 9:
+        return "\t";
+      case 110:
+        return `
+`;
+      case 118:
+        return "\v";
+      case 102:
+        return "\f";
+      case 114:
+        return "\r";
+      case 101:
+        return "\x1B";
+      case 32:
+        return " ";
+      case 34:
+        return '"';
+      case 47:
+        return "/";
+      case 92:
+        return "\\";
+      case 78:
+        return "";
+      case 95:
+        return " ";
+      case 76:
+        return "\u2028";
+      case 80:
+        return "\u2029";
+      default:
+        return "";
+    }
+  }
+  function charFromCodepoint(c) {
+    if (c <= 65535)
+      return String.fromCharCode(c);
+    return String.fromCharCode((c - 65536 >> 10) + 55296, (c - 65536 & 1023) + 56320);
+  }
+  function setProperty(object, key, value) {
+    if (key === "__proto__")
+      Object.defineProperty(object, key, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value
+      });
+    else
+      object[key] = value;
+  }
+  var simpleEscapeCheck = new Array(256);
+  var simpleEscapeMap = new Array(256);
+  for (let i = 0;i < 256; i++) {
+    simpleEscapeCheck[i] = simpleEscapeSequence(i) ? 1 : 0;
+    simpleEscapeMap[i] = simpleEscapeSequence(i);
+  }
+  function State(input, options) {
+    this.input = input;
+    this.filename = options["filename"] || null;
+    this.schema = options["schema"] || DEFAULT_SCHEMA;
+    this.onWarning = options["onWarning"] || null;
+    this.legacy = options["legacy"] || false;
+    this.json = options["json"] || false;
+    this.listener = options["listener"] || null;
+    this.maxDepth = typeof options["maxDepth"] === "number" ? options["maxDepth"] : 100;
+    this.maxMergeSeqLength = typeof options["maxMergeSeqLength"] === "number" ? options["maxMergeSeqLength"] : 20;
+    this.implicitTypes = this.schema.compiledImplicit;
+    this.typeMap = this.schema.compiledTypeMap;
+    this.length = input.length;
+    this.position = 0;
+    this.line = 0;
+    this.lineStart = 0;
+    this.lineIndent = 0;
+    this.depth = 0;
+    this.firstTabInLine = -1;
+    this.documents = [];
+    this.anchorMapTransactions = [];
+  }
+  function generateError(state, message) {
+    const mark = {
+      name: state.filename,
+      buffer: state.input.slice(0, -1),
+      position: state.position,
+      line: state.line,
+      column: state.position - state.lineStart
+    };
+    mark.snippet = makeSnippet(mark);
+    return new YAMLException(message, mark);
+  }
+  function throwError(state, message) {
+    throw generateError(state, message);
+  }
+  function throwWarning(state, message) {
+    if (state.onWarning)
+      state.onWarning.call(null, generateError(state, message));
+  }
+  function storeAnchor(state, name, value) {
+    const transactions = state.anchorMapTransactions;
+    if (transactions.length !== 0) {
+      const transaction = transactions[transactions.length - 1];
+      if (!_hasOwnProperty.call(transaction, name))
+        transaction[name] = {
+          existed: _hasOwnProperty.call(state.anchorMap, name),
+          value: state.anchorMap[name]
+        };
+    }
+    state.anchorMap[name] = value;
+  }
+  function beginAnchorTransaction(state) {
+    state.anchorMapTransactions.push(Object.create(null));
+  }
+  function commitAnchorTransaction(state) {
+    const transaction = state.anchorMapTransactions.pop();
+    const transactions = state.anchorMapTransactions;
+    if (transactions.length === 0)
+      return;
+    const parent = transactions[transactions.length - 1];
+    const names = Object.keys(transaction);
+    for (let index = 0, length = names.length;index < length; index += 1) {
+      const name = names[index];
+      if (!_hasOwnProperty.call(parent, name))
+        parent[name] = transaction[name];
+    }
+  }
+  function rollbackAnchorTransaction(state) {
+    const transaction = state.anchorMapTransactions.pop();
+    const names = Object.keys(transaction);
+    for (let index = names.length - 1;index >= 0; index -= 1) {
+      const entry = transaction[names[index]];
+      if (entry.existed)
+        state.anchorMap[names[index]] = entry.value;
+      else
+        delete state.anchorMap[names[index]];
+    }
+  }
+  function snapshotState(state) {
+    return {
+      position: state.position,
+      line: state.line,
+      lineStart: state.lineStart,
+      lineIndent: state.lineIndent,
+      firstTabInLine: state.firstTabInLine,
+      tag: state.tag,
+      anchor: state.anchor,
+      kind: state.kind,
+      result: state.result
+    };
+  }
+  function restoreState(state, snapshot) {
+    state.position = snapshot.position;
+    state.line = snapshot.line;
+    state.lineStart = snapshot.lineStart;
+    state.lineIndent = snapshot.lineIndent;
+    state.firstTabInLine = snapshot.firstTabInLine;
+    state.tag = snapshot.tag;
+    state.anchor = snapshot.anchor;
+    state.kind = snapshot.kind;
+    state.result = snapshot.result;
+  }
+  var directiveHandlers = {
+    YAML: function handleYamlDirective(state, name, args) {
+      if (state.version !== null)
+        throwError(state, "duplication of %YAML directive");
+      if (args.length !== 1)
+        throwError(state, "YAML directive accepts exactly one argument");
+      const match = /^([0-9]+)\.([0-9]+)$/.exec(args[0]);
+      if (match === null)
+        throwError(state, "ill-formed argument of the YAML directive");
+      const major = parseInt(match[1], 10);
+      const minor = parseInt(match[2], 10);
+      if (major !== 1)
+        throwError(state, "unacceptable YAML version of the document");
+      state.version = args[0];
+      state.checkLineBreaks = minor < 2;
+      if (minor !== 1 && minor !== 2)
+        throwWarning(state, "unsupported YAML version of the document");
+    },
+    TAG: function handleTagDirective(state, name, args) {
+      let prefix;
+      if (args.length !== 2)
+        throwError(state, "TAG directive accepts exactly two arguments");
+      const handle = args[0];
+      prefix = args[1];
+      if (!PATTERN_TAG_HANDLE.test(handle))
+        throwError(state, "ill-formed tag handle (first argument) of the TAG directive");
+      if (_hasOwnProperty.call(state.tagMap, handle))
+        throwError(state, 'there is a previously declared suffix for "' + handle + '" tag handle');
+      if (!PATTERN_TAG_URI.test(prefix))
+        throwError(state, "ill-formed tag prefix (second argument) of the TAG directive");
+      try {
+        prefix = decodeURIComponent(prefix);
+      } catch (err) {
+        throwError(state, "tag prefix is malformed: " + prefix);
+      }
+      state.tagMap[handle] = prefix;
+    }
+  };
+  function captureSegment(state, start, end, checkJson) {
+    if (start < end) {
+      const _result = state.input.slice(start, end);
+      if (checkJson)
+        for (let _position = 0, _length = _result.length;_position < _length; _position += 1) {
+          const _character = _result.charCodeAt(_position);
+          if (!(_character === 9 || _character >= 32 && _character <= 1114111))
+            throwError(state, "expected valid JSON character");
+        }
+      else if (PATTERN_NON_PRINTABLE.test(_result))
+        throwError(state, "the stream contains non-printable characters");
+      state.result += _result;
+    }
+  }
+  function mergeMappings(state, destination, source, overridableKeys) {
+    if (!common.isObject(source))
+      throwError(state, "cannot merge mappings; the provided source object is unacceptable");
+    const sourceKeys = Object.keys(source);
+    for (let index = 0, quantity = sourceKeys.length;index < quantity; index += 1) {
+      const key = sourceKeys[index];
+      if (!_hasOwnProperty.call(destination, key)) {
+        setProperty(destination, key, source[key]);
+        overridableKeys[key] = true;
+      }
+    }
+  }
+  function storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, startLine, startLineStart, startPos) {
+    if (Array.isArray(keyNode)) {
+      keyNode = Array.prototype.slice.call(keyNode);
+      for (let index = 0, quantity = keyNode.length;index < quantity; index += 1) {
+        if (Array.isArray(keyNode[index]))
+          throwError(state, "nested arrays are not supported inside keys");
+        if (typeof keyNode === "object" && _class(keyNode[index]) === "[object Object]")
+          keyNode[index] = "[object Object]";
+      }
+    }
+    if (typeof keyNode === "object" && _class(keyNode) === "[object Object]")
+      keyNode = "[object Object]";
+    keyNode = String(keyNode);
+    if (_result === null)
+      _result = {};
+    if (keyTag === "tag:yaml.org,2002:merge")
+      if (Array.isArray(valueNode)) {
+        if (valueNode.length > state.maxMergeSeqLength)
+          throwError(state, "merge sequence length exceeded maxMergeSeqLength (" + state.maxMergeSeqLength + ")");
+        const seen = /* @__PURE__ */ new Set;
+        for (let index = 0, quantity = valueNode.length;index < quantity; index += 1) {
+          const src = valueNode[index];
+          if (seen.has(src))
+            continue;
+          seen.add(src);
+          mergeMappings(state, _result, src, overridableKeys);
+        }
+      } else
+        mergeMappings(state, _result, valueNode, overridableKeys);
+    else {
+      if (!state.json && !_hasOwnProperty.call(overridableKeys, keyNode) && _hasOwnProperty.call(_result, keyNode)) {
+        state.line = startLine || state.line;
+        state.lineStart = startLineStart || state.lineStart;
+        state.position = startPos || state.position;
+        throwError(state, "duplicated mapping key");
+      }
+      setProperty(_result, keyNode, valueNode);
+      delete overridableKeys[keyNode];
+    }
+    return _result;
+  }
+  function readLineBreak(state) {
+    const ch = state.input.charCodeAt(state.position);
+    if (ch === 10)
+      state.position++;
+    else if (ch === 13) {
+      state.position++;
+      if (state.input.charCodeAt(state.position) === 10)
+        state.position++;
+    } else
+      throwError(state, "a line break is expected");
+    state.line += 1;
+    state.lineStart = state.position;
+    state.firstTabInLine = -1;
+  }
+  function skipSeparationSpace(state, allowComments, checkIndent) {
+    let lineBreaks = 0;
+    let ch = state.input.charCodeAt(state.position);
+    while (ch !== 0) {
+      while (isWhiteSpace(ch)) {
+        if (ch === 9 && state.firstTabInLine === -1)
+          state.firstTabInLine = state.position;
+        ch = state.input.charCodeAt(++state.position);
+      }
+      if (allowComments && ch === 35)
+        do
+          ch = state.input.charCodeAt(++state.position);
+        while (ch !== 10 && ch !== 13 && ch !== 0);
+      if (isEol(ch)) {
+        readLineBreak(state);
+        ch = state.input.charCodeAt(state.position);
+        lineBreaks++;
+        state.lineIndent = 0;
+        while (ch === 32) {
+          state.lineIndent++;
+          ch = state.input.charCodeAt(++state.position);
+        }
+      } else
+        break;
+    }
+    if (checkIndent !== -1 && lineBreaks !== 0 && state.lineIndent < checkIndent)
+      throwWarning(state, "deficient indentation");
+    return lineBreaks;
+  }
+  function testDocumentSeparator(state) {
+    let _position = state.position;
+    let ch = state.input.charCodeAt(_position);
+    if ((ch === 45 || ch === 46) && ch === state.input.charCodeAt(_position + 1) && ch === state.input.charCodeAt(_position + 2)) {
+      _position += 3;
+      ch = state.input.charCodeAt(_position);
+      if (ch === 0 || isWsOrEol(ch))
+        return true;
+    }
+    return false;
+  }
+  function writeFoldedLines(state, count) {
+    if (count === 1)
+      state.result += " ";
+    else if (count > 1)
+      state.result += common.repeat(`
+`, count - 1);
+  }
+  function readPlainScalar(state, nodeIndent, withinFlowCollection) {
+    let captureStart;
+    let captureEnd;
+    let hasPendingContent;
+    let _line;
+    let _lineStart;
+    let _lineIndent;
+    const _kind = state.kind;
+    const _result = state.result;
+    let ch = state.input.charCodeAt(state.position);
+    if (isWsOrEol(ch) || isFlowIndicator(ch) || ch === 35 || ch === 38 || ch === 42 || ch === 33 || ch === 124 || ch === 62 || ch === 39 || ch === 34 || ch === 37 || ch === 64 || ch === 96)
+      return false;
+    if (ch === 63 || ch === 45) {
+      const following = state.input.charCodeAt(state.position + 1);
+      if (isWsOrEol(following) || withinFlowCollection && isFlowIndicator(following))
+        return false;
+    }
+    state.kind = "scalar";
+    state.result = "";
+    captureStart = captureEnd = state.position;
+    hasPendingContent = false;
+    while (ch !== 0) {
+      if (ch === 58) {
+        const following = state.input.charCodeAt(state.position + 1);
+        if (isWsOrEol(following) || withinFlowCollection && isFlowIndicator(following))
+          break;
+      } else if (ch === 35) {
+        if (isWsOrEol(state.input.charCodeAt(state.position - 1)))
+          break;
+      } else if (state.position === state.lineStart && testDocumentSeparator(state) || withinFlowCollection && isFlowIndicator(ch))
+        break;
+      else if (isEol(ch)) {
+        _line = state.line;
+        _lineStart = state.lineStart;
+        _lineIndent = state.lineIndent;
+        skipSeparationSpace(state, false, -1);
+        if (state.lineIndent >= nodeIndent) {
+          hasPendingContent = true;
+          ch = state.input.charCodeAt(state.position);
+          continue;
+        } else {
+          state.position = captureEnd;
+          state.line = _line;
+          state.lineStart = _lineStart;
+          state.lineIndent = _lineIndent;
+          break;
+        }
+      }
+      if (hasPendingContent) {
+        captureSegment(state, captureStart, captureEnd, false);
+        writeFoldedLines(state, state.line - _line);
+        captureStart = captureEnd = state.position;
+        hasPendingContent = false;
+      }
+      if (!isWhiteSpace(ch))
+        captureEnd = state.position + 1;
+      ch = state.input.charCodeAt(++state.position);
+    }
+    captureSegment(state, captureStart, captureEnd, false);
+    if (state.result)
+      return true;
+    state.kind = _kind;
+    state.result = _result;
+    return false;
+  }
+  function readSingleQuotedScalar(state, nodeIndent) {
+    let captureStart;
+    let captureEnd;
+    let ch = state.input.charCodeAt(state.position);
+    if (ch !== 39)
+      return false;
+    state.kind = "scalar";
+    state.result = "";
+    state.position++;
+    captureStart = captureEnd = state.position;
+    while ((ch = state.input.charCodeAt(state.position)) !== 0)
+      if (ch === 39) {
+        captureSegment(state, captureStart, state.position, true);
+        ch = state.input.charCodeAt(++state.position);
+        if (ch === 39) {
+          captureStart = state.position;
+          state.position++;
+          captureEnd = state.position;
+        } else
+          return true;
+      } else if (isEol(ch)) {
+        captureSegment(state, captureStart, captureEnd, true);
+        writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
+        captureStart = captureEnd = state.position;
+      } else if (state.position === state.lineStart && testDocumentSeparator(state))
+        throwError(state, "unexpected end of the document within a single quoted scalar");
+      else {
+        state.position++;
+        if (!isWhiteSpace(ch))
+          captureEnd = state.position;
+      }
+    throwError(state, "unexpected end of the stream within a single quoted scalar");
+  }
+  function readDoubleQuotedScalar(state, nodeIndent) {
+    let captureStart;
+    let captureEnd;
+    let tmp;
+    let ch = state.input.charCodeAt(state.position);
+    if (ch !== 34)
+      return false;
+    state.kind = "scalar";
+    state.result = "";
+    state.position++;
+    captureStart = captureEnd = state.position;
+    while ((ch = state.input.charCodeAt(state.position)) !== 0)
+      if (ch === 34) {
+        captureSegment(state, captureStart, state.position, true);
+        state.position++;
+        return true;
+      } else if (ch === 92) {
+        captureSegment(state, captureStart, state.position, true);
+        ch = state.input.charCodeAt(++state.position);
+        if (isEol(ch))
+          skipSeparationSpace(state, false, nodeIndent);
+        else if (ch < 256 && simpleEscapeCheck[ch]) {
+          state.result += simpleEscapeMap[ch];
+          state.position++;
+        } else if ((tmp = escapedHexLen(ch)) > 0) {
+          let hexLength = tmp;
+          let hexResult = 0;
+          for (;hexLength > 0; hexLength--) {
+            ch = state.input.charCodeAt(++state.position);
+            if ((tmp = fromHexCode(ch)) >= 0)
+              hexResult = (hexResult << 4) + tmp;
+            else
+              throwError(state, "expected hexadecimal character");
+          }
+          state.result += charFromCodepoint(hexResult);
+          state.position++;
+        } else
+          throwError(state, "unknown escape sequence");
+        captureStart = captureEnd = state.position;
+      } else if (isEol(ch)) {
+        captureSegment(state, captureStart, captureEnd, true);
+        writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
+        captureStart = captureEnd = state.position;
+      } else if (state.position === state.lineStart && testDocumentSeparator(state))
+        throwError(state, "unexpected end of the document within a double quoted scalar");
+      else {
+        state.position++;
+        if (!isWhiteSpace(ch))
+          captureEnd = state.position;
+      }
+    throwError(state, "unexpected end of the stream within a double quoted scalar");
+  }
+  function readFlowCollection(state, nodeIndent) {
+    let readNext = true;
+    let _line;
+    let _lineStart;
+    let _pos;
+    const _tag = state.tag;
+    let _result;
+    const _anchor = state.anchor;
+    let terminator;
+    let isPair;
+    let isExplicitPair;
+    let isMapping;
+    const overridableKeys = Object.create(null);
+    let keyNode;
+    let keyTag;
+    let valueNode;
+    let ch = state.input.charCodeAt(state.position);
+    if (ch === 91) {
+      terminator = 93;
+      isMapping = false;
+      _result = [];
+    } else if (ch === 123) {
+      terminator = 125;
+      isMapping = true;
+      _result = {};
+    } else
+      return false;
+    if (state.anchor !== null)
+      storeAnchor(state, state.anchor, _result);
+    ch = state.input.charCodeAt(++state.position);
+    while (ch !== 0) {
+      skipSeparationSpace(state, true, nodeIndent);
+      ch = state.input.charCodeAt(state.position);
+      if (ch === terminator) {
+        state.position++;
+        state.tag = _tag;
+        state.anchor = _anchor;
+        state.kind = isMapping ? "mapping" : "sequence";
+        state.result = _result;
+        return true;
+      } else if (!readNext)
+        throwError(state, "missed comma between flow collection entries");
+      else if (ch === 44)
+        throwError(state, "expected the node content, but found ','");
+      keyTag = keyNode = valueNode = null;
+      isPair = isExplicitPair = false;
+      if (ch === 63) {
+        if (isWsOrEol(state.input.charCodeAt(state.position + 1))) {
+          isPair = isExplicitPair = true;
+          state.position++;
+          skipSeparationSpace(state, true, nodeIndent);
+        }
+      }
+      _line = state.line;
+      _lineStart = state.lineStart;
+      _pos = state.position;
+      composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
+      keyTag = state.tag;
+      keyNode = state.result;
+      skipSeparationSpace(state, true, nodeIndent);
+      ch = state.input.charCodeAt(state.position);
+      if ((isExplicitPair || state.line === _line) && ch === 58) {
+        isPair = true;
+        ch = state.input.charCodeAt(++state.position);
+        skipSeparationSpace(state, true, nodeIndent);
+        composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
+        valueNode = state.result;
+      }
+      if (isMapping)
+        storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos);
+      else if (isPair)
+        _result.push(storeMappingPair(state, null, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos));
+      else
+        _result.push(keyNode);
+      skipSeparationSpace(state, true, nodeIndent);
+      ch = state.input.charCodeAt(state.position);
+      if (ch === 44) {
+        readNext = true;
+        ch = state.input.charCodeAt(++state.position);
+      } else
+        readNext = false;
+    }
+    throwError(state, "unexpected end of the stream within a flow collection");
+  }
+  function readBlockScalar(state, nodeIndent) {
+    let folding;
+    let chomping = CHOMPING_CLIP;
+    let didReadContent = false;
+    let detectedIndent = false;
+    let textIndent = nodeIndent;
+    let emptyLines = 0;
+    let atMoreIndented = false;
+    let tmp;
+    let ch = state.input.charCodeAt(state.position);
+    if (ch === 124)
+      folding = false;
+    else if (ch === 62)
+      folding = true;
+    else
+      return false;
+    state.kind = "scalar";
+    state.result = "";
+    while (ch !== 0) {
+      ch = state.input.charCodeAt(++state.position);
+      if (ch === 43 || ch === 45)
+        if (CHOMPING_CLIP === chomping)
+          chomping = ch === 43 ? CHOMPING_KEEP : CHOMPING_STRIP;
+        else
+          throwError(state, "repeat of a chomping mode identifier");
+      else if ((tmp = fromDecimalCode(ch)) >= 0)
+        if (tmp === 0)
+          throwError(state, "bad explicit indentation width of a block scalar; it cannot be less than one");
+        else if (!detectedIndent) {
+          textIndent = nodeIndent + tmp - 1;
+          detectedIndent = true;
+        } else
+          throwError(state, "repeat of an indentation width identifier");
+      else
+        break;
+    }
+    if (isWhiteSpace(ch)) {
+      do
+        ch = state.input.charCodeAt(++state.position);
+      while (isWhiteSpace(ch));
+      if (ch === 35)
+        do
+          ch = state.input.charCodeAt(++state.position);
+        while (!isEol(ch) && ch !== 0);
+    }
+    while (ch !== 0) {
+      readLineBreak(state);
+      state.lineIndent = 0;
+      ch = state.input.charCodeAt(state.position);
+      while ((!detectedIndent || state.lineIndent < textIndent) && ch === 32) {
+        state.lineIndent++;
+        ch = state.input.charCodeAt(++state.position);
+      }
+      if (!detectedIndent && state.lineIndent > textIndent)
+        textIndent = state.lineIndent;
+      if (isEol(ch)) {
+        emptyLines++;
+        continue;
+      }
+      if (!detectedIndent && textIndent === 0)
+        throwError(state, "missing indentation for block scalar");
+      if (state.lineIndent < textIndent) {
+        if (chomping === CHOMPING_KEEP)
+          state.result += common.repeat(`
+`, didReadContent ? 1 + emptyLines : emptyLines);
+        else if (chomping === CHOMPING_CLIP) {
+          if (didReadContent)
+            state.result += `
+`;
+        }
+        break;
+      }
+      if (folding)
+        if (isWhiteSpace(ch)) {
+          atMoreIndented = true;
+          state.result += common.repeat(`
+`, didReadContent ? 1 + emptyLines : emptyLines);
+        } else if (atMoreIndented) {
+          atMoreIndented = false;
+          state.result += common.repeat(`
+`, emptyLines + 1);
+        } else if (emptyLines === 0) {
+          if (didReadContent)
+            state.result += " ";
+        } else
+          state.result += common.repeat(`
+`, emptyLines);
+      else
+        state.result += common.repeat(`
+`, didReadContent ? 1 + emptyLines : emptyLines);
+      didReadContent = true;
+      detectedIndent = true;
+      emptyLines = 0;
+      const captureStart = state.position;
+      while (!isEol(ch) && ch !== 0)
+        ch = state.input.charCodeAt(++state.position);
+      captureSegment(state, captureStart, state.position, false);
+    }
+    return true;
+  }
+  function readBlockSequence(state, nodeIndent) {
+    const _tag = state.tag;
+    const _anchor = state.anchor;
+    const _result = [];
+    let detected = false;
+    if (state.firstTabInLine !== -1)
+      return false;
+    if (state.anchor !== null)
+      storeAnchor(state, state.anchor, _result);
+    let ch = state.input.charCodeAt(state.position);
+    while (ch !== 0) {
+      if (state.firstTabInLine !== -1) {
+        state.position = state.firstTabInLine;
+        throwError(state, "tab characters must not be used in indentation");
+      }
+      if (ch !== 45)
+        break;
+      if (!isWsOrEol(state.input.charCodeAt(state.position + 1)))
+        break;
+      detected = true;
+      state.position++;
+      if (skipSeparationSpace(state, true, -1)) {
+        if (state.lineIndent <= nodeIndent) {
+          _result.push(null);
+          ch = state.input.charCodeAt(state.position);
+          continue;
+        }
+      }
+      const _line = state.line;
+      composeNode(state, nodeIndent, CONTEXT_BLOCK_IN, false, true);
+      _result.push(state.result);
+      skipSeparationSpace(state, true, -1);
+      ch = state.input.charCodeAt(state.position);
+      if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0)
+        throwError(state, "bad indentation of a sequence entry");
+      else if (state.lineIndent < nodeIndent)
+        break;
+    }
+    if (detected) {
+      state.tag = _tag;
+      state.anchor = _anchor;
+      state.kind = "sequence";
+      state.result = _result;
+      return true;
+    }
+    return false;
+  }
+  function readBlockMapping(state, nodeIndent, flowIndent) {
+    let allowCompact;
+    let _keyLine;
+    let _keyLineStart;
+    let _keyPos;
+    const _tag = state.tag;
+    const _anchor = state.anchor;
+    const _result = {};
+    const overridableKeys = Object.create(null);
+    let keyTag = null;
+    let keyNode = null;
+    let valueNode = null;
+    let atExplicitKey = false;
+    let detected = false;
+    if (state.firstTabInLine !== -1)
+      return false;
+    if (state.anchor !== null)
+      storeAnchor(state, state.anchor, _result);
+    let ch = state.input.charCodeAt(state.position);
+    while (ch !== 0) {
+      if (!atExplicitKey && state.firstTabInLine !== -1) {
+        state.position = state.firstTabInLine;
+        throwError(state, "tab characters must not be used in indentation");
+      }
+      const following = state.input.charCodeAt(state.position + 1);
+      const _line = state.line;
+      if ((ch === 63 || ch === 58) && isWsOrEol(following)) {
+        if (ch === 63) {
+          if (atExplicitKey) {
+            storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+            keyTag = keyNode = valueNode = null;
+          }
+          detected = true;
+          atExplicitKey = true;
+          allowCompact = true;
+        } else if (atExplicitKey) {
+          atExplicitKey = false;
+          allowCompact = true;
+        } else
+          throwError(state, "incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line");
+        state.position += 1;
+        ch = following;
+      } else {
+        _keyLine = state.line;
+        _keyLineStart = state.lineStart;
+        _keyPos = state.position;
+        if (!composeNode(state, flowIndent, CONTEXT_FLOW_OUT, false, true))
+          break;
+        if (state.line === _line) {
+          ch = state.input.charCodeAt(state.position);
+          while (isWhiteSpace(ch))
+            ch = state.input.charCodeAt(++state.position);
+          if (ch === 58) {
+            ch = state.input.charCodeAt(++state.position);
+            if (!isWsOrEol(ch))
+              throwError(state, "a whitespace character is expected after the key-value separator within a block mapping");
+            if (atExplicitKey) {
+              storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+              keyTag = keyNode = valueNode = null;
+            }
+            detected = true;
+            atExplicitKey = false;
+            allowCompact = false;
+            keyTag = state.tag;
+            keyNode = state.result;
+          } else if (detected)
+            throwError(state, "can not read an implicit mapping pair; a colon is missed");
+          else {
+            state.tag = _tag;
+            state.anchor = _anchor;
+            return true;
+          }
+        } else if (detected)
+          throwError(state, "can not read a block mapping entry; a multiline key may not be an implicit key");
+        else {
+          state.tag = _tag;
+          state.anchor = _anchor;
+          return true;
+        }
+      }
+      if (state.line === _line || state.lineIndent > nodeIndent) {
+        if (atExplicitKey) {
+          _keyLine = state.line;
+          _keyLineStart = state.lineStart;
+          _keyPos = state.position;
+        }
+        if (composeNode(state, nodeIndent, CONTEXT_BLOCK_OUT, true, allowCompact))
+          if (atExplicitKey)
+            keyNode = state.result;
+          else
+            valueNode = state.result;
+        if (!atExplicitKey) {
+          storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _keyLine, _keyLineStart, _keyPos);
+          keyTag = keyNode = valueNode = null;
+        }
+        skipSeparationSpace(state, true, -1);
+        ch = state.input.charCodeAt(state.position);
+      }
+      if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0)
+        throwError(state, "bad indentation of a mapping entry");
+      else if (state.lineIndent < nodeIndent)
+        break;
+    }
+    if (atExplicitKey)
+      storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+    if (detected) {
+      state.tag = _tag;
+      state.anchor = _anchor;
+      state.kind = "mapping";
+      state.result = _result;
+    }
+    return detected;
+  }
+  function readTagProperty(state) {
+    let isVerbatim = false;
+    let isNamed = false;
+    let tagHandle;
+    let tagName;
+    let ch = state.input.charCodeAt(state.position);
+    if (ch !== 33)
+      return false;
+    if (state.tag !== null)
+      throwError(state, "duplication of a tag property");
+    ch = state.input.charCodeAt(++state.position);
+    if (ch === 60) {
+      isVerbatim = true;
+      ch = state.input.charCodeAt(++state.position);
+    } else if (ch === 33) {
+      isNamed = true;
+      tagHandle = "!!";
+      ch = state.input.charCodeAt(++state.position);
+    } else
+      tagHandle = "!";
+    let _position = state.position;
+    if (isVerbatim) {
+      do
+        ch = state.input.charCodeAt(++state.position);
+      while (ch !== 0 && ch !== 62);
+      if (state.position < state.length) {
+        tagName = state.input.slice(_position, state.position);
+        ch = state.input.charCodeAt(++state.position);
+      } else
+        throwError(state, "unexpected end of the stream within a verbatim tag");
+    } else {
+      while (ch !== 0 && !isWsOrEol(ch)) {
+        if (ch === 33)
+          if (!isNamed) {
+            tagHandle = state.input.slice(_position - 1, state.position + 1);
+            if (!PATTERN_TAG_HANDLE.test(tagHandle))
+              throwError(state, "named tag handle cannot contain such characters");
+            isNamed = true;
+            _position = state.position + 1;
+          } else
+            throwError(state, "tag suffix cannot contain exclamation marks");
+        ch = state.input.charCodeAt(++state.position);
+      }
+      tagName = state.input.slice(_position, state.position);
+      if (PATTERN_FLOW_INDICATORS.test(tagName))
+        throwError(state, "tag suffix cannot contain flow indicator characters");
+    }
+    if (tagName && !PATTERN_TAG_URI.test(tagName))
+      throwError(state, "tag name cannot contain such characters: " + tagName);
+    try {
+      tagName = decodeURIComponent(tagName);
+    } catch (err) {
+      throwError(state, "tag name is malformed: " + tagName);
+    }
+    if (isVerbatim)
+      state.tag = tagName;
+    else if (_hasOwnProperty.call(state.tagMap, tagHandle))
+      state.tag = state.tagMap[tagHandle] + tagName;
+    else if (tagHandle === "!")
+      state.tag = "!" + tagName;
+    else if (tagHandle === "!!")
+      state.tag = "tag:yaml.org,2002:" + tagName;
+    else
+      throwError(state, 'undeclared tag handle "' + tagHandle + '"');
+    return true;
+  }
+  function readAnchorProperty(state) {
+    let ch = state.input.charCodeAt(state.position);
+    if (ch !== 38)
+      return false;
+    if (state.anchor !== null)
+      throwError(state, "duplication of an anchor property");
+    ch = state.input.charCodeAt(++state.position);
+    const _position = state.position;
+    while (ch !== 0 && !isWsOrEol(ch) && !isFlowIndicator(ch))
+      ch = state.input.charCodeAt(++state.position);
+    if (state.position === _position)
+      throwError(state, "name of an anchor node must contain at least one character");
+    state.anchor = state.input.slice(_position, state.position);
+    return true;
+  }
+  function readAlias(state) {
+    let ch = state.input.charCodeAt(state.position);
+    if (ch !== 42)
+      return false;
+    ch = state.input.charCodeAt(++state.position);
+    const _position = state.position;
+    while (ch !== 0 && !isWsOrEol(ch) && !isFlowIndicator(ch))
+      ch = state.input.charCodeAt(++state.position);
+    if (state.position === _position)
+      throwError(state, "name of an alias node must contain at least one character");
+    const alias = state.input.slice(_position, state.position);
+    if (!_hasOwnProperty.call(state.anchorMap, alias))
+      throwError(state, 'unidentified alias "' + alias + '"');
+    state.result = state.anchorMap[alias];
+    skipSeparationSpace(state, true, -1);
+    return true;
+  }
+  function tryReadBlockMappingFromProperty(state, propertyStart, nodeIndent, flowIndent) {
+    const fallbackState = snapshotState(state);
+    beginAnchorTransaction(state);
+    restoreState(state, propertyStart);
+    state.tag = null;
+    state.anchor = null;
+    state.kind = null;
+    state.result = null;
+    if (readBlockMapping(state, nodeIndent, flowIndent) && state.kind === "mapping") {
+      commitAnchorTransaction(state);
+      return true;
+    }
+    rollbackAnchorTransaction(state);
+    restoreState(state, fallbackState);
+    return false;
+  }
+  function composeNode(state, parentIndent, nodeContext, allowToSeek, allowCompact) {
+    let allowBlockScalars;
+    let allowBlockCollections;
+    let indentStatus = 1;
+    let atNewLine = false;
+    let hasContent = false;
+    let propertyStart = null;
+    let type;
+    let flowIndent;
+    let blockIndent;
+    if (state.depth >= state.maxDepth)
+      throwError(state, "nesting exceeded maxDepth (" + state.maxDepth + ")");
+    state.depth += 1;
+    if (state.listener !== null)
+      state.listener("open", state);
+    state.tag = null;
+    state.anchor = null;
+    state.kind = null;
+    state.result = null;
+    const allowBlockStyles = allowBlockScalars = allowBlockCollections = CONTEXT_BLOCK_OUT === nodeContext || CONTEXT_BLOCK_IN === nodeContext;
+    if (allowToSeek) {
+      if (skipSeparationSpace(state, true, -1)) {
+        atNewLine = true;
+        if (state.lineIndent > parentIndent)
+          indentStatus = 1;
+        else if (state.lineIndent === parentIndent)
+          indentStatus = 0;
+        else if (state.lineIndent < parentIndent)
+          indentStatus = -1;
+      }
+    }
+    if (indentStatus === 1)
+      while (true) {
+        const ch = state.input.charCodeAt(state.position);
+        const propertyState = snapshotState(state);
+        if (atNewLine && (ch === 33 && state.tag !== null || ch === 38 && state.anchor !== null))
+          break;
+        if (!readTagProperty(state) && !readAnchorProperty(state))
+          break;
+        if (propertyStart === null)
+          propertyStart = propertyState;
+        if (skipSeparationSpace(state, true, -1)) {
+          atNewLine = true;
+          allowBlockCollections = allowBlockStyles;
+          if (state.lineIndent > parentIndent)
+            indentStatus = 1;
+          else if (state.lineIndent === parentIndent)
+            indentStatus = 0;
+          else if (state.lineIndent < parentIndent)
+            indentStatus = -1;
+        } else
+          allowBlockCollections = false;
+      }
+    if (allowBlockCollections)
+      allowBlockCollections = atNewLine || allowCompact;
+    if (indentStatus === 1 || CONTEXT_BLOCK_OUT === nodeContext) {
+      if (CONTEXT_FLOW_IN === nodeContext || CONTEXT_FLOW_OUT === nodeContext)
+        flowIndent = parentIndent;
+      else
+        flowIndent = parentIndent + 1;
+      blockIndent = state.position - state.lineStart;
+      if (indentStatus === 1)
+        if (allowBlockCollections && (readBlockSequence(state, blockIndent) || readBlockMapping(state, blockIndent, flowIndent)) || readFlowCollection(state, flowIndent))
+          hasContent = true;
+        else {
+          const ch = state.input.charCodeAt(state.position);
+          if (propertyStart !== null && allowBlockStyles && !allowBlockCollections && ch !== 124 && ch !== 62 && tryReadBlockMappingFromProperty(state, propertyStart, propertyStart.position - propertyStart.lineStart, flowIndent))
+            hasContent = true;
+          else if (allowBlockScalars && readBlockScalar(state, flowIndent) || readSingleQuotedScalar(state, flowIndent) || readDoubleQuotedScalar(state, flowIndent))
+            hasContent = true;
+          else if (readAlias(state)) {
+            hasContent = true;
+            if (state.tag !== null || state.anchor !== null)
+              throwError(state, "alias node should not have any properties");
+          } else if (readPlainScalar(state, flowIndent, CONTEXT_FLOW_IN === nodeContext)) {
+            hasContent = true;
+            if (state.tag === null)
+              state.tag = "?";
+          }
+          if (state.anchor !== null)
+            storeAnchor(state, state.anchor, state.result);
+        }
+      else if (indentStatus === 0)
+        hasContent = allowBlockCollections && readBlockSequence(state, blockIndent);
+    }
+    if (state.tag === null) {
+      if (state.anchor !== null)
+        storeAnchor(state, state.anchor, state.result);
+    } else if (state.tag === "?") {
+      if (state.result !== null && state.kind !== "scalar")
+        throwError(state, 'unacceptable node kind for !<?> tag; it should be "scalar", not "' + state.kind + '"');
+      for (let typeIndex = 0, typeQuantity = state.implicitTypes.length;typeIndex < typeQuantity; typeIndex += 1) {
+        type = state.implicitTypes[typeIndex];
+        if (type.resolve(state.result)) {
+          state.result = type.construct(state.result);
+          state.tag = type.tag;
+          if (state.anchor !== null)
+            storeAnchor(state, state.anchor, state.result);
+          break;
+        }
+      }
+    } else if (state.tag !== "!") {
+      if (_hasOwnProperty.call(state.typeMap[state.kind || "fallback"], state.tag))
+        type = state.typeMap[state.kind || "fallback"][state.tag];
+      else {
+        type = null;
+        const typeList = state.typeMap.multi[state.kind || "fallback"];
+        for (let typeIndex = 0, typeQuantity = typeList.length;typeIndex < typeQuantity; typeIndex += 1)
+          if (state.tag.slice(0, typeList[typeIndex].tag.length) === typeList[typeIndex].tag) {
+            type = typeList[typeIndex];
+            break;
+          }
+      }
+      if (!type)
+        throwError(state, "unknown tag !<" + state.tag + ">");
+      if (state.result !== null && type.kind !== state.kind)
+        throwError(state, "unacceptable node kind for !<" + state.tag + '> tag; it should be "' + type.kind + '", not "' + state.kind + '"');
+      if (!type.resolve(state.result, state.tag))
+        throwError(state, "cannot resolve a node with !<" + state.tag + "> explicit tag");
+      else {
+        state.result = type.construct(state.result, state.tag);
+        if (state.anchor !== null)
+          storeAnchor(state, state.anchor, state.result);
+      }
+    }
+    if (state.listener !== null)
+      state.listener("close", state);
+    state.depth -= 1;
+    return state.tag !== null || state.anchor !== null || hasContent;
+  }
+  function readDocument(state) {
+    const documentStart = state.position;
+    let hasDirectives = false;
+    let ch;
+    state.version = null;
+    state.checkLineBreaks = state.legacy;
+    state.tagMap = Object.create(null);
+    state.anchorMap = Object.create(null);
+    while ((ch = state.input.charCodeAt(state.position)) !== 0) {
+      skipSeparationSpace(state, true, -1);
+      ch = state.input.charCodeAt(state.position);
+      if (state.lineIndent > 0 || ch !== 37)
+        break;
+      hasDirectives = true;
+      ch = state.input.charCodeAt(++state.position);
+      let _position = state.position;
+      while (ch !== 0 && !isWsOrEol(ch))
+        ch = state.input.charCodeAt(++state.position);
+      const directiveName = state.input.slice(_position, state.position);
+      const directiveArgs = [];
+      if (directiveName.length < 1)
+        throwError(state, "directive name must not be less than one character in length");
+      while (ch !== 0) {
+        while (isWhiteSpace(ch))
+          ch = state.input.charCodeAt(++state.position);
+        if (ch === 35) {
+          do
+            ch = state.input.charCodeAt(++state.position);
+          while (ch !== 0 && !isEol(ch));
+          break;
+        }
+        if (isEol(ch))
+          break;
+        _position = state.position;
+        while (ch !== 0 && !isWsOrEol(ch))
+          ch = state.input.charCodeAt(++state.position);
+        directiveArgs.push(state.input.slice(_position, state.position));
+      }
+      if (ch !== 0)
+        readLineBreak(state);
+      if (_hasOwnProperty.call(directiveHandlers, directiveName))
+        directiveHandlers[directiveName](state, directiveName, directiveArgs);
+      else
+        throwWarning(state, 'unknown document directive "' + directiveName + '"');
+    }
+    skipSeparationSpace(state, true, -1);
+    if (state.lineIndent === 0 && state.input.charCodeAt(state.position) === 45 && state.input.charCodeAt(state.position + 1) === 45 && state.input.charCodeAt(state.position + 2) === 45) {
+      state.position += 3;
+      skipSeparationSpace(state, true, -1);
+    } else if (hasDirectives)
+      throwError(state, "directives end mark is expected");
+    composeNode(state, state.lineIndent - 1, CONTEXT_BLOCK_OUT, false, true);
+    skipSeparationSpace(state, true, -1);
+    if (state.checkLineBreaks && PATTERN_NON_ASCII_LINE_BREAKS.test(state.input.slice(documentStart, state.position)))
+      throwWarning(state, "non-ASCII line breaks are interpreted as content");
+    state.documents.push(state.result);
+    if (state.position === state.lineStart && testDocumentSeparator(state)) {
+      if (state.input.charCodeAt(state.position) === 46) {
+        state.position += 3;
+        skipSeparationSpace(state, true, -1);
+      }
+      return;
+    }
+    if (state.position < state.length - 1)
+      throwError(state, "end of the stream or a document separator is expected");
+  }
+  function loadDocuments(input, options) {
+    input = String(input);
+    options = options || {};
+    if (input.length !== 0) {
+      if (input.charCodeAt(input.length - 1) !== 10 && input.charCodeAt(input.length - 1) !== 13)
+        input += `
+`;
+      if (input.charCodeAt(0) === 65279)
+        input = input.slice(1);
+    }
+    const state = new State(input, options);
+    const nullpos = input.indexOf("\x00");
+    if (nullpos !== -1) {
+      state.position = nullpos;
+      throwError(state, "null byte is not allowed in input");
+    }
+    state.input += "\x00";
+    while (state.input.charCodeAt(state.position) === 32) {
+      state.lineIndent += 1;
+      state.position += 1;
+    }
+    while (state.position < state.length - 1)
+      readDocument(state);
+    return state.documents;
+  }
+  function loadAll(input, iterator, options) {
+    if (iterator !== null && typeof iterator === "object" && typeof options === "undefined") {
+      options = iterator;
+      iterator = null;
+    }
+    const documents = loadDocuments(input, options);
+    if (typeof iterator !== "function")
+      return documents;
+    for (let index = 0, length = documents.length;index < length; index += 1)
+      iterator(documents[index]);
+  }
+  function load(input, options) {
+    const documents = loadDocuments(input, options);
+    if (documents.length === 0)
+      return;
+    else if (documents.length === 1)
+      return documents[0];
+    throw new YAMLException("expected a single document in the stream, but found more");
+  }
+  module.exports.loadAll = loadAll;
+  module.exports.load = load;
+});
+var require_dumper = /* @__PURE__ */ __commonJSMin((exports, module) => {
+  var common = require_common();
+  var YAMLException = require_exception();
+  var DEFAULT_SCHEMA = require_default();
+  var _toString = Object.prototype.toString;
+  var _hasOwnProperty = Object.prototype.hasOwnProperty;
+  var CHAR_BOM = 65279;
+  var CHAR_TAB = 9;
+  var CHAR_LINE_FEED = 10;
+  var CHAR_CARRIAGE_RETURN = 13;
+  var CHAR_SPACE = 32;
+  var CHAR_EXCLAMATION = 33;
+  var CHAR_DOUBLE_QUOTE = 34;
+  var CHAR_SHARP = 35;
+  var CHAR_PERCENT = 37;
+  var CHAR_AMPERSAND = 38;
+  var CHAR_SINGLE_QUOTE = 39;
+  var CHAR_ASTERISK = 42;
+  var CHAR_COMMA = 44;
+  var CHAR_MINUS = 45;
+  var CHAR_COLON = 58;
+  var CHAR_EQUALS = 61;
+  var CHAR_GREATER_THAN = 62;
+  var CHAR_QUESTION = 63;
+  var CHAR_COMMERCIAL_AT = 64;
+  var CHAR_LEFT_SQUARE_BRACKET = 91;
+  var CHAR_RIGHT_SQUARE_BRACKET = 93;
+  var CHAR_GRAVE_ACCENT = 96;
+  var CHAR_LEFT_CURLY_BRACKET = 123;
+  var CHAR_VERTICAL_LINE = 124;
+  var CHAR_RIGHT_CURLY_BRACKET = 125;
+  var ESCAPE_SEQUENCES = {};
+  ESCAPE_SEQUENCES[0] = "\\0";
+  ESCAPE_SEQUENCES[7] = "\\a";
+  ESCAPE_SEQUENCES[8] = "\\b";
+  ESCAPE_SEQUENCES[9] = "\\t";
+  ESCAPE_SEQUENCES[10] = "\\n";
+  ESCAPE_SEQUENCES[11] = "\\v";
+  ESCAPE_SEQUENCES[12] = "\\f";
+  ESCAPE_SEQUENCES[13] = "\\r";
+  ESCAPE_SEQUENCES[27] = "\\e";
+  ESCAPE_SEQUENCES[34] = "\\\"";
+  ESCAPE_SEQUENCES[92] = "\\\\";
+  ESCAPE_SEQUENCES[133] = "\\N";
+  ESCAPE_SEQUENCES[160] = "\\_";
+  ESCAPE_SEQUENCES[8232] = "\\L";
+  ESCAPE_SEQUENCES[8233] = "\\P";
+  var DEPRECATED_BOOLEANS_SYNTAX = [
+    "y",
+    "Y",
+    "yes",
+    "Yes",
+    "YES",
+    "on",
+    "On",
+    "ON",
+    "n",
+    "N",
+    "no",
+    "No",
+    "NO",
+    "off",
+    "Off",
+    "OFF"
+  ];
+  var DEPRECATED_BASE60_SYNTAX = /^[-+]?[0-9_]+(?::[0-9_]+)+(?:\.[0-9_]*)?$/;
+  function compileStyleMap(schema, map) {
+    if (map === null)
+      return {};
+    const result = {};
+    const keys = Object.keys(map);
+    for (let index = 0, length = keys.length;index < length; index += 1) {
+      let tag = keys[index];
+      let style = String(map[tag]);
+      if (tag.slice(0, 2) === "!!")
+        tag = "tag:yaml.org,2002:" + tag.slice(2);
+      const type = schema.compiledTypeMap["fallback"][tag];
+      if (type && _hasOwnProperty.call(type.styleAliases, style))
+        style = type.styleAliases[style];
+      result[tag] = style;
+    }
+    return result;
+  }
+  function encodeHex(character) {
+    let handle;
+    let length;
+    const string = character.toString(16).toUpperCase();
+    if (character <= 255) {
+      handle = "x";
+      length = 2;
+    } else if (character <= 65535) {
+      handle = "u";
+      length = 4;
+    } else if (character <= 4294967295) {
+      handle = "U";
+      length = 8;
+    } else
+      throw new YAMLException("code point within a string may not be greater than 0xFFFFFFFF");
+    return "\\" + handle + common.repeat("0", length - string.length) + string;
+  }
+  var QUOTING_TYPE_SINGLE = 1;
+  var QUOTING_TYPE_DOUBLE = 2;
+  function State(options) {
+    this.schema = options["schema"] || DEFAULT_SCHEMA;
+    this.indent = Math.max(1, options["indent"] || 2);
+    this.noArrayIndent = options["noArrayIndent"] || false;
+    this.skipInvalid = options["skipInvalid"] || false;
+    this.flowLevel = common.isNothing(options["flowLevel"]) ? -1 : options["flowLevel"];
+    this.styleMap = compileStyleMap(this.schema, options["styles"] || null);
+    this.sortKeys = options["sortKeys"] || false;
+    this.lineWidth = options["lineWidth"] || 80;
+    this.noRefs = options["noRefs"] || false;
+    this.noCompatMode = options["noCompatMode"] || false;
+    this.condenseFlow = options["condenseFlow"] || false;
+    this.quotingType = options["quotingType"] === '"' ? QUOTING_TYPE_DOUBLE : QUOTING_TYPE_SINGLE;
+    this.forceQuotes = options["forceQuotes"] || false;
+    this.replacer = typeof options["replacer"] === "function" ? options["replacer"] : null;
+    this.implicitTypes = this.schema.compiledImplicit;
+    this.explicitTypes = this.schema.compiledExplicit;
+    this.tag = null;
+    this.result = "";
+    this.duplicates = [];
+    this.usedDuplicates = null;
+  }
+  function indentString(string, spaces) {
+    const ind = common.repeat(" ", spaces);
+    let position = 0;
+    let result = "";
+    const length = string.length;
+    while (position < length) {
+      let line;
+      const next = string.indexOf(`
+`, position);
+      if (next === -1) {
+        line = string.slice(position);
+        position = length;
+      } else {
+        line = string.slice(position, next + 1);
+        position = next + 1;
+      }
+      if (line.length && line !== `
+`)
+        result += ind;
+      result += line;
+    }
+    return result;
+  }
+  function generateNextLine(state, level) {
+    return `
+` + common.repeat(" ", state.indent * level);
+  }
+  function testImplicitResolving(state, str) {
+    for (let index = 0, length = state.implicitTypes.length;index < length; index += 1)
+      if (state.implicitTypes[index].resolve(str))
+        return true;
+    return false;
+  }
+  function isWhitespace(c) {
+    return c === CHAR_SPACE || c === CHAR_TAB;
+  }
+  function isPrintable(c) {
+    return c >= 32 && c <= 126 || c >= 161 && c <= 55295 && c !== 8232 && c !== 8233 || c >= 57344 && c <= 65533 && c !== CHAR_BOM || c >= 65536 && c <= 1114111;
+  }
+  function isNsCharOrWhitespace(c) {
+    return isPrintable(c) && c !== CHAR_BOM && c !== CHAR_CARRIAGE_RETURN && c !== CHAR_LINE_FEED;
+  }
+  function isPlainSafe(c, prev, inblock) {
+    const cIsNsCharOrWhitespace = isNsCharOrWhitespace(c);
+    const cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c);
+    return (inblock ? cIsNsCharOrWhitespace : cIsNsCharOrWhitespace && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET) && c !== CHAR_SHARP && !(prev === CHAR_COLON && !cIsNsChar) || isNsCharOrWhitespace(prev) && !isWhitespace(prev) && c === CHAR_SHARP || prev === CHAR_COLON && cIsNsChar;
+  }
+  function isPlainSafeFirst(c) {
+    return isPrintable(c) && c !== CHAR_BOM && !isWhitespace(c) && c !== CHAR_MINUS && c !== CHAR_QUESTION && c !== CHAR_COLON && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET && c !== CHAR_SHARP && c !== CHAR_AMPERSAND && c !== CHAR_ASTERISK && c !== CHAR_EXCLAMATION && c !== CHAR_VERTICAL_LINE && c !== CHAR_EQUALS && c !== CHAR_GREATER_THAN && c !== CHAR_SINGLE_QUOTE && c !== CHAR_DOUBLE_QUOTE && c !== CHAR_PERCENT && c !== CHAR_COMMERCIAL_AT && c !== CHAR_GRAVE_ACCENT;
+  }
+  function isPlainSafeLast(c) {
+    return !isWhitespace(c) && c !== CHAR_COLON;
+  }
+  function codePointAt(string, pos) {
+    const first = string.charCodeAt(pos);
+    let second;
+    if (first >= 55296 && first <= 56319 && pos + 1 < string.length) {
+      second = string.charCodeAt(pos + 1);
+      if (second >= 56320 && second <= 57343)
+        return (first - 55296) * 1024 + second - 56320 + 65536;
+    }
+    return first;
+  }
+  function needIndentIndicator(string) {
+    return /^\n* /.test(string);
+  }
+  var STYLE_PLAIN = 1;
+  var STYLE_SINGLE = 2;
+  var STYLE_LITERAL = 3;
+  var STYLE_FOLDED = 4;
+  var STYLE_DOUBLE = 5;
+  function chooseScalarStyle(string, singleLineOnly, indentPerLevel, lineWidth, testAmbiguousType, quotingType, forceQuotes, inblock) {
+    let i;
+    let char = 0;
+    let prevChar = null;
+    let hasLineBreak = false;
+    let hasFoldableLine = false;
+    const shouldTrackWidth = lineWidth !== -1;
+    let previousLineBreak = -1;
+    let plain = isPlainSafeFirst(codePointAt(string, 0)) && isPlainSafeLast(codePointAt(string, string.length - 1));
+    if (singleLineOnly || forceQuotes)
+      for (i = 0;i < string.length; char >= 65536 ? i += 2 : i++) {
+        char = codePointAt(string, i);
+        if (!isPrintable(char))
+          return STYLE_DOUBLE;
+        plain = plain && isPlainSafe(char, prevChar, inblock);
+        prevChar = char;
+      }
+    else {
+      for (i = 0;i < string.length; char >= 65536 ? i += 2 : i++) {
+        char = codePointAt(string, i);
+        if (char === CHAR_LINE_FEED) {
+          hasLineBreak = true;
+          if (shouldTrackWidth) {
+            hasFoldableLine = hasFoldableLine || i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
+            previousLineBreak = i;
+          }
+        } else if (!isPrintable(char))
+          return STYLE_DOUBLE;
+        plain = plain && isPlainSafe(char, prevChar, inblock);
+        prevChar = char;
+      }
+      hasFoldableLine = hasFoldableLine || shouldTrackWidth && i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
+    }
+    if (!hasLineBreak && !hasFoldableLine) {
+      if (plain && !forceQuotes && !testAmbiguousType(string))
+        return STYLE_PLAIN;
+      return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
+    }
+    if (indentPerLevel > 9 && needIndentIndicator(string))
+      return STYLE_DOUBLE;
+    if (!forceQuotes)
+      return hasFoldableLine ? STYLE_FOLDED : STYLE_LITERAL;
+    return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
+  }
+  function writeScalar(state, string, level, iskey, inblock) {
+    state.dump = function() {
+      if (string.length === 0)
+        return state.quotingType === QUOTING_TYPE_DOUBLE ? '""' : "''";
+      if (!state.noCompatMode) {
+        if (DEPRECATED_BOOLEANS_SYNTAX.indexOf(string) !== -1 || DEPRECATED_BASE60_SYNTAX.test(string))
+          return state.quotingType === QUOTING_TYPE_DOUBLE ? '"' + string + '"' : "'" + string + "'";
+      }
+      const indent = state.indent * Math.max(1, level);
+      const lineWidth = state.lineWidth === -1 ? -1 : Math.max(Math.min(state.lineWidth, 40), state.lineWidth - indent);
+      const singleLineOnly = iskey || state.flowLevel > -1 && level >= state.flowLevel;
+      function testAmbiguity(string2) {
+        return testImplicitResolving(state, string2);
+      }
+      switch (chooseScalarStyle(string, singleLineOnly, state.indent, lineWidth, testAmbiguity, state.quotingType, state.forceQuotes && !iskey, inblock)) {
+        case STYLE_PLAIN:
+          return string;
+        case STYLE_SINGLE:
+          return "'" + string.replace(/'/g, "''") + "'";
+        case STYLE_LITERAL:
+          return "|" + blockHeader(string, state.indent) + dropEndingNewline(indentString(string, indent));
+        case STYLE_FOLDED:
+          return ">" + blockHeader(string, state.indent) + dropEndingNewline(indentString(foldString(string, lineWidth), indent));
+        case STYLE_DOUBLE:
+          return '"' + escapeString(string, lineWidth) + '"';
+        default:
+          throw new YAMLException("impossible error: invalid scalar style");
+      }
+    }();
+  }
+  function blockHeader(string, indentPerLevel) {
+    const indentIndicator = needIndentIndicator(string) ? String(indentPerLevel) : "";
+    const clip = string[string.length - 1] === `
+`;
+    return indentIndicator + (clip && (string[string.length - 2] === `
+` || string === `
+`) ? "+" : clip ? "" : "-") + `
+`;
+  }
+  function dropEndingNewline(string) {
+    return string[string.length - 1] === `
+` ? string.slice(0, -1) : string;
+  }
+  function foldString(string, width) {
+    const lineRe = /(\n+)([^\n]*)/g;
+    let result = function() {
+      let nextLF = string.indexOf(`
+`);
+      nextLF = nextLF !== -1 ? nextLF : string.length;
+      lineRe.lastIndex = nextLF;
+      return foldLine(string.slice(0, nextLF), width);
+    }();
+    let prevMoreIndented = string[0] === `
+` || string[0] === " ";
+    let moreIndented;
+    let match;
+    while (match = lineRe.exec(string)) {
+      const prefix = match[1];
+      const line = match[2];
+      moreIndented = line[0] === " ";
+      result += prefix + (!prevMoreIndented && !moreIndented && line !== "" ? `
+` : "") + foldLine(line, width);
+      prevMoreIndented = moreIndented;
+    }
+    return result;
+  }
+  function foldLine(line, width) {
+    if (line === "" || line[0] === " ")
+      return line;
+    const breakRe = / [^ ]/g;
+    let match;
+    let start = 0;
+    let end;
+    let curr = 0;
+    let next = 0;
+    let result = "";
+    while (match = breakRe.exec(line)) {
+      next = match.index;
+      if (next - start > width) {
+        end = curr > start ? curr : next;
+        result += `
+` + line.slice(start, end);
+        start = end + 1;
+      }
+      curr = next;
+    }
+    result += `
+`;
+    if (line.length - start > width && curr > start)
+      result += line.slice(start, curr) + `
+` + line.slice(curr + 1);
+    else
+      result += line.slice(start);
+    return result.slice(1);
+  }
+  function escapeString(string) {
+    let result = "";
+    let char = 0;
+    for (let i = 0;i < string.length; char >= 65536 ? i += 2 : i++) {
+      char = codePointAt(string, i);
+      const escapeSeq = ESCAPE_SEQUENCES[char];
+      if (!escapeSeq && isPrintable(char)) {
+        result += string[i];
+        if (char >= 65536)
+          result += string[i + 1];
+      } else
+        result += escapeSeq || encodeHex(char);
+    }
+    return result;
+  }
+  function writeFlowSequence(state, level, object) {
+    let _result = "";
+    const _tag = state.tag;
+    for (let index = 0, length = object.length;index < length; index += 1) {
+      let value = object[index];
+      if (state.replacer)
+        value = state.replacer.call(object, String(index), value);
+      if (writeNode(state, level, value, false, false) || typeof value === "undefined" && writeNode(state, level, null, false, false)) {
+        if (_result !== "")
+          _result += "," + (!state.condenseFlow ? " " : "");
+        _result += state.dump;
+      }
+    }
+    state.tag = _tag;
+    state.dump = "[" + _result + "]";
+  }
+  function writeBlockSequence(state, level, object, compact) {
+    let _result = "";
+    const _tag = state.tag;
+    for (let index = 0, length = object.length;index < length; index += 1) {
+      let value = object[index];
+      if (state.replacer)
+        value = state.replacer.call(object, String(index), value);
+      if (writeNode(state, level + 1, value, true, true, false, true) || typeof value === "undefined" && writeNode(state, level + 1, null, true, true, false, true)) {
+        if (!compact || _result !== "")
+          _result += generateNextLine(state, level);
+        if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0))
+          _result += "-";
+        else
+          _result += "- ";
+        _result += state.dump;
+      }
+    }
+    state.tag = _tag;
+    state.dump = _result || "[]";
+  }
+  function writeFlowMapping(state, level, object) {
+    let _result = "";
+    const _tag = state.tag;
+    const objectKeyList = Object.keys(object);
+    for (let index = 0, length = objectKeyList.length;index < length; index += 1) {
+      let pairBuffer = "";
+      if (_result !== "")
+        pairBuffer += ", ";
+      if (state.condenseFlow)
+        pairBuffer += '"';
+      const objectKey = objectKeyList[index];
+      let objectValue = object[objectKey];
+      if (state.replacer)
+        objectValue = state.replacer.call(object, objectKey, objectValue);
+      if (!writeNode(state, level, objectKey, false, false))
+        continue;
+      if (state.dump.length > 1024)
+        pairBuffer += "? ";
+      pairBuffer += state.dump + (state.condenseFlow ? '"' : "") + ":" + (state.condenseFlow ? "" : " ");
+      if (!writeNode(state, level, objectValue, false, false))
+        continue;
+      pairBuffer += state.dump;
+      _result += pairBuffer;
+    }
+    state.tag = _tag;
+    state.dump = "{" + _result + "}";
+  }
+  function writeBlockMapping(state, level, object, compact) {
+    let _result = "";
+    const _tag = state.tag;
+    const objectKeyList = Object.keys(object);
+    if (state.sortKeys === true)
+      objectKeyList.sort();
+    else if (typeof state.sortKeys === "function")
+      objectKeyList.sort(state.sortKeys);
+    else if (state.sortKeys)
+      throw new YAMLException("sortKeys must be a boolean or a function");
+    for (let index = 0, length = objectKeyList.length;index < length; index += 1) {
+      let pairBuffer = "";
+      if (!compact || _result !== "")
+        pairBuffer += generateNextLine(state, level);
+      const objectKey = objectKeyList[index];
+      let objectValue = object[objectKey];
+      if (state.replacer)
+        objectValue = state.replacer.call(object, objectKey, objectValue);
+      if (!writeNode(state, level + 1, objectKey, true, true, true))
+        continue;
+      const explicitPair = state.tag !== null && state.tag !== "?" || state.dump && state.dump.length > 1024;
+      if (explicitPair)
+        if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0))
+          pairBuffer += "?";
+        else
+          pairBuffer += "? ";
+      pairBuffer += state.dump;
+      if (explicitPair)
+        pairBuffer += generateNextLine(state, level);
+      if (!writeNode(state, level + 1, objectValue, true, explicitPair))
+        continue;
+      if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0))
+        pairBuffer += ":";
+      else
+        pairBuffer += ": ";
+      pairBuffer += state.dump;
+      _result += pairBuffer;
+    }
+    state.tag = _tag;
+    state.dump = _result || "{}";
+  }
+  function detectType(state, object, explicit) {
+    const typeList = explicit ? state.explicitTypes : state.implicitTypes;
+    for (let index = 0, length = typeList.length;index < length; index += 1) {
+      const type = typeList[index];
+      if ((type.instanceOf || type.predicate) && (!type.instanceOf || typeof object === "object" && object instanceof type.instanceOf) && (!type.predicate || type.predicate(object))) {
+        if (explicit)
+          if (type.multi && type.representName)
+            state.tag = type.representName(object);
+          else
+            state.tag = type.tag;
+        else
+          state.tag = "?";
+        if (type.represent) {
+          const style = state.styleMap[type.tag] || type.defaultStyle;
+          let _result;
+          if (_toString.call(type.represent) === "[object Function]")
+            _result = type.represent(object, style);
+          else if (_hasOwnProperty.call(type.represent, style))
+            _result = type.represent[style](object, style);
+          else
+            throw new YAMLException("!<" + type.tag + '> tag resolver accepts not "' + style + '" style');
+          state.dump = _result;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+  function writeNode(state, level, object, block, compact, iskey, isblockseq) {
+    state.tag = null;
+    state.dump = object;
+    if (!detectType(state, object, false))
+      detectType(state, object, true);
+    const type = _toString.call(state.dump);
+    const inblock = block;
+    if (block)
+      block = state.flowLevel < 0 || state.flowLevel > level;
+    const objectOrArray = type === "[object Object]" || type === "[object Array]";
+    let duplicateIndex;
+    let duplicate;
+    if (objectOrArray) {
+      duplicateIndex = state.duplicates.indexOf(object);
+      duplicate = duplicateIndex !== -1;
+    }
+    if (state.tag !== null && state.tag !== "?" || duplicate || state.indent !== 2 && level > 0)
+      compact = false;
+    if (duplicate && state.usedDuplicates[duplicateIndex])
+      state.dump = "*ref_" + duplicateIndex;
+    else {
+      if (objectOrArray && duplicate && !state.usedDuplicates[duplicateIndex])
+        state.usedDuplicates[duplicateIndex] = true;
+      if (type === "[object Object]")
+        if (block && Object.keys(state.dump).length !== 0) {
+          writeBlockMapping(state, level, state.dump, compact);
+          if (duplicate)
+            state.dump = "&ref_" + duplicateIndex + state.dump;
+        } else {
+          writeFlowMapping(state, level, state.dump);
+          if (duplicate)
+            state.dump = "&ref_" + duplicateIndex + " " + state.dump;
+        }
+      else if (type === "[object Array]")
+        if (block && state.dump.length !== 0) {
+          if (state.noArrayIndent && !isblockseq && level > 0)
+            writeBlockSequence(state, level - 1, state.dump, compact);
+          else
+            writeBlockSequence(state, level, state.dump, compact);
+          if (duplicate)
+            state.dump = "&ref_" + duplicateIndex + state.dump;
+        } else {
+          writeFlowSequence(state, level, state.dump);
+          if (duplicate)
+            state.dump = "&ref_" + duplicateIndex + " " + state.dump;
+        }
+      else if (type === "[object String]") {
+        if (state.tag !== "?")
+          writeScalar(state, state.dump, level, iskey, inblock);
+      } else if (type === "[object Undefined]")
+        return false;
+      else {
+        if (state.skipInvalid)
+          return false;
+        throw new YAMLException("unacceptable kind of an object to dump " + type);
+      }
+      if (state.tag !== null && state.tag !== "?") {
+        let tagStr = encodeURI(state.tag[0] === "!" ? state.tag.slice(1) : state.tag).replace(/!/g, "%21");
+        if (state.tag[0] === "!")
+          tagStr = "!" + tagStr;
+        else if (tagStr.slice(0, 18) === "tag:yaml.org,2002:")
+          tagStr = "!!" + tagStr.slice(18);
+        else
+          tagStr = "!<" + tagStr + ">";
+        state.dump = tagStr + " " + state.dump;
+      }
+    }
+    return true;
+  }
+  function getDuplicateReferences(object, state) {
+    const objects = [];
+    const duplicatesIndexes = [];
+    inspectNode(object, objects, duplicatesIndexes);
+    const length = duplicatesIndexes.length;
+    for (let index = 0;index < length; index += 1)
+      state.duplicates.push(objects[duplicatesIndexes[index]]);
+    state.usedDuplicates = new Array(length);
+  }
+  function inspectNode(object, objects, duplicatesIndexes) {
+    if (object !== null && typeof object === "object") {
+      const index = objects.indexOf(object);
+      if (index !== -1) {
+        if (duplicatesIndexes.indexOf(index) === -1)
+          duplicatesIndexes.push(index);
+      } else {
+        objects.push(object);
+        if (Array.isArray(object))
+          for (let i = 0, length = object.length;i < length; i += 1)
+            inspectNode(object[i], objects, duplicatesIndexes);
+        else {
+          const objectKeyList = Object.keys(object);
+          for (let i = 0, length = objectKeyList.length;i < length; i += 1)
+            inspectNode(object[objectKeyList[i]], objects, duplicatesIndexes);
+        }
+      }
+    }
+  }
+  function dump(input, options) {
+    options = options || {};
+    const state = new State(options);
+    if (!state.noRefs)
+      getDuplicateReferences(input, state);
+    let value = input;
+    if (state.replacer)
+      value = state.replacer.call({ "": value }, "", value);
+    if (writeNode(state, 0, value, true, true))
+      return state.dump + `
+`;
+    return "";
+  }
+  module.exports.dump = dump;
+});
+var import_js_yaml = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin((exports, module) => {
+  var loader = require_loader();
+  var dumper = require_dumper();
+  function renamed(from, to) {
+    return function() {
+      throw new Error("Function yaml." + from + " is removed in js-yaml 4. Use yaml." + to + " instead, which is now safe by default.");
+    };
+  }
+  module.exports.Type = require_type();
+  module.exports.Schema = require_schema();
+  module.exports.FAILSAFE_SCHEMA = require_failsafe();
+  module.exports.JSON_SCHEMA = require_json();
+  module.exports.CORE_SCHEMA = require_core();
+  module.exports.DEFAULT_SCHEMA = require_default();
+  module.exports.load = loader.load;
+  module.exports.loadAll = loader.loadAll;
+  module.exports.dump = dumper.dump;
+  module.exports.YAMLException = require_exception();
+  module.exports.types = {
+    binary: require_binary(),
+    float: require_float(),
+    map: require_map(),
+    null: require_null(),
+    pairs: require_pairs(),
+    set: require_set(),
+    timestamp: require_timestamp(),
+    bool: require_bool(),
+    int: require_int(),
+    merge: require_merge(),
+    omap: require_omap(),
+    seq: require_seq(),
+    str: require_str()
+  };
+  module.exports.safeLoad = renamed("safeLoad", "load");
+  module.exports.safeLoadAll = renamed("safeLoadAll", "loadAll");
+  module.exports.safeDump = renamed("safeDump", "dump");
+}))(), 1);
+var { Type, Schema, FAILSAFE_SCHEMA, JSON_SCHEMA, CORE_SCHEMA, DEFAULT_SCHEMA, load, loadAll, dump, YAMLException, types, safeLoad, safeLoadAll, safeDump } = import_js_yaml.default;
+var index_vite_proxy_tmp_default = import_js_yaml.default;
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+var CharacterCodes;
+(function(CharacterCodes2) {
+  CharacterCodes2[CharacterCodes2["lineFeed"] = 10] = "lineFeed";
+  CharacterCodes2[CharacterCodes2["carriageReturn"] = 13] = "carriageReturn";
+  CharacterCodes2[CharacterCodes2["space"] = 32] = "space";
+  CharacterCodes2[CharacterCodes2["_0"] = 48] = "_0";
+  CharacterCodes2[CharacterCodes2["_1"] = 49] = "_1";
+  CharacterCodes2[CharacterCodes2["_2"] = 50] = "_2";
+  CharacterCodes2[CharacterCodes2["_3"] = 51] = "_3";
+  CharacterCodes2[CharacterCodes2["_4"] = 52] = "_4";
+  CharacterCodes2[CharacterCodes2["_5"] = 53] = "_5";
+  CharacterCodes2[CharacterCodes2["_6"] = 54] = "_6";
+  CharacterCodes2[CharacterCodes2["_7"] = 55] = "_7";
+  CharacterCodes2[CharacterCodes2["_8"] = 56] = "_8";
+  CharacterCodes2[CharacterCodes2["_9"] = 57] = "_9";
+  CharacterCodes2[CharacterCodes2["a"] = 97] = "a";
+  CharacterCodes2[CharacterCodes2["b"] = 98] = "b";
+  CharacterCodes2[CharacterCodes2["c"] = 99] = "c";
+  CharacterCodes2[CharacterCodes2["d"] = 100] = "d";
+  CharacterCodes2[CharacterCodes2["e"] = 101] = "e";
+  CharacterCodes2[CharacterCodes2["f"] = 102] = "f";
+  CharacterCodes2[CharacterCodes2["g"] = 103] = "g";
+  CharacterCodes2[CharacterCodes2["h"] = 104] = "h";
+  CharacterCodes2[CharacterCodes2["i"] = 105] = "i";
+  CharacterCodes2[CharacterCodes2["j"] = 106] = "j";
+  CharacterCodes2[CharacterCodes2["k"] = 107] = "k";
+  CharacterCodes2[CharacterCodes2["l"] = 108] = "l";
+  CharacterCodes2[CharacterCodes2["m"] = 109] = "m";
+  CharacterCodes2[CharacterCodes2["n"] = 110] = "n";
+  CharacterCodes2[CharacterCodes2["o"] = 111] = "o";
+  CharacterCodes2[CharacterCodes2["p"] = 112] = "p";
+  CharacterCodes2[CharacterCodes2["q"] = 113] = "q";
+  CharacterCodes2[CharacterCodes2["r"] = 114] = "r";
+  CharacterCodes2[CharacterCodes2["s"] = 115] = "s";
+  CharacterCodes2[CharacterCodes2["t"] = 116] = "t";
+  CharacterCodes2[CharacterCodes2["u"] = 117] = "u";
+  CharacterCodes2[CharacterCodes2["v"] = 118] = "v";
+  CharacterCodes2[CharacterCodes2["w"] = 119] = "w";
+  CharacterCodes2[CharacterCodes2["x"] = 120] = "x";
+  CharacterCodes2[CharacterCodes2["y"] = 121] = "y";
+  CharacterCodes2[CharacterCodes2["z"] = 122] = "z";
+  CharacterCodes2[CharacterCodes2["A"] = 65] = "A";
+  CharacterCodes2[CharacterCodes2["B"] = 66] = "B";
+  CharacterCodes2[CharacterCodes2["C"] = 67] = "C";
+  CharacterCodes2[CharacterCodes2["D"] = 68] = "D";
+  CharacterCodes2[CharacterCodes2["E"] = 69] = "E";
+  CharacterCodes2[CharacterCodes2["F"] = 70] = "F";
+  CharacterCodes2[CharacterCodes2["G"] = 71] = "G";
+  CharacterCodes2[CharacterCodes2["H"] = 72] = "H";
+  CharacterCodes2[CharacterCodes2["I"] = 73] = "I";
+  CharacterCodes2[CharacterCodes2["J"] = 74] = "J";
+  CharacterCodes2[CharacterCodes2["K"] = 75] = "K";
+  CharacterCodes2[CharacterCodes2["L"] = 76] = "L";
+  CharacterCodes2[CharacterCodes2["M"] = 77] = "M";
+  CharacterCodes2[CharacterCodes2["N"] = 78] = "N";
+  CharacterCodes2[CharacterCodes2["O"] = 79] = "O";
+  CharacterCodes2[CharacterCodes2["P"] = 80] = "P";
+  CharacterCodes2[CharacterCodes2["Q"] = 81] = "Q";
+  CharacterCodes2[CharacterCodes2["R"] = 82] = "R";
+  CharacterCodes2[CharacterCodes2["S"] = 83] = "S";
+  CharacterCodes2[CharacterCodes2["T"] = 84] = "T";
+  CharacterCodes2[CharacterCodes2["U"] = 85] = "U";
+  CharacterCodes2[CharacterCodes2["V"] = 86] = "V";
+  CharacterCodes2[CharacterCodes2["W"] = 87] = "W";
+  CharacterCodes2[CharacterCodes2["X"] = 88] = "X";
+  CharacterCodes2[CharacterCodes2["Y"] = 89] = "Y";
+  CharacterCodes2[CharacterCodes2["Z"] = 90] = "Z";
+  CharacterCodes2[CharacterCodes2["asterisk"] = 42] = "asterisk";
+  CharacterCodes2[CharacterCodes2["backslash"] = 92] = "backslash";
+  CharacterCodes2[CharacterCodes2["closeBrace"] = 125] = "closeBrace";
+  CharacterCodes2[CharacterCodes2["closeBracket"] = 93] = "closeBracket";
+  CharacterCodes2[CharacterCodes2["colon"] = 58] = "colon";
+  CharacterCodes2[CharacterCodes2["comma"] = 44] = "comma";
+  CharacterCodes2[CharacterCodes2["dot"] = 46] = "dot";
+  CharacterCodes2[CharacterCodes2["doubleQuote"] = 34] = "doubleQuote";
+  CharacterCodes2[CharacterCodes2["minus"] = 45] = "minus";
+  CharacterCodes2[CharacterCodes2["openBrace"] = 123] = "openBrace";
+  CharacterCodes2[CharacterCodes2["openBracket"] = 91] = "openBracket";
+  CharacterCodes2[CharacterCodes2["plus"] = 43] = "plus";
+  CharacterCodes2[CharacterCodes2["slash"] = 47] = "slash";
+  CharacterCodes2[CharacterCodes2["formFeed"] = 12] = "formFeed";
+  CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
+})(CharacterCodes || (CharacterCodes = {}));
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+var cachedSpaces = new Array(20).fill(0).map((_, index) => {
+  return " ".repeat(index);
+});
+var maxCachedValues = 200;
+var cachedBreakLinesWithSpaces = {
+  " ": {
+    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `
+` + " ".repeat(index);
+    }),
+    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return "\r" + " ".repeat(index);
+    }),
+    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `\r
+` + " ".repeat(index);
+    })
+  },
+  "\t": {
+    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `
+` + "\t".repeat(index);
+    }),
+    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return "\r" + "\t".repeat(index);
+    }),
+    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `\r
+` + "\t".repeat(index);
+    })
+  }
+};
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+var ParseOptions;
+(function(ParseOptions2) {
+  ParseOptions2.DEFAULT = {
+    allowTrailingComma: false
+  };
+})(ParseOptions || (ParseOptions = {}));
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+var ScanError;
+(function(ScanError2) {
+  ScanError2[ScanError2["None"] = 0] = "None";
+  ScanError2[ScanError2["UnexpectedEndOfComment"] = 1] = "UnexpectedEndOfComment";
+  ScanError2[ScanError2["UnexpectedEndOfString"] = 2] = "UnexpectedEndOfString";
+  ScanError2[ScanError2["UnexpectedEndOfNumber"] = 3] = "UnexpectedEndOfNumber";
+  ScanError2[ScanError2["InvalidUnicode"] = 4] = "InvalidUnicode";
+  ScanError2[ScanError2["InvalidEscapeCharacter"] = 5] = "InvalidEscapeCharacter";
+  ScanError2[ScanError2["InvalidCharacter"] = 6] = "InvalidCharacter";
+})(ScanError || (ScanError = {}));
+var SyntaxKind;
+(function(SyntaxKind2) {
+  SyntaxKind2[SyntaxKind2["OpenBraceToken"] = 1] = "OpenBraceToken";
+  SyntaxKind2[SyntaxKind2["CloseBraceToken"] = 2] = "CloseBraceToken";
+  SyntaxKind2[SyntaxKind2["OpenBracketToken"] = 3] = "OpenBracketToken";
+  SyntaxKind2[SyntaxKind2["CloseBracketToken"] = 4] = "CloseBracketToken";
+  SyntaxKind2[SyntaxKind2["CommaToken"] = 5] = "CommaToken";
+  SyntaxKind2[SyntaxKind2["ColonToken"] = 6] = "ColonToken";
+  SyntaxKind2[SyntaxKind2["NullKeyword"] = 7] = "NullKeyword";
+  SyntaxKind2[SyntaxKind2["TrueKeyword"] = 8] = "TrueKeyword";
+  SyntaxKind2[SyntaxKind2["FalseKeyword"] = 9] = "FalseKeyword";
+  SyntaxKind2[SyntaxKind2["StringLiteral"] = 10] = "StringLiteral";
+  SyntaxKind2[SyntaxKind2["NumericLiteral"] = 11] = "NumericLiteral";
+  SyntaxKind2[SyntaxKind2["LineCommentTrivia"] = 12] = "LineCommentTrivia";
+  SyntaxKind2[SyntaxKind2["BlockCommentTrivia"] = 13] = "BlockCommentTrivia";
+  SyntaxKind2[SyntaxKind2["LineBreakTrivia"] = 14] = "LineBreakTrivia";
+  SyntaxKind2[SyntaxKind2["Trivia"] = 15] = "Trivia";
+  SyntaxKind2[SyntaxKind2["Unknown"] = 16] = "Unknown";
+  SyntaxKind2[SyntaxKind2["EOF"] = 17] = "EOF";
+})(SyntaxKind || (SyntaxKind = {}));
+var ParseErrorCode;
+(function(ParseErrorCode2) {
+  ParseErrorCode2[ParseErrorCode2["InvalidSymbol"] = 1] = "InvalidSymbol";
+  ParseErrorCode2[ParseErrorCode2["InvalidNumberFormat"] = 2] = "InvalidNumberFormat";
+  ParseErrorCode2[ParseErrorCode2["PropertyNameExpected"] = 3] = "PropertyNameExpected";
+  ParseErrorCode2[ParseErrorCode2["ValueExpected"] = 4] = "ValueExpected";
+  ParseErrorCode2[ParseErrorCode2["ColonExpected"] = 5] = "ColonExpected";
+  ParseErrorCode2[ParseErrorCode2["CommaExpected"] = 6] = "CommaExpected";
+  ParseErrorCode2[ParseErrorCode2["CloseBraceExpected"] = 7] = "CloseBraceExpected";
+  ParseErrorCode2[ParseErrorCode2["CloseBracketExpected"] = 8] = "CloseBracketExpected";
+  ParseErrorCode2[ParseErrorCode2["EndOfFileExpected"] = 9] = "EndOfFileExpected";
+  ParseErrorCode2[ParseErrorCode2["InvalidCommentToken"] = 10] = "InvalidCommentToken";
+  ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfComment"] = 11] = "UnexpectedEndOfComment";
+  ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfString"] = 12] = "UnexpectedEndOfString";
+  ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfNumber"] = 13] = "UnexpectedEndOfNumber";
+  ParseErrorCode2[ParseErrorCode2["InvalidUnicode"] = 14] = "InvalidUnicode";
+  ParseErrorCode2[ParseErrorCode2["InvalidEscapeCharacter"] = 15] = "InvalidEscapeCharacter";
+  ParseErrorCode2[ParseErrorCode2["InvalidCharacter"] = 16] = "InvalidCharacter";
+})(ParseErrorCode || (ParseErrorCode = {}));
+
+// packages/utils/src/jsonc-parser.ts
+var pluginConfigFileDetectionCache = new Map;
+
+// packages/utils/src/index.ts
+init_xdg_data_dir();
+init_atomic_write();
+
+// packages/utils/src/logging/logger.ts
+var DEFAULT_MAX_LOG_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+// packages/utils/src/logger.ts
+var sharedSubunitLogger = () => {};
+function log(message, data) {
+  sharedSubunitLogger(message, data);
+}
+// packages/utils/src/omo-config.ts
+var HARNESS_IDS = ["codex", "opencode", "omo"];
+// packages/utils/src/omo-config/loader.ts
+var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
+// packages/utils/src/ast-grep/sg-manifest.ts
+function normalizeRuntimePlatform(platform = process.platform) {
+  if (platform === "darwin" || platform === "linux" || platform === "win32")
+    return platform;
+  return "linux";
+}
+function normalizeRuntimeArch(arch = process.arch) {
+  if (arch === "arm64" || arch === "aarch64")
+    return "arm64";
+  return "x64";
+}
+function runtimeSlug(platform = process.platform, arch = process.arch) {
+  return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
+}
+// packages/utils/src/ast-grep/install-script.ts
+import { spawn as spawn3 } from "node:child_process";
+import { existsSync as existsSync3 } from "node:fs";
+import { join as join23 } from "node:path";
+var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
+var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
+function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
+  return join23(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
+}
+function isMissingExecutable(error) {
+  if (!("code" in error))
+    return false;
+  return error.code === "ENOENT";
+}
+function defaultSpawnProcess(command, args, options) {
+  const child = spawn3(command, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  let settled = false;
+  const outcome = new Promise((resolve8) => {
+    const settle = (result) => {
+      if (settled)
+        return;
+      settled = true;
+      resolve8(result);
+    };
+    child.once("error", (error) => {
+      settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
+    });
+    child.once("exit", (code, signal) => {
+      settle({ kind: "exit", code, signal });
+    });
+  });
+  return {
+    kill: () => {
+      if (!child.killed)
+        child.kill();
+    },
+    outcome
+  };
+}
+function scriptPathForPlatform(skillDir, platform) {
+  return join23(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
+}
+function invocationsForPlatform(scriptPath, platform) {
+  if (platform !== "win32")
+    return [{ command: "bash", args: [scriptPath] }];
+  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
+  return [{ command: "pwsh", args }, { command: "powershell.exe", args }];
+}
+async function runInvocation(input) {
+  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    child.kill();
+  }, input.timeoutMs);
+  timeout.unref?.();
+  try {
+    const outcome = await child.outcome;
+    return timedOut ? { kind: "timed-out" } : outcome;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function failedReason(outcome) {
+  return outcome.error.message;
+}
+async function runAstGrepSkillInstall(options) {
+  const platform = options.platform ?? process.platform;
+  const fileExists = options.fileExists ?? existsSync3;
+  const scriptPath = scriptPathForPlatform(options.skillDir, platform);
+  if (!fileExists(scriptPath))
+    return { kind: "skipped", reason: `missing ${scriptPath}` };
+  const env = { ...options.env ?? process.env, [AST_GREP_BIN_DIR_ENV_KEY]: options.targetDir };
+  const spawnProcess = options.spawnProcess ?? defaultSpawnProcess;
+  const timeoutMs = options.timeoutMs ?? AST_GREP_INSTALL_TIMEOUT_MS;
+  const invocations = invocationsForPlatform(scriptPath, platform);
+  try {
+    for (const invocation of invocations) {
+      const outcome = await runInvocation({ env, invocation, skillDir: options.skillDir, spawnProcess, timeoutMs });
+      if (outcome.kind === "timed-out")
+        return { kind: "timed-out" };
+      if (outcome.kind === "exit") {
+        if (outcome.code === 0)
+          return { kind: "succeeded" };
+        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` };
+      }
+      if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh")
+        continue;
+      return { kind: "failed", reason: failedReason(outcome) };
+    }
+    return { kind: "failed", reason: "no ast-grep install shell was available" };
+  } catch (error) {
+    if (error instanceof Error)
+      return { kind: "failed", reason: error.message };
+    return { kind: "failed", reason: String(error) };
+  }
+}
+// packages/utils/src/codegraph/provision.ts
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+var execFileAsync = promisify(execFile);
+// packages/utils/src/codegraph/resolve.ts
+import { createRequire } from "node:module";
+var requireFromHere = createRequire(import.meta.url);
+// packages/utils/src/command-executor/execute-command.ts
+import { exec } from "node:child_process";
+import { promisify as promisify2 } from "node:util";
+var execAsync = promisify2(exec);
+// packages/utils/src/internal-initiator-marker.ts
+var INTERNAL_INITIATOR_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_INITIATOR\s*-->/;
+var INTERNAL_NOREPLY_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_NOREPLY\s*-->/;
+function hasInternalInitiatorMarker(text) {
+  return INTERNAL_INITIATOR_MARKER_DETECT_PATTERN.test(text);
+}
+function hasInternalNoReplyMarker(text) {
+  return INTERNAL_NOREPLY_MARKER_DETECT_PATTERN.test(text);
+}
+function isTextPartLike(part) {
+  return part.type === "text" && typeof part.text === "string";
+}
+function isSyntheticOrInternalTextPart(part) {
+  return isTextPartLike(part) && (part.synthetic === true || hasInternalInitiatorMarker(part.text));
+}
+function isSyntheticOrInternalOnlyTextParts(parts) {
+  const textParts = (parts ?? []).filter(isTextPartLike);
+  return textParts.length > 0 && textParts.every(isSyntheticOrInternalTextPart);
+}
+function isSyntheticOrInternalUserMessage(message) {
+  const role = message.info?.role ?? message.role;
+  return role === "user" && isSyntheticOrInternalOnlyTextParts(message.parts);
+}
+function isNoReplyTextPart(part) {
+  return isTextPartLike(part) && hasInternalNoReplyMarker(part.text);
+}
+function isTerminalNoReplyUserMessage(message) {
+  const role = message.info?.role ?? message.role;
+  if (role !== "user") {
+    return false;
+  }
+  const textParts = (message.parts ?? []).filter(isTextPartLike);
+  return textParts.some(isNoReplyTextPart);
+}
+// packages/utils/src/migration/agent-names.ts
+var BUILTIN_AGENT_NAMES = new Set([
+  "sisyphus",
+  "oracle",
+  "librarian",
+  "explore",
+  "multimodal-looker",
+  "metis",
+  "momus",
+  "prometheus",
+  "atlas",
+  "build"
+]);
+// packages/utils/src/migration/model-versions.ts
+var CURRENT_USER_SELECTABLE_MODELS = new Set([
+  "anthropic/claude-opus-4-5",
+  "anthropic/claude-opus-4-6",
+  "anthropic/claude-sonnet-4-5"
+]);
+// packages/utils/src/write-file-atomically.ts
+init_atomic_write();
+// packages/utils/src/session-idle-settle.ts
+var DEFAULT_SESSION_IDLE_SETTLE_MS = 150;
+var DEFAULT_SESSION_STATUS_TIMEOUT_MS = 5000;
+function settleAfterSessionIdle(ms = DEFAULT_SESSION_IDLE_SETTLE_MS) {
+  return ms > 0 ? new Promise((resolve9) => setTimeout(resolve9, ms)) : Promise.resolve();
+}
+function withStatusTimeout(promise, timeoutMs) {
+  let timeoutID;
+  const timeoutPromise = new Promise((_resolve, reject) => {
+    timeoutID = setTimeout(() => {
+      reject(new Error(`session.status() timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutID !== undefined) {
+      clearTimeout(timeoutID);
+    }
+  });
+}
+var ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"]);
+function getSessionStatusPayload(response) {
+  if (isRecord(response) && isRecord(response.data)) {
+    return response.data;
+  }
+  if (isRecord(response)) {
+    return response;
+  }
+  return {};
+}
+function isActiveSessionStatusType(statusType) {
+  return ACTIVE_SESSION_STATUSES.has(statusType);
+}
+async function isSessionActive(client, sessionID, statusTimeoutMs = DEFAULT_SESSION_STATUS_TIMEOUT_MS) {
+  if (typeof client.session?.status !== "function") {
+    return false;
+  }
+  try {
+    const statusResult = await withStatusTimeout(client.session.status(), statusTimeoutMs);
+    const status = getSessionStatusPayload(statusResult)[sessionID];
+    if (!isRecord(status)) {
+      return false;
+    }
+    const statusType = status.type;
+    return typeof statusType === "string" && isActiveSessionStatusType(statusType);
+  } catch (error) {
+    if (error instanceof Error) {
+      return false;
+    }
+    return false;
+  }
+}
+
+// packages/utils/src/prompt-async-gate/prompt-message-state.ts
+function messageRole(message) {
+  if (!isRecord(message)) {
+    return;
+  }
+  const info = message.info;
+  if (isRecord(info) && typeof info.role === "string") {
+    return info.role;
+  }
+  return typeof message.role === "string" ? message.role : undefined;
+}
+function messageFinish(message) {
+  if (!isRecord(message)) {
+    return;
+  }
+  const info = message.info;
+  if (isRecord(info)) {
+    if (info.finish === true) {
+      return true;
+    }
+    if (typeof info.finish === "string" && info.finish.length > 0) {
+      return info.finish;
+    }
+  }
+  if (message.finish === true) {
+    return true;
+  }
+  return typeof message.finish === "string" && message.finish.length > 0 ? message.finish : undefined;
+}
+function messageCompleted(message) {
+  if (!isRecord(message)) {
+    return false;
+  }
+  const info = message.info;
+  const time = isRecord(info) && isRecord(info.time) ? info.time : undefined;
+  const completed = time?.completed;
+  if (typeof completed === "number" && Number.isFinite(completed)) {
+    return true;
+  }
+  return typeof completed === "string" && completed.length > 0;
+}
+function messageHasTerminalError(message) {
+  if (!isRecord(message)) {
+    return false;
+  }
+  const info = message.info;
+  if (isRecord(info) && info.error !== undefined && info.error !== null) {
+    return true;
+  }
+  return message.error !== undefined && message.error !== null;
+}
+function toInternalInitiatorTextPartLike(part) {
+  const result = {};
+  if (!isRecord(part)) {
+    return result;
+  }
+  if (typeof part.type === "string") {
+    result.type = part.type;
+  }
+  if (typeof part.text === "string") {
+    result.text = part.text;
+  }
+  if (typeof part.synthetic === "boolean") {
+    result.synthetic = part.synthetic;
+  }
+  return result;
+}
+function toInternalInitiatorMessageLike(message) {
+  if (!isRecord(message)) {
+    return;
+  }
+  const result = {};
+  const info = message.info;
+  if (isRecord(info) && typeof info.role === "string") {
+    result.info = { role: info.role };
+  }
+  if (typeof message.role === "string") {
+    result.role = message.role;
+  }
+  if (Array.isArray(message.parts)) {
+    result.parts = message.parts.map(toInternalInitiatorTextPartLike);
+  }
+  return result;
+}
+function messageIsSyntheticOrInternalUser(message) {
+  const initiatorMessage = toInternalInitiatorMessageLike(message);
+  return initiatorMessage !== undefined && isSyntheticOrInternalUserMessage(initiatorMessage);
+}
+function messageIsTerminalNoReplyUser(message) {
+  const initiatorMessage = toInternalInitiatorMessageLike(message);
+  return initiatorMessage !== undefined && isTerminalNoReplyUserMessage(initiatorMessage);
+}
+var QUESTION_TOOL_NAMES = new Set(["question", "ask_user_question", "askuserquestion"]);
+function partToolName(part) {
+  if (typeof part.name === "string") {
+    return part.name;
+  }
+  if (typeof part.tool === "string") {
+    return part.tool;
+  }
+  return typeof part.toolName === "string" ? part.toolName : undefined;
+}
+function partIsToolCall(part) {
+  return part.type === "tool" || part.type === "tool_use" || part.type === "tool-call" || part.type === "tool-invocation";
+}
+function partIsQuestionTool(part) {
+  if (!isRecord(part) || !partIsToolCall(part)) {
+    return false;
+  }
+  const toolName = partToolName(part);
+  return toolName !== undefined && QUESTION_TOOL_NAMES.has(toolName.toLowerCase());
+}
+function partIsUnansweredQuestionTool(part) {
+  if (!partIsQuestionTool(part) || !isRecord(part)) {
+    return false;
+  }
+  const state = part.state;
+  if (!isRecord(state)) {
+    return true;
+  }
+  return state.status !== "completed";
+}
+function partIsWaitingOnTool(part) {
+  if (!isRecord(part)) {
+    return false;
+  }
+  if (!partIsToolCall(part)) {
+    return false;
+  }
+  const state = part.state;
+  if (!isRecord(state)) {
+    return false;
+  }
+  return state.status === "pending" || state.status === "running";
+}
+function partIsUnresolvedTool(part) {
+  if (!isRecord(part) || !partIsToolCall(part)) {
+    return false;
+  }
+  const state = part.state;
+  if (!isRecord(state)) {
+    return true;
+  }
+  return state.status !== "completed";
+}
+function partHasSubstantiveAssistantOutput(part) {
+  if (!isRecord(part)) {
+    return false;
+  }
+  if (part.type === "step-start" || part.type === "step-finish") {
+    return false;
+  }
+  if (part.type === "text") {
+    return typeof part.text === "string" && part.text.trim().length > 0;
+  }
+  return typeof part.type === "string" && part.type.length > 0;
+}
+function messageHasQuestionTool(message) {
+  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsUnansweredQuestionTool);
+}
+function messageHasWaitingTool(message) {
+  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsWaitingOnTool);
+}
+function messageHasUnresolvedTool(message) {
+  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsUnresolvedTool);
+}
+function messageHasSubstantiveAssistantOutput(message) {
+  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partHasSubstantiveAssistantOutput);
+}
+
+// packages/utils/src/prompt-async-gate/message-inspection-error.ts
+function isPromptMessageInspectionAborted(error) {
+  if (error instanceof Error && error.name === "MessageAbortedError") {
+    return true;
+  }
+  return isRecord(error) && error.name === "MessageAbortedError";
+}
+
+// packages/utils/src/prompt-async-gate/timing.ts
+var DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS = 5000;
+var promptGateMessagesFetchTimeoutMsForTesting;
+function getPromptGateMessagesFetchTimeoutMs() {
+  return promptGateMessagesFetchTimeoutMsForTesting ?? DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS;
+}
+async function withDispatchTimeout(operation, dispatchTimeoutMs, operationName) {
+  if (dispatchTimeoutMs <= 0) {
+    return operation;
+  }
+  let timeoutID;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutID = setTimeout(() => {
+      reject(new Error(`${operationName} timed out after ${dispatchTimeoutMs}ms`));
+    }, dispatchTimeoutMs);
+  });
+  try {
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timeoutID !== undefined) {
+      clearTimeout(timeoutID);
+    }
+  }
+}
+
+// packages/utils/src/prompt-async-gate/pending-tool-turn.ts
+function getPromptQuery(input) {
+  if (!isRecord(input)) {
+    return { directory: "" };
+  }
+  const query = input.query;
+  if (!isRecord(query)) {
+    return { directory: "" };
+  }
+  const promptQuery = { directory: "" };
+  if (typeof query.directory === "string") {
+    return typeof query.limit === "number" ? { directory: query.directory, limit: query.limit } : { directory: query.directory };
+  }
+  if (typeof query.limit === "number") {
+    return { ...promptQuery, limit: query.limit };
+  }
+  return promptQuery;
+}
+function getMessagesData(response) {
+  if (isRecord(response) && Array.isArray(response.data)) {
+    return response.data;
+  }
+  return Array.isArray(response) ? response : [];
+}
+function latestAssistantTurnBlocksInternalPrompt(messages) {
+  let sawAssistantAfterLatestUser = false;
+  for (let index = messages.length - 1;index >= 0; index--) {
+    const message = messages[index];
+    const role = messageRole(message);
+    if (role === "assistant") {
+      sawAssistantAfterLatestUser = true;
+      if (messageHasQuestionTool(message)) {
+        return true;
+      }
+      const finish = messageFinish(message);
+      if (finish === "tool-calls") {
+        return !isRecord(message) || !Array.isArray(message.parts) || messageHasUnresolvedTool(message);
+      }
+      if ((finish === undefined || finish === "unknown") && !messageHasSubstantiveAssistantOutput(message)) {
+        return !(messageCompleted(message) && messageHasTerminalError(message));
+      }
+      if (messageCompleted(message)) {
+        return false;
+      }
+      if (finish === true) {
+        return false;
+      }
+      if (finish === undefined || finish === "unknown") {
+        return true;
+      }
+      if (!isRecord(message) || !Array.isArray(message.parts)) {
+        return finish === "tool-calls";
+      }
+      return messageHasWaitingTool(message);
+    }
+    if (role === "user") {
+      if (messageIsSyntheticOrInternalUser(message)) {
+        if (messageIsTerminalNoReplyUser(message)) {
+          continue;
+        }
+        if (!sawAssistantAfterLatestUser) {
+          return true;
+        }
+        continue;
+      }
+      return false;
+    }
+  }
+  return false;
+}
+async function sessionLatestAssistantBlocksInternalPrompt(args) {
+  const session = args.client.session;
+  if (typeof session?.messages !== "function") {
+    return false;
+  }
+  const messages = session.messages.bind(session);
+  try {
+    const response = await withDispatchTimeout(messages({
+      path: { id: args.sessionID },
+      query: getPromptQuery(args.input)
+    }), args.timeoutMs, `[prompt-async-gate] ${args.sessionName} session.messages`);
+    return latestAssistantTurnBlocksInternalPrompt(getMessagesData(response));
+  } catch (error) {
+    log("[prompt-async-gate] latest assistant prompt-block check failed", {
+      sessionID: args.sessionID,
+      source: args.source,
+      error: String(error)
+    });
+    return !isPromptMessageInspectionAborted(error);
+  }
+}
+
+// packages/utils/src/prompt-async-gate/recent-dispatches.ts
+var recentPromptDispatches = new Map;
+function recentDispatchKey(sessionID, dedupeKey) {
+  return `${sessionID}\x00${dedupeKey}`;
+}
+function pruneRecentPromptDispatches(now = Date.now()) {
+  for (const [key, dispatch] of recentPromptDispatches) {
+    if (dispatch.expiresAt <= now) {
+      recentPromptDispatches.delete(key);
+    }
+  }
+}
+function rememberRecentPromptDispatch(args) {
+  pruneRecentPromptDispatches();
+  if (args.holdMs <= 0) {
+    return;
+  }
+  recentPromptDispatches.set(recentDispatchKey(args.sessionID, args.dedupeKey), {
+    source: args.source,
+    expiresAt: Date.now() + args.holdMs
+  });
+  log("[prompt-async-gate] remembered semantic prompt dispatch", {
+    sessionID: args.sessionID,
+    source: args.source,
+    holdMs: args.holdMs
+  });
+}
+
+// packages/utils/src/prompt-async-gate/reservations.ts
+var promptAsyncReservations = new Map;
+var expiredReservationHandler;
+function setExpiredReservationHandler(handler) {
+  expiredReservationHandler = handler;
+}
+function notifyExpiredReservation(sessionID) {
+  expiredReservationHandler?.(sessionID);
+}
+function pruneExpiredReservations(now = Date.now()) {
+  const expiredSessionIDs = [];
+  for (const [sessionID, reservation] of promptAsyncReservations) {
+    if (typeof reservation.expiresAt === "number" && reservation.expiresAt <= now) {
+      promptAsyncReservations.delete(sessionID);
+      expiredSessionIDs.push(sessionID);
+      log("[prompt-async-gate] expired reservation released", {
+        sessionID,
+        source: reservation.source
+      });
+    }
+  }
+  for (const sessionID of expiredSessionIDs) {
+    notifyExpiredReservation(sessionID);
+  }
+}
+function getActiveReservation(sessionID) {
+  pruneExpiredReservations();
+  return promptAsyncReservations.get(sessionID);
+}
+function setPromptReservation(sessionID, reservation) {
+  promptAsyncReservations.set(sessionID, reservation);
+}
+function finishPromptReservation(sessionID, reservation, dispatchAttempted, postDispatchHoldMs) {
+  const current = promptAsyncReservations.get(sessionID);
+  if (current?.token !== reservation.token) {
+    return;
+  }
+  if (dispatchAttempted && postDispatchHoldMs > 0) {
+    promptAsyncReservations.set(sessionID, {
+      ...reservation,
+      expiresAt: Date.now() + postDispatchHoldMs
+    });
+    return;
+  }
+  promptAsyncReservations.delete(sessionID);
+}
+
+// packages/utils/src/prompt-async-gate/session-idle-dispatch.ts
+async function dispatchAfterSessionIdle(args) {
+  const {
+    sessionName,
+    client,
+    sessionID,
+    input,
+    source,
+    dedupeKey,
+    settleMs,
+    postDispatchHoldMs,
+    semanticDedupeHoldMs,
+    dispatchTimeoutMs,
+    checkStatus,
+    checkToolState,
+    dispatch
+  } = args;
+  const existing = getActiveReservation(sessionID);
+  if (existing) {
+    log(`[prompt-async-gate] ${sessionName} skipped because session is reserved`, {
+      sessionID,
+      source,
+      reservedBy: existing.source,
+      reservedAgeMs: Date.now() - existing.reservedAt
+    });
+    return { status: "reserved", reservedBy: existing.source };
+  }
+  const reservation = {
+    source,
+    dedupeKey,
+    reservedAt: Date.now(),
+    token: Symbol(source)
+  };
+  setPromptReservation(sessionID, reservation);
+  let dispatchAttempted = false;
+  try {
+    const canReadStatus = checkStatus && typeof client.session?.status === "function";
+    if (settleMs > 0) {
+      await settleAfterSessionIdle(settleMs);
+    }
+    let sessionActive = false;
+    if (canReadStatus) {
+      try {
+        sessionActive = await withDispatchTimeout(isSessionActive(client, sessionID), Math.min(dispatchTimeoutMs, 5000), `[prompt-async-gate] ${sessionName} isSessionActive`);
+      } catch (error) {
+        if (error instanceof Error) {
+          sessionActive = false;
+        }
+        sessionActive = false;
+      }
+    }
+    if (sessionActive) {
+      log(`[prompt-async-gate] ${sessionName} skipped because session is active`, { sessionID, source });
+      return { status: "active" };
+    }
+    if (checkToolState && typeof client.session?.messages === "function" && await sessionLatestAssistantBlocksInternalPrompt({
+      client,
+      sessionID,
+      input,
+      sessionName,
+      source,
+      timeoutMs: Math.min(dispatchTimeoutMs, getPromptGateMessagesFetchTimeoutMs())
+    })) {
+      log(`[prompt-async-gate] ${sessionName} skipped because latest assistant is still active`, {
+        sessionID,
+        source
+      });
+      return { status: "active" };
+    }
+    log(`[prompt-async-gate] ${sessionName} dispatching`, { sessionID, source });
+    dispatchAttempted = true;
+    const response = await withDispatchTimeout(dispatch(input), dispatchTimeoutMs, `[prompt-async-gate] ${sessionName} dispatch`);
+    rememberRecentPromptDispatch({
+      sessionID,
+      dedupeKey,
+      source,
+      holdMs: semanticDedupeHoldMs
+    });
+    log(`[prompt-async-gate] ${sessionName} dispatched`, { sessionID, source });
+    return { status: "dispatched", response };
+  } catch (error) {
+    if (dispatchAttempted) {
+      rememberRecentPromptDispatch({
+        sessionID,
+        dedupeKey,
+        source,
+        holdMs: semanticDedupeHoldMs
+      });
+    }
+    const errorText = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    log(`[prompt-async-gate] ${sessionName} failed`, { sessionID, source, error: errorText });
+    return { status: "failed", error, dispatchAttempted };
+  } finally {
+    finishPromptReservation(sessionID, reservation, dispatchAttempted, postDispatchHoldMs);
+  }
+}
+
+// packages/utils/src/prompt-async-gate/queue.ts
+var promptQueues = new Map;
+var promptQueueDraining = new Set;
+var promptQueueInFlight = new Map;
+var promptQueueTimers = new Map;
+setExpiredReservationHandler((sessionID) => {
+  schedulePromptQueueDrain(sessionID, 0);
+});
+function setPromptQueue(sessionID, queue) {
+  if (queue.length === 0) {
+    promptQueues.delete(sessionID);
+    return;
+  }
+  promptQueues.set(sessionID, queue);
+}
+function queuedResult(entry, position, queuedBy = entry.source) {
+  return {
+    status: "queued",
+    queuedBy,
+    position
+  };
+}
+function clearPromptQueueTimer(sessionID) {
+  const timer = promptQueueTimers.get(sessionID);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    promptQueueTimers.delete(sessionID);
+  }
+}
+function schedulePromptQueueDrain(sessionID, delayMs) {
+  const queue = promptQueues.get(sessionID);
+  if (!queue || queue.length === 0) {
+    clearPromptQueueTimer(sessionID);
+    return;
+  }
+  clearPromptQueueTimer(sessionID);
+  const timer = setTimeout(() => {
+    promptQueueTimers.delete(sessionID);
+    drainPromptQueue(sessionID).catch((error) => {
+      log("[prompt-async-gate] queued prompt drain failed", {
+        sessionID,
+        error: String(error)
+      });
+    });
+  }, Math.max(0, delayMs));
+  promptQueueTimers.set(sessionID, timer);
+}
+function removePromptQueueEntry(sessionID, entry) {
+  const queue = promptQueues.get(sessionID);
+  if (!queue) {
+    return;
+  }
+  const nextQueue = queue.filter((queued) => queued.id !== entry.id);
+  setPromptQueue(sessionID, nextQueue);
+}
+async function drainPromptQueue(sessionID, awaitedEntry) {
+  if (promptQueueDraining.has(sessionID)) {
+    return awaitedEntry ? queuedResult(awaitedEntry, 1) : undefined;
+  }
+  promptQueueDraining.add(sessionID);
+  clearPromptQueueTimer(sessionID);
+  let awaitedResult;
+  try {
+    while (true) {
+      const queue = promptQueues.get(sessionID);
+      const entry = queue?.[0];
+      if (!entry) {
+        break;
+      }
+      promptQueueInFlight.set(sessionID, entry);
+      const result = await dispatchAfterSessionIdle({
+        sessionName: entry.sessionName,
+        client: entry.client,
+        sessionID: entry.sessionID,
+        input: entry.input,
+        source: entry.source,
+        dedupeKey: entry.dedupeKey,
+        settleMs: entry.settleMs,
+        postDispatchHoldMs: entry.postDispatchHoldMs,
+        semanticDedupeHoldMs: entry.semanticDedupeHoldMs,
+        dispatchTimeoutMs: entry.dispatchTimeoutMs,
+        checkStatus: entry.checkStatus,
+        checkToolState: entry.checkToolState,
+        dispatch: entry.dispatch
+      });
+      if (promptQueueInFlight.get(sessionID)?.id === entry.id) {
+        promptQueueInFlight.delete(sessionID);
+      }
+      if (result.status === "active" || result.status === "reserved") {
+        const queued = queuedResult(entry, 1, result.status === "reserved" ? result.reservedBy : entry.source);
+        if (awaitedEntry?.id === entry.id) {
+          awaitedResult = queued;
+        }
+        schedulePromptQueueDrain(sessionID, entry.queueRetryMs);
+        break;
+      }
+      removePromptQueueEntry(sessionID, entry);
+      if (awaitedEntry?.id === entry.id) {
+        awaitedResult = result;
+      }
+      const remainingQueue = promptQueues.get(sessionID);
+      if (!remainingQueue || remainingQueue.length === 0) {
+        break;
+      }
+      schedulePromptQueueDrain(sessionID, entry.postDispatchHoldMs);
+      break;
+    }
+  } finally {
+    promptQueueDraining.delete(sessionID);
+  }
+  return awaitedResult;
+}
+// packages/omo-codex/src/install/install-ast-grep-sg.ts
+function describeResult(result) {
+  if (result.kind === "succeeded")
+    return null;
+  if (result.kind === "timed-out")
+    return "timed out after 30s";
+  return result.reason;
+}
+async function installAstGrepForCodex(options) {
+  const plugin = options.installed.find((entry) => entry.name === "omo");
+  if (plugin === undefined)
+    return;
+  const platform = options.platform ?? process.platform;
+  const targetDir = astGrepRuntimeDir(options.codexHome, platform, options.arch ?? process.arch);
+  const skillDir = join24(plugin.path, "skills", "ast-grep");
+  const installer = options.installer ?? runAstGrepSkillInstall;
+  try {
+    const result = await installer({ platform, skillDir, targetDir });
+    const failure = describeResult(result);
+    if (failure !== null)
+      options.log?.(`[ast-grep] skipped sg provisioning: ${failure}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    options.log?.(`[ast-grep] skipped sg provisioning: ${message}`);
+  }
+}
+
+// packages/omo-codex/src/install/codex-install-telemetry.ts
+async function trackCodexInstallTelemetry() {
+  try {
+    const { createInstallPostHog: createInstallPostHog2, getPostHogDistinctId: getPostHogDistinctId2 } = await Promise.resolve().then(() => (init_telemetry(), exports_telemetry));
+    const posthog = createInstallPostHog2();
+    posthog.trackActive(getPostHogDistinctId2(), "install_completed");
+    await posthog.shutdown();
+  } catch (error) {
+    if (error instanceof Error)
+      return;
+    return;
+  }
+}
+
 // packages/omo-codex/src/install/install-codex.ts
 var SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
 async function runCodexInstaller(options = {}) {
-  const env2 = options.env ?? process.env;
+  const env3 = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
-  const repoRoot = resolve8(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env2 }));
-  const codexHome = resolve8(options.codexHome ?? env2.CODEX_HOME ?? join26(homedir2(), ".codex"));
-  const projectDirectory = resolve8(options.projectDirectory ?? env2.OMO_CODEX_PROJECT ?? process.cwd());
-  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env2 });
+  const repoRoot = resolve10(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env3 }));
+  const codexHome = resolve10(options.codexHome ?? env3.CODEX_HOME ?? join27(homedir2(), ".codex"));
+  const projectDirectory = resolve10(options.projectDirectory ?? env3.OMO_CODEX_PROJECT ?? process.cwd());
+  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env3 });
   const runCommand = options.runCommand ?? defaultRunCommand;
-  const log = options.log ?? (() => {
+  const log2 = options.log ?? (() => {
     return;
   });
   const buildSource = await shouldBuildSourcePackages(repoRoot);
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
-    env: env2,
+    env: env3,
     cwd: repoRoot,
     runCommand,
-    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env: env2 })) : undefined
+    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env: env3 })) : undefined
   });
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
   }
-  const codexPackageRoot = join26(repoRoot, "packages", "omo-codex");
+  const codexPackageRoot = join27(repoRoot, "packages", "omo-codex");
   const marketplace = await readMarketplace(repoRoot, {
-    marketplacePath: join26(codexPackageRoot, "marketplace.json")
+    marketplacePath: join27(codexPackageRoot, "marketplace.json")
   });
   const distributionManifest = await readDistributionManifest(repoRoot);
   const installed = [];
@@ -8917,7 +12709,7 @@ async function runCodexInstaller(options = {}) {
       distributionManifest
     });
     validatePathSegment(version2, "plugin version");
-    log(`Building ${entry.name}@${version2}`);
+    log2(`Building ${entry.name}@${version2}`);
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
@@ -8933,18 +12725,25 @@ async function runCodexInstaller(options = {}) {
     }
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
     for (const link of links) {
-      log(`Linked ${link.name} -> ${link.target}`);
+      log2(`Linked ${link.name} -> ${link.target}`);
     }
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       const runtimeLink = await linkRootRuntimeBin({ binDir, codexHome, repoRoot, platform });
       if (runtimeLink !== null)
-        log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
+        log2(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log(`Warning: skipped the omo runtime wrapper because ${join26(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log2(`Warning: skipped the omo runtime wrapper because ${join27(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
   }
+  await installAstGrepForCodex({
+    codexHome,
+    installed,
+    installer: options.astGrepInstaller,
+    log: log2,
+    platform
+  });
   const preservedReasoning = await capturePreservedAgentReasoning({ codexHome });
   const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome });
   const agentSourceRoots = await agentSourceRootsForInstall({
@@ -8963,7 +12762,7 @@ async function runCodexInstaller(options = {}) {
       preservedServiceTier
     });
     for (const link of agentLinks) {
-      log(`Linked agent ${link.name} -> ${link.target}`);
+      log2(`Linked agent ${link.name} -> ${link.target}`);
       const agentName = agentNameFromToml2(link.name);
       agentConfigs.set(agentName, { name: agentName, configFile: `./agents/${link.name}` });
     }
@@ -8986,13 +12785,13 @@ async function runCodexInstaller(options = {}) {
     });
   }
   await reapLspDaemons(codexHome).catch(() => []);
-  const marketplaceRoot = join26(codexHome, "plugins", "cache", marketplace.name);
+  const marketplaceRoot = join27(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
     marketplaceRoot,
     plugins: installed
   });
-  const configPath = join26(codexHome, "config.toml");
+  const configPath = join27(codexHome, "config.toml");
   await updateCodexConfig({
     configPath,
     repoRoot: codexPackageRoot,
@@ -9005,19 +12804,19 @@ async function runCodexInstaller(options = {}) {
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false
   });
-  await seedAndMigrateOmoSot({ env: env2, log, repoRoot, runCommand });
+  await seedAndMigrateOmoSot({ env: env3, log: log2, repoRoot, runCommand });
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
     startDirectory: projectDirectory,
     codexHome,
-    log
+    log: log2
   });
   for (const configCleanup of projectCleanup.configs) {
     if (!configCleanup.changed)
       continue;
-    log(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`);
+    log2(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`);
   }
   for (const artifact of projectCleanup.artifacts) {
-    log(`Found project-local legacy artifact ${artifact.path}; left in place`);
+    log2(`Found project-local legacy artifact ${artifact.path}; left in place`);
   }
   await trackCodexInstallTelemetry();
   return {
@@ -9051,40 +12850,28 @@ function findRepoRootFromImporter(importerDir) {
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [join26(current, "node_modules", "oh-my-openagent"), join26(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [join27(current, "node_modules", "oh-my-openagent"), join27(current, "oh-my-openagent")]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
         return wrapperPackageRoot;
     }
-    current = resolve8(current, "..");
+    current = resolve10(current, "..");
   }
   throw new Error("Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 7 parent levels");
 }
 function findRepoRoot(input) {
   const wrapperPackageRoot = input.env?.OMO_WRAPPER_PACKAGE_ROOT;
   if (wrapperPackageRoot !== undefined && wrapperPackageRoot.trim().length > 0) {
-    const resolvedWrapperPackageRoot = resolve8(wrapperPackageRoot);
+    const resolvedWrapperPackageRoot = resolve10(wrapperPackageRoot);
     if (isRepoRootWithCodexPlugin(resolvedWrapperPackageRoot))
       return resolvedWrapperPackageRoot;
   }
   return findRepoRootFromImporter(input.importerDir);
 }
 function isRepoRootWithCodexPlugin(repoRoot) {
-  return existsSync5(join26(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
+  return existsSync6(join27(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
 }
 function codexMarketplaceSource(marketplaceRoot) {
   return { sourceType: "local", source: marketplaceRoot };
-}
-async function trackCodexInstallTelemetry() {
-  try {
-    const { createInstallPostHog: createInstallPostHog2, getPostHogDistinctId: getPostHogDistinctId2 } = await Promise.resolve().then(() => (init_telemetry(), exports_telemetry));
-    const posthog = createInstallPostHog2();
-    posthog.trackActive(getPostHogDistinctId2(), "install_completed");
-    await posthog.shutdown();
-  } catch (error) {
-    if (!(error instanceof Error))
-      return;
-    return;
-  }
 }
 
 // packages/omo-codex/src/install/lazycodex-cli-args.ts
@@ -9263,8 +13050,8 @@ async function runDelegatedOmoCommand(parsed, options) {
     options.log(`${invocation.command} ${invocation.args.join(" ")}`);
     return;
   }
-  const env2 = { ...process.env, OMO_INVOCATION_NAME: "omo" };
-  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env2 });
+  const env3 = { ...process.env, OMO_INVOCATION_NAME: "omo" };
+  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env3 });
 }
 function buildDelegatedOmoInvocation(parsed) {
   const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
@@ -9289,35 +13076,35 @@ function buildDelegatedOmoInvocation(parsed) {
 }
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
-import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
+import { spawn as spawn4, spawnSync as spawnSync2 } from "node:child_process";
 import { readFileSync as readFileSync3 } from "node:fs";
-import { dirname as dirname8, join as join27 } from "node:path";
+import { dirname as dirname8, join as join28 } from "node:path";
 import { fileURLToPath } from "node:url";
 var DEFAULT_UPDATE_COMMAND = "npx";
 var DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
 var INSTALLED_VERSION_FILE = "lazycodex-install.json";
 async function runLazyCodexManualUpdate(input = {}) {
-  const env2 = input.env ?? process.env;
-  const log = input.log ?? console.log;
+  const env3 = input.env ?? process.env;
+  const log2 = input.log ?? console.log;
   const commandRunner = input.runCommand ?? defaultRunCommandForManualUpdate;
-  const currentVersion = resolveCurrentVersion(env2);
-  const latestVersion = resolveLatestVersion(env2);
+  const currentVersion = resolveCurrentVersion(env3);
+  const latestVersion = resolveLatestVersion(env3);
   const plan = resolveLazyCodexUpdatePlan({
     currentVersion,
     latestVersion,
-    command: resolveCommand2(env2),
-    args: resolveArgs(env2)
+    command: resolveCommand2(env3),
+    args: resolveArgs(env3)
   });
   if (!plan.shouldUpdate) {
     const printableVersion = currentVersion ?? "unknown";
-    log(plan.reason === "up-to-date" ? `lazycodex-ai ${printableVersion} is already up to date.` : `Unable to check lazycodex-ai updates (${plan.reason}).`);
+    log2(plan.reason === "up-to-date" ? `lazycodex-ai ${printableVersion} is already up to date.` : `Unable to check lazycodex-ai updates (${plan.reason}).`);
     return plan.reason === "up-to-date" ? 0 : 1;
   }
   if (input.dryRun) {
-    log(`${plan.command} ${plan.args.join(" ")}`);
+    log2(`${plan.command} ${plan.args.join(" ")}`);
     return 0;
   }
-  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env2 });
+  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env3 });
   return 0;
 }
 function resolveLazyCodexUpdatePlan(input = {}) {
@@ -9331,12 +13118,12 @@ function resolveLazyCodexUpdatePlan(input = {}) {
     return { shouldUpdate: false, reason: "up-to-date" };
   return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS };
 }
-function resolveCommand2(env2) {
-  return env2.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
+function resolveCommand2(env3) {
+  return env3.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
 }
-function resolveArgs(env2) {
-  if (env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
-    const parsed = JSON.parse(env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
+function resolveArgs(env3) {
+  if (env3.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
+    const parsed = JSON.parse(env3.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
     if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
       throw new TypeError("LAZYCODEX_AUTO_UPDATE_ARGS_JSON must be a JSON string array");
     }
@@ -9344,15 +13131,15 @@ function resolveArgs(env2) {
   }
   return DEFAULT_UPDATE_ARGS;
 }
-function resolveCurrentVersion(env2) {
-  if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
-    return env2.LAZYCODEX_CURRENT_VERSION.trim();
+function resolveCurrentVersion(env3) {
+  if (env3.LAZYCODEX_CURRENT_VERSION?.trim())
+    return env3.LAZYCODEX_CURRENT_VERSION.trim();
   const pluginRoot = dirname8(dirname8(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join27(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join27(pluginRoot, ".codex-plugin", "plugin.json"));
+  return readVersionManifest(resolveInstalledVersionPath(env3, pluginRoot)) ?? readVersionManifest(join28(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join28(pluginRoot, ".codex-plugin", "plugin.json"));
 }
-function resolveLatestVersion(env2) {
-  if (env2.LAZYCODEX_LATEST_VERSION?.trim())
-    return env2.LAZYCODEX_LATEST_VERSION.trim();
+function resolveLatestVersion(env3) {
+  if (env3.LAZYCODEX_LATEST_VERSION?.trim())
+    return env3.LAZYCODEX_LATEST_VERSION.trim();
   const result = spawnSync2("npm", ["view", "lazycodex-ai", "version", "--silent"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"]
@@ -9363,8 +13150,8 @@ function resolveLatestVersion(env2) {
   return version2.length > 0 ? version2 : undefined;
 }
 function defaultRunCommandForManualUpdate(command, args, options) {
-  return new Promise((resolve9, reject) => {
-    const child = spawn3(command, args, {
+  return new Promise((resolve11, reject) => {
+    const child = spawn4(command, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: "inherit",
@@ -9373,7 +13160,7 @@ function defaultRunCommandForManualUpdate(command, args, options) {
     child.once("error", reject);
     child.once("close", (code) => {
       if (code === 0) {
-        resolve9();
+        resolve11();
         return;
       }
       reject(new Error(`${command} ${args.join(" ")} exited with ${code ?? "unknown status"}`));
@@ -9410,10 +13197,10 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-function resolveInstalledVersionPath(env2, pluginRoot) {
-  if (env2.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
-    return env2.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
-  return join27(pluginRoot, INSTALLED_VERSION_FILE);
+function resolveInstalledVersionPath(env3, pluginRoot) {
+  if (env3.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
+    return env3.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
+  return join28(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path2) {
   try {
@@ -9430,7 +13217,7 @@ function readVersionManifest(path2) {
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
 import { readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join28 } from "node:path";
+import { join as join29 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 async function stampGitBashMcpEnv(input) {
   if (input.platform !== "win32")
@@ -9439,7 +13226,7 @@ async function stampGitBashMcpEnv(input) {
   const override = typeof rawOverride === "string" ? rawOverride.trim() : "";
   if (override === "")
     return false;
-  const manifestPath = join28(input.pluginRoot, ".mcp.json");
+  const manifestPath = join29(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
   const parsed = JSON.parse(await readFile17(manifestPath, "utf8"));
@@ -9458,10 +13245,10 @@ async function stampGitBashMcpEnv(input) {
 }
 // packages/omo-codex/src/install/codex-hook-targets.ts
 import { readFile as readFile18 } from "node:fs/promises";
-import { join as join29, sep as sep8 } from "node:path";
+import { join as join30, sep as sep8 } from "node:path";
 var PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}\/([^"']+)/g;
 async function findMissingHookCommandTargets(pluginRoot) {
-  const manifestPath = join29(pluginRoot, "hooks", "hooks.json");
+  const manifestPath = join30(pluginRoot, "hooks", "hooks.json");
   if (!await fileExistsStrict(manifestPath))
     return [];
   const commands = [];
@@ -9474,7 +13261,7 @@ async function findMissingHookCommandTargets(pluginRoot) {
       const targetSuffix = match[1];
       if (targetSuffix === undefined)
         continue;
-      const target = join29(pluginRoot, ...targetSuffix.split("/"));
+      const target = join30(pluginRoot, ...targetSuffix.split("/"));
       if (seen.has(target))
         continue;
       seen.add(target);
@@ -9510,7 +13297,7 @@ async function installMarketplaceLocally(options = {}) {
   return runCodexInstaller(options);
 }
 function resolveDefaultRepoRootForEntrypoint(entrypointPath) {
-  return resolve9(dirname9(entrypointPath), "..", "..", "..");
+  return resolve11(dirname9(entrypointPath), "..", "..", "..");
 }
 function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
@@ -9522,7 +13309,7 @@ async function runLazyCodexInstallLocalCli(input) {
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile19(join30(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile19(join31(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;
@@ -9538,7 +13325,7 @@ async function runLazyCodexInstallLocalCli(input) {
         return 0;
       }
       const result2 = await installMarketplaceLocally({
-        repoRoot: resolve9(parsed.repoRoot),
+        repoRoot: resolve11(parsed.repoRoot),
         autonomousPermissions: true,
         env: input.env
       });
@@ -9547,7 +13334,7 @@ async function runLazyCodexInstallLocalCli(input) {
     }
     return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log });
   }
-  const repoRoot = parsed.repoRoot ? resolve9(parsed.repoRoot) : input.defaultRepoRoot;
+  const repoRoot = parsed.repoRoot ? resolve11(parsed.repoRoot) : input.defaultRepoRoot;
   const result = await installMarketplaceLocally({
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,

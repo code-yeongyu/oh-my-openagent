@@ -65,7 +65,6 @@ jobs:
             case "$1" in
               packages/omo-codex/*) return 0 ;;
               packages/shared-skills/*) return 0 ;;
-              packages/ast-grep-mcp/*) return 0 ;;
               packages/git-bash-mcp/*) return 0 ;;
               packages/lsp-tools-mcp/*) return 0 ;;
               packages/omo-opencode/src/cli/install-codex/*) return 0 ;;

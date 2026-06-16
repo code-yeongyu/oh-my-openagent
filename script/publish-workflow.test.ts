@@ -198,7 +198,6 @@ describe("test workflows", () => {
     // #when
     const requiredPrerequisites = [
       ["generated Codex installer", "bun run build:codex-install"],
-      ["ast-grep MCP runtime", "bun run build:ast-grep-mcp"],
       ["Git Bash MCP runtime", "bun run build:git-bash-mcp"],
       ["lsp-tools MCP runtime", "bun run build:lsp-tools-mcp"],
       ["lsp daemon runtime", "bun run build:lsp-daemon"],

@@ -9,6 +9,7 @@ const requiredRetainedPythonFiles = [
   "packages/omo-codex/plugin/components/lsp/test/fixtures/broken.py",
 ] as const
 const optionalGeneratedPythonFiles = [
+  "packages/omo-codex/plugin/skills/ast-grep/scripts/ast_grep_helper.py",
   "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/core.py",
   "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/design_system.py",
   "packages/omo-codex/plugin/skills/frontend/references/ui-ux-db/scripts/search.py",

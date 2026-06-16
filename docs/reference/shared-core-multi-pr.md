@@ -6,7 +6,7 @@ behavior before moving logic into harness-neutral packages.
 
 The current extraction surface includes `utils`, `rules-engine`,
 `agents-md-core`, `model-core`, `prompts-core`, `comment-checker-core`,
-`hashline-core`, `boulder-state`, `telemetry-core`, `ast-grep-core`,
+`hashline-core`, `boulder-state`, `telemetry-core`,
 `lsp-core`, `mcp-stdio-core`, `mcp-client-core`, `tmux-core`, `team-core`,
 `openclaw-core`, `claude-code-compat-core`, `skills-loader-core`, and
 `delegate-core`. Release and packaging PRs must keep the root npm tarball,
