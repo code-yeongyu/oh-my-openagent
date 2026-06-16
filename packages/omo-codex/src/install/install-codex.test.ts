@@ -10,6 +10,8 @@ import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
 }
@@ -116,7 +118,7 @@ describe("install-codex", () => {
     await writeFile(join(legacyCacheRoot, ".mcp.json"), JSON.stringify({ mcpServers: { lsp: { args: ["old-lsp"] } } }))
 
     // when
-    const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
+    const first = await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     expect(first.marketplaceName).toBe("sisyphuslabs")
@@ -196,6 +198,7 @@ describe("install-codex", () => {
       codexHome,
       binDir,
       repoRoot,
+      astGrepInstaller: skipAstGrepInstall,
       env: { HOME: home },
       runCommand: async (command, args, options) => {
         invocations.push({ command, args: [...args], home: options.env?.HOME })
@@ -221,6 +224,7 @@ describe("install-codex", () => {
       binDir,
       repoRoot,
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
       runCommand: async () => undefined,
     })
@@ -252,6 +256,7 @@ describe("install-codex", () => {
       binDir,
       repoRoot,
       platform: "linux",
+      astGrepInstaller: skipAstGrepInstall,
       runCommand: async () => undefined,
     })
 
@@ -274,7 +279,7 @@ describe("install-codex", () => {
     const logs: string[] = []
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined, log: (line) => logs.push(line) })
+    await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined, log: (line) => logs.push(line) })
 
     // then
     const cliPath = join(repoRoot, "dist", "cli", "index.js")
@@ -297,6 +302,7 @@ describe("install-codex", () => {
       codexHome,
       binDir,
       repoRoot,
+      astGrepInstaller: skipAstGrepInstall,
       runCommand: async () => undefined,
       autonomousPermissions: true,
     })

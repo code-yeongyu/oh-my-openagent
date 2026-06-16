@@ -9,6 +9,8 @@ import { runCodexInstaller } from "./install-codex"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 type CachedMcpManifest = {
   readonly mcpServers: {
     readonly context7: { readonly url: string }
@@ -27,6 +29,7 @@ describe("install-codex MCP manifest", () => {
       codexHome,
       binDir,
       repoRoot: process.cwd(),
+      astGrepInstaller: skipAstGrepInstall,
       runCommand: async () => undefined,
     })
 
