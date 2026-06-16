@@ -2,7 +2,7 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-06-11 | **Commit:** 6bb284503 | **Branch:** dev | **Release:** v4.8.1
+**Generated:** 2026-06-16 | **Commit:** 6d4928684 | **Branch:** dev | **Release:** v4.10.0
 
 ## STOP. QA IS MANDATORY. NON-NEGOTIABLE. EVERY SINGLE TIME YOU TOUCH AN OPENCODE- OR CODEX-CONNECTED COMPONENT.
 
@@ -53,7 +53,7 @@ OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` duri
 
 ```
 oh-my-opencode/                      # workspace root (no root src/ — it moved into packages/omo-opencode)
-├── packages/                        # 38 sibling pkgs, layered: Core → MCP → Skills → Adapters → Platform/Web. See packages/AGENTS.md
+├── packages/                        # 39 sibling pkgs, layered: Core → MCP → Skills → Adapters → Platform/Web. See packages/AGENTS.md
 │   ├── omo-opencode/                # ★ THE OpenCode plugin adapter (formerly root src/). Build entry: src/index.ts
 │   │   └── src/                     # plugin source and OpenCode-facing adapter shims. Full breakdown → packages/omo-opencode/src/AGENTS.md
 │   │       ├── index.ts             # Plugin entry; thin wrapper re-exporting createPluginModule() from src/testing/
@@ -75,7 +75,7 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 │   ├── lsp-tools-mcp/ ast-grep-mcp/ git-bash-mcp/ lsp-daemon/   # 4 MCP-layer pkgs (stdio); LSP packages consume lsp-core + mcp-stdio-core
 │   ├── shared-skills/               # Cross-harness SKILL.md bundle shared by OpenCode + Codex
 │   ├── web/                         # Marketing site (Next.js 15 + Cloudflare Workers); own bun.lock; only @/* alias zone in the repo
-│   └── oh-my-opencode-<os>-<arch>[-variant]/   # 11 platform binaries (bin/ + package.json only; generated, never hand-edited)
+│   └── oh-my-opencode-<os>-<arch>[-variant]/   # 12 platform binaries (bin/ + package.json only; generated, never hand-edited)
 ├── bin/                             # Platform-detection JS shim (5 bin aliases: oh-my-opencode, oh-my-openagent, omo, lazycodex, lazycodex-ai)
 ├── script/                          # Build/publish automation (singular, not scripts/)
 ├── docs/                            # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, troubleshooting/)
