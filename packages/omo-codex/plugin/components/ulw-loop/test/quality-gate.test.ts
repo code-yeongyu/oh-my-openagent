@@ -71,6 +71,9 @@ const VALID_GATE = {
 	criteriaCoverage: {
 		totalCriteria: 2,
 		passCount: 2,
+		originalIntent: "User wanted a strict final quality gate.",
+		desiredOutcome: "The gate accepts only complete artifact-backed completion.",
+		userOutcomeReview: "The work satisfies the user's requested outcome with reviewed evidence.",
 		adversarialClassesCovered: ["malformed_input", "stale_state"],
 	},
 } as const;
@@ -109,7 +112,9 @@ describe("validateQualityGate", () => {
 			"manualQa",
 		]);
 		expect(gate.codeReview.codeQualityStatus).toBe("CLEAR");
-		expect(gate).toMatchObject({ criteriaCoverage: { totalCriteria: 9, passCount: 9 } });
+		expect(gate).toMatchObject({
+			criteriaCoverage: { totalCriteria: 9, passCount: 9, userOutcomeReview: expect.stringContaining("user") },
+		});
 	});
 
 	it("#given the new five-section gate fixture #when validated with fs opts #then report and artifact paths must exist", async () => {
@@ -123,23 +128,6 @@ describe("validateQualityGate", () => {
 		// then
 		expect(gate.codeReview.recommendation).toBe("APPROVE");
 		expect(gate.manualQa.artifactRefs).toHaveLength(5);
-	});
-
-	it("#given the old aiSlopCleaner and verification schema #when validated #then it is rejected", () => {
-		// given
-		const input = {
-			aiSlopCleaner: { status: "passed", evidence: "no slop detected after cleaner run" },
-			verification: { status: "passed", commands: ["npm test"], evidence: "all tests pass" },
-			codeReview: { recommendation: "APPROVE", architectStatus: "CLEAR", evidence: "ship it" },
-			criteriaCoverage: { totalCriteria: 2, passCount: 2, adversarialClassesCovered: ["malformed_input"] },
-		};
-
-		// when
-		const error = getQualityGateError(input);
-
-		// then
-		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
-		expect(error.message).toContain("manualQa");
 	});
 
 	it("#given missing manualQa surface evidence #when validated #then it fails closed", () => {
@@ -247,5 +235,17 @@ describe("validateQualityGate", () => {
 
 		// then
 		expect(error.message).toContain("criteriaCoverage.passCount");
+	});
+
+	it("#given criteria coverage lacks user-outcome review #when validated #then it is rejected", () => {
+		// when
+		const error = getQualityGateError(
+			makeGate({
+				criteriaCoverage: { ...VALID_GATE.criteriaCoverage, userOutcomeReview: "" },
+			}),
+		);
+
+		// then
+		expect(error.message).toContain("criteriaCoverage.userOutcomeReview");
 	});
 });

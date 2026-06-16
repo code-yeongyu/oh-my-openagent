@@ -175,7 +175,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
 2. Run Manual-QA for every criterion; confirm each artifact exists and is non-empty.
-3. Spawn the three final reviewer roles in parallel with self-contained prompts and `fork_context: false`: `lazycodex-code-reviewer` for diff review, `lazycodex-qa-executor` for scenario/evidence review, and `lazycodex-gate-reviewer` for final criteria/checkpoint review. If unavailable, describe those roles in generic worker prompts.
+3. Spawn final reviewers with `fork_context: false`: code review, QA review, gate review. Include original brief, goals, desired outcome, and diff.
 4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Fix, rerun affected verification/Manual-QA, and repeat review.
 5. If review remains blocked, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 6. If clean, checkpoint final completion:
@@ -189,10 +189,10 @@ omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e eviden
   "manualQa":{"by":"lazycodex-qa-executor","status":"passed","evidence":"CLI and data surfaces passed.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"omo ulw-loop checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-diff"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt"},{"id":"artifact-data-diff","kind":"data-diff","description":"Data diff artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/data-diff.txt"}]},
   "gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md","evidence":"Gate review passed.","blockers":[]},
   "iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-doc.test.ts"],"evidence":"Focused rerun passed."},
-  "criteriaCoverage":{"totalCriteria":3,"passCount":3,"adversarialClassesCovered":["malformed_input","stale_state"]}
+  "criteriaCoverage":{"totalCriteria":3,"passCount":3,"originalIntent":"User wanted artifact-backed completion.","desiredOutcome":"Behavior ships with review and QA evidence.","userOutcomeReview":"Result matches brief and goals.","adversarialClassesCovered":["malformed_input","stale_state"]}
 }
 ```
-Artifacts must be non-empty. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
+Artifacts must be non-empty; counts alone fail. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
 
 ## Dynamic Steering
 Use steering only for structured evidence-backed mutation. Reject natural-language steering requests.
