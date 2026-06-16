@@ -26,6 +26,8 @@ const LAZYCODEX_AGENT_ROLE_NAMES = [
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 describe("lazycodex install surface", () => {
   test("#given codex installer #when installing omo #then exposes durable LazyCodex agent roles", async () => {
     // given
@@ -33,7 +35,7 @@ describe("lazycodex install surface", () => {
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-lazycodex-agents-"))
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -53,7 +55,7 @@ describe("lazycodex install surface", () => {
     const repoRoot = await createRepoWithBuiltComponentBins()
 
     // when
-    const result = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
+    const result = await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     const pluginPath = result.installed[0]?.path ?? ""
@@ -120,7 +122,7 @@ describe("lazycodex install surface", () => {
     await writeFile(join(marketplaceRoot, ".codex-marketplace-install.json"), '{"source_type":"git"}\n')
 
     // when
-    const result = await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), runCommand: async () => undefined })
+    const result = await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
     const pluginPath = result.installed[0]?.path
     if (pluginPath === undefined) {
       throw new Error("Codex installer did not report an installed plugin path")
@@ -146,7 +148,7 @@ describe("lazycodex install surface", () => {
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-clean-snapshot-"))
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
     await rm(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"), { recursive: true, force: true })
     await rm(join(codexHome, "plugins", "cache", "sisyphuslabs"), { recursive: true, force: true })
 
