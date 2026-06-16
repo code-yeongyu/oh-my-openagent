@@ -5,6 +5,7 @@ import { join } from "node:path";
 export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 
 export const expectedSkills = [
+	"ast-grep",
 	"comment-checker",
 	"debugging",
 	"frontend",

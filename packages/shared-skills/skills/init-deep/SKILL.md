@@ -133,7 +133,7 @@ LspWorkspaceSymbols(filePath=".", query="function")
 LspFindReferences(filePath="...", line=X, character=Y)
 ```
 
-**LSP Fallback**: If unavailable, rely on explore agents + AST-grep.
+**LSP Fallback**: If unavailable, use `codegraph_explore` first when codegraph_* tools exist; otherwise rely on explore agents + the ast-grep skill (`sg` CLI).
 
 ### Collect Background Results
 

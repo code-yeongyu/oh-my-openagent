@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as configManager from "./config-manager"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import * as codexInstaller from "./install-codex"
 import { runCliInstaller } from "./cli-installer"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
@@ -21,6 +22,7 @@ describe("runCliInstaller", () => {
     console.error = mockConsoleError
     mockConsoleLog.mockClear()
     mockConsoleError.mockClear()
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

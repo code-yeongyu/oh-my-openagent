@@ -118,7 +118,7 @@ Total: 53 base, 60 with team-mode. Each tier produces an object whose values are
 | `plugin-handlers/` | 6-phase config loading pipeline | yes |
 | `openclaw/` | Bidirectional Discord/Telegram/HTTP integration | yes |
 | `__tests__/` | Plugin-level integration tests + perf fixtures | — |
-| `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + ast_grep) | yes |
+| `mcp/` | 4 built-in MCPs (3 remote + local stdio lsp) | yes |
 | `testing/` | Test utilities + `create-plugin-module.ts` | — |
 | `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | — |
 | `locales/` | i18n strings (en, zh): toasts + model-fallback labels | — |

@@ -353,7 +353,7 @@ main() {
   if [ -f "$MKT/.agents/plugins/marketplace.json" ] &&
     [ -f "$MKT/plugins/omo/.codex-plugin/plugin.json" ] &&
     [ -s "$MKT/plugins/omo/components/bootstrap/dist/cli.js" ] &&
-    [ -s "$MKT/plugins/omo/components/ast-grep-mcp/dist/cli.js" ]; then
+    [ -s "$MKT/plugins/omo/skills/ast-grep/SKILL.md" ]; then
     pass 1 "plugin build + fresh sync produced a validated marketplace tree at $MKT" "step1-build-sync.log"
   else
     fail 1 "plugin build + fresh sync produced a validated marketplace tree at $MKT" "step1-build-sync.log"
@@ -476,38 +476,37 @@ EOF
   kill_session mkbs-qa-main
   stop_recorder "$rec_main"
 
-  step "STEP 6: restart session + live ast_grep MCP proof (session mkbs-qa-mcp)"
-  launch_codex mkbs-qa-mcp "$QAHOME" "$WORKDIR" 1
+  step "STEP 6: restart session + live AST-Grep skill proof (session mkbs-qa-sg)"
+  launch_codex mkbs-qa-sg "$QAHOME" "$WORKDIR" 1
   local rec_mcp
-  rec_mcp=$(start_recorder mkbs-qa-mcp "$FINAL/step6-pane-rolling-mcp.txt")
-  drive_startup mkbs-qa-mcp "$FINAL/step6-startup-pane.txt" 2 120
+  rec_mcp=$(start_recorder mkbs-qa-sg "$FINAL/step6-pane-rolling-sg.txt")
+  drive_startup mkbs-qa-sg "$FINAL/step6-startup-pane.txt" 2 120
   local drive2_rc=$?
   if [ "$DRIVE_REVIEW_SEEN" = 1 ]; then
     note "NOTE: hooks review reappeared on restart (unexpected before upgrade) — trust may not have persisted"
   fi
 
-  if poll 60 0.5 grep -q "LazyCodex(" "$FINAL/step5-pane-rolling-main.txt" "$FINAL/step6-pane-rolling-mcp.txt"; then
-    grep -h "LazyCodex(" "$FINAL/step5-pane-rolling-main.txt" "$FINAL/step6-pane-rolling-mcp.txt" 2>/dev/null |
+  if poll 60 0.5 grep -q "LazyCodex(" "$FINAL/step5-pane-rolling-main.txt" "$FINAL/step6-pane-rolling-sg.txt"; then
+    grep -h "LazyCodex(" "$FINAL/step5-pane-rolling-main.txt" "$FINAL/step6-pane-rolling-sg.txt" 2>/dev/null |
       sort -u >"$FINAL/step5-lazycodex-lines.txt"
     pass 5a "LazyCodex(...) hook statusMessage lines visible in tmux panes (hooks fired)" "step5-lazycodex-lines.txt"
   else
     fail 5a "LazyCodex(...) hook statusMessage lines visible in tmux panes" "step5-pane-rolling-main.txt"
   fi
 
-  local mcp_prompt="Use the ast_grep MCP search tool to find the pattern of function mkbsQaFixtureMarker inside fixture.ts in this folder, and then tell me the exact string literal that this function returns. Do not use shell commands and do not read the file directly - derive the answer only from the ast_grep tool result."
+  local sg_prompt="Use the ast-grep skill to find the pattern of function mkbsQaFixtureMarker inside fixture.ts in this folder, and then tell me the exact string literal that this function returns. Prefer the provisioned sg binary over reading the file directly."
   if [ "$drive2_rc" -eq 0 ] &&
-    run_turn mkbs-qa-mcp "$FINAL/step6-mcp-pane.txt" "$mcp_prompt" "MKBS_E2E_TOOL_PROOF_73c1" 300 &&
-    grep -q "ast_grep" "$FINAL/step6-mcp-pane.txt" "$FINAL/step6-pane-rolling-mcp.txt" 2>/dev/null; then
-    pass 6 "live turn: codex answered with the fixture's return literal via the ast_grep MCP tool" "step6-mcp-pane.txt"
+    run_turn mkbs-qa-sg "$FINAL/step6-sg-pane.txt" "$sg_prompt" "MKBS_E2E_TOOL_PROOF_73c1" 300; then
+    pass 6 "live turn: codex answered with the fixture's return literal via the ast-grep skill" "step6-sg-pane.txt"
   else
-    note "live MCP turn failed or blocked — running documented SUBSTITUTION (raw MCP stdio roundtrip against the installed plugin cache)"
-    if mcp_substitution_proof; then
-      pass 6 "SUBSTITUTED: raw MCP initialize+tools/call roundtrip against the installed ast_grep server returned the fixture match" "step6-mcp-substitution.txt"
+    note "live ast-grep skill turn failed or blocked — running documented SUBSTITUTION (direct provisioned sg roundtrip)"
+    if sg_substitution_proof; then
+      pass 6 "SUBSTITUTED: direct provisioned sg search returned the fixture match" "step6-sg-substitution.txt"
     else
-      fail 6 "ast_grep MCP proof (live turn AND stdio substitution both failed)" "step6-mcp-pane.txt"
+      fail 6 "AST-Grep skill proof (live turn AND direct sg substitution both failed)" "step6-sg-pane.txt"
     fi
   fi
-  kill_session mkbs-qa-mcp
+  kill_session mkbs-qa-sg
   stop_recorder "$rec_mcp"
 
   step "STEP 5f: no-force worker run records sg preexisting:<path>"
@@ -633,17 +632,13 @@ EOF
   fi
 }
 
-mcp_substitution_proof() {
-  local out="$FINAL/step6-mcp-substitution.txt"
+sg_substitution_proof() {
+  local out="$FINAL/step6-sg-substitution.txt"
+  local sg_bin="$QAHOME/runtime/ast-grep/$("$NODE_BIN" -p process.platform)-$("$NODE_BIN" -p process.arch)/sg"
   (
     cd "$WORKDIR"
-    {
-      printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"mkbs-qa","version":"0"}}}'
-      printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-      printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"search\",\"arguments\":{\"pattern\":\"\\\"MKBS_E2E_TOOL_PROOF_73c1\\\"\",\"lang\":\"typescript\",\"paths\":[\".\"]}}}"
-      sleep 5
-    } | env PATH="$STRIPPED_PATH" CODEX_HOME="$QAHOME" HOME="$HOME" \
-      "$NODE_BIN" "$IROOT/components/ast-grep-mcp/dist/cli.js" mcp >"$out" 2>&1
+    env PATH="$STRIPPED_PATH" CODEX_HOME="$QAHOME" HOME="$HOME" \
+      "$sg_bin" --pattern '"MKBS_E2E_TOOL_PROOF_73c1"' --lang ts . >"$out" 2>&1
   )
   grep -q "MKBS_E2E_TOOL_PROOF_73c1" "$out"
 }

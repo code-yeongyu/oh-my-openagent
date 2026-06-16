@@ -11,7 +11,6 @@ describe("copyBundledMcpRuntimeDists", () => {
     const sourceRoot = join(tempRoot, "packages", "omo-codex", "plugin")
     const pluginRoot = join(tempRoot, "cache", "plugin")
     const runtimeRoots = [
-      "../../ast-grep-mcp/dist",
       "../../git-bash-mcp/dist",
       "../../lsp-daemon/dist",
       "../../lsp-tools-mcp/dist",
@@ -23,7 +22,6 @@ describe("copyBundledMcpRuntimeDists", () => {
         join(sourceRoot, ".mcp.json"),
         JSON.stringify({
           mcpServers: {
-            ast_grep: { args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
             git_bash: { args: ["../../git-bash-mcp/dist/cli.js", "mcp"] },
             lsp: { args: ["../../lsp-daemon/dist/cli.js", "mcp"] },
           },
@@ -41,7 +39,7 @@ describe("copyBundledMcpRuntimeDists", () => {
 
       // then
       const copiedComponents = await readdir(join(pluginRoot, "components"))
-      expect(copiedComponents.sort()).toEqual(["ast-grep-mcp", "git-bash-mcp", "lsp-daemon"])
+      expect(copiedComponents.sort()).toEqual(["git-bash-mcp", "lsp-daemon"])
     } finally {
       await rm(tempRoot, { recursive: true, force: true })
     }
