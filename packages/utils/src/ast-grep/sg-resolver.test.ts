@@ -48,6 +48,7 @@ describe("findSgBinarySync", () => {
     const result = findSgBinarySync({
       env: {},
       fileExists: (filePath) => filePath === runtimeSg,
+      platform: "linux",
       runtimeDir,
       which: () => join(root, "path-sg"),
     })
