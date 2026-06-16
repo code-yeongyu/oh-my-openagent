@@ -84,6 +84,7 @@ export async function pollSyncSession(
     anchorMessageCount?: number
     maxAssistantTurns?: number
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
+    hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
   },
   timeoutMs?: number
@@ -97,19 +98,34 @@ export async function pollSyncSession(
   let timedOut = false
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
-  const childWakeGraceMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
+  const childSettleMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
   let childWaitAssistantId: string | undefined
-  let childWaitStartedAt = 0
-  const shouldWaitForChildTasks = (currentAssistantId: string | undefined): boolean => {
-    if (input.hasActiveChildBackgroundTasks?.(input.sessionID)) {
+  let childSettleStartedAt = 0
+  // A sync subagent can end its turn and then be re-woken by a parent-wake
+  // notification once its background children finish. The task is only truly done
+  // when no direct child work remains AND no wake is queued/in-flight for this
+  // session. (Direct children only: a grandchild's completion wake is addressed to
+  // its immediate parent, never to this session, so gating on grandchildren would
+  // block on continuations this session can never receive.)
+  // hasPendingParentWake bridges the notification dispatch window (debounce + queue +
+  // promptAsync gate), which routinely exceeds a fixed grace; the settle window then
+  // covers only the sub-second gap between a child reaching terminal status and the
+  // wake being enqueued. Once a new turn appears the assistant id changes and we stop
+  // waiting to evaluate it. The outer inactivity timeout remains the safety bound.
+  const isAwaitingChildContinuation = (currentAssistantId: string | undefined): boolean => {
+    const continuationOwed =
+      (input.hasActiveChildBackgroundTasks?.(input.sessionID) ?? false) ||
+      (input.hasPendingParentWake?.(input.sessionID) ?? false)
+    if (continuationOwed) {
       childWaitAssistantId = currentAssistantId
-      childWaitStartedAt = 0
-    } else if (childWaitAssistantId === undefined || currentAssistantId !== childWaitAssistantId) {
-      return false
-    } else {
-      childWaitStartedAt ||= Date.now()
+      childSettleStartedAt = 0
+      return true
     }
-    return childWaitStartedAt === 0 || Date.now() - childWaitStartedAt < childWakeGraceMs
+    if (childWaitAssistantId === undefined || currentAssistantId !== childWaitAssistantId) {
+      return false
+    }
+    childSettleStartedAt ||= Date.now()
+    return Date.now() - childSettleStartedAt < childSettleMs
   }
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
@@ -204,7 +220,7 @@ export async function pollSyncSession(
 
     if (isSessionComplete(messages)) {
       const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
-      if (shouldWaitForChildTasks(currentAssistantId)) {
+      if (isAwaitingChildContinuation(currentAssistantId)) {
         continue
       }
       log("[task] Poll complete - terminal finish detected", { sessionID: input.sessionID, pollCount })
@@ -239,7 +255,7 @@ export async function pollSyncSession(
     })
 
     if (!lastAssistant?.info?.finish && hasAssistantText) {
-      if (shouldWaitForChildTasks(lastAssistant?.info?.id)) {
+      if (isAwaitingChildContinuation(lastAssistant?.info?.id)) {
         continue
       }
       log("[task] Poll complete - assistant text detected (fallback)", {
