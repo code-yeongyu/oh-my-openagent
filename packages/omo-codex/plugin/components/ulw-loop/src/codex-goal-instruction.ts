@@ -113,8 +113,8 @@ function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, ag
 		"Final story — run mandatory quality gate before update_goal:",
 		"- Run targeted verification for changed behavior.",
 		"- Confirm every manualQa artifact path exists and has non-zero size.",
-		"- Spawn the three final reviewer roles with fork_context=false: lazycodex-code-reviewer for implementation review, lazycodex-qa-executor for Manual-QA evidence review, and lazycodex-gate-reviewer for final criteria/checkpoint review. If selectable roles are unavailable, describe the same roles in scoped worker prompts.",
-		"- Require a quality gate JSON with clean codeReview, manualQa, gateReview, iteration, and criteriaCoverage fields.",
+		"- Spawn final reviewers with fork_context=false: lazycodex-code-reviewer, lazycodex-qa-executor, and lazycodex-gate-reviewer. Include the original brief, goal objectives, desired user-visible outcome, diff, and evidence.",
+		"- Require clean codeReview, manualQa, gateReview, iteration, and criteriaCoverage. criteriaCoverage must summarize originalIntent, desiredOutcome, and userOutcomeReview; counts alone are not approval.",
 		"- If any reviewer is blocked/inconclusive or the quality gate is not clean, do not call update_goal. Record blocker work first:",
 		`  ${blockerCommand}`,
 		aggregate
