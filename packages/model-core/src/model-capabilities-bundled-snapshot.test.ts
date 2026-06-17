@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "./registry";
 import { describe, expect, test } from "bun:test"
 
 import { getBundledModelCapabilitiesSnapshot, getModelCapabilities } from "./model-capabilities"
@@ -16,7 +17,7 @@ describe("bundled model capabilities snapshot", () => {
     // when
     const results = modelIDs.map((modelID) =>
       getModelCapabilities({
-        providerID: "openai",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
         modelID,
         bundledSnapshot,
       }),

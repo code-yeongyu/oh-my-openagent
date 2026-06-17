@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import { clearSessionModel, getSessionModel, setSessionModel } from "./session-model-state"
 
@@ -7,11 +8,11 @@ describe("session-model-state", () => {
     const sessionID = "ses_test"
 
     //#when
-    setSessionModel(sessionID, { providerID: "github-copilot", modelID: "gpt-4.1" })
+    setSessionModel(sessionID, { providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, modelID: "gpt-4.1" })
 
     //#then
     expect(getSessionModel(sessionID)).toEqual({
-      providerID: "github-copilot",
+      providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
       modelID: "gpt-4.1",
     })
   })
@@ -19,7 +20,7 @@ describe("session-model-state", () => {
   test("clears a session model", () => {
     //#given
     const sessionID = "ses_clear"
-    setSessionModel(sessionID, { providerID: "anthropic", modelID: "gpt-5.5" })
+    setSessionModel(sessionID, { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.GPT_5_5 })
 
     //#when
     clearSessionModel(sessionID)

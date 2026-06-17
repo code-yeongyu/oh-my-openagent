@@ -11,6 +11,7 @@
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core"
 import type { AgentMode } from "../types"
 import { isGlmModel, isGpt5_5Model, isGpt5_6Model, isGptModel, isGeminiModel, isKimiK2Model, isKimiK27Model, buildClaudeThinkingConfig } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
@@ -29,6 +30,8 @@ import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
 import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
 import { buildGlm52SisyphusJuniorPrompt } from "./glm-5-2"
 
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core"
+
 const MODE: AgentMode = "subagent"
 
 // Core tools that Sisyphus-Junior must NEVER have access to
@@ -36,7 +39,7 @@ const MODE: AgentMode = "subagent"
 const BLOCKED_TOOLS = ["task"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
-  model: "anthropic/claude-sonnet-4-6",
+  model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
   temperature: 0.1,
 } as const
 
@@ -143,12 +146,12 @@ export function createSisyphusJuniorAgentWithOverrides(
     permission,
   }
 
-  if (override?.top_p !== undefined) {
-    base.top_p = override.top_p
+  if (override?.topP !== undefined) {
+    base.topP = override.topP
   }
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" } as AgentConfig
+    return { ...base, reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM } as AgentConfig
   }
 
   if (isGlmModel(model)) {

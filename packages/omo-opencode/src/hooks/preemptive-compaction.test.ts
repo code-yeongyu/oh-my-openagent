@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
@@ -97,8 +98,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 50000,
@@ -150,8 +151,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -187,7 +188,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "google-vertex-anthropic",
-            modelID: "claude-sonnet-4-6",
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -224,8 +225,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: { input: 180000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
           },
@@ -263,8 +264,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -286,8 +287,8 @@ describe("preemptive-compaction", () => {
     //#then
     expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
       sessionID,
-      providerID: "anthropic",
-      modelID: "claude-sonnet-4-6",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
       error: String(summarizeError),
     })
   })
@@ -309,8 +310,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -353,8 +354,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -382,8 +383,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -419,8 +420,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 300000,
@@ -458,8 +459,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 300000,
@@ -500,8 +501,8 @@ describe("preemptive-compaction", () => {
             info: {
               role: "assistant",
               sessionID,
-              providerID: "anthropic",
-              modelID: "claude-sonnet-4-6",
+              providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+              modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
               finish: true,
               tokens: {
                 input: 800000,
@@ -524,8 +525,8 @@ describe("preemptive-compaction", () => {
       expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
       expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
         sessionID,
-        providerID: "anthropic",
-        modelID: "claude-sonnet-4-6",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+        modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
         error: expect.stringContaining("Compaction summarize timed out"),
       })
 
@@ -540,8 +541,8 @@ describe("preemptive-compaction", () => {
               info: {
                 role: "assistant",
                 sessionID,
-                providerID: "anthropic",
-                modelID: "claude-sonnet-4-6",
+                providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+                modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
                 finish: true,
                 tokens: {
                   input: 800000,
@@ -584,8 +585,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -615,8 +616,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -653,8 +654,8 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,
@@ -686,8 +687,8 @@ describe("preemptive-compaction", () => {
               agent: "compaction",
               role: "assistant",
               sessionID,
-              providerID: "anthropic",
-              modelID: "claude-sonnet-4-6",
+              providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+              modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
               finish: true,
               tokens: {
                 input: 170000,
@@ -814,7 +815,7 @@ describe("preemptive-compaction", () => {
           info: {
             role: "assistant",
             sessionID,
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             modelID: "claude-sonnet-4-5",
             finish: true,
             tokens: {

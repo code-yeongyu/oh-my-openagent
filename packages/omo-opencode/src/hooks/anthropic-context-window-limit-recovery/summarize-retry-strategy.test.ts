@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { runSummarizeRetryStrategy } from "./summarize-retry-strategy"
 import type { AutoCompactState, ParsedTokenLimitError, RetryState } from "./types"
@@ -71,7 +72,7 @@ describe("runSummarizeRetryStrategy", () => {
     //#when
     await runSummarizeRetryStrategy({
       sessionID,
-      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      msg: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       autoCompactState,
       client: client as never,
       directory,
@@ -112,7 +113,7 @@ describe("runSummarizeRetryStrategy", () => {
     //#when
     await runSummarizeRetryStrategy({
       sessionID,
-      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      msg: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       autoCompactState,
       client: client as never,
       directory,
@@ -141,7 +142,7 @@ describe("runSummarizeRetryStrategy", () => {
 
     await runSummarizeRetryStrategy({
       sessionID,
-      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      msg: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       autoCompactState,
       client: client as never,
       directory,
@@ -183,7 +184,7 @@ describe("runSummarizeRetryStrategy", () => {
     //#when
     await runSummarizeRetryStrategy({
       sessionID,
-      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      msg: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       autoCompactState,
       client: client as never,
       directory,

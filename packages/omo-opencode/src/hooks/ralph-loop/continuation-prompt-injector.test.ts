@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
@@ -239,9 +240,9 @@ describe("ralph-loop continuation prompt injector", () => {
         }
       | undefined
     const model = {
-      providerID: "openai",
-      modelID: "gpt-5.5",
-      variant: "max",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MAX,
     }
     const ctx = {
       client: {
@@ -272,8 +273,8 @@ describe("ralph-loop continuation prompt injector", () => {
 
     // then
     expect(promptBody?.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.5",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_5,
     })
     expect(promptBody?.variant).toBe("max")
   })

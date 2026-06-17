@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
@@ -91,7 +92,7 @@ describe("Atlas final-wave approval gate regressions", () => {
       join(messageDirectory, "msg_test001.json"),
       JSON.stringify({
         agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }),
     )
   }

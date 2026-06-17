@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 
 import { ULTIMATE_FALLBACK } from "./model-fallback"
@@ -38,8 +39,8 @@ describe("provider availability", () => {
     const availability = toProviderAvailability(createConfig({ hasBailianCodingPlan: true }))
 
     // #when / #then
-    expect(isProviderAvailable("bailian-coding-plan", availability)).toBe(true)
-    expect(isProviderAvailable("minimax-coding-plan", availability)).toBe(false)
+    expect(isProviderAvailable(SUPPORTED_PROVIDERS.BAILIAN_CODING_PLAN, availability)).toBe(true)
+    expect(isProviderAvailable(SUPPORTED_PROVIDERS.MINIMAX_CODING_PLAN, availability)).toBe(false)
   })
 
   test("installer warning copy uses ultimate fallback constant", () => {

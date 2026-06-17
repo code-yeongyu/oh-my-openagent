@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -26,8 +27,8 @@ describe("FallbackModelsSchema", () => {
     const fallbackModels: FallbackModelObject[] = [
       {
         model: "openai/gpt-5.4",
-        variant: "high",
-        reasoningEffort: "high",
+        variant: SUPPORTED_VARIANTS.HIGH,
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         temperature: 0.3,
       },
     ]
@@ -50,7 +51,7 @@ describe("OhMyOpenCodeConfigSchema fallback_models", () => {
       {
         model: "openai/gpt-5.4",
         variant: "low",
-        reasoningEffort: "medium",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
       },
     ]
     const config = {

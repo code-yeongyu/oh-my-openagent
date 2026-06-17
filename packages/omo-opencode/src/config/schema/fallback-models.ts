@@ -2,10 +2,10 @@ import { z } from "zod"
 
 export const FallbackModelObjectSchema = z.object({
   model: z.string(),
-  variant: z.string().optional(),
+  variant: z.enum(["low", "medium", "high", "xhigh", "max", "auto", "thinking", "minimal", "none"]).optional(),
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
+  topP: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
   thinking: z
     .object({

@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, it, expect } from "bun:test"
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper"
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
@@ -224,7 +225,7 @@ describe("remapAgentKeysToDisplayNames", () => {
         sisyphus: { prompt: "test", mode: "primary" },
       }
       const overrides = {
-        sisyphus: { model: "claude-opus-4-7" },
+        sisyphus: { model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }
 
       // when remapping with overrides that have no displayName

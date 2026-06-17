@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import {
   createRecoveryHook,
@@ -99,8 +100,8 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
     getLastAssistantMock.mockResolvedValueOnce({
       info: {
         summary: true,
-        providerID: "anthropic",
-        modelID: "claude-sonnet-4-6",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+        modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
       },
       hasContent: false,
     })

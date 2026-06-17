@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, it, afterEach } from "bun:test"
@@ -40,7 +41,7 @@ function createContextUsageMockContext(
             {
               info: {
                 role: "assistant",
-                providerID: options?.providerID ?? "anthropic",
+                providerID: options?.providerID ?? SUPPORTED_PROVIDERS.ANTHROPIC,
                 modelID: options?.modelID,
                 tokens: {
                   input: inputTokens,
@@ -70,7 +71,7 @@ function createCountingContextUsageMockContext(inputTokens: number) {
                 {
                   info: {
                     role: "assistant",
-                    providerID: "anthropic",
+                    providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
                     modelID: "claude-sonnet-4-5",
                     tokens: {
                       input: inputTokens,
@@ -168,7 +169,7 @@ describe("getContextWindowUsage", () => {
                     {
                       info: {
                         role: "assistant",
-                        providerID: "anthropic",
+                        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
                         modelID: "claude-sonnet-4-5",
                         tokens: {
                           input: 100000,
@@ -306,7 +307,7 @@ describe("getContextWindowUsage", () => {
   it("returns null for non-anthropic providers without a cached limit", async () => {
     // given
     const ctx = createContextUsageMockContext(180000, {
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-5",
     })
 
@@ -330,7 +331,7 @@ describe("getContextWindowUsage", () => {
         modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 200000)
 
         const ctx = createContextUsageMockContext(300000, {
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-sonnet-4-5",
         })
 

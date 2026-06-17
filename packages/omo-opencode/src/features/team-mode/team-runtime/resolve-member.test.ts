@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { readFileSync } from "node:fs"
 declare const require: (name: string) => any
 const { describe, expect, mock, test, beforeEach } = require("bun:test")
@@ -46,10 +47,10 @@ describe("resolveMember", () => {
 
     resolveCategoryExecutionMock.mockResolvedValue({
       agentToUse: "sisyphus-junior",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.4" },
+      categoryModel: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 512,
-      fallbackChain: [{ providers: ["openai"], model: "gpt-5.4-mini" }],
+      fallbackChain: [{ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4_MINI }],
     })
 
     // when
@@ -91,7 +92,7 @@ describe("resolveMember", () => {
     }
     resolveCategoryExecutionMock.mockResolvedValue({
       agentToUse: "sisyphus-junior",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.5", variant: "xhigh" },
+      categoryModel: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5, variant: SUPPORTED_VARIANTS.XHIGH },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 256,
       fallbackChain: [],
@@ -118,8 +119,8 @@ describe("resolveMember", () => {
 
     resolveSubagentExecutionMock.mockResolvedValue({
       agentToUse: "atlas",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
-      fallbackChain: [{ providers: ["openai"], model: "gpt-5.4-nano" }],
+      categoryModel: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4_MINI },
+      fallbackChain: [{ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4_NANO }],
     })
 
     // when
@@ -190,14 +191,14 @@ describe("resolveMember", () => {
 
     resolveCategoryExecutionMock.mockResolvedValue({
       agentToUse: "sisyphus-junior",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.4" },
+      categoryModel: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 128,
       fallbackChain: [],
     })
     resolveSubagentExecutionMock.mockResolvedValue({
       agentToUse: "atlas",
-      categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      categoryModel: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4_MINI },
       fallbackChain: [],
     })
     const source = readFileSync(new URL("./resolve-member.ts", import.meta.url), "utf8")
@@ -212,13 +213,13 @@ describe("resolveMember", () => {
       agentName: "sisyphus-junior",
       categoryPromptAppend: "appendix",
       maxPromptTokens: 128,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
     })
     expect(buildSystemContentMock).toHaveBeenNthCalledWith(2, {
       agentName: "atlas",
       categoryPromptAppend: undefined,
       maxPromptTokens: undefined,
-      model: { providerID: "openai", modelID: "gpt-5.4-mini" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4_MINI },
     })
     expect(source).toContain("buildSystemContent({")
     expect(source).not.toContain("member.prompt +")

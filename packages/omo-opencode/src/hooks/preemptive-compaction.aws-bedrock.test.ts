@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, it, mock } from "bun:test"
@@ -39,7 +40,7 @@ describe("preemptive-compaction aws-bedrock-anthropic", () => {
             role: "assistant",
             sessionID,
             providerID: "aws-bedrock-anthropic",
-            modelID: "claude-sonnet-4-6",
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
             finish: true,
             tokens: {
               input: 800000,

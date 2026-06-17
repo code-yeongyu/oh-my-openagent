@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, expect, test, spyOn, afterEach, beforeEach, mock } from "bun:test";
 
 import * as shared from "../shared";
@@ -134,7 +135,7 @@ describe("buildPrometheusAgentConfig", () => {
       // when
         resolveModelPipelineSpy.mockReturnValue({
           model: explicitModel,
-          variant: "high",
+          variant: SUPPORTED_VARIANTS.HIGH,
           provenance: "override",
         });
 
@@ -241,7 +242,7 @@ describe("buildPrometheusAgentConfig", () => {
   describe("#given no currentModel and no explicit config", () => {
     test("falls through to fallback chain", async () => {
       // given - no currentModel, no explicit config
-      readConnectedProvidersCacheSpy.mockReturnValue(["anthropic"]);
+      readConnectedProvidersCacheSpy.mockReturnValue([SUPPORTED_PROVIDERS.ANTHROPIC]);
 
       // when
         const result = await buildPrometheusAgentConfig({
@@ -253,7 +254,7 @@ describe("buildPrometheusAgentConfig", () => {
 
         // then
         expect(fetchAvailableModelsSpy).toHaveBeenCalledWith(undefined, {
-          connectedProviders: ["anthropic"],
+          connectedProviders: [SUPPORTED_PROVIDERS.ANTHROPIC],
         });
         expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
           expect.objectContaining({

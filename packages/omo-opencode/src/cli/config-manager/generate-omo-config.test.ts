@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -161,7 +162,7 @@ describe("generateOmoConfig - model fallback system", () => {
     expect(agents.sisyphus.fallback_models).toEqual([
       {
         model: "openai/gpt-5.5",
-        variant: "medium",
+        variant: SUPPORTED_VARIANTS.MEDIUM,
       },
     ])
     expect(categories.deep.model).toBe("openai/gpt-5.6-terra")
@@ -177,7 +178,7 @@ describe("generateOmoConfig - model fallback system", () => {
       },
       {
         model: "anthropic/claude-opus-4-7",
-        variant: "max",
+        variant: SUPPORTED_VARIANTS.MAX,
       },
     ])
   })

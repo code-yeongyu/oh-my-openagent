@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { describe, test, expect } from "bun:test"
 import { buildRetryModelPayload } from "./retry-model-payload"
 
@@ -15,7 +16,7 @@ describe("buildRetryModelPayload", () => {
 
   test("should return undefined for model without provider prefix", () => {
     // given
-    const model = "kimi-k2.5"
+    const model = SUPPORTED_MODELS.KIMI_K2_5
 
     // when
     const result = buildRetryModelPayload(model)
@@ -33,7 +34,7 @@ describe("buildRetryModelPayload", () => {
 
     // then
     expect(result).toEqual({
-      model: { providerID: "chutes", modelID: "kimi-k2.5" },
+      model: { providerID: "chutes", modelID: SUPPORTED_MODELS.KIMI_K2_5 },
     })
   })
 
@@ -46,69 +47,69 @@ describe("buildRetryModelPayload", () => {
 
     // then
     expect(result).toEqual({
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
-      variant: "high",
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-5" },
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
   test("should use agent variant when model string has no variant", () => {
     // given
     const model = "chutes/kimi-k2.5"
-    const agentSettings = { variant: "max" }
+    const agentSettings = { variant: SUPPORTED_VARIANTS.MAX }
 
     // when
     const result = buildRetryModelPayload(model, agentSettings)
 
     // then
     expect(result).toEqual({
-      model: { providerID: "chutes", modelID: "kimi-k2.5" },
-      variant: "max",
+      model: { providerID: "chutes", modelID: SUPPORTED_MODELS.KIMI_K2_5 },
+      variant: SUPPORTED_VARIANTS.MAX,
     })
   })
 
   test("should prefer model string variant over agent variant", () => {
     // given
     const model = "anthropic/claude-sonnet-4-5 high"
-    const agentSettings = { variant: "max" }
+    const agentSettings = { variant: SUPPORTED_VARIANTS.MAX }
 
     // when
     const result = buildRetryModelPayload(model, agentSettings)
 
     // then
     expect(result).toEqual({
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
-      variant: "high",
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-5" },
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
   test("should include reasoningEffort from agent settings", () => {
     // given
     const model = "openai/gpt-5.4"
-    const agentSettings = { variant: "high", reasoningEffort: "xhigh" }
+    const agentSettings = { variant: SUPPORTED_VARIANTS.HIGH, reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH }
 
     // when
     const result = buildRetryModelPayload(model, agentSettings)
 
     // then
     expect(result).toEqual({
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-      variant: "high",
-      reasoningEffort: "xhigh",
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
+      variant: SUPPORTED_VARIANTS.HIGH,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH,
     })
   })
 
   test("should not include reasoningEffort when agent settings has none", () => {
     // given
     const model = "chutes/kimi-k2.5"
-    const agentSettings = { variant: "medium" }
+    const agentSettings = { variant: SUPPORTED_VARIANTS.MEDIUM }
 
     // when
     const result = buildRetryModelPayload(model, agentSettings)
 
     // then
     expect(result).toEqual({
-      model: { providerID: "chutes", modelID: "kimi-k2.5" },
-      variant: "medium",
+      model: { providerID: "chutes", modelID: SUPPORTED_MODELS.KIMI_K2_5 },
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
   })
 })

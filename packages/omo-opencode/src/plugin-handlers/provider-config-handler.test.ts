@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -71,7 +72,7 @@ describe("applyProviderConfig", () => {
         },
         google: {
           models: {
-            "gemini-3-flash": {
+            [SUPPORTED_MODELS.GEMINI_3_FLASH]: {
               capabilities: {
                 input: {
                   image: true,
@@ -93,7 +94,7 @@ describe("applyProviderConfig", () => {
     ])
     expect(readVisionCapableModelsCache()).toEqual([
       { providerID: "rundao", modelID: "public/qwen3.5-397b" },
-      { providerID: "google", modelID: "gemini-3-flash" },
+      { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_FLASH },
     ])
   })
 
@@ -108,7 +109,7 @@ describe("applyProviderConfig", () => {
       provider: {
         "zhipuai-coding-plan": {
           models: {
-            "glm-5.1": {
+            [SUPPORTED_MODELS.GLM_5_1]: {
               limit: { context: 200000 },
             },
           },
@@ -128,7 +129,7 @@ describe("applyProviderConfig", () => {
       "zhipuai-coding-plan/glm-5.1",
     ])
     expect(readVisionCapableModelsCache()).toEqual([
-      { providerID: "zhipuai-coding-plan", modelID: "glm-5.1" },
+      { providerID: "zhipuai-coding-plan", modelID: SUPPORTED_MODELS.GLM_5_1 },
     ])
   })
 
@@ -143,7 +144,7 @@ describe("applyProviderConfig", () => {
       provider: {
         google: {
           models: {
-            "gemini-3-flash": {
+            [SUPPORTED_MODELS.GEMINI_3_FLASH]: {
               modalities: { input: ["text", "image"] },
             },
           },

@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -221,7 +222,7 @@ describe("AgentOverrideConfigSchema", () => {
   describe("variant field", () => {
     test("accepts variant as optional string", () => {
       // given
-      const config = { variant: "high" }
+      const config = { variant: SUPPORTED_VARIANTS.HIGH }
 
       // when
       const result = AgentOverrideConfigSchema.safeParse(config)
@@ -377,7 +378,7 @@ describe("AgentOverrideConfigSchema", () => {
 describe("CategoryConfigSchema", () => {
   test("accepts variant as optional string", () => {
     // given
-    const config = { model: "openai/gpt-5.4", variant: "xhigh" }
+    const config = { model: "openai/gpt-5.4", variant: SUPPORTED_VARIANTS.XHIGH }
 
     // when
     const result = CategoryConfigSchema.safeParse(config)
@@ -391,7 +392,7 @@ describe("CategoryConfigSchema", () => {
 
   test("accepts reasoningEffort as optional string with xhigh", () => {
     // given
-    const config = { reasoningEffort: "xhigh" }
+    const config = { reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH }
 
     // when
     const result = CategoryConfigSchema.safeParse(config)
@@ -405,8 +406,8 @@ describe("CategoryConfigSchema", () => {
 
   test("accepts reasoningEffort values none and minimal", () => {
     // given
-    const noneConfig = { reasoningEffort: "none" }
-    const minimalConfig = { reasoningEffort: "minimal" }
+    const noneConfig = { reasoningEffort: SUPPORTED_REASONING_EFFORTS.NONE }
+    const minimalConfig = { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MINIMAL }
 
     // when
     const noneResult = CategoryConfigSchema.safeParse(noneConfig)
@@ -427,7 +428,7 @@ describe("CategoryConfigSchema", () => {
   // the full enum and assert all three reasoningEffort schemas agree.
   test("accepts reasoningEffort 'max' on CategoryConfigSchema", () => {
     // given
-    const config = { reasoningEffort: "max" }
+    const config = { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MAX }
 
     // when
     const result = CategoryConfigSchema.safeParse(config)
@@ -441,7 +442,7 @@ describe("CategoryConfigSchema", () => {
 
   test("accepts reasoningEffort 'max' on AgentOverrideConfigSchema", () => {
     // given
-    const config = { reasoningEffort: "max" }
+    const config = { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MAX }
 
     // when
     const result = AgentOverrideConfigSchema.safeParse(config)
@@ -455,7 +456,7 @@ describe("CategoryConfigSchema", () => {
 
   test("accepts reasoningEffort 'max' on FallbackModelObjectSchema", () => {
     // given
-    const config = { model: "openai/gpt-5", reasoningEffort: "max" }
+    const config = { model: "openai/gpt-5", reasoningEffort: SUPPORTED_REASONING_EFFORTS.MAX }
 
     // when
     const result = FallbackModelObjectSchema.safeParse(config)

@@ -10,7 +10,7 @@ function toDelegatedModelConfig(fallback: NonNullable<ReturnType<typeof getNextR
     variant: fallback.variant,
     reasoningEffort: fallback.reasoningEffort,
     temperature: fallback.temperature,
-    top_p: fallback.top_p,
+    topP: fallback.topP,
     maxTokens: fallback.maxTokens,
     thinking: fallback.thinking,
   }

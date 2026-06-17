@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
@@ -264,7 +265,7 @@ describe("createEventHandler", () => {
     await handler({
       event: {
         type: "session.created",
-        properties: { info: { id: sessionID, model: { id: "gpt-5.5-codex", providerID: "openai", variant: "medium" } } },
+        properties: { info: { id: sessionID, model: { id: "gpt-5.5-codex", providerID: SUPPORTED_PROVIDERS.OPENAI, variant: SUPPORTED_VARIANTS.MEDIUM } } },
       },
     })
 

@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
@@ -196,7 +197,7 @@ describe("promptInstallConfig platform branching", () => {
     const options = firstCall?.options as Array<{ value: string; hint?: string }>
     const noOption = options?.find((o) => o.value === "no")
     expect(noOption?.hint).toContain(ULTIMATE_FALLBACK)
-    expect(noOption?.hint).not.toContain("big-pickle")
+    expect(noOption?.hint).not.toContain(SUPPORTED_MODELS.BIG_PICKLE)
   })
 
   test("uses explicit Codex autonomous override without asking", async () => {

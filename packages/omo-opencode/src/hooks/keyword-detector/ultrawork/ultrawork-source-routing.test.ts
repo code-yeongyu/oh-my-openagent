@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -15,19 +16,19 @@ const ULTRAWORK_ROUTING_BASELINES: readonly UltraworkRoutingBaseline[] = [
   {
     name: "default",
     agentName: "sisyphus",
-    modelID: "claude-sonnet-4-6",
+    modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     expectedSource: "default",
   },
   {
     name: "gpt",
     agentName: "sisyphus",
-    modelID: "gpt-5.5",
+    modelID: SUPPORTED_MODELS.GPT_5_5,
     expectedSource: "gpt",
   },
   {
     name: "gemini",
     agentName: "sisyphus",
-    modelID: "gemini-3.1-pro",
+    modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
     expectedSource: "gemini",
   },
   {
@@ -39,7 +40,7 @@ const ULTRAWORK_ROUTING_BASELINES: readonly UltraworkRoutingBaseline[] = [
   {
     name: "planner",
     agentName: "prometheus",
-    modelID: "gpt-5.5",
+    modelID: SUPPORTED_MODELS.GPT_5_5,
     expectedSource: "planner",
   },
 ]

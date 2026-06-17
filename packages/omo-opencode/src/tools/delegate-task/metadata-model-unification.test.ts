@@ -1,11 +1,12 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 const { describe, test, expect } = require("bun:test")
 
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ParentContext } from "./executor-types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
-const MODEL_WITH_VARIANT = { providerID: "google", modelID: "gemini-3.1-pro", variant: "high" }
+const MODEL = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 }
+const MODEL_WITH_VARIANT = { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO, variant: SUPPORTED_VARIANTS.HIGH }
 
 type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
 
@@ -160,7 +161,7 @@ describe("metadata model unification", () => {
           client: {
             session: {
               messages: async () => ({
-                data: [{ info: { agent: "explore", model: MODEL, providerID: "anthropic", modelID: "claude-sonnet-4-6" } }],
+                data: [{ info: { agent: "explore", model: MODEL, providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 } }],
               }),
               prompt: async () => ({}),
             },
@@ -479,7 +480,7 @@ describe("metadata model unification", () => {
           client: {
             session: {
               messages: async () => ({
-                data: [{ info: { agent: "explore", model: MODEL_WITH_VARIANT, providerID: "google", modelID: "gemini-3.1-pro" } }],
+                data: [{ info: { agent: "explore", model: MODEL_WITH_VARIANT, providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO } }],
               }),
               prompt: async () => ({}),
             },

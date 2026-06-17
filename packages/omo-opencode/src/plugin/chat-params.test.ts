@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -37,11 +38,11 @@ describe("createChatParamsHandler", () => {
   test("applies stored prompt params for the session", async () => {
     //#given
     sharedModule.writeProviderModelsCache({
-      connected: ["openai"],
+      connected: [SUPPORTED_PROVIDERS.OPENAI],
       models: {
         openai: [
           {
-            id: "gpt-5.4",
+            id: SUPPORTED_MODELS.GPT_5_4,
             name: "GPT-5.4",
             temperature: true,
             reasoning: true,
@@ -60,7 +61,7 @@ describe("createChatParamsHandler", () => {
       topP: 0.7,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "disabled" },
       },
     })
@@ -70,8 +71,8 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params_temperature",
       agent: { name: "oracle" },
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-      provider: { id: "openai" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
+      provider: { id: SUPPORTED_PROVIDERS.OPENAI },
       message: {},
     }
 
@@ -93,7 +94,7 @@ describe("createChatParamsHandler", () => {
       maxOutputTokens: 4096,
       options: {
         existing: true,
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "disabled" },
       },
     })
@@ -102,7 +103,7 @@ describe("createChatParamsHandler", () => {
       topP: 0.7,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "disabled" },
       },
     })
@@ -120,8 +121,8 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params_temperature",
       agent: { name: "oracle" },
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-      provider: { id: "openai" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
+      provider: { id: SUPPORTED_PROVIDERS.OPENAI },
       message: {},
     }
 
@@ -149,7 +150,7 @@ describe("createChatParamsHandler", () => {
     setSessionPromptParams("ses_chat_params", {
       temperature: 0.4,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "enabled", budgetTokens: 4096 },
       },
     })
@@ -159,8 +160,8 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params",
       agent: { name: "oracle" },
-      model: { providerID: "openai", modelID: "gpt-4.1" },
-      provider: { id: "openai" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4.1" },
+      provider: { id: SUPPORTED_PROVIDERS.OPENAI },
       message: {},
     }
 
@@ -230,8 +231,8 @@ describe("createChatParamsHandler", () => {
     const input = {
       sessionID: "ses_chat_params",
       agent: { name: "oracle" },
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-      provider: { id: "openai" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
+      provider: { id: SUPPORTED_PROVIDERS.OPENAI },
       message: {},
     }
 

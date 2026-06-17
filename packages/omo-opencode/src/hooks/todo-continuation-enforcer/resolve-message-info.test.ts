@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 
@@ -9,8 +10,8 @@ import type { MessageWithInfo } from "./types"
 describe("resolveLatestMessageInfo", () => {
   test("given synthetic latest user info, skips it and resolves the prior real user info", async () => {
     // given
-    const realModel = { providerID: "openai", modelID: "gpt-5.5" }
-    const syntheticModel = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
+    const realModel = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 }
+    const syntheticModel = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 }
     const messages: MessageWithInfo[] = [
       {
         info: { role: "user", agent: "sisyphus", model: realModel },
@@ -39,8 +40,8 @@ describe("resolveLatestMessageInfo", () => {
 
   test("given internally marked latest user info, skips it and resolves the prior real user info", async () => {
     // given
-    const realModel = { providerID: "openai", modelID: "gpt-5.5" }
-    const internalModel = { providerID: "openai", modelID: "gpt-5.4" }
+    const realModel = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 }
+    const internalModel = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 }
     const messages: MessageWithInfo[] = [
       {
         info: { role: "user", agent: "sisyphus", model: realModel },

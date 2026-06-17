@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { tryFallbackRetry, TeamModeFallbackError, type FallbackRetryHandlerDeps } from "./fallback-retry-handler"
 import type { FallbackEntry } from "../../shared/model-requirements"
@@ -248,26 +249,26 @@ describe("tryFallbackRetry", () => {
 
     test("queues fallback retry on provider key when provider concurrency is configured", async () => {
       const args = createDefaultArgs({
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-        concurrencyKey: "anthropic",
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
+        concurrencyKey: SUPPORTED_PROVIDERS.ANTHROPIC,
         fallbackChain: [
-          { model: "claude-sonnet-4-6", providers: ["anthropic"], variant: undefined },
+          { model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6, providers: [SUPPORTED_PROVIDERS.ANTHROPIC], variant: undefined },
         ],
       })
       args.concurrencyManager.getConcurrencyKey = mock((model: string) =>
-        model.startsWith("anthropic/") ? "anthropic" : model
+        model.startsWith("anthropic/") ? SUPPORTED_PROVIDERS.ANTHROPIC : model
       )
 
       await tryFallbackRetry(args)
 
       expect(args.task.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-sonnet-4-6",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+        modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
         variant: undefined,
       })
-      expect(args.queuesByKey.get("anthropic")).toHaveLength(1)
+      expect(args.queuesByKey.get(SUPPORTED_PROVIDERS.ANTHROPIC)).toHaveLength(1)
       expect(args.queuesByKey.has("anthropic/claude-sonnet-4-6")).toBe(false)
-      expect(args.processKey).toHaveBeenCalledWith("anthropic")
+      expect(args.processKey).toHaveBeenCalledWith(SUPPORTED_PROVIDERS.ANTHROPIC)
     })
 
     test("preserves team identity and session callback in retry input", async () => {

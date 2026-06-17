@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -307,7 +308,7 @@ session_id: ses_standalone_def
         metadata: {
           sessionId: "ses_standalone_def",
           agent: "sisyphus-junior",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
           truncated: false,
         } as Record<string, unknown>,
       }
@@ -322,7 +323,7 @@ session_id: ses_standalone_def
       expect(output.output).toContain("LYING")
       expect(output.metadata.sessionId).toBe("ses_standalone_def")
       expect(output.metadata.agent).toBe("sisyphus-junior")
-      expect(output.metadata.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(output.metadata.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
       expect(output.metadata.truncated).toBe(false)
 
       cleanupMessageStorage(sessionID)

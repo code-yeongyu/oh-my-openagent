@@ -8,7 +8,7 @@ export const CategoryConfigSchema = z.object({
   fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
+  topP: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
   thinking: z
     .object({

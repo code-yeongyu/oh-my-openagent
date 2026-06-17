@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test";
@@ -9,7 +10,7 @@ import {
 } from "./index";
 
 describe("getHephaestusPromptSource", () => {
-  test("returns 'gpt-5-4' for gpt-5.4 models", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_4 for gpt-5.4 models", () => {
     // given
     const model1 = "openai/gpt-5.4";
     const model2 = "openai/gpt-5.4-codex";
@@ -26,7 +27,7 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt-5-4");
   });
 
-  test("returns 'gpt-5-5' for gpt-5.5 models", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_5 for gpt-5.5 models", () => {
     // given
     const model1 = "openai/gpt-5.5";
     const model2 = "openai/gpt-5-5";
@@ -43,7 +44,7 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt-5-5");
   });
 
-  test("returns 'gpt-5-5' for GPT 5.5 models", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_5 for GPT 5.5 models", () => {
     // given
     const model1 = "openai/gpt-5.5";
     const model2 = "github-copilot/gpt-5.5";

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, it, expect } from "bun:test"
 
 import { createMessagesTransformHandler } from "./messages-transform"
@@ -241,7 +242,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_opus47_prefill",
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
           system: "system-prompt",
           tools: { bash: true },
         },
@@ -266,7 +267,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_opus47_prefill",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       system: "system-prompt",
       tools: { bash: true },
     })
@@ -286,7 +287,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_opus48_prefill",
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-8" },
           system: "system-prompt",
           tools: { bash: true },
         },
@@ -311,7 +312,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_opus48_prefill",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-8" },
       system: "system-prompt",
       tools: { bash: true },
     })
@@ -341,7 +342,7 @@ describe("createMessagesTransformHandler", () => {
           id: "msg_assistant_model_fallback",
           role: "assistant",
           sessionID: "ses_assistant_model_fallback",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-6" },
         },
         parts: [{ type: "text", text: "done" }],
       },
@@ -376,7 +377,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_first_user",
           agent: "atlas",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
           system: "old-system",
           tools: { read: true },
         },
@@ -388,7 +389,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_last_user",
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-8" },
           system: "new-system",
           tools: { bash: true },
         },
@@ -413,7 +414,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_last_user",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-8" },
       system: "new-system",
       tools: { bash: true },
     })
@@ -460,7 +461,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_recovery_timing",
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-8" },
         },
         parts: [{ type: "text", text: "continue" }],
       },
@@ -501,7 +502,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_allowed_then_rejecting_assistant",
           agent: "sisyphus",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
         },
         parts: [{ type: "text", text: "continue" }],
       },
@@ -510,7 +511,7 @@ describe("createMessagesTransformHandler", () => {
           id: "msg_assistant_rejecting_metadata",
           role: "assistant",
           sessionID: "ses_allowed_then_rejecting_assistant",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-6" },
         },
         parts: [{ type: "text", text: "done" }],
       },
@@ -525,7 +526,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_allowed_then_rejecting_assistant",
       agent: "sisyphus",
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
     })
     expect(messages.at(-1)?.parts[0]).toMatchObject({
       type: "text",
@@ -543,7 +544,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_vertex_anthropic",
           agent: "sisyphus",
-          model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+          model: { providerID: "google-vertex-anthropic", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
         parts: [{ type: "text", text: "continue" }],
       },
@@ -566,7 +567,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_vertex_anthropic",
       agent: "sisyphus",
-      model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: "google-vertex-anthropic", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     })
     expect(messages.at(-1)?.parts[0]).toMatchObject({
       type: "text",
@@ -584,7 +585,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_direct_model",
           agent: "sisyphus",
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-sonnet-4.6",
           system: "system-prompt",
           tools: { bash: true },
@@ -610,7 +611,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_direct_model",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4.6" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4.6" },
       system: "system-prompt",
       tools: { bash: true },
     })
@@ -625,17 +626,17 @@ describe("createMessagesTransformHandler", () => {
     //#given
     const scenarios: Array<{ name: string; userInfo: TestMessage["info"] }> = [
       {
-        name: "openai",
+        name: SUPPORTED_PROVIDERS.OPENAI,
         userInfo: {
           role: "user",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
         },
       },
       {
         name: "anthropic allowed",
         userInfo: {
           role: "user",
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-5" },
         },
       },
       {
@@ -646,7 +647,7 @@ describe("createMessagesTransformHandler", () => {
         name: "non-anthropic provider",
         userInfo: {
           role: "user",
-          model: { providerID: "openai", modelID: "claude-opus-4-7" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
     ]
@@ -700,7 +701,7 @@ describe("createMessagesTransformHandler", () => {
       {
         info: {
           role: "user",
-          model: { providerID: "openai", modelID: "gpt-5.4" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
         },
         parts: [{
           type: "text",

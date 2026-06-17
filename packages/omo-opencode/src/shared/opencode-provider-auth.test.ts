@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -48,7 +49,7 @@ describe("opencode-provider-auth", () => {
     }))
 
     // when isProviderUsingOAuth queries each provider
-    const anthropicOauth = isProviderUsingOAuth("anthropic")
+    const anthropicOauth = isProviderUsingOAuth(SUPPORTED_PROVIDERS.ANTHROPIC)
     const opencodeOauth = isProviderUsingOAuth("opencode")
 
     // then only OAuth providers return true
@@ -61,11 +62,11 @@ describe("opencode-provider-auth", () => {
     writeAuthFile(JSON.stringify({ anthropic: { type: "api", key: "sk-ant-xxx" } }))
 
     // when getProviderAuthType queries the provider
-    const authType = getProviderAuthType("anthropic")
+    const authType = getProviderAuthType(SUPPORTED_PROVIDERS.ANTHROPIC)
 
     // then the api type is returned
     expect(authType).toBe("api")
-    expect(isProviderUsingOAuth("anthropic")).toBe(false)
+    expect(isProviderUsingOAuth(SUPPORTED_PROVIDERS.ANTHROPIC)).toBe(false)
   })
 
   it("#given missing auth.json #then returns undefined with no throw", () => {
@@ -74,8 +75,8 @@ describe("opencode-provider-auth", () => {
     _resetProviderAuthCacheForTesting()
 
     // when isProviderUsingOAuth queries a provider
-    const anthropicOauth = isProviderUsingOAuth("anthropic")
-    const anthropicType = getProviderAuthType("anthropic")
+    const anthropicOauth = isProviderUsingOAuth(SUPPORTED_PROVIDERS.ANTHROPIC)
+    const anthropicType = getProviderAuthType(SUPPORTED_PROVIDERS.ANTHROPIC)
 
     // then callers get a safe undefined/false
     expect(anthropicOauth).toBe(false)
@@ -87,7 +88,7 @@ describe("opencode-provider-auth", () => {
     writeAuthFile("not json at all")
 
     // when isProviderUsingOAuth queries a provider
-    const anthropicOauth = isProviderUsingOAuth("anthropic")
+    const anthropicOauth = isProviderUsingOAuth(SUPPORTED_PROVIDERS.ANTHROPIC)
 
     // then detection degrades safely
     expect(anthropicOauth).toBe(false)
@@ -98,10 +99,10 @@ describe("opencode-provider-auth", () => {
     writeAuthFile(JSON.stringify({ anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 } }))
 
     // when querying a provider that is not present
-    const openai = getProviderAuthType("openai")
+    const openai = getProviderAuthType(SUPPORTED_PROVIDERS.OPENAI)
 
     // then undefined
     expect(openai).toBeUndefined()
-    expect(isProviderUsingOAuth("openai")).toBe(false)
+    expect(isProviderUsingOAuth(SUPPORTED_PROVIDERS.OPENAI)).toBe(false)
   })
 })

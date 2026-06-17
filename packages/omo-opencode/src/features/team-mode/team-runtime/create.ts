@@ -232,7 +232,7 @@ export async function createTeamRun(
                 ...(resolvedMember.model.variant ? { variant: resolvedMember.model.variant } : {}),
                 ...(resolvedMember.model.reasoningEffort ? { reasoningEffort: resolvedMember.model.reasoningEffort } : {}),
                 ...(resolvedMember.model.temperature !== undefined ? { temperature: resolvedMember.model.temperature } : {}),
-                ...(resolvedMember.model.top_p !== undefined ? { top_p: resolvedMember.model.top_p } : {}),
+                ...(resolvedMember.model.topP !== undefined ? { topP: resolvedMember.model.topP } : {}),
                 ...(resolvedMember.model.maxTokens !== undefined ? { maxTokens: resolvedMember.model.maxTokens } : {}),
                 ...(resolvedMember.model.thinking ? { thinking: resolvedMember.model.thinking } : {}),
               }

@@ -5,7 +5,7 @@ import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
-
+import type { Provider } from "@oh-my-opencode/model-core"
 type OpencodeClient = PluginInput["client"]
 type ModelListClient = OpencodeClient & { model?: { list?: () => Promise<unknown> } }
 
@@ -40,7 +40,7 @@ function normalizeModelName(name: string): string {
 export function fuzzyMatchModel(
 	target: string,
 	available: Set<string>,
-	providers?: string[],
+	providers?: Provider[],
 ): string | null {
 	log("[fuzzyMatchModel] called", { target, availableCount: available.size, providers })
 
@@ -109,7 +109,7 @@ export function isModelAvailable(
 	return fuzzyMatchModel(targetModel, availableModels) !== null
 }
 
-export async function getConnectedProviders(client: OpencodeClient): Promise<string[]> {
+export async function getConnectedProviders(client: OpencodeClient): Promise<Provider[]> {
 	if (!client?.provider?.list) {
 		log("[getConnectedProviders] client.provider.list not available")
 		return []
@@ -128,7 +128,7 @@ export async function getConnectedProviders(client: OpencodeClient): Promise<str
 
 export async function fetchAvailableModels(
 	client?: ModelListClient,
-	options?: { connectedProviders?: string[] | null }
+	options?: { connectedProviders?: Provider[] | null }
 ): Promise<Set<string>> {
 	let connectedProviders = options?.connectedProviders ?? null
 	let connectedProvidersUnknown = connectedProviders === null

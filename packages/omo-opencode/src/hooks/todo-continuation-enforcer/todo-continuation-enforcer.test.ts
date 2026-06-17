@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
@@ -1614,8 +1615,8 @@ describe("todo-continuation-enforcer", () => {
 
     // OpenCode returns assistant messages with flat modelID/providerID, not nested model object
     const mockMessagesWithAssistant = [
-      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-5.4" } } },
-      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", modelID: "gpt-5.4", providerID: "openai" } },
+      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", modelID: SUPPORTED_MODELS.GPT_5_4, providerID: SUPPORTED_PROVIDERS.OPENAI } },
     ]
 
     const mockInput = {
@@ -1659,7 +1660,7 @@ describe("todo-continuation-enforcer", () => {
 
      // then - model should be extracted from assistant message's flat modelID/providerID
      expect(promptCalls.length).toBe(1)
-     expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+     expect(promptCalls[0].model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
   })
 
   // COMPACTION AGENT FILTERING TESTS
@@ -1672,9 +1673,9 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     const mockMessagesWithCompaction = [
-      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" } } },
-      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
-      { info: { id: "msg-3", role: "assistant", finish: "stop", agent: "compaction", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 } } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6, providerID: SUPPORTED_PROVIDERS.ANTHROPIC } },
+      { info: { id: "msg-3", role: "assistant", finish: "stop", agent: "compaction", modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6, providerID: SUPPORTED_PROVIDERS.ANTHROPIC } },
     ]
 
     const mockInput = {
@@ -1779,9 +1780,9 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     const mockMessagesWithCompactionMarker = [
-      { info: { id: "msg-1", role: "assistant", finish: "stop", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-1", role: "assistant", finish: "stop", agent: "sisyphus", modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6, providerID: SUPPORTED_PROVIDERS.ANTHROPIC } },
       {
-        info: { id: "msg-2", role: "user", agent: "atlas", model: { providerID: "openai", modelID: "gpt-5.4" } },
+        info: { id: "msg-2", role: "user", agent: "atlas", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
         parts: [{ type: "compaction" }],
       },
     ]

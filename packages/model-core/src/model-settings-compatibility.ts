@@ -1,9 +1,10 @@
 import { detectHeuristicModelFamily } from "./model-capability-heuristics"
+import type { Variant } from "./registry"
 
 type CompatibilityField = "variant" | "reasoningEffort" | "temperature" | "topP" | "maxTokens" | "thinking"
 
 type DesiredModelSettings = {
-  variant?: string
+  variant?: Variant
   reasoningEffort?: string
   temperature?: number
   topP?: number
@@ -39,7 +40,7 @@ export type ModelSettingsCompatibilityChange = {
 }
 
 export type ModelSettingsCompatibilityResult = {
-  variant?: string
+  variant?: Variant
   reasoningEffort?: string
   temperature?: number
   topP?: number
@@ -132,7 +133,7 @@ export function resolveCompatibleModelSettings(
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "variant", from: variant, to: resolved.value, reason: resolved.reason })
     }
-    variant = resolved.value
+    variant = resolved.value as Variant | undefined
   }
 
   let reasoningEffort = input.desired.reasoningEffort

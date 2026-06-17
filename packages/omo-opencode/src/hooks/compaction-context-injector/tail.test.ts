@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { afterAll, describe, expect, it, mock } from "bun:test"
 
 mock.module("../../shared/system-directive", () => ({
@@ -31,9 +32,9 @@ type PromptAsyncInput = {
 function createMockContext(promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))) {
   let callIndex = 0
   const responses = [
-    [{ info: { role: "user", agent: "atlas", model: { providerID: "openai", modelID: "gpt-5" } } }],
-    [{ info: { role: "user", agent: "atlas", model: { providerID: "openai", modelID: "gpt-5" } } }],
-    [{ info: { role: "user", agent: "atlas", model: { providerID: "openai", modelID: "gpt-5" } } }],
+    [{ info: { role: "user", agent: "atlas", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" } } }],
+    [{ info: { role: "user", agent: "atlas", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" } } }],
+    [{ info: { role: "user", agent: "atlas", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" } } }],
   ]
 
   return {

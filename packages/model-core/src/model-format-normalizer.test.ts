@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "./registry";
 import { describe, it, expect } from "bun:test"
 import { normalizeModelFormat } from "./model-format-normalizer"
 
@@ -10,7 +11,7 @@ describe("normalizeModelFormat", () => {
 
     it("handles provider with multiple slashes", () => {
       const result = normalizeModelFormat("anthropic/claude-opus-4-7/max")
-      expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7/max" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7/max" })
     })
 
     it("returns undefined for malformed string without separator", () => {

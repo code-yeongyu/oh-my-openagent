@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
@@ -33,15 +34,15 @@ describe("loadAvailableModelsFromCache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
-        openai: { models: { "gpt-5.4": {} } },
-        anthropic: { models: { "claude-opus-4-7": {}, "claude-sonnet-4-6": {} } },
+        openai: { models: { [SUPPORTED_MODELS.GPT_5_4]: {} } },
+        anthropic: { models: { [SUPPORTED_MODELS.CLAUDE_OPUS_4_7]: {}, [SUPPORTED_MODELS.CLAUDE_SONNET_4_6]: {} } },
       })
     )
 
     const result = loadAvailableModelsFromCache()
     expect(result.cacheExists).toBe(true)
-    expect(result.providers).toContain("openai")
-    expect(result.providers).toContain("anthropic")
+    expect(result.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
+    expect(result.providers).toContain(SUPPORTED_PROVIDERS.ANTHROPIC)
     expect(result.modelCount).toBe(3)
   })
 
@@ -49,7 +50,7 @@ describe("loadAvailableModelsFromCache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
-        openai: { models: { "gpt-5.4": {} } },
+        openai: { models: { [SUPPORTED_MODELS.GPT_5_4]: {} } },
       })
     )
     writeFileSync(
@@ -58,7 +59,7 @@ describe("loadAvailableModelsFromCache", () => {
         provider: {
           "openai-custom": {
             npm: "@ai-sdk/openai-compatible",
-            models: { "gpt-5.4": {} },
+            models: { [SUPPORTED_MODELS.GPT_5_4]: {} },
           },
           "my-local-llm": {
             npm: "@ai-sdk/openai-compatible",
@@ -70,7 +71,7 @@ describe("loadAvailableModelsFromCache", () => {
 
     const result = loadAvailableModelsFromCache()
     expect(result.cacheExists).toBe(true)
-    expect(result.providers).toContain("openai")
+    expect(result.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
     expect(result.providers).toContain("openai-custom")
     expect(result.providers).toContain("my-local-llm")
   })
@@ -79,7 +80,7 @@ describe("loadAvailableModelsFromCache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
       JSON.stringify({
-        openai: { models: { "gpt-5.4": {} } },
+        openai: { models: { [SUPPORTED_MODELS.GPT_5_4]: {} } },
       })
     )
     writeFileSync(
@@ -92,7 +93,7 @@ describe("loadAvailableModelsFromCache", () => {
     )
 
     const result = loadAvailableModelsFromCache()
-    const openaiCount = result.providers.filter((p) => p === "openai").length
+    const openaiCount = result.providers.filter((p) => p === SUPPORTED_PROVIDERS.OPENAI).length
     expect(openaiCount).toBe(1)
   })
 
@@ -104,7 +105,7 @@ describe("loadAvailableModelsFromCache", () => {
         provider: {
           "openai-custom": {
             npm: "@ai-sdk/openai-compatible",
-            models: { "gpt-5.4": {} },
+            models: { [SUPPORTED_MODELS.GPT_5_4]: {} },
           },
         },
       })
@@ -135,7 +136,7 @@ describe("loadAvailableModelsFromCache", () => {
   test("ignores malformed opencode.json gracefully", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
-      JSON.stringify({ openai: { models: { "gpt-5.4": {} } } })
+      JSON.stringify({ openai: { models: { [SUPPORTED_MODELS.GPT_5_4]: {} } } })
     )
     writeFileSync(
       join(tempDir, "config", "opencode", "opencode.json"),
@@ -144,7 +145,7 @@ describe("loadAvailableModelsFromCache", () => {
 
     const result = loadAvailableModelsFromCache()
     expect(result.cacheExists).toBe(true)
-    expect(result.providers).toContain("openai")
+    expect(result.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
     // Should not crash, just skip the config
   })
 })

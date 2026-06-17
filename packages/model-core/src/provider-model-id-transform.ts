@@ -1,11 +1,13 @@
+import { SUPPORTED_PROVIDERS } from "./registry"
+
 function inferSubProvider(model: string): string | undefined {
-	if (model.startsWith("claude-")) return "anthropic"
-	if (model.startsWith("gpt-")) return "openai"
-	if (model.startsWith("gemini-")) return "google"
-	if (model.startsWith("grok-")) return "xai"
-	if (model.startsWith("minimax-")) return "minimax"
-	if (model.startsWith("kimi-")) return "moonshotai"
-	if (model.startsWith("glm-")) return "zai"
+	if (model.startsWith("claude-")) return SUPPORTED_PROVIDERS.ANTHROPIC
+	if (model.startsWith("gpt-")) return SUPPORTED_PROVIDERS.OPENAI
+	if (model.startsWith("gemini-")) return SUPPORTED_PROVIDERS.GOOGLE
+	if (model.startsWith("grok-")) return SUPPORTED_PROVIDERS.XAI
+	if (model.startsWith("minimax-")) return SUPPORTED_PROVIDERS.MINIMAX
+	if (model.startsWith("kimi-")) return SUPPORTED_PROVIDERS.MOONSHOTAI
+	if (model.startsWith("glm-")) return SUPPORTED_PROVIDERS.ZAI
 	return undefined
 }
 
@@ -28,7 +30,7 @@ function transformModelForProviderUsingAnthropicBehavior(
 	provider: string,
 	model: string,
 ): string {
-	if (provider === "vercel") {
+	if (provider === SUPPORTED_PROVIDERS.VERCEL) {
 		const slashIndex = model.indexOf("/")
 		if (slashIndex !== -1) {
 			const subProvider = model.substring(0, slashIndex)
@@ -41,17 +43,17 @@ function transformModelForProviderUsingAnthropicBehavior(
 		}
 		return model
 	}
-	if (provider === "github-copilot") {
+	if (provider === SUPPORTED_PROVIDERS.GITHUB_COPILOT) {
 		return claudeVersionDot(model)
 			.replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
 			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
 	}
-	if (provider === "google") {
+	if (provider === SUPPORTED_PROVIDERS.GOOGLE) {
 		return model
 			.replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
 			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
 	}
-	if (provider === "anthropic") {
+	if (provider === SUPPORTED_PROVIDERS.ANTHROPIC) {
 		return model
 	}
 	return model

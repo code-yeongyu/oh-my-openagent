@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "./registry";
 import { describe, expect, test } from "bun:test"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
@@ -90,13 +91,13 @@ describe("model requirement global invariants", () => {
     ].flatMap((requirement) => requirement.fallbackChain)
 
     // when
-    const currentEntries = allEntries.filter((entry) => entry.model === "gpt-5.5")
+    const currentEntries = allEntries.filter((entry) => entry.model === SUPPORTED_MODELS.GPT_5_5)
 
     // then
     expect(currentEntries.length).toBeGreaterThan(0)
     for (const entry of currentEntries) {
-      expect(entry.model).toBe("gpt-5.5")
-      expect(entry.providers).toContain("openai")
+      expect(entry.model).toBe(SUPPORTED_MODELS.GPT_5_5)
+      expect(entry.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
     }
   })
 })

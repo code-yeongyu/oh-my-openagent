@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
@@ -116,14 +117,14 @@ describe("aggregateStatus", () => {
     const teamRunId = await seedRuntimeState(baseDir, "team-beta", "lead-2", [])
     const backgroundManager = {
       getTasksByParentSession: () => [
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+        { status: "running", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "running", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "running", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "running", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "running", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "pending", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "pending", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
+        { status: "pending", model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } },
       ],
       getConcurrencyCounts: () => ({ running: 5, queued: 3 }),
       listTasksByParentSession: () => [{}, {}, {}, {}],

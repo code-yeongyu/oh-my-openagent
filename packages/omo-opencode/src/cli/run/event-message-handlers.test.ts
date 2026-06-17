@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference path="../../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 import { describe, expect, it, spyOn } from "bun:test"
@@ -165,7 +166,7 @@ describe("handleMessagePartUpdated", () => {
             sessionID: "ses_main",
             role: "assistant",
             agent: "Sisyphus",
-            modelID: "claude-sonnet-4-6",
+            modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
           },
         },
       }),

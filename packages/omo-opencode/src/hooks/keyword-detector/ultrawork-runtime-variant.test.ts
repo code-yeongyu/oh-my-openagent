@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import { createKeywordDetectorHook } from "./index"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
@@ -23,12 +24,12 @@ describe("keyword-detector ultrawork runtime variant gating", () => {
     const toastMessages: string[] = []
     const hook = createKeywordDetectorHook(createMockPluginInput(toastMessages))
     const output = {
-      message: { variant: "max" } as Record<string, unknown>,
+      message: { variant: SUPPORTED_VARIANTS.MAX } as Record<string, unknown>,
       parts: [{ type: "text", text: "ultrawork do it" }],
     }
 
     // when
-    await hook["chat.message"]({ sessionID: "main-session", variant: "max" }, output)
+    await hook["chat.message"]({ sessionID: "main-session", variant: SUPPORTED_VARIANTS.MAX }, output)
 
     // then
     expect(output.message.variant).toBe("max")
@@ -43,12 +44,12 @@ describe("keyword-detector ultrawork runtime variant gating", () => {
     const toastMessages: string[] = []
     const hook = createKeywordDetectorHook(createMockPluginInput(toastMessages))
     const output = {
-      message: { variant: "medium" } as Record<string, unknown>,
+      message: { variant: SUPPORTED_VARIANTS.MEDIUM } as Record<string, unknown>,
       parts: [{ type: "text", text: "ultrawork do it" }],
     }
 
     // when
-    await hook["chat.message"]({ sessionID: "main-session", variant: "medium" }, output)
+    await hook["chat.message"]({ sessionID: "main-session", variant: SUPPORTED_VARIANTS.MEDIUM }, output)
 
     // then
     expect(output.message.variant).toBe("medium")

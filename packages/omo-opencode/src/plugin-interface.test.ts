@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -312,7 +313,7 @@ describe("createPluginInterface - chat.params variant injection", () => {
       ctx: { client: {} } as never,
       pluginConfig: {
         agents: {
-          sisyphus: { variant: "max" },
+          sisyphus: { variant: SUPPORTED_VARIANTS.MAX },
         },
       } as never,
       firstMessageVariantGate: {
@@ -328,8 +329,8 @@ describe("createPluginInterface - chat.params variant injection", () => {
     const input = {
       sessionID: "ses-variant-inject",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
-      provider: { id: "anthropic" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-6" },
+      provider: { id: SUPPORTED_PROVIDERS.ANTHROPIC },
       message: {} as { variant?: string },
     }
     const output = { options: {} }
@@ -347,7 +348,7 @@ describe("createPluginInterface - chat.params variant injection", () => {
       ctx: { client: {} } as never,
       pluginConfig: {
         agents: {
-          sisyphus: { variant: "max" },
+          sisyphus: { variant: SUPPORTED_VARIANTS.MAX },
         },
       } as never,
       firstMessageVariantGate: {
@@ -363,9 +364,9 @@ describe("createPluginInterface - chat.params variant injection", () => {
     const input = {
       sessionID: "ses-variant-keep",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
-      provider: { id: "anthropic" },
-      message: { variant: "high" } as { variant?: string },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-6" },
+      provider: { id: SUPPORTED_PROVIDERS.ANTHROPIC },
+      message: { variant: SUPPORTED_VARIANTS.HIGH } as { variant?: string },
     }
     const output = { options: {} }
 

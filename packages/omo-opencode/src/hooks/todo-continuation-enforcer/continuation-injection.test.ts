@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { injectContinuation } from "./continuation-injection"
@@ -42,7 +43,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_display_name_agent",
       resolvedInfo: {
         agent: "Sisyphus - ultraworker",
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })
@@ -80,7 +81,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_zwsp_agent",
       resolvedInfo: {
         agent: "\u200B\u200BSisyphus - ultraworker",
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })
@@ -136,7 +137,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_continuation_tools",
       resolvedInfo: {
         agent: "Hephaestus",
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
         tools: { question: "deny", bash: "allow" },
       },
       sessionStateStore: sessionStateStore as never,
@@ -175,7 +176,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_plan_skip",
       resolvedInfo: {
         agent: "plan",
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })
@@ -213,9 +214,9 @@ describe("injectContinuation", () => {
       getExistingState: () => ({ inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }),
     }
     const model = {
-      providerID: "openai",
-      modelID: "gpt-5.5",
-      variant: "max",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MAX,
     }
 
     // when
@@ -231,8 +232,8 @@ describe("injectContinuation", () => {
 
     // then
     expect(capturedBody?.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.5",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_5,
     })
     expect(capturedBody?.variant).toBe("max")
   })
@@ -281,7 +282,7 @@ describe("injectContinuation", () => {
       sessionID,
       resolvedInfo: {
         agent: "Sisyphus - ultraworker",
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })
@@ -325,7 +326,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_continuation_eof",
       resolvedInfo: {
         agent: "Sisyphus - ultraworker",
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })

@@ -1,6 +1,7 @@
 import { isRecord } from "@oh-my-opencode/utils"
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
+import type { Variant } from "@oh-my-opencode/model-core"
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
@@ -9,7 +10,7 @@ export type ChatParamsInput = {
   agent: { name?: string }
   model: { providerID: string; modelID: string }
   provider: { id: string }
-  message: { variant?: string }
+  message: { variant?: Variant }
 }
 
 type ChatParamsHookInput = ChatParamsInput & {
@@ -67,7 +68,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     agent: { name: agentName },
     model: { providerID, modelID },
     provider: { id: providerId },
-    message,
+    message: message as { variant?: Variant },
     rawMessage: message,
   }
 }
@@ -120,7 +121,7 @@ export function createChatParamsHandler(_args: {
       modelID: normalizedInput.model.modelID,
       desired: {
         variant: typeof normalizedInput.message.variant === "string"
-          ? normalizedInput.message.variant
+          ? (normalizedInput.message.variant as Variant)
           : undefined,
         reasoningEffort: typeof output.options.reasoningEffort === "string"
           ? output.options.reasoningEffort
@@ -140,7 +141,7 @@ export function createChatParamsHandler(_args: {
         delete normalizedInput.rawMessage.variant
       }
     }
-    normalizedInput.message = normalizedInput.rawMessage as { variant?: string }
+    normalizedInput.message = normalizedInput.rawMessage as { variant?: Variant }
 
     if (compatibility.reasoningEffort !== undefined) {
       output.options.reasoningEffort = compatibility.reasoningEffort

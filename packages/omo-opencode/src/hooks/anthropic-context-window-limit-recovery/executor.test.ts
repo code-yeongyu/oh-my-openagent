@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { OhMyOpenCodeConfigSchema } from "../../config"
@@ -99,7 +100,7 @@ describe("executeCompact lock management", () => {
   let pluginConfig: ReturnType<typeof OhMyOpenCodeConfigSchema.parse>
   const sessionID = "test-session-123"
   const directory = "/test/dir"
-  const msg = { providerID: "anthropic", modelID: "claude-opus-4-7" }
+  const msg = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 }
 
   beforeEach(() => {
     // given: Fresh state for each test
@@ -148,7 +149,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
+        body: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, auto: true },
       }),
     )
 
@@ -192,7 +193,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
+        body: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, auto: true },
       }),
     )
 
@@ -399,7 +400,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
+        body: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, auto: true },
       }),
     )
 

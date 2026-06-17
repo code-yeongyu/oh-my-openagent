@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, it, beforeEach, afterEach, spyOn } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
@@ -35,7 +36,7 @@ describe("readOpencodeConfigAgents", () => {
         agents: {
           "my-agent": {
             description: "Custom agent",
-            model: "claude-opus-4-7",
+            model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
             mode: "subagent",
             prompt: "You are a helpful assistant",
           },

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "./registry";
 import { describe, expect, it } from "bun:test"
 
 import { parseModelSuggestion } from "./parse-model-suggestion"
@@ -7,14 +8,14 @@ describe("parseModelSuggestion", () => {
     const error = {
       name: "ProviderModelNotFoundError",
       data: {
-        providerID: "anthropic",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
         modelID: "claude-sonet-4",
-        suggestions: ["claude-sonnet-4", "claude-sonnet-4-6"],
+        suggestions: ["claude-sonnet-4", SUPPORTED_MODELS.CLAUDE_SONNET_4_6],
       },
     }
 
     expect(parseModelSuggestion(error)).toEqual({
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-sonet-4",
       suggestion: "claude-sonnet-4",
     })
@@ -25,17 +26,17 @@ describe("parseModelSuggestion", () => {
       data: {
         name: "ProviderModelNotFoundError",
         data: {
-          providerID: "openai",
+          providerID: SUPPORTED_PROVIDERS.OPENAI,
           modelID: "gpt-5",
-          suggestions: ["gpt-5.4"],
+          suggestions: [SUPPORTED_MODELS.GPT_5_4],
         },
       },
     }
 
     expect(parseModelSuggestion(error)).toEqual({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-5",
-      suggestion: "gpt-5.4",
+      suggestion: SUPPORTED_MODELS.GPT_5_4,
     })
   })
 
@@ -55,7 +56,7 @@ describe("parseModelSuggestion", () => {
     const error = "Model not found: openai/gtp-5. Did you mean: gpt-5?"
 
     expect(parseModelSuggestion(error)).toEqual({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gtp-5",
       suggestion: "gpt-5",
     })

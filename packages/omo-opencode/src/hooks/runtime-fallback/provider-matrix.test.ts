@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 
 import { classifyErrorType, isRetryableError } from "./error-classifier"
@@ -9,7 +10,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       const error = {
         name: "InsufficientQuotaError",
         message: "You exceeded your current quota. Please check your plan and billing details.",
-        provider: "openai",
+        provider: SUPPORTED_PROVIDERS.OPENAI,
       }
 
       //#when
@@ -27,7 +28,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       const error = {
         name: "BillingError",
         message: "Billing hard limit reached. You have exceeded your hard limit.",
-        provider: "openai",
+        provider: SUPPORTED_PROVIDERS.OPENAI,
       }
 
       //#when
@@ -43,7 +44,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
         name: "RateLimitError",
         statusCode: 429,
         message: "Rate limit reached for requests",
-        provider: "openai",
+        provider: SUPPORTED_PROVIDERS.OPENAI,
       }
 
       //#when
@@ -60,7 +61,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       const error = {
         name: "QuotaExceededError",
         message: "Your account has exceeded its quota. Please upgrade your plan.",
-        provider: "anthropic",
+        provider: SUPPORTED_PROVIDERS.ANTHROPIC,
       }
 
       //#when
@@ -78,7 +79,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       const error = {
         name: "AI_APICallError",
         message: "Subscription quota exceeded. You can continue using free models.",
-        provider: "anthropic",
+        provider: SUPPORTED_PROVIDERS.ANTHROPIC,
       }
 
       //#when
@@ -96,7 +97,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       const error = {
         name: "AI_APICallError",
         message: "All credentials for model claude-opus-4-7 are cooling down [retrying in ~2 weeks]",
-        provider: "anthropic",
+        provider: SUPPORTED_PROVIDERS.ANTHROPIC,
       }
 
       //#when
@@ -116,7 +117,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
         name: "AI_LoadAPIKeyError",
         message:
           "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
-        provider: "google",
+        provider: SUPPORTED_PROVIDERS.GOOGLE,
       }
 
       //#when
@@ -133,7 +134,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       const error = {
         name: "QuotaExceededError",
         message: "Quota exceeded for quota metric 'Generate Content API requests'",
-        provider: "google",
+        provider: SUPPORTED_PROVIDERS.GOOGLE,
       }
 
       //#when
@@ -152,7 +153,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
         name: "ResourceExhausted",
         statusCode: 429,
         message: "Rate limit exceeded. Please try again later.",
-        provider: "google",
+        provider: SUPPORTED_PROVIDERS.GOOGLE,
       }
 
       //#when

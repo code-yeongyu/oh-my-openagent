@@ -63,9 +63,11 @@ export type ModelCapabilities = {
 	diagnostics: ModelCapabilitiesDiagnostics
 }
 
+import type { Provider, SupportedModel } from "../registry";
+
 export type GetModelCapabilitiesInput = {
-	providerID: string
-	modelID: string
+	providerID: Provider
+	modelID: SupportedModel
 	runtimeModel?: ModelMetadata | Record<string, unknown>
 	runtimeSnapshot?: ModelCapabilitiesSnapshot
 	bundledSnapshot?: ModelCapabilitiesSnapshot

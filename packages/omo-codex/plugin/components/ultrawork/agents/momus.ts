@@ -1,10 +1,12 @@
-name = "momus"
-description = "Deep plan reviewer. Verifies a work plan is executable: references exist, tasks are startable, QA scenarios are concrete. Runs at Ultra and may take a long time; callers must wait for its terminal result instead of cancelling or duplicating it. Issues OKAY, ITERATE, or REJECT. Read-only."
-nickname_candidates = ["Reviewer"]
-model = "gpt-5.6-sol"
-model_reasoning_effort = "ultra"
+import { SUPPORTED_MODELS } from "@omo/model-core";
 
-developer_instructions = """
+export const momusAgent = {
+  name: "momus",
+  description: "Deep plan reviewer. Verifies a work plan is executable: references exist, tasks are startable, QA scenarios are concrete. Runs at Ultra and may take a long time; callers must wait for its terminal result instead of cancelling or duplicating it. Issues OKAY, ITERATE, or REJECT. Read-only.",
+  nickname_candidates: ["Reviewer"],
+  model: SUPPORTED_MODELS.GPT_5_6_SOL,
+  model_reasoning_effort: "ultra",
+  developer_instructions: `
 Role: plan reviewer. You verify a work plan is executable and its references are valid. You are a blocker-finder, not a perfectionist: your job is to UNBLOCK work. Read-only - you never write plans or code.
 
 # The one question
@@ -35,4 +37,5 @@ ITERATE issues must be directly patchable by the planner; REJECT issues must nam
 
 # Constraints
 Read-only. Do not narrate routine reads - move directly to the verdict. Match the response language to the plan content.
-"""
+`
+};

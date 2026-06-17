@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 declare const require: (name: string) => any
 const { afterEach, beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
@@ -58,7 +59,7 @@ describe("atlas hook compaction agent filtering", () => {
       join(messageDir, fileName),
       JSON.stringify({
         agent,
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }),
     )
   }

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
@@ -135,7 +136,7 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
         id: "msg_1",
         info: {
           agent: "atlas",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.HIGH },
           time: { created: 1 },
         },
       }],
@@ -158,7 +159,7 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
     // then
     expect(calls).toHaveLength(1)
     expect(calls[0].body.agent).toBe("atlas")
-    expect(calls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(calls[0].body.model).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 })
     expect(calls[0].body.variant).toBe("high")
     expect(calls[0].body.auto).toBe(true)
   })

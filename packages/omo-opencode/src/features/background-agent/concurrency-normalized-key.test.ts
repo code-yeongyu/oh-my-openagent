@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import type { BackgroundTaskConfig } from "../../config/schema"
 import { ConcurrencyManager } from "./concurrency"
@@ -31,7 +32,7 @@ describe("ConcurrencyManager normalized acquire/release keys", () => {
     }
 
     // then
-    expect(normalizedKey).toBe("anthropic")
+    expect(normalizedKey).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
     expect(countAfterRelease).toBe(0)
     expect(countAfterReacquire).toBe(1)
     expect(queueLengthAfterReacquire).toBe(0)
@@ -60,7 +61,7 @@ describe("ConcurrencyManager normalized acquire/release keys", () => {
     const queueLengthAfterSecondAcquire = manager.getQueueLength(normalizedKey)
 
     // then
-    expect(normalizedKey).toBe("anthropic")
+    expect(normalizedKey).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
     expect(countAfterSecondAcquire).toBe(1)
     expect(queueLengthAfterSecondAcquire).toBe(1)
 

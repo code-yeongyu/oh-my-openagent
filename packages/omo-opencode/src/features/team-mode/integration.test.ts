@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 // allow: SIZE_OK - team-mode integration tests share one registry/runtime fixture; this release adds narrow concurrency cases and future behavior should split by integration scenario.
@@ -26,12 +27,12 @@ import type { TeamSpec } from "./types"
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
   model: {
-    providerID: "openai",
-    modelID: "gpt-5.4-mini",
-    variant: "medium",
-    reasoningEffort: "high",
+    providerID: SUPPORTED_PROVIDERS.OPENAI,
+    modelID: SUPPORTED_MODELS.GPT_5_4_MINI,
+    variant: SUPPORTED_VARIANTS.MEDIUM,
+    reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
     temperature: 0.1,
-    top_p: 0.9,
+    topP: 0.9,
     maxTokens: 2048,
     thinking: { type: "enabled", budgetTokens: 1024 },
   },
@@ -267,12 +268,12 @@ describe("team-mode integration", () => {
     expect(persistedWorker?.subagent_type).toBe("worker-agent")
     expect(persistedWorker?.category).toBe("quick")
     expect(persistedWorker?.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4-mini",
-      variant: "medium",
-      reasoningEffort: "high",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4_MINI,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       temperature: 0.1,
-      top_p: 0.9,
+      topP: 0.9,
       maxTokens: 2048,
       thinking: { type: "enabled", budgetTokens: 1024 },
     })
@@ -280,7 +281,7 @@ describe("team-mode integration", () => {
     expect(recorded).toHaveLength(1)
     expect(recorded[0]?.sessionId).toBe(workerMember.sessionId)
     expect(recorded[0]?.agent).toBe("worker-agent")
-    expect(recorded[0]?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4-mini" })
+    expect(recorded[0]?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4_MINI })
     expect(recorded[0]?.variant).toBe("medium")
     expect(recorded[0]?.directory).toBe(baseDir)
     expect(SessionCategoryRegistry.get(workerMember.sessionId)).toBe("quick")
@@ -289,7 +290,7 @@ describe("team-mode integration", () => {
       topP: 0.9,
       maxOutputTokens: 2048,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "enabled", budgetTokens: 1024 },
       },
     })

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -111,9 +112,9 @@ async function launchAtlasOracleSubagent(manager: BackgroundManager): Promise<st
     parentSessionId: "atlas-parent",
     parentMessageId: "atlas-message",
     parentAgent: "atlas",
-    model: { providerID: "openai", modelID: "gpt-5.5", variant: "high" },
+    model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5, variant: SUPPORTED_VARIANTS.HIGH },
     fallbackChain: [
-      { providers: ["github-copilot"], model: "claude-sonnet-4.6", variant: "high" },
+      { providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT], model: "claude-sonnet-4.6", variant: SUPPORTED_VARIANTS.HIGH },
     ],
   })
   await flushAsyncWork()
@@ -152,10 +153,10 @@ describe("Atlas-spawned subagent runtime fallback", () => {
     const task = manager.getTask(taskID)
     expect(task?.status).toBe("running")
     expect(task?.sessionId).toBe("ses_fallback")
-    expect(task?.model).toEqual({ providerID: "github-copilot", modelID: "claude-sonnet-4.6", variant: "high" })
+    expect(task?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, modelID: "claude-sonnet-4.6", variant: SUPPORTED_VARIANTS.HIGH })
     expect(task?.attemptCount).toBe(1)
     expect(createdSessions).toHaveLength(2)
-    expect(createdSessions[1]?.body?.model).toEqual({ providerID: "github-copilot", id: "claude-sonnet-4.6", variant: "high" })
+    expect(createdSessions[1]?.body?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, id: "claude-sonnet-4.6", variant: SUPPORTED_VARIANTS.HIGH })
     expect(promptCalls).toHaveLength(2)
     expect(subagentSessions.has("ses_primary")).toBe(false)
     expect(subagentSessions.has("ses_fallback")).toBe(true)

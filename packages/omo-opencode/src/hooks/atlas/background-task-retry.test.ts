@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -389,7 +390,7 @@ describe("atlas background task retry", () => {
           promptAsync: promptAsyncMock,
           messages: async ({ path }: { path: { id: string } }) => ({
             data: path.id === descendantSessionID
-              ? [{ info: { agent: descendantAgent, providerID: "openai", modelID: "gpt-5.4" } }]
+              ? [{ info: { agent: descendantAgent, providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }]
               : [],
           }),
         },

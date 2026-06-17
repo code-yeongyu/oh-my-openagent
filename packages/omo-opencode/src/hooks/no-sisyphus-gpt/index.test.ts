@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, spyOn, test } from "bun:test"
@@ -41,12 +42,12 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-4.1" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4.1" },
     }, output1)
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-4.1" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4.1" },
     }, output2)
 
     // then - toast is shown for every message
@@ -74,7 +75,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_gpt54",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
     }, output)
 
     // then - no toast, agent NOT switched to Hephaestus
@@ -93,7 +94,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_gpt55",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
     }, output)
 
     // then - no toast, agent NOT switched to Hephaestus
@@ -112,7 +113,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_gpt55_medium",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
     }, output)
 
     // then - Sisyphus stays active and receives its configured GPT-5.5 variant
@@ -126,13 +127,13 @@ describe("no-sisyphus-gpt hook", () => {
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
 
-    const output: HookOutput = { message: { variant: "high" }, parts: [] }
+    const output: HookOutput = { message: { variant: SUPPORTED_VARIANTS.HIGH }, parts: [] }
 
     // when - chat.message runs with gpt-5.5
     await hook["chat.message"]?.({
       sessionID: "ses_gpt55_high",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
     }, output)
 
     // then - user-selected variant is not overwritten
@@ -152,7 +153,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_2",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     }, output)
 
     // then - no toast
@@ -171,7 +172,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_3",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
     }, output)
 
     // then - no toast
@@ -191,7 +192,7 @@ describe("no-sisyphus-gpt hook", () => {
     // when - chat.message runs without input.agent
     await hook["chat.message"]?.({
       sessionID: "ses_4",
-      model: { providerID: "openai", modelID: "gpt-4o" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_4O },
     }, output)
 
     // then - toast shown via session-agent fallback

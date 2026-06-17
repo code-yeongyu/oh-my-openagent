@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, it, expect } from "bun:test"
 
 function expectDefined<T>(value: T | null | undefined, label: string): T {
@@ -33,7 +34,7 @@ describe("model-resolution check", () => {
       const result = parseProviderModel(value)
 
       // #then provider and model are split normally
-      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" })
     })
 
     it("splits synthetic provider model IDs at the provider separator", async () => {
@@ -65,8 +66,8 @@ describe("model-resolution check", () => {
         info.agents.find((a) => a.name === "sisyphus"),
         "sisyphus agent resolution",
       )
-      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-7")
-      expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
+      expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain(SUPPORTED_PROVIDERS.ANTHROPIC)
     })
 
     it("returns category requirements with provider chains", async () => {
@@ -79,8 +80,8 @@ describe("model-resolution check", () => {
         info.categories.find((c) => c.name === "visual-engineering"),
         "visual-engineering category resolution",
       )
-      expect(visual.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
-      expect(visual.requirement.fallbackChain[0]?.providers).toContain("google")
+      expect(visual.requirement.fallbackChain[0]?.model).toBe(SUPPORTED_MODELS.GEMINI_3_1_PRO)
+      expect(visual.requirement.fallbackChain[0]?.providers).toContain(SUPPORTED_PROVIDERS.GOOGLE)
     })
   })
 
@@ -143,7 +144,7 @@ describe("model-resolution check", () => {
       )
       expect(sisyphus.userOverride).toBeUndefined()
       expect(sisyphus.effectiveResolution).toContain("Provider fallback:")
-      expect(sisyphus.effectiveResolution).toContain("anthropic")
+      expect(sisyphus.effectiveResolution).toContain(SUPPORTED_PROVIDERS.ANTHROPIC)
     })
 
     it("captures user variant for agent when configured", async () => {
@@ -152,7 +153,7 @@ describe("model-resolution check", () => {
       //#given User has model with variant override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "openai/gpt-5.4", variant: "xhigh" },
+          oracle: { model: "openai/gpt-5.4", variant: SUPPORTED_VARIANTS.XHIGH },
         },
       }
 
@@ -171,7 +172,7 @@ describe("model-resolution check", () => {
       //#given User has model with variant override for visual-engineering category
       const mockConfig = {
         categories: {
-          "visual-engineering": { model: "google/gemini-3-flash-preview", variant: "high" },
+          "visual-engineering": { model: "google/gemini-3-flash-preview", variant: SUPPORTED_VARIANTS.HIGH },
         },
       }
 

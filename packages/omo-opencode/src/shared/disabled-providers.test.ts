@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, test } from "bun:test"
@@ -17,18 +18,18 @@ beforeEach(() => {
 
 describe("getModelProvider", () => {
   test("returns the first segment before the slash", () => {
-    expect(getModelProvider("github-copilot/gpt-5.5")).toBe("github-copilot")
-    expect(getModelProvider("anthropic/claude-opus-4-7")).toBe("anthropic")
-    expect(getModelProvider("vercel/openai/gpt-5.5")).toBe("vercel")
+    expect(getModelProvider("github-copilot/gpt-5.5")).toBe(SUPPORTED_PROVIDERS.GITHUB_COPILOT)
+    expect(getModelProvider("anthropic/claude-opus-4-7")).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
+    expect(getModelProvider("vercel/openai/gpt-5.5")).toBe(SUPPORTED_PROVIDERS.VERCEL)
   })
 
   test("trims provider whitespace before returning", () => {
-    expect(getModelProvider(" github-copilot/gpt-5.5")).toBe("github-copilot")
-    expect(getModelProvider("github-copilot /gpt-5.5")).toBe("github-copilot")
+    expect(getModelProvider(" github-copilot/gpt-5.5")).toBe(SUPPORTED_PROVIDERS.GITHUB_COPILOT)
+    expect(getModelProvider("github-copilot /gpt-5.5")).toBe(SUPPORTED_PROVIDERS.GITHUB_COPILOT)
   })
 
   test("returns undefined when the string has no provider prefix", () => {
-    expect(getModelProvider("gpt-5.5")).toBeUndefined()
+    expect(getModelProvider(SUPPORTED_MODELS.GPT_5_5)).toBeUndefined()
     expect(getModelProvider("")).toBeUndefined()
     expect(getModelProvider("/foo")).toBeUndefined()
   })
@@ -36,9 +37,9 @@ describe("getModelProvider", () => {
 
 describe("isProviderDisabled", () => {
   test("returns true only when the model's provider exactly matches a disabled entry", () => {
-    expect(isProviderDisabled("github-copilot/foo", ["github-copilot"])).toBe(true)
-    expect(isProviderDisabled("github-copilot-extra/foo", ["github-copilot"])).toBe(false)
-    expect(isProviderDisabled("opencode-go/glm-5.1", ["github-copilot", "vercel"])).toBe(false)
+    expect(isProviderDisabled("github-copilot/foo", [SUPPORTED_PROVIDERS.GITHUB_COPILOT])).toBe(true)
+    expect(isProviderDisabled("github-copilot-extra/foo", [SUPPORTED_PROVIDERS.GITHUB_COPILOT])).toBe(false)
+    expect(isProviderDisabled("opencode-go/glm-5.1", [SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.VERCEL])).toBe(false)
   })
 
   test("short-circuits when the disabled list is empty", () => {
@@ -46,18 +47,18 @@ describe("isProviderDisabled", () => {
   })
 
   test("handles undefined model", () => {
-    expect(isProviderDisabled(undefined, ["github-copilot"])).toBe(false)
+    expect(isProviderDisabled(undefined, [SUPPORTED_PROVIDERS.GITHUB_COPILOT])).toBe(false)
   })
 
   test("is case-insensitive: matches regardless of casing on either side", () => {
-    expect(isProviderDisabled("GitHub-Copilot/gpt-5.5", ["github-copilot"])).toBe(true)
+    expect(isProviderDisabled("GitHub-Copilot/gpt-5.5", [SUPPORTED_PROVIDERS.GITHUB_COPILOT])).toBe(true)
     expect(isProviderDisabled("github-copilot/gpt-5.5", ["GitHub-Copilot"])).toBe(true)
-    expect(isProviderDisabled("OPENAI/gpt-5.5", ["openai"])).toBe(true)
+    expect(isProviderDisabled("OPENAI/gpt-5.5", [SUPPORTED_PROVIDERS.OPENAI])).toBe(true)
     expect(isProviderDisabled("openai/gpt-5.5", ["VERCEL"])).toBe(false)
   })
 
   test("trims provider and disabled-list entries before comparing", () => {
-    expect(isProviderDisabled(" github-copilot/gpt-5.5", ["github-copilot"])).toBe(true)
+    expect(isProviderDisabled(" github-copilot/gpt-5.5", [SUPPORTED_PROVIDERS.GITHUB_COPILOT])).toBe(true)
     expect(isProviderDisabled("github-copilot /gpt-5.5", [" github-copilot "])).toBe(true)
   })
 })
@@ -67,13 +68,13 @@ describe("filterDisabledProviderModels", () => {
     const input = [
       "github-copilot/gpt-5.5",
       "openai/gpt-5.5",
-      { model: "vercel/openai/gpt-5.5", variant: "medium" },
-      { model: "opencode/gpt-5.5", variant: "medium" },
+      { model: "vercel/openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
+      { model: "opencode/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
     ]
-    const result = filterDisabledProviderModels(input, ["github-copilot", "vercel"])
+    const result = filterDisabledProviderModels(input, [SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.VERCEL])
     expect(result).toEqual([
       "openai/gpt-5.5",
-      { model: "opencode/gpt-5.5", variant: "medium" },
+      { model: "opencode/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
     ])
   })
 
@@ -104,14 +105,14 @@ describe("applyDisabledProviders", () => {
 
   test("filters fallback chain and substitutes primary from the first allowed entry", () => {
     const config = {
-      disabled_providers: ["github-copilot", "vercel"],
+      disabled_providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.VERCEL],
       agents: {
         hephaestus: {
           model: "github-copilot/gpt-5.5",
           fallback_models: [
             "github-copilot/gpt-5.4-mini",
-            { model: "openai/gpt-5.5", variant: "medium" },
-            { model: "vercel/openai/gpt-5.5", variant: "medium" },
+            { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
+            { model: "vercel/openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
             "opencode/gpt-5.5",
           ],
         },
@@ -127,7 +128,7 @@ describe("applyDisabledProviders", () => {
     const agents = config.agents as Record<string, { model?: string; fallback_models?: unknown }>
     expect(agents.hephaestus.model).toBe("openai/gpt-5.5")
     expect(agents.hephaestus.fallback_models).toEqual([
-      { model: "openai/gpt-5.5", variant: "medium" },
+      { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
       "opencode/gpt-5.5",
     ])
 
@@ -137,7 +138,7 @@ describe("applyDisabledProviders", () => {
 
   test("leaves primary unchanged but records a config-load error when every chain entry is also disabled", () => {
     const config = {
-      disabled_providers: ["github-copilot"],
+      disabled_providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT],
       agents: {
         oracle: {
           model: "github-copilot/gpt-5.5",
@@ -184,7 +185,7 @@ describe("applyDisabledProviders", () => {
 
   test("applies the same rules to categories", () => {
     const config = {
-      disabled_providers: ["github-copilot"],
+      disabled_providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT],
       categories: {
         deep: {
           model: "github-copilot/gpt-5.5",

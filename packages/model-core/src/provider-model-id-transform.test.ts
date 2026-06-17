@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "./registry";
 import { describe, expect, test } from "bun:test"
 
 import {
@@ -8,8 +9,8 @@ import {
 describe("provider model ID transforms", () => {
 	test("preserves hyphenated Anthropic IDs for direct API calls", () => {
 		// #given Anthropic model IDs in config-display form
-		const provider = "anthropic"
-		const models = ["claude-haiku-4-5", "claude-opus-4-7"] as const
+		const provider = SUPPORTED_PROVIDERS.ANTHROPIC
+		const models = [SUPPORTED_MODELS.CLAUDE_HAIKU_4_5, SUPPORTED_MODELS.CLAUDE_OPUS_4_7] as const
 
 		for (const model of models) {
 			// #when both model-core transform variants are called
@@ -26,22 +27,22 @@ describe("provider model ID transforms", () => {
 		// #given gateway providers that expect Claude version aliases
 		const scenarios = [
 			{
-				provider: "github-copilot",
-				model: "claude-haiku-4-5",
+				provider: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
+				model: SUPPORTED_MODELS.CLAUDE_HAIKU_4_5,
 				expected: "claude-haiku-4.5",
 			},
 			{
-				provider: "github-copilot",
-				model: "claude-opus-4-7",
+				provider: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
+				model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
 				expected: "claude-opus-4.7",
 			},
 			{
-				provider: "vercel",
-				model: "claude-haiku-4-5",
+				provider: SUPPORTED_PROVIDERS.VERCEL,
+				model: SUPPORTED_MODELS.CLAUDE_HAIKU_4_5,
 				expected: "anthropic/claude-haiku-4.5",
 			},
 			{
-				provider: "vercel",
+				provider: SUPPORTED_PROVIDERS.VERCEL,
 				model: "anthropic/claude-opus-4-7",
 				expected: "anthropic/claude-opus-4.7",
 			},
@@ -59,10 +60,10 @@ describe("provider model ID transforms", () => {
 	test("produces identical results for non-Anthropic providers", () => {
 		// #given non-Anthropic provider/model pairs
 		const scenarios = [
-			{ provider: "openai", model: "gpt-4o" },
-			{ provider: "google", model: "gemini-2.5-pro" },
-			{ provider: "github-copilot", model: "gemini-3-flash" },
-			{ provider: "vercel", model: "claude-opus-4-7" },
+			{ provider: SUPPORTED_PROVIDERS.OPENAI, model: SUPPORTED_MODELS.GPT_4O },
+			{ provider: SUPPORTED_PROVIDERS.GOOGLE, model: "gemini-2.5-pro" },
+			{ provider: SUPPORTED_PROVIDERS.GITHUB_COPILOT, model: SUPPORTED_MODELS.GEMINI_3_FLASH },
+			{ provider: SUPPORTED_PROVIDERS.VERCEL, model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
 		] as const
 
 		for (const scenario of scenarios) {

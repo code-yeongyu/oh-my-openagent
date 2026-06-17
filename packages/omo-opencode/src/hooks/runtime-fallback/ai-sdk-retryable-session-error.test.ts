@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
@@ -91,6 +92,6 @@ describe("runtime-fallback AI SDK retryable session errors", () => {
     //#then
     expect(promptCalls).toHaveLength(1)
     const promptBody = promptCalls[0]?.body as { model?: { providerID?: string; modelID?: string } } | undefined
-    expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(promptBody?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
   })
 })

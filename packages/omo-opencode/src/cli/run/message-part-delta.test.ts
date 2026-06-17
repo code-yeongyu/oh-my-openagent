@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, expect, it, spyOn } from "bun:test"
 import type { EventPayload, RunContext } from "./types"
 import { createEventState } from "./events"
@@ -98,8 +99,8 @@ describe("message.part.delta handling", () => {
           sessionID: "ses_main",
           role: "assistant",
           agent: "Sisyphus - Ultraworker",
-          modelID: "claude-opus-4-7",
-          variant: "max",
+          modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+          variant: SUPPORTED_VARIANTS.MAX,
         },
       },
     }
@@ -128,7 +129,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -187,7 +188,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -242,7 +243,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -309,7 +310,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -353,7 +354,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7", variant: "max" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
         },
       },
       {
@@ -388,7 +389,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_user", sessionID: "ses_main", role: "user", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: { id: "msg_user", sessionID: "ses_main", role: "user", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -410,7 +411,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -619,7 +620,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-7" },
+          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {
@@ -634,7 +635,7 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-7" },
+          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
         },
       },
       {

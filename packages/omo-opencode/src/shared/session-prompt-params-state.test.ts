@@ -1,3 +1,4 @@
+import { SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 
 import {
@@ -20,7 +21,7 @@ describe("session-prompt-params-state", () => {
       topP: 0.7,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       },
     }
 
@@ -36,7 +37,7 @@ describe("session-prompt-params-state", () => {
     const sessionID = "ses_prompt_params_copy"
     setSessionPromptParams(sessionID, {
       temperature: 0.2,
-      options: { reasoningEffort: "medium" },
+      options: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM },
     })
 
     //#when
@@ -47,7 +48,7 @@ describe("session-prompt-params-state", () => {
     //#then
     expect(getSessionPromptParams(sessionID)).toEqual({
       temperature: 0.2,
-      options: { reasoningEffort: "medium" },
+      options: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM },
     })
   })
 

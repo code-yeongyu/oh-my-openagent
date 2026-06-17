@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, it, expect, mock } from "bun:test"
 import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "./prompt-async-gate"
 import { parseModelSuggestion, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "./model-suggestion-retry"
@@ -10,9 +11,9 @@ describe("parseModelSuggestion", () => {
       const error = {
         name: "ProviderModelNotFoundError",
         data: {
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-sonet-4",
-          suggestions: ["claude-sonnet-4", "claude-sonnet-4-6"],
+          suggestions: ["claude-sonnet-4", SUPPORTED_MODELS.CLAUDE_SONNET_4_6],
         },
       }
 
@@ -21,7 +22,7 @@ describe("parseModelSuggestion", () => {
 
       // then should return the first suggestion
       expect(result).toEqual({
-        providerID: "anthropic",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
         modelID: "claude-sonet-4",
         suggestion: "claude-sonnet-4",
       })
@@ -32,7 +33,7 @@ describe("parseModelSuggestion", () => {
       const error = {
         name: "ProviderModelNotFoundError",
         data: {
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-sonet-4",
           suggestions: [],
         },
@@ -50,7 +51,7 @@ describe("parseModelSuggestion", () => {
       const error = {
         name: "ProviderModelNotFoundError",
         data: {
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-sonet-4",
         },
       }
@@ -70,9 +71,9 @@ describe("parseModelSuggestion", () => {
         data: {
           name: "ProviderModelNotFoundError",
           data: {
-            providerID: "openai",
+            providerID: SUPPORTED_PROVIDERS.OPENAI,
             modelID: "gpt-5",
-            suggestions: ["gpt-5.4"],
+            suggestions: [SUPPORTED_MODELS.GPT_5_4],
           },
         },
       }
@@ -82,9 +83,9 @@ describe("parseModelSuggestion", () => {
 
       // then should extract from nested structure
       expect(result).toEqual({
-        providerID: "openai",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
         modelID: "gpt-5",
-        suggestion: "gpt-5.4",
+        suggestion: SUPPORTED_MODELS.GPT_5_4,
       })
     })
 
@@ -94,9 +95,9 @@ describe("parseModelSuggestion", () => {
         error: {
           name: "ProviderModelNotFoundError",
           data: {
-            providerID: "google",
+            providerID: SUPPORTED_PROVIDERS.GOOGLE,
             modelID: "gemini-3-flsh",
-            suggestions: ["gemini-3-flash"],
+            suggestions: [SUPPORTED_MODELS.GEMINI_3_FLASH],
           },
         },
       }
@@ -106,9 +107,9 @@ describe("parseModelSuggestion", () => {
 
       // then should extract from nested error field
       expect(result).toEqual({
-        providerID: "google",
+        providerID: SUPPORTED_PROVIDERS.GOOGLE,
         modelID: "gemini-3-flsh",
-        suggestion: "gemini-3-flash",
+        suggestion: SUPPORTED_MODELS.GEMINI_3_FLASH,
       })
     })
   })
@@ -125,7 +126,7 @@ describe("parseModelSuggestion", () => {
 
       // then should extract from message string
       expect(result).toEqual({
-        providerID: "anthropic",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
         modelID: "claude-sonet-4",
         suggestion: "claude-sonnet-4",
       })
@@ -141,7 +142,7 @@ describe("parseModelSuggestion", () => {
 
       // then should extract from string
       expect(result).toEqual({
-        providerID: "openai",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
         modelID: "gtp-5",
         suggestion: "gpt-5",
       })
@@ -158,9 +159,9 @@ describe("parseModelSuggestion", () => {
 
       // then should extract from message property
       expect(result).toEqual({
-        providerID: "google",
+        providerID: SUPPORTED_PROVIDERS.GOOGLE,
         modelID: "gemini-3-flsh",
-        suggestion: "gemini-3-flash",
+        suggestion: SUPPORTED_MODELS.GEMINI_3_FLASH,
       })
     })
 
@@ -228,7 +229,7 @@ describe("promptWithModelSuggestionRetry", () => {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     })
 
@@ -255,7 +256,7 @@ describe("promptWithModelSuggestionRetry", () => {
       path: { id: "session-dup" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     }
 
@@ -284,7 +285,7 @@ describe("promptWithModelSuggestionRetry", () => {
       path: { id: "session-post-dispatch-hold" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     }
 
@@ -308,7 +309,7 @@ describe("promptWithModelSuggestionRetry", () => {
       path: { id: "session-peer-reservation" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     }
 
@@ -335,7 +336,7 @@ describe("promptWithModelSuggestionRetry", () => {
     const promptMock = mock().mockRejectedValueOnce({
       name: "ProviderModelNotFoundError",
       data: {
-        providerID: "anthropic",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
         modelID: "claude-sonet-4",
         suggestions: ["claude-sonnet-4"],
       },
@@ -350,7 +351,7 @@ describe("promptWithModelSuggestionRetry", () => {
         body: {
           agent: "explore",
           parts: [{ type: "text", text: "hello" }],
-          model: { providerID: "anthropic", modelID: "claude-sonet-4" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonet-4" },
         },
       })
     ).rejects.toThrow()
@@ -372,7 +373,7 @@ describe("promptWithModelSuggestionRetry", () => {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
         },
       })
     ).rejects.toThrow("Connection refused")
@@ -393,7 +394,7 @@ describe("promptWithModelSuggestionRetry", () => {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
         },
       })
     ).rejects.toThrow("Still not found")
@@ -410,7 +411,7 @@ describe("promptWithModelSuggestionRetry", () => {
       path: { id: "session-failed-async-hold" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     }
 
@@ -474,8 +475,8 @@ describe("promptWithModelSuggestionRetry", () => {
         system: "You are a helpful agent",
         tools: { task: false },
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
-        variant: "max",
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
+        variant: SUPPORTED_VARIANTS.MAX,
       },
     })
 
@@ -486,7 +487,7 @@ describe("promptWithModelSuggestionRetry", () => {
     expect(call.body.tools).toEqual({ task: false })
     expect(call.body.variant).toBe("max")
     expect(call.body.model).toEqual({
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-sonnet-4",
     })
   })
@@ -505,7 +506,7 @@ describe("promptWithModelSuggestionRetry", () => {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
         },
       })
     ).rejects.toThrow()
@@ -550,7 +551,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     })
 
@@ -571,7 +572,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
       path: { id: "session-sync-post-dispatch-hold" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     }
 
@@ -613,7 +614,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
         },
       }, { timeoutMs: 1 })
     ).rejects.toThrow("prompt timed out after 1ms")
@@ -631,7 +632,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
       path: { id: "session-sync-ambiguous-eof" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
       },
     })
 
@@ -645,7 +646,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
       .mockRejectedValueOnce({
         name: "ProviderModelNotFoundError",
         data: {
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-sonet-4",
           suggestions: ["claude-sonnet-4"],
         },
@@ -658,7 +659,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
-        model: { providerID: "anthropic", modelID: "claude-sonet-4" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonet-4" },
       },
     })
 
@@ -666,7 +667,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     expect(promptMock).toHaveBeenCalledTimes(2)
     const retryCall = promptMock.mock.calls[1][0]
     expect(retryCall.body.model).toEqual({
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-sonnet-4",
     })
   })
@@ -684,7 +685,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" },
         },
       })
     ).rejects.toThrow("Connection refused")
@@ -697,7 +698,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     const promptMock = mock().mockRejectedValueOnce({
       name: "ProviderModelNotFoundError",
       data: {
-        providerID: "anthropic",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
         modelID: "claude-sonet-4",
         suggestions: ["claude-sonnet-4"],
       },
@@ -730,8 +731,8 @@ describe("promptSyncWithModelSuggestionRetry", () => {
         agent: "multimodal-looker",
         tools: { task: false },
         parts: [{ type: "text", text: "analyze" }],
-        model: { providerID: "google", modelID: "gemini-3-flash" },
-        variant: "max",
+        model: { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_FLASH },
+        variant: SUPPORTED_VARIANTS.MAX,
       },
     })
 

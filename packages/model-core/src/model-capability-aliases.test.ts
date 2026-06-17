@@ -1,14 +1,15 @@
+import { SUPPORTED_MODELS } from "./registry";
 import { describe, expect, test } from "bun:test"
 
 import { resolveModelIDAlias } from "./model-capability-aliases"
 
 describe("model-capability-aliases", () => {
   test("keeps canonical model IDs unchanged", () => {
-    const result = resolveModelIDAlias("gpt-5.4")
+    const result = resolveModelIDAlias(SUPPORTED_MODELS.GPT_5_4)
 
     expect(result).toEqual({
-      requestedModelID: "gpt-5.4",
-      canonicalModelID: "gpt-5.4",
+      requestedModelID: SUPPORTED_MODELS.GPT_5_4,
+      canonicalModelID: SUPPORTED_MODELS.GPT_5_4,
       source: "canonical",
     })
   })
@@ -18,7 +19,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "anthropic/claude-sonnet-4-6",
-      canonicalModelID: "claude-sonnet-4-6",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
       source: "canonical",
     })
   })
@@ -28,7 +29,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "gemini-3.1-pro-high",
-      canonicalModelID: "gemini-3.1-pro",
+      canonicalModelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
       source: "pattern-alias",
       ruleID: "gemini-3.1-pro-tier-alias",
     })
@@ -39,7 +40,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "google/gemini-3.1-pro-high",
-      canonicalModelID: "gemini-3.1-pro",
+      canonicalModelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
       source: "pattern-alias",
       ruleID: "gemini-3.1-pro-tier-alias",
     })
@@ -61,7 +62,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "kimi-for-coding/k2pb",
-      canonicalModelID: "k2p5",
+      canonicalModelID: SUPPORTED_MODELS.KIMI_K2P5,
       source: "exact-alias",
       ruleID: "kimi-k2pb-alias",
     })
@@ -72,7 +73,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "github-copilot/claude-opus-4.7",
-      canonicalModelID: "claude-opus-4.7",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       source: "canonical",
     })
   })
@@ -92,7 +93,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "anthropic/claude-opus-4-7-thinking",
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
     })
@@ -123,7 +124,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "claude-opus-4-7-thinking",
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
     })

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
@@ -379,7 +380,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -457,7 +458,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderModelNotFoundError",
               data: {
-                providerID: "anthropic",
+                providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
                 modelID: "claude-opus-4.7",
                 message: "Model not found: anthropic/claude-opus-4.7.",
               },
@@ -512,7 +513,7 @@ describe("runtime-fallback", () => {
         model?: { providerID?: string; modelID?: string }
         variant?: string
       } | undefined
-      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
       expect(promptBody?.variant).toBe("high")
 
       const bootstrapLog = logCalls.find((call) =>
@@ -573,7 +574,7 @@ describe("runtime-fallback", () => {
         tools?: Record<string, boolean>
         variant?: string
       } | undefined
-      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
       expect(promptBody?.variant).toBe("high")
       expect(promptBody?.system).toBe("delegated child system prompt")
       expect(promptBody?.tools?.question).toBe(false)
@@ -1287,7 +1288,7 @@ describe("runtime-fallback", () => {
         model?: { providerID?: string; modelID?: string }
         variant?: string
       } | undefined
-      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
       expect(promptBody?.variant).toBe("high")
 
       const bootstrapLog = logCalls.find((call) =>
@@ -1340,7 +1341,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -1361,7 +1362,7 @@ describe("runtime-fallback", () => {
               error: {
                 name: "ProviderAuthError",
                 data: {
-                  providerID: "google",
+                  providerID: SUPPORTED_PROVIDERS.GOOGLE,
                   message:
                     "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
                 },
@@ -1495,7 +1496,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -1584,7 +1585,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -1654,7 +1655,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -1670,7 +1671,7 @@ describe("runtime-fallback", () => {
       await hook["chat.message"]?.(
         {
           sessionID,
-          model: { providerID: "github-copilot", modelID: "claude-opus-4.7" },
+          model: { providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, modelID: "claude-opus-4.7" },
         },
         output
       )
@@ -1740,7 +1741,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -1809,7 +1810,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -1957,7 +1958,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -2053,7 +2054,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -2129,7 +2130,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -2206,7 +2207,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -2283,7 +2284,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -2360,7 +2361,7 @@ describe("runtime-fallback", () => {
             error: {
               name: "ProviderAuthError",
               data: {
-                providerID: "google",
+                providerID: SUPPORTED_PROVIDERS.GOOGLE,
                 message:
                   "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
               },
@@ -2638,7 +2639,7 @@ describe("runtime-fallback", () => {
         output
       )
 
-      expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(output.message.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     })
 
     test("should restore configured primary when reopened on a configured fallback model", async () => {
@@ -2664,9 +2665,9 @@ describe("runtime-fallback", () => {
         message: {},
         parts: [],
       }
-      await hook["chat.message"]?.({ sessionID, model: { providerID: "openai", modelID: "gpt-5.4" } }, output)
+      await hook["chat.message"]?.({ sessionID, model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }, output)
 
-      expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+      expect(output.message.model).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-5" })
     })
 
     test("should notify when fallback occurs", async () => {
@@ -2692,7 +2693,7 @@ describe("runtime-fallback", () => {
       })
 
       expect(toastCalls.length).toBe(1)
-      expect(toastCalls[0]?.message.includes("gpt-5.4")).toBe(true)
+      expect(toastCalls[0]?.message.includes(SUPPORTED_MODELS.GPT_5_4)).toBe(true)
     })
   })
 
@@ -2813,7 +2814,7 @@ describe("runtime-fallback", () => {
       expect(promptCalls.length).toBe(1)
       const callBody = promptCalls[0]?.body as Record<string, unknown>
       expect(callBody?.agent).toBe("prometheus")
-      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(callBody?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     })
 
     test("should not dispatch a second fallback prompt while the accepted retry session is still active", async () => {

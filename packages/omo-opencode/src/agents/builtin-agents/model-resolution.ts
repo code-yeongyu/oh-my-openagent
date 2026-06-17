@@ -1,10 +1,11 @@
 import { resolveModelPipeline } from "../../shared"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
+import type { Variant } from "@oh-my-opencode/model-core"
 
 export function applyModelResolution(input: {
   uiSelectedModel?: string
   userModel?: string
-  requirement?: { fallbackChain?: { providers: string[]; model: string; variant?: string }[] }
+  requirement?: { fallbackChain?: { providers: string[]; model: string; variant?: Variant }[] }
   availableModels: Set<string>
   systemDefaultModel?: string
 }) {
@@ -17,7 +18,7 @@ export function applyModelResolution(input: {
 }
 
 export function getFirstFallbackModel(requirement?: {
-  fallbackChain?: { providers: string[]; model: string; variant?: string }[]
+  fallbackChain?: { providers: string[]; model: string; variant?: Variant }[]
 }) {
   const entry = requirement?.fallbackChain?.[0]
   if (!entry || entry.providers.length === 0) return undefined

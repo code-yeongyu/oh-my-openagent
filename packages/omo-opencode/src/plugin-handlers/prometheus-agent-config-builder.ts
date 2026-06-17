@@ -18,7 +18,7 @@ type PrometheusOverride = Record<string, unknown> & {
   textVerbosity?: string;
   thinking?: { type: string; budgetTokens?: number };
   temperature?: number;
-  top_p?: number;
+  topP?: number;
   maxTokens?: number;
   prompt?: string;
   prompt_append?: string;
@@ -91,7 +91,7 @@ export async function buildPrometheusAgentConfig(params: {
   const thinkingToUse = params.pluginPrometheusOverride?.thinking ?? categoryConfig?.thinking;
   const temperatureToUse =
     params.pluginPrometheusOverride?.temperature ?? categoryConfig?.temperature;
-  const topPToUse = params.pluginPrometheusOverride?.top_p ?? categoryConfig?.top_p;
+  const topPToUse = params.pluginPrometheusOverride?.topP ?? categoryConfig?.topP;
   const maxTokensToUse =
     params.pluginPrometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
 
@@ -104,7 +104,7 @@ export async function buildPrometheusAgentConfig(params: {
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
-    ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
+    ...(topPToUse !== undefined ? { topP: topPToUse } : {}),
     ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
     ...(categoryConfig?.tools ? { tools: categoryConfig.tools } : {}),
     ...(thinkingToUse ? { thinking: thinkingToUse } : {}),

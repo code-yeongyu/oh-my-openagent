@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 declare const require: (name: string) => any
 const { afterEach, describe, expect, spyOn, test } = require("bun:test")
 
@@ -127,7 +128,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             },
             parentID: "msg_user_pin_1",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -140,8 +141,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toBeDefined()
     expect(body.agent).toContain("Sisyphus")
     expect(body.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
     })
     expectSyntheticContinuation(body)
   })
@@ -160,7 +161,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
         type: "session.error",
         properties: {
           sessionID,
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-opus-4-7-thinking",
           error: {
             name: "UnknownError",
@@ -181,8 +182,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toBeDefined()
     expect(body.agent?.toLowerCase()).toContain("sisyphus")
     expect(body.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
     })
     expectSyntheticContinuation(body)
   })
@@ -207,7 +208,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             sessionID,
             role: "user",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -238,8 +239,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toBeDefined()
     expect(body.agent).toContain("Sisyphus")
     expect(body.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
     })
     expectSyntheticContinuation(body)
   })
@@ -268,7 +269,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
         type: "session.error",
         properties: {
           sessionID,
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-opus-4-7-thinking",
           error: {
             name: "UnknownError",

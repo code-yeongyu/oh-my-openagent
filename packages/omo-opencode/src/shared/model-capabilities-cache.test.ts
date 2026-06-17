@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
@@ -37,8 +38,8 @@ describe("model-capabilities-cache", () => {
       new Response(JSON.stringify({
         openai: {
           models: {
-            "gpt-5.4": {
-              id: "gpt-5.4",
+            [SUPPORTED_MODELS.GPT_5_4]: {
+              id: SUPPORTED_MODELS.GPT_5_4,
               family: "gpt",
               reasoning: true,
               limit: { output: 128_000 },
@@ -55,7 +56,7 @@ describe("model-capabilities-cache", () => {
     const reloadedStore = createModelCapabilitiesCacheStore(() => testCacheDir)
 
     //#then
-    expect(snapshot.models["gpt-5.4"]?.limit?.output).toBe(128_000)
+    expect(snapshot.models[SUPPORTED_MODELS.GPT_5_4]?.limit?.output).toBe(128_000)
     expect(existsSync(sentinelPath)).toBe(true)
     expect(readFileSync(sentinelPath, "utf-8")).toBe(JSON.stringify({ keep: true }))
     expect(reloadedStore.readModelCapabilitiesCache()).toEqual(snapshot)

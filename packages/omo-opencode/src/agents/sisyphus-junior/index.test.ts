@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import {
   createSisyphusJuniorAgentWithOverrides,
@@ -30,15 +31,15 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.temperature).toBe(0.5)
     })
 
-    test("applies top_p override", () => {
+    test("applies topP override", () => {
       // given
-      const override = { top_p: 0.9 }
+      const override = { topP: 0.9 }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.top_p).toBe(0.9)
+      expect(result.topP).toBe(0.9)
     })
 
     test("applies description override", () => {
@@ -477,7 +478,7 @@ describe("getSisyphusJuniorPromptSource", () => {
 
   test("returns 'kimi-k2' for kimi-k2-5 model", () => {
     // given
-    const model = "kimi-k2.5"
+    const model = SUPPORTED_MODELS.KIMI_K2_5
 
     // when
     const source = getSisyphusJuniorPromptSource(model)
@@ -519,7 +520,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("kimi-k2-7")
   })
 
-  test("returns 'gpt-5-4' for GPT 5.4 models", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_4 for GPT 5.4 models", () => {
     // given
     const model = "openai/gpt-5.4"
 
@@ -530,7 +531,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("gpt-5-4")
   })
 
-  test("returns 'gpt-5-4' for GitHub Copilot GPT 5.4", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_4 for GitHub Copilot GPT 5.4", () => {
     // given
     const model = "github-copilot/gpt-5.4"
 
@@ -541,7 +542,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("gpt-5-4")
   })
 
-  test("returns 'gpt-5-5' for GPT 5.5 models", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_5 for GPT 5.5 models", () => {
     // given
     const model = "openai/gpt-5.5"
 
@@ -552,7 +553,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("gpt-5-5")
   })
 
-  test("returns 'gpt-5-5' for GitHub Copilot GPT 5.5", () => {
+  test("returns SUPPORTED_MODELS.GPT_5_5 for GitHub Copilot GPT 5.5", () => {
     // given
     const model = "github-copilot/gpt-5.5"
 

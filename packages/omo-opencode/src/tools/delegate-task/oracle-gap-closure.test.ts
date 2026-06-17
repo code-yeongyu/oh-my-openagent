@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 declare const require: NodeJS.Require
 
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
@@ -7,7 +8,7 @@ import type { ParentContext } from "./executor-types"
 import * as executor from "./executor"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
-const MODEL = { providerID: "openai", modelID: "gpt-5.4" }
+const MODEL = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 }
 
 function clearRequireCache(modulePath: string): void {
   const resolvedPath = runtimeRequire.resolve(modulePath)
@@ -68,7 +69,7 @@ describe("delegate-task Oracle gap closure", () => {
     await executeSyncContinuation(args, ctx, {
       client: {
         session: {
-          messages: async () => ({ data: [{ info: { agent: "explore", model: MODEL, variant: "max" } }] }),
+          messages: async () => ({ data: [{ info: { agent: "explore", model: MODEL, variant: SUPPORTED_VARIANTS.MAX } }] }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
         },
@@ -80,7 +81,7 @@ describe("delegate-task Oracle gap closure", () => {
 
     //#then
     const published = ctx.captured.find((item) => item.metadata?.sessionId === "ses_cont_variant")
-    expect(published?.metadata?.model).toEqual({ ...MODEL, variant: "max" })
+    expect(published?.metadata?.model).toEqual({ ...MODEL, variant: SUPPORTED_VARIANTS.MAX })
   })
 
   test("#given sync continuation category arg #when result returns task metadata block #then block includes category", async () => {

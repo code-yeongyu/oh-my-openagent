@@ -1,7 +1,8 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeFallbackModels } from "./model-resolver"
-import { KNOWN_VARIANTS } from "./known-variants"
+import { KNOWN_VARIANTS, isKnownVariant } from "./known-variants"
+import { SUPPORTED_PROVIDERS } from "./registry"
 
 function parseVariantFromModel(rawModel: string): { modelID: string; variant?: string } {
   if (typeof rawModel !== "string") {
@@ -23,7 +24,7 @@ function parseVariantFromModel(rawModel: string): { modelID: string; variant?: s
   if (spaceVariant) {
     const modelID = spaceVariant[1]?.trim() ?? ""
     const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant && KNOWN_VARIANTS.has(variant)) {
+    if (isKnownVariant(variant)) {
       return { modelID, variant }
     }
   }
@@ -34,7 +35,7 @@ function parseVariantFromModel(rawModel: string): { modelID: string; variant?: s
 export function parseFallbackModelEntry(
   model: string,
   contextProviderID: string | undefined,
-  defaultProviderID = "opencode",
+  defaultProviderID = SUPPORTED_PROVIDERS.OPENCODE,
 ): FallbackEntry | undefined {
   if (typeof model !== "string") return undefined
   const trimmed = model.trim()
@@ -52,14 +53,14 @@ export function parseFallbackModelEntry(
   return {
     providers: [providerID],
     model: parsed.modelID,
-    variant: parsed.variant,
+    variant: parsed.variant as import("./registry").Variant | undefined,
   }
 }
 
 export function parseFallbackModelObjectEntry(
   obj: FallbackModelObject,
   contextProviderID: string | undefined,
-  defaultProviderID = "opencode",
+  defaultProviderID = SUPPORTED_PROVIDERS.OPENCODE,
 ): FallbackEntry | undefined {
   const base = parseFallbackModelEntry(obj.model, contextProviderID, defaultProviderID)
   if (!base) return undefined
@@ -69,7 +70,7 @@ export function parseFallbackModelObjectEntry(
     variant: obj.variant ?? base.variant,
     reasoningEffort: obj.reasoningEffort,
     temperature: obj.temperature,
-    top_p: obj.top_p,
+    topP: obj.topP,
     maxTokens: obj.maxTokens,
     thinking: obj.thinking,
   }
@@ -109,7 +110,7 @@ export function findMostSpecificFallbackEntry(
 export function buildFallbackChainFromModels(
   fallbackModels: string | (string | FallbackModelObject)[] | undefined,
   contextProviderID: string | undefined,
-  defaultProviderID = "opencode",
+  defaultProviderID = SUPPORTED_PROVIDERS.OPENCODE,
 ): FallbackEntry[] | undefined {
   const normalized = normalizeFallbackModels(fallbackModels)
   if (!normalized || normalized.length === 0) return undefined

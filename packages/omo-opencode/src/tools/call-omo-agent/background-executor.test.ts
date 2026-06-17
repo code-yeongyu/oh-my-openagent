@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 import { describe, test, expect, mock } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
@@ -74,8 +75,8 @@ describe("executeBackground", () => {
   test("passes fallbackChain to background manager launch", async () => {
     //#given
     const fallbackChain = [
-      { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["openai"], model: "gpt-5.5", variant: "high" },
+      { providers: ["quotio"], model: SUPPORTED_MODELS.KIMI_K2_5, variant: undefined },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_5, variant: SUPPORTED_VARIANTS.HIGH },
     ]
     launchMock.mockResolvedValueOnce({
       id: "test-task-id",

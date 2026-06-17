@@ -3,11 +3,12 @@ import type { ProviderAvailability } from "./model-fallback-types"
 import { CLI_AGENT_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
 import { isProviderAvailable } from "./provider-availability"
 import { transformModelForProvider } from "./provider-model-id-transform"
+import type { Variant } from "@oh-my-opencode/model-core"
 
 export function resolveModelFromChain(
 	fallbackChain: FallbackEntry[],
 	availability: ProviderAvailability
-): { model: string; variant?: string } | null {
+): { model: string; variant?: Variant } | null {
 	for (const entry of fallbackChain) {
 		for (const provider of entry.providers) {
 			if (isProviderAvailable(provider, availability)) {

@@ -12,7 +12,7 @@ export const AgentOverrideConfigSchema = z.object({
   /** Skill names to inject into agent prompt */
   skills: z.array(z.string()).optional(),
   temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
+  topP: z.number().min(0).max(1).optional(),
   prompt: z.string().optional(),
   /** Text to append to agent prompt. Supports file:// URIs (file:///abs, file://./rel, file://~/home) */
   prompt_append: z.string().optional(),

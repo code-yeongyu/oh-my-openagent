@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
@@ -17,7 +18,7 @@ function createContextUsageMockContext(inputTokens: number) {
             {
               info: {
                 role: "assistant",
-                providerID: "anthropic",
+                providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
                 modelID: "claude-sonnet-4-5",
                 tokens: {
                   input: inputTokens,

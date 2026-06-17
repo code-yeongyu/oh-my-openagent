@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 const {
   describe: bunDescribe,
   test: bunTest,
@@ -259,9 +260,9 @@ bunDescribe("sendSyncPrompt", () => {
       },
       systemContent: undefined,
       categoryModel: {
-        providerID: "openai",
-        modelID: "gpt-5.4",
-        variant: "medium",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
+        modelID: SUPPORTED_MODELS.GPT_5_4,
+        variant: SUPPORTED_VARIANTS.MEDIUM,
       },
       toastManager: null,
       taskId: undefined,
@@ -274,8 +275,8 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptAsync).toHaveBeenCalled()
     bunExpect(promptArgs.body.agent).toBe("sisyphus-junior")
     bunExpect(promptArgs.body.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
     })
     bunExpect(promptArgs.body.variant).toBe("medium")
   })
@@ -300,12 +301,12 @@ bunDescribe("sendSyncPrompt", () => {
       },
       systemContent: undefined,
       categoryModel: {
-        providerID: "openai",
-        modelID: "gpt-5.4",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
+        modelID: SUPPORTED_MODELS.GPT_5_4,
         variant: "low",
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         temperature: 0.4,
-        top_p: 0.7,
+        topP: 0.7,
         maxTokens: 4096,
         thinking: { type: "disabled" },
       },
@@ -325,12 +326,12 @@ bunDescribe("sendSyncPrompt", () => {
     //#then
     bunExpect(promptWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
     bunExpect(promptArgs.body.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
     })
     bunExpect(promptArgs.body.variant).toBe("low")
     bunExpect(promptArgs.body.options).toEqual({
-      reasoningEffort: "high",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       thinking: { type: "disabled" },
     })
     bunExpect(promptArgs.body.maxOutputTokens).toBe(4096)
@@ -339,7 +340,7 @@ bunDescribe("sendSyncPrompt", () => {
       topP: 0.7,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "disabled" },
       },
     })
@@ -366,8 +367,8 @@ bunDescribe("sendSyncPrompt", () => {
       },
       systemContent: undefined,
       categoryModel: {
-        providerID: "openai",
-        modelID: "gpt-5.4",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
+        modelID: SUPPORTED_MODELS.GPT_5_4,
         temperature: 0.25,
       },
       toastManager: null,

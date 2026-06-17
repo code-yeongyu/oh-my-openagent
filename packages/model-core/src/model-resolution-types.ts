@@ -6,7 +6,7 @@ export interface DelegatedModelConfig {
   variant?: string
   reasoningEffort?: string
   temperature?: number
-  top_p?: number
+  topP?: number
   maxTokens?: number
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
   tools?: Record<string, boolean>

@@ -2,7 +2,7 @@ import type { FallbackEntry } from "./model-requirements"
 import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeModel } from "./model-normalization"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
-import { KNOWN_VARIANTS } from "./known-variants"
+import { KNOWN_VARIANTS, isKnownVariant } from "./known-variants"
 import type { ConnectedProvidersAdapter } from "./connected-providers-cache"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
@@ -97,7 +97,7 @@ export function flattenToFallbackModelStrings(
 				.replace(/\([^()]+\)\s*$/, "")
 				.replace(/\s+([a-z][a-z0-9_-]*)\s*$/i, (match: string, suffix: string) => {
 					const normalized = String(suffix).toLowerCase()
-					return KNOWN_VARIANTS.has(normalized)
+					return isKnownVariant(normalized)
 						? ""
 						: match
 				})

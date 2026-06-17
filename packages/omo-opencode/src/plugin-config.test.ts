@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -209,36 +210,36 @@ describe("mergeConfigs", () => {
 
     it("should union disabled_providers from base and override without duplicates", () => {
       const base = createConfig({
-        disabled_providers: ["github-copilot", "vercel"],
+        disabled_providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.VERCEL],
       });
 
       const override = createConfig({
-        disabled_providers: ["vercel", "anthropic"],
+        disabled_providers: [SUPPORTED_PROVIDERS.VERCEL, SUPPORTED_PROVIDERS.ANTHROPIC],
       });
 
       const result = mergeConfigs(base, override);
 
-      expect(result.disabled_providers).toContain("github-copilot");
-      expect(result.disabled_providers).toContain("vercel");
-      expect(result.disabled_providers).toContain("anthropic");
+      expect(result.disabled_providers).toContain(SUPPORTED_PROVIDERS.GITHUB_COPILOT);
+      expect(result.disabled_providers).toContain(SUPPORTED_PROVIDERS.VERCEL);
+      expect(result.disabled_providers).toContain(SUPPORTED_PROVIDERS.ANTHROPIC);
       expect(result.disabled_providers?.length).toBe(3);
     });
 
     it("should dedupe disabled_providers case-insensitively, preserving first-seen casing", () => {
       const base = createConfig({
-        disabled_providers: ["GitHub-Copilot", "vercel"],
+        disabled_providers: ["GitHub-Copilot", SUPPORTED_PROVIDERS.VERCEL],
       });
 
       const override = createConfig({
-        disabled_providers: ["github-copilot", "VERCEL", "anthropic"],
+        disabled_providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT, "VERCEL", SUPPORTED_PROVIDERS.ANTHROPIC],
       });
 
       const result = mergeConfigs(base, override);
 
       expect(result.disabled_providers).toEqual([
         "GitHub-Copilot",
-        "vercel",
-        "anthropic",
+        SUPPORTED_PROVIDERS.VERCEL,
+        SUPPORTED_PROVIDERS.ANTHROPIC,
       ]);
     });
 
@@ -637,11 +638,11 @@ describe("loadPluginConfig", () => {
       agents: {
         sisyphus: {
           model: "openai/gpt-5.4",
-          variant: "xhigh",
+          variant: SUPPORTED_VARIANTS.XHIGH,
         },
         hephaestus: {
           model: "openai/gpt-5.4",
-          variant: "medium",
+          variant: SUPPORTED_VARIANTS.MEDIUM,
         },
       },
     })
@@ -1198,7 +1199,7 @@ describe("loadPluginConfig", () => {
     writeFileSync(
       join(projectConfigDir, "oh-my-openagent.jsonc"),
       JSON.stringify({
-        disabled_providers: ["github-copilot", "vercel"],
+        disabled_providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.VERCEL],
         agents: {
           hephaestus: {
             model: "github-copilot/gpt-5.5",
@@ -1258,7 +1259,7 @@ describe("loadPluginConfig", () => {
     expect(deep?.fallback_models).toEqual(["openai/gpt-5.5"])
 
     // And the disabled_providers list itself survives merging unchanged.
-    expect(config.disabled_providers).toEqual(["github-copilot", "vercel"])
+    expect(config.disabled_providers).toEqual([SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.VERCEL])
   })
 
   it("is a no-op for chains when disabled_providers is absent", async () => {

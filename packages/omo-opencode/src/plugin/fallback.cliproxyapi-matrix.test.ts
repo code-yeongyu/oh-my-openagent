@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 declare const require: (name: string) => any
 const { afterEach, describe, expect, spyOn, test } = require("bun:test")
 
@@ -59,14 +60,14 @@ function createChatMessageHandlerHooks(
 
 const PRIMARY_MODEL = {
   providerID: PROVIDER_ID,
-  modelID: "claude-opus-4-7",
+  modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
 }
 
 const PRIMARY_MODEL_STRING = `${PRIMARY_MODEL.providerID}/${PRIMARY_MODEL.modelID}`
 
 const FIRST_FALLBACK_MODEL = {
   providerID: PROVIDER_ID,
-  modelID: "claude-sonnet-4-6",
+  modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
 }
 
 const CLIPROXYAPI_FALLBACKS = [

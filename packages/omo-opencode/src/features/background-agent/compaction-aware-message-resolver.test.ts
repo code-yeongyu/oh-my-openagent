@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
@@ -84,7 +85,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       // given
       const message = {
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(message))
 
@@ -94,19 +95,19 @@ describe("findNearestMessageExcludingCompaction", () => {
       // then
       expect(result).not.toBeNull()
       expect(result?.agent).toBe("sisyphus")
-      expect(result?.model?.providerID).toBe("anthropic")
-      expect(result?.model?.modelID).toBe("claude-opus-4-7")
+      expect(result?.model?.providerID).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
+      expect(result?.model?.modelID).toBe(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
     })
 
     test("skips compaction agent messages", () => {
       // given
       const compactionMessage = {
         agent: "compaction",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }
       const validMessage = {
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }
       writeFileSync(join(tempDir, "002.json"), JSON.stringify(compactionMessage))
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(validMessage))
@@ -126,12 +127,12 @@ describe("findNearestMessageExcludingCompaction", () => {
       writeFileSync(join(tempDir, "002.json"), JSON.stringify({
         id: compactionMessageID,
         agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }))
       writeFileSync(join(tempDir, "001.json"), JSON.stringify({
         id: "msg_001",
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       }))
       mkdirSync(partDir, { recursive: true })
       writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
@@ -149,7 +150,7 @@ describe("findNearestMessageExcludingCompaction", () => {
         agent: "hephaestus",
       }
       const messageWithModelOnly = {
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
       }
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(messageWithModelOnly))
       writeFileSync(join(tempDir, "002.json"), JSON.stringify(messageWithAgentOnly))
@@ -189,7 +190,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       const invalidJson = "{ invalid json"
       const validMessage = {
         agent: "oracle",
-        model: { providerID: "google", modelID: "gemini-2-flash" },
+        model: { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: "gemini-2-flash" },
       }
       writeFileSync(join(tempDir, "002.json"), invalidJson)
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(validMessage))
@@ -227,7 +228,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       // given
       writeFileSync(
         join(tempDir, "003.json"),
-        JSON.stringify({ model: { providerID: "anthropic", modelID: "claude-opus-4-1" } }),
+        JSON.stringify({ model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" } }),
       )
       writeFileSync(join(tempDir, "002.json"), JSON.stringify({ agent: "atlas" }))
       writeFileSync(join(tempDir, "001.json"), JSON.stringify({ tools: { bash: true } }))
@@ -238,7 +239,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       // then
       expect(result).toEqual({
         agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
         tools: { bash: true },
       })
     })
@@ -247,7 +248,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       // given
       setCompactionAgentConfigCheckpoint("ses_checkpoint", {
         agent: "sisyphus",
-        model: { providerID: "openai", modelID: "gpt-5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
       })
       writeFileSync(join(tempDir, "001.json"), JSON.stringify({ tools: { bash: true } }))
 
@@ -257,7 +258,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       // then
       expect(result).toEqual({
         agent: "sisyphus",
-        model: { providerID: "openai", modelID: "gpt-5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
         tools: { bash: true },
       })
     })
@@ -269,7 +270,7 @@ describe("resolvePromptContextFromSessionMessages", () => {
     // given
     const messages = [
       { info: { agent: "atlas" } },
-      { info: { model: { providerID: "anthropic", modelID: "claude-opus-4-1" } } },
+      { info: { model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" } } },
       { info: { tools: { bash: true } } },
     ]
 
@@ -279,7 +280,7 @@ describe("resolvePromptContextFromSessionMessages", () => {
     // then
     expect(result).toEqual({
       agent: "atlas",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
       tools: { bash: true },
     })
   })
@@ -289,11 +290,11 @@ describe("resolvePromptContextFromSessionMessages", () => {
     const messages = [
       {
         id: "msg_compaction",
-        info: { agent: "atlas", model: { providerID: "openai", modelID: "gpt-5" } },
+        info: { agent: "atlas", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" } },
         parts: [{ type: "compaction" }],
       },
       { info: { agent: "sisyphus" } },
-      { info: { model: { providerID: "anthropic", modelID: "claude-opus-4-1" } } },
+      { info: { model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" } } },
       { info: { tools: { bash: true } } },
     ]
 
@@ -303,7 +304,7 @@ describe("resolvePromptContextFromSessionMessages", () => {
     // then
     expect(result).toEqual({
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
       tools: { bash: true },
     })
   })

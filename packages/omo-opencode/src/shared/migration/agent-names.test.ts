@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -76,9 +77,9 @@ describe("migrateAgentNames with parenthesized aliases", () => {
     // given
     const legacyAgents = {
       "Sisyphus (Ultraworker)": { model: "claude-opus-4" },
-      "Hephaestus (Deep Agent)": { model: "gpt-5.4" },
+      "Hephaestus (Deep Agent)": { model: SUPPORTED_MODELS.GPT_5_4 },
       "Prometheus (Plan Builder)": { model: "claude-opus-4" },
-      "Atlas (Plan Executor)": { model: "kimi-k2.5" },
+      "Atlas (Plan Executor)": { model: SUPPORTED_MODELS.KIMI_K2_5 },
       "Metis (Plan Consultant)": { model: "claude-opus-4" },
       "Momus (Plan Critic)": { model: "claude-opus-4" },
     }
@@ -89,9 +90,9 @@ describe("migrateAgentNames with parenthesized aliases", () => {
     // then
     expect(changed).toBe(true)
     expect(migrated.sisyphus).toEqual({ model: "claude-opus-4" })
-    expect(migrated.hephaestus).toEqual({ model: "gpt-5.4" })
+    expect(migrated.hephaestus).toEqual({ model: SUPPORTED_MODELS.GPT_5_4 })
     expect(migrated.prometheus).toEqual({ model: "claude-opus-4" })
-    expect(migrated.atlas).toEqual({ model: "kimi-k2.5" })
+    expect(migrated.atlas).toEqual({ model: SUPPORTED_MODELS.KIMI_K2_5 })
     expect(migrated.metis).toEqual({ model: "claude-opus-4" })
     expect(migrated.momus).toEqual({ model: "claude-opus-4" })
     expect(migrated["Sisyphus (Ultraworker)"]).toBeUndefined()

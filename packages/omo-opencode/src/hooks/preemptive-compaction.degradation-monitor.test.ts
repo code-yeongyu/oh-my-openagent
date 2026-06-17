@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
@@ -80,8 +81,8 @@ function buildAssistantUpdate(input: {
           id: input.id,
           role: "assistant",
           sessionID: input.sessionID,
-          providerID: "anthropic",
-          modelID: "claude-sonnet-4-6",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+          modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
           finish: true,
           tokens: { input: 1000, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
           parts: input.parts,

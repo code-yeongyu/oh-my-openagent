@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
 const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -109,13 +110,13 @@ Approach:
 export const GOOGLE_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "visual-engineering",
-    config: { model: "google/gemini-3.1-pro", variant: "high" },
+    config: { model: "google/gemini-3.1-pro", variant: SUPPORTED_VARIANTS.HIGH },
     description: "Frontend, UI/UX, design, styling, animation",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "artistry",
-    config: { model: "google/gemini-3.1-pro", variant: "high" },
+    config: { model: "google/gemini-3.1-pro", variant: SUPPORTED_VARIANTS.HIGH },
     description: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
     promptAppend: ARTISTRY_CATEGORY_PROMPT_APPEND,
   },

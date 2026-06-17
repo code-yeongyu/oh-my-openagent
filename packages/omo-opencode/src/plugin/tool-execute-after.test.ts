@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { beforeEach, describe, expect, it } from "bun:test"
 
 import { clearPendingStore, storeToolMetadata } from "../features/tool-metadata-store"
@@ -94,7 +95,7 @@ describe("createToolExecuteAfterHandler", () => {
   })
   it("#given native session linkage without model #when stored metadata exists #then required task metadata is preserved", async () => {
     // given
-    const model = { providerID: "openai", modelID: "gpt-5.5" }
+    const model = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 }
     storeToolMetadata("ses_parent", "call_model", {
       title: "stored title",
       metadata: { sessionId: "ses_stored", agent: "oracle", model },
