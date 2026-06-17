@@ -61,7 +61,6 @@ export function createToolRegistry(args: {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
-    gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["mouse"]?.model,
     browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
@@ -92,7 +91,6 @@ export function createToolRegistry(args: {
     skills: skillContext.mergedSkills,
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
-    gitMasterConfig: pluginConfig.git_master,
     disabledSkills: skillContext.disabledSkills,
   })
 
