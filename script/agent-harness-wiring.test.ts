@@ -124,3 +124,53 @@ describe("cross-harness env wiring", () => {
     expect(raw).toContain("!.claude/settings.json")
   })
 })
+
+describe("Docker QA harness", () => {
+  test("#given the QA image #when reading .devcontainer/qa.Dockerfile #then it layers latest opencode + codex on the dev image", () => {
+    // given
+    const path = join(REPO_ROOT, ".devcontainer", "qa.Dockerfile")
+
+    // then
+    expect(existsSync(path), ".devcontainer/qa.Dockerfile must exist").toBe(true)
+    const raw = read(path)
+    expect(raw).toContain("FROM omo-dev")
+    expect(raw).toContain("opencode-ai")
+    expect(raw).toContain("@openai/codex")
+  })
+
+  test("#given the QA entrypoint #when reading .devcontainer/qa-entrypoint.sh #then it copies host config from a read-only mount", () => {
+    // given
+    const path = join(REPO_ROOT, ".devcontainer", "qa-entrypoint.sh")
+
+    // then
+    expect(existsSync(path), ".devcontainer/qa-entrypoint.sh must exist").toBe(true)
+    const raw = read(path)
+    expect(raw.startsWith("#!/usr/bin/env bash")).toBe(true)
+    expect(raw).toContain("/mnt/host")
+    expect(raw).toContain("rsync")
+  })
+
+  test("#given the runner #when reading script/agent/qa-docker.sh #then it is disposable with local + Windows fallback", () => {
+    // given
+    const path = join(AGENT_DIR, "qa-docker.sh")
+
+    // then
+    expect(existsSync(path), "script/agent/qa-docker.sh must exist").toBe(true)
+    const raw = read(path)
+    expect(raw).toContain("docker run --rm")
+    expect(raw.toLowerCase()).toContain("windows")
+    expect(raw).toContain(".devcontainer/qa.Dockerfile")
+  })
+
+  test("#given both QA skills #when looking for the docker-qa reference #then each documents the Docker path", () => {
+    // given
+    const oc = join(REPO_ROOT, ".agents", "skills", "opencode-qa", "references", "docker-qa.md")
+    const cx = join(REPO_ROOT, ".claude", "skills", "codex-qa", "references", "docker-qa.md")
+
+    // then
+    expect(existsSync(oc), "opencode-qa needs references/docker-qa.md").toBe(true)
+    expect(existsSync(cx), "codex-qa needs references/docker-qa.md").toBe(true)
+    expect(read(oc)).toContain("qa-docker.sh")
+    expect(read(cx)).toContain("qa-docker.sh")
+  })
+})
