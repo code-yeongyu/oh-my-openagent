@@ -117,12 +117,13 @@ export const TaskSchema = z.object({
   claimedAt: z.number().int().positive().optional(),
 })
 
-const RuntimeStateMemberModelSchema = z.object({
+const BaseRuntimeStateMemberModelSchema = z.object({
   providerID: z.string(),
   modelID: z.string(),
   variant: z.string().optional(),
   reasoningEffort: z.string().optional(),
   temperature: z.number().optional(),
+  topP: z.number().optional(),
   top_p: z.number().optional(),
   maxTokens: z.number().optional(),
   thinking: z.object({
@@ -130,6 +131,16 @@ const RuntimeStateMemberModelSchema = z.object({
     budgetTokens: z.number().int().positive().optional(),
   }).optional(),
 }).strict()
+
+const RuntimeStateMemberModelSchema = BaseRuntimeStateMemberModelSchema.transform(
+  (val): Omit<typeof val, "top_p"> & { topP?: number } => {
+    if (val.top_p !== undefined && val.topP === undefined) {
+      val.topP = val.top_p
+    }
+    const { top_p, ...rest } = val
+    return rest
+  }
+)
 
 const RuntimeStateMemberSchema = z.object({
   name: z.string(),
