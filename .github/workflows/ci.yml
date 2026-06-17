@@ -204,7 +204,6 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility]
     permissions:
       contents: write
     steps:
