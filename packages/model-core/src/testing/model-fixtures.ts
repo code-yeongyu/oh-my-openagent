@@ -1,4 +1,4 @@
-import { SUPPORTED_PROVIDERS as P, SUPPORTED_MODELS as M } from "../registry";
+import { SUPPORTED_PROVIDERS as P } from "../registry";
 
 /** Fake providers for testing — NOT part of the public API. */
 export const TEST_PROVIDERS = {
@@ -11,7 +11,6 @@ export const TEST_PROVIDERS = {
 /** Fake models for testing. */
 export const TEST_MODELS = {
   MYSTERY_MODEL_1: "mystery-model-1",
-  BIG_PICKLE: "big-pickle",
   DEEPSEEK_V4_PRO: "deepseek-v4-pro",
 } as const;
 

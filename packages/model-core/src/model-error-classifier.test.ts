@@ -1,4 +1,4 @@
-import { TEST_PROVIDERS, TEST_MODELS, TEST_QUALIFIED } from "./testing/model-fixtures";
+import { TEST_PROVIDERS } from "./testing/model-fixtures";
 import { SUPPORTED_PROVIDERS } from "./registry";
 declare const require: (name: string) => any
 const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")

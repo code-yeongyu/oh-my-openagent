@@ -63,7 +63,7 @@ export type ModelCapabilities = {
 	}
 	diagnostics: ModelCapabilitiesDiagnostics
 }
-import type { Provider, SupportedModel } from "../registry";
+
 
 export type GetModelCapabilitiesInput = {
 	providerID: Provider

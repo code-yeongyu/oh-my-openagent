@@ -1,4 +1,4 @@
-import { TEST_PROVIDERS, TEST_MODELS, TEST_QUALIFIED } from "./testing/model-fixtures";
+import { TEST_PROVIDERS, TEST_MODELS } from "./testing/model-fixtures";
 import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS, type Variant } from "./registry";
 import { describe, expect, test } from "bun:test"
 
