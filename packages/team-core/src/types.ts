@@ -145,6 +145,10 @@ const RuntimeStateMemberSchema = z.object({
   worktreePath: z.string().optional(),
   lastInjectedTurnMarker: z.string().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
+  /** "dynamic" = re-resolve model per message. "static" = use creation-time model. */
+  modelResolutionMode: z.enum(["static", "dynamic"]).default("static").optional(),
+  /** Category name used for re-resolution when modelResolutionMode is "dynamic". */
+  resolutionCategory: z.string().optional(),
 }).strict()
 
 const RuntimeBoundsSchema = z.object({

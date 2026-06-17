@@ -18,6 +18,10 @@ import { createDelegateTaskPresentation } from "./tool-description"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeNativeSkillInfos, type NativeSkillEntry } from "../skill/native-skills"
 import type { SkillInfo } from "../skill/types"
+import {
+  smartRouteToCategory,
+} from "@oh-my-opencode/delegate-core"
+import { mergeCategories } from "../../shared/merge-categories"
 
 async function loadNativeSkillEntries(
   nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
@@ -128,10 +132,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         return executeSyncContinuation(delegateTaskArgs, ctx, options, parentContext, undefined, continuationSystemContent)
       }
 
-      if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
-        return `Invalid arguments: Must provide either category or subagent_type.`
-      }
-
       let systemDefaultModel: string | undefined
       try {
         const openCodeConfig = await options.client.config.get()
@@ -153,6 +153,21 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let isUnstableAgent = false
       let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
       let maxPromptTokens: number | undefined
+
+      if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
+        // Smart router: infer best category from prompt complexity.
+        // The inferred category flows through the standard resolveCategoryExecution()
+        // pipeline below, gaining fallback chains, promptAppend, unstable agent
+        // detection, and cold-cache handling for free.
+        const enabledCategories = new Set(Object.keys(mergeCategories(options.userCategories)))
+        const route = smartRouteToCategory(delegateTaskArgs.prompt || "", enabledCategories)
+        delegateTaskArgs.category = route.category
+        log("[auto-route] category inferred", {
+          complexity: route.complexity,
+          category: route.category,
+          promptPreview: (delegateTaskArgs.prompt || "").slice(0, 80),
+        })
+      }
 
       if (delegateTaskArgs.category) {
         const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel)
