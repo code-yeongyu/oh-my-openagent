@@ -170,11 +170,6 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
     rejectionMessage:
       "Agent 'smith' is read-only (plan validator). Cannot write to mailbox as team member. Use delegate-task for plan validation instead.",
   },
-  niobe: {
-    verdict: "hard-reject",
-    rejectionMessage:
-      "Agent 'niobe' is read-only (research specialist). Cannot write to mailbox as team member. Use delegate-task for research queries instead.",
-  },
   sentinel: {
     verdict: "hard-reject",
     rejectionMessage:
