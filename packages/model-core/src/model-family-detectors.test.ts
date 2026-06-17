@@ -1,5 +1,5 @@
 import { TEST_QUALIFIED } from "./testing/model-fixtures";
-import { SUPPORTED_MODELS } from "./registry";
+import { SUPPORTED_MODELS, SUPPORTED_PROVIDERS } from "./registry";
 import { describe, expect, test } from "bun:test"
 import {
   isClaudeFable5Model,
