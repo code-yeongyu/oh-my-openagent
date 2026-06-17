@@ -21,6 +21,7 @@ import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 import { MonitorConfigSchema } from "./monitor"
 import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
+import { SilentFallbackGuardConfigSchema } from "./silent-fallback-guard"
 import { TeamModeConfigSchema } from "./team-mode"
 import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
@@ -75,6 +76,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
    * { "enabled": true, "retry_on_errors": [429, 500, 502, 503, 504], "timeout_seconds": 30 }
    */
   runtime_fallback: z.union([z.boolean(), RuntimeFallbackConfigSchema]).optional(),
+  silent_fallback_guard: SilentFallbackGuardConfigSchema.optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   model_capabilities: ModelCapabilitiesConfigSchema.optional(),
