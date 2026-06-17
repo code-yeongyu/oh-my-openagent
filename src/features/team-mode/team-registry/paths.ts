@@ -19,8 +19,14 @@ function getTeamDirectory(baseDir: string, teamName: string, scope: "user" | "pr
   return path.join(baseDir, "teams", teamName)
 }
 
+function expandLeadingTilde(input: string): string {
+  if (input === "~") return homedir()
+  if (input.startsWith(`~${path.sep}`)) return path.join(homedir(), input.slice(2))
+  return input
+}
+
 export function resolveBaseDir(config: TeamModeConfig): string {
-  return config.base_dir ?? path.join(homedir(), ".omo")
+  return expandLeadingTilde(config.base_dir ?? path.join(homedir(), ".omo"))
 }
 
 export function getTeamSpecPath(

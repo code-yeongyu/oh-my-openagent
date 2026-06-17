@@ -54,6 +54,28 @@ describe("paths", () => {
     expect(resolvedBaseDir).toBe("/tmp/test-abc")
   })
 
+  test("resolveBaseDir expands leading tilde to homedir (#5331)", () => {
+    // given - user wrote the natural docs value "~/.omo" expecting shell expansion
+    const config = TeamModeConfigSchema.parse({ base_dir: "~/.omo" })
+
+    // when
+    const resolvedBaseDir = resolveBaseDir(config)
+
+    // then - should be $HOME/.omo, NOT a literal "~" dir in cwd
+    expect(resolvedBaseDir).toBe(path.join(homedir(), ".omo"))
+  })
+
+  test("resolveBaseDir expands tilde with subpath (#5331)", () => {
+    // given - tilde in the middle of a path is left alone; only the leading ~ is expanded
+    const config = TeamModeConfigSchema.parse({ base_dir: "~/.omo/teams" })
+
+    // when
+    const resolvedBaseDir = resolveBaseDir(config)
+
+    // then
+    expect(resolvedBaseDir).toBe(path.join(homedir(), ".omo", "teams"))
+  })
+
   test("discoverTeamSpecs prefers project scope", async () => {
     // given
     const rootDirectory = await createTemporaryRoot()
