@@ -7,26 +7,31 @@ config is loaded, and the container is removed on exit (`docker run --rm`). This
 is the DEFAULT; fall back to running the scripts locally (see SKILL.md) only
 when Docker is unavailable or on Windows.
 
-## Run
+## Use it
 
-From the repo root:
+`qa-docker.sh` brings up a disposable box (builds `omo-dev` then `omo-qa` on
+first use, reused after) and drops you into it. From the repo root:
 
 ```bash
-# smoke: prove the container has the latest codex
-script/agent/qa-docker.sh bash -lc 'codex --version'
+# drive codex via the FIRST-PARTY app-server (no acp): a real turn in the box
+script/agent/qa-docker.sh codex
 
-# drive the app-server / hook probes inside the container
-script/agent/qa-docker.sh bash .claude/skills/codex-qa/scripts/app-server-drive.sh --self-test
-script/agent/qa-docker.sh bash .claude/skills/codex-qa/scripts/hook-unit-probe.sh --self-test
-script/agent/qa-docker.sh bash .claude/skills/codex-qa/scripts/install-verify.sh --self-test
+# fallback: the interactive codex TUI in the box (uses your mounted config)
+script/agent/qa-docker.sh codex --tui
 
-# remove the QA images when done
-script/agent/qa-docker.sh --clean
+# a shell inside the box: codex (and opencode) are on PATH
+script/agent/qa-docker.sh
+script/agent/qa-docker.sh shell
+
+# one-off command, or a codex-qa self-test inside the box:
+script/agent/qa-docker.sh exec codex --version
+script/agent/qa-docker.sh exec bash .claude/skills/codex-qa/scripts/tui-smoke.sh --self-test
+
+script/agent/qa-docker.sh --clean   # remove the QA images
 ```
 
-`qa-docker.sh` builds `omo-dev` (from `.devcontainer/Dockerfile`) then `omo-qa`
-(from `.devcontainer/qa.Dockerfile`, which adds the latest `@openai/codex` +
-`opencode-ai` npm packages plus `sqlite3 jq curl rsync`).
+`omo-qa` is `omo-dev` (`.devcontainer/Dockerfile`) plus the latest `@openai/codex`
+and `opencode-ai` npm packages and `sqlite3 jq curl rsync`.
 
 ## Isolation still applies inside
 

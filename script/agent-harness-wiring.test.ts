@@ -160,6 +160,10 @@ describe("Docker QA harness", () => {
     expect(raw).toContain("docker run --rm")
     expect(raw.toLowerCase()).toContain("windows")
     expect(raw).toContain(".devcontainer/qa.Dockerfile")
+    expect(raw).toContain("serve")
+    expect(raw).toContain("codex")
+    expect(raw).toContain("app-server")
+    expect(raw).toContain("--tui")
   })
 
   test("#given both QA skills #when looking for the docker-qa reference #then each documents the Docker path", () => {
