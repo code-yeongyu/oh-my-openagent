@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentFactory } from "./types"
-import type { CategoriesConfig, CategoryConfig, GitMasterConfig } from "../config/schema"
+import type { CategoriesConfig, CategoryConfig } from "../config/schema"
 import type { BrowserAutomationProvider } from "../config/schema"
 import { mergeCategories } from "../shared/merge-categories"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
@@ -15,7 +15,6 @@ export function buildAgent(
   source: AgentSource,
   model: string,
   categories?: CategoriesConfig,
-  gitMasterConfig?: GitMasterConfig,
   browserProvider?: BrowserAutomationProvider,
   disabledSkills?: Set<string>
 ): AgentConfig {
@@ -39,7 +38,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider, disabledSkills })
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { browserProvider, disabledSkills })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")

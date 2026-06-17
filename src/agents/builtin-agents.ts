@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
-import type { CategoriesConfig, GitMasterConfig } from "../config/schema"
+import type { CategoriesConfig } from "../config/schema"
 import type { LoadedSkill } from "../features/opencode-skill-loader/types"
 import type { BrowserAutomationProvider } from "../config/schema"
 import { createMorpheusAgent } from "./morpheus"
@@ -71,7 +71,6 @@ export async function createBuiltinAgents(
   directory?: string,
   systemDefaultModel?: string,
   categories?: CategoriesConfig,
-  gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
   customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
@@ -115,7 +114,6 @@ export async function createBuiltinAgents(
     directory,
     systemDefaultModel,
     mergedCategories,
-    gitMasterConfig,
     browserProvider,
     uiSelectedModel,
     availableModels,
