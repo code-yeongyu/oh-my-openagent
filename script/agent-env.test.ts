@@ -20,7 +20,9 @@ describe("agent dev-environment scripts", () => {
     test("#given the shared bootstrap #when inspected #then it is an executable strict bash script", () => {
       // given / when / then
       expect(existsSync(setup), "script/agent/setup.sh must exist").toBe(true)
-      expect(isExecutable(setup), "setup.sh must be executable").toBe(true)
+      if (process.platform !== "win32") {
+        expect(isExecutable(setup), "setup.sh must be executable").toBe(true)
+      }
       const body = read(setup)
       expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
       expect(body).toContain("set -euo pipefail")
@@ -49,7 +51,9 @@ describe("agent dev-environment scripts", () => {
     test("#given the teardown #when inspected #then it is an executable strict bash script with a --deep mode", () => {
       // given / when / then
       expect(existsSync(cleanup), "script/agent/cleanup.sh must exist").toBe(true)
-      expect(isExecutable(cleanup), "cleanup.sh must be executable").toBe(true)
+      if (process.platform !== "win32") {
+        expect(isExecutable(cleanup), "cleanup.sh must be executable").toBe(true)
+      }
       const body = read(cleanup)
       expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
       expect(body).toContain("set -euo pipefail")
