@@ -1,16 +1,18 @@
 ---
 name: work-with-pr
-description: "Full PR lifecycle in an isolated git worktree: implement via the ulw-loop skill with mandatory evidence-bound manual QA → detailed English PR → verification loop (CI + review-work reviewers + Cubic, where Cubic is skipped only when its quota is exhausted) → merge by default → worktree cleanup. Unbounded loop: any failing gate sends you back to fix-and-re-QA inside the worktree. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
+description: "Full PR lifecycle in an isolated git worktree: implement via the ulw-loop skill with mandatory evidence-bound manual QA → detailed English PR → verification loop (CI + review-work reviewers + Cubic, where Cubic is skipped only when its quota is exhausted) → merge by default → worktree cleanup. Decomposes one task into the smallest atomic, independently-mergeable PRs and builds the independent ones concurrently via a worktree per PR driven by parallel subagents or a team. Unbounded loop: any failing gate sends you back to fix-and-re-QA inside the worktree. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'split into atomic PRs', 'parallel PRs', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
 ---
 
 # Work With PR — Full PR Lifecycle
 
 You are executing a complete PR lifecycle: from isolated worktree setup, through `ulw-loop`-driven implementation with evidence-bound manual QA, PR creation, and an unbounded verification loop until the PR is merged. The loop has three gates — CI, review-work, and Cubic — and a failing gate sends you back into the worktree to fix and re-QA. You keep cycling until every active gate passes at once.
 
+**The unit of delivery is the smallest PR that compiles, passes, and stands on its own — not "one task, one PR."** A single task routinely splits into several atomic PRs; the lifecycle below describes ONE of them, so apply it to each, and build the independent ones concurrently (Phase 0).
+
 <architecture>
 
 ```
-Phase 0: Setup         → Branch + worktree in sibling directory
+Phase 0: Setup         → Split into atomic PRs, then branch + worktree per PR (parallel when independent)
 Phase 1: Implement     → Drive the work through the ulw-loop skill:
                          evidence-bound manual QA per success criterion, atomic commits
 Phase 2: PR Creation   → Push, create a detailed English PR targeting dev
@@ -28,11 +30,21 @@ Phase 4: Merge         → Merge by default, then worktree cleanup
 
 ## Phase 0: Setup
 
-Create an isolated worktree so the user's main working directory stays clean. This matters because the user may have uncommitted work, and checking out a branch would destroy it.
+Create an isolated worktree so the user's main working directory stays clean — the user may have uncommitted work, and a branch checkout would destroy it. Isolation also makes parallelism cheap: one worktree per PR, so several build at once without colliding.
 
 <setup>
 
-### 1. Resolve repository context
+### 1. Decide the PR split
+
+Before creating anything, decompose the task into the smallest atomic PRs that each compile, pass, and deliver one reviewable slice. Prefer more small PRs over one large one — a 200-line PR gets a real review; a 2000-line PR gets a rubber stamp. Sequence by dependency: independent slices branch off the base and run in parallel; dependent slices stack, each branched off the previous.
+
+Building more than one independent PR concurrently is the recommended default, not an exotic option:
+- **Subagents** — dispatch one background subagent per PR, each owning its own worktree, branch, and the full Phase 0→4 lifecycle.
+- **Team** — for larger fan-outs, form a team (`team_mode`) and assign one member per PR.
+
+When the work is large enough to need a plan (`ulw-plan`), this decomposition is not optional polish: the plan MUST encode the atomic PRs, their dependency order, and which run in parallel as first-class structure.
+
+### 2. Resolve repository context
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
@@ -40,7 +52,7 @@ REPO_NAME=$(basename "$PWD")
 BASE_BRANCH="dev"  # CI blocks PRs to master
 ```
 
-### 2. Create branch
+### 3. Create branch
 
 If user provides a branch name, use it. Otherwise, derive from the task:
 
@@ -51,7 +63,7 @@ git fetch origin "$BASE_BRANCH"
 git branch "$BRANCH_NAME" "origin/$BASE_BRANCH"
 ```
 
-### 3. Create worktree
+### 4. Create worktree
 
 Place worktrees as siblings to the repo — not inside it. This avoids git nested repo issues and keeps the working tree clean.
 
@@ -61,7 +73,7 @@ mkdir -p "$(dirname "$WORKTREE_PATH")"
 git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
 ```
 
-### 4. Set working context
+### 5. Set working context
 
 All subsequent work happens inside the worktree. Install dependencies if needed:
 
@@ -85,7 +97,7 @@ Drive all implementation through the `ulw-loop` skill (your harness's native ult
 
 ### Scope discipline
 
-For bug fixes, stay minimal: fix the bug, add a test, prove it, stop. Do not refactor surrounding code, add config options, or "improve" things that aren't broken — the verification loop catches regressions, and scope creep makes failures harder to isolate.
+Within each PR, stay minimal: deliver its one slice, add the test, prove it, stop. Do not refactor surrounding code, add config options, or "improve" things that aren't broken — that work belongs in its own PR, and scope creep makes failures harder to isolate.
 
 ### Commit strategy
 
@@ -367,5 +379,6 @@ git rebase "origin/$BASE_BRANCH"
 | Fixing unrelated code during verification loop | Scope creep causes new failures | HIGH |
 | Deleting worktree on failure | User loses ability to inspect/resume | HIGH |
 | Ignoring Cubic false positives without justification | Cubic issues should be evaluated, not blindly dismissed | MEDIUM |
+| Bundling independent slices into one big PR | Atomic review dies — a 2000-line PR gets rubber-stamped, regressions hide, and one bad slice blocks all the others | HIGH |
 | Giant single commits | Harder to isolate failures, violates git-master principles | MEDIUM |
 | Not running local checks before push | Wastes CI time on obvious failures | MEDIUM |
