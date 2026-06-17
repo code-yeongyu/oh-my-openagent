@@ -45,7 +45,7 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -132,7 +132,7 @@ jobs:
 
       - name: Build launcher
         if: steps.check.outputs.skip != 'true'
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 5
           max_attempts: 5
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload artifact
         if: steps.check.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-${{ matrix.platform }}
           path: |
@@ -247,7 +247,7 @@ jobs:
       - name: Download artifact
         id: download
         if: steps.check.outputs.skip_all != 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: binary-${{ matrix.platform }}
           path: .
