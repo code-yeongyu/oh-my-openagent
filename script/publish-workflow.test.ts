@@ -37,6 +37,10 @@ function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: 
   return workflow.slice(start, end)
 }
 
+function normalizeWorkflowText(workflow: string): string {
+  return workflow.replace(/\r\n/g, "\n")
+}
+
 function expectBunSetupBeforeLspToolsBuild(workflowSection: string, label: string): void {
   const bunSetupIndex = workflowSection.indexOf("uses: oven-sh/setup-bun@v2")
   const lspBuildIndex = workflowSection.indexOf("name: Build vendored lsp-tools-mcp package")
@@ -141,7 +145,7 @@ describe("test workflows", () => {
 
   test("runs codex compatibility checks on every supported os without serializing build", () => {
     // #given
-    const workflow = readFileSync(ciWorkflowPath, "utf8")
+    const workflow = normalizeWorkflowText(readFileSync(ciWorkflowPath, "utf8"))
     const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
     const buildJob = sliceWorkflowSection(workflow, "  build:", "  draft-release:")
 
