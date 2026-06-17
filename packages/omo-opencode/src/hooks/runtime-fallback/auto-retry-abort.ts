@@ -20,6 +20,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
       releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
         reservedBy: `runtime-fallback:${source}`,
         reservedByPrefix: "runtime-fallback:",
+        supersedeTransientRetryOwners: true,
       })
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
     } catch (error) {
