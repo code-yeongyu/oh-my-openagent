@@ -7,30 +7,33 @@ config is loaded, and the container is removed on exit (`docker run --rm`). This
 is the DEFAULT; fall back to running the scripts locally (see SKILL.md) only
 when Docker is unavailable or on Windows.
 
-## Run
+## Use it
 
-From the repo root:
+`qa-docker.sh` brings up a disposable box (builds `omo-dev` then `omo-qa` on
+first use, reused after) and either drops you into it or serves opencode to
+your host. From the repo root:
 
 ```bash
-# smoke: prove the container has the latest opencode + codex
+# a shell inside the box: just type `opencode ...` or `codex ...`
 script/agent/qa-docker.sh
+script/agent/qa-docker.sh shell
 
-# run any opencode-qa script inside the container
-script/agent/qa-docker.sh bash .agents/skills/opencode-qa/scripts/server-smoke.sh --self-test
-script/agent/qa-docker.sh bash .agents/skills/opencode-qa/scripts/sse-hook-probe.sh --self-test
+# serve opencode's HTTP API to the host, then drive it from OUTSIDE:
+script/agent/qa-docker.sh serve 4096               # terminal 1 (Ctrl-C stops + removes)
+curl http://127.0.0.1:4096/global/health           # host -> {"healthy":true,"version":"1.17.7"}
+opencode run "hi" --attach http://127.0.0.1:4096   # a real turn against the box
 
-# skip the config copy (fastest, for pure version / CLI checks)
-script/agent/qa-docker.sh --no-config bash -lc 'opencode --version'
+# one-off command, or a skill's own self-test, inside:
+script/agent/qa-docker.sh exec opencode --version
+script/agent/qa-docker.sh exec bash .agents/skills/opencode-qa/scripts/server-smoke.sh --self-test
 
-# remove the QA images when done
-script/agent/qa-docker.sh --clean
+script/agent/qa-docker.sh --no-config exec opencode --version   # skip the config copy
+script/agent/qa-docker.sh --clean                               # remove the QA images
 ```
 
-`qa-docker.sh` builds two images on first use and reuses them after: `omo-dev`
-(from `.devcontainer/Dockerfile`) and `omo-qa` (from `.devcontainer/qa.Dockerfile`,
-which adds the latest `opencode-ai` + `@openai/codex` npm packages plus
-`sqlite3 jq curl rsync`). Pin versions with `--build-arg OMO_OPENCODE_VERSION=...`
-on the qa.Dockerfile if you need a specific release.
+`omo-qa` is `omo-dev` (`.devcontainer/Dockerfile`) plus the latest `opencode-ai`
+and `@openai/codex` npm packages and `sqlite3 jq curl rsync`. Pin with
+`--build-arg OMO_OPENCODE_VERSION=...` on the qa.Dockerfile for a specific release.
 
 ## Why the container is the sandbox
 
