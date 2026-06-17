@@ -205,7 +205,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v5
         with:
@@ -242,8 +242,41 @@ jobs:
       - name: Verify dist bundle tests
         run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
 
+  auto-commit-schema:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, codex-compatibility, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
+
+      - name: Build
+        run: bun run build
+
       - name: Auto-commit schema changes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           if git diff --quiet assets/oh-my-opencode.schema.json; then
             echo "No schema changes to commit"
@@ -257,7 +290,7 @@ jobs:
 
   draft-release:
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [test, typecheck, codex-compatibility, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     permissions:
       contents: write

@@ -37,6 +37,14 @@ function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: 
   return workflow.slice(start, end)
 }
 
+function sliceWorkflowSectionToEnd(workflow: string, startMarker: string): string {
+  const start = workflow.indexOf(startMarker)
+  if (start < 0) {
+    throw new Error(`missing workflow section starting at ${startMarker}`)
+  }
+  return workflow.slice(start)
+}
+
 function normalizeWorkflowText(workflow: string): string {
   return workflow.replace(/\r\n/g, "\n")
 }
@@ -147,21 +155,27 @@ describe("test workflows", () => {
     // #given
     const workflow = normalizeWorkflowText(readFileSync(ciWorkflowPath, "utf8"))
     const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
-    const buildJob = sliceWorkflowSection(workflow, "  build:", "  draft-release:")
+    const buildJob = sliceWorkflowSection(workflow, "  build:", "  auto-commit-schema:")
+    const autoCommitSchemaJob = sliceWorkflowSection(workflow, "  auto-commit-schema:", "  draft-release:")
+    const draftReleaseJob = sliceWorkflowSectionToEnd(workflow, "  draft-release:")
 
     // #when
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
     const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
     const buildWaitsForChecks = buildJob.includes("needs:")
-    const draftReleaseWaitsForBuild = workflow.includes("  draft-release:\n    runs-on: ubuntu-latest\n    needs: [build]")
+    const buildHasWritePermission = buildJob.includes("contents: write")
+    const writeGateNeedsAllChecks = autoCommitSchemaJob.includes("needs: [test, typecheck, codex-compatibility, build]")
+    const draftReleaseNeedsAllChecks = draftReleaseJob.includes("needs: [test, typecheck, codex-compatibility, build]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
     expect(hasSupportedOsMatrix, "CI Codex compatibility must cover supported OSes").toBe(true)
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
     expect(buildWaitsForChecks, "Build has no artifact dependency on test/typecheck/codex and must not serialize CI").toBe(false)
-    expect(draftReleaseWaitsForBuild, "Draft release must still wait for the build artifact gate").toBe(true)
+    expect(buildHasWritePermission, "Parallel build must stay read-only; write actions belong behind the all-check gate").toBe(false)
+    expect(writeGateNeedsAllChecks, "Schema auto-commit must wait for all root checks and build").toBe(true)
+    expect(draftReleaseNeedsAllChecks, "Draft release must wait for all root checks and build").toBe(true)
   })
 
   test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
