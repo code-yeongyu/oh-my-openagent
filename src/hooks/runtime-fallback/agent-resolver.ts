@@ -12,7 +12,6 @@ export const AGENT_NAMES = [
   "seraph",
   "smith",
   "cipher",
-  "niobe",
   "mouse",
   "sentinel",
   "zion",

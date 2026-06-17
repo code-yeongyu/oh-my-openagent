@@ -1,6 +1,6 @@
 import type { MatrixxConfig } from "./schema/matrixx-config"
 
-export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate"] as const
+export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate", "go-trio"] as const
 export type ProfileName = (typeof PROFILE_NAMES)[number]
 
 const OPUS = "anthropic/claude-opus-4-6"
@@ -18,7 +18,9 @@ const KIMI_K25 = "opencode-go/kimi-k2.5"
 const DEEPSEEK_PRO = "opencode-go/deepseek-v4-pro"
 const DEEPSEEK_FLASH = "opencode-go/deepseek-v4-flash"
 const GLM_51 = "opencode-go/glm-5.1"
+const MIMO_V25 = "opencode-go/mimo-v2.5"
 const MIMO_PRO = "opencode-go/mimo-v2.5-pro"
+const MINIMAX_M3 = "opencode-go/minimax-m3"
 const MINIMAX_27 = "opencode-go/minimax-m2.7"
 const QWEN_36 = "opencode-go/qwen3.6-plus"
 
@@ -43,7 +45,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       oracle: { model: KIMI_FREE },
       seraph: { model: KIMI_FREE },
       cipher: { model: KIMI_FREE },
-      niobe: { model: KIMI_FREE },
       sentinel: { model: KIMI_FREE },
       architect: { model: KIMI_FREE },
       smith: { model: KIMI_FREE },
@@ -76,7 +77,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: GLM_51 },
       oracle: { model: GLM_51 },
       seraph: { model: GLM_51 },
-      niobe: { model: GLM_51 },
       architect: { model: GLM_51 },
       /* Tier 2 — Deep Workers (Development & Implementation): Kimi K2.6 for complex code */
       keymaker: { model: KIMI_K26 },
@@ -109,7 +109,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: SONNET },
       oracle: { model: HAIKU },
       cipher: { model: HAIKU },
-      niobe: { model: HAIKU },
       sentinel: { model: HAIKU },
       seraph: { model: HAIKU },
       merovingian: { model: HAIKU },
@@ -136,7 +135,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: SONNET },
       oracle: { model: SONNET },
       cipher: { model: SONNET },
-      niobe: { model: SONNET },
       sentinel: { model: SONNET },
       seraph: { model: SONNET },
       merovingian: { model: SONNET },
@@ -163,7 +161,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: OPUS },
       oracle: { model: SONNET },
       cipher: { model: SONNET },
-      niobe: { model: SONNET },
       sentinel: { model: SONNET },
       seraph: { model: OPUS },
       merovingian: { model: SONNET },
@@ -190,7 +187,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: OPUS },
       oracle: { model: OPUS },
       cipher: { model: OPUS },
-      niobe: { model: OPUS },
       sentinel: { model: OPUS },
       seraph: { model: OPUS },
       merovingian: { model: SONNET },
@@ -221,7 +217,7 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: XIAOMI_MIMO_V25_PRO },
       oracle: { model: XIAOMI_MIMO_V25_PRO },
       seraph: { model: XIAOMI_MIMO_V25_PRO },
-      niobe: { model: XIAOMI_MIMO_V25_PRO },
+
       architect: { model: XIAOMI_MIMO_V25_PRO },
       keymaker: { model: XIAOMI_MIMO_V25_PRO },
       cipher: { model: XIAOMI_MIMO_V25_PRO },
@@ -255,7 +251,7 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       morpheus: { model: KIMI_K26 },
       oracle: { model: KIMI_K26 },
       seraph: { model: KIMI_K26 },
-      niobe: { model: KIMI_K26 },
+
       architect: { model: KIMI_K26 },
       keymaker: { model: KIMI_K26 },
       cipher: { model: KIMI_K26 },
@@ -277,6 +273,42 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       "blue-pill": { model: DEEPSEEK_PRO },
       broadcast: { model: DEEPSEEK_PRO },
       "bullet-time": { model: DEEPSEEK_PRO },
+    },
+  },
+  /* Three-model sweet spot using deepseek-v4-flash, minimax-m3, and mimo-v2.5
+   * from the OpenCode Go provider. Minimax-m3 (+128% growth, $2.40/M) handles
+   * orchestration & strategy. Mimo-v2.5 (same price as flash at $0.28/M but
+   * stronger reasoning) covers deep work. DeepSeek V4 Flash (#1 by usage, $0.28/M)
+   * handles high-volume automation. */
+  "go-trio": {
+    agents: {
+      /* Tier 1 — Orchestrators: minimax-m3 for top reasoning & planning */
+      morpheus: { model: MINIMAX_M3 },
+      oracle: { model: MINIMAX_M3 },
+      seraph: { model: MINIMAX_M3 },
+      architect: { model: MINIMAX_M3 },
+      /* Tier 2 — Deep Workers: mimo-v2.5 — same $0.28/M as flash, stronger reasoning */
+      keymaker: { model: MIMO_V25 },
+      cipher: { model: MIMO_V25 },
+      sentinel: { model: MIMO_V25 },
+      smith: { model: MIMO_V25 },
+      merovingian: { model: MIMO_V25 },
+      /* Tier 3 — Automation: deepseek-v4-flash — #1 workhorse, 96% cache ratio */
+      operator: { model: DEEPSEEK_FLASH },
+      trinity: { model: DEEPSEEK_FLASH },
+      construct: { model: DEEPSEEK_FLASH },
+      mouse: { model: DEEPSEEK_FLASH },
+      zion: { model: DEEPSEEK_FLASH },
+    },
+    categories: {
+      source: { model: MINIMAX_M3 },
+      "deep-jack": { model: MINIMAX_M3 },
+      "matrix-bend": { model: MINIMAX_M3 },
+      "red-pill": { model: MIMO_V25 },
+      construct: { model: DEEPSEEK_FLASH },
+      "blue-pill": { model: DEEPSEEK_FLASH },
+      broadcast: { model: DEEPSEEK_FLASH },
+      "bullet-time": { model: DEEPSEEK_FLASH },
     },
   },
 }

@@ -63,6 +63,10 @@ export async function pollSyncSession(
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
     anchorMessageCount?: number
+    /** Callback: does the parent session still have running background children? */
+    hasActiveChildBackgroundTasks?: () => boolean
+    /** Callback: is there a pending parent-wake notification in flight? */
+    hasPendingParentWake?: () => boolean
   }
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
@@ -108,6 +112,16 @@ export async function pollSyncSession(
     }
 
     if (sessionStatus && sessionStatus.type !== "idle") {
+      idleStallCount = 0
+      lastMsgCount = 0
+      stableIdlePolls = 0
+      continue
+    }
+
+    // Race-condition guard: if the parent session still has running background
+    // children, or a parent-wake notification is in-flight, keep polling instead
+    // of prematurely concluding the session is done.
+    if (input.hasActiveChildBackgroundTasks?.() || input.hasPendingParentWake?.()) {
       idleStallCount = 0
       lastMsgCount = 0
       stableIdlePolls = 0

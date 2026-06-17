@@ -245,7 +245,7 @@ Or disable via `disabled_agents` in `~/.config/opencode/matrixx.json` or `.openc
 }
 ```
 
-Available agents: `morpheus`, `oracle`, `merovingian`, `operator`, `trinity`, `construct`, `seraph`, `smith`, `architect`, `cipher`, `niobe`
+Available agents: `morpheus`, `oracle`, `merovingian`, `operator`, `trinity`, `construct`, `seraph`, `smith`, `architect`, `cipher`
 
 ## Built-in Skills
 

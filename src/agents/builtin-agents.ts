@@ -12,7 +12,7 @@ import { createSeraphAgent, seraphPromptMetadata } from "./seraph"
 import { createAtlasAgent, atlasPromptMetadata } from "./architect"
 import { createSmithAgent, smithPromptMetadata } from "./smith"
 import { createCipherAgent, CIPHER_PROMPT_METADATA } from "./cipher"
-import { createNiobeAgent, NIOBE_PROMPT_METADATA } from "./niobe"
+
 import { createSentinelAgent, SENTINEL_PROMPT_METADATA } from "./sentinel"
 import { createZionAgent, ZION_PROMPT_METADATA } from "./zion"
 import { createKeymakerAgent } from "./keymaker"
@@ -44,7 +44,6 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   smith: createSmithAgent,
   architect: createAtlasAgent as AgentFactory,
   cipher: createCipherAgent,
-  niobe: createNiobeAgent,
   sentinel: createSentinelAgent,
   zion: createZionAgent,
 }
@@ -62,7 +61,6 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   smith: smithPromptMetadata,
   architect: atlasPromptMetadata,
   cipher: CIPHER_PROMPT_METADATA,
-  niobe: NIOBE_PROMPT_METADATA,
   sentinel: SENTINEL_PROMPT_METADATA,
   zion: ZION_PROMPT_METADATA,
 }
