@@ -173,6 +173,10 @@ production code before its failing test → rewrite.
 Never guess from memory — locate with the right tool, and re-read before
 you claim or change. Fire 3+ independent lookups in one action;
 serialize only when one output strictly feeds the next.
+- CodeGraph, when `codegraph_*` tools exist -> use `codegraph_explore`
+  first for how/where/what/flow questions and before edits; if absent,
+  inactive/uninitialized, or cold-start unavailable, keep moving with
+  Read/Grep/Glob/LSP and the ast-grep skill.
 - Repo-wide inspection, CLI smoke tests, git/history, bounded command
   output → prefer `omo sparkshell <command>` before raw shell commands
   (use `omo sparkshell --shell '<cmd>'` only when shell metacharacters
@@ -183,7 +187,7 @@ serialize only when one output strictly feeds the next.
   `lsp_diagnostics`. Use the LSP, not text search, for anything
   symbol-shaped.
 - Structural shapes — call/function/class/import patterns, codemods →
-  `ast_grep_search` with `$VAR` / `$$$` metavars.
+  the `ast-grep` skill or `sg` CLI with `$VAR` / `$$$` metavars.
 - Text / strings / comments / logs → `rg`. File-name discovery →
   `glob` / `find`. Verbatim content → `read`.
 When discovery needs multiple angles or the module layout is

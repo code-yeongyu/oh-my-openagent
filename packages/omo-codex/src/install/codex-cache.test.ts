@@ -38,7 +38,6 @@ describe("codex-cache", () => {
       join(cacheRoot, ".mcp.json"),
       JSON.stringify({
         mcpServers: {
-          ast_grep: { cwd: ".", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
           custom: { args: ["/usr/local/bin/custom-mcp", "--stdio"] },
           git_bash: { cwd: ".", args: ["../../git-bash-mcp/dist/cli.js", "mcp"] },
           lsp: { cwd: ".", args: ["../../lsp-daemon/dist/cli.js", "mcp"] },
@@ -52,15 +51,12 @@ describe("codex-cache", () => {
     // then
     const rewritten = JSON.parse(await readFile(join(cacheRoot, ".mcp.json"), "utf8")) as {
       mcpServers: {
-        ast_grep: { cwd?: string; args: string[] }
         custom: { args: string[] }
         git_bash: { cwd?: string; args: string[] }
         lsp: { cwd?: string; args: string[] }
       }
     }
-    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["ast_grep", "custom", "git_bash", "lsp"])
-    expect(rewritten.mcpServers.ast_grep.cwd).toBeUndefined()
-    expect(rewritten.mcpServers.ast_grep.args[0]).toBe(join(cacheRoot, "components", "ast-grep-mcp", "dist", "cli.js"))
+    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["custom", "git_bash", "lsp"])
     expect(rewritten.mcpServers.custom.args).toEqual(["/usr/local/bin/custom-mcp", "--stdio"])
     expect(rewritten.mcpServers.git_bash.cwd).toBeUndefined()
     expect(rewritten.mcpServers.git_bash.args[0]).toBe(join(cacheRoot, "components", "git-bash-mcp", "dist", "cli.js"))

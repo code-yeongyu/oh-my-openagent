@@ -12,6 +12,8 @@ const WINDOWS_GIT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe"
 const LSP_CLI_PATH = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "cli.js")
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T> {
   let lspCliAlreadyPresent = true
   try {
@@ -92,6 +94,7 @@ describe("install-codex Git Bash preflight", () => {
       binDir,
       repoRoot: process.cwd(),
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => resolutions[resolveCallCount++] ?? resolutions[resolutions.length - 1],
       runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
         runCalls.push([command, ...args, options.cwd].join(" "))
@@ -116,6 +119,7 @@ describe("install-codex Git Bash preflight", () => {
       binDir,
       repoRoot: process.cwd(),
       platform: "linux",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
       runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
         runCalls.push([command, ...args, options.cwd].join(" "))
@@ -138,6 +142,7 @@ describe("install-codex Git Bash preflight", () => {
       binDir,
       repoRoot: process.cwd(),
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
       runCommand: async () => undefined,
     }))
@@ -160,6 +165,7 @@ describe("install-codex Git Bash preflight", () => {
       binDir,
       repoRoot: process.cwd(),
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       env: { OMO_CODEX_GIT_BASH_PATH: gitBashPath },
       runCommand: async () => undefined,
     }))
@@ -179,6 +185,7 @@ describe("install-codex Git Bash preflight", () => {
       binDir,
       repoRoot: process.cwd(),
       platform: "linux",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({
         found: false,
         checkedPaths: [WINDOWS_GIT_BASH_PATH],

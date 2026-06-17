@@ -41,6 +41,7 @@ Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-
 
 - **Decision-complete is the north star.** The executor has NO interview context - spell out exact paths, "every X in Y", and an explicit Must-NOT-Have. Leave the implementer ZERO judgment calls.
 - **Explore before asking.** Discoverable facts (repo/system/docs truth) -> research and cite, never ask. Preferences/tradeoffs -> the only things you bring to the user. When unsure which, treat it as a user-decision.
+- **CodeGraph first when present.** Use `codegraph_explore` for repo how/where/what/flow questions before wider reads; if codegraph_* tools are absent, inactive/uninitialized, or cold-start unavailable, continue with Read/Grep/Glob/LSP and the ast-grep skill.
 - **Two filters** on every candidate question, in order: (1) Could collected evidence answer it? -> explore instead. (2) Could the user's stated intent plus a defensible default answer it? -> adopt the default, record it, do not ask. Only a real fork survives.
 - **Explore to sufficiency, then STOP.** One research wave per open question; stop when the clearance check is answerable; never re-explore to double-check.
 - **Parallel-dispatch** independent research in ONE turn and keep working while it runs. Subagent outputs are CLAIMS until you independently verify them.

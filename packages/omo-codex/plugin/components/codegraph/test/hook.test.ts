@@ -197,6 +197,42 @@ describe("CodeGraph SessionStart hook", () => {
 		}
 	});
 
+	it("#given an unsupported local Node #when worker runs #then it skips codegraph without resolving or provisioning", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-home-"));
+		const outcomes: unknown[] = [];
+
+		try {
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				cwd: workspace,
+				env: { HOME: homeDir },
+				nodeVersion: "26.3.0",
+				logOutcome: (outcome) => outcomes.push(outcome),
+				deps: {
+					resolveCommand: () => {
+						throw new Error("resolveCommand should not run on unsupported Node");
+					},
+					ensureProvisioned: () => {
+						throw new Error("ensureProvisioned should not run on unsupported Node");
+					},
+					runCommand: () => {
+						throw new Error("runCommand should not run on unsupported Node");
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "skipped-unsupported-node" });
+			expect(existsSync(join(workspace, ".codegraph"))).toBe(false);
+			expect(outcomes).toEqual([{ action: "skipped-unsupported-node", projectRoot: workspace }]);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
+
 	it("#given CodeGraph cannot be resolved or provisioned #when worker runs #then it logs a graceful skip", async () => {
 		// given
 		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-"));
@@ -209,6 +245,7 @@ describe("CodeGraph SessionStart hook", () => {
 			const result = await runCodegraphSessionStartWorker({
 				cwd: workspace,
 				env: { HOME: homeDir },
+				nodeVersion: "22.14.0",
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
 					ensureGitignored: () => {
@@ -261,6 +298,7 @@ describe("CodeGraph SessionStart hook", () => {
 			// when
 			const result = await runCodegraphSessionStartWorker({
 				config: { codegraph: { auto_provision: false, enabled: true }, sources: [], warnings: [] },
+				nodeVersion: "22.14.0",
 				cwd: workspace,
 				env: { HOME: homeDir },
 				logOutcome: (outcome) => outcomes.push(outcome),
@@ -309,6 +347,7 @@ describe("CodeGraph SessionStart hook", () => {
 				// when
 				const result = await runCodegraphSessionStartWorker({
 					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
+					nodeVersion: "22.14.0",
 					cwd: workspace,
 					env: { HOME: homeDir },
 					logOutcome: (outcome) => outcomes.push(outcome),
@@ -390,6 +429,7 @@ describe("CodeGraph SessionStart hook", () => {
 				// when
 				const result = await runCodegraphSessionStartWorker({
 					config: { codegraph: { enabled: true, install_dir: "/tmp/codegraph-install" }, sources: [], warnings: [] },
+					nodeVersion: "22.14.0",
 					cwd: workspace,
 					env: { HOME: homeDir },
 					logOutcome: (outcome) => outcomes.push(outcome),

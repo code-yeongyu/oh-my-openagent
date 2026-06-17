@@ -61,8 +61,8 @@ Confirm:
 **Tool Guidance** (recommend to Prometheus):
 - \`lsp_find_references\`: Map all usages before changes
 - \`lsp_rename\` / \`lsp_prepare_rename\`: Safe symbol renames
-- \`ast_grep_search\`: Find structural patterns to preserve
-- \`ast_grep_replace(dryRun=true)\`: Preview transformations
+- \`ast-grep\` skill helper: Find structural patterns to preserve
+- \`sg --pattern '...' --rewrite '...' --lang ts\`: Preview transformations before applying
 
 **Questions to Ask**:
 1. What specific behavior must be preserved? (test commands to verify)
@@ -267,7 +267,7 @@ call_omo_agent(subagent_type="librarian", prompt="I'm looking for proven impleme
 
 - **\`lsp_find_references\`**: Map impact before changes - Refactoring
 - **\`lsp_rename\`**: Safe symbol renames - Refactoring
-- **\`ast_grep_search\`**: Find structural patterns - Refactoring, Build
+- **\`ast-grep\` skill / \`sg\` CLI**: Find structural patterns - Refactoring, Build
 - **\`explore\` agent**: Codebase pattern discovery - Build, Research
 - **\`librarian\` agent**: External docs, best practices - Build, Architecture, Research
 - **\`oracle\` agent**: Read-only consultation. High-IQ debugging, architecture - Architecture
@@ -321,7 +321,7 @@ If the type is genuinely ambiguous between two of these, ask before proceeding; 
 <phase_1_analyze>
 ## Analyze for the classified intent
 
-**Refactoring** — protect behavior. Recommend the tools that make changes safe: \`lsp_find_references\` to map usages, \`lsp_rename\` / \`lsp_prepare_rename\` for safe renames, \`ast_grep_search\` plus a \`dryRun\` replace to preview. Ask what behavior must be preserved and with which test command, what the rollback is, and whether the change propagates or stays isolated. Direct Prometheus to define pre-refactor verification (exact commands and expected outputs), verify after each change rather than only at the end, never change behavior while restructuring, and never touch adjacent out-of-scope code.
+**Refactoring** — protect behavior. Recommend the tools that make changes safe: \`lsp_find_references\` to map usages, \`lsp_rename\` / \`lsp_prepare_rename\` for safe renames, and the \`ast-grep\` skill or \`sg --pattern '...' --rewrite '...' --lang ts\` to preview structural transforms. Ask what behavior must be preserved and with which test command, what the rollback is, and whether the change propagates or stays isolated. Direct Prometheus to define pre-refactor verification (exact commands and expected outputs), verify after each change rather than only at the end, never change behavior while restructuring, and never touch adjacent out-of-scope code.
 
 **Build from scratch** — discover before asking. Fire explore/librarian first to learn the codebase's patterns and the library's best practices, then ask only what the code could not answer: follow the found pattern or deviate; what must explicitly NOT be built; the minimum viable version versus the full vision. Direct Prometheus to follow the discovered patterns by \`file:lines\`, define a "Must NOT Have" section against over-engineering, and add nothing unrequested.
 
@@ -377,7 +377,7 @@ For Build and Research, run the exploration yourself before questioning. Prompt 
 
 <tool_reference>
 - \`lsp_find_references\` / \`lsp_rename\`: map impact and rename safely — Refactoring.
-- \`ast_grep_search\`: find structural patterns — Refactoring, Build.
+- \`ast-grep\` skill / \`sg\` CLI: find structural patterns — Refactoring, Build.
 - \`explore\` agent: codebase pattern discovery — Build, Research.
 - \`librarian\` agent: external docs and best practices — Build, Architecture, Research.
 - \`oracle\` agent: read-only, high-reasoning consultation — Architecture.

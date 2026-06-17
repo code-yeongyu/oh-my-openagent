@@ -9,7 +9,6 @@ import { stampGitBashMcpEnv } from "./install-dist/install-local.mjs";
 const MANIFEST = `${JSON.stringify(
 	{
 		mcpServers: {
-			ast_grep: { command: "node", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
 			git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"] },
 		},
 	},
@@ -36,7 +35,7 @@ test("#given win32 install with OMO_CODEX_GIT_BASH_PATH set #when stamping #then
 	assert.equal(changed, true);
 	const parsed = JSON.parse(await readFile(join(pluginRoot, ".mcp.json"), "utf8"));
 	assert.deepEqual(parsed.mcpServers.git_bash.env, { OMO_CODEX_GIT_BASH_PATH: "D:\\Git\\bin\\bash.exe" });
-	assert.equal(parsed.mcpServers.ast_grep.env, undefined);
+	assert.equal(Object.hasOwn(parsed.mcpServers, "ast_grep"), false);
 });
 
 test("#given the override is unset #when stamping #then the manifest stays byte-identical", async (t) => {
@@ -79,7 +78,7 @@ test("#given the override already stamped #when stamping again #then nothing cha
 test("#given a manifest without a git_bash server #when stamping #then the manifest stays byte-identical", async (t) => {
 	const pluginRoot = await mkdtemp(join(tmpdir(), "git-bash-mcp-env-"));
 	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
-	const manifest = `${JSON.stringify({ mcpServers: { ast_grep: { command: "node" } } }, null, "\t")}\n`;
+	const manifest = `${JSON.stringify({ mcpServers: { codegraph: { command: "node" } } }, null, "\t")}\n`;
 	await writeFile(join(pluginRoot, ".mcp.json"), manifest);
 
 	const changed = await stampGitBashMcpEnv({

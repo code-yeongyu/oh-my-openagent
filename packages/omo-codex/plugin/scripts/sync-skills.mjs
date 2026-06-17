@@ -161,7 +161,7 @@ async function adaptSkillForCodex(skillName) {
 }
 
 async function syncSkills() {
-	await rm(skillsRoot, { recursive: true, force: true });
+	await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	await mkdir(skillsRoot, { recursive: true });
 
 	for (const [name, source] of skillSources) {

@@ -189,6 +189,9 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 		criteriaCoverage: {
 			totalCriteria,
 			passCount,
+			originalIntent: textField(coverage["originalIntent"], "criteriaCoverage.originalIntent"),
+			desiredOutcome: textField(coverage["desiredOutcome"], "criteriaCoverage.desiredOutcome"),
+			userOutcomeReview: textField(coverage["userOutcomeReview"], "criteriaCoverage.userOutcomeReview"),
 			adversarialClassesCovered: stringArray(
 				coverage["adversarialClassesCovered"],
 				"criteriaCoverage.adversarialClassesCovered",

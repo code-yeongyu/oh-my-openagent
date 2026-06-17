@@ -9,6 +9,8 @@ import { runCodexInstaller } from "./install-codex"
 
 const resolveTestGitBash = () => ({ found: true, path: "C:\\Git\\bin\\bash.exe", source: "env" }) as const
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 async function createPackagedCodexRepoRoot(): Promise<string> {
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-cleanup-repo-"))
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
@@ -68,6 +70,7 @@ describe("install-codex project-local cleanup", () => {
       repoRoot,
       projectDirectory,
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: resolveTestGitBash,
       runCommand: async () => undefined,
     })
@@ -115,6 +118,7 @@ describe("install-codex project-local cleanup", () => {
       repoRoot,
       projectDirectory,
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: resolveTestGitBash,
       runCommand: async () => undefined,
     })
@@ -144,6 +148,7 @@ describe("install-codex project-local cleanup", () => {
       repoRoot,
       projectDirectory,
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: resolveTestGitBash,
       runCommand: async () => undefined,
       log: (message) => logs.push(message),

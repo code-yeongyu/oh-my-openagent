@@ -1,0 +1,1 @@
+upstream: https://github.com/code-yeongyu/ast-grep-skill @ 3148c69 (ast-grep 0.43.0). Vendored as a sync; do not fork-drift.

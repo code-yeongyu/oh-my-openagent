@@ -82,6 +82,9 @@ export async function qualityGateJson(repoRoot: string, cliArtifactPath = CLI_PA
 		criteriaCoverage: {
 			totalCriteria: 2,
 			passCount: 2,
+			originalIntent: "User wanted a final checkpoint that only accepts artifact-backed completion.",
+			desiredOutcome: "Checkpoint completes only after code review, manual QA, and gate review all pass.",
+			userOutcomeReview: "The artifacts show the requested checkpoint behavior from the user's perspective.",
 			adversarialClassesCovered: ["missing_artifact", "role_mismatch"],
 		},
 	});

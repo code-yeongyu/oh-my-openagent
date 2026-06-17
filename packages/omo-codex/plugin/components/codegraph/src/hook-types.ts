@@ -10,7 +10,7 @@ import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparati
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 
 export type SessionStartAction = "skipped-disabled" | "spawned";
-export type WorkerAction = "failed" | "initialized" | "skipped-disabled" | "skipped-status" | "skipped-unavailable" | "synced";
+export type WorkerAction = "failed" | "initialized" | "skipped-disabled" | "skipped-status" | "skipped-unavailable" | "skipped-unsupported-node" | "synced";
 
 export interface WorkerSpawnInvocation {
 	readonly args: readonly string[];
@@ -79,4 +79,5 @@ export interface SessionStartWorkerOptions {
 	readonly deps?: Partial<CodegraphSessionStartDeps>;
 	readonly env?: Record<string, string | undefined>;
 	readonly logOutcome?: (outcome: CodegraphSessionStartOutcome) => void;
+	readonly nodeVersion?: string;
 }

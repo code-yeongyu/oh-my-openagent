@@ -112,6 +112,9 @@
 	"criteriaCoverage": {
 		"totalCriteria": 9,
 		"passCount": 9,
+		"originalIntent": "User wanted the final quality gate to accept only artifact-backed completion.",
+		"desiredOutcome": "The validator rejects weak gates and stores a complete, review-backed approval record.",
+		"userOutcomeReview": "From the user's perspective, every intended outcome is covered by evidence and review artifacts.",
 		"adversarialClassesCovered": ["malformed_input", "stale_state", "dirty_worktree", "misleading_success_output"]
 	}
 }

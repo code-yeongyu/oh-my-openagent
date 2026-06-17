@@ -11,12 +11,6 @@ listed as a shipped codex component here.
 
 ## Components
 
-### @ast-grep/cli binary payload@0.42.3
-- License: MIT, from root dependency metadata and the root third-party notice.
-- Copyright: ast-grep contributors.
-- Upstream URL: https://github.com/ast-grep/ast-grep
-- Where-bundled: AST-grep MCP runtime payload used by the codex plugin MCP surface and bootstrap provisioning manifests.
-
 ### @code-yeongyu/comment-checker@0.8.0
 - License: MIT, from package metadata and the root third-party notice.
 - Copyright: Yeongyu Kim and contributors.
@@ -68,11 +62,6 @@ listed as a shipped codex component here.
 - License: MIT, from `packages/lsp-tools-mcp/LICENSE`.
 - Notice: `packages/lsp-tools-mcp/NOTICE`.
 - Where-bundled: LSP MCP runtime built and copied by codex marketplace sync and root package layout.
-
-### @oh-my-opencode/ast-grep-mcp@0.0.0
-- License: project license plus third-party ast-grep notices in the root notice.
-- Copyright: Yeongyu Kim and contributors.
-- Where-bundled: Codex plugin `ast_grep` MCP server runtime.
 
 ### @oh-my-opencode/boulder-state@0.1.0
 - License: project license.
