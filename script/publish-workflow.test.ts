@@ -164,7 +164,7 @@ describe("test workflows", () => {
     const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
     const buildWaitsForChecks = buildJob.includes("needs:")
-    const buildHasWritePermission = buildJob.includes("contents: write")
+    const buildHasReadOnlyContentsPermission = buildJob.includes("permissions:\n      contents: read")
     const writeGateNeedsAllChecks = autoCommitSchemaJob.includes("needs: [test, typecheck, codex-compatibility, build]")
     const draftReleaseNeedsAllChecks = draftReleaseJob.includes("needs: [test, typecheck, codex-compatibility, build]")
 
@@ -173,7 +173,7 @@ describe("test workflows", () => {
     expect(hasSupportedOsMatrix, "CI Codex compatibility must cover supported OSes").toBe(true)
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
     expect(buildWaitsForChecks, "Build has no artifact dependency on test/typecheck/codex and must not serialize CI").toBe(false)
-    expect(buildHasWritePermission, "Parallel build must stay read-only; write actions belong behind the all-check gate").toBe(false)
+    expect(buildHasReadOnlyContentsPermission, "Parallel build must explicitly stay read-only; write actions belong behind the all-check gate").toBe(true)
     expect(writeGateNeedsAllChecks, "Schema auto-commit must wait for all root checks and build").toBe(true)
     expect(draftReleaseNeedsAllChecks, "Draft release must wait for all root checks and build").toBe(true)
   })
