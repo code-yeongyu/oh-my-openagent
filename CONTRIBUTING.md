@@ -19,6 +19,7 @@ First off, thanks for taking the time to contribute! This document provides guid
   - [Adding a New Tool](#adding-a-new-tool)
   - [Adding a New MCP Server](#adding-a-new-mcp-server)
 - [Pull Request Process](#pull-request-process)
+  - [Branch Naming](#branch-naming)
 - [Publishing](#publishing)
 - [Getting Help](#getting-help)
 
@@ -240,6 +241,23 @@ export function createMyHook(input: PluginInput) {
    - Reference issues if applicable ("Fix #123")
 6. **Push** to your fork and create a Pull Request
 7. **Describe** your changes clearly in the PR description
+
+### Branch Naming
+
+Use short, issue-linked branch names when possible:
+
+```text
+<type>/<issue-number>-<short-slug>
+```
+
+Good examples:
+
+- `fix/123-handle-missing-config`
+- `feat/456-add-runtime-check`
+- `docs/3103-branch-naming`
+- `chore/789-update-ci-cache`
+
+Choose a type that matches the work, such as `fix`, `feat`, `docs`, `test`, `refactor`, or `chore`. Keep the slug lowercase and descriptive enough to recognize in the branch list.
 
 ### PR Checklist
 
