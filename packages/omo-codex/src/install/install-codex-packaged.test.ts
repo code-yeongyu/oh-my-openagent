@@ -7,6 +7,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 test("#given packaged lazycodex tarball layout #when installing Codex plugin #then uses bundled artifacts without source builds", async () => {
   // given
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-"))
@@ -90,6 +92,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
     binDir,
     repoRoot,
     platform: "linux",
+    astGrepInstaller: skipAstGrepInstall,
     runCommand: async (command, args, options) => {
       commands.push([command, args.join(" "), options.cwd])
     },
@@ -178,6 +181,7 @@ test("#given packaged lazycodex tarball layout #when simulating Windows install 
     binDir,
     repoRoot,
     platform: "win32",
+    astGrepInstaller: skipAstGrepInstall,
     gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
     runCommand: async () => undefined,
   })

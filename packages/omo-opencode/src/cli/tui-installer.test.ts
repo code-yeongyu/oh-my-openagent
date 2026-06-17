@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as p from "@clack/prompts"
 import * as configManager from "./config-manager"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import * as starRequest from "./star-request"
 import * as tuiInstallPrompts from "./tui-install-prompts"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
@@ -31,11 +32,13 @@ describe("runTuiInstaller", () => {
   beforeEach(() => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true })
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: originalIsStdinTty })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: originalIsStdoutTty })
+    mock.restore()
   })
 
   it("blocks installation when OpenCode is below the minimum version", async () => {

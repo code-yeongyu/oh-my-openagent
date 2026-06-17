@@ -9,6 +9,8 @@ import { runCodexInstaller } from "./install-codex"
 
 const INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS = 20_000
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 const LEGACY_MANAGED_ULTRAWORK_REVIEWER_TOML = `name = "codex-ultrawork-reviewer"
 description = "Strict ultrawork verification reviewer. Use after full QA evidence to audit the diff, goal, and scenario evidence before declaring done."
 nickname_candidates = ["Verifier"]
@@ -54,7 +56,7 @@ describe("install-codex legacy agent purge", () => {
     await writeFile(join(agentsDir, "user-custom.toml"), 'name = "user-custom"\nmodel = "gpt-5.5"\n')
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -78,7 +80,7 @@ describe("install-codex legacy agent purge", () => {
     await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), customReviewer)
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), runCommand: async () => undefined })
+    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")

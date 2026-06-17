@@ -47,6 +47,7 @@ describe("runCodegraphServe", () => {
 		// when
 		const exitCode = await runCodegraphServe({
 			env: { CUSTOM: "keep", HOME: "/tmp/home" },
+			nodeVersion: "22.14.0",
 			homeDir: "/tmp/home",
 			buildEnv: ({ homeDir }) => ({
 				CODEGRAPH_INSTALL_DIR: `${homeDir}/.omo/codegraph`,
@@ -83,6 +84,54 @@ describe("runCodegraphServe", () => {
 				stdio: "inherit",
 			},
 		]);
+	});
+
+	it("#given an unsupported local Node #when serving MCP #then skips fast without spawning codegraph", async () => {
+		// given
+		const stderr: string[] = [];
+		const spawned: string[] = [];
+
+		// when
+		const exitCode = await runCodegraphServe({
+			env: {},
+			nodeVersion: "26.3.0",
+			buildEnv: () => ({}),
+			resolve: () => ({ argsPrefix: [], command: "codegraph", exists: true, source: "path" }),
+			runProcess: (command: string) => {
+				spawned.push(command);
+				return Promise.resolve(0);
+			},
+			stderr: { write: (chunk: string) => stderr.push(chunk) },
+		});
+
+		// then
+		expect(exitCode).toBe(1);
+		expect(spawned).toEqual([]);
+		expect(stderr).toHaveLength(1);
+		expect(stderr[0]).toContain("CodeGraph MCP skipped");
+		expect(stderr[0]).toContain("CODEGRAPH_ALLOW_UNSAFE_NODE");
+	});
+
+	it("#given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph", async () => {
+		// given
+		const spawned: string[] = [];
+
+		// when
+		const exitCode = await runCodegraphServe({
+			env: { CODEGRAPH_ALLOW_UNSAFE_NODE: "1" },
+			nodeVersion: "26.3.0",
+			buildEnv: () => ({}),
+			resolve: () => ({ argsPrefix: ["shim.js"], command: "node", exists: true, source: "bundled" }),
+			runProcess: (command: string) => {
+				spawned.push(command);
+				return Promise.resolve(0);
+			},
+			stderr: { write: () => undefined },
+		});
+
+		// then
+		expect(exitCode).toBe(0);
+		expect(spawned).toEqual(["node"]);
 	});
 
 	it("#given OMO_CODEGRAPH_BIN points at a missing path #when serving MCP #then exits before spawn", async () => {
@@ -165,6 +214,7 @@ describe("runCodegraphServe", () => {
 				const exitCode = await runCodegraphServe({
 					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
 					env: { HOME: "/tmp/home" },
+					nodeVersion: "22.14.0",
 					homeDir: "/tmp/home",
 					resolve: (options) => {
 						const provisioned = options.provisioned?.();
@@ -281,6 +331,7 @@ function runBuiltWrapper(entryPath: string, tempRoot: string): ReturnType<typeof
 		encoding: "utf8",
 		env: {
 			...process.env,
+			CODEGRAPH_ALLOW_UNSAFE_NODE: "1",
 			CODEGRAPH_FAKE_LOG: join(tempRoot, "invocations.log"),
 			OMO_CODEGRAPH_BIN: join(tempRoot, "codegraph-fake.cjs"),
 		},

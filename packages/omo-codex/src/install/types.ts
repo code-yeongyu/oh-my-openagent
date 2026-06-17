@@ -1,4 +1,5 @@
 import type { ProjectLocalCodexCleanupResult } from "./codex-project-local-cleanup"
+import type { RunAstGrepSkillInstall } from "@oh-my-opencode/utils"
 
 export interface MarketplacePluginSourceLocal {
   readonly source: "local"
@@ -84,6 +85,7 @@ export interface CodexInstallOptions {
   readonly env?: { readonly [key: string]: string | undefined }
   readonly gitBashResolver?: GitBashResolver
   readonly autonomousPermissions?: boolean
+  readonly astGrepInstaller?: RunAstGrepSkillInstall
   readonly runCommand?: RunCommand
   readonly log?: (message: string) => void
 }

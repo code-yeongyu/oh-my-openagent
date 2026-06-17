@@ -8,9 +8,6 @@ function mockLocalMcps(): void {
   mock.module("../lsp", () => ({
     createLspMcpConfig: () => ({ type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }),
   }))
-  mock.module("../ast-grep", () => ({
-    createAstGrepMcpConfig: () => ({ type: "local", command: ["node", "ast-grep-mcp", "mcp"], enabled: true }),
-  }))
   mock.module("../codegraph", () => ({
     createCodegraphMcpConfig: () => ({ type: "local", command: ["codegraph", "serve", "--mcp"], enabled: true }),
   }))
@@ -32,7 +29,6 @@ describe("createBuiltinMcps", () => {
     expect(result.context7).toBeDefined()
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
-    expect(result.ast_grep).toBeDefined()
     expect(result.codegraph).toBeDefined()
   })
 
@@ -50,7 +46,6 @@ describe("createBuiltinMcps", () => {
     expect(result.context7).toBeDefined()
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
-    expect(result.ast_grep).toBeDefined()
     expect(result.codegraph).toBeDefined()
   })
 
@@ -72,7 +67,7 @@ describe("createBuiltinMcps", () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
-    const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "ast_grep", "codegraph"]
+    const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "codegraph"]
 
     // when
     const result = createBuiltinMcps(disabledMcps)
@@ -83,7 +78,6 @@ describe("createBuiltinMcps", () => {
     expect(remainingMcpNames).not.toContain("context7")
     expect(remainingMcpNames).not.toContain("grep_app")
     expect(remainingMcpNames).not.toContain("lsp")
-    expect(remainingMcpNames).not.toContain("ast_grep")
     expect(remainingMcpNames).not.toContain("codegraph")
     expect(remainingMcpNames).toEqual([])
   })
@@ -150,11 +144,9 @@ describe("createBuiltinMcps", () => {
     })
 
     // then
-    for (const entry of [result.lsp, result.ast_grep]) {
-      expect(entry?.type).toBe("local")
-      if (entry?.type !== "local") throw new Error("expected local MCP config")
-      expect(["node", "bun"]).not.toContain(entry.command[0])
-      expect([nodePath, bunPath]).toContain(entry.command[0])
-    }
+    expect(result.lsp?.type).toBe("local")
+    if (result.lsp?.type !== "local") throw new Error("expected local MCP config")
+    expect(["node", "bun"]).not.toContain(result.lsp.command[0])
+    expect([nodePath, bunPath]).toContain(result.lsp.command[0])
   })
 })

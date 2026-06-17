@@ -3,6 +3,7 @@ import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { shouldRetryError } from "../../shared/model-error-classifier"
+import { getDeliverableTag } from "./constants"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildRecoveredSyncTaskCompletion, buildSyncTaskCompletion } from "./sync-completion-message"
 import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
@@ -81,6 +82,8 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
   } = input
   const { client, directory, sisyphusAgentConfig } = executorCtx
   const hasActiveChildBackgroundTasks = executorCtx.manager?.hasActiveChildTasks?.bind(executorCtx.manager)
+  const hasPendingParentWake = executorCtx.manager?.hasPendingParentWake?.bind(executorCtx.manager)
+  const deliverableTag = getDeliverableTag(agentToUse)
   let effectiveCategoryModel = input.categoryModel
   let fallbackState: ModelFallbackState | undefined = effectiveCategoryModel && fallbackChain?.length
     ? {
@@ -141,11 +144,13 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       toastManager,
       taskId,
       hasActiveChildBackgroundTasks,
+      hasPendingParentWake,
     }, syncPollTimeoutMs)
     if (pollError) {
       if (shouldAttemptPollErrorRecovery(pollError)) {
         const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
           strictAbortRecovery: true,
+          deliverableTag,
         })
         if (recoveredResult.ok) {
           return buildRecoveredSyncTaskCompletion({
@@ -196,7 +201,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       continue
     }
 
-    const result = await deps.fetchSyncResult(client, activeSessionID)
+    const result = await deps.fetchSyncResult(client, activeSessionID, undefined, { deliverableTag })
     if (!result.ok) {
       return result.error
     }

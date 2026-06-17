@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { runCliInstaller } from "./cli-installer"
 import * as configManager from "./config-manager"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import * as codexInstaller from "./install-codex"
 import type { CodexInstallResult } from "./install-codex"
 import type { InstallArgs } from "./types"
@@ -75,6 +76,7 @@ describe("runCliInstaller platform branching", () => {
   beforeEach(() => {
     consoleLogMock.mockClear()
     console.log = consoleLogMock
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

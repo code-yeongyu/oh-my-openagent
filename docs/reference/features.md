@@ -638,14 +638,9 @@ Hashline IDs use characters from `ZPMQVRWSNKTXJBYH`.
 | **lsp_find_references** | Find all usages across workspace            |
 | **lsp_symbols**         | Get file outline or workspace symbol search |
 
-### AST-Grep Tools
+### AST-Grep Skill
 
-These user-facing tool names are served by the built-in local `ast_grep` MCP backed by `packages/ast-grep-mcp/`.
-
-| Tool                 | Description                                  |
-| -------------------- | -------------------------------------------- |
-| **ast_grep_search**  | AST-aware code pattern search (25 languages) |
-| **ast_grep_replace** | AST-aware code replacement                   |
+AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the `skill` tool when you need structural matching, then use its `sg` helper commands for search or rewrite workflows.
 
 ### Delegation Tools
 
@@ -1005,7 +1000,6 @@ The three tiers of MCP servers and where they come from:
 | **context7**  | Official documentation lookup for any library/framework                                       |
 | **grep_app**  | Ultra-fast code search across public GitHub repos. Great for finding implementation examples. |
 | **lsp**       | Local LSP tools for diagnostics, symbols, references, and renames                             |
-| **ast_grep**  | Local AST-aware search and rewrite tools                                                      |
 
 ### Skill-Embedded MCPs
 
