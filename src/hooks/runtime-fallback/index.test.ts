@@ -76,10 +76,6 @@ describe("runtime-fallback", () => {
 
   function createMockPluginConfigWithCategoryFallback(fallbackModels: string[]): MatrixxConfig {
     return {
-      git_master: {
-        commit_footer: true,
-        include_co_authored_by: true,
-      },
       categories: {
         test: {
           fallback_models: fallbackModels,
@@ -95,10 +91,6 @@ describe("runtime-fallback", () => {
     variant?: string,
   ): MatrixxConfig {
     return {
-      git_master: {
-        commit_footer: true,
-        include_co_authored_by: true,
-      },
       categories: {
         [categoryName]: {
           model,
@@ -302,12 +294,7 @@ describe("runtime-fallback", () => {
       //#given
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig(),
-        pluginConfig: {
-          git_master: {
-            commit_footer: true,
-            include_co_authored_by: true,
-          },
-        },
+        pluginConfig: {},
       })
       const sessionID = "test-session-no-fallbacks"
 
