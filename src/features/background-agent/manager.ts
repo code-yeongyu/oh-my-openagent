@@ -926,6 +926,16 @@ export class BackgroundManager {
     return this.notifications.get(sessionID) ?? []
   }
 
+  /**
+   * Check whether a parent-wake notification is currently in flight
+   * for the given parent session.  Used by sync-task polling to avoid
+   * concluding when a background task just completed but its
+   * parent notification hasn't been delivered yet.
+   */
+  hasInFlightNotificationForParent(sessionID: string): boolean {
+    return this.notificationQueueByParent.has(sessionID)
+  }
+
   clearNotifications(sessionID: string): void {
     this.notifications.delete(sessionID)
   }

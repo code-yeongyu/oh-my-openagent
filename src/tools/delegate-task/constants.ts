@@ -566,6 +566,23 @@ export function isPlanAgent(agentName: string | undefined): boolean {
 export const PLAN_FAMILY_NAMES = ["plan", "oracle"]
 
 /**
+ * Deliverable tag for plan agent results (e.g., "<plan>...</plan>").
+ * Used by sync-result-fetcher to select the correct turn when a sync
+ * agent produces a structured deliverable alongside intermediate output.
+ */
+export const PLAN_DELIVERABLE_TAG = "plan"
+
+/**
+ * Get the deliverable tag for a given agent name.
+ * Returns undefined if no tagging applies.
+ */
+export function getDeliverableTag(agentName: string | undefined): string | undefined {
+  if (!agentName) return undefined
+  if (isPlanAgent(agentName) || isPlanFamily(agentName)) return PLAN_DELIVERABLE_TAG
+  return undefined
+}
+
+/**
  * Check if the given agent belongs to the plan family (blocking + task permission).
  */
 export function isPlanFamily(category: string): boolean

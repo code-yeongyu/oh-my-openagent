@@ -6,6 +6,7 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { formatDuration } from "./time-formatter"
+import { getDeliverableTag } from "./constants"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 
@@ -106,12 +107,22 @@ export async function executeSyncTask(
         agentToUse,
         toastManager,
         taskId,
+        hasActiveChildBackgroundTasks: () => {
+          const children = executorCtx.manager.getTasksByParentSession(sessionID)
+          return children.some(t => t.status === "running" || t.status === "pending")
+        },
+        hasPendingParentWake: () => {
+          return executorCtx.manager.hasInFlightNotificationForParent(sessionID)
+        },
       })
       if (pollError) {
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, sessionID)
+      const result = await deps.fetchSyncResult(client, sessionID, undefined, {
+        deliverableTag: getDeliverableTag(agentToUse),
+        finalTextOnly: true,
+      })
       if (!result.ok) {
         return result.error
       }
@@ -145,6 +156,9 @@ session_id: ${sessionID}
   } finally {
     if (syncSessionID) {
       subagentSessions.delete(syncSessionID)
+      // Abort the sync session to prevent todo-continuation enforcer
+      // from re-awakening a completed sync agent's session.
+      client.session.abort({ path: { id: syncSessionID } }).catch(() => {})
     }
   }
 }

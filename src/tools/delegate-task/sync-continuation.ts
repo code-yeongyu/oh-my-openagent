@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, SessionMessage } from "./executor-types"
-import { isPlanFamily } from "./constants"
+import { isPlanFamily, getDeliverableTag } from "./constants"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
@@ -121,7 +121,10 @@ export async function executeSyncContinuation(
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, continuationID!, anchorMessageCount)
+      const result = await deps.fetchSyncResult(client, continuationID!, anchorMessageCount, {
+        deliverableTag: getDeliverableTag(resumeAgent),
+        finalTextOnly: true,
+      })
       if (!result.ok) {
         return result.error
       }
