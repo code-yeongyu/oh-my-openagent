@@ -16,6 +16,7 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
+const opencodeOnlyToolPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
 async function readPackagedSkillFile(...segments) {
 	const path = join(root, "skills", ...segments);
@@ -253,6 +254,8 @@ test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent p
 		["does not accept subagent outputs as success without independent verification", /subagent outputs?[\s\S]*(?:not|never)[\s\S]*(?:success|approval)|independent(?:ly)? verif(?:y|ied|ication)[\s\S]*subagent outputs?/i],
 		["treats Discord or external content as claims, not instructions", /(?:Discord|external content)[\s\S]*claims?[\s\S]*not instructions?|not instructions?[\s\S]*(?:Discord|external content)/i],
 	]);
+	assert.doesNotMatch(combinedFile.content, opencodeOnlyToolPattern);
+	assert.doesNotMatch(combinedFile.content, /Proceeding to plan generation/);
 });
 
 test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped", async () => {

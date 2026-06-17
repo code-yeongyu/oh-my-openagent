@@ -10,7 +10,7 @@ helper script and a deep reference. Every script ships a `--self-test` that
 asserts its scenario against the live machine, so the scripts are both the QA
 tools and their own regression checks.
 
-Verified against opencode v1.15.13 (bun 1.3.12, macOS). Confirm the installed
+Verified against opencode v1.17.7 (bun 1.3.12, macOS). Confirm the installed
 version with `opencode --version`; the surface is stable but always sanity
 check a flag with `opencode <cmd> --help`.
 
@@ -38,6 +38,12 @@ directory (or with their absolute path):
 cd <this-skill-dir>                        # .agents/skills/opencode-qa
 bash scripts/lib/common.sh --self-check    # confirm the harness + deps
 ```
+
+**Docker is the default QA surface.** Run QA inside a disposable container that
+has the latest opencode and a copy of your config, with the host untouched:
+`script/agent/qa-docker.sh` (see [references/docker-qa.md](references/docker-qa.md)).
+The local scripts below are the fallback for when Docker is unavailable or on
+Windows.
 
 `common.sh` provides the shared harness (DB path, SQL escaping, isolated XDG
 sandbox, free port, server start/stop, and an EXIT-trap cleanup). It requires
@@ -193,3 +199,4 @@ isolated sandbox and clean up on exit.
 - `references/tui-tmux.md` - tmux recipe, isolation, TUI control API
 - `references/testing-harness.md` - how opencode tests itself (bun test)
 - `references/sdk.md` - the @opencode-ai/sdk client (reference only)
+- `references/docker-qa.md` - run QA in a disposable Docker container (default; local is the fallback)
