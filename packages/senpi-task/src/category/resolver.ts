@@ -256,7 +256,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     modelId: foundModel.modelId,
     ...(variant !== undefined ? { variant } : {}),
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
+    ...(config.topP !== undefined ? { topP: config.topP } : {}),
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
     ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),

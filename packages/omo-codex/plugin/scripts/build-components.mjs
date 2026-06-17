@@ -12,6 +12,9 @@ const workspaces = Array.isArray(packageJson.workspaces) ? packageJson.workspace
 const workspaceSet = new Set(workspaces);
 const builtinModuleNames = new Set(builtinModules.filter((moduleName) => !moduleName.startsWith("_")));
 
+console.log("Syncing agents TOMLs...");
+await runCaptured("bun", ["run", "scripts/sync-agents.mjs"], root, "Syncing agents TOMLs");
+
 const workspaceComponents = [];
 for (const workspace of workspaces) {
 	if (typeof workspace !== "string" || !workspace.startsWith("components/")) continue;

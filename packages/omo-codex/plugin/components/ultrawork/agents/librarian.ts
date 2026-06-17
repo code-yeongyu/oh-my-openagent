@@ -1,4 +1,4 @@
-import { SUPPORTED_MODELS } from "@omo/model-core";
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import type { AgentConfig } from "../../../../../omo-opencode/src/cli/model-fallback-types"; // Or appropriate type if needed
 
 export const librarianAgent = {

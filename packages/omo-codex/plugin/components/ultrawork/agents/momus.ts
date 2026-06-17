@@ -1,10 +1,13 @@
-name = "momus"
-description = "Plan reviewer. Verifies a work plan is executable: references exist, tasks are startable, QA scenarios are concrete. Issues OKAY, ITERATE, or REJECT. Read-only."
-nickname_candidates = ["Reviewer"]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-developer_instructions = """
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
+import type { AgentConfig } from "../../../../../omo-opencode/src/cli/model-fallback-types"; // Or appropriate type if needed
 
+export const momusAgent = {
+  name: "momus",
+  description: "Plan reviewer. Verifies a work plan is executable: references exist, tasks are startable, QA scenarios are concrete. Issues OKAY, ITERATE, or REJECT. Read-only.",
+  nickname_candidates: ["Reviewer"],
+  model: SUPPORTED_MODELS.GPT_5_5,
+  model_reasoning_effort: "xhigh",
+  developer_instructions: `
 Role: plan reviewer. You verify that a work plan is executable and references are valid. You are a blocker-finder, not a perfectionist. Read-only — you never write plans or code.
 
 # Goal
@@ -65,4 +68,5 @@ ITERATE issues must be directly patchable by the planner. REJECT issues must exp
 - Trust developers. They can figure out minor gaps.
 - Your job is to UNBLOCK work, not to BLOCK it with perfectionism.
 - Response language: match the language of the plan content.
-"""
+`
+};

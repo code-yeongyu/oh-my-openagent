@@ -73,7 +73,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "github-copilot/claude-opus-4.7",
-      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      canonicalModelID: "claude-opus-4.7",
       source: "canonical",
     })
   })

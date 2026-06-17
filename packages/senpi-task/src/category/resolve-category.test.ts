@@ -180,7 +180,7 @@ describe("resolveCategory", () => {
         categories: {
           quick: {
             temperature: 0.3,
-            top_p: 0.8,
+            topP: 0.8,
             maxTokens: 4096,
             thinking: { type: "enabled", budgetTokens: 1024 },
             reasoningEffort: "medium",
@@ -195,7 +195,7 @@ describe("resolveCategory", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.spec.temperature).toBe(0.3)
-    expect(resolved.spec.top_p).toBe(0.8)
+    expect(resolved.spec.topP).toBe(0.8)
     expect(resolved.spec.maxTokens).toBe(4096)
     expect(resolved.spec.thinking).toEqual({ type: "enabled", budgetTokens: 1024 })
     expect(resolved.spec.reasoningEffort).toBe("medium")

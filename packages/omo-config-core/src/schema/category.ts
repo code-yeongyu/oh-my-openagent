@@ -4,7 +4,7 @@ import { OmoFallbackModelsSchema, OmoThinkingConfigSchema } from "./fallback-mod
 /**
  * Category config intentionally keeps the OpenCode category key set verbatim.
  * Most `omo.json` keys are snake_case, but category parity requires the
- * existing camelCase keys: `maxTokens`, `reasoningEffort`,
+ * existing camelCase keys: `topP`, `maxTokens`, `reasoningEffort`,
  * `textVerbosity`, and `thinking.budgetTokens`.
  */
 export const OmoCategoryConfigSchema = z.object({
@@ -13,7 +13,7 @@ export const OmoCategoryConfigSchema = z.object({
   fallback_models: OmoFallbackModelsSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
+  topP: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
   thinking: OmoThinkingConfigSchema.optional(),
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
