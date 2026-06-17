@@ -1,16 +1,28 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const AGENT_DIR = join(import.meta.dir, "agent")
 const REPO_ROOT = join(import.meta.dir, "..")
+const SETUP_SCRIPT = "script/agent/setup.sh"
+const CLEANUP_SCRIPT = "script/agent/cleanup.sh"
 
 function read(path: string): string {
   return readFileSync(path, "utf8")
 }
 
-function isExecutable(path: string): boolean {
-  return (statSync(path).mode & 0o111) !== 0
+function gitFileMode(path: string): string {
+  const output = execFileSync("git", ["ls-files", "--stage", "--", path], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  })
+  const [mode] = output.trim().split(/\s+/, 1)
+  return mode ?? ""
+}
+
+function isExecutableInGitIndex(path: string): boolean {
+  return gitFileMode(path) === "100755"
 }
 
 describe("agent dev-environment scripts", () => {
@@ -20,7 +32,7 @@ describe("agent dev-environment scripts", () => {
     test("#given the shared bootstrap #when inspected #then it is an executable strict bash script", () => {
       // given / when / then
       expect(existsSync(setup), "script/agent/setup.sh must exist").toBe(true)
-      expect(isExecutable(setup), "setup.sh must be executable").toBe(true)
+      expect(isExecutableInGitIndex(SETUP_SCRIPT), "setup.sh must be executable").toBe(true)
       const body = read(setup)
       expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
       expect(body).toContain("set -euo pipefail")
@@ -49,7 +61,7 @@ describe("agent dev-environment scripts", () => {
     test("#given the teardown #when inspected #then it is an executable strict bash script with a --deep mode", () => {
       // given / when / then
       expect(existsSync(cleanup), "script/agent/cleanup.sh must exist").toBe(true)
-      expect(isExecutable(cleanup), "cleanup.sh must be executable").toBe(true)
+      expect(isExecutableInGitIndex(CLEANUP_SCRIPT), "cleanup.sh must be executable").toBe(true)
       const body = read(cleanup)
       expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
       expect(body).toContain("set -euo pipefail")
