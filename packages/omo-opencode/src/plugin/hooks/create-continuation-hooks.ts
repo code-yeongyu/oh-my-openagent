@@ -62,6 +62,7 @@ export function createContinuationHooks(args: {
       createTodoContinuationEnforcer(ctx, {
           backgroundManager,
           isContinuationStopped: stopContinuationGuard?.isStopped,
+          continuationConfig: pluginConfig.continuation,
         }))
     : null
 

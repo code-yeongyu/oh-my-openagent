@@ -23,6 +23,7 @@ export type {
   SisyphusTasksConfig,
   RuntimeFallbackConfig,
   ModelCapabilitiesConfig,
+  ContinuationConfig,
   FallbackModels,
   TeamModeConfig,
   KeywordDetectorConfig,

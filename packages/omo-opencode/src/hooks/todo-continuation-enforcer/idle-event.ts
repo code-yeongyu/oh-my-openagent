@@ -15,7 +15,7 @@ import { resolveLatestMessageInfo } from "./resolve-message-info"
 import type { SessionStateStore } from "./session-state"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
-import type { MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
+import type { ContinuationTimingConfig, MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
 
 export async function handleSessionIdle(args: {
   ctx: PluginInput
@@ -24,6 +24,7 @@ export async function handleSessionIdle(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  continuationConfig?: ContinuationTimingConfig
 }): Promise<void> {
   const {
     ctx,
@@ -32,6 +33,7 @@ export async function handleSessionIdle(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
+    continuationConfig,
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
@@ -66,7 +68,7 @@ export async function handleSessionIdle(args: {
 
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
-    if (timeSinceAbort < ABORT_WINDOW_MS) {
+    if (timeSinceAbort < (continuationConfig?.abortWindowMs ?? ABORT_WINDOW_MS)) {
       log(`[${HOOK_NAME}] Skipped: abort detected via event ${timeSinceAbort}ms ago`, { sessionID })
       state.abortDetectedAt = undefined
       return
@@ -139,21 +141,21 @@ export async function handleSessionIdle(args: {
   }
 
   if (
-    state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+    state.consecutiveFailures >= (continuationConfig?.maxConsecutiveFailures ?? MAX_CONSECUTIVE_FAILURES)
     && state.lastInjectedAt
-    && Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
+    && Date.now() - state.lastInjectedAt >= (continuationConfig?.failureResetWindowMs ?? FAILURE_RESET_WINDOW_MS)
   ) {
     state.consecutiveFailures = 0
-    log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, { sessionID, failureResetWindowMs: FAILURE_RESET_WINDOW_MS })
+    log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, { sessionID, failureResetWindowMs: continuationConfig?.failureResetWindowMs ?? FAILURE_RESET_WINDOW_MS })
   }
 
-  if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+  if (state.consecutiveFailures >= (continuationConfig?.maxConsecutiveFailures ?? MAX_CONSECUTIVE_FAILURES)) {
     log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, { sessionID, consecutiveFailures: state.consecutiveFailures })
     return
   }
 
   const effectiveCooldown =
-    CONTINUATION_COOLDOWN_MS * 2 ** Math.min(state.consecutiveFailures, 5)
+    (continuationConfig?.cooldownMs ?? CONTINUATION_COOLDOWN_MS) * 2 ** Math.min(state.consecutiveFailures, 5)
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
     log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID, effectiveCooldown, consecutiveFailures: state.consecutiveFailures })
     return
@@ -219,7 +221,7 @@ export async function handleSessionIdle(args: {
     incompleteCount,
     todos,
   )
-  if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
+  if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate, maxStagnationCount: continuationConfig?.maxStagnationCount })) {
     return
   }
   startCountdown({
@@ -232,5 +234,6 @@ export async function handleSessionIdle(args: {
     skipAgents,
     sessionStateStore,
     isContinuationStopped,
+    countdownSeconds: continuationConfig?.countdownSeconds,
   })
 }
