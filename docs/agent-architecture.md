@@ -16,7 +16,6 @@ graph TB
 
     subgraph SPECIALIST["Specialist Agents (mode: all)"]
         CIP["🔵 Cipher<br/>Claude Opus 4.6<br/><i>DSL Engineering</i><br/>11 skills"]
-        NIO["🟢 Niobe<br/>Claude Opus 4.6<br/><i>Research & EU Expert</i><br/>12 skills"]
     end
 
     subgraph ADVISORS["Advisory Agents (mode: subagent)"]
@@ -40,7 +39,6 @@ graph TB
     UI --> KEY
     UI --> ARC
     UI -.->|"@cipher"| CIP
-    UI -.->|"@niobe"| NIO
 
     MOR ==>|"task(subagent_type)"| ORA
     MOR ==>|"task(subagent_type)"| MER
@@ -55,7 +53,6 @@ graph TB
     style KEY fill:#f39c12,color:#fff
     style ARC fill:#9b59b6,color:#fff
     style CIP fill:#3498db,color:#fff
-    style NIO fill:#27ae60,color:#fff
     style ORA fill:#e67e22,color:#fff
     style MER fill:#8e44ad,color:#fff
     style SER fill:#2ecc71,color:#fff
@@ -172,7 +169,7 @@ flowchart LR
 
 ```mermaid
 graph TD
-    subgraph SKILL_REGISTRY["Skill Registry (27 Built-in Skills)"]
+    subgraph SKILL_REGISTRY["Skill Registry (15 Built-in Skills)"]
         subgraph DSL_SKILLS["Cipher's DSL Skills (11)"]
             S1["dsl-core"]
             S2["dsl-grammar"]
@@ -187,21 +184,6 @@ graph TD
             S11["dsl-composition"]
         end
 
-        subgraph NIOBE_SKILLS["Niobe's Research Skills (12)"]
-            N1["eu-horizon"]
-            N2["academic-writing"]
-            N3["academic-review"]
-            N4["literature-review"]
-            N5["research-methodology"]
-            N6["grant-writing"]
-            N7["deliverable-writing"]
-            N8["project-management"]
-            N9["technical-lead"]
-            N10["scientific-presentation"]
-            N11["data-management-plan"]
-            N12["ip-exploitation"]
-        end
-
         subgraph GENERAL_SKILLS["General Skills (4)"]
             G1["playwright"]
             G2["git-master"]
@@ -212,15 +194,12 @@ graph TD
 
     subgraph AGENTS["Agent Skill Loading"]
         CIP_AGENT["Cipher Agent<br/><b>Auto-loads 11 DSL skills</b>"]
-        NIO_AGENT["Niobe Agent<br/><b>Auto-loads 12 research skills</b>"]
         MOUSE_AGENT["Mouse Agent<br/><b>Loads skills from load_skills[]</b>"]
     end
 
     DSL_SKILLS -.->|"built into factory"| CIP_AGENT
-    NIOBE_SKILLS -.->|"built into factory"| NIO_AGENT
     GENERAL_SKILLS -.->|"via load_skills param"| MOUSE_AGENT
     DSL_SKILLS -.->|"via load_skills param"| MOUSE_AGENT
-    NIOBE_SKILLS -.->|"via load_skills param"| MOUSE_AGENT
 ```
 
 ## Tool Restrictions
@@ -246,8 +225,7 @@ graph LR
 
     subgraph NO_DELEGATION["No Delegation (no task)"]
         ND1["Cipher"]
-        ND2["Niobe"]
-        ND3["Mouse"]
+        ND2["Mouse"]
     end
 
     TOOLS["25+ Tools<br/>LSP, AST-Grep, Grep,<br/>Glob, Read, Edit, Write,<br/>Bash, task(), background,<br/>session, look_at, skill"]
@@ -328,7 +306,7 @@ flowchart TD
 | **Plan → Review → Execute** | Morpheus → Oracle → Smith → Mouse | Complex multi-step features |
 | **Pre-Analysis** | Morpheus → Seraph → Oracle | Ambiguous requirements needing scope clarification |
 | **Consultation** | Morpheus → Merovingian | Architecture decisions, debugging after 2+ failures |
-| **Specialist Delegation** | Morpheus → Cipher / Niobe | Domain-specific work (DSL, academic, EU) |
+| **Specialist Delegation** | Morpheus → Cipher | Domain-specific DSL work |
 | **Category Work** | Morpheus → Mouse[category] | General task execution with category-optimized model |
 | **Session Continuation** | Any agent → same agent (session_id) | Multi-turn follow-up preserving full context |
 | **Autonomous Deep Work** | User → Keymaker | Complex tasks needing sustained autonomous execution |
