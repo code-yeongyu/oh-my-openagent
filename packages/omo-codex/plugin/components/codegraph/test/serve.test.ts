@@ -134,6 +134,53 @@ describe("runCodegraphServe", () => {
 		expect(spawned).toEqual(["node"]);
 	});
 
+	it("#given an unsupported local Node but CODEGRAPH_NODE_BIN resolves a bundled shim with Node 22 #when serving MCP #then it spawns the compatible runtime", async () => {
+		// given
+		const spawned: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
+		const nodeBin = "/opt/node22/bin/node";
+
+		// when
+		const exitCode = await runCodegraphServe({
+			env: { CODEGRAPH_NODE_BIN: nodeBin },
+			nodeVersion: "26.3.0",
+			buildEnv: () => ({}),
+			resolve: () => ({ argsPrefix: ["codegraph.js"], command: nodeBin, exists: true, source: "bundled" }),
+			runProcess: (command: string, args: readonly string[]) => {
+				spawned.push({ args, command });
+				return Promise.resolve(0);
+			},
+			stderr: { write: () => undefined },
+		});
+
+		// then
+		expect(exitCode).toBe(0);
+		expect(spawned).toEqual([{ args: ["codegraph.js", "serve", "--mcp"], command: nodeBin }]);
+	});
+
+	it("#given OMO_CODEGRAPH_BIN points at an explicit command #when local Node is unsupported #then serve trusts the configured command", async () => {
+		// given
+		const commandPath = "/opt/codegraph-node22/bin/codegraph";
+		const spawned: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
+
+		// when
+		const exitCode = await runCodegraphServe({
+			env: { OMO_CODEGRAPH_BIN: commandPath },
+			nodeVersion: "26.3.0",
+			buildEnv: () => ({}),
+			commandExists: (candidate) => candidate === commandPath,
+			resolve: () => ({ argsPrefix: [], command: commandPath, exists: true, source: "env" }),
+			runProcess: (command: string, args: readonly string[]) => {
+				spawned.push({ args, command });
+				return Promise.resolve(0);
+			},
+			stderr: { write: () => undefined },
+		});
+
+		// then
+		expect(exitCode).toBe(0);
+		expect(spawned).toEqual([{ args: ["serve", "--mcp"], command: commandPath }]);
+	});
+
 	it("#given OMO_CODEGRAPH_BIN points at a missing path #when serving MCP #then exits before spawn", async () => {
 		// given
 		const stderr: string[] = [];
