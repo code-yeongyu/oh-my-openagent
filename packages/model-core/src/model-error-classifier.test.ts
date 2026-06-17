@@ -1,3 +1,4 @@
+import { TEST_PROVIDERS, TEST_MODELS, TEST_QUALIFIED } from "./testing/model-fixtures";
 import { SUPPORTED_PROVIDERS } from "./registry";
 declare const require: (name: string) => any
 const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")
@@ -76,13 +77,13 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
-    readConnectedProvidersCacheSpy?.mockReturnValue([SUPPORTED_PROVIDERS.PROVIDER_X])
+    readConnectedProvidersCacheSpy?.mockReturnValue([TEST_PROVIDERS.PROVIDER_X])
 
     //#when
-    const provider = selectFallbackProvider([SUPPORTED_PROVIDERS.PROVIDER_Y], SUPPORTED_PROVIDERS.PROVIDER_X)
+    const provider = selectFallbackProvider([TEST_PROVIDERS.PROVIDER_Y], TEST_PROVIDERS.PROVIDER_X)
 
     //#then
-    expect(provider).toBe(SUPPORTED_PROVIDERS.PROVIDER_X)
+    expect(provider).toBe(TEST_PROVIDERS.PROVIDER_X)
   })
 
   test("treats QuotaExceededError (PascalCase name) as non-retryable STOP error", () => {

@@ -146,7 +146,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(fourth?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE_GO)
     expect(fifth).toEqual({
       providers: [SUPPORTED_PROVIDERS.MINIMAX_CODING_PLAN, SUPPORTED_PROVIDERS.MINIMAX_CN_CODING_PLAN],
-      model: SUPPORTED_MODELS.MINIMAX_M3_CAP,
+      model: SUPPORTED_MODELS.MINIMAX_M3_NATIVE,
     })
     expect(sixth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M2_7)
     expect(sixth?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE_GO)

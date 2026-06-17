@@ -1,3 +1,4 @@
+import { TEST_PROVIDERS, TEST_MODELS, TEST_QUALIFIED } from "@oh-my-opencode/model-core/src/testing/model-fixtures";
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
@@ -408,7 +409,7 @@ describe("TaskToastManager", () => {
 
       // when - runtime fallback applied by session
       toastManager.updateTaskModelBySession("ses_update_1", {
-        model: SUPPORTED_MODELS.NVIDIA_STEPFUN_AI_STEP_3_5_FLASH,
+        model: TEST_MODELS.NVIDIA_STEPFUN_AI_STEP_3_5_FLASH,
         type: "runtime-fallback",
       })
 
@@ -416,7 +417,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain(SUPPORTED_MODELS.NVIDIA_STEPFUN_AI_STEP_3_5_FLASH)
+      expect(call.body.message).toContain(TEST_MODELS.NVIDIA_STEPFUN_AI_STEP_3_5_FLASH)
       expect(call.body.message).toContain("(runtime fallback)")
     })
   })

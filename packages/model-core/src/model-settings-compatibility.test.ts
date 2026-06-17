@@ -1,3 +1,4 @@
+import { TEST_PROVIDERS, TEST_MODELS, TEST_QUALIFIED } from "./testing/model-fixtures";
 import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS, type Variant } from "./registry";
 import { describe, expect, test } from "bun:test"
 
@@ -185,8 +186,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("treats unknown model families conservatively by dropping unsupported settings", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: SUPPORTED_PROVIDERS.MYSTERY,
-      modelID: SUPPORTED_MODELS.MYSTERY_MODEL_1,
+      providerID: TEST_PROVIDERS.MYSTERY,
+      modelID: TEST_MODELS.MYSTERY_MODEL_1,
       desired: { variant: SUPPORTED_VARIANTS.MAX, reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 

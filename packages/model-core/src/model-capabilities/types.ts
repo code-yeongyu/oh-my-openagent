@@ -1,4 +1,5 @@
 import type { ModelMetadata, ProviderCache } from "../provider-cache"
+import type { Provider, SupportedModel } from "../registry";
 
 export type ModelCapabilitiesSnapshotEntry = {
 	id: string
@@ -62,7 +63,6 @@ export type ModelCapabilities = {
 	}
 	diagnostics: ModelCapabilitiesDiagnostics
 }
-
 import type { Provider, SupportedModel } from "../registry";
 
 export type GetModelCapabilitiesInput = {

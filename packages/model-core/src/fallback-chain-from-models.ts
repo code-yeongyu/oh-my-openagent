@@ -53,7 +53,7 @@ export function parseFallbackModelEntry(
   return {
     providers: [providerID],
     model: parsed.modelID,
-    variant: parsed.variant as import("./registry").Variant | undefined,
+    variant: isKnownVariant(parsed.variant) ? parsed.variant : undefined,
   }
 }
 

@@ -37,11 +37,6 @@ export const SUPPORTED_PROVIDERS = {
   GOOGLE_VERTEX_ANTHROPIC: "google-vertex-anthropic",
   AWS_BEDROCK_ANTHROPIC: "aws-bedrock-anthropic",
   NVIDIA: "nvidia",
-  MYSTERY: "mystery",
-  PROVIDER_X: "provider-x",
-  PROVIDER_Y: "provider-y",
-  Z_AI: "z-ai",
-  UNKNOWN: "unknown",
 } as const;
 
 export type Provider = typeof SUPPORTED_PROVIDERS[keyof typeof SUPPORTED_PROVIDERS] | (string & {});
@@ -61,36 +56,19 @@ export const SUPPORTED_MODELS = {
   GPT_4O: "gpt-4o",
   GPT_4O_MINI: "gpt-4o-mini",
   O3_MINI: "o3-mini",
-  OPENAI_O3_MINI: "openai/o3-mini",
-  OPENAI_GPT_5_5: "openai/gpt-5.5",
-  GITHUB_COPILOT_GPT_4O: "github-copilot/gpt-4o",
 
   // Anthropic
   CLAUDE_OPUS_4_8: "claude-opus-4-8",
   CLAUDE_OPUS_4_7: "claude-opus-4-7",
-  CLAUDE_OPUS_4_7_THINKING: "anthropic/claude-opus-4-7-thinking",
   CLAUDE_SONNET_4_6: "claude-sonnet-4-6",
   CLAUDE_SONNET_5_1: "claude-sonnet-5-1",
   CLAUDE_HAIKU_4_5: "claude-haiku-4-5",
   CLAUDE_FABLE_5: "claude-fable-5",
-  ANTHROPIC_CLAUDE_OPUS_4_6: "anthropic/claude-opus-4-6",
-  ANTHROPIC_CLAUDE_OPUS_4_6_ALT: "anthropic/claude-opus-4.6",
   CLAUDE_OPUS_4_6: "claude-opus-4-6",
-  ANTHROPIC_CLAUDE_OPUS_4_7: "anthropic/claude-opus-4-7",
-  ANTHROPIC_CLAUDE_OPUS_4_7_ALT: "anthropic/claude-opus-4.7",
-  ANTHROPIC_CLAUDE_SONNET_4_6: "anthropic/claude-sonnet-4-6",
-  ANTHROPIC_CLAUDE_OPUS_4_8: "anthropic/claude-opus-4-8",
-  ANTHROPIC_CLAUDE_OPUS_4_8_ALT: "anthropic/claude-opus-4.8",
-  ANTHROPIC_CLAUDE_FABLE_5: "anthropic/claude-fable-5",
-  ANTHROPIC_CLAUDE_FABLE_5_1M: "anthropic/claude-fable-5[1m]",
-  ANTHROPIC_CLAUDE_OPUS_5_0: "anthropic/claude-opus-5-0",
 
   // Google
   GEMINI_3_1_PRO: "gemini-3.1-pro",
   GEMINI_3_FLASH: "gemini-3-flash",
-  GOOGLE_GEMINI_3_1_PRO: "google/gemini-3.1-pro",
-  GOOGLE_VERTEX_GEMINI_3_FLASH: "google-vertex/gemini-3-flash",
-  GITHUB_COPILOT_GEMINI_3_1_PRO: "github-copilot/gemini-3.1-pro",
 
   // Z.ai / OP / Kimi
   GLM_5_2: "glm-5.2",
@@ -102,18 +80,6 @@ export const SUPPORTED_MODELS = {
   KIMI_K2_5: "kimi-k2.5",
   KIMI_K2P5: "k2p5",
   KIMI_P6: "kimi-p6",
-  Z_AI_GLM_5_1: "z-ai/glm-5.1",
-  OPENCODE_GLM_4_6V: "opencode/glm-4.6v",
-  MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
-  OPENCODE_K2P5: "opencode/k2p5",
-  OPENCODE_K2_P6: "opencode/k2-p6",
-  OPENCODE_GO_KIMI_K2_7: "opencode-go/kimi-k2.7",
-  MOONSHOTAI_KIMI_K2_7: "moonshotai/kimi-k2-7",
-  KIMI_FOR_CODING_K2P7: "kimi-for-coding/k2p7",
-  OPENCODE_K2_P7: "opencode/k2-p7",
-  OPENCODE_GO_KIMI_K2_6: "opencode-go/kimi-k2.6",
-  KIMI_FOR_CODING_K2P6: "kimi-for-coding/k2p6",
-  KIMI_FOR_CODING_K2P5: "kimi-for-coding/k2p5",
 
   // Qwen
   QWEN_3_5_PLUS: "qwen3.5-plus",
@@ -121,15 +87,12 @@ export const SUPPORTED_MODELS = {
   // Minimax
   MINIMAX_M2_7_HIGHSPEED: "minimax-m2.7-highspeed",
   MINIMAX_M3: "minimax-m3",
-  MINIMAX_M3_CAP: "MiniMax-M3",
+  /** Original pascal-cased routing string required by certain provider endpoints */
+  MINIMAX_M3_NATIVE: "MiniMax-M3",
   MINIMAX_M2_7: "minimax-m2.7",
-  OPENCODE_MINIMAX_M2_7: "opencode/minimax-m2.7",
 
   // Custom
   BIG_PICKLE: "big-pickle",
-  DEEPSEEK_V4_PRO: "deepseek-v4-pro",
-  MYSTERY_MODEL_1: "mystery-model-1",
-  NVIDIA_STEPFUN_AI_STEP_3_5_FLASH: "nvidia/stepfun-ai/step-3.5-flash",
 } as const;
 
 export type SupportedModel = typeof SUPPORTED_MODELS[keyof typeof SUPPORTED_MODELS] | (string & {});
