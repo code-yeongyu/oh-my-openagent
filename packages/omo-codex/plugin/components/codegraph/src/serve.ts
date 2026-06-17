@@ -13,6 +13,10 @@ import { fileURLToPath } from "node:url";
 
 import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import {
+	buildCodegraphNodeSkipHint,
+	evaluateCodegraphNodeSupport,
+} from "../../../../../utils/src/codegraph/node-support.ts";
+import {
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 	type ResolveCodegraphCommandOptions,
@@ -49,6 +53,7 @@ export interface RunCodegraphServeOptions {
 	readonly cwd?: string;
 	readonly env?: Record<string, string | undefined>;
 	readonly homeDir?: string;
+	readonly nodeVersion?: string;
 	readonly resolve?: (options: ResolveCodegraphCommandOptions) => ReturnType<typeof resolveCodegraphCommand>;
 	readonly runProcess?: CodegraphServeProcessRunner;
 	readonly stderr?: CodegraphServeStderr;
@@ -79,6 +84,12 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
 	if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync)) {
 		(options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
+		return 1;
+	}
+
+	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
+	if (!nodeSupport.supported) {
+		(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
 		return 1;
 	}
 

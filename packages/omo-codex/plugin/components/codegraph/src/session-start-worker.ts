@@ -6,6 +6,7 @@ import { cwd as processCwd, env as processEnv, stderr as processStderr } from "n
 
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import { evaluateCodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
 import {
 	resolveCodegraphCommand,
@@ -44,6 +45,10 @@ export async function runCodegraphSessionStartWorker(options: SessionStartWorker
 
 	if (config.codegraph?.enabled === false) {
 		return finish("skipped-disabled", { projectRoot }, logOutcome);
+	}
+
+	if (!evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion }).supported) {
+		return finish("skipped-unsupported-node", { projectRoot }, logOutcome);
 	}
 
 	return runBootstrap(projectRoot, config.codegraph ?? {}, env, homeDir, { ...defaultDeps, ...options.deps }, logOutcome);
