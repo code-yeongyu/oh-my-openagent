@@ -139,19 +139,25 @@ describe("test workflows", () => {
     expect(hasMatrixRunner, "CI root checks must run on the selected matrix OS").toBe(true)
   })
 
-  test("runs codex compatibility checks on every supported os", () => {
+  test("runs codex compatibility checks on every supported os without serializing build", () => {
     // #given
     const workflow = readFileSync(ciWorkflowPath, "utf8")
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
+    const buildJob = sliceWorkflowSection(workflow, "  build:", "  draft-release:")
 
     // #when
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
+    const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
-    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility]")
+    const buildWaitsForChecks = buildJob.includes("needs:")
+    const draftReleaseWaitsForBuild = workflow.includes("  draft-release:\n    runs-on: ubuntu-latest\n    needs: [build]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
+    expect(hasSupportedOsMatrix, "CI Codex compatibility must cover supported OSes").toBe(true)
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
-    expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
+    expect(buildWaitsForChecks, "Build has no artifact dependency on test/typecheck/codex and must not serialize CI").toBe(false)
+    expect(draftReleaseWaitsForBuild, "Draft release must still wait for the build artifact gate").toBe(true)
   })
 
   test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
