@@ -19,7 +19,7 @@ jobs:
       - name: Check stored CLA signatures
         id: cla_state
         if: github.event_name == 'pull_request_target'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const signaturePath = "signatures/cla.json";

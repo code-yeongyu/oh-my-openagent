@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { dirname } from "node:path"
 
 import { writeFileAtomically } from "../../shared/write-file-atomically"
 import { STALE_MS } from "./constants"
-import { mirrorFilePath } from "./mirror-path"
+import { canonicalProjectDir, mirrorFilePath } from "./mirror-path"
 import { parseSnapshot } from "./snapshot-schema"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
 
@@ -30,7 +30,7 @@ export function readMirror(projectDir: string): TuiRuntimeSnapshot | null {
   if (snapshot === null) {
     return null
   }
-  if (snapshot.projectDir !== resolve(projectDir)) {
+  if (canonicalProjectDir(snapshot.projectDir) !== canonicalProjectDir(projectDir)) {
     return null
   }
   if (Date.now() - snapshot.updatedAt > STALE_MS) {
