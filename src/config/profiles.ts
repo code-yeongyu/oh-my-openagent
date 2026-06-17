@@ -1,6 +1,6 @@
 import type { MatrixxConfig } from "./schema/matrixx-config"
 
-export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate"] as const
+export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate", "go-trio"] as const
 export type ProfileName = (typeof PROFILE_NAMES)[number]
 
 const OPUS = "anthropic/claude-opus-4-6"
@@ -18,7 +18,9 @@ const KIMI_K25 = "opencode-go/kimi-k2.5"
 const DEEPSEEK_PRO = "opencode-go/deepseek-v4-pro"
 const DEEPSEEK_FLASH = "opencode-go/deepseek-v4-flash"
 const GLM_51 = "opencode-go/glm-5.1"
+const MIMO_V25 = "opencode-go/mimo-v2.5"
 const MIMO_PRO = "opencode-go/mimo-v2.5-pro"
+const MINIMAX_M3 = "opencode-go/minimax-m3"
 const MINIMAX_27 = "opencode-go/minimax-m2.7"
 const QWEN_36 = "opencode-go/qwen3.6-plus"
 
@@ -277,6 +279,43 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       "blue-pill": { model: DEEPSEEK_PRO },
       broadcast: { model: DEEPSEEK_PRO },
       "bullet-time": { model: DEEPSEEK_PRO },
+    },
+  },
+  /* Three-model sweet spot using deepseek-v4-flash, minimax-m3, and mimo-v2.5
+   * from the OpenCode Go provider. Minimax-m3 (+128% growth, $2.40/M) handles
+   * orchestration & strategy. Mimo-v2.5 (same price as flash at $0.28/M but
+   * stronger reasoning) covers deep work. DeepSeek V4 Flash (#1 by usage, $0.28/M)
+   * handles high-volume automation. */
+  "go-trio": {
+    agents: {
+      /* Tier 1 — Orchestrators: minimax-m3 for top reasoning & planning */
+      morpheus: { model: MINIMAX_M3 },
+      oracle: { model: MINIMAX_M3 },
+      seraph: { model: MINIMAX_M3 },
+      niobe: { model: MINIMAX_M3 },
+      architect: { model: MINIMAX_M3 },
+      /* Tier 2 — Deep Workers: mimo-v2.5 — same $0.28/M as flash, stronger reasoning */
+      keymaker: { model: MIMO_V25 },
+      cipher: { model: MIMO_V25 },
+      sentinel: { model: MIMO_V25 },
+      smith: { model: MIMO_V25 },
+      merovingian: { model: MIMO_V25 },
+      /* Tier 3 — Automation: deepseek-v4-flash — #1 workhorse, 96% cache ratio */
+      operator: { model: DEEPSEEK_FLASH },
+      trinity: { model: DEEPSEEK_FLASH },
+      construct: { model: DEEPSEEK_FLASH },
+      mouse: { model: DEEPSEEK_FLASH },
+      zion: { model: DEEPSEEK_FLASH },
+    },
+    categories: {
+      source: { model: MINIMAX_M3 },
+      "deep-jack": { model: MINIMAX_M3 },
+      "matrix-bend": { model: MINIMAX_M3 },
+      "red-pill": { model: MIMO_V25 },
+      construct: { model: DEEPSEEK_FLASH },
+      "blue-pill": { model: DEEPSEEK_FLASH },
+      broadcast: { model: DEEPSEEK_FLASH },
+      "bullet-time": { model: DEEPSEEK_FLASH },
     },
   },
 }
