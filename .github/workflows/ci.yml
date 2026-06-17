@@ -63,6 +63,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            packages/lsp-tools-mcp/package-lock.json
+            packages/lsp-daemon/package-lock.json
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -103,6 +107,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            packages/lsp-tools-mcp/package-lock.json
+            packages/lsp-daemon/package-lock.json
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -142,6 +150,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            packages/lsp-tools-mcp/package-lock.json
+            packages/lsp-daemon/package-lock.json
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -211,6 +223,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-vendored-${{ hashFiles('packages/lsp-tools-mcp/package-lock.json', 'packages/lsp-daemon/package-lock.json') }}
 
       - uses: oven-sh/setup-bun@v2
         with:
