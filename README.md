@@ -87,13 +87,6 @@ Grammars, parsers, type systems, code generators, metamodels. 11 composable skil
 </td>
 <td>
 
-### Niobe — *The Research Navigator*
-<img src=".github/assets/niobe.png" width="120" align="right"/>
-
-**Claude Sonnet 4.6** &middot; Research & technical leadership
-
-Academic papers, EU proposals, systematic reviews, project management, IP exploitation. 12 composable skills covering the full research lifecycle.
-
 </td>
 </tr>
 <tr>
@@ -142,10 +135,10 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 | | |
 |---|---|
-| **Agent Orchestration** | 14 agents, parallel background execution, category-based routing, session continuity |
+| **Agent Orchestration** | 13 agents, parallel background execution, category-based routing, session continuity |
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **41 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery |
-| **39 Built-in Skills** | DSL engineering (11), research & leadership (12), security (9), crypto (3), browser, git, frontend |
+| **27 Built-in Skills** | DSL engineering (11), security (9), crypto (3), browser, git, frontend |
 | **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search), Document Reader (office docs) |
 | **Claude Code Compat** | Full compatibility — commands, agents, skills, MCPs, hooks from `settings.json` |
 
@@ -183,7 +176,7 @@ The `go` profile divides 14 agents into four cost tiers, stretching the 5-hour r
 
 | Tier | Agents | Model | Purpose |
 |------|--------|-------|---------|
-| **Orchestrators** | morpheus, oracle, seraph, niobe, architect | GLM-5.1 | Long-horizon reasoning, planning, architecture |
+| **Orchestrators** | morpheus, oracle, seraph, architect | GLM-5.1 | Long-horizon reasoning, planning, architecture |
 | **Deep Workers** | keymaker, cipher | Kimi K2.6 | Complex multi-file coding, DSL engineering |
 | **QA / Review** | sentinel, smith, merovingian | DeepSeek V4 Pro | Structured logic, test suites, debugging |
 | **Automation** | operator, trinity, construct, mouse, zion | DeepSeek V4 Flash | Lightweight tasks, search, utilities (~31k req/5h) |
