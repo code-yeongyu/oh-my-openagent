@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	listDirectoryNames,
+	listDirectoryEntries,
 	readHooksJson,
 	readPackageJson,
 	readPluginJson,
@@ -16,7 +16,7 @@ describe("plugin package metadata", () => {
 		const hooksJson = readHooksJson("hooks/hooks.json");
 		const cliSource = readTextFile("src/cli.ts");
 		const packageFiles = requireFiles(packageJson, "package.json");
-		const bundledRules = [...listDirectoryNames("bundled-rules")].sort();
+		const bundledRules = [...listDirectoryEntries("bundled-rules")].sort();
 
 		// when
 		const hookConfig = hooksJson.hooks;

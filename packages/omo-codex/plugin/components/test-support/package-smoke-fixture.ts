@@ -6,10 +6,10 @@ export type ComponentPackageJson = {
 	readonly version?: string;
 	readonly type: string;
 	readonly packageManager: string;
-	readonly bin: Record<string, string>;
-	readonly dependencies?: Record<string, string>;
-	readonly optionalDependencies?: Record<string, string>;
-	readonly scripts?: Record<string, string>;
+	readonly bin: Readonly<Record<string, string>>;
+	readonly dependencies?: Readonly<Record<string, string>>;
+	readonly optionalDependencies?: Readonly<Record<string, string>>;
+	readonly scripts?: Readonly<Record<string, string>>;
 	readonly files?: readonly string[];
 };
 
@@ -71,7 +71,7 @@ export function readTextFile(path: string): string {
 	return readFileSync(path, "utf8");
 }
 
-export function listDirectoryNames(path: string): readonly string[] {
+export function listDirectoryEntries(path: string): readonly string[] {
 	return readdirSync(path);
 }
 
@@ -80,7 +80,7 @@ export function requireFiles(packageJson: ComponentPackageJson, path: string): r
 	return packageJson.files;
 }
 
-export function requireScripts(packageJson: ComponentPackageJson, path: string): Record<string, string> {
+export function requireScripts(packageJson: ComponentPackageJson, path: string): Readonly<Record<string, string>> {
 	if (packageJson.scripts === undefined) throw new TypeError(`Package metadata missing scripts: ${path}`);
 	return packageJson.scripts;
 }

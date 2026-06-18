@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	listDirectoryNames,
+	listDirectoryEntries,
 	readHooksJson,
 	readMcpJson,
 	readPackageJson,
@@ -17,7 +17,7 @@ describe("plugin package metadata", () => {
 		const cliSource = readTextFile("src/cli.ts");
 		const codexHookCliSource = readTextFile("src/codex-hook-cli.ts");
 		const codexHookSource = readTextFile("src/codex-hook.ts");
-		const sourceFiles = listDirectoryNames("src");
+		const sourceFiles = listDirectoryEntries("src");
 		const scripts = requireScripts(packageJson, "package.json");
 
 		// when
