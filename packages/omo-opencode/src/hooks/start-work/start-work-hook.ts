@@ -94,7 +94,8 @@ export function createStartWorkHook(ctx: PluginInput) {
       : await findRecentSessionPlanPath({
           client: ctx.client,
           directory: ctx.directory,
-          sessionID: sessionId,
+          // SDK session.messages needs the bare ses_ id, not the opencode:-prefixed storage id (#5285)
+          sessionID: input.sessionID,
           availablePlans: findPrometheusPlans(ctx.directory),
         })
 
