@@ -1,5 +1,6 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
+import { isRealUserTextPart } from "../../shared"
 import { applyFallbackToChatMessage } from "./chat-message-fallback-handler"
 import {
   createModelFallbackStateController,
@@ -174,6 +175,11 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     ): Promise<void> => {
       const { sessionID } = input
       if (!sessionID) return
+
+      if (output.parts.some(isRealUserTextPart)) {
+        clearPendingModelFallback(controller, sessionID)
+        return
+      }
 
       const fallback = getNextFallback(controller, sessionID)
       if (!fallback) return
