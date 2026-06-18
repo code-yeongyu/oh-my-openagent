@@ -29,17 +29,17 @@ function resolveAutoContinuationFallbackContext(
   modelFallback: Pick<ModelFallbackHook, "getFallbackState"> | null | undefined,
   sessionID: string,
   fallbackContext: FallbackContinuationContext,
-): FallbackContinuationContext {
+): FallbackContinuationContext | null {
   if (typeof modelFallback?.getFallbackState !== "function") return fallbackContext;
 
   const state = modelFallback?.getFallbackState(sessionID);
-  if (!state?.pending) return fallbackContext;
+  if (!state?.pending) return null;
 
   const fallback = getNextReachableFallback(sessionID, {
     ...state,
     fallbackChain: [...state.fallbackChain],
   } satisfies ModelFallbackState);
-  if (!fallback) return fallbackContext;
+  if (!fallback) return null;
 
   return {
     ...fallbackContext,
@@ -125,6 +125,10 @@ export function createModelFallbackEventHandler(args: {
 
     if (setFallback && shouldAutoContinue) {
       const continuationContext = resolveAutoContinuationFallbackContext(args.modelFallback, sessionID, fallbackContext);
+      if (!continuationContext) {
+        args.modelFallback?.getNextFallback?.(sessionID);
+        return;
+      }
       if (continuation.shouldSkipFallbackContinuation(sessionID, source, continuationContext)) return;
 
       const dispatched = await continuation.autoContinueAfterFallback(
