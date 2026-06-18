@@ -85,11 +85,7 @@ describe("codex ultrawork package metadata", () => {
 		// given
 		const skill = readTextFile("skills/ulw-plan/SKILL.md");
 		const workflow = readTextFile("skills/ulw-plan/references/full-workflow.md");
-		const skillContracts = [
-			"CodeGraph first",
-			"scripts/scaffold-plan.mjs",
-			"Approval gate",
-		] as const;
+		const skillContracts = ["CodeGraph first", "scripts/scaffold-plan.mjs", "Approval gate"] as const;
 		const workflowContracts = [
 			"dynamic adversarial workflow phases",
 			"stale_state",
