@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -31,6 +31,7 @@ function clearTelemetryEnv(): void {
 
 function createDataHomePath(): string {
   const tempPath = mkdtempSync(join(tmpdir(), "omo-codex-posthog-diagnostics-"))
+  mkdirSync(join(tempPath, CACHE_DIR_NAME), { recursive: true })
   tempPaths.push(tempPath)
   return tempPath
 }
@@ -39,41 +40,35 @@ function getDiagnosticsFilePath(dataHomePath: string): string {
   return join(dataHomePath, CACHE_DIR_NAME, "telemetry-diagnostics.jsonl")
 }
 
-function mockPostHogCaptureFailure(): void {
-  mock.module("posthog-node", () => ({
-    PostHog: class {
-      capture(): void {
-        throw new Error("capture failed")
-      }
-
-      async shutdown(): Promise<void> {}
+function mockPostHogCaptureFailure(posthog: PostHogModule): void {
+  posthog.__setTransportFactoryForTesting(() => ({
+    capture: () => {
+      throw new Error("capture failed")
     },
+    flush: async () => {},
+    shutdown: async () => {},
   }))
 }
 
-function mockPostHogCaptureSymbolFailure(): void {
+function mockPostHogCaptureSymbolFailure(posthog: PostHogModule): void {
   const failure = Symbol("capture failed")
-  mock.module("posthog-node", () => ({
-    PostHog: class {
-      capture(): void {
-        throw failure
-      }
-
-      async shutdown(): Promise<void> {}
+  posthog.__setTransportFactoryForTesting(() => ({
+    capture: () => {
+      throw failure
     },
+    flush: async () => {},
+    shutdown: async () => {},
   }))
 }
 
-function mockPostHogShutdownFailure(capturedMessages: CapturedPostHogMessage[]): void {
-  mock.module("posthog-node", () => ({
-    PostHog: class {
-      capture(message: CapturedPostHogMessage): void {
-        capturedMessages.push(message)
-      }
-
-      async shutdown(): Promise<void> {
-        throw new Error("shutdown failed")
-      }
+function mockPostHogShutdownFailure(posthog: PostHogModule, capturedMessages: CapturedPostHogMessage[]): void {
+  posthog.__setTransportFactoryForTesting(() => ({
+    capture: (message: any) => {
+      capturedMessages.push(message)
+    },
+    flush: async () => {},
+    shutdown: async () => {
+      throw new Error("shutdown failed")
     },
   }))
 }
@@ -92,6 +87,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     } else {
       process.env.XDG_DATA_HOME = originalXdgDataHome
     }
+    delete process.env.XDG_STATE_HOME
     for (const tempPath of tempPaths.splice(0)) {
       rmSync(tempPath, { recursive: true, force: true })
     }
@@ -101,9 +97,10 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     // given
     const dataHomePath = createDataHomePath()
     process.env.XDG_DATA_HOME = dataHomePath
+    process.env.XDG_STATE_HOME = dataHomePath
     process.env.POSTHOG_API_KEY = "test-api-key"
-    mockPostHogCaptureFailure()
     const posthog = await importPostHogModule()
+    mockPostHogCaptureFailure(posthog)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
@@ -120,9 +117,10 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     // given
     const dataHomePath = createDataHomePath()
     process.env.XDG_DATA_HOME = dataHomePath
+    process.env.XDG_STATE_HOME = dataHomePath
     process.env.POSTHOG_API_KEY = "test-api-key"
-    mockPostHogCaptureSymbolFailure()
     const posthog = await importPostHogModule()
+    mockPostHogCaptureSymbolFailure(posthog)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
@@ -141,9 +139,10 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     const dataHomePath = createDataHomePath()
     const capturedMessages: CapturedPostHogMessage[] = []
     process.env.XDG_DATA_HOME = dataHomePath
+    process.env.XDG_STATE_HOME = dataHomePath
     process.env.POSTHOG_API_KEY = "test-api-key"
-    mockPostHogShutdownFailure(capturedMessages)
     const posthog = await importPostHogModule()
+    mockPostHogShutdownFailure(posthog, capturedMessages)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
