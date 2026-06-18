@@ -2,7 +2,6 @@
 	"hooks": {
 		"SubagentStop": [
 			{
-				"matcher": "^lazycodex-executor$",
 				"hooks": [
 					{
 						"type": "command",
@@ -10,7 +9,8 @@
 						"timeout": 10,
 						"statusMessage": "(OmO) Verifying LazyCodex Executor Evidence"
 					}
-				]
+				],
+				"matcher": "^lazycodex-executor$"
 			}
 		]
 	}

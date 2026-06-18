@@ -17,6 +17,19 @@ export async function readPluginVersion() {
 	return (await readJson(".codex-plugin/plugin.json")).version;
 }
 
+export async function readAggregateHookManifests() {
+	const manifest = await readJson(".codex-plugin/plugin.json");
+	const hookPaths = Array.isArray(manifest.hooks) ? manifest.hooks : [manifest.hooks];
+	return Promise.all(
+		hookPaths
+			.filter((hookPath) => typeof hookPath === "string")
+			.map(async (hookPath) => {
+				const source = hookPath.replace(/^\.\//, "");
+				return { source, hooks: await readJson(source) };
+			}),
+	);
+}
+
 export async function exists(relativePath) {
 	try {
 		await stat(join(root, relativePath));

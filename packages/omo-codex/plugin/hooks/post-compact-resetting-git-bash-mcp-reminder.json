@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PostCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/git-bash/dist/cli.js\" hook post-compact",
+						"timeout": 5,
+						"statusMessage": "(OmO) Resetting Git Bash MCP Reminder"
+					}
+				],
+				"matcher": "manual|auto"
+			}
+		]
+	}
+}

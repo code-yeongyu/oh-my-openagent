@@ -7873,17 +7873,33 @@ async function trustedHookStatesForPlugin(input) {
   if (!await exists2(manifestPath))
     return [];
   const manifest = JSON.parse(await readFile10(manifestPath, "utf8"));
-  if (!isPlainRecord(manifest) || typeof manifest.hooks !== "string")
+  if (!isPlainRecord(manifest))
     return [];
-  const hooksPath = join14(input.pluginRoot, manifest.hooks);
-  if (!await exists2(hooksPath))
-    return [];
-  const parsed = JSON.parse(await readFile10(hooksPath, "utf8"));
-  if (!isPlainRecord(parsed) || !isPlainRecord(parsed.hooks))
-    return [];
-  const keySource = `${input.pluginName}@${input.marketplaceName}:${stripDotSlash(manifest.hooks)}`;
   const states = [];
-  for (const [eventName, groups] of Object.entries(parsed.hooks)) {
+  for (const hookPath of hookManifestPaths(manifest.hooks)) {
+    const hooksPath = join14(input.pluginRoot, hookPath);
+    if (!await exists2(hooksPath))
+      continue;
+    const parsed = JSON.parse(await readFile10(hooksPath, "utf8"));
+    if (!isPlainRecord(parsed) || !isPlainRecord(parsed.hooks))
+      continue;
+    states.push(...trustedHookStatesForHooksFile({
+      keySource: `${input.pluginName}@${input.marketplaceName}:${hookPath}`,
+      hooks: parsed.hooks
+    }));
+  }
+  return states;
+}
+function hookManifestPaths(value) {
+  if (typeof value === "string" && value.trim() !== "")
+    return [stripDotSlash(value)];
+  if (!Array.isArray(value))
+    return [];
+  return value.filter((item) => typeof item === "string" && item.trim() !== "").map(stripDotSlash);
+}
+function trustedHookStatesForHooksFile(input) {
+  const states = [];
+  for (const [eventName, groups] of Object.entries(input.hooks)) {
     if (!Array.isArray(groups))
       continue;
     const eventLabel = EVENT_LABELS.get(eventName);
@@ -7899,7 +7915,7 @@ async function trustedHookStatesForPlugin(input) {
           continue;
         if (typeof handler.command !== "string" || handler.command.trim() === "")
           continue;
-        const key = `${keySource}:${eventLabel}:${groupIndex}:${handlerIndex}`;
+        const key = `${input.keySource}:${eventLabel}:${groupIndex}:${handlerIndex}`;
         states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler) });
       }
     }
@@ -8327,14 +8343,26 @@ async function readPluginManifest(pluginRoot) {
   if (parsed.version !== undefined && (typeof parsed.version !== "string" || parsed.version.trim() === "")) {
     throw new Error(`${pluginRoot} plugin.json version must be a non-empty string`);
   }
-  if (parsed.hooks !== undefined && (typeof parsed.hooks !== "string" || parsed.hooks.trim() === "")) {
-    throw new Error(`${pluginRoot} plugin.json hooks must be a non-empty string`);
+  if (parsed.hooks !== undefined && !isPluginHooksManifestValue(parsed.hooks)) {
+    throw new Error(`${pluginRoot} plugin.json hooks must be a non-empty string or string array`);
   }
   return {
     name: parsed.name,
     version: typeof parsed.version === "string" ? parsed.version.trim() : undefined,
-    hooks: typeof parsed.hooks === "string" ? parsed.hooks.trim() : undefined
+    hooks: normalizePluginHooksManifestValue(parsed.hooks)
   };
+}
+function isPluginHooksManifestValue(value) {
+  if (typeof value === "string")
+    return value.trim() !== "";
+  return Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim() !== "");
+}
+function normalizePluginHooksManifestValue(value) {
+  if (typeof value === "string")
+    return value.trim();
+  if (Array.isArray(value))
+    return value.map((item) => item.trim());
+  return;
 }
 function validatePathSegment(value, label) {
   if (!/^[A-Za-z0-9._+-]+$/.test(value)) {
@@ -8459,9 +8487,13 @@ function resolveLazyCodexPluginVersion(input) {
   return input.manifestVersion ?? "local";
 }
 async function stampLazyCodexPluginVersion(input) {
-  await stampJsonVersion(join19(input.pluginRoot, ".codex-plugin", "plugin.json"), input.version);
+  const manifestPath = join19(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const hookPaths = await readPluginHookPaths(manifestPath);
+  await stampJsonVersion(manifestPath, input.version);
   await stampJsonVersion(join19(input.pluginRoot, "package.json"), input.version);
-  await stampHookStatusMessages(join19(input.pluginRoot, "hooks", "hooks.json"), input.version);
+  for (const hookPath of hookPaths) {
+    await stampHookStatusMessages(join19(input.pluginRoot, hookPath), input.version);
+  }
   await stampComponentVersions(input);
 }
 async function writeLazyCodexInstallSnapshot(input) {
@@ -8486,6 +8518,26 @@ async function stampJsonVersion(path, version) {
       return;
     throw error;
   }
+}
+async function readPluginHookPaths(manifestPath) {
+  try {
+    const parsed = JSON.parse(await readFile14(manifestPath, "utf8"));
+    if (!isPlainRecord(parsed))
+      return [];
+    if (typeof parsed.hooks === "string" && parsed.hooks.trim().length > 0)
+      return [stripDotSlash2(parsed.hooks)];
+    if (Array.isArray(parsed.hooks)) {
+      return parsed.hooks.filter((hookPath) => typeof hookPath === "string" && hookPath.trim().length > 0).map(stripDotSlash2);
+    }
+    return [];
+  } catch (error) {
+    if (error instanceof Error)
+      return [];
+    throw error;
+  }
+}
+function stripDotSlash2(path) {
+  return path.startsWith("./") ? path.slice(2) : path;
 }
 async function stampHookStatusMessages(path, version) {
   try {
@@ -8534,7 +8586,7 @@ function stampHookGroups(hooks, version) {
 function stampHookStatusMessage(hook, version) {
   if (!isPlainRecord(hook) || typeof hook.statusMessage !== "string")
     return;
-  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):/, `LazyCodex(${version}):`);
+  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):\s*/, "(OmO) ");
 }
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
@@ -13276,12 +13328,13 @@ import { readFile as readFile18 } from "node:fs/promises";
 import { join as join31, sep as sep8 } from "node:path";
 var PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}\/([^"']+)/g;
 async function findMissingHookCommandTargets(pluginRoot) {
-  const manifestPath = join31(pluginRoot, "hooks", "hooks.json");
-  if (!await fileExistsStrict(manifestPath))
-    return [];
   const commands = [];
-  const parsed = JSON.parse(await readFile18(manifestPath, "utf8"));
-  collectCommands(parsed, commands);
+  for (const manifestPath of await hookManifestPaths2(pluginRoot)) {
+    if (!await fileExistsStrict(manifestPath))
+      continue;
+    const parsed = JSON.parse(await readFile18(manifestPath, "utf8"));
+    collectCommands(parsed, commands);
+  }
   const missing = [];
   const seen = new Set;
   for (const command of commands) {
@@ -13298,6 +13351,24 @@ async function findMissingHookCommandTargets(pluginRoot) {
     }
   }
   return missing;
+}
+async function hookManifestPaths2(pluginRoot) {
+  const pluginManifestPath = join31(pluginRoot, ".codex-plugin", "plugin.json");
+  if (!await fileExistsStrict(pluginManifestPath))
+    return [join31(pluginRoot, "hooks", "hooks.json")];
+  const parsed = JSON.parse(await readFile18(pluginManifestPath, "utf8"));
+  if (!isPlainRecord(parsed))
+    return [];
+  if (typeof parsed.hooks === "string" && parsed.hooks.trim() !== "") {
+    return [join31(pluginRoot, stripDotSlash3(parsed.hooks))];
+  }
+  if (Array.isArray(parsed.hooks)) {
+    return parsed.hooks.filter((hookPath) => typeof hookPath === "string" && hookPath.trim() !== "").map((hookPath) => join31(pluginRoot, stripDotSlash3(hookPath)));
+  }
+  return [];
+}
+function stripDotSlash3(path2) {
+  return path2.startsWith("./") ? path2.slice(2) : path2;
 }
 async function assertHookCommandTargets(pluginRoot) {
   const missing = await findMissingHookCommandTargets(pluginRoot);

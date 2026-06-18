@@ -56,6 +56,34 @@ async function createPluginRoot({ withGitBashDist }) {
 	return pluginRoot;
 }
 
+async function createPluginRootWithHookArray({ withGitBashDist }) {
+	const pluginRoot = await mkdtemp(join(tmpdir(), "hook-targets-array-"));
+	await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
+	await mkdir(join(pluginRoot, "hooks"), { recursive: true });
+	await writeFile(
+		join(pluginRoot, ".codex-plugin", "plugin.json"),
+		JSON.stringify({ name: "omo", hooks: ["./hooks/session-start.json", "./hooks/stop.json"] }, null, "\t"),
+	);
+	await writeFile(
+		join(pluginRoot, "hooks", "session-start.json"),
+		JSON.stringify({ hooks: { SessionStart: HOOKS_MANIFEST.hooks.SessionStart } }, null, "\t"),
+	);
+	await writeFile(
+		join(pluginRoot, "hooks", "stop.json"),
+		JSON.stringify({ hooks: { Stop: HOOKS_MANIFEST.hooks.Stop } }, null, "\t"),
+	);
+	const targets = [
+		"scripts/auto-update.mjs",
+		"components/ulw-loop/dist/cli.js",
+		...(withGitBashDist ? ["components/git-bash/dist/cli.js"] : []),
+	];
+	for (const target of targets) {
+		await mkdir(dirname(join(pluginRoot, target)), { recursive: true });
+		await writeFile(join(pluginRoot, target), "");
+	}
+	return pluginRoot;
+}
+
 test("#given a hook command target missing from the payload #when scanning #then exactly that path is reported", async (t) => {
 	const pluginRoot = await createPluginRoot({ withGitBashDist: false });
 	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
@@ -67,6 +95,22 @@ test("#given a hook command target missing from the payload #when scanning #then
 
 test("#given a complete payload #when scanning #then nothing is missing", async (t) => {
 	const pluginRoot = await createPluginRoot({ withGitBashDist: true });
+	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
+
+	assert.deepEqual(await findMissingHookCommandTargets(pluginRoot), []);
+});
+
+test("#given hook manifests declared as an array #when scanning #then missing targets are reported", async (t) => {
+	const pluginRoot = await createPluginRootWithHookArray({ withGitBashDist: false });
+	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
+
+	const missing = await findMissingHookCommandTargets(pluginRoot);
+
+	assert.deepEqual(missing, [join(pluginRoot, "components/git-bash/dist/cli.js")]);
+});
+
+test("#given hook manifests declared as an array and complete payload #when scanning #then nothing is missing", async (t) => {
+	const pluginRoot = await createPluginRootWithHookArray({ withGitBashDist: true });
 	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
 
 	assert.deepEqual(await findMissingHookCommandTargets(pluginRoot), []);
