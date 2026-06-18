@@ -302,29 +302,41 @@ function marketplaceCheckEnv(root, pluginRoot, spawnLogPath, extra = {}) {
 	});
 }
 
-test("#given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice", async () => {
+test("#given marketplace plugin root without install snapshot #when running check #then runs the same auto-update flow", async () => {
 	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-");
 	const spawnLogPath = join(root, "spawn.log");
 	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath);
 
 	const result = await runAutoUpdateCheck({ env, now: 123_456 });
 
-	assert.equal(result.started, false);
-	assert.equal(result.reason, "marketplace-flow");
+	assert.equal(result.started, true);
+	assert.equal(result.status, 0);
 	assert.equal(result.notices.length, 1);
-	assert.match(result.notices[0], /codex plugin marketplace upgrade sisyphuslabs/);
-	assert.match(result.notices[0], /re-approve/);
-	await assert.rejects(readFile(spawnLogPath, "utf8"), { code: "ENOENT" });
+	assert.match(result.notices[0], /Auto-update started in the background/);
+	assert.doesNotMatch(result.notices[0], /marketplace upgrade/);
+	assert.equal(await readFile(spawnLogPath, "utf8"), "ok");
 	const state = JSON.parse(await readFile(env.LAZYCODEX_AUTO_UPDATE_STATE_PATH, "utf8"));
 	assert.equal(state.lastCheckedAt, 123_456);
 	assert.equal(state.lastStatus, "success");
-	assert.notEqual(state.lastStatus, "started");
 	const logEntries = (await readFile(env.LAZYCODEX_AUTO_UPDATE_LOG_PATH, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
 	assert.deepEqual(logEntries, [
 		{
 			timestamp: "1970-01-01T00:02:03.456Z",
-			event: "skipped",
-			kind: "marketplace-flow",
+			event: "started",
+			command: process.execPath,
+			args: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(spawnLogPath)}, "ok")`],
+		},
+		{
+			timestamp: "1970-01-01T00:02:03.456Z",
+			event: "finished",
+			status: 0,
+		},
+		{
+			timestamp: "1970-01-01T00:02:03.456Z",
+			event: "notified",
+			kind: "update-started",
+			fromVersion: "1.0.0",
+			toVersion: "1.0.1",
 		},
 	]);
 });
@@ -355,7 +367,7 @@ test("#given marketplace skip already recorded #when next session is within inte
 	const first = await runAutoUpdateCheck({ env, now: 123_456 });
 	const second = await runAutoUpdateCheck({ env, now: 123_457 });
 
-	assert.equal(first.reason, "marketplace-flow");
+	assert.equal(first.started, true);
 	assert.equal(first.notices.length, 1);
 	assert.equal(second.started, false);
 	assert.equal(second.reason, "throttled");

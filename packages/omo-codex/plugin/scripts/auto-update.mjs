@@ -22,10 +22,8 @@ const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
 const DEFAULT_UPDATE_COMMAND = "npx";
 const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
-const MARKETPLACE_FLOW_NOTICE =
-	"[LazyCodex] Auto-update skipped: this LazyCodex install is managed by the Codex plugin marketplace, so the npx self-update was not started. Tell the user to upgrade with `codex plugin marketplace upgrade sisyphuslabs`, and that Codex will ask them to re-approve hooks after the upgrade.";
 
-export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt, lastAttemptedAt, lastStatus, installFlow } = {}) {
+export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt, lastAttemptedAt, lastStatus } = {}) {
 	if (env.LAZYCODEX_AUTO_UPDATE_DISABLED === "1" || env.OMO_CODEX_AUTO_UPDATE_DISABLED === "1") {
 		return { shouldRun: false, reason: "disabled" };
 	}
@@ -39,9 +37,6 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 	if (!successStatus && typeof lastAttemptedAt === "number" && retryIntervalMs > 0 && now - lastAttemptedAt < retryIntervalMs) {
 		return { shouldRun: false, reason: "retry-throttled" };
 	}
-
-	const flow = installFlow ?? detectAutoUpdateInstallFlow(env).flow;
-	if (flow === "marketplace") return { shouldRun: false, reason: "marketplace-flow" };
 
 	const currentVersion = resolveCurrentVersion(env);
 	const latestVersion = resolveLatestVersion(env);
@@ -116,15 +111,8 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		lastCheckedAt: state.lastCheckedAt,
 		lastAttemptedAt: state.lastAttemptedAt,
 		lastStatus: state.lastStatus,
-		installFlow: installFlow.flow,
 	});
 	if (!plan.shouldRun) {
-		if (plan.reason === "marketplace-flow") {
-			await appendUpdateLog(env, now, "skipped", { kind: "marketplace-flow" });
-			await writeState(statePath, { ...state, lastCheckedAt: now, lastStatus: "success" });
-			notices.push(MARKETPLACE_FLOW_NOTICE);
-			return { started: false, reason: plan.reason, notices };
-		}
 		await appendUpdateLog(env, now, "skipped", { reason: plan.reason });
 		if (plan.reason === "up-to-date") {
 			await writeState(statePath, { ...state, lastCheckedAt: now, lastStatus: "success" });
