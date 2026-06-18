@@ -24482,6 +24482,27 @@
         "output": 128000
       }
     },
+    "anthropic/claude-opus-4-8": {
+      "id": "anthropic/claude-opus-4-8",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
     "anthropic/claude-opus-4-1": {
       "id": "anthropic/claude-opus-4-1",
       "family": "claude-opus",
@@ -24918,6 +24939,27 @@
     },
     "claude-opus-4-7": {
       "id": "claude-opus-4-7",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
+    "claude-opus-4-8": {
+      "id": "claude-opus-4-8",
       "family": "claude-opus",
       "reasoning": true,
       "temperature": false,
@@ -28859,6 +28901,27 @@
         "output": 128000
       }
     },
+    "global.anthropic.claude-opus-4-8": {
+      "id": "global.anthropic.claude-opus-4-8",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
     "mistral.pixtral-large-2502-v1:0": {
       "id": "mistral.pixtral-large-2502-v1:0",
       "family": "mistral",
@@ -29160,6 +29223,27 @@
         "output": 128000
       }
     },
+    "us.anthropic.claude-opus-4-8": {
+      "id": "us.anthropic.claude-opus-4-8",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
     "amazon.nova-2-lite-v1:0": {
       "id": "amazon.nova-2-lite-v1:0",
       "family": "nova",
@@ -29324,6 +29408,27 @@
     },
     "anthropic.claude-opus-4-7": {
       "id": "anthropic.claude-opus-4-7",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
+    "anthropic.claude-opus-4-8": {
+      "id": "anthropic.claude-opus-4-8",
       "family": "claude-opus",
       "reasoning": true,
       "temperature": false,
@@ -29785,6 +29890,27 @@
     },
     "eu.anthropic.claude-opus-4-7": {
       "id": "eu.anthropic.claude-opus-4-7",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
+    "eu.anthropic.claude-opus-4-8": {
+      "id": "eu.anthropic.claude-opus-4-8",
       "family": "claude-opus",
       "reasoning": true,
       "temperature": false,
@@ -33513,6 +33639,27 @@
     },
     "claude-opus-4-7@default": {
       "id": "claude-opus-4-7@default",
+      "family": "claude-opus",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1000000,
+        "output": 128000
+      }
+    },
+    "claude-opus-4-8@default": {
+      "id": "claude-opus-4-8@default",
       "family": "claude-opus",
       "reasoning": true,
       "temperature": false,

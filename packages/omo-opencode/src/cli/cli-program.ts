@@ -109,7 +109,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Baili
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
-  OpenCode Zen  opencode/ models (opencode/claude-opus-4-7, etc.)
+  OpenCode Zen  opencode/ models (opencode/claude-opus-4-8, etc.)
   Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
   Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)

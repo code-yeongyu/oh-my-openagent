@@ -45,7 +45,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary?.variant).toBe("high")
     expect(second?.providers[0]).toBe("zai-coding-plan")
     expect(second?.model).toBe("glm-5")
-    expect(third?.model).toBe("claude-opus-4-7")
+    expect(third?.model).toBe("claude-opus-4-8")
     expect(third?.variant).toBe("max")
     expect(fourth?.providers[0]).toBe("opencode-go")
     expect(fourth?.model).toBe("glm-5.1")
@@ -92,7 +92,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
     })
     expect(secondary).toEqual({

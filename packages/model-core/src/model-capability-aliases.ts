@@ -44,6 +44,12 @@ const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
     canonicalModelID: "claude-opus-4-7",
     rationale: "GitHub Copilot exposes Claude Opus 4.7 with dotted version syntax while the snapshot uses dashed syntax.",
   },
+  {
+    aliasModelID: "claude-opus-4.8",
+    ruleID: "claude-opus-dotted-version-alias",
+    canonicalModelID: "claude-opus-4-8",
+    rationale: "GitHub Copilot exposes Claude Opus 4.8 with dotted version syntax while the snapshot uses dashed syntax.",
+  },
 ]
 
 const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
@@ -53,9 +59,9 @@ const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(
 const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
   {
     ruleID: "claude-thinking-legacy-alias",
-    description: "Normalizes the legacy claude-opus-4-7-thinking id to the canonical snapshot ID.",
-    match: (normalizedModelID) => /^claude-opus-4-7-thinking$/.test(normalizedModelID),
-    canonicalize: () => "claude-opus-4-7",
+    description: "Normalizes the legacy claude-opus-4-7-thinking and claude-opus-4-8-thinking ids to the canonical snapshot ID.",
+    match: (normalizedModelID) => /^claude-opus-4-(?:7|8)-thinking$/.test(normalizedModelID),
+    canonicalize: () => "claude-opus-4-8",
   },
   {
     ruleID: "gemini-3.1-pro-tier-alias",

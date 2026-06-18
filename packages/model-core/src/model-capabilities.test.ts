@@ -32,6 +32,21 @@ describe("getModelCapabilities", () => {
         },
         toolCall: true,
       },
+      "claude-opus-4-8": {
+        id: "claude-opus-4-8",
+        family: "claude-opus",
+        reasoning: true,
+        temperature: true,
+        modalities: {
+          input: ["text", "image", "pdf"],
+          output: ["text"],
+        },
+        limit: {
+          context: 1_000_000,
+          output: 128_000,
+        },
+        toolCall: true,
+      },
       "gemini-3.1-pro": {
         id: "gemini-3.1-pro",
         family: "gemini",
@@ -185,7 +200,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: "claude-opus-4-8",
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
@@ -260,7 +275,7 @@ describe("getModelCapabilities", () => {
 
     expect(result).toMatchObject({
       requestedModelID: "anthropic/claude-opus-4-7-thinking",
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: "claude-opus-4-8",
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
