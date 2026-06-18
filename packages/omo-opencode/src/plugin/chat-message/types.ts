@@ -33,6 +33,7 @@ type ChatMessageHook = {
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput,
   ) => Promise<void>
+  clearPendingModelFallback?: (sessionID: string) => void
 }
 
 type StopContinuationGuard = {

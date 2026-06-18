@@ -22,6 +22,10 @@ import {
 } from "./event-model-fallback-state";
 import type { PluginEventContext } from "./event-types";
 
+function isAbortErrorName(errorName: string | undefined): boolean {
+  return errorName === "MessageAbortedError" || errorName === "AbortError";
+}
+
 export function createModelFallbackEventHandler(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
@@ -112,6 +116,11 @@ export function createModelFallbackEventHandler(args: {
     if (lastHandled === assistantMessageID) return true;
 
     const errorName = extractErrorName(assistantError);
+    if (isAbortErrorName(errorName)) {
+      if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
+      return false;
+    }
+
     const errorMessage = extractErrorMessage(assistantError);
     if (!shouldRetryError({ name: errorName, message: errorMessage })) return false;
 
@@ -192,7 +201,12 @@ export function createModelFallbackEventHandler(args: {
     errorName?: string;
     props?: Record<string, unknown>;
   }): Promise<void> => {
-    if (!shouldHandleModelFallback() || !shouldRetryError({ name: params.errorName, message: params.errorMessage })) return;
+    if (!shouldHandleModelFallback()) return;
+    if (isAbortErrorName(params.errorName)) {
+      if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
+      return;
+    }
+    if (!shouldRetryError({ name: params.errorName, message: params.errorMessage })) return;
 
     const agentName = resolveFallbackAgentName({
       currentAgent: getSessionAgent(params.sessionID),

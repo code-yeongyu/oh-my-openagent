@@ -219,6 +219,42 @@ describe("createChatMessageHandler - first message hook ordering", () => {
     // then
     expect(hookCalls).toEqual(["runtimeFallback"])
   })
+
+  test("clears pending model fallback before ordinary stopped user messages", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const fallbackClearCalls: string[] = []
+    let pendingFallback = true
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.modelFallback = {
+      clearPendingModelFallback: (sessionID: string) => {
+        fallbackClearCalls.push(sessionID)
+        pendingFallback = false
+      },
+      "chat.message": async (_input, output) => {
+        if (pendingFallback) {
+          output.message["model"] = {
+            providerID: "opencode-go",
+            modelID: "gpt-5.5",
+          }
+        }
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(stopContinuationGuard.isStoppedCalls).toEqual(["test-session"])
+    expect(fallbackClearCalls).toEqual(["test-session"])
+    expect(output.message["model"]).toBeUndefined()
+  })
 })
 
 describe("createChatMessageHandler - cache warning behavior", () => {
