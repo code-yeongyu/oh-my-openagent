@@ -1990,7 +1990,6 @@ async function executeCodegraphSessionStartHook(options = {}) {
   const homeDir = resolveHomeDir2(env);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
   if (config.codegraph?.enabled === false) {
-    writeHookJson(options.stdout ?? processStdout, "skipped-disabled");
     return { action: "skipped-disabled", exitCode: 0 };
   }
   (options.spawnWorker ?? spawnDetachedWorker)({
@@ -1998,11 +1997,16 @@ async function executeCodegraphSessionStartHook(options = {}) {
     command: process.execPath,
     env: { ...env, [SESSION_START_CWD_ENV]: projectRoot }
   });
-  writeHookJson(options.stdout ?? processStdout, "spawned");
+  writeHookJson(options.stdout ?? processStdout);
   return { action: "spawned", exitCode: 0 };
 }
-function writeHookJson(stdout, action) {
-  const output = action === "spawned" ? { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: CODEGRAPH_SESSION_START_NOTICE }, codegraph: { action } } : { hookSpecificOutput: { hookEventName: "SessionStart" }, codegraph: { action } };
+function writeHookJson(stdout) {
+  const output = {
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: CODEGRAPH_SESSION_START_NOTICE
+    }
+  };
   stdout.write(`${JSON.stringify(output)}
 `);
 }
