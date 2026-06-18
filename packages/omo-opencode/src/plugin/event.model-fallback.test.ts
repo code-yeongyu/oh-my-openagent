@@ -237,7 +237,7 @@ describe("createEventHandler - model fallback", () => {
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
       { providers: ["anthropic"], model: "claude-opus-4-7" },
-      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5", variant: "medium" },
     ]))
     const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
 
@@ -272,6 +272,7 @@ describe("createEventHandler - model fallback", () => {
       providerID: "opencode-go",
       modelID: "gpt-5.5",
     })
+    expect(promptInputs[0]?.body?.["variant"]).toBe("medium")
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 

@@ -46,6 +46,7 @@ function resolveAutoContinuationFallbackContext(
     providerID: fallback.providerID,
     dedupeProviderID: fallback.providerID,
     modelID: fallback.modelID,
+    variant: fallback.variant,
   };
 }
 

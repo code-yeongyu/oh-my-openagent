@@ -22,6 +22,7 @@ export type FallbackContinuationContext = {
   providerID?: string;
   dedupeProviderID?: string;
   modelID?: string;
+  variant?: string;
 };
 
 type FallbackContinuationDedupeKeys = {
@@ -191,7 +192,7 @@ export function createModelFallbackContinuationController(args: {
       const agentSettings = agentConfigKey
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
-      const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+      const launchVariant = fallbackContext?.variant ?? (agentSettings as { variant?: string } | undefined)?.variant;
       const promptBody = {
         path: { id: sessionID },
         body: {
