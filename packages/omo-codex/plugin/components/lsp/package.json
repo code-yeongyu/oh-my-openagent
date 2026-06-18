@@ -39,7 +39,7 @@
 		"bootstrap": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
 		"prebuild": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
 		"build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
-		"pretest": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
+		"pretest": "npm run build --silent",
 		"test": "node scripts/test.mjs",
 		"test:watch": "vitest",
 		"pretypecheck": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
