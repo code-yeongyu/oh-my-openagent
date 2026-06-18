@@ -110,15 +110,15 @@ export function createModelFallbackEventHandler(args: {
     const assistantError = params.info.error;
     if (!assistantMessageID || !assistantError) return false;
 
-    const lastHandled = lastHandledModelErrorMessageID.get(params.sessionID);
-    if (lastHandled === assistantMessageID) return true;
-
     const errorName = extractErrorName(assistantError);
     const errorMessage = extractErrorMessage(assistantError);
     if (isAbortError(assistantError) || isAbortError({ name: errorName, message: errorMessage })) {
       if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
       return false;
     }
+
+    const lastHandled = lastHandledModelErrorMessageID.get(params.sessionID);
+    if (lastHandled === assistantMessageID) return true;
 
     if (!shouldRetryError({ name: errorName, message: errorMessage })) return false;
 

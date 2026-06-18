@@ -1204,6 +1204,106 @@ describe("createEventHandler - model fallback", () => {
     expect(output.message["model"]).toBeUndefined()
   })
 
+  test("clears pending fallback when the same assistant message updates from retryable error to abort", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_same_message_abort_clear"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providerID: "opencode-go", modelID: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when - first update arms fallback and marks this assistant message id as handled.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_retry_then_abort_clear",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            parentID: "msg_user_retry_then_abort_clear",
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+
+    //#when - OpenCode later rewrites the same assistant message to the user-abort error.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_retry_then_abort_clear",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              message: "Request was canceled by the user.",
+            },
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
