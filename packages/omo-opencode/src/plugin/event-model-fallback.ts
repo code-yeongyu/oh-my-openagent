@@ -6,6 +6,7 @@ import {
   setPendingModelFallback,
   type ModelFallbackHook,
 } from "../hooks/model-fallback/hook";
+import { isAbortError } from "../shared/is-abort-error";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import {
@@ -21,13 +22,6 @@ import {
   type FallbackContinuationContext,
 } from "./event-model-fallback-state";
 import type { PluginEventContext } from "./event-types";
-
-const ABORT_ERROR_NAMES = new Set(["messageabortederror", "aborterror"]);
-
-function isAbortErrorName(errorName: string | undefined): boolean {
-  const normalized = errorName?.trim().toLowerCase();
-  return normalized ? ABORT_ERROR_NAMES.has(normalized) : false;
-}
 
 export function createModelFallbackEventHandler(args: {
   pluginConfig: OhMyOpenCodeConfig;
@@ -120,12 +114,12 @@ export function createModelFallbackEventHandler(args: {
     if (lastHandled === assistantMessageID) return true;
 
     const errorName = extractErrorName(assistantError);
-    if (isAbortErrorName(errorName)) {
+    const errorMessage = extractErrorMessage(assistantError);
+    if (isAbortError(assistantError) || isAbortError({ name: errorName, message: errorMessage })) {
       if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
       return false;
     }
 
-    const errorMessage = extractErrorMessage(assistantError);
     if (!shouldRetryError({ name: errorName, message: errorMessage })) return false;
 
     const agentName = resolveFallbackAgentName({
@@ -206,7 +200,7 @@ export function createModelFallbackEventHandler(args: {
     props?: Record<string, unknown>;
   }): Promise<void> => {
     if (!shouldHandleModelFallback()) return;
-    if (isAbortErrorName(params.errorName)) {
+    if (isAbortError({ name: params.errorName, message: params.errorMessage })) {
       if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
       return;
     }

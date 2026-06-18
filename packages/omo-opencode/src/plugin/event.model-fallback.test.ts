@@ -1132,6 +1132,78 @@ describe("createEventHandler - model fallback", () => {
     expect(output.message["model"]).toBeUndefined()
   })
 
+  test("clears pending fallback on abort message even when error name is generic", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_generic_abort_message_clear"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providerID: "opencode-go", modelID: "gpt-5.5" },
+    ]))
+    expect(
+      modelFallback.setPendingModelFallback(
+        sessionID,
+        "sisyphus",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "APIError",
+            message: "Request was cancelled by the user.",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
