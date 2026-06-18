@@ -184,7 +184,7 @@ A `tsconfig.json` with `"strict": true` alone is **not** strict. The reference e
 
 ## CODE SMELLS — AUTOMATIC REVIEW TRIGGERS
 
-**A code smell is not a hard block — it is a signal that your design NEEDS a second look.** When any smell below fires, STOP. Re-examine the code. Decide whether `/refactor` is warranted. Either fix the smell or justify carrying it with a SPECIFIC reason — "it's fine" is not a justification.
+Most smells below are design review triggers: STOP, re-examine the code, and either fix the smell or justify carrying it with a SPECIFIC reason. **The 250 pure LOC ceiling is stricter: >250 is a DEFECT. Refactor before adding lines except for rare SIZE_OK or pure-data-table exceptions.**
 
 Full rationale, measurement methods, workaround detection, and split examples: **[`references/code-smells.md`](references/code-smells.md)**.
 
@@ -243,7 +243,7 @@ bun run scripts/typescript/check-no-excuse-rules.ts <changed paths>
 |---|---|---|
 | ≤ 200 | Healthy | continue |
 | 200 - 250 | **Warning band** | State that fact and propose a split if the next edit will add lines. |
-| > 250 | **Code smell detected** | Re-examine the file. Load `/refactor` if splitting is warranted. Justify with a SPECIFIC reason if carrying the smell. |
+| > 250 | **DEFECT** | Do NOT commit new lines to this file. Refactor now: split the touched unit before adding lines, except for rare SIZE_OK or pure-data-table exceptions. |
 
 ### Step 3 — architectural self-review (always, even at 80 LOC)
 
