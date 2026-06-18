@@ -90,6 +90,13 @@ function sliceJob(workflow: string, jobName: string): string {
   return workflow.slice(start, afterMarker + nextJob.index)
 }
 
+function sliceWorkflowSectionToEnd(workflow: string, startMarker: string): string {
+  const start = workflow.indexOf(startMarker)
+  if (start < 0) throw new Error(`missing workflow section starting at ${startMarker}`)
+
+  return workflow.slice(start)
+}
+
 function hasSummaryWriter(jobSection: string): boolean {
   return jobSection.includes("name: Write job summary") && jobSection.includes("GITHUB_STEP_SUMMARY")
 }
@@ -133,6 +140,15 @@ describe("GitHub workflow job summaries", () => {
         expect(hasSummaryWriter(jobSection), `${expectation.path} ${job} must write a job summary`).toBe(true)
       }
     }
+  })
+
+  test("#given a privileged publish summary #when it renders dispatch inputs #then raw inputs are passed through env", () => {
+    const workflow = readFileSync(".github/workflows/publish-platform.yml", "utf8")
+    const summaryStep = sliceWorkflowSectionToEnd(workflow, "      - name: Write job summary")
+
+    expect(summaryStep).toContain("JOB_SUMMARY_DIST_TAG: ${{ inputs.dist_tag || 'latest' }}")
+    expect(summaryStep).toContain("\\`$JOB_SUMMARY_DIST_TAG\\`")
+    expect(summaryStep).not.toContain("`${{ inputs.dist_tag || 'latest' }}`")
   })
 
   test("#given summary inputs #when the shared writer runs #then it emits the Markdown contract GitHub renders", () => {

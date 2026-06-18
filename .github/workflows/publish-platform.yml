@@ -342,6 +342,8 @@ jobs:
 
       - name: Write job summary
         if: always()
+        env:
+          JOB_SUMMARY_DIST_TAG: ${{ inputs.dist_tag || 'latest' }}
         run: |
           {
             echo "## Platform publish (${{ matrix.platform }})"
@@ -351,7 +353,7 @@ jobs:
             echo "| Result | \`${{ job.status }}\` |"
             echo "| Workflow | \`${{ github.workflow }}\` |"
             echo "| Platform | \`${{ matrix.platform }}\` |"
-            echo "| Dist tag | \`${{ inputs.dist_tag || 'latest' }}\` |"
+            echo "| Dist tag | \`$JOB_SUMMARY_DIST_TAG\` |"
             echo
             echo "### What this job checks"
             echo
