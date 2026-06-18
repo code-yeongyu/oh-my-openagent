@@ -4,6 +4,8 @@ import { resolveBundledMcpRuntimeArg } from "./codex-cache-bundled-mcps"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { resolveCachedRuntimePath } from "./codex-cache-paths"
 
+const CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"])
+
 export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = pluginRoot): Promise<void> {
   const manifestPath = join(pluginRoot, ".mcp.json")
   if (!(await fileExistsStrict(manifestPath))) return
@@ -23,6 +25,7 @@ export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = 
       if (typeof arg !== "string") return arg
       const bundledMcpRuntimeArg = resolveBundledMcpRuntimeArg(pluginRoot, arg)
       if (bundledMcpRuntimeArg !== null) return bundledMcpRuntimeArg
+      if (CODEGRAPH_RELATIVE_ARGS.has(arg)) return join(pluginRoot, "components", "codegraph", "dist", "serve.js")
       if (arg.startsWith("./") || arg.startsWith("../")) return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg)
       return arg
     })

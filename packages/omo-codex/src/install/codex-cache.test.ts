@@ -28,6 +28,34 @@ describe("codex-cache", () => {
     expect(rewritten.mcpServers.lsp.args[0]).toBe(join(root, "./components/lsp/dist/cli.js"))
   })
 
+  test("#given cached CodeGraph manifest uses bare package-relative entrypoint #when rewriting before bootstrap #then entrypoint becomes absolute under plugin root", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-codegraph-"))
+    await writeFile(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          codegraph: {
+            command: "node",
+            args: ["components/codegraph/dist/serve.js"],
+            cwd: ".",
+            required: false,
+          },
+        },
+      }),
+    )
+
+    // when
+    await rewriteCachedMcpManifest(root)
+
+    // then
+    const rewritten = JSON.parse(await readFile(join(root, ".mcp.json"), "utf8")) as {
+      mcpServers: { codegraph: { cwd?: string; args: string[] } }
+    }
+    expect(rewritten.mcpServers.codegraph.cwd).toBeUndefined()
+    expect(rewritten.mcpServers.codegraph.args).toEqual([join(root, "components", "codegraph", "dist", "serve.js")])
+  })
+
   test("rewrites bundled mcp manifest args that point outside the plugin cache into bundled cache paths", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))

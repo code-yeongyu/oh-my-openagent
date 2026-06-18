@@ -6979,6 +6979,7 @@ async function collectPackageJsonPaths(directory, root, paths) {
 // packages/omo-codex/src/install/codex-cache-mcp-manifest.ts
 import { readFile as readFile5, writeFile as writeFile3 } from "node:fs/promises";
 import { join as join7, sep as sep3 } from "node:path";
+var CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot) {
   const manifestPath = join7(pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
@@ -7004,6 +7005,8 @@ async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot) {
       const bundledMcpRuntimeArg = resolveBundledMcpRuntimeArg(pluginRoot, arg);
       if (bundledMcpRuntimeArg !== null)
         return bundledMcpRuntimeArg;
+      if (CODEGRAPH_RELATIVE_ARGS.has(arg))
+        return join7(pluginRoot, "components", "codegraph", "dist", "serve.js");
       if (arg.startsWith("./") || arg.startsWith("../"))
         return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg);
       return arg;
@@ -13230,7 +13233,7 @@ function readVersionManifest(path2) {
 import { readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
 import { join as join30 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
-var CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
+var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 async function stampGitBashMcpEnv(input) {
   const manifestPath = join30(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
@@ -13263,7 +13266,7 @@ function stampCodegraphMcpPath(mcpServers, pluginRoot) {
     return false;
   const args = codegraphServer["args"];
   const entrypoint = args[0];
-  if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS.has(entrypoint))
+  if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS2.has(entrypoint))
     return false;
   codegraphServer["args"] = [join30(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
   return true;
