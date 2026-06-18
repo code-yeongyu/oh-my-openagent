@@ -38,7 +38,7 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 1. **Discovery + Analysis** (concurrent)
    - Fire background explore agents immediately
-   - Main session: bash structure + LSP codemap + read existing AGENTS.md
+   - Main session: bash structure + LSP/codegraph code map + read existing AGENTS.md
 2. **Score & Decide** - Determine AGENTS.md locations from merged findings
 3. **Generate** - Root first, then subdirs in parallel
 4. **Review** - Deduplicate, trim, validate
@@ -47,7 +47,7 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 **TodoWrite ALL phases. Mark in_progress → completed in real-time.**
 ```
 TodoWrite([
-  { id: "discovery", content: "Fire explore agents + LSP codemap + read existing", status: "pending", priority: "high" },
+  { id: "discovery", content: "Fire explore agents + LSP/codegraph map + read existing", status: "pending", priority: "high" },
   { id: "scoring", content: "Score directories, determine locations", status: "pending", priority: "high" },
   { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
   { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
@@ -63,16 +63,16 @@ TodoWrite([
 
 ### Fire Background Explore Agents IMMEDIATELY
 
-Don't wait-these run async while main session works.
+Don't wait-these run async while main session works. **Equip every agent with the code graph**: any task touching structure, entry points, dependencies, or hotspots MUST query `codegraph_*` (explore/search/callers/callees/impact) and `lsp_symbols` when present, and ground its claims in that data instead of guessing from conventions. Richer real-graph context per agent = a more accurate project map.
 
 ```
 // Fire all at once, collect results later
-task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
-task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files → REPORT non-standard organization")
+task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: map real layout via codegraph_explore/codegraph_files → REPORT deviations from standard patterns")
+task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files, trace reach via codegraph_callees + lsp_symbols → REPORT non-standard organization")
 task(subagent_type="explore", load_skills=[], description="Find conventions", run_in_background=true, prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
 task(subagent_type="explore", load_skills=[], description="Find anti-patterns", run_in_background=true, prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
 task(subagent_type="explore", load_skills=[], description="Explore build/CI", run_in_background=true, prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
+task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs/structure; codegraph_callers on core modules to see what is covered → REPORT unique conventions")
 ```
 
 <dynamic-agents>
@@ -134,24 +134,19 @@ For each existing file found:
 
 If `--create-new`: Read all existing first (preserve context) → then delete all → regenerate.
 
-#### 3. LSP Codemap (if available)
-```
-LspServers()  # Check availability
+#### 3. Code Map - drive LSP AND codegraph (do NOT skip)
 
-# Entry points (parallel)
-LspDocumentSymbols(filePath="src/index.ts")
-LspDocumentSymbols(filePath="main.py")
+Highest-signal source for the CODE MAP and the Symbol/Export/Reference scoring rows. Complementary, not alternatives - run BOTH when present, alongside the explore agents.
 
-# Key symbols (parallel)
-LspWorkspaceSymbols(filePath=".", query="class")
-LspWorkspaceSymbols(filePath=".", query="interface")
-LspWorkspaceSymbols(filePath=".", query="function")
+**LSP** - check `lsp_status`; model-facing names are `lsp_status`/`lsp_symbols`/`lsp_find_references`/`lsp_goto_definition` (some harnesses drop the `lsp_` prefix):
+- `lsp_symbols` scope="document" on each entry point -> file outline.
+- `lsp_symbols` scope="workspace", query by kind (class/interface/function) -> symbol inventory.
+- `lsp_find_references` on top exports (line/character from the symbols result) -> reference centrality.
 
-# Centrality for top exports
-LspFindReferences(filePath="...", line=X, character=Y)
-```
+**codegraph** - when `codegraph_*` tools exist (check `codegraph_status`); a first-class peer to LSP, NOT a last resort:
+- `codegraph_explore` -> overview; `codegraph_callers`/`codegraph_callees`/`codegraph_impact` -> centrality + blast radius for the scoring matrix; `codegraph_search`/`codegraph_files` -> symbol/file inventory.
 
-**LSP Fallback**: If unavailable, use `codegraph_explore` first when codegraph_* tools exist; otherwise rely on explore agents + the ast-grep skill (`sg` CLI).
+Only if NEITHER exists: explore agents + the ast-grep skill (`sg`), and mark centrality unmeasured in the CODE MAP.
 
 ### Collect Background Results
 
@@ -160,7 +155,7 @@ LspFindReferences(filePath="...", line=X, character=Y)
 for each background task ID (`bg_...`): background_output(task_id="bg_...")
 ```
 
-**Merge: bash + LSP + existing + explore findings. Mark "discovery" as completed.**
+**Merge: bash + LSP/codegraph + existing + explore findings. Mark "discovery" as completed.**
 
 ---
 
@@ -177,9 +172,9 @@ for each background task ID (`bg_...`): background_output(task_id="bg_...")
 | Code ratio | 2x | >70% | bash |
 | Unique patterns | 1x | Has own config | explore |
 | Module boundary | 2x | Has index.ts/__init__.py | bash |
-| Symbol density | 2x | >30 symbols | LSP |
-| Export count | 2x | >10 exports | LSP |
-| Reference centrality | 3x | >20 refs | LSP |
+| Symbol density | 2x | >30 symbols | LSP/cg |
+| Export count | 2x | >10 exports | LSP/cg |
+| Reference centrality | 3x | >20 refs | LSP/cg |
 
 ### Decision Rules
 
@@ -236,7 +231,7 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 |------|----------|-------|
 
 ## CODE MAP
-{From LSP - skip if unavailable or project <10 files}
+{From LSP/codegraph - skip only if neither exists or project <10 files}
 
 | Symbol | Type | Location | Refs | Role |
 |--------|------|----------|------|------|
@@ -319,7 +314,7 @@ Hierarchy:
 ## Anti-Patterns
 
 - **Static agent count**: MUST vary agents based on project size/depth
-- **Sequential execution**: MUST parallel (explore + LSP concurrent)
+- **Sequential execution**: MUST parallel (explore + LSP + codegraph concurrent)
 - **Ignoring existing**: ALWAYS read existing first, even with --create-new
 - **Over-documenting**: Not every dir needs AGENTS.md
 - **Redundancy**: Child never repeats parent
