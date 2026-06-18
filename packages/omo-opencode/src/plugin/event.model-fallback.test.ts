@@ -1352,6 +1352,78 @@ describe("createEventHandler - model fallback", () => {
     expect(output.message["model"]).toBeUndefined()
   })
 
+  test("clears auto-continuation dedupe on abort so same-model retry can re-arm fallback before idle", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_abort_clears_auto_dedupe"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const retryInfo = (id: string) => ({
+      id,
+      sessionID,
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+      error: {
+        name: "ModelNotSupportedError",
+        message: "model_not_supported: claude-opus-4-7 is not supported",
+      },
+      parentID: `${id}_user`,
+      modelID: "claude-opus-4-7",
+      providerID: "anthropic",
+      agent: "Sisyphus - Ultraworker",
+      path: { cwd: "/tmp", root: "/tmp" },
+    })
+
+    //#when - first retryable error dispatches auto-continuation and records dedupe.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: retryInfo("msg_retry_before_abort_dedupe_clear"),
+        },
+      },
+    })
+
+    //#when - abort update arrives before session.idle.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_retry_before_abort_dedupe_clear",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              message: "Request was canceled by the user.",
+            },
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - user retries and OpenCode reports the same failed model before idle clears dedupe.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: retryInfo("msg_retry_after_abort_dedupe_clear"),
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"

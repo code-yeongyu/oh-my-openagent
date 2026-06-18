@@ -95,6 +95,12 @@ export function createModelFallbackEventHandler(args: {
     lastDispatchedContinuationKeys.delete(sessionID);
   };
 
+  const clearPendingFallbackAfterAbort = (sessionID: string): void => {
+    lastHandledRetryStatusKey.delete(sessionID);
+    lastDispatchedContinuationKeys.delete(sessionID);
+    if (args.modelFallback) clearPendingModelFallback(args.modelFallback, sessionID);
+  };
+
   const setLastKnownModel = (sessionID: string, model: { providerID: string; modelID: string }): void => {
     lastKnownModelBySession.set(sessionID, model);
   };
@@ -147,7 +153,7 @@ export function createModelFallbackEventHandler(args: {
     const errorName = extractErrorName(assistantError);
     const errorMessage = extractErrorMessage(assistantError);
     if (isAbortError(assistantError) || isAbortError({ name: errorName, message: errorMessage })) {
-      if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
+      clearPendingFallbackAfterAbort(params.sessionID);
       return false;
     }
 
@@ -235,7 +241,7 @@ export function createModelFallbackEventHandler(args: {
   }): Promise<void> => {
     if (!shouldHandleModelFallback()) return;
     if (isAbortError({ name: params.errorName, message: params.errorMessage })) {
-      if (args.modelFallback) clearPendingModelFallback(args.modelFallback, params.sessionID);
+      clearPendingFallbackAfterAbort(params.sessionID);
       return;
     }
     if (!shouldRetryError({ name: params.errorName, message: params.errorMessage })) return;
