@@ -16,6 +16,7 @@ const skillSources = [
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
+const skillDisplayPrefix = "(OmO) ";
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
@@ -151,6 +152,40 @@ function applyCodexSkillOverlays(skillName, content) {
 	return content;
 }
 
+function readSkillFrontmatterName(content, fallbackName) {
+	const frontmatter = content.match(/^---\n(?<body>[\s\S]*?)\n---\n+/);
+	const rawName = frontmatter?.groups?.body.match(/^name:\s*"?([^"\n]+)"?\s*$/m)?.[1]?.trim();
+	return rawName && rawName.length > 0 ? rawName : fallbackName;
+}
+
+function upsertDisplayName(metadata, displayName) {
+	const content = metadata.endsWith("\n") ? metadata : `${metadata}\n`;
+	if (/^\s*display_name:/m.test(metadata)) {
+		return content.replace(/^(\s*display_name:\s*).+$/m, `$1"${displayName}"`);
+	}
+	if (/^interface:\s*$/m.test(metadata)) {
+		return content.replace(/^interface:\s*$/m, `interface:\n  display_name: "${displayName}"`);
+	}
+	return `interface:\n  display_name: "${displayName}"\n${content}`;
+}
+
+async function writeCodexSkillDisplayMetadata(skillName) {
+	const skillRoot = join(skillsRoot, skillName);
+	const skillPath = join(skillRoot, "SKILL.md");
+	const content = await readFile(skillPath, "utf8");
+	const frontmatterName = readSkillFrontmatterName(content, skillName);
+	const metadataDir = join(skillRoot, "agents");
+	const metadataPath = join(metadataDir, "openai.yaml");
+	await mkdir(metadataDir, { recursive: true });
+	let metadata = "interface:\n";
+	try {
+		metadata = await readFile(metadataPath, "utf8");
+	} catch (error) {
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+	}
+	await writeFile(metadataPath, upsertDisplayName(metadata, `${skillDisplayPrefix}${frontmatterName}`), "utf8");
+}
+
 async function adaptSkillForCodex(skillName) {
 	const skillPath = join(skillsRoot, skillName, "SKILL.md");
 	const content = await readFile(skillPath, "utf8");
@@ -158,6 +193,7 @@ async function adaptSkillForCodex(skillName) {
 	if (adapted !== content) {
 		await writeFile(skillPath, adapted, "utf8");
 	}
+	await writeCodexSkillDisplayMetadata(skillName);
 }
 
 async function syncSkills() {
