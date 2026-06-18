@@ -480,6 +480,106 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("Result")
   })
 
+  test("#given active internal all-complete wake during sync continuation #then child task gate lets poller complete", async () => {
+    const { executeSyncContinuation } = require("./sync-continuation")
+    const { pollSyncSession } = require("./sync-session-poller")
+    const controller = new AbortController()
+    const abortTimer = setTimeout(() => controller.abort(), 80)
+    let messageCallCount = 0
+    let childCheckCount = 0
+    let statusCallCount = 0
+    const completeMessages = [
+      { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "prometheus" } },
+      {
+        info: {
+          id: "msg_002",
+          role: "assistant",
+          time: { created: 2000 },
+          finish: "stop",
+          agent: "prometheus",
+        },
+        parts: [{ type: "text", text: "Done" }],
+      },
+    ]
+    const internalWakeMessages = [
+      ...completeMessages,
+      {
+        info: { id: "msg_003", role: "user", time: { created: 3000 } },
+        parts: [
+          {
+            type: "text",
+            text: [
+              "<system-reminder>",
+              "[BACKGROUND TASK COMPLETED]",
+              "[ALL BACKGROUND TASKS COMPLETE]",
+              "</system-reminder>",
+              "<!-- OMO_INTERNAL_INITIATOR -->",
+            ].join("\n"),
+          },
+        ],
+      },
+    ]
+    const mockClient = {
+      session: {
+        messages: async () => {
+          messageCallCount++
+          return { data: messageCallCount === 1 ? completeMessages : internalWakeMessages }
+        },
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => {
+          statusCallCount++
+          const type = statusCallCount === 1 ? "idle" : "running"
+          return { data: { ses_test_12345678: { type } } }
+        },
+        abort: async () => ({}),
+      },
+    }
+
+    const deps = {
+      pollSyncSession,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+      abort: controller.signal,
+    }
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 200,
+      manager: {
+        hasActiveChildTasks: () => {
+          childCheckCount++
+          return false
+        },
+      },
+    }
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue planning",
+      description: "resume prometheus task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    try {
+      const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+      }, deps)
+
+      expect(result).toContain("Task continued and completed")
+      expect(result).toContain("Result")
+      expect(childCheckCount).toBeGreaterThan(0)
+      expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
+    } finally {
+      clearTimeout(abortTimer)
+    }
+  })
+
   test("marks and aborts resumed sync session after successful handback", async () => {
     //#given - a resumed sync continuation completes successfully
     const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
@@ -525,11 +625,9 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       callID: "call-123",
       metadata: () => {},
     }
-
     const mockExecutorCtx = {
       client: mockClient,
     }
-
     const args = {
       task_id: "ses_test_12345678",
       prompt: "test prompt",

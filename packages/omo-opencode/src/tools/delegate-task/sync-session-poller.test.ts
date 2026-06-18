@@ -695,6 +695,29 @@ describe("pollSyncSession", () => {
       ],
     }
 
+    const internalAllCompleteWake = {
+      info: { id: "msg_003", role: "user", time: { created: 3000 } },
+      parts: [
+        {
+          type: "text",
+          text: [
+            "<system-reminder>",
+            "[BACKGROUND TASK COMPLETED]",
+            "[ALL BACKGROUND TASKS COMPLETE]",
+            "</system-reminder>",
+            "<!-- OMO_INTERNAL_INITIATOR -->",
+          ].join("\n"),
+        },
+      ],
+    }
+
+    const internalAllCompleteWakeMessages = {
+      data: [
+        ...completeMessages.data,
+        internalAllCompleteWake,
+      ],
+    }
+
     test("waits for a fresh terminal turn after child background tasks clear", async () => {
       const { pollSyncSession } = require("./sync-session-poller")
       let childCheck = 0
@@ -787,6 +810,160 @@ describe("pollSyncSession", () => {
         toastManager: null,
         taskId: undefined,
         hasActiveChildBackgroundTasks: () => true,
+      }, 30)
+
+      expect(result).toContain("Poll inactivity timeout reached")
+    })
+
+    test("#given active status and internal all-complete wake after terminal assistant #then poller completes without abort", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const controller = new AbortController()
+      const abortTimer = setTimeout(() => controller.abort(), 50)
+      let messageCallCount = 0
+      let abortCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => {
+            messageCallCount++
+            return internalAllCompleteWakeMessages
+          },
+          status: async () => ({ data: { ses_test: { type: "running" } } }),
+          abort: async () => {
+            abortCount++
+          },
+        },
+      }
+
+      try {
+        const result = await pollSyncSession({
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "test-agent",
+          abort: controller.signal,
+        }, mockClient, {
+          sessionID: "ses_test",
+          agentToUse: "test-agent",
+          toastManager: null,
+          taskId: undefined,
+          childWakeGraceMs: 0,
+          hasActiveChildBackgroundTasks: () => false,
+        }, 200)
+
+        expect(result).toBeNull()
+        expect(messageCallCount).toBeGreaterThan(0)
+        expect(abortCount).toBe(0)
+      } finally {
+        clearTimeout(abortTimer)
+      }
+    })
+
+    test("#given idle status and internal all-complete wake after terminal assistant #then poller completes before timeout", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      let abortCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => internalAllCompleteWakeMessages,
+          status: async () => ({ data: { ses_test: { type: "idle" } } }),
+          abort: async () => {
+            abortCount++
+          },
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        childWakeGraceMs: 0,
+        hasActiveChildBackgroundTasks: () => false,
+      }, 50)
+
+      expect(result).toBeNull()
+      expect(abortCount).toBe(0)
+    })
+
+    test("#given internal all-complete wake while child tasks remain active #then poller waits until child gate clears", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      let childCheckCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => internalAllCompleteWakeMessages,
+          status: async () => ({ data: { ses_test: { type: "idle" } } }),
+          abort: async () => ({}),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        childWakeGraceMs: 0,
+        hasActiveChildBackgroundTasks: () => ++childCheckCount <= 2,
+      }, 100)
+
+      expect(result).toBeNull()
+      expect(childCheckCount).toBeGreaterThanOrEqual(3)
+    })
+
+    test("#given internal result-ready wake after terminal assistant #then poller still times out", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const resultReadyMessages = {
+        data: [
+          ...completeMessages.data,
+          {
+            info: { id: "msg_003", role: "user", time: { created: 3000 } },
+            parts: [{ type: "text", text: "[BACKGROUND TASK RESULT READY]\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+          },
+        ],
+      }
+      const mockClient = {
+        session: {
+          messages: async () => resultReadyMessages,
+          status: async () => ({ data: { ses_test: { type: "idle" } } }),
+          abort: async () => ({}),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        childWakeGraceMs: 0,
+        hasActiveChildBackgroundTasks: () => false,
+      }, 30)
+
+      expect(result).toContain("Poll inactivity timeout reached")
+    })
+
+    test("#given non-internal all-complete user message after terminal assistant #then poller still times out", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const nonInternalAllCompleteMessages = {
+        data: [
+          ...completeMessages.data,
+          {
+            info: { id: "msg_003", role: "user", time: { created: 3000 } },
+            parts: [{ type: "text", text: "[ALL BACKGROUND TASKS COMPLETE]" }],
+          },
+        ],
+      }
+      const mockClient = {
+        session: {
+          messages: async () => nonInternalAllCompleteMessages,
+          status: async () => ({ data: { ses_test: { type: "idle" } } }),
+          abort: async () => ({}),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        childWakeGraceMs: 0,
+        hasActiveChildBackgroundTasks: () => false,
       }, 30)
 
       expect(result).toContain("Poll inactivity timeout reached")

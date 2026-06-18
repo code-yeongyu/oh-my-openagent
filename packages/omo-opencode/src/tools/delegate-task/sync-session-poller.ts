@@ -2,19 +2,17 @@ import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
-import { normalizeSDKResponse } from "../../shared"
+import { hasInternalInitiatorMarker, normalizeSDKResponse } from "../../shared"
 import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
+const ALL_BACKGROUND_TASKS_COMPLETE_MARKER = "[ALL BACKGROUND TASKS COMPLETE]"
 const CHILD_WAKE_GRACE_MS = 5_000
 
 function wait(milliseconds: number): Promise<void> {
-  const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
-  const typedArray = new Int32Array(sharedBuffer)
-  const result = Atomics.waitAsync(typedArray, 0, 0, milliseconds)
-  return result.async ? result.value.then(() => undefined) : Promise.resolve()
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function abortSyncSession(client: OpencodeClient, sessionID: string, reason: string): void {
@@ -40,7 +38,7 @@ async function fetchSessionMessages(
 }
 
 function getTerminalSessionError(messages: SessionMessage[]): string | null {
-  const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
+  const lastAssistant = getLastAssistant(messages)
   const lastUser = [...messages].reverse().find((msg) => msg.info?.role === "user")
   if (lastUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastUser.info.id) {
     return null
@@ -51,6 +49,34 @@ function getTerminalSessionError(messages: SessionMessage[]): string | null {
 
   const errorMessage = extractErrorMessage((lastAssistant.info as { error?: unknown }).error)
   return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
+}
+
+function getMessageText(message: SessionMessage): string {
+  return (message.parts ?? [])
+    .map((part) => part.text ?? "")
+    .filter((text) => text.length > 0)
+    .join("\n")
+}
+
+function getLastAssistant(messages: SessionMessage[]): SessionMessage | undefined {
+  return [...messages].reverse().find((msg) => msg.info?.role === "assistant")
+}
+
+function isInternalAllCompleteWake(message: SessionMessage | undefined): boolean {
+  if (message?.info?.role !== "user") return false
+  const text = getMessageText(message)
+  return hasInternalInitiatorMarker(text) && text.includes(ALL_BACKGROUND_TASKS_COMPLETE_MARKER)
+}
+
+function getTerminalAssistantBeforeInternalAllCompleteWake(
+  messages: SessionMessage[]
+): SessionMessage | undefined {
+  const latestMessage = messages[messages.length - 1]
+  if (!isInternalAllCompleteWake(latestMessage)) return undefined
+
+  const messagesBeforeWake = messages.slice(0, -1)
+  if (!isSessionComplete(messagesBeforeWake)) return undefined
+  return getLastAssistant(messagesBeforeWake)
 }
 
 export function isSessionComplete(messages: SessionMessage[]): boolean {
@@ -195,9 +221,12 @@ export async function pollSyncSession(
       })
     }
 
-    if (isActiveSessionStatus(sessionStatus)) {
+    const activeSessionStatus = isActiveSessionStatus(sessionStatus)
+    if (activeSessionStatus) {
       inactiveStart = Date.now()
-      continue
+      if (input.hasActiveChildBackgroundTasks === undefined) {
+        continue
+      }
     }
 
     let messages: SessionMessage[]
@@ -212,6 +241,22 @@ export async function pollSyncSession(
       continue
     }
 
+    const internalWakeAssistant = getTerminalAssistantBeforeInternalAllCompleteWake(messages)
+    if (internalWakeAssistant) {
+      if (isAwaitingChildContinuation(internalWakeAssistant.info?.id)) {
+        continue
+      }
+      log("[task] Poll complete - internal all-background wake after terminal finish", {
+        sessionID: input.sessionID,
+        pollCount,
+      })
+      break
+    }
+
+    if (activeSessionStatus) {
+      continue
+    }
+
     const sessionError = getTerminalSessionError(messages)
     if (sessionError) {
       log("[task] Poll detected terminal session error", { sessionID: input.sessionID, sessionError })
@@ -219,7 +264,7 @@ export async function pollSyncSession(
     }
 
     if (isSessionComplete(messages)) {
-      const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
+      const currentAssistantId = getLastAssistant(messages)?.info?.id
       if (isAwaitingChildContinuation(currentAssistantId)) {
         continue
       }
@@ -228,7 +273,7 @@ export async function pollSyncSession(
     }
 
     // Count new assistant turns to circuit-break infinite loops
-    const lastAssistant = [...messages].reverse().find((m) => m.info?.role === "assistant")
+    const lastAssistant = getLastAssistant(messages)
     if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
       lastSeenAssistantId = lastAssistant.info.id
       assistantTurnCount++

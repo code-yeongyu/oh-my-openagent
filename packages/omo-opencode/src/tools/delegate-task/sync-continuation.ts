@@ -15,6 +15,7 @@ import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
 import { log } from "../../shared/logger"
 
 type ResumeModel = { providerID: string; modelID: string }
@@ -24,32 +25,6 @@ type ResumeContext = {
   resumeModel?: ResumeModel
   resumeVariant?: string
   anchorMessageCount?: number
-}
-
-function shouldAttemptPollErrorRecovery(pollError: string): boolean {
-  const trimmed = pollError.trim()
-
-  if (trimmed.length === 0) {
-    return false
-  }
-
-  if (/\bMessageAbortedError\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/\bDOMException\b/u.test(trimmed) && /\bAbortError\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/\bAbortError\b/u.test(trimmed) && !/\bTask aborted\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/^the operation was aborted\.?$/iu.test(trimmed)) {
-    return true
-  }
-
-  return false
 }
 
 async function resolveResumeContext(
@@ -101,6 +76,7 @@ export async function executeSyncContinuation(
 ): Promise<string> {
   const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
+  const hasActiveChildBackgroundTasks = executorCtx.manager?.hasActiveChildTasks?.bind(executorCtx.manager)
   const continuationID = getTaskID(args)
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
@@ -193,6 +169,7 @@ export async function executeSyncContinuation(
         toastManager,
         taskId,
         anchorMessageCount,
+        hasActiveChildBackgroundTasks,
       }, syncPollTimeoutMs)
       if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
         if (anchorMessageCount === undefined) {
