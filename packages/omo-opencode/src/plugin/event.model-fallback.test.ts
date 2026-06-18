@@ -942,7 +942,7 @@ describe("createEventHandler - model fallback", () => {
     setMainSession(sessionID)
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
-      { providerID: "opencode-go", modelID: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
     ]))
     expect(
       modelFallback.setPendingModelFallback(
@@ -1021,7 +1021,7 @@ describe("createEventHandler - model fallback", () => {
     setMainSession(sessionID)
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
-      { providerID: "opencode-go", modelID: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
     ]))
     expect(
       modelFallback.setPendingModelFallback(
@@ -1059,7 +1059,7 @@ describe("createEventHandler - model fallback", () => {
     setMainSession(sessionID)
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
-      { providerID: "opencode-go", modelID: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
     ]))
     expect(
       modelFallback.setPendingModelFallback(
@@ -1138,7 +1138,7 @@ describe("createEventHandler - model fallback", () => {
     setMainSession(sessionID)
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
-      { providerID: "opencode-go", modelID: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
     ]))
     expect(
       modelFallback.setPendingModelFallback(
@@ -1210,7 +1210,7 @@ describe("createEventHandler - model fallback", () => {
     setMainSession(sessionID)
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
-      { providerID: "opencode-go", modelID: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
     ]))
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
     const chatMessageHandler = createChatMessageHandler({
