@@ -1,5 +1,5 @@
 import {
-  isClaudeOpus47Model,
+  isClaudeOpus47OrLaterModel,
   isGeminiModel,
   isGlmModel,
   isGptModel,
@@ -25,7 +25,7 @@ const MODEL_MATCHERS: Readonly<Record<string, ModelMatcher>> = {
   "kimi-k2-7": isKimiK27Model,
   kimi: isKimiK2Model,
   glm: isGlmModel,
-  "opus-4-7": isClaudeOpus47Model,
+  "opus-4-7": isClaudeOpus47OrLaterModel,
   minimax: isMiniMaxModel,
 }
 

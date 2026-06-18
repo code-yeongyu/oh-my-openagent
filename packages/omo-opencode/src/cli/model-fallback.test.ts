@@ -57,7 +57,7 @@ describe("generateModelConfig", () => {
         variant: "high",
         fallback_models: [
           {
-            model: "github-copilot/claude-opus-4.7",
+            model: "github-copilot/claude-opus-4.8",
             variant: "max",
           },
           {

@@ -7,7 +7,7 @@ import {
 
 describe("transformModelForProvider", () => {
   describe("github-copilot provider", () => {
-    test("transforms claude-opus-4-8 to claude-opus-4.7", () => {
+    test("transforms claude-opus-4-8 to claude-opus-4.8", () => {
       // #given github-copilot provider and claude-opus-4-8 model
       const provider = "github-copilot"
       const model = "claude-opus-4-8"
@@ -15,8 +15,8 @@ describe("transformModelForProvider", () => {
       // #when transformModelForProvider is called
       const result = transformModelForProvider(provider, model)
 
-      // #then should transform to claude-opus-4.7
-      expect(result).toBe("claude-opus-4.7")
+      // #then should transform to claude-opus-4.8
+      expect(result).toBe("claude-opus-4.8")
     })
 
     test("transforms claude-sonnet-4-5 to claude-sonnet-4.5", () => {
@@ -210,8 +210,8 @@ describe("transformModelForProvider", () => {
       // #when transformModelForProvider is called
       const result = transformModelForProvider("vercel", "claude-opus-4-8")
 
-      // #then should produce anthropic/claude-opus-4.7
-      expect(result).toBe("anthropic/claude-opus-4.7")
+      // #then should produce anthropic/claude-opus-4.8
+      expect(result).toBe("anthropic/claude-opus-4.8")
     })
 
     test("prepends anthropic/ and applies anthropic transform for claude-sonnet", () => {
@@ -274,7 +274,7 @@ describe("transformModelForProvider", () => {
       const result = transformModelForProvider("vercel", "anthropic/claude-opus-4-8")
 
       // #then should apply anthropic transform within the prefix
-      expect(result).toBe("anthropic/claude-opus-4.7")
+      expect(result).toBe("anthropic/claude-opus-4.8")
     })
 
     test("prepends minimax/ for minimax models", () => {

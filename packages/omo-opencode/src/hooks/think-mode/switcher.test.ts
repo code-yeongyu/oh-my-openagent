@@ -23,7 +23,7 @@ describe("think-mode switcher", () => {
     describe("getHighVariant with dots vs hyphens", () => {
       it("should handle dots in Claude version numbers", () => {
         // given a Claude model ID with dot format
-        const variant = getHighVariant("claude-opus-4.7")
+        const variant = getHighVariant("claude-opus-4.8")
 
         // then should return high variant with hyphen format
         expect(variant).toBe("claude-opus-4-8-high")
@@ -133,7 +133,7 @@ describe("think-mode switcher", () => {
 
       it("should handle prefixes with dots in version numbers", () => {
         // given a model ID with prefix and dots
-        const variant = getHighVariant("vertex_ai/claude-opus-4.7")
+        const variant = getHighVariant("vertex_ai/claude-opus-4.8")
 
         // then should normalize dots and preserve prefix
         expect(variant).toBe("vertex_ai/claude-opus-4-8-high")

@@ -1315,7 +1315,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
         }
@@ -1470,7 +1470,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
         }
@@ -1558,7 +1558,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
@@ -1628,7 +1628,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
@@ -1714,7 +1714,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
@@ -1783,7 +1783,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
@@ -1859,7 +1859,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
-            "anthropic/claude-opus-4-8",
+            "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
@@ -2802,7 +2802,7 @@ describe("runtime-fallback", () => {
           type: "session.error",
           properties: {
             sessionID,
-            model: "anthropic/claude-opus-4-8",
+            model: "anthropic/claude-opus-4-7",
             error: { statusCode: 503, message: "Service unavailable" },
             agent: "prometheus",
           },

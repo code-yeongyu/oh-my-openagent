@@ -86,7 +86,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     const deps = createDeps(promptCalls)
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-reserved-then-released"
-    const state = createFallbackState("anthropic/claude-opus-4-8")
+    const state = createFallbackState("anthropic/claude-opus-4-7")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     reserveSession(sessionID, 250)
@@ -114,7 +114,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     }
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-reserved-then-ambiguous-failure"
-    const state = createFallbackState("anthropic/claude-opus-4-8")
+    const state = createFallbackState("anthropic/claude-opus-4-7")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     reserveSession(sessionID, 250)
@@ -166,7 +166,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
       return {}
     }
     const helpers = createAutoRetryHelpers(deps)
-    const state = createFallbackState("anthropic/claude-opus-4-8")
+    const state = createFallbackState("anthropic/claude-opus-4-7")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     const clock = installRuntimeFallbackTestClock()

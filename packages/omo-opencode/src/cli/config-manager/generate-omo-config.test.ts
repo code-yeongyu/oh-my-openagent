@@ -32,6 +32,7 @@ describe("generateOmoConfig - model fallback system", () => {
     //#then
     expect([
       "github-copilot/claude-opus-4.7",
+      "github-copilot/claude-opus-4.8",
       "github-copilot/claude-opus-4-8",
     ]).toContain((result.agents as Record<string, { model: string }>).sisyphus.model)
   })

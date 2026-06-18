@@ -251,13 +251,13 @@ describe("fuzzyMatchModel", () => {
 	// given github-copilot serves claude versions with dot notation
 	// when fallback chain uses hyphen notation in requested model
 	// then normalize both forms and match github-copilot model
-	it("should match github-copilot claude-opus-4-8 to claude-opus-4.7", () => {
+	it("should match github-copilot claude-opus-4-8 to claude-opus-4.8", () => {
 		const available = new Set([
-			"github-copilot/claude-opus-4.7",
+			"github-copilot/claude-opus-4.8",
 			"opencode/big-pickle",
 		])
 		const result = fuzzyMatchModel("claude-opus-4-8", available, ["github-copilot"])
-		expect(result).toBe("github-copilot/claude-opus-4.7")
+		expect(result).toBe("github-copilot/claude-opus-4.8")
 	})
 
 	// given claude models can evolve to newer version numbers

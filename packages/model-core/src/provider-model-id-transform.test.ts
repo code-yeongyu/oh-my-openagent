@@ -33,7 +33,7 @@ describe("provider model ID transforms", () => {
 			{
 				provider: "github-copilot",
 				model: "claude-opus-4-8",
-				expected: "claude-opus-4.7",
+				expected: "claude-opus-4.8",
 			},
 			{
 				provider: "vercel",
@@ -43,7 +43,7 @@ describe("provider model ID transforms", () => {
 			{
 				provider: "vercel",
 				model: "anthropic/claude-opus-4-8",
-				expected: "anthropic/claude-opus-4.7",
+				expected: "anthropic/claude-opus-4.8",
 			},
 		] as const
 
