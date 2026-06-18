@@ -26,7 +26,7 @@ async function readPackagedSkillFile(...segments) {
 }
 
 function excludeGeneratedSkillMetadata(files) {
-	return files.filter((file) => !generatedSkillMetadataFiles.has(file));
+	return files.filter((file) => !generatedSkillMetadataFiles.has(file.replaceAll("\\", "/")));
 }
 
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
