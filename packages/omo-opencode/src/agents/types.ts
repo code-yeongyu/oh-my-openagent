@@ -119,7 +119,7 @@ function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model;
 }
 
-const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:(?:3[.-])?codex|[4-9]|\d{2,})/i;
 
 export function isGptNativeSisyphusModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
