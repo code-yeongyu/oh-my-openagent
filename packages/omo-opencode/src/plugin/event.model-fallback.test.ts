@@ -3,7 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
-import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
+import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import {
@@ -142,6 +142,89 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
+  })
+
+  test("preserves pending fallback for non-auto retry sessions until the next user message", async () => {
+    //#given
+    const sessionID = "ses_non_auto_subagent_fallback"
+    subagentSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_non_auto_subagent_error",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            parentID: "msg_non_auto_subagent_user",
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - non-auto sessions do not dispatch continuation, so pending fallback must remain.
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+
+    //#when - the next real user message is the fallback application opportunity.
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {

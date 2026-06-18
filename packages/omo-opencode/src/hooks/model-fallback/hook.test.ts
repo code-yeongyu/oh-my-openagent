@@ -18,7 +18,6 @@ const {
   clearPendingModelFallback,
   createModelFallbackHook,
   getSessionFallbackChain,
-  hasPendingModelFallback,
   setSessionFallbackChain,
   setPendingModelFallback,
 } = await importFreshModelFallbackHookModule()
@@ -73,14 +72,14 @@ describe("model fallback hook", () => {
     })
   })
 
-  test("clears stale pending fallback instead of applying it to real user messages", async () => {
+  test("preserves pending fallback for real user messages when no auto-continuation consumed it", async () => {
     const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
     }>(modelFallback)
-    const sessionID = "ses_model_fallback_real_user_resume"
+    const sessionID = "ses_model_fallback_real_user_retry"
 
     const set = setPendingModelFallback(
       modelFallback,
@@ -103,10 +102,48 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+    expect(output.message["variant"]).toBe("max")
+  })
+
+  test("clears auto-continuation pending fallback on real user resume", async () => {
+    const hook = unsafeTestValue<{
+      markPendingFallbackAutoContinuation?: (sessionID: string) => void
+      hasPendingModelFallback?: (sessionID: string) => boolean
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+    const sessionID = "ses_model_fallback_auto_resume"
+
+    const set = setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+    hook.markPendingFallbackAutoContinuation?.(sessionID)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
       modelID: "claude-opus-4-7-thinking",
     })
     expect(output.message["variant"]).toBe("max")
-    expect(hasPendingModelFallback(modelFallback, sessionID)).toBe(false)
+    expect(hook.hasPendingModelFallback?.(sessionID)).toBe(false)
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {
