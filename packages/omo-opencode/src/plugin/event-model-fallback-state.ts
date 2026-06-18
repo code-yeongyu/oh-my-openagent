@@ -159,8 +159,8 @@ export function createModelFallbackContinuationController(args: {
     sessionID: string,
     source: string,
     fallbackContext?: FallbackContinuationContext,
-  ): Promise<void> => {
-    if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return;
+  ): Promise<boolean> => {
+    if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return false;
 
     continuationsInFlight.add(sessionID);
     let dispatched = false;
@@ -173,7 +173,7 @@ export function createModelFallbackContinuationController(args: {
           source,
           error: error instanceof Error ? error : String(error),
         });
-        return;
+        return false;
       }
       releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
         reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
@@ -231,6 +231,8 @@ export function createModelFallbackContinuationController(args: {
       if (dispatched) markDispatched(sessionID, fallbackContext);
       continuationsInFlight.delete(sessionID);
     }
+
+    return dispatched;
   };
 
   return {

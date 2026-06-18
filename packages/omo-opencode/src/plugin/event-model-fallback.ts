@@ -93,8 +93,8 @@ export function createModelFallbackEventHandler(args: {
       : false;
 
     if (setFallback && shouldAutoContinue) {
-      args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
-      await continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
+      const dispatched = await continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
+      if (dispatched) args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
     }
   };
 

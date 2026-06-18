@@ -452,19 +452,41 @@ describe("createEventHandler - model fallback", () => {
     const sessionID = "ses_model_fallback_abort_failure"
     setMainSession(sessionID)
     let pendingFallbackArms = 0
-    const modelFallback = unsafeTestValue({
-      setSessionFallbackChain: () => {},
-      setPendingModelFallback: () => {
-        pendingFallbackArms += 1
-        return true
-      },
-    })
+    const modelFallback = createModelFallbackHook()
+    const setPendingModelFallback = modelFallback.setPendingModelFallback.bind(modelFallback)
+    modelFallback.setPendingModelFallback = (...args) => {
+      pendingFallbackArms += 1
+      return setPendingModelFallback(...args)
+    }
     const { handler, abortCalls, promptAsyncCalls } = createHandler({
       hooks: { modelFallback },
       abort: async () => {
         throw new Error("abort transport failed")
       },
       promptAsync: async () => ({}),
+    })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
     })
     const assistantError = {
       name: "APIError",
@@ -497,6 +519,25 @@ describe("createEventHandler - model fallback", () => {
     expect(pendingFallbackArms).toBe(1)
     expect(abortCalls).toEqual([sessionID])
     expect(promptAsyncCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+
+    //#when - a real user resume after failed dispatch must still consume the pending fallback.
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
   test("does not collapse fallback continuations for different providers with the same model id", async () => {
