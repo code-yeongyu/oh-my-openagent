@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -8,6 +8,8 @@ type WorkflowExpectation = {
   readonly path: string
   readonly jobs: readonly string[]
 }
+
+const workflowDirectory = ".github/workflows"
 
 const workflowExpectations = [
   {
@@ -37,6 +39,45 @@ const workflowExpectations = [
   { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
 ] as const satisfies readonly WorkflowExpectation[]
 
+function discoverWorkflowPaths(): readonly string[] {
+  return readdirSync(workflowDirectory)
+    .filter((fileName) => fileName.endsWith(".yml") || fileName.endsWith(".yaml"))
+    .map((fileName) => `${workflowDirectory}/${fileName}`)
+    .sort()
+}
+
+function discoverStepBasedJobs(workflow: string): readonly string[] {
+  const jobsStart = workflow.match(/^jobs:\s*$/m)
+  if (jobsStart?.index === undefined) return []
+
+  const jobs: string[] = []
+  const lines = workflow.slice(jobsStart.index + jobsStart[0].length).split("\n")
+  let currentJob: string | undefined
+  let currentJobHasSteps = false
+
+  function flushCurrentJob(): void {
+    if (currentJob !== undefined && currentJobHasSteps) jobs.push(currentJob)
+  }
+
+  for (const line of lines) {
+    const jobMatch = line.match(/^  ([A-Za-z0-9_-]+):\s*$/)
+    if (jobMatch !== null) {
+      flushCurrentJob()
+
+      const nextJob = jobMatch[1]
+      if (nextJob === undefined) throw new Error(`Unable to read job name from line: ${line}`)
+      currentJob = nextJob
+      currentJobHasSteps = false
+      continue
+    }
+
+    if (currentJob !== undefined && /^    steps:\s*$/.test(line)) currentJobHasSteps = true
+  }
+
+  flushCurrentJob()
+  return jobs
+}
+
 function sliceJob(workflow: string, jobName: string): string {
   const marker = `  ${jobName}:`
   const start = workflow.indexOf(marker)
@@ -54,9 +95,37 @@ function hasSummaryWriter(jobSection: string): boolean {
 }
 
 describe("GitHub workflow job summaries", () => {
+  test("#given a new step-based workflow job #when workflow coverage is checked #then the job is discovered automatically", () => {
+    const workflow = [
+      "name: Example",
+      "on: workflow_dispatch",
+      "jobs:",
+      "  existing:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - name: Write job summary",
+      "        run: echo ok >> \"$GITHUB_STEP_SUMMARY\"",
+      "  newly-added:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: echo missed",
+      "  reusable:",
+      "    uses: ./.github/workflows/publish-platform.yml",
+      "",
+    ].join("\n")
+
+    expect(discoverStepBasedJobs(workflow)).toEqual(["existing", "newly-added"])
+  })
+
   test("#given repository workflows #when inspected #then every step-based job writes a concise Markdown summary", () => {
+    const expectedWorkflowPaths = workflowExpectations.map((expectation) => expectation.path).sort()
+    expect(discoverWorkflowPaths()).toEqual(expectedWorkflowPaths)
+
     for (const expectation of workflowExpectations) {
       const workflow = readFileSync(expectation.path, "utf8")
+      expect(discoverStepBasedJobs(workflow), `${expectation.path} step-based job list must stay covered`).toEqual(
+        expectation.jobs,
+      )
 
       for (const job of expectation.jobs) {
         const jobSection = sliceJob(workflow, job)
