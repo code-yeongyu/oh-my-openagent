@@ -62,8 +62,8 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 
 function writeHookJson(stdout: HookStdout, action: SessionStartAction): void {
 	const output = action === "spawned"
-		? { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: CODEGRAPH_SESSION_START_NOTICE }, codegraph: { action } }
-		: { hookSpecificOutput: { hookEventName: "SessionStart" }, codegraph: { action } };
+		? { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: CODEGRAPH_SESSION_START_NOTICE } }
+		: { hookSpecificOutput: { hookEventName: "SessionStart" } };
 	stdout.write(`${JSON.stringify(output)}\n`);
 }
 

@@ -37,12 +37,12 @@ describe("CodeGraph SessionStart hook", () => {
 			expect(exitCode).toBe(0);
 			expect(spawned).toHaveLength(1);
 			const parsed = JSON.parse(stdout.join(""));
+			expect(Object.keys(parsed)).toEqual(["hookSpecificOutput"]);
 			expect(parsed).toEqual({
 				hookSpecificOutput: {
 					hookEventName: "SessionStart",
 					additionalContext: "LazyCodex CodeGraph bootstrap scheduled in background",
 				},
-				codegraph: { action: "spawned" },
 			});
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
@@ -68,7 +68,6 @@ describe("CodeGraph SessionStart hook", () => {
 		expect(spawned).toEqual([]);
 		expect(JSON.parse(stdout.join(""))).toEqual({
 			hookSpecificOutput: { hookEventName: "SessionStart" },
-			codegraph: { action: "skipped-disabled" },
 		});
 	});
 
@@ -97,7 +96,7 @@ describe("CodeGraph SessionStart hook", () => {
 			// then
 			expect(result).toEqual({ action: "skipped-disabled", exitCode: 0 });
 			expect(spawned).toEqual([]);
-			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+			expect(JSON.parse(stdout.join(""))).toEqual({ hookSpecificOutput: { hookEventName: "SessionStart" } });
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(workspace, { recursive: true, force: true });
@@ -128,7 +127,7 @@ describe("CodeGraph SessionStart hook", () => {
 			// then
 			expect(result).toEqual({ action: "skipped-disabled", exitCode: 0 });
 			expect(spawned).toEqual([]);
-			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+			expect(JSON.parse(stdout.join(""))).toEqual({ hookSpecificOutput: { hookEventName: "SessionStart" } });
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(workspace, { recursive: true, force: true });
@@ -191,7 +190,12 @@ describe("CodeGraph SessionStart hook", () => {
 					},
 				},
 			]);
-			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "spawned" });
+			expect(JSON.parse(stdout.join(""))).toEqual({
+				hookSpecificOutput: {
+					hookEventName: "SessionStart",
+					additionalContext: "LazyCodex CodeGraph bootstrap scheduled in background",
+				},
+			});
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });
 		}
@@ -531,7 +535,7 @@ describe("CodeGraph SessionStart hook", () => {
 		// then
 		expect(result.exitCode).toBe(0);
 		expect(spawned).toEqual([]);
-		expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+		expect(JSON.parse(stdout.join(""))).toEqual({ hookSpecificOutput: { hookEventName: "SessionStart" } });
 	});
 
 	it("#given plugin hook config #when inspected #then CodeGraph is registered after bootstrap SessionStart", () => {
