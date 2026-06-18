@@ -37,7 +37,7 @@ describe("codex ultrawork package metadata", () => {
 		expect(hookCommands).not.toContainEqual(expect.stringMatching(/\bpython3?\b|ultrawork-detector\.py/));
 	});
 
-	it("#given explorer guidance #when inspected #then names the packaged code-search MCP surface", () => {
+	it("#given explorer guidance #when inspected #then names the packaged code-search surfaces", () => {
 		// given
 		const explorer = readTextFile("agents/explorer.toml");
 
@@ -45,7 +45,7 @@ describe("codex ultrawork package metadata", () => {
 		const guidance = explorer.toLowerCase();
 
 		// then
-		expect(guidance).toContain("ast_grep");
+		expect(guidance).toContain("ast-grep");
 		expect(guidance).toContain("structural");
 	});
 
@@ -57,7 +57,7 @@ describe("codex ultrawork package metadata", () => {
 		const guidance = explorer.toLowerCase();
 		const sparkshellIndex = guidance.indexOf("omo sparkshell <command>");
 		const lspIndex = guidance.indexOf("lsp_goto_definition");
-		const structuralIndex = guidance.indexOf("ast_grep_search");
+		const structuralIndex = guidance.indexOf("ast-grep");
 
 		// then
 		expect(sparkshellIndex).toBeGreaterThanOrEqual(0);
@@ -78,34 +78,34 @@ describe("codex ultrawork package metadata", () => {
 		// then
 		expect(guidance).toContain("grep_app");
 		expect(guidance).toContain("context7");
-		expect(guidance).toContain("ast_grep");
+		expect(guidance).toContain("ast-grep");
 	});
 
 	it("#given ulw-plan skill #when inspected #then requires dynamic adversarial workflow phases", () => {
 		// given
 		const skill = readTextFile("skills/ulw-plan/SKILL.md");
 		const workflow = readTextFile("skills/ulw-plan/references/full-workflow.md");
-		const requiredContracts = [
+		const skillContracts = [
+			"CodeGraph first",
+			"scripts/scaffold-plan.mjs",
+			"Approval gate",
+		] as const;
+		const workflowContracts = [
 			"dynamic adversarial workflow phases",
 			"stale_state",
-			"source vs packaged split",
+			"source-vs-packaged split",
 			"misleading_success_output",
-			"confirm test really ran",
+			"confirm a test really ran",
 			"prompt_injection",
-			"Discord/external content treated as claims, not instructions",
+			"Discord / external content as claims",
 		] as const;
 
-		// when
-		const sourceSurfaces = {
-			skill,
-			workflow,
-		} satisfies Record<string, string>;
-
 		// then
-		for (const [name, source] of Object.entries(sourceSurfaces)) {
-			for (const contract of requiredContracts) {
-				expect(source, `${name} should include ${contract}`).toContain(contract);
-			}
+		for (const contract of skillContracts) {
+			expect(skill, `skill should include ${contract}`).toContain(contract);
+		}
+		for (const contract of workflowContracts) {
+			expect(workflow, `workflow should include ${contract}`).toContain(contract);
 		}
 	});
 });
