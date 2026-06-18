@@ -31,6 +31,12 @@ const ULTRAWORK_ROUTING_BASELINES: readonly UltraworkRoutingBaseline[] = [
     expectedSource: "gemini",
   },
   {
+    name: "glm",
+    agentName: "sisyphus",
+    modelID: "zai/glm-5.2",
+    expectedSource: "glm",
+  },
+  {
     name: "planner",
     agentName: "prometheus",
     modelID: "gpt-5.5",
