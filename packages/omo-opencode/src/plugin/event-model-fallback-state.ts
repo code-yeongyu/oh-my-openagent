@@ -159,8 +159,9 @@ export function createModelFallbackContinuationController(args: {
     sessionID: string,
     source: string,
     fallbackContext?: FallbackContinuationContext,
+    dedupeContext: FallbackContinuationContext | undefined = fallbackContext,
   ): Promise<boolean> => {
-    if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return false;
+    if (shouldSkipFallbackContinuation(sessionID, source, dedupeContext)) return false;
 
     continuationsInFlight.add(sessionID);
     let dispatched = false;
@@ -228,7 +229,7 @@ export function createModelFallbackContinuationController(args: {
         });
       }
     } finally {
-      if (dispatched) markDispatched(sessionID, fallbackContext);
+      if (dispatched) markDispatched(sessionID, dedupeContext);
       continuationsInFlight.delete(sessionID);
     }
 

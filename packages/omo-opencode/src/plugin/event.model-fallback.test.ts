@@ -42,6 +42,7 @@ describe("createEventHandler - model fallback", () => {
     const abortCalls: string[] = []
     const promptCalls: string[] = []
     const promptAsyncCalls: string[] = []
+    const promptInputs: Array<{ path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }> = []
 
     const sessionClient = {
       abort: async ({ path }: { path: { id: string } }) => {
@@ -51,14 +52,16 @@ describe("createEventHandler - model fallback", () => {
         }
         return {}
       },
-      prompt: async ({ path }: { path: { id: string } }) => {
-        promptCalls.push(path.id)
+      prompt: async (input: { path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }) => {
+        promptCalls.push(input.path.id)
+        promptInputs.push(input)
         return {}
       },
       ...(args?.promptAsync
         ? {
-            promptAsync: async (input: { path: { id: string } }) => {
+            promptAsync: async (input: { path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }) => {
               promptAsyncCalls.push(input.path.id)
+              promptInputs.push(input)
               return args.promptAsync?.(input)
             },
           }
@@ -90,7 +93,7 @@ describe("createEventHandler - model fallback", () => {
     })
     const handler = (input: EventInput): Promise<void> => eventHandler(asEventHandlerInput(input))
 
-    return { handler, abortCalls, promptCalls, promptAsyncCalls }
+    return { handler, abortCalls, promptCalls, promptAsyncCalls, promptInputs }
   }
 
   afterEach(() => {
@@ -225,6 +228,51 @@ describe("createEventHandler - model fallback", () => {
       modelID: "kimi-k2.6",
     })
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("auto-continuation prompt uses the selected fallback model instead of the failed model", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_selected_fallback_model"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_selected_fallback_model",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_selected_fallback_model",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
   })
 
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {

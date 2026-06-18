@@ -5,7 +5,9 @@ import {
   clearSessionFallbackChain,
   setPendingModelFallback,
   type ModelFallbackHook,
+  type ModelFallbackState,
 } from "../hooks/model-fallback/hook";
+import { getNextReachableFallback } from "../hooks/model-fallback/next-fallback";
 import { isAbortError } from "../shared/is-abort-error";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
@@ -22,6 +24,30 @@ import {
   type FallbackContinuationContext,
 } from "./event-model-fallback-state";
 import type { PluginEventContext } from "./event-types";
+
+function resolveAutoContinuationFallbackContext(
+  modelFallback: Pick<ModelFallbackHook, "getFallbackState"> | null | undefined,
+  sessionID: string,
+  fallbackContext: FallbackContinuationContext,
+): FallbackContinuationContext {
+  if (typeof modelFallback?.getFallbackState !== "function") return fallbackContext;
+
+  const state = modelFallback?.getFallbackState(sessionID);
+  if (!state?.pending) return fallbackContext;
+
+  const fallback = getNextReachableFallback(sessionID, {
+    ...state,
+    fallbackChain: [...state.fallbackChain],
+  } satisfies ModelFallbackState);
+  if (!fallback) return fallbackContext;
+
+  return {
+    ...fallbackContext,
+    providerID: fallback.providerID,
+    dedupeProviderID: fallback.providerID,
+    modelID: fallback.modelID,
+  };
+}
 
 export function createModelFallbackEventHandler(args: {
   pluginConfig: OhMyOpenCodeConfig;
@@ -90,7 +116,15 @@ export function createModelFallbackEventHandler(args: {
       : false;
 
     if (setFallback && shouldAutoContinue) {
-      const dispatched = await continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
+      const continuationContext = resolveAutoContinuationFallbackContext(args.modelFallback, sessionID, fallbackContext);
+      if (continuation.shouldSkipFallbackContinuation(sessionID, source, continuationContext)) return;
+
+      const dispatched = await continuation.autoContinueAfterFallback(
+        sessionID,
+        source,
+        continuationContext,
+        fallbackContext,
+      );
       if (dispatched) args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
     }
   };
