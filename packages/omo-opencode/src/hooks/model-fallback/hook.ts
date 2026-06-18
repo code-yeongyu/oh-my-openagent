@@ -181,14 +181,20 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
       const { sessionID } = input
       if (!sessionID) return
 
-      if (autoContinuationPendingSessions.has(sessionID) && output.parts.some(isRealUserTextPart)) {
+      if (
+        autoContinuationPendingSessions.has(sessionID)
+        && output.parts.some(isRealUserTextPart)
+        && !controller.hasPendingModelFallback(sessionID)
+      ) {
         autoContinuationPendingSessions.delete(sessionID)
-        clearPendingModelFallback(controller, sessionID)
         return
       }
 
       const fallback = getNextFallback(controller, sessionID)
-      if (!fallback) return
+      if (!fallback) {
+        autoContinuationPendingSessions.delete(sessionID)
+        return
+      }
       autoContinuationPendingSessions.delete(sessionID)
 
       await applyFallbackToChatMessage({
