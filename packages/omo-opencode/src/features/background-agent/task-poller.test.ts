@@ -185,7 +185,7 @@ describe("checkAndInterruptStaleTasks", () => {
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
-      concurrencyKey: "anthropic/claude-opus-4-7",
+      concurrencyKey: "anthropic/claude-opus-4-8",
     })
     const releaseMock = mock(() => {})
     const onTaskInterrupted = mock(() => {})
@@ -204,7 +204,7 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then
     expect(task.status).toBe("running")
     expect(task.error).toBeUndefined()
-    expect(task.concurrencyKey).toBe("anthropic/claude-opus-4-7")
+    expect(task.concurrencyKey).toBe("anthropic/claude-opus-4-8")
     expect(releaseMock).not.toHaveBeenCalled()
     expect(onTaskInterrupted).not.toHaveBeenCalled()
     expect(mockNotify).not.toHaveBeenCalled()
@@ -341,7 +341,7 @@ describe("checkAndInterruptStaleTasks", () => {
         toolCalls: 2,
         lastUpdate: new Date(Date.now() - 900_000),
       },
-      concurrencyKey: "anthropic/claude-opus-4-7",
+      concurrencyKey: "anthropic/claude-opus-4-8",
     })
     const releaseMock = mock(() => {})
     const onTaskInterrupted = mock(() => {})
@@ -361,7 +361,7 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then
     expect(task.status).toBe("running")
     expect(task.error).toBeUndefined()
-    expect(task.concurrencyKey).toBe("anthropic/claude-opus-4-7")
+    expect(task.concurrencyKey).toBe("anthropic/claude-opus-4-8")
     expect(releaseMock).not.toHaveBeenCalled()
     expect(onTaskInterrupted).not.toHaveBeenCalled()
     expect(mockNotify).not.toHaveBeenCalled()
@@ -844,7 +844,7 @@ describe("checkAndInterruptStaleTasks", () => {
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
-      concurrencyKey: "anthropic/claude-opus-4-7",
+      concurrencyKey: "anthropic/claude-opus-4-8",
     })
 
     //#when
@@ -857,7 +857,7 @@ describe("checkAndInterruptStaleTasks", () => {
     })
 
     //#then
-    expect(releaseMock).toHaveBeenCalledWith("anthropic/claude-opus-4-7")
+    expect(releaseMock).toHaveBeenCalledWith("anthropic/claude-opus-4-8")
     expect(task.concurrencyKey).toBeUndefined()
   })
 

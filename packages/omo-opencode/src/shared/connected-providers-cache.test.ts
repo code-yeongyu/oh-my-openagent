@@ -61,7 +61,7 @@ describe("updateConnectedProvidersCache", () => {
 									name: "Anthropic",
 									env: [],
 									models: {
-										"claude-opus-4-7": { id: "claude-opus-4-7", name: "Claude Opus 4.7" },
+										"claude-opus-4-8": { id: "claude-opus-4-8", name: "Claude Opus 4.7" },
 										"claude-sonnet-4-6": { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
 									},
 								},
@@ -84,7 +84,7 @@ describe("updateConnectedProvidersCache", () => {
 					{ id: "gpt-5.4", name: "GPT-5.4" },
 				],
 				anthropic: [
-					{ id: "claude-opus-4-7", name: "Claude Opus 4.7" },
+					{ id: "claude-opus-4-8", name: "Claude Opus 4.7" },
 					{ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
 				],
 			})
@@ -114,7 +114,7 @@ describe("updateConnectedProvidersCache", () => {
 								{
 									id: "anthropic",
 									models: {
-										"claude-opus-4-7": { id: "claude-opus-4-7" },
+										"claude-opus-4-8": { id: "claude-opus-4-8" },
 									},
 								},
 							],
@@ -148,7 +148,7 @@ describe("updateConnectedProvidersCache", () => {
 				connected: ["google", "anthropic"],
 				models: {
 					google: [{ id: "gemini-3.1-pro" }],
-					anthropic: [{ id: "claude-opus-4-7" }],
+					anthropic: [{ id: "claude-opus-4-8" }],
 				},
 			})
 		} finally {
@@ -177,7 +177,7 @@ describe("updateConnectedProvidersCache", () => {
 								{
 									id: "anthropic",
 									models: {
-										"claude-opus-4-7": { id: "claude-opus-4-7" },
+										"claude-opus-4-8": { id: "claude-opus-4-8" },
 									},
 								},
 							],
@@ -202,7 +202,7 @@ describe("updateConnectedProvidersCache", () => {
 								{
 									id: "anthropic",
 									models: {
-										"claude-opus-4-7": { id: "claude-opus-4-7" },
+										"claude-opus-4-8": { id: "claude-opus-4-8" },
 									},
 								},
 							],
@@ -237,7 +237,7 @@ describe("updateConnectedProvidersCache", () => {
 							connected: ["google", "anthropic"],
 							all: [
 								{ id: "google", models: { "gemini-3.1-pro": { id: "gemini-3.1-pro" } } },
-								{ id: "anthropic", models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
+								{ id: "anthropic", models: { "claude-opus-4-8": { id: "claude-opus-4-8" } } },
 							],
 						},
 					}),
@@ -252,7 +252,7 @@ describe("updateConnectedProvidersCache", () => {
 							connected: [],
 							all: [
 								{ id: "google", models: { "gemini-3.1-pro": { id: "gemini-3.1-pro" } } },
-								{ id: "anthropic", models: { "claude-opus-4-7": { id: "claude-opus-4-7" } } },
+								{ id: "anthropic", models: { "claude-opus-4-8": { id: "claude-opus-4-8" } } },
 							],
 						},
 					}),

@@ -115,10 +115,10 @@ describe("createRuntimeFallbackHook dispose", () => {
     const fallbackTimeout = setTimeout(() => {}, 60_000)
 
     capturedDeps?.sessionStates.set("session-1", {
-      originalModel: "anthropic/claude-opus-4-7",
+      originalModel: "anthropic/claude-opus-4-8",
       currentModel: "openai/gpt-5.4",
       fallbackIndex: 1,
-      failedModels: new Map([["anthropic/claude-opus-4-7", 1]]),
+      failedModels: new Map([["anthropic/claude-opus-4-8", 1]]),
       attemptCount: 1,
     })
     capturedDeps?.sessionLastAccess.set("session-1", Date.now())

@@ -18,7 +18,7 @@ beforeEach(() => {
 describe("getModelProvider", () => {
   test("returns the first segment before the slash", () => {
     expect(getModelProvider("github-copilot/gpt-5.5")).toBe("github-copilot")
-    expect(getModelProvider("anthropic/claude-opus-4-7")).toBe("anthropic")
+    expect(getModelProvider("anthropic/claude-opus-4-8")).toBe("anthropic")
     expect(getModelProvider("vercel/openai/gpt-5.5")).toBe("vercel")
   })
 
@@ -116,7 +116,7 @@ describe("applyDisabledProviders", () => {
           ],
         },
         sisyphus: {
-          model: "anthropic/claude-opus-4-7",
+          model: "anthropic/claude-opus-4-8",
           fallback_models: [{ model: "github-copilot/claude-sonnet-4.6" }, "opencode-go/glm-5.1"],
         },
       },
@@ -131,7 +131,7 @@ describe("applyDisabledProviders", () => {
       "opencode/gpt-5.5",
     ])
 
-    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-7")
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-8")
     expect(agents.sisyphus.fallback_models).toEqual(["opencode-go/glm-5.1"])
   })
 

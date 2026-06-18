@@ -16,7 +16,7 @@ describe("runtime-fallback fallback-models", () => {
     const pluginConfig = unsafeTestValue({
       categories: {
         quick: {
-          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-8"],
         },
       },
     })
@@ -25,7 +25,7 @@ describe("runtime-fallback fallback-models", () => {
     const result = getFallbackModelsForSession(sessionID, undefined, pluginConfig)
 
     //#then
-    expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+    expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-8"])
   })
 
   test("uses agent-specific fallback_models when agent is resolved", () => {
@@ -33,7 +33,7 @@ describe("runtime-fallback fallback-models", () => {
     const pluginConfig = unsafeTestValue({
       agents: {
         oracle: {
-          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-8"],
         },
       },
     })
@@ -42,7 +42,7 @@ describe("runtime-fallback fallback-models", () => {
     const result = getFallbackModelsForSession("ses_runtime_fallback_agent", "oracle", pluginConfig)
 
     //#then
-    expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+    expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-8"])
   })
 
   test("does not fall back to another agent chain when agent cannot be resolved", () => {
@@ -53,7 +53,7 @@ describe("runtime-fallback fallback-models", () => {
           fallback_models: ["quotio/gpt-5.5", "quotio/glm-5", "quotio/kimi-k2.5"],
         },
         oracle: {
-          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-8"],
         },
       },
     })

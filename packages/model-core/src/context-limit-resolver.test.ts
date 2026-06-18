@@ -100,9 +100,9 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>()
-    modelContextLimitsCache.set("anthropic/claude-opus-4-7", 700_000)
+    modelContextLimitsCache.set("anthropic/claude-opus-4-8", 700_000)
 
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-7", {
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })

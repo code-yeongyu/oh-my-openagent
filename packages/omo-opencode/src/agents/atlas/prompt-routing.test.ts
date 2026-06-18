@@ -26,7 +26,7 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
   })
 
   test("Claude Opus 4.7 routes to opus-4-7", () => {
-    expect(getAtlasPromptSource("anthropic/claude-opus-4-7")).toBe("opus-4-7")
+    expect(getAtlasPromptSource("anthropic/claude-opus-4-8")).toBe("opus-4-7")
     expect(getAtlasPromptSource("github-copilot/claude-opus-4.7")).toBe("opus-4-7")
   })
 

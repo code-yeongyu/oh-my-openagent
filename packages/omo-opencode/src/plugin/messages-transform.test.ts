@@ -241,7 +241,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_opus47_prefill",
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
           system: "system-prompt",
           tools: { bash: true },
         },
@@ -266,7 +266,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_opus47_prefill",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
       system: "system-prompt",
       tools: { bash: true },
     })
@@ -543,7 +543,7 @@ describe("createMessagesTransformHandler", () => {
           role: "user",
           sessionID: "ses_vertex_anthropic",
           agent: "sisyphus",
-          model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+          model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-8" },
         },
         parts: [{ type: "text", text: "continue" }],
       },
@@ -566,7 +566,7 @@ describe("createMessagesTransformHandler", () => {
       role: "user",
       sessionID: "ses_vertex_anthropic",
       agent: "sisyphus",
-      model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-8" },
     })
     expect(messages.at(-1)?.parts[0]).toMatchObject({
       type: "text",
@@ -646,7 +646,7 @@ describe("createMessagesTransformHandler", () => {
         name: "non-anthropic provider",
         userInfo: {
           role: "user",
-          model: { providerID: "openai", modelID: "claude-opus-4-7" },
+          model: { providerID: "openai", modelID: "claude-opus-4-8" },
         },
       },
     ]

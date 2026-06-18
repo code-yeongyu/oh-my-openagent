@@ -23,7 +23,7 @@ describe("resolveValidUltraworkVariant", () => {
     // given
     const client = createClient({
       anthropic: {
-        "claude-opus-4-7": {
+        "claude-opus-4-8": {
           variants: {
             max: {},
             high: {},
@@ -35,7 +35,7 @@ describe("resolveValidUltraworkVariant", () => {
     // when
     const result = await resolveValidUltraworkVariant(
       client,
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
       "max",
     )
 
@@ -47,7 +47,7 @@ describe("resolveValidUltraworkVariant", () => {
     // given
     const client = createClient({
       anthropic: {
-        "claude-opus-4-7": {
+        "claude-opus-4-8": {
           variants: {
             high: {},
           },
@@ -58,7 +58,7 @@ describe("resolveValidUltraworkVariant", () => {
     // when
     const result = await resolveValidUltraworkVariant(
       client,
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
       "max",
     )
 
@@ -87,7 +87,7 @@ describe("applyUltraworkModelOverrideOnMessage variant guard", () => {
     // given
     const client = createClient({
       anthropic: {
-        "claude-opus-4-7": {
+        "claude-opus-4-8": {
           variants: {
             high: {},
           },
@@ -100,7 +100,7 @@ describe("applyUltraworkModelOverrideOnMessage variant guard", () => {
       agents: {
         sisyphus: {
           ultrawork: {
-            model: "anthropic/claude-opus-4-7",
+            model: "anthropic/claude-opus-4-8",
             variant: "max",
           },
         },
@@ -130,7 +130,7 @@ describe("applyUltraworkModelOverrideOnMessage variant guard", () => {
     expect(output.message["thinking"]).toBeUndefined()
     expect(dbOverrideSpy).toHaveBeenCalledWith(
       "msg_123",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
       undefined,
     )
     dbOverrideSpy.mockRestore()

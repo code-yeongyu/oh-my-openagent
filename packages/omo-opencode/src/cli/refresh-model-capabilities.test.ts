@@ -49,7 +49,7 @@ describe("refreshModelCapabilities", () => {
       sourceUrl: "https://override.example/api.json",
       models: {
         "gpt-5.4": { id: "gpt-5.4" },
-        "claude-opus-4-7": { id: "claude-opus-4-7" },
+        "claude-opus-4-8": { id: "claude-opus-4-8" },
       },
     }))
     let stdout = ""

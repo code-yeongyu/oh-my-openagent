@@ -79,7 +79,7 @@ describe("getHephaestusPromptSource", () => {
     const model1 = "openai/gpt-4o";
     const model2 = "openai/gpt-5.9";
     const model3 = "openai/gpt-5.10";
-    const model4 = "anthropic/claude-opus-4-7";
+    const model4 = "anthropic/claude-opus-4-8";
     const model5 = undefined;
 
     // when
@@ -155,7 +155,7 @@ describe("getHephaestusPrompt", () => {
 
   test("Claude model is rejected", () => {
     // given
-    const model = "anthropic/claude-opus-4-7";
+    const model = "anthropic/claude-opus-4-8";
 
     // when
     const getPrompt = () => getHephaestusPrompt(model);
@@ -348,7 +348,7 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
-          model: "anthropic/claude-opus-4-7",
+          model: "anthropic/claude-opus-4-8",
           permission: {
             apply_patch: "allow",
           } as Record<string, "allow">,
@@ -360,8 +360,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
       const config = maybeCreateHephaestusConfig({
         disabledAgents: [],
         agentOverrides,
-        availableModels: new Set(["anthropic/claude-opus-4-7"]),
-        systemDefaultModel: "anthropic/claude-opus-4-7",
+        availableModels: new Set(["anthropic/claude-opus-4-8"]),
+        systemDefaultModel: "anthropic/claude-opus-4-8",
         isFirstRunNoCache: false,
         availableAgents: [],
         availableSkills: [],
@@ -412,7 +412,7 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
       // given
       const agentOverrides: AgentOverrides = {
         hephaestus: {
-          model: "anthropic/claude-opus-4-7",
+          model: "anthropic/claude-opus-4-8",
           permission: {
             grep: "allow",
             glob: "allow",
@@ -425,8 +425,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
       const config = maybeCreateHephaestusConfig({
         disabledAgents: [],
         agentOverrides,
-        availableModels: new Set(["anthropic/claude-opus-4-7"]),
-        systemDefaultModel: "anthropic/claude-opus-4-7",
+        availableModels: new Set(["anthropic/claude-opus-4-8"]),
+        systemDefaultModel: "anthropic/claude-opus-4-8",
         isFirstRunNoCache: false,
         availableAgents: [],
         availableSkills: [],

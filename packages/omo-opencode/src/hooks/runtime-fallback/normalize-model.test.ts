@@ -6,13 +6,13 @@ describe("normalizeModelToCanonicalString", () => {
   describe("#given a plain string model", () => {
     test("#when called #then it returns the trimmed string", () => {
       // given
-      const model = "  anthropic/claude-opus-4-7  "
+      const model = "  anthropic/claude-opus-4-8  "
 
       // when
       const result = normalizeModelToCanonicalString(model)
 
       // then
-      expect(result).toBe("anthropic/claude-opus-4-7")
+      expect(result).toBe("anthropic/claude-opus-4-8")
     })
 
     test("#when the string is empty #then it returns undefined", () => {
@@ -41,13 +41,13 @@ describe("normalizeModelToCanonicalString", () => {
 
     test("#when it exposes modelID instead of id #then it still resolves", () => {
       // given
-      const model = unsafeTestValue<unknown>({ modelID: "claude-opus-4-7", providerID: "anthropic" })
+      const model = unsafeTestValue<unknown>({ modelID: "claude-opus-4-8", providerID: "anthropic" })
 
       // when
       const result = normalizeModelToCanonicalString(model)
 
       // then
-      expect(result).toBe("anthropic/claude-opus-4-7")
+      expect(result).toBe("anthropic/claude-opus-4-8")
     })
 
     test("#when providerID is missing #then it returns undefined", () => {

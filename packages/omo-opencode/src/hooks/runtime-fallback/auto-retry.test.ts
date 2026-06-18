@@ -66,7 +66,7 @@ describe("createAutoRetryHelpers", () => {
     }
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-auto-retry-ambiguous"
-    const state = createFallbackState("anthropic/claude-opus-4-7")
+    const state = createFallbackState("anthropic/claude-opus-4-8")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
 
@@ -86,7 +86,7 @@ describe("createAutoRetryHelpers", () => {
     const deps = createDeps(promptCalls)
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-auto-retry"
-    const state = createFallbackState("anthropic/claude-opus-4-7")
+    const state = createFallbackState("anthropic/claude-opus-4-8")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     deps.sessionAwaitingFallbackResult.add(sessionID)
@@ -113,7 +113,7 @@ describe("createAutoRetryHelpers", () => {
     }
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-compact-flushed"
-    const state = createFallbackState("anthropic/claude-opus-4-7")
+    const state = createFallbackState("anthropic/claude-opus-4-8")
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
 
@@ -155,7 +155,7 @@ describe("createAutoRetryHelpers", () => {
     }
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-auto-retry-dedup"
-    const state = createFallbackState("anthropic/claude-opus-4-7")
+    const state = createFallbackState("anthropic/claude-opus-4-8")
     deps.sessionStates.set(sessionID, state)
 
     // when
@@ -190,7 +190,7 @@ describe("createAutoRetryHelpers", () => {
     const deps = createDeps(promptCalls)
     const helpers = createAutoRetryHelpers(deps)
     const sessionID = "session-stale-internal-abort"
-    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-8"))
     deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
     deps.internallyAbortedSessions.add(sessionID)
 

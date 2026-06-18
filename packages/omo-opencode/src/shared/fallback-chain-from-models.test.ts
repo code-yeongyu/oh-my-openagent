@@ -403,7 +403,7 @@ describe("findMostSpecificFallbackEntry", () => {
 describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
   test("returns undefined when caller forwards an object instead of a string", () => {
     //#given
-    const wrong = { model: "anthropic/claude-opus-4-7", variant: "high" } as unknown as string
+    const wrong = { model: "anthropic/claude-opus-4-8", variant: "high" } as unknown as string
 
     //#when
     const parsed = parseFallbackModelEntry(wrong, "anthropic")
@@ -426,7 +426,7 @@ describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
     //#given: FallbackModelObject whose .model was somehow forwarded as a nested
     //object instead of a flat string (issue #4145 reproduction).
     const malformedObject = {
-      model: ({ model: "claude-opus-4-7" } as unknown) as string,
+      model: ({ model: "claude-opus-4-8" } as unknown) as string,
       variant: "high",
     }
 

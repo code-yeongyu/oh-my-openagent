@@ -248,7 +248,7 @@ describe("tryFallbackRetry", () => {
 
     test("queues fallback retry on provider key when provider concurrency is configured", async () => {
       const args = createDefaultArgs({
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
         concurrencyKey: "anthropic",
         fallbackChain: [
           { model: "claude-sonnet-4-6", providers: ["anthropic"], variant: undefined },

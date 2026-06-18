@@ -6,7 +6,7 @@ const ALL_VARIANTS: Array<[string, string]> = [
   ["gpt", getAtlasPrompt("openai/gpt-5.5")],
   ["gemini", getAtlasPrompt("google/gemini-3.1-pro")],
   ["kimi", getAtlasPrompt("moonshotai/kimi-k2.6")],
-  ["opus-4-7", getAtlasPrompt("anthropic/claude-opus-4-7")],
+  ["opus-4-7", getAtlasPrompt("anthropic/claude-opus-4-8")],
 ]
 
 describe("Atlas prompts boulder-completion response", () => {

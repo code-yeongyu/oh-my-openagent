@@ -17,8 +17,8 @@ describe("getModelCapabilities", () => {
     generatedAt: "2026-03-25T00:00:00.000Z",
     sourceUrl: "https://models.dev/api.json",
     models: {
-      "claude-opus-4-7": {
-        id: "claude-opus-4-7",
+      "claude-opus-4-8": {
+        id: "claude-opus-4-8",
         family: "claude-opus",
         reasoning: true,
         temperature: true,
@@ -88,7 +88,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       runtimeModel: {
         variants: {
           low: {},
@@ -100,7 +100,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: "claude-opus-4-8",
       family: "claude-opus",
       variants: ["low", "medium", "high"],
       supportsThinking: true,
@@ -195,7 +195,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7-thinking",
+      modelID: "claude-opus-4-8-thinking",
       bundledSnapshot,
     })
 
@@ -269,12 +269,12 @@ describe("getModelCapabilities", () => {
   test("canonicalizes provider-prefixed Claude thinking aliases to bare snapshot IDs", () => {
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "anthropic/claude-opus-4-7-thinking",
+      modelID: "anthropic/claude-opus-4-8-thinking",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
-      requestedModelID: "anthropic/claude-opus-4-7-thinking",
+      requestedModelID: "anthropic/claude-opus-4-8-thinking",
       canonicalModelID: "claude-opus-4-8",
       family: "claude-opus",
       supportsThinking: true,

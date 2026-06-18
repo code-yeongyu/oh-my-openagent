@@ -29,7 +29,7 @@ const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
 const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai"]
 const TEST_AVAILABLE_MODELS = new Set([
-  "anthropic/claude-opus-4-7",
+  "anthropic/claude-opus-4-8",
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
   "google/gemini-3.1-pro",
@@ -138,7 +138,7 @@ describe("sisyphus-task", () => {
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
-        anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
+        anthropic: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"],
         openai: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
       },
@@ -185,13 +185,13 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("medium")
     })
 
-    test("unspecified-high category uses claude-opus-4-7 max as primary", () => {
+    test("unspecified-high category uses claude-opus-4-8 max as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-opus-4-7")
+      expect(category.model).toBe("anthropic/claude-opus-4-8")
       expect(category.variant).toBe("max")
     })
   })
@@ -820,7 +820,7 @@ describe("sisyphus-task", () => {
     test("allows artistry to use its fallback chain when gemini is missing", () => {
       // given - artistry can fall back from gemini to another capable model
       const categoryName = "artistry"
-      const availableModels = new Set<string>(["anthropic/claude-opus-4-7"])
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-8"])
 
       // when
       const result = resolveCategoryConfig(categoryName, {
@@ -852,9 +852,9 @@ describe("sisyphus-task", () => {
     test("bypasses requiresModel when explicit user config provided", () => {
       // #given
       const categoryName = "deep"
-      const availableModels = new Set<string>(["anthropic/claude-opus-4-7"])
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-8"])
       const userCategories = {
-        deep: { model: "anthropic/claude-opus-4-7" },
+        deep: { model: "anthropic/claude-opus-4-8" },
       }
 
       // #when
@@ -866,7 +866,7 @@ describe("sisyphus-task", () => {
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-opus-4-7")
+      expect(resolved.config.model).toBe("anthropic/claude-opus-4-8")
     })
 
     test("bypasses requiresModel when explicit user config provided even with empty availability", () => {
@@ -874,7 +874,7 @@ describe("sisyphus-task", () => {
       const categoryName = "deep"
       const availableModels = new Set<string>()
       const userCategories = {
-        deep: { model: "anthropic/claude-opus-4-7" },
+        deep: { model: "anthropic/claude-opus-4-8" },
       }
 
       // #when
@@ -886,7 +886,7 @@ describe("sisyphus-task", () => {
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-opus-4-7")
+      expect(resolved.config.model).toBe("anthropic/claude-opus-4-8")
     })
 
     test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
@@ -906,7 +906,7 @@ describe("sisyphus-task", () => {
       // given
       const categoryName = "visual-engineering"
       const userCategories = {
-        "visual-engineering": { model: "anthropic/claude-opus-4-7" },
+        "visual-engineering": { model: "anthropic/claude-opus-4-8" },
       }
 
       // when
@@ -914,7 +914,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-opus-4-7")
+      expect(resolved.config.model).toBe("anthropic/claude-opus-4-8")
     })
 
     test("user prompt_append is appended to default", () => {
@@ -978,7 +978,7 @@ describe("sisyphus-task", () => {
     test("category built-in model takes precedence over inheritedModel", () => {
       // given - builtin category with its own model, parent model also provided
       const categoryName = "visual-engineering"
-      const inheritedModel = "cliproxy/claude-opus-4-7"
+      const inheritedModel = "cliproxy/claude-opus-4-8"
 
       // when
       const result = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -992,7 +992,7 @@ describe("sisyphus-task", () => {
       // given - custom category with no model defined
       const categoryName = "my-custom-no-model"
       const userCategories: Record<string, CategoryConfig> = { "my-custom-no-model": { temperature: 0.5 } }
-      const inheritedModel = "cliproxy/claude-opus-4-7"
+      const inheritedModel = "cliproxy/claude-opus-4-8"
 
       // when
       const result = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -1008,7 +1008,7 @@ describe("sisyphus-task", () => {
       const userCategories = {
         "visual-engineering": { model: "my-provider/my-model" },
       }
-      const inheritedModel = "cliproxy/claude-opus-4-7"
+      const inheritedModel = "cliproxy/claude-opus-4-8"
 
       // when
       const result = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -1119,7 +1119,7 @@ describe("sisyphus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-7" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -1143,7 +1143,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high uses claude-opus-4-7 max in DEFAULT_CATEGORIES
+      // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high default variant",
@@ -1155,10 +1155,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-7 should be passed with max variant
+      // then - claude-opus-4-8 should be passed with max variant
       expect(launchInput.model).toEqual({
         providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        modelID: "claude-opus-4-8",
         variant: "max",
       })
     }, { timeout: 20000 })
@@ -1178,7 +1178,7 @@ describe("sisyphus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-7" }] },
+         model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-8" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
            create: async () => ({ data: { id: "ses_sync_default_variant" } }),
@@ -1204,7 +1204,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high uses claude-opus-4-7 max in DEFAULT_CATEGORIES
+      // when - unspecified-high uses claude-opus-4-8 max in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high sync variant",
@@ -1216,10 +1216,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - claude-opus-4-7 should be passed with max variant
+      // then - claude-opus-4-8 should be passed with max variant
       expect(promptBody.model).toEqual({
         providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        modelID: "claude-opus-4-8",
       })
       expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })
@@ -1677,7 +1677,7 @@ describe("sisyphus-task", () => {
       let promptCalled = false
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } }] }) },
+        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
@@ -1962,7 +1962,7 @@ describe("sisyphus-task", () => {
           id: "msg_001",
           role: "user",
           agent: "sisyphus-junior",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
           variant: "max",
           time: { created: baseTime },
         },
@@ -2044,7 +2044,7 @@ describe("sisyphus-task", () => {
     const callArgs = promptMock.mock.calls[0][0]
     expect(callArgs.body.variant).toBe("max")
     expect(callArgs.body.agent).toBe("sisyphus-junior")
-    expect(callArgs.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(callArgs.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
   }, { timeout: 10000 })
 
   test("task_id with background=true should return immediately without waiting", async () => {
@@ -2749,7 +2749,7 @@ describe("sisyphus-task", () => {
       // Override provider cache to include kimi-for-coding provider
       providerModelsSpy.mockReturnValue({
         models: {
-          anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
+          anthropic: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
           google: ["gemini-3.1-pro", "gemini-3-flash"],
         openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
           "kimi-for-coding": ["k2p5"],
@@ -2996,7 +2996,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          userCategories: {
-           "fallback-test": { model: "anthropic/claude-opus-4-7" },
+           "fallback-test": { model: "anthropic/claude-opus-4-8" },
          },
          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
          availableModelsOverride: createTestAvailableModels(),
@@ -3766,7 +3766,7 @@ describe("sisyphus-task", () => {
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
       // given - builtin ultrabrain category with its own model, inherited model also provided
       const categoryName = "ultrabrain"
-      const inheritedModel = "cliproxy/claude-opus-4-7"
+      const inheritedModel = "cliproxy/claude-opus-4-8"
       
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -3781,7 +3781,7 @@ describe("sisyphus-task", () => {
       // given
       const categoryName = "ultrabrain"
       const userCategories = { "ultrabrain": { model: "my-provider/custom-model" } }
-      const inheritedModel = "cliproxy/claude-opus-4-7"
+      const inheritedModel = "cliproxy/claude-opus-4-8"
       
       // when
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -3798,7 +3798,7 @@ describe("sisyphus-task", () => {
       // given - This test verifies the fix for PR #770 bug
       // The bug was: checking `if (inheritedModel)` instead of `if (actualModel === inheritedModel)`
       const categoryName = "ultrabrain"
-      const inheritedModel = "cliproxy/claude-opus-4-7"
+      const inheritedModel = "cliproxy/claude-opus-4-8"
       const userCategories = { "ultrabrain": { model: "user/model" } }
       
       // when - user model wins
@@ -3826,7 +3826,7 @@ describe("sisyphus-task", () => {
       // given a builtin category with its own model, and an inherited model from parent
       // The CORRECT chain: userConfig?.model ?? categoryBuiltIn ?? systemDefaultModel
       const categoryName = "ultrabrain"
-      const inheritedModel = "anthropic/claude-opus-4-7"
+      const inheritedModel = "anthropic/claude-opus-4-8"
       
       // when category has a built-in model (gpt-5.5 for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -3857,7 +3857,7 @@ describe("sisyphus-task", () => {
       // given userConfig.model is explicitly set
       const categoryName = "ultrabrain"
       const userCategories = { "ultrabrain": { model: "custom/user-model" } }
-      const inheritedModel = "anthropic/claude-opus-4-7"
+      const inheritedModel = "anthropic/claude-opus-4-8"
       const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when resolveCategoryConfig is called with all sources
@@ -3876,7 +3876,7 @@ describe("sisyphus-task", () => {
       // given userConfig.model is empty string "" for a custom category (no built-in model)
       const categoryName = "custom-empty-model"
       const userCategories = { "custom-empty-model": { model: "", temperature: 0.3 } }
-      const inheritedModel = "anthropic/claude-opus-4-7"
+      const inheritedModel = "anthropic/claude-opus-4-8"
       
       // when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -3890,7 +3890,7 @@ describe("sisyphus-task", () => {
       // given user sets a builtin category but leaves model undefined
       const categoryName = "visual-engineering"
       const userCategories: Record<string, CategoryConfig> = { "visual-engineering": { temperature: 0.2 } }
-      const inheritedModel = "anthropic/claude-opus-4-7"
+      const inheritedModel = "anthropic/claude-opus-4-8"
       
       // when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
@@ -4109,7 +4109,7 @@ describe("sisyphus-task", () => {
          app: {
            agents: async () => ({
              data: [
-               { name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+               { name: "oracle", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
              ],
            }),
          },
@@ -4152,7 +4152,7 @@ describe("sisyphus-task", () => {
 
       expect(promptBody.model).toEqual({
         providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        modelID: "claude-opus-4-8",
       })
     }, { timeout: 20000 })
 
@@ -4254,7 +4254,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          agentOverrides: {
-           oracle: { model: "anthropic/claude-opus-4-7" },
+           oracle: { model: "anthropic/claude-opus-4-8" },
          },
        })
 
@@ -4280,7 +4280,7 @@ describe("sisyphus-task", () => {
       // then - user-configured model should take priority over matchedAgent.model
       expect(promptBody.model).toEqual({
         providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        modelID: "claude-opus-4-8",
       })
     }, { timeout: 20000 })
 
@@ -4321,7 +4321,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          agentOverrides: {
-           oracle: { model: "anthropic/claude-opus-4-7", variant: "max" },
+           oracle: { model: "anthropic/claude-opus-4-8", variant: "max" },
          },
        })
 
@@ -4409,7 +4409,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
-      // oracle fallback chain: gpt-5.5 (openai) > gemini-3.1-pro (google) > claude-opus-4-7 (anthropic)
+      // oracle fallback chain: gpt-5.5 (openai) > gemini-3.1-pro (google) > claude-opus-4-8 (anthropic)
       // Since openai is in connectedProviders, should resolve to openai/gpt-5.5
       expect(promptBody.model).toBeDefined()
       expect(promptBody.model.providerID).toBe("openai")

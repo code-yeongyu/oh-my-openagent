@@ -95,7 +95,7 @@ describe("resolveDeepCategoryPromptAppend", () => {
 
   test("returns legacy prompt for a non-GPT model", () => {
     //#when
-    const result = resolveDeepCategoryPromptAppend("anthropic/claude-opus-4-7")
+    const result = resolveDeepCategoryPromptAppend("anthropic/claude-opus-4-8")
 
     //#then
     expect(result).toBe(DEEP_CATEGORY_PROMPT_APPEND)

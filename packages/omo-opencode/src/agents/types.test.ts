@@ -39,7 +39,7 @@ describe("isGptNativeSisyphusModel", () => {
   });
 
   test("rejects non-GPT models", () => {
-    expect(isGptNativeSisyphusModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGptNativeSisyphusModel("anthropic/claude-opus-4-8")).toBe(false);
     expect(isGptNativeSisyphusModel("google/gemini-3.1-pro")).toBe(false);
     expect(isGptNativeSisyphusModel("openai/o1")).toBe(false);
   });
@@ -85,7 +85,7 @@ describe("isGptModel", () => {
   });
 
   test("claude models are not gpt", () => {
-    expect(isGptModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGptModel("anthropic/claude-opus-4-8")).toBe(false);
     expect(isGptModel("anthropic/claude-sonnet-4-6")).toBe(false);
     expect(isGptModel("litellm/anthropic.claude-opus-4-5")).toBe(false);
   });
@@ -96,7 +96,7 @@ describe("isGptModel", () => {
   });
 
   test("opencode provider is not gpt", () => {
-    expect(isGptModel("opencode/claude-opus-4-7")).toBe(false);
+    expect(isGptModel("opencode/claude-opus-4-8")).toBe(false);
   });
 });
 
@@ -116,7 +116,7 @@ describe("isMiniMaxModel", () => {
 
   test("does not match non-minimax models", () => {
     expect(isMiniMaxModel("openai/gpt-5.4")).toBe(false);
-    expect(isMiniMaxModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isMiniMaxModel("anthropic/claude-opus-4-8")).toBe(false);
     expect(isMiniMaxModel("google/gemini-3.1-pro")).toBe(false);
     expect(isMiniMaxModel("opencode-go/kimi-k2.5")).toBe(false);
   });
@@ -137,7 +137,7 @@ describe("isGlmModel", () => {
 
   test("#given non-GLM models #then returns false", () => {
     expect(isGlmModel("openai/gpt-5.4")).toBe(false);
-    expect(isGlmModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGlmModel("anthropic/claude-opus-4-8")).toBe(false);
     expect(isGlmModel("google/gemini-3.1-pro")).toBe(false);
   });
 });
@@ -177,11 +177,11 @@ describe("isGeminiModel", () => {
   });
 
   test("#given claude models #then returns false", () => {
-    expect(isGeminiModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGeminiModel("anthropic/claude-opus-4-8")).toBe(false);
     expect(isGeminiModel("anthropic/claude-sonnet-4-6")).toBe(false);
   });
 
   test("#given opencode provider #then returns false", () => {
-    expect(isGeminiModel("opencode/claude-opus-4-7")).toBe(false);
+    expect(isGeminiModel("opencode/claude-opus-4-8")).toBe(false);
   });
 });

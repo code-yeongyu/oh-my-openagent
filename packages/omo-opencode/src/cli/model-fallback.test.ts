@@ -193,7 +193,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -210,7 +210,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
 
     test("Sisyphus resolves to gpt-5.5 medium when only OpenAI is available", () => {
@@ -494,7 +494,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then should prefer native anthropic over gateway
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
   })
 

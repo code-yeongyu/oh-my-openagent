@@ -56,7 +56,7 @@ describe("readOpencodeConfigSkills", () => {
     fs.mkdirSync(opencodeDir, { recursive: true })
     fs.writeFileSync(
       path.join(opencodeDir, "opencode.json"),
-      JSON.stringify({ model: "anthropic/claude-opus-4-7" }),
+      JSON.stringify({ model: "anthropic/claude-opus-4-8" }),
     )
 
     expect(readOpencodeConfigSkills(tmpDir)).toBeUndefined()
