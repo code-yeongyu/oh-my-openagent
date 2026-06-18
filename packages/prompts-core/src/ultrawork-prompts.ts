@@ -2,6 +2,7 @@ import type { VariantTable } from "./types"
 import codexPrompt from "../prompts/ultrawork/codex.md"
 import defaultPrompt from "../prompts/ultrawork/default.md"
 import geminiPrompt from "../prompts/ultrawork/gemini.md"
+import glmPrompt from "../prompts/ultrawork/glm.md"
 import gptPrompt from "../prompts/ultrawork/gpt.md"
 import plannerPrompt from "../prompts/ultrawork/planner.md"
 
@@ -26,6 +27,11 @@ export const ultraworkPromptVariants = {
     kind: "bundled",
     content: geminiPrompt,
     filePath: "packages/prompts-core/prompts/ultrawork/gemini.md",
+  },
+  glm: {
+    kind: "bundled",
+    content: glmPrompt,
+    filePath: "packages/prompts-core/prompts/ultrawork/glm.md",
   },
   default: {
     kind: "bundled",

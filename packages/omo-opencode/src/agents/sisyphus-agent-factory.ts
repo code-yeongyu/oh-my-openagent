@@ -7,12 +7,14 @@ import type {
 } from "./dynamic-agent-prompt-builder";
 import {
   buildClaudeSisyphusAgentConfig,
+  buildGlmSisyphusAgentConfig,
   buildGptSisyphusAgentConfig,
 } from "./sisyphus-agent-config";
 import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
+import { buildGlm52SisyphusPrompt } from "./sisyphus/glm-5-2";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
@@ -22,6 +24,7 @@ import {
   isClaudeFable5Model,
   isClaudeOpus47Model,
   isClaudeOpus48Model,
+  isGlmModel,
   isGpt5_5Model,
   isGptModel,
   isGptNativeSisyphusModel,
@@ -97,6 +100,14 @@ export function createSisyphusAgent(
       MODE,
       model,
       buildClaudeOpus47SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+    );
+  }
+
+  if (isGlmModel(model)) {
+    return buildGlmSisyphusAgentConfig(
+      MODE,
+      model,
+      buildGlm52SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
     );
   }
 
