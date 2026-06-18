@@ -28,6 +28,8 @@ export type ModelFallbackState = {
   fallbackChain: FallbackEntry[]
   attemptCount: number
   pending: boolean
+  lastFailedProviderID?: string
+  lastFailedModelID?: string
 }
 
 type ModelFallbackControllerWithState = Pick<
@@ -39,6 +41,7 @@ type ModelFallbackControllerWithState = Pick<
   | "setPendingModelFallback"
   | "getNextFallback"
   | "clearPendingModelFallback"
+  | "clearLastFailedModelFallback"
   | "hasPendingModelFallback"
   | "getFallbackState"
   | "reset"
@@ -168,6 +171,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     setPendingModelFallback: controller.setPendingModelFallback,
     getNextFallback: controller.getNextFallback,
     clearPendingModelFallback: controller.clearPendingModelFallback,
+    clearLastFailedModelFallback: controller.clearLastFailedModelFallback,
     hasPendingModelFallback: controller.hasPendingModelFallback,
     getFallbackState: controller.getFallbackState,
     reset: controller.reset,

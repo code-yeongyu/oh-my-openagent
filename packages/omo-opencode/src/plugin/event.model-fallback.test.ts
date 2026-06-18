@@ -230,6 +230,121 @@ describe("createEventHandler - model fallback", () => {
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
+  test("ignores duplicate non-auto failed-model updates after the fallback is consumed", async () => {
+    //#given
+    const sessionID = "ses_non_auto_duplicate_failed_model"
+    subagentSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+    const retryInfo = (id: string, modelID: string, providerID = "anthropic") => ({
+      id,
+      sessionID,
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+      error: {
+        name: "ModelNotSupportedError",
+        message: `model_not_supported: ${modelID} is not supported`,
+      },
+      parentID: `${id}_user`,
+      modelID,
+      providerID,
+      agent: "Sisyphus - Ultraworker",
+      path: { cwd: "/tmp", root: "/tmp" },
+    })
+
+    //#when - the first non-auto error arms fallback and the next user message consumes it.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: retryInfo("msg_non_auto_duplicate_failed_model", "claude-opus-4-7-thinking") },
+      },
+    })
+    const firstOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      firstOutput,
+    )
+
+    //#then - the duplicate original error must not arm the next fallback entry.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: retryInfo("msg_non_auto_duplicate_failed_model", "claude-opus-4-7-thinking") },
+      },
+    })
+    const duplicateOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      duplicateOutput,
+    )
+
+    //#when - the selected fallback model itself fails, the chain still advances.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: retryInfo("msg_non_auto_selected_fallback_failed", "gpt-5.5", "opencode-go") },
+      },
+    })
+    const fallbackFailureOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      },
+      fallbackFailureOutput,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(firstOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(duplicateOutput.message["model"]).toBeUndefined()
+    expect(fallbackFailureOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+  })
+
   test("auto-continuation prompt uses the selected fallback model instead of the failed model", async () => {
     //#given
     const sessionID = "ses_auto_continuation_selected_fallback_model"

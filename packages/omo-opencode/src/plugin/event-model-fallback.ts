@@ -94,6 +94,7 @@ export function createModelFallbackEventHandler(args: {
   const clearRetryDedupeAfterIdle = (sessionID: string): void => {
     lastHandledRetryStatusKey.delete(sessionID);
     lastDispatchedContinuationKeys.delete(sessionID);
+    args.modelFallback?.clearLastFailedModelFallback?.(sessionID);
   };
 
   const clearPendingFallbackAfterAbort = (sessionID: string): void => {
