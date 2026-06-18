@@ -35,6 +35,7 @@ describe("plugin package metadata", () => {
 		expect(packageJson.bin["omo-lsp"]).toBe("./dist/cli.js");
 		expect(packageJson.bin["codex-lsp"]).toBeUndefined();
 		expect(scripts["build"]).toBe("node scripts/clean-dist.mjs && tsc -p tsconfig.build.json");
+		expect(scripts["pretest"]).toBe("npm run build --silent");
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(cliSource).toContain("Usage: omo-lsp [mcp | hook post-tool-use | hook post-compact]");
 		expect(postToolUseCommand).toBe(`node "${pluginRoot}/dist/cli.js" hook post-tool-use`);
