@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(4.11.0): Checking Start-Work Continuation"
+						"statusMessage": "LazyCodex(4.11.1): Checking Start-Work Continuation"
 					}
 				]
 			}
@@ -19,7 +19,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook subagent-stop",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(4.11.0): Checking Start-Work Continuation"
+						"statusMessage": "LazyCodex(4.11.1): Checking Start-Work Continuation"
 					}
 				]
 			}

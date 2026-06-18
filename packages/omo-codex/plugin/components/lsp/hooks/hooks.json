@@ -8,7 +8,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-tool-use",
 						"timeout": 60,
-						"statusMessage": "LazyCodex(4.11.0): Checking LSP Diagnostics"
+						"statusMessage": "LazyCodex(4.11.1): Checking LSP Diagnostics"
 					}
 				]
 			}
@@ -21,7 +21,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-compact",
 						"timeout": 5,
-						"statusMessage": "LazyCodex(4.11.0): Resetting LSP Diagnostics Cache"
+						"statusMessage": "LazyCodex(4.11.1): Resetting LSP Diagnostics Cache"
 					}
 				]
 			}
