@@ -1053,6 +1053,85 @@ describe("createEventHandler - model fallback", () => {
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
+  test("clears pending fallback on lowercase abort error names before manual resume", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_lowercase_abort_clear"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providerID: "opencode-go", modelID: "gpt-5.5" },
+    ]))
+    expect(
+      modelFallback.setPendingModelFallback(
+        sessionID,
+        "sisyphus",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_lowercase_abort_clear_message",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "messageabortederror",
+              message: "The user aborted the message.",
+            },
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"

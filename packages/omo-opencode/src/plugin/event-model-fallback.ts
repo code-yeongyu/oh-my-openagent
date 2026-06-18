@@ -22,8 +22,11 @@ import {
 } from "./event-model-fallback-state";
 import type { PluginEventContext } from "./event-types";
 
+const ABORT_ERROR_NAMES = new Set(["messageabortederror", "aborterror"]);
+
 function isAbortErrorName(errorName: string | undefined): boolean {
-  return errorName === "MessageAbortedError" || errorName === "AbortError";
+  const normalized = errorName?.trim().toLowerCase();
+  return normalized ? ABORT_ERROR_NAMES.has(normalized) : false;
 }
 
 export function createModelFallbackEventHandler(args: {
