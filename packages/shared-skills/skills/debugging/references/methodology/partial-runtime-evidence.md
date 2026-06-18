@@ -119,7 +119,7 @@ Record in the journal:
 ```markdown
 ## Partial runtime evidence
 ### Question being verified
-<the specific claim, e.g. "Opus 4.7 default effort is 'high'">
+<the specific claim, e.g. "Opus 4.8 default effort is 'high'">
 
 ### Available signals
 - Tier 1: debug log /tmp/trace.log line 47-49 shows `effort: "high"` ✓

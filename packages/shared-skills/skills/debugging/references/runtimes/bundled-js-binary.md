@@ -223,7 +223,7 @@ Once you have the source on disk, treat it as a normal codebase:
 rg -n "^function |^const \w+ = (function|\(.*\) =>)" extracted-bundle.js | head
 
 # Find specific behavior
-rg -n "claude-opus-4-7|reasoning_effort|api_key" extracted-bundle.js
+rg -n "claude-opus-4-8|reasoning_effort|api_key" extracted-bundle.js
 
 # Resolve minified identifiers — they show up as `var XYZ="value"`
 rg -aoP 'var \w+="[^"]+"' extracted-bundle.js | head -50
