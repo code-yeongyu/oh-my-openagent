@@ -109,7 +109,7 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_message_updated_fallback"
     const modelFallback = createModelFallbackHook()
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
 
     //#when
     await handler({
@@ -153,7 +153,7 @@ describe("createEventHandler - model fallback", () => {
     subagentSessions.add(sessionID)
     const modelFallback = createModelFallbackHook()
     clearPendingModelFallback(modelFallback, sessionID)
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
     const chatMessageHandler = createChatMessageHandler({
       ctx: unsafeTestValue({
         client: {
@@ -272,7 +272,72 @@ describe("createEventHandler - model fallback", () => {
       providerID: "opencode-go",
       modelID: "gpt-5.5",
     })
-    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("auto-continuation advances fallback state before the selected fallback model can retry", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_advances_fallback_state"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - first failure auto-continues on the first fallback.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_first_fallback",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_first_fallback",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#when - that selected fallback fails before any manual resume.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "opencode-go",
+          modelID: "gpt-5.5",
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {
@@ -657,7 +722,7 @@ describe("createEventHandler - model fallback", () => {
     const modelFallback = createModelFallbackHook()
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
 
     const chatMessageHandler = createChatMessageHandler({
       ctx: unsafeTestValue({
@@ -732,11 +797,11 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
-    expect(output.message["model"]).toMatchObject({
+    expect(promptInputs[0]?.body?.["model"]).toMatchObject({
       providerID: "opencode-go",
       modelID: "kimi-k2.6",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(promptInputs[0]?.body?.["variant"]).toBeUndefined()
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -1312,7 +1377,7 @@ describe("createEventHandler - model fallback", () => {
         },
       },
     })
-    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
 
     //#when - OpenCode later rewrites the same assistant message to the user-abort error.
     await handler({
@@ -1421,7 +1486,7 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
-    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
@@ -1491,7 +1556,7 @@ describe("createEventHandler - model fallback", () => {
       },
     }
 
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback }, pluginConfig })
 
     const chatMessageHandler = createChatMessageHandler({
       ctx: unsafeTestValue({
@@ -1566,17 +1631,18 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
-    expect(output.message["model"]).toEqual({
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
       providerID: "quotio",
       modelID: "gpt-5.5",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(promptInputs[0]?.body?.["variant"]).toBeUndefined()
   })
 
   test("advances main-session fallback chain across repeated session.error retries end-to-end", async () => {
     //#given
     const abortCalls: string[] = []
     const promptCalls: string[] = []
+    const promptInputs: Array<{ path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }> = []
     const toastCalls: string[] = []
     const sessionID = "ses_main_fallback_chain"
     setMainSession(sessionID)
@@ -1593,8 +1659,9 @@ describe("createEventHandler - model fallback", () => {
               abortCalls.push(path.id)
               return {}
             },
-            prompt: async ({ path }: { path: { id: string } }) => {
-              promptCalls.push(path.id)
+            prompt: async (input: { path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }) => {
+              promptCalls.push(input.path.id)
+              promptInputs.push(input)
               return {}
             },
           },
@@ -1676,28 +1743,26 @@ describe("createEventHandler - model fallback", () => {
         },
         output,
       )
-      return output
+      return promptInputs[promptInputs.length - 1]?.body?.["model"]
     }
 
     //#when - first retry cycle
     const first = await triggerRetryCycle("anthropic", "claude-opus-4-7-thinking")
 
     //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
-    expect(first.message["model"]).toMatchObject({
+    expect(first).toMatchObject({
       providerID: "opencode-go",
       modelID: "kimi-k2.6",
     })
-    expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k2.6")
 
     //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
-    expect(second.message["model"]).toMatchObject({
+    expect(second).toMatchObject({
       providerID: "kimi-for-coding",
       modelID: "k2p5",
     })
-    expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)

@@ -98,8 +98,7 @@ export function createModelFallbackStateController(input: {
     }
 
     if (existing.attemptCount > 0 && isSameFailedModel(existing, currentProviderID, currentModelID)) {
-      log(`[model-fallback] Ignoring duplicate fallback arm for already handled model in session: ${sessionID}`)
-      return false
+      log(`[model-fallback] Re-arming previously handled model for session: ${sessionID}`)
     }
 
     existing.providerID = currentProviderID

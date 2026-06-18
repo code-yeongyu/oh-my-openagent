@@ -131,7 +131,15 @@ export function createModelFallbackEventHandler(args: {
         continuationContext,
         fallbackContext,
       );
-      if (dispatched) args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
+      if (dispatched) {
+        const advancedFallback = args.modelFallback?.getNextFallback?.(sessionID);
+        const advancedState = advancedFallback ? args.modelFallback?.getFallbackState?.(sessionID) : undefined;
+        if (advancedFallback && advancedState) {
+          advancedState.providerID = advancedFallback.providerID;
+          advancedState.modelID = advancedFallback.modelID;
+        }
+        args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
+      }
     }
   };
 
