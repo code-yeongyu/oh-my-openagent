@@ -8,7 +8,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/lazycodex-executor-verify/dist/cli.js\" hook subagent-stop",
 						"timeout": 10,
-						"statusMessage": "LazyCodex(4.11.0): Verifying LazyCodex Executor Evidence"
+						"statusMessage": "LazyCodex(4.11.1): Verifying LazyCodex Executor Evidence"
 					}
 				]
 			}
