@@ -8,6 +8,7 @@ import plannerPrompt from "../prompts/ultrawork/planner.md"
 
 export const ULTRAWORK_DEFAULT_PROMPT = defaultPrompt
 export const ULTRAWORK_GEMINI_PROMPT = geminiPrompt
+export const ULTRAWORK_GLM_PROMPT = glmPrompt
 export const ULTRAWORK_GPT_PROMPT = gptPrompt
 export const ULTRAWORK_PLANNER_PROMPT = plannerPrompt
 export const CODEX_ULTRAWORK_PROMPT = codexPrompt
