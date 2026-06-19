@@ -12,6 +12,7 @@ const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
+	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
