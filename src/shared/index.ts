@@ -1,3 +1,6 @@
+export * from "./format-duration"
+export * from "./is-object"
+export * from "./code-patterns"
 export * from "./frontmatter"
 export * from "./command-executor"
 export * from "./file-reference-resolver"
