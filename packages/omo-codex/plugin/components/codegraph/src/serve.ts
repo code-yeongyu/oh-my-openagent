@@ -17,6 +17,10 @@ import {
 	evaluateCodegraphNodeSupport,
 } from "../../../../../utils/src/codegraph/node-support.ts";
 import {
+	ensureCodegraphProvisioned,
+	type EnsureCodegraphProvisionedOptions,
+} from "../../../../../utils/src/codegraph/provision.ts";
+import {
 	codegraphCommandRequiresSupportedLocalNode,
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
@@ -37,6 +41,9 @@ export type CodegraphServeProcessRunner = (
 	args: readonly string[],
 	options: CodegraphServeProcessOptions,
 ) => Promise<number>;
+export type CodegraphProvisioner = (
+	options: EnsureCodegraphProvisionedOptions,
+) => ReturnType<typeof ensureCodegraphProvisioned>;
 
 export interface ServeProcessInvocation {
 	readonly args: readonly string[];
@@ -58,12 +65,14 @@ export interface RunCodegraphServeOptions {
 	readonly resolve?: (options: ResolveCodegraphCommandOptions) => ReturnType<typeof resolveCodegraphCommand>;
 	readonly runProcess?: CodegraphServeProcessRunner;
 	readonly stderr?: CodegraphServeStderr;
+	readonly ensureProvisioned?: CodegraphProvisioner;
 }
 
 const CODEGRAPH_SKIP_HINT =
 	"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n";
 const CODEGRAPH_DISABLED_HINT =
 	"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n";
+const CODEGRAPH_VERSION = "1.0.1";
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 
@@ -82,15 +91,24 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		homeDir,
 		provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir),
 	} satisfies ResolveCodegraphCommandOptions;
-	const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+	let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
 	if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync)) {
 		if (resolution.source === "path" && !nodeSupport.supported) {
 			(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
 			return 1;
 		}
-		(options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
-		return 1;
+		const provisioned = await provisionMissingCodegraph({
+			config: codegraphConfig,
+			ensureProvisioned: options.ensureProvisioned ?? ensureCodegraphProvisioned,
+			homeDir,
+			resolution,
+		});
+		if (provisioned === null) {
+			(options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
+			return 1;
+		}
+		resolution = provisioned;
 	}
 
 	if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
@@ -108,6 +126,25 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		env: mergedEnv,
 		stdio: "inherit",
 	});
+}
+
+async function provisionMissingCodegraph(options: {
+	readonly config: CodegraphConfig;
+	readonly ensureProvisioned: CodegraphProvisioner;
+	readonly homeDir: string;
+	readonly resolution: CodegraphCommandResolution;
+}): Promise<CodegraphCommandResolution | null> {
+	if (options.resolution.source === "env") return null;
+	if (options.config.auto_provision === false) return null;
+
+	const installDir = options.config.install_dir ?? join(options.homeDir, ".omo", "codegraph");
+	const result = await options.ensureProvisioned({
+		installDir,
+		lockDir: join(installDir, ".locks"),
+		version: CODEGRAPH_VERSION,
+	});
+	if (!result.provisioned || result.binPath === undefined) return null;
+	return { argsPrefix: [], command: result.binPath, exists: true, source: "provisioned" };
 }
 
 function shouldSkipResolvedCommand(
