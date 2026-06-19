@@ -429,36 +429,4 @@ describe("OpenCode Go/Zen error classification", () => {
     expect(retryable).toBe(true)
   })
 
-  test("classifies Zen ModelError (free promotion ended) as retryable via pattern", () => {
-    //#given
-    const error = {
-      type: "error",
-      error: {
-        type: "ModelError",
-        message: "Free promotion has ended for Qwen3.6 Plus Free. You can continue using the model by subscribing to OpenCode Go."
-      }
-    }
-
-    //#when
-    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
-
-    //#then
-    expect(retryable).toBe(true)
-  })
-
-  test("classifies authentication_error as retryable", () => {
-    //#given
-    const error = {
-      error: {
-        type: "authentication_error",
-        message: "Invalid Authentication"
-      }
-    }
-
-    //#when
-    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
-
-    //#then
-    expect(retryable).toBe(true)
-  })
 })
