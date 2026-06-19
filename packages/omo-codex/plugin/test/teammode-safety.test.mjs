@@ -84,6 +84,103 @@ test("#given member A exists #when add-member receives A with trailing space #th
 	}
 });
 
+test("#given member focus already exists #when add-member receives same focus with different spacing and case #then state is not partially mutated", () => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-duplicate-focus-"));
+	try {
+		runTeam(tempRoot, "init", "--name", "DuplicateFocus", "--session-name", "Members", "--session", "safe-duplicate-focus");
+		runTeam(
+			tempRoot,
+			"add-member",
+			"--team",
+			"safe-duplicate-focus",
+			"--id",
+			"A",
+			"--focus",
+			"Plugin Hook Packaging",
+			"--lens",
+			"ownership",
+			"--deliverable",
+			"first",
+		);
+
+		const result = runTeamRaw(
+			tempRoot,
+			"add-member",
+			"--team",
+			"safe-duplicate-focus",
+			"--id",
+			"B",
+			"--focus",
+			" plugin   hook packaging ",
+			"--lens",
+			"area",
+			"--deliverable",
+			"second",
+		);
+		const team = JSON.parse(readFileSync(join(tempRoot, ".omo", "teams", "safe-duplicate-focus", "team.json"), "utf8"));
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member focus "plugin   hook packaging" duplicates "Plugin Hook Packaging"/);
+		assert.deepEqual(
+			team.members.map((member) => member.id),
+			["A"],
+		);
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
+test("#given only one member exists #when bind-thread runs #then member is not activated", () => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-understaffed-bind-"));
+	try {
+		runTeam(tempRoot, "init", "--name", "Understaffed", "--session-name", "Members", "--session", "safe-understaffed");
+		runTeam(
+			tempRoot,
+			"add-member",
+			"--team",
+			"safe-understaffed",
+			"--id",
+			"A",
+			"--focus",
+			"installer",
+			"--lens",
+			"area",
+			"--deliverable",
+			"first",
+		);
+
+		const result = runTeamRaw(tempRoot, "bind-thread", "--team", "safe-understaffed", "--id", "A", "--thread", "thread-a");
+		let team = JSON.parse(readFileSync(join(tempRoot, ".omo", "teams", "safe-understaffed", "team.json"), "utf8"));
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /at least 2 distinct members/);
+		assert.equal(team.members[0].threadId, null);
+		assert.equal(team.members[0].status, "pending");
+
+		runTeam(
+			tempRoot,
+			"add-member",
+			"--team",
+			"safe-understaffed",
+			"--id",
+			"B",
+			"--focus",
+			"runtime qa",
+			"--lens",
+			"perspective",
+			"--deliverable",
+			"second",
+		);
+		runTeam(tempRoot, "bind-thread", "--team", "safe-understaffed", "--id", "A", "--thread", "thread-a");
+		team = JSON.parse(readFileSync(join(tempRoot, ".omo", "teams", "safe-understaffed", "team.json"), "utf8"));
+
+		assert.equal(team.members[0].threadId, "thread-a");
+		assert.equal(team.members[0].status, "active");
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
 test("#given persisted paths are mutated outside trusted team dir #when guide is regenerated #then outside file stays untouched", () => {
 	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-mutated-paths-"));
 	try {
