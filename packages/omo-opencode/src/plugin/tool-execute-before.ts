@@ -113,7 +113,7 @@ export function createToolExecuteBeforeHandler(args: {
       })
     }
 
-    if (input.tool === "task") {
+    if (input.tool === "task" || input.tool === "call_omo_agent") {
       const category = typeof output.args.category === "string" ? output.args.category : undefined
       const subagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
       const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined
@@ -123,10 +123,16 @@ export function createToolExecuteBeforeHandler(args: {
       } else if (!subagentType && taskId) {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
         replaceToolArgs(output, { subagent_type: resolvedAgent ?? "continue" })
+      } else if (!subagentType) {
+        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
       }
 
       const normalizedSubagentType =
         typeof output.args.subagent_type === "string" ? stripInvisibleAgentCharacters(output.args.subagent_type) : undefined
+
+      if (normalizedSubagentType === "general" || normalizedSubagentType === "general-purpose") {
+        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
+      }
       const prompt = typeof output.args.prompt === "string" ? output.args.prompt : ""
       const loopState = typeof ctx.directory === "string" ? readState(ctx.directory) : null
       const shouldInjectOracleVerification =

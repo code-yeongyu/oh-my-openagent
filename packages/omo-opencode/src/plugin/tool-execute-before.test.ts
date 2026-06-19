@@ -178,6 +178,48 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("sisyphus-junior")
     })
 
+    test("defaults task delegation to sisyphus-junior instead of native general", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.subagent_type).toBe("sisyphus-junior")
+    })
+
+    test("rewrites explicit general subagent delegation to sisyphus-junior", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { subagent_type: "general", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.subagent_type).toBe("sisyphus-junior")
+    })
+
+    test("rewrites call_omo_agent general-purpose delegation to sisyphus-junior", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "call_omo_agent", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { subagent_type: "general-purpose", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.subagent_type).toBe("sisyphus-junior")
+    })
+
     test("resolves subagent_type from session first message when task_id is provided without subagent_type", async () => {
       //#given
       const ctx = createCtxWithSessionMessages([
