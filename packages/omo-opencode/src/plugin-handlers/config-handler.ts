@@ -105,6 +105,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     pluginComponentsPromise ??= loadPluginComponents({ pluginConfig });
     const pluginComponents = await pluginComponentsPromise;
+    if (pluginComponents.retryableLoadFailure) {
+      pluginComponentsPromise = undefined;
+    }
 
     applyHookConfig({ pluginComponents });
 
