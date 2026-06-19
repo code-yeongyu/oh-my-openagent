@@ -6127,7 +6127,7 @@ var init_telemetry = __esm(() => {
 
 // packages/omo-codex/src/install/install-local-cli.ts
 import { readFile as readFile19 } from "node:fs/promises";
-import { dirname as dirname9, join as join32, resolve as resolve11 } from "node:path";
+import { dirname as dirname9, join as join33, resolve as resolve11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -13144,9 +13144,32 @@ function buildDelegatedOmoInvocation(parsed) {
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn4, spawnSync as spawnSync2 } from "node:child_process";
 import { readFileSync as readFileSync3 } from "node:fs";
-import { dirname as dirname8, join as join29 } from "node:path";
+import { dirname as dirname8, join as join30 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+
+// packages/omo-codex/src/install/lazycodex-bun-global-paths.ts
+import { join as join29 } from "node:path";
+function isBunGlobalEntrypointPath(invokedPath, env3) {
+  if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
+    return false;
+  const normalizedPath = normalizePathForPrefix(invokedPath);
+  return resolveBunGlobalRoots(env3).some((root) => normalizedPath.startsWith(root));
+}
+function resolveBunGlobalRoots(env3) {
+  const bunInstallRoot = env3.BUN_INSTALL?.trim();
+  const homeRoot = env3.HOME?.trim();
+  return [
+    ...bunInstallRoot ? [join29(bunInstallRoot, "bin"), join29(bunInstallRoot, "install", "global", "node_modules")] : [],
+    ...homeRoot ? [join29(homeRoot, ".bun", "bin"), join29(homeRoot, ".bun", "install", "global", "node_modules")] : []
+  ].map(normalizePathForPrefix);
+}
+function normalizePathForPrefix(path2) {
+  const normalized = path2.replaceAll("\\", "/").replace(/\/+$/, "");
+  return normalized.endsWith("/node_modules") || normalized.endsWith("/bin") ? `${normalized}/` : normalized;
+}
+
+// packages/omo-codex/src/install/lazycodex-manual-update.ts
 var DEFAULT_UPDATE_COMMAND = "npx";
 var DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
 var BUN_UPDATE_COMMAND = "bun";
@@ -13228,7 +13251,7 @@ function resolveCurrentVersion(env3) {
   if (env3.LAZYCODEX_CURRENT_VERSION?.trim())
     return env3.LAZYCODEX_CURRENT_VERSION.trim();
   const pluginRoot = dirname8(dirname8(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env3, pluginRoot)) ?? readVersionManifest(join29(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join29(pluginRoot, ".codex-plugin", "plugin.json"));
+  return readVersionManifest(resolveInstalledVersionPath(env3, pluginRoot)) ?? readVersionManifest(join30(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join30(pluginRoot, ".codex-plugin", "plugin.json"));
 }
 function resolveLatestVersion(env3) {
   if (env3.LAZYCODEX_LATEST_VERSION?.trim())
@@ -13291,20 +13314,7 @@ function isKnownLazyCodexBunTrustPackage(packageName) {
   return KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) || KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES.some((prefix) => packageName.startsWith(prefix));
 }
 function isBunGlobalEntrypoint(invokedPath, env3) {
-  if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
-    return false;
-  const normalizedPath = normalizePathForPrefix(invokedPath);
-  return resolveBunGlobalNodeModulesRoots(env3).some((root) => normalizedPath.startsWith(root));
-}
-function resolveBunGlobalNodeModulesRoots(env3) {
-  return [
-    env3.BUN_INSTALL?.trim() ? join29(env3.BUN_INSTALL.trim(), "install", "global", "node_modules") : undefined,
-    env3.HOME?.trim() ? join29(env3.HOME.trim(), ".bun", "install", "global", "node_modules") : undefined
-  ].flatMap((root) => root === undefined ? [] : [normalizePathForPrefix(root)]);
-}
-function normalizePathForPrefix(path2) {
-  const normalized = path2.replaceAll("\\", "/").replace(/\/+$/, "");
-  return normalized.endsWith("/node_modules") ? `${normalized}/` : normalized;
+  return isBunGlobalEntrypointPath(invokedPath, env3);
 }
 function defaultRunCommandForManualUpdate(command, args, options) {
   return new Promise((resolve11, reject) => {
@@ -13357,7 +13367,7 @@ function compareVersions(left, right) {
 function resolveInstalledVersionPath(env3, pluginRoot) {
   if (env3.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
     return env3.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
-  return join29(pluginRoot, INSTALLED_VERSION_FILE);
+  return join30(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path2) {
   try {
@@ -13374,11 +13384,11 @@ function readVersionManifest(path2) {
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
 import { readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join30 } from "node:path";
+import { join as join31 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 async function stampGitBashMcpEnv(input) {
-  const manifestPath = join30(input.pluginRoot, ".mcp.json");
+  const manifestPath = join31(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
   const parsed = JSON.parse(await readFile17(manifestPath, "utf8"));
@@ -13411,12 +13421,12 @@ function stampCodegraphMcpPath(mcpServers, pluginRoot) {
   const entrypoint = args[0];
   if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS2.has(entrypoint))
     return false;
-  codegraphServer["args"] = [join30(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
+  codegraphServer["args"] = [join31(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
   return true;
 }
 // packages/omo-codex/src/install/codex-hook-targets.ts
 import { readFile as readFile18 } from "node:fs/promises";
-import { join as join31, sep as sep8 } from "node:path";
+import { join as join32, sep as sep8 } from "node:path";
 var PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}\/([^"']+)/g;
 async function findMissingHookCommandTargets(pluginRoot) {
   const commands = [];
@@ -13433,7 +13443,7 @@ async function findMissingHookCommandTargets(pluginRoot) {
       const targetSuffix = match[1];
       if (targetSuffix === undefined)
         continue;
-      const target = join31(pluginRoot, ...targetSuffix.split("/"));
+      const target = join32(pluginRoot, ...targetSuffix.split("/"));
       if (seen.has(target))
         continue;
       seen.add(target);
@@ -13444,17 +13454,17 @@ async function findMissingHookCommandTargets(pluginRoot) {
   return missing;
 }
 async function hookManifestPaths2(pluginRoot) {
-  const pluginManifestPath = join31(pluginRoot, ".codex-plugin", "plugin.json");
+  const pluginManifestPath = join32(pluginRoot, ".codex-plugin", "plugin.json");
   if (!await fileExistsStrict(pluginManifestPath))
-    return [join31(pluginRoot, "hooks", "hooks.json")];
+    return [join32(pluginRoot, "hooks", "hooks.json")];
   const parsed = JSON.parse(await readFile18(pluginManifestPath, "utf8"));
   if (!isPlainRecord(parsed))
     return [];
   if (typeof parsed.hooks === "string" && parsed.hooks.trim() !== "") {
-    return [join31(pluginRoot, stripDotSlash3(parsed.hooks))];
+    return [join32(pluginRoot, stripDotSlash3(parsed.hooks))];
   }
   if (Array.isArray(parsed.hooks)) {
-    return parsed.hooks.filter((hookPath) => typeof hookPath === "string" && hookPath.trim() !== "").map((hookPath) => join31(pluginRoot, stripDotSlash3(hookPath)));
+    return parsed.hooks.filter((hookPath) => typeof hookPath === "string" && hookPath.trim() !== "").map((hookPath) => join32(pluginRoot, stripDotSlash3(hookPath)));
   }
   return [];
 }
@@ -13499,7 +13509,7 @@ async function runLazyCodexInstallLocalCli(input) {
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile19(join32(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile19(join33(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;
