@@ -8,6 +8,7 @@ import { handleRalphLoopMessage } from "./chat-message/loop-commands"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runStartWorkHookIfApplicable } from "./chat-message/start-work-message"
+import { recoverStaleFallbackSessionModel } from "./chat-message/stale-fallback-model"
 import type {
   ChatMessageHandlerOutput,
   ChatMessageHooks,
@@ -112,6 +113,12 @@ export function createChatMessageHandler(args: {
     if (storedMainSessionModel) {
       output.message.model = storedMainSessionModel
     }
+    await recoverStaleFallbackSessionModel({
+      ctx,
+      input,
+      output,
+      modelFallback: hooks.modelFallback as { hasPendingModelFallback?: (sessionID: string) => boolean } | null | undefined,
+    })
 
     await runChatMessageHooks({
       input,

@@ -914,6 +914,61 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(normalOutput.message["model"]).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
   })
 
+  test("recovers an already-stale fallback title before reusing the fallback model", async () => {
+    //#given
+    setMainSession("test-session")
+    let title = "Atlas work [fallback: openai/gpt-5.5 high]"
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    args.ctx = unsafeTestValue<PluginContext>({
+      directory: "/tmp/project",
+      client: {
+        tui: { showToast: async () => {} },
+        session: {
+          get: async () => ({ data: { title } }),
+          update: async ({ body }: { body: { title: string } }) => {
+            title = body.title
+            return {}
+          },
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  role: "user",
+                  agent: "Sisyphus - Ultraworker",
+                  providerID: "anthropic",
+                  modelID: "claude-opus-4-7",
+                },
+                parts: [{ type: "text", text: "original" }],
+              },
+              {
+                info: {
+                  role: "user",
+                  agent: "Sisyphus - Ultraworker",
+                  providerID: "openai",
+                  modelID: "gpt-5.5",
+                },
+                parts: [{ type: "text", text: "작업재개" }],
+              },
+            ],
+          }),
+        },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const output = createMockOutput()
+
+    //#when
+    await handler(
+      createMockInput("sisyphus", { providerID: "openai", modelID: "gpt-5.5" }),
+      output,
+    )
+
+    //#then
+    expect(output.message["model"]).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(title).toBe("Atlas work")
+  })
+
   test("does not reuse a stored model for the first message of a session", async () => {
     //#given
     setMainSession("test-session")
