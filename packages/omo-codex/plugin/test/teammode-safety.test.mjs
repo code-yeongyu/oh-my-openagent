@@ -38,6 +38,52 @@ test("#given guide.md is a symlink #when guide is regenerated #then the outside 
 	}
 });
 
+test("#given member A exists #when add-member receives A with trailing space #then state is not partially mutated", () => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-duplicate-"));
+	try {
+		runTeam(tempRoot, "init", "--name", "Duplicate", "--session-name", "Members", "--session", "safe-duplicate");
+		runTeam(
+			tempRoot,
+			"add-member",
+			"--team",
+			"safe-duplicate",
+			"--id",
+			"A",
+			"--focus",
+			"alpha",
+			"--lens",
+			"area",
+			"--deliverable",
+			"first",
+		);
+
+		const result = runTeamRaw(
+			tempRoot,
+			"add-member",
+			"--team",
+			"safe-duplicate",
+			"--id",
+			"A ",
+			"--focus",
+			"beta",
+			"--lens",
+			"ownership",
+			"--deliverable",
+			"second",
+		);
+		const team = JSON.parse(readFileSync(join(tempRoot, ".omo", "teams", "safe-duplicate", "team.json"), "utf8"));
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member id "A" already exists/);
+		assert.deepEqual(
+			team.members.map((member) => member.id),
+			["A"],
+		);
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
 function runTeam(cwd, ...args) {
 	const result = runTeamRaw(cwd, ...args);
 	assert.equal(result.status, 0, `team.mjs ${args.join(" ")} failed: ${result.stderr}`);
