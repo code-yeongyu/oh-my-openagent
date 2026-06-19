@@ -17,8 +17,9 @@
 //   node "<skill-root>/scripts/team.mjs" guide        --team <id>
 
 import { randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildGuide, buildMemberPrompt } from "./team-guide.mjs";
 import {
 	addMember,
@@ -191,7 +192,20 @@ async function main() {
 	await handler(process.cwd(), parseFlags(rest));
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Symlink-robust main-module check: a symlinked install invokes this file through a symlink
+// path while node resolves import.meta.url to the realpath, so compare the resolved real paths
+// (falling back to the literal url comparison if a path cannot be resolved).
+function isInvokedAsScript() {
+	const entry = process.argv[1];
+	if (!entry) return false;
+	try {
+		return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(entry);
+	} catch {
+		return import.meta.url === pathToFileURL(entry).href;
+	}
+}
+
+if (isInvokedAsScript()) {
 	await main().catch((error) => {
 		process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
 		process.exit(1);
