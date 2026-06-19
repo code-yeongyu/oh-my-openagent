@@ -29,6 +29,8 @@
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
     "test": "bun test"
   },
   "keywords": [
@@ -82,6 +84,7 @@
     "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
     "bun-types": "1.3.6",
