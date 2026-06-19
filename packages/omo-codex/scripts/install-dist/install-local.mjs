@@ -13145,10 +13145,24 @@ function buildDelegatedOmoInvocation(parsed) {
 import { spawn as spawn4, spawnSync as spawnSync2 } from "node:child_process";
 import { readFileSync as readFileSync3 } from "node:fs";
 import { dirname as dirname8, join as join29 } from "node:path";
+import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 var DEFAULT_UPDATE_COMMAND = "npx";
 var DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
+var BUN_UPDATE_COMMAND = "bun";
+var BUN_GLOBAL_UPDATE_ARGS = ["update", "-g", "lazycodex-ai@latest"];
+var BUN_GLOBAL_UNTRUSTED_ARGS = ["pm", "-g", "untrusted"];
+var BUN_GLOBAL_TRUST_ARGS = ["pm", "-g", "trust"];
 var INSTALLED_VERSION_FILE = "lazycodex-install.json";
+var KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES = new Set([
+  "@ast-grep/cli",
+  "@code-yeongyu/comment-checker",
+  "@sisyphuslabs/omo-codex-plugin",
+  "lazycodex-ai",
+  "oh-my-openagent",
+  "oh-my-opencode"
+]);
+var KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES = ["@oh-my-opencode/", "oh-my-openagent-", "oh-my-opencode-"];
 async function runLazyCodexManualUpdate(input = {}) {
   const env3 = input.env ?? process.env;
   const log2 = input.log ?? console.log;
@@ -13159,7 +13173,9 @@ async function runLazyCodexManualUpdate(input = {}) {
     currentVersion,
     latestVersion,
     command: resolveCommand2(env3),
-    args: resolveArgs(env3)
+    args: resolveArgs(env3),
+    env: env3,
+    invokedPath: input.invokedPath ?? process.argv[1]
   });
   if (!plan.shouldUpdate) {
     const printableVersion = currentVersion ?? "unknown";
@@ -13171,6 +13187,14 @@ async function runLazyCodexManualUpdate(input = {}) {
     return 0;
   }
   await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env3 });
+  if (plan.postUpdate === "bun-global-trust") {
+    await handleBunGlobalTrust({
+      env: env3,
+      log: log2,
+      commandRunner,
+      isInteractive: input.isInteractive ?? (process.stdin.isTTY === true && process.stdout.isTTY === true)
+    });
+  }
   return 0;
 }
 function resolveLazyCodexUpdatePlan(input = {}) {
@@ -13182,7 +13206,10 @@ function resolveLazyCodexUpdatePlan(input = {}) {
     return { shouldUpdate: false, reason: "unknown-latest" };
   if (compareVersions(latest, current) <= 0)
     return { shouldUpdate: false, reason: "up-to-date" };
-  return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS };
+  if (isBunGlobalEntrypoint(input.invokedPath, input.env ?? process.env)) {
+    return { shouldUpdate: true, command: BUN_UPDATE_COMMAND, args: BUN_GLOBAL_UPDATE_ARGS, postUpdate: "bun-global-trust" };
+  }
+  return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS, postUpdate: "none" };
 }
 function resolveCommand2(env3) {
   return env3.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
@@ -13214,6 +13241,70 @@ function resolveLatestVersion(env3) {
     return;
   const version2 = result.stdout.trim();
   return version2.length > 0 ? version2 : undefined;
+}
+async function handleBunGlobalTrust(input) {
+  const packageNames = resolveKnownBunGlobalUntrustedPackages(input.env);
+  if (packageNames.length === 0)
+    return;
+  const trustArgs = [...BUN_GLOBAL_TRUST_ARGS, ...packageNames];
+  const trustCommand = [BUN_UPDATE_COMMAND, ...trustArgs].join(" ");
+  if (!input.isInteractive) {
+    input.log(`Bun blocked LazyCodex-related postinstall scripts. Run this command to trust them:
+${trustCommand}`);
+    return;
+  }
+  if (await confirmBunGlobalTrust(packageNames)) {
+    await input.commandRunner(BUN_UPDATE_COMMAND, trustArgs, { cwd: process.cwd(), env: input.env });
+    return;
+  }
+  input.log(`Skipped Bun postinstall trust. To run it later:
+${trustCommand}`);
+}
+function resolveKnownBunGlobalUntrustedPackages(env3) {
+  const result = spawnSync2(BUN_UPDATE_COMMAND, BUN_GLOBAL_UNTRUSTED_ARGS, {
+    encoding: "utf8",
+    env: env3,
+    stdio: ["ignore", "pipe", "ignore"]
+  });
+  if (result.status !== 0)
+    return [];
+  const names = [];
+  for (const match of result.stdout.matchAll(/^\.\/node_modules\/((?:@[^/\s]+\/)?[^\s]+)\s+@/gm)) {
+    const packageName = match[1];
+    if (packageName !== undefined && isKnownLazyCodexBunTrustPackage(packageName) && !names.includes(packageName)) {
+      names.push(packageName);
+    }
+  }
+  return names;
+}
+async function confirmBunGlobalTrust(packageNames) {
+  const prompt = `Trust Bun postinstall scripts for ${packageNames.join(", ")}? [y/N] `;
+  const readline = createInterface2({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await readline.question(prompt)).trim().toLowerCase();
+    return answer === "y" || answer === "yes";
+  } finally {
+    readline.close();
+  }
+}
+function isKnownLazyCodexBunTrustPackage(packageName) {
+  return KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) || KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES.some((prefix) => packageName.startsWith(prefix));
+}
+function isBunGlobalEntrypoint(invokedPath, env3) {
+  if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
+    return false;
+  const normalizedPath = normalizePathForPrefix(invokedPath);
+  return resolveBunGlobalNodeModulesRoots(env3).some((root) => normalizedPath.startsWith(root));
+}
+function resolveBunGlobalNodeModulesRoots(env3) {
+  return [
+    env3.BUN_INSTALL?.trim() ? join29(env3.BUN_INSTALL.trim(), "install", "global", "node_modules") : undefined,
+    env3.HOME?.trim() ? join29(env3.HOME.trim(), ".bun", "install", "global", "node_modules") : undefined
+  ].flatMap((root) => root === undefined ? [] : [normalizePathForPrefix(root)]);
+}
+function normalizePathForPrefix(path2) {
+  const normalized = path2.replaceAll("\\", "/").replace(/\/+$/, "");
+  return normalized.endsWith("/node_modules") ? `${normalized}/` : normalized;
 }
 function defaultRunCommandForManualUpdate(command, args, options) {
   return new Promise((resolve11, reject) => {
@@ -13431,7 +13522,7 @@ async function runLazyCodexInstallLocalCli(input) {
       input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
       return 0;
     }
-    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log });
+    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath });
   }
   const repoRoot = parsed.repoRoot ? resolve11(parsed.repoRoot) : input.defaultRepoRoot;
   const result = await installMarketplaceLocally({

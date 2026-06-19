@@ -1,12 +1,26 @@
 import { spawn, spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
+import { createInterface } from "node:readline/promises"
 import { fileURLToPath } from "node:url"
 import type { RunCommand } from "./types"
 
 const DEFAULT_UPDATE_COMMAND = "npx"
 const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"] as const
+const BUN_UPDATE_COMMAND = "bun"
+const BUN_GLOBAL_UPDATE_ARGS = ["update", "-g", "lazycodex-ai@latest"] as const
+const BUN_GLOBAL_UNTRUSTED_ARGS = ["pm", "-g", "untrusted"] as const
+const BUN_GLOBAL_TRUST_ARGS = ["pm", "-g", "trust"] as const
 const INSTALLED_VERSION_FILE = "lazycodex-install.json"
+const KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES = new Set([
+  "@ast-grep/cli",
+  "@code-yeongyu/comment-checker",
+  "@sisyphuslabs/omo-codex-plugin",
+  "lazycodex-ai",
+  "oh-my-openagent",
+  "oh-my-opencode",
+])
+const KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES = ["@oh-my-opencode/", "oh-my-openagent-", "oh-my-opencode-"] as const
 
 type Version = {
   readonly major: number
@@ -17,13 +31,15 @@ type Version = {
 
 type LazyCodexUpdatePlan =
   | { readonly shouldUpdate: false; readonly reason: "unknown-current" | "unknown-latest" | "up-to-date" }
-  | { readonly shouldUpdate: true; readonly command: string; readonly args: readonly string[] }
+  | { readonly shouldUpdate: true; readonly command: string; readonly args: readonly string[]; readonly postUpdate: "bun-global-trust" | "none" }
 
 export async function runLazyCodexManualUpdate(input: {
   readonly env?: NodeJS.ProcessEnv
   readonly dryRun?: boolean
   readonly log?: (line: string) => void
   readonly runCommand?: RunCommand
+  readonly invokedPath?: string
+  readonly isInteractive?: boolean
 } = {}): Promise<number> {
   const env = input.env ?? process.env
   const log = input.log ?? console.log
@@ -35,6 +51,8 @@ export async function runLazyCodexManualUpdate(input: {
     latestVersion,
     command: resolveCommand(env),
     args: resolveArgs(env),
+    env,
+    invokedPath: input.invokedPath ?? process.argv[1],
   })
   if (!plan.shouldUpdate) {
     const printableVersion = currentVersion ?? "unknown"
@@ -48,6 +66,14 @@ export async function runLazyCodexManualUpdate(input: {
     return 0
   }
   await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env })
+  if (plan.postUpdate === "bun-global-trust") {
+    await handleBunGlobalTrust({
+      env,
+      log,
+      commandRunner,
+      isInteractive: input.isInteractive ?? (process.stdin.isTTY === true && process.stdout.isTTY === true),
+    })
+  }
   return 0
 }
 
@@ -56,13 +82,18 @@ function resolveLazyCodexUpdatePlan(input: {
   readonly latestVersion?: string
   readonly command?: string
   readonly args?: readonly string[]
+  readonly env?: NodeJS.ProcessEnv
+  readonly invokedPath?: string
 } = {}): LazyCodexUpdatePlan {
   const current = parseVersion(input.currentVersion)
   if (current === null) return { shouldUpdate: false, reason: "unknown-current" }
   const latest = parseVersion(input.latestVersion)
   if (latest === null) return { shouldUpdate: false, reason: "unknown-latest" }
   if (compareVersions(latest, current) <= 0) return { shouldUpdate: false, reason: "up-to-date" }
-  return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS }
+  if (isBunGlobalEntrypoint(input.invokedPath, input.env ?? process.env)) {
+    return { shouldUpdate: true, command: BUN_UPDATE_COMMAND, args: BUN_GLOBAL_UPDATE_ARGS, postUpdate: "bun-global-trust" }
+  }
+  return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS, postUpdate: "none" }
 }
 
 function resolveCommand(env: NodeJS.ProcessEnv): string {
@@ -99,6 +130,80 @@ function resolveLatestVersion(env: NodeJS.ProcessEnv): string | undefined {
   if (result.status !== 0) return undefined
   const version = result.stdout.trim()
   return version.length > 0 ? version : undefined
+}
+
+async function handleBunGlobalTrust(input: {
+  readonly env: NodeJS.ProcessEnv
+  readonly log: (line: string) => void
+  readonly commandRunner: RunCommand
+  readonly isInteractive: boolean
+}): Promise<void> {
+  const packageNames = resolveKnownBunGlobalUntrustedPackages(input.env)
+  if (packageNames.length === 0) return
+
+  const trustArgs = [...BUN_GLOBAL_TRUST_ARGS, ...packageNames]
+  const trustCommand = [BUN_UPDATE_COMMAND, ...trustArgs].join(" ")
+  if (!input.isInteractive) {
+    input.log(`Bun blocked LazyCodex-related postinstall scripts. Run this command to trust them:\n${trustCommand}`)
+    return
+  }
+
+  if (await confirmBunGlobalTrust(packageNames)) {
+    await input.commandRunner(BUN_UPDATE_COMMAND, trustArgs, { cwd: process.cwd(), env: input.env })
+    return
+  }
+  input.log(`Skipped Bun postinstall trust. To run it later:\n${trustCommand}`)
+}
+
+function resolveKnownBunGlobalUntrustedPackages(env: NodeJS.ProcessEnv): readonly string[] {
+  const result = spawnSync(BUN_UPDATE_COMMAND, BUN_GLOBAL_UNTRUSTED_ARGS, {
+    encoding: "utf8",
+    env,
+    stdio: ["ignore", "pipe", "ignore"],
+  })
+  if (result.status !== 0) return []
+  const names: string[] = []
+  for (const match of result.stdout.matchAll(/^\.\/node_modules\/((?:@[^/\s]+\/)?[^\s]+)\s+@/gm)) {
+    const packageName = match[1]
+    if (packageName !== undefined && isKnownLazyCodexBunTrustPackage(packageName) && !names.includes(packageName)) {
+      names.push(packageName)
+    }
+  }
+  return names
+}
+
+async function confirmBunGlobalTrust(packageNames: readonly string[]): Promise<boolean> {
+  const prompt = `Trust Bun postinstall scripts for ${packageNames.join(", ")}? [y/N] `
+  const readline = createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    const answer = (await readline.question(prompt)).trim().toLowerCase()
+    return answer === "y" || answer === "yes"
+  } finally {
+    readline.close()
+  }
+}
+
+function isKnownLazyCodexBunTrustPackage(packageName: string): boolean {
+  return KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) ||
+    KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES.some((prefix) => packageName.startsWith(prefix))
+}
+
+function isBunGlobalEntrypoint(invokedPath: string | undefined, env: NodeJS.ProcessEnv): boolean {
+  if (typeof invokedPath !== "string" || invokedPath.trim().length === 0) return false
+  const normalizedPath = normalizePathForPrefix(invokedPath)
+  return resolveBunGlobalNodeModulesRoots(env).some((root) => normalizedPath.startsWith(root))
+}
+
+function resolveBunGlobalNodeModulesRoots(env: NodeJS.ProcessEnv): readonly string[] {
+  return [
+    env.BUN_INSTALL?.trim() ? join(env.BUN_INSTALL.trim(), "install", "global", "node_modules") : undefined,
+    env.HOME?.trim() ? join(env.HOME.trim(), ".bun", "install", "global", "node_modules") : undefined,
+  ].flatMap((root) => root === undefined ? [] : [normalizePathForPrefix(root)])
+}
+
+function normalizePathForPrefix(path: string): string {
+  const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "")
+  return normalized.endsWith("/node_modules") ? `${normalized}/` : normalized
 }
 
 function defaultRunCommandForManualUpdate(command: string, args: readonly string[], options: { readonly cwd: string; readonly env?: NodeJS.ProcessEnv }): Promise<void> {
