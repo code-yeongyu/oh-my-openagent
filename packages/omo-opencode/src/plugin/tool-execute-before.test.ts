@@ -178,7 +178,7 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("sisyphus-junior")
     })
 
-    test("defaults task delegation to sisyphus-junior instead of native general", async () => {
+    test("defaults task delegation to quick category instead of direct native general", async () => {
       //#given
       const ctx = createCtxWithSessionMessages()
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
@@ -189,10 +189,11 @@ describe("createToolExecuteBeforeHandler", () => {
       await handler(input, output)
 
       //#then
-      expect(output.args.subagent_type).toBe("sisyphus-junior")
+      expect(output.args.category).toBe("quick")
+      expect(output.args.subagent_type).toBeUndefined()
     })
 
-    test("rewrites explicit general subagent delegation to sisyphus-junior", async () => {
+    test("rewrites explicit general subagent delegation to quick category", async () => {
       //#given
       const ctx = createCtxWithSessionMessages()
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
@@ -203,7 +204,8 @@ describe("createToolExecuteBeforeHandler", () => {
       await handler(input, output)
 
       //#then
-      expect(output.args.subagent_type).toBe("sisyphus-junior")
+      expect(output.args.category).toBe("quick")
+      expect(output.args.subagent_type).toBeUndefined()
     })
 
     test("does not rewrite call_omo_agent general-purpose outside its allowed-agent validator", async () => {

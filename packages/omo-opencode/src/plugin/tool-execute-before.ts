@@ -124,14 +124,14 @@ export function createToolExecuteBeforeHandler(args: {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
         replaceToolArgs(output, { subagent_type: resolvedAgent ?? "continue" })
       } else if (!subagentType) {
-        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
+        replaceToolArgs(output, { category: "quick", subagent_type: undefined })
       }
 
       const normalizedSubagentType =
         typeof output.args.subagent_type === "string" ? stripInvisibleAgentCharacters(output.args.subagent_type) : undefined
 
       if (normalizedSubagentType === "general" || normalizedSubagentType === "general-purpose") {
-        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
+        replaceToolArgs(output, { category: "quick", subagent_type: undefined })
       }
       const prompt = typeof output.args.prompt === "string" ? output.args.prompt : ""
       const loopState = typeof ctx.directory === "string" ? readState(ctx.directory) : null
