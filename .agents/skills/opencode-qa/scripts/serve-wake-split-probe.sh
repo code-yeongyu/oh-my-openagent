@@ -7,8 +7,8 @@
 # or routes correctly through the live listener (FIXED).
 #
 # Two assertion modes:
-#   --expect reproduced   exit 0 if stops>1 OR children>1 OR mechanism arm true
-#   --expect fixed        exit 0 if children==1 AND stops==1
+#   --expect reproduced   exit 0 if terminal_stops>1 OR child_task_sessions>1 OR mechanism arm true
+#   --expect fixed        exit 0 if terminal_stops==1, child_task_sessions==1, and fixed branch counts hold
 #
 # Usage:
 #   serve-wake-split-probe.sh [--expect reproduced|fixed] [--evidence-dir DIR]
@@ -203,9 +203,9 @@ JSONC
   swsp_info "opencode.jsonc written to $cfg_dir/opencode/opencode.jsonc"
 }
 
-# Poll the sandbox DB for children/stops on a message matching a LIKE pattern.
+# Poll the sandbox DB for parent assistant step metrics on a message matching a LIKE pattern.
 # Args: db_path like_pattern timeout_s
-# Outputs: "<children> <stops>" on stdout
+# Outputs: "<parent_assistant_messages> <parent_tool_call_turns> <terminal_stops> <child_task_sessions>" on stdout
 swsp_poll_db_metrics() {
   local db="$1"
   local like_pat="$2"
@@ -222,17 +222,28 @@ swsp_poll_db_metrics() {
       ),
       counts AS (
         SELECT
-          count(a.id) AS children,
-          sum(CASE WHEN json_extract(a.data, '\$.finish') = 'stop' THEN 1 ELSE 0 END) AS stops
+          count(a.id) AS parent_assistant_messages,
+          sum(CASE WHEN json_extract(a.data, '\$.finish') = 'tool-calls' THEN 1 ELSE 0 END) AS parent_tool_call_turns,
+          sum(CASE WHEN json_extract(a.data, '\$.finish') = 'stop' THEN 1 ELSE 0 END) AS terminal_stops
         FROM target t
         LEFT JOIN message a
           ON a.session_id = t.session_id
           AND json_extract(a.data, '\$.parentID') = t.user_id
         GROUP BY t.user_id
+      ),
+      child_task_sessions AS (
+        SELECT count(DISTINCT m.session_id) AS child_task_sessions
+        FROM message m
+        JOIN part p ON p.message_id = m.id
+        WHERE json_extract(m.data, '\$.role') = 'user'
+          AND json_extract(p.data, '\$.type') = 'text'
+          AND json_extract(p.data, '\$.text') LIKE '%SPLIT_CHILD_TASK:%'
       )
-      SELECT printf('%d %d',
-        coalesce((SELECT max(children) FROM counts), 0),
-        coalesce((SELECT max(stops) FROM counts), 0)
+      SELECT printf('%d %d %d %d',
+        coalesce((SELECT max(parent_assistant_messages) FROM counts), 0),
+        coalesce((SELECT max(parent_tool_call_turns) FROM counts), 0),
+        coalesce((SELECT max(terminal_stops) FROM counts), 0),
+        coalesce((SELECT child_task_sessions FROM child_task_sessions), 0)
       );
   "
 
@@ -245,13 +256,15 @@ swsp_poll_db_metrics() {
     local result
     result="$(sqlite3 "$db" "$metrics_query" 2>/dev/null)" || true
 
-    local children stops
-    children="$(printf '%s' "$result" | awk '{print $1}')"
-    stops="$(printf '%s' "$result" | awk '{print $2}')"
+    local parent_assistant_messages parent_tool_call_turns terminal_stops child_task_sessions
+    parent_assistant_messages="$(printf '%s' "$result" | awk '{print $1}')"
+    parent_tool_call_turns="$(printf '%s' "$result" | awk '{print $2}')"
+    terminal_stops="$(printf '%s' "$result" | awk '{print $3}')"
+    child_task_sessions="$(printf '%s' "$result" | awk '{print $4}')"
 
     # Return once we have at least 1 stop (parent session finished)
-    if [ -n "$stops" ] && [ "${stops:-0}" -ge 1 ] 2>/dev/null; then
-      printf '%s %s' "$children" "$stops"
+    if [ -n "$terminal_stops" ] && [ "${terminal_stops:-0}" -ge 1 ] 2>/dev/null; then
+      printf '%s %s %s %s' "$parent_assistant_messages" "$parent_tool_call_turns" "$terminal_stops" "$child_task_sessions"
       return 0
     fi
     sleep 0.5
@@ -260,7 +273,7 @@ swsp_poll_db_metrics() {
   # Return whatever we have on timeout
   local result
   result="$(sqlite3 "$db" "$metrics_query" 2>/dev/null)" || true
-  printf '%s' "${result:-0 0}"
+  printf '%s' "${result:-0 0 0 0}"
 }
 
 # Wait until a session is no longer in the server's active status map.
@@ -294,8 +307,7 @@ swsp_count_plugin_inits() {
   # tail from byte offset
   tail -c "+$((offset + 1))" "$log_path" 2>/dev/null \
     | grep "ENTRY - plugin loading" \
-    | grep -c "$sandbox_dir" 2>/dev/null \
-    || printf '0'
+    | awk -v sandbox_dir="$sandbox_dir" 'index($0, sandbox_dir) { count += 1 } END { print count + 0 }'
 }
 
 # Detect WAKE_DISPATCHED_DURING_PARENT_TURN:
@@ -354,6 +366,7 @@ swsp_detect_wake_during_parent() {
 # Returns 0 if OK, 1 if any required branch missing (also sets RESULT=HARNESS_ERROR).
 swsp_check_branch_counts() {
   local fake_log="$1"
+  local mode="${2:-}"
   local ptc pc cc wc
   ptc="$(grep -c "branch=parent-tool-call" "$fake_log" 2>/dev/null | tr -d '[:space:]')"; ptc="${ptc:-0}"
   pc="$(grep -c "branch=parent-hold" "$fake_log" 2>/dev/null | tr -d '[:space:]')"; pc="${pc:-0}"
@@ -364,7 +377,12 @@ swsp_check_branch_counts() {
 
   swsp_info "branch counts: parent-tool-call=$ptc parent-hold=$pc child=$cc wake=$wc"
 
-  if [ "$ptc" -lt 1 ] || [ "$pc" -lt 1 ] || [ "$cc" -lt 1 ] || [ "$wc" -lt 1 ]; then
+  local wake_required=0
+  if [ "$mode" = "reproduced" ]; then
+    wake_required=1
+  fi
+
+  if [ "$ptc" -lt 1 ] || [ "$pc" -lt 1 ] || [ "$cc" -lt 1 ] || { [ "$wake_required" -eq 1 ] && [ "$wc" -lt 1 ]; }; then
     printf 'RESULT=HARNESS_ERROR branch_counts parent-tool-call=%s parent-hold=%s child=%s wake=%s\n' \
       "$ptc" "$pc" "$cc" "$wc"
     return 1
@@ -573,29 +591,38 @@ swsp_run_probe() {
     2>/dev/null)" || prompt_response=""
   swsp_info "prompt_async response: $prompt_response"
 
-  # Step 7: Poll sandbox DB for children/stops; also wait for session idle
   swsp_info "polling DB for wake-split metrics (up to 120s)..."
   local metrics
-  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%[BACKGROUND TASK%' 120)"
-  local children stops
-  children="$(printf '%s' "$metrics" | awk '{print $1}')"
-  stops="$(printf '%s' "$metrics" | awk '{print $2}')"
-  children="${children:-0}"
-  stops="${stops:-0}"
-  swsp_info "DB metrics: children=$children stops=$stops"
+  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%Run the split probe:%' 120)"
+  local parent_assistant_messages parent_tool_call_turns terminal_stops child_task_sessions
+  parent_assistant_messages="$(printf '%s' "$metrics" | awk '{print $1}')"
+  parent_tool_call_turns="$(printf '%s' "$metrics" | awk '{print $2}')"
+  terminal_stops="$(printf '%s' "$metrics" | awk '{print $3}')"
+  child_task_sessions="$(printf '%s' "$metrics" | awk '{print $4}')"
+  parent_assistant_messages="${parent_assistant_messages:-0}"
+  parent_tool_call_turns="${parent_tool_call_turns:-0}"
+  terminal_stops="${terminal_stops:-0}"
+  child_task_sessions="${child_task_sessions:-0}"
+  swsp_info "DB metrics: parent_assistant_messages=$parent_assistant_messages parent_tool_call_turns=$parent_tool_call_turns terminal_stops=$terminal_stops child_task_sessions=$child_task_sessions"
 
   # Wait for parent session to go idle
   swsp_info "waiting for parent session to go idle..."
   swsp_wait_session_idle "$OQA_SERVER_URL" "$pass" "$ses_id" 60
 
   # Re-read metrics after idle
-  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%[BACKGROUND TASK%' 10)"
-  children="$(printf '%s' "$metrics" | awk '{print $1}')"
-  stops="$(printf '%s' "$metrics" | awk '{print $2}')"
-  children="${children:-0}"
-  stops="${stops:-0}"
-  swsp_info "final DB metrics: children=$children stops=$stops"
-  printf 'children=%s stops=%s\n' "$children" "$stops" >"$evidence_dir/marker-metrics.txt"
+  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%Run the split probe:%' 10)"
+  parent_assistant_messages="$(printf '%s' "$metrics" | awk '{print $1}')"
+  parent_tool_call_turns="$(printf '%s' "$metrics" | awk '{print $2}')"
+  terminal_stops="$(printf '%s' "$metrics" | awk '{print $3}')"
+  child_task_sessions="$(printf '%s' "$metrics" | awk '{print $4}')"
+  parent_assistant_messages="${parent_assistant_messages:-0}"
+  parent_tool_call_turns="${parent_tool_call_turns:-0}"
+  terminal_stops="${terminal_stops:-0}"
+  child_task_sessions="${child_task_sessions:-0}"
+  swsp_info "final DB metrics: parent_assistant_messages=$parent_assistant_messages parent_tool_call_turns=$parent_tool_call_turns terminal_stops=$terminal_stops child_task_sessions=$child_task_sessions"
+  printf 'parent_assistant_messages=%s parent_tool_call_turns=%s terminal_stops=%s child_task_sessions=%s\n' \
+    "$parent_assistant_messages" "$parent_tool_call_turns" "$terminal_stops" "$child_task_sessions" \
+    >"$evidence_dir/marker-metrics.txt"
 
   # Step 8: Plugin-init count
   local plugin_inits
@@ -618,16 +645,30 @@ swsp_run_probe() {
   wake_during_parent="$(swsp_detect_wake_during_parent "$omo_log_offset" "$fake_llm_log" "$OQA_PROJ")"
   swsp_info "WAKE_DISPATCHED_DURING_PARENT_TURN=$wake_during_parent"
 
+  local real_db_count_after=""
+  if [ -n "$real_db_path" ] && [ "$real_db_path" != "(not found)" ] && [ -f "$real_db_path" ]; then
+    real_db_count_after="$(sqlite3 "$real_db_path" 'SELECT count(*) FROM session' 2>/dev/null || echo "0")"
+  else
+    real_db_count_after="$real_db_count_before"
+  fi
+  printf 'after=%s unchanged=%s\n' \
+    "$real_db_count_after" \
+    "$([ "$real_db_count_after" = "$real_db_count_before" ] && echo yes || echo NO)" \
+    >>"$evidence_dir/isolation-receipt.txt"
+  swsp_info "isolation: real DB before=$real_db_count_before after=$real_db_count_after"
+
+  sqlite3 "$sandbox_db" ".backup '$evidence_dir/sandbox-opencode.db'" 2>/dev/null || true
+
   # Step 10: Branch-count guard
-  if ! swsp_check_branch_counts "$fake_llm_log" >&2; then
+  if ! swsp_check_branch_counts "$fake_llm_log" "$EXPECT_MODE" >&2; then
     # Branch counts not met — HARNESS_ERROR
     local ptc pc cc wc
-    ptc="$(grep -c "branch=parent-tool-call" "$fake_llm_log" 2>/dev/null || printf '0')"
-    pc="$(grep -c "branch=parent-hold" "$fake_llm_log" 2>/dev/null || printf '0')"
-    cc="$(grep -c "branch=child" "$fake_llm_log" 2>/dev/null || printf '0')"
-    wc="$(grep -c "branch=wake" "$fake_llm_log" 2>/dev/null || printf '0')"
+    ptc="$(grep -c "branch=parent-tool-call" "$fake_llm_log" 2>/dev/null || true)"; ptc="${ptc:-0}"
+    pc="$(grep -c "branch=parent-hold" "$fake_llm_log" 2>/dev/null || true)"; pc="${pc:-0}"
+    cc="$(grep -c "branch=child" "$fake_llm_log" 2>/dev/null || true)"; cc="${cc:-0}"
+    wc="$(grep -c "branch=wake" "$fake_llm_log" 2>/dev/null || true)"; wc="${wc:-0}"
     local verdict_line
-    verdict_line="RESULT=HARNESS_ERROR children=${children} stops=${stops} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent} branch_counts=parent-tool-call:${ptc},parent-hold:${pc},child:${cc},wake:${wc}"
+    verdict_line="RESULT=HARNESS_ERROR parent_assistant_messages=${parent_assistant_messages} parent_tool_call_turns=${parent_tool_call_turns} terminal_stops=${terminal_stops} child_task_sessions=${child_task_sessions} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent} branch_counts=parent-tool-call:${ptc},parent-hold:${pc},child:${cc},wake:${wc}"
     printf '%s\n' "$verdict_line" | tee -a "$harness_log"
     swsp_stop_fake_llm
     return 1
@@ -636,9 +677,13 @@ swsp_run_probe() {
   # Step 11: Determine verdict
   local result="INCONCLUSIVE"
   local exit_code=1
+  local ptc pc cc wc
+  ptc="$(grep -c "branch=parent-tool-call" "$fake_llm_log" 2>/dev/null || true)"; ptc="${ptc:-0}"
+  pc="$(grep -c "branch=parent-hold" "$fake_llm_log" 2>/dev/null || true)"; pc="${pc:-0}"
+  cc="$(grep -c "branch=child" "$fake_llm_log" 2>/dev/null || true)"; cc="${cc:-0}"
+  wc="$(grep -c "branch=wake" "$fake_llm_log" 2>/dev/null || true)"; wc="${wc:-0}"
 
-  # Arm 1: SQLite evidence (stops>1 or children>1)
-  if [ "${stops:-0}" -gt 1 ] || [ "${children:-0}" -gt 1 ] 2>/dev/null; then
+  if [ "${terminal_stops:-0}" -gt 1 ] || [ "${child_task_sessions:-0}" -gt 1 ] 2>/dev/null; then
     result="REPRODUCED"
   fi
 
@@ -652,13 +697,19 @@ swsp_run_probe() {
     result="REPRODUCED"
   fi
 
-  # FIXED: exactly 1 child and 1 stop, and neither REPRODUCED arm held
-  if [ "$result" = "INCONCLUSIVE" ] && [ "${children:-0}" -eq 1 ] && [ "${stops:-0}" -eq 1 ] 2>/dev/null; then
+  if [ "$result" = "INCONCLUSIVE" ] \
+    && [ "${terminal_stops:-0}" -eq 1 ] \
+    && [ "${child_task_sessions:-0}" -eq 1 ] \
+    && [ "${parent_tool_call_turns:-0}" -eq 2 ] \
+    && [ "${ptc:-0}" -eq 1 ] \
+    && [ "${pc:-0}" -eq 1 ] \
+    && [ "${cc:-0}" -eq 1 ] \
+    && [ "${wc:-0}" -eq 0 ] 2>/dev/null; then
     result="FIXED"
   fi
 
   local verdict_line
-  verdict_line="RESULT=${result} children=${children} stops=${stops} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent}"
+  verdict_line="RESULT=${result} parent_assistant_messages=${parent_assistant_messages} parent_tool_call_turns=${parent_tool_call_turns} terminal_stops=${terminal_stops} child_task_sessions=${child_task_sessions} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent} branch_counts=parent-tool-call:${ptc},parent-hold:${pc},child:${cc},wake:${wc}"
   printf '%s\n' "$verdict_line" | tee -a "$harness_log"
 
   # Determine exit code based on expected mode
@@ -673,22 +724,6 @@ swsp_run_probe() {
   else
     exit_code=0  # no expectation: just report
   fi
-
-  # Step 12: Isolation receipt — verify real DB count unchanged
-  local real_db_count_after=""
-  if [ -n "$real_db_path" ] && [ "$real_db_path" != "(not found)" ] && [ -f "$real_db_path" ]; then
-    real_db_count_after="$(sqlite3 "$real_db_path" 'SELECT count(*) FROM session' 2>/dev/null || echo "0")"
-  else
-    real_db_count_after="$real_db_count_before"
-  fi
-  printf 'after=%s unchanged=%s\n' \
-    "$real_db_count_after" \
-    "$([ "$real_db_count_after" = "$real_db_count_before" ] && echo yes || echo NO)" \
-    >>"$evidence_dir/isolation-receipt.txt"
-  swsp_info "isolation: real DB before=$real_db_count_before after=$real_db_count_after"
-
-  # Preserve the sandbox DB for post-hoc inspection before the trap removes it
-  sqlite3 "$sandbox_db" ".backup '$evidence_dir/sandbox-opencode.db'" 2>/dev/null || true
 
   # Cleanup receipt
   swsp_stop_fake_llm
