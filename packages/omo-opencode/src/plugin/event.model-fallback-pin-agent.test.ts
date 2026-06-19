@@ -140,8 +140,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toBeDefined()
     expect(body.agent).toContain("Sisyphus")
     expect(body.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
     })
     expectSyntheticContinuation(body)
   })
@@ -181,8 +181,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toBeDefined()
     expect(body.agent?.toLowerCase()).toContain("sisyphus")
     expect(body.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
     })
     expectSyntheticContinuation(body)
   })
@@ -238,8 +238,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toBeDefined()
     expect(body.agent).toContain("Sisyphus")
     expect(body.model).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
     })
     expectSyntheticContinuation(body)
   })

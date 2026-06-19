@@ -45,12 +45,12 @@ export function applyUserConfiguredFallbackChain(
 ): void {
   const agentKey = getAgentConfigKey(agentName);
   const rawFallbackModels = getRawFallbackModels(sessionID, agentKey, pluginConfig);
-  if (!rawFallbackModels || rawFallbackModels.length === 0) return;
+  if (!rawFallbackModels) return;
 
   const fallbackChain = buildFallbackChainFromModels(rawFallbackModels, currentProviderID);
 
-  if (fallbackChain && fallbackChain.length > 0 && modelFallback) {
-    setSessionFallbackChain(modelFallback, sessionID, fallbackChain);
+  if (modelFallback) {
+    setSessionFallbackChain(modelFallback, sessionID, fallbackChain ?? []);
   }
 }
 
