@@ -107,7 +107,8 @@ describe("model fallback hook", () => {
     expect(output.message["variant"]).toBe("max")
   })
 
-  test("applies auto-continuation pending fallback on real user resume when still pending", async () => {
+  test("clears stale auto-continuation pending fallback on real user resume", async () => {
+    const clearedSessions: string[] = []
     const hook = unsafeTestValue<{
       markPendingFallbackAutoContinuation?: (sessionID: string) => void
       hasPendingModelFallback?: (sessionID: string) => boolean
@@ -115,11 +116,15 @@ describe("model fallback hook", () => {
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }>(createModelFallbackHook({
+      onCleared: ({ sessionID }) => {
+        clearedSessions.push(sessionID)
+      },
+    }))
     const sessionID = "ses_model_fallback_auto_resume"
 
     const set = setPendingModelFallback(
-      modelFallback,
+      hook,
       sessionID,
       "Sisyphus - Ultraworker",
       "anthropic",
@@ -140,10 +145,11 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-7-thinking",
     })
     expect(output.message["variant"]).toBe("max")
     expect(hook.hasPendingModelFallback?.(sessionID)).toBe(false)
+    expect(clearedSessions).toEqual([sessionID])
   })
 
   test("clears auto-continuation marker without changing model after fallback was already consumed", async () => {

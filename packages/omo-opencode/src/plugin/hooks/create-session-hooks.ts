@@ -124,6 +124,7 @@ export function createSessionHooks(args: {
             .catch(() => {})
         },
         onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
+        onCleared: enableFallbackTitle ? updateFallbackTitle?.clear : undefined,
         controllerAccessor: modelFallbackControllerAccessor,
       }))
     : null

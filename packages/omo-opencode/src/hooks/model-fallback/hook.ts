@@ -22,6 +22,10 @@ type FallbackCallback = (input: {
   variant?: string
 }) => void | Promise<void>
 
+type FallbackClearCallback = (input: {
+  sessionID: string
+}) => void | Promise<void>
+
 export type ModelFallbackState = {
   providerID: string
   modelID: string
@@ -58,6 +62,7 @@ export type ModelFallbackHook = ModelFallbackControllerWithState & {
 type ModelFallbackHookArgs = {
   toast?: FallbackToast
   onApplied?: FallbackCallback
+  onCleared?: FallbackClearCallback
   controllerAccessor?: ModelFallbackControllerAccessor
 }
 
@@ -162,6 +167,12 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
 
   const toast = args?.toast
   const onApplied = args?.onApplied
+  const onCleared = args?.onCleared
+
+  const clearPending = (sessionID: string): void => {
+    controller.clearPendingModelFallback(sessionID)
+    void Promise.resolve(onCleared?.({ sessionID })).catch(() => {})
+  }
 
   return {
     lastToastKey: controller.lastToastKey,
@@ -170,7 +181,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     clearSessionFallbackChain: controller.clearSessionFallbackChain,
     setPendingModelFallback: controller.setPendingModelFallback,
     getNextFallback: controller.getNextFallback,
-    clearPendingModelFallback: controller.clearPendingModelFallback,
+    clearPendingModelFallback: clearPending,
     clearLastFailedModelFallback: controller.clearLastFailedModelFallback,
     hasPendingModelFallback: controller.hasPendingModelFallback,
     getFallbackState: controller.getFallbackState,
@@ -188,9 +199,9 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
       if (
         autoContinuationPendingSessions.has(sessionID)
         && output.parts.some(isRealUserTextPart)
-        && !controller.hasPendingModelFallback(sessionID)
       ) {
         autoContinuationPendingSessions.delete(sessionID)
+        if (controller.hasPendingModelFallback(sessionID)) clearPending(sessionID)
         return
       }
 
