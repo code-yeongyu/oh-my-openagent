@@ -258,7 +258,7 @@ export class BackgroundManager {
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
-      } as any,
+      },
       query: {
         directory: parentDirectory,
       },

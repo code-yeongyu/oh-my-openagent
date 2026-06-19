@@ -41,7 +41,7 @@ export async function executeSync(
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
-    await (ctx.client.session as any).promptAsync({
+    await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
         agent: args.subagent_type,

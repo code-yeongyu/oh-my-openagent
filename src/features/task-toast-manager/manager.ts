@@ -153,8 +153,7 @@ export class TaskToastManager {
    * Show consolidated toast with all running/queued tasks
    */
   private showTaskListToast(newTask: TrackedTask): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as unknown as { tui?: { showToast: (options: unknown) => Promise<unknown> } }
     if (!tuiClient.tui?.showToast) return
 
     const message = this.buildTaskListMessage(newTask)
@@ -179,8 +178,7 @@ export class TaskToastManager {
    * Show task completion toast
    */
   showCompletionToast(task: { id: string; description: string; duration: string }): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as unknown as { tui?: { showToast: (options: unknown) => Promise<unknown> } }
     if (!tuiClient.tui?.showToast) return
 
     this.removeTask(task.id)

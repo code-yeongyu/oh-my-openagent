@@ -62,8 +62,7 @@ export async function startTask(
     body: {
       parentID: input.parentSessionID,
       title: `Background: ${input.description}`,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    },
     query: {
       directory: parentDirectory,
     },
