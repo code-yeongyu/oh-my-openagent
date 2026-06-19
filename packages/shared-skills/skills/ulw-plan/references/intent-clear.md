@@ -20,7 +20,7 @@ Explore-before-asking. Dispatch parallel read-only research in one turn - intern
 <interview>
 TOPOLOGY LOCK first: from the request plus exploration, enumerate the 1-6 top-level components that can each succeed or fail independently, confirm them in ONE turn, and record them in the draft's Components ledger (id, one-line outcome, status, evidence path). Do NOT collapse to one component because the request looks small.
 
-Then the TWO FILTERS on every candidate question: (1) evidence-answerable -> explore; (2) intent plus a defensible default -> adopt and record, do not ask. Only a real fork survives.
+Then the TWO FILTERS (full definition in SKILL.md): (1) evidence-answerable -> explore; (2) intent plus a defensible default -> adopt and record, EXCEPT owner-decisions (irreversible / destructive / safety-critical, or cross-cutting product choices), which always survive as questions.
 
 ASK WITH WHY: name what you explored, why it did not resolve, and which part of the plan forks on the answer. 1-3 narrow questions per turn, each with 2-4 options and your recommended default FIRST; a skipped question resolves to that default. Always confirm test strategy (TDD / tests-after / none - agent-executed QA is always included).
 
@@ -30,7 +30,7 @@ CLEARANCE CHECK after each turn: objective defined? scope IN/OUT explicit? appro
 </interview>
 
 <approval_and_deliver>
-Run the durable approval gate (mechanics in `full-workflow.md`): present the brief once with findings (paths), each remaining ambiguity plus your recommended option, and the approach; then wait for the user's explicit okay. After approval: scaffold the files, run mandatory Metis, APPEND the todos, fill the human TL;DR last. Then present the summary and ask ONE question - start work now, or run the dual high-accuracy review (both Momus passes; see `full-workflow.md`) first? It is the user's choice here, never automatic. Never pick for the user; never begin execution.
+Run the durable approval gate (mechanics in `full-workflow.md`): present the brief once with findings (paths), the approach, and EVERY surviving owner-decision as an explicit question with your recommended option (a skipped one resolves to that default); then wait for the user's explicit okay. If "start now, or review first?" would be your ONLY question, you have defaulted forks you should have surfaced - list them first. After approval: scaffold the files, run mandatory Metis, APPEND the todos, fill the human TL;DR last. Then present the summary and ask ONE question - start work now, or run the dual high-accuracy review (both Momus passes; see `full-workflow.md`) first? It is the user's choice here, never automatic. Never pick for the user; never begin execution.
 </approval_and_deliver>
 
 <worked_example>
