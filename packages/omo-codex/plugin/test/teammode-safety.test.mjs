@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -79,6 +79,57 @@ test("#given member A exists #when add-member receives A with trailing space #th
 			team.members.map((member) => member.id),
 			["A"],
 		);
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
+test("#given persisted paths are mutated outside trusted team dir #when guide is regenerated #then outside file stays untouched", () => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-mutated-paths-"));
+	try {
+		runTeam(tempRoot, "init", "--name", "Mutated", "--session-name", "Paths", "--session", "safe-mutated");
+		const teamPath = join(tempRoot, ".omo", "teams", "safe-mutated", "team.json");
+		const outsideDir = join(tempRoot, "outside");
+		const outsideGuide = join(outsideDir, "guide.md");
+		mkdirSync(outsideDir);
+		writeFileSync(outsideGuide, "ORIGINAL_OUTSIDE\n");
+		const team = JSON.parse(readFileSync(teamPath, "utf8"));
+		team.paths.dir = outsideDir;
+		team.paths.guide = outsideGuide;
+		writeFileSync(teamPath, `${JSON.stringify(team, null, 2)}\n`);
+
+		const result = runTeamRaw(tempRoot, "guide", "--team", "safe-mutated");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /persisted team dir does not match trusted team dir/);
+		assert.equal(readFileSync(outsideGuide, "utf8"), "ORIGINAL_OUTSIDE\n");
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
+test("#given team dir is swapped to a symlink #when status reads team state #then command refuses the symlink", (t) => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-dir-symlink-"));
+	try {
+		runTeam(tempRoot, "init", "--name", "SymlinkDir", "--session-name", "Paths", "--session", "safe-dir");
+		const teamDir = join(tempRoot, ".omo", "teams", "safe-dir");
+		const outsideDir = join(tempRoot, "outside-team-dir");
+		mkdirSync(outsideDir);
+		rmSync(teamDir, { recursive: true, force: true });
+		try {
+			symlinkSync(outsideDir, teamDir, "dir");
+		} catch (error) {
+			if (error?.code === "EPERM" || error?.code === "EACCES" || error?.code === "EINVAL") {
+				t.skip(`symlink unavailable on this filesystem: ${error.code}`);
+				return;
+			}
+			throw error;
+		}
+
+		const result = runTeamRaw(tempRoot, "status", "--team", "safe-dir");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /path component is a symlink|team dir is a symlink/);
 	} finally {
 		rmSync(tempRoot, { recursive: true, force: true });
 	}

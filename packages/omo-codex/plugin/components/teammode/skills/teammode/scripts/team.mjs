@@ -24,6 +24,7 @@ import { buildGuide, buildMemberPrompt } from "./team-guide.mjs";
 import {
 	addMember,
 	archive,
+	assertSafeTeamDir,
 	bindThread,
 	buildTeam,
 	ensureTeamDir,
@@ -63,9 +64,14 @@ function requireFlag(flags, name) {
 	return value;
 }
 
-async function persist(team) {
-	await writeTeamAtomic(team);
-	await writeGuideAtomic(team, buildGuide(team));
+async function loadTeam(cwd, sessionId) {
+	const dir = await assertSafeTeamDir(cwd, sessionId);
+	return { dir, team: await readTeam(dir) };
+}
+
+async function persist(team, dir) {
+	await writeTeamAtomic(team, dir);
+	await writeGuideAtomic(team, buildGuide(team), dir);
 }
 
 const handlers = {
@@ -86,7 +92,7 @@ const handlers = {
 			worktreeEnabled: flags.worktree === true,
 			baseBranch: typeof flags["base-branch"] === "string" ? flags["base-branch"] : "dev",
 		});
-		await persist(team);
+		await persist(team, dir);
 		process.stdout.write(`created: ${dir}\n`);
 		process.stdout.write(`team.json + guide.md written; artifacts/ ready. session id: ${sessionId}\n`);
 		process.stdout.write(`next: add-member --team ${sessionId} --id A --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>"\n`);
@@ -94,7 +100,7 @@ const handlers = {
 
 	async "add-member"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const { dir, team } = await loadTeam(cwd, sessionId);
 		const memberId = requireFlag(flags, "id").trim();
 		addMember(team, {
 			id: memberId,
@@ -103,49 +109,49 @@ const handlers = {
 			deliverable: typeof flags.deliverable === "string" ? flags.deliverable : "",
 			branch: typeof flags.branch === "string" ? flags.branch : null,
 		});
-		await persist(team);
+		await persist(team, dir);
 		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\nSend this as the new thread's first message (title it "${team.threadTitleConvention}"):\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
 	},
 
 	async "bind-thread"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const { dir, team } = await loadTeam(cwd, sessionId);
 		bindThread(team, {
 			id: requireFlag(flags, "id"),
 			threadId: requireFlag(flags, "thread"),
 			cwd: typeof flags.cwd === "string" ? flags.cwd : null,
 			worktreePath: typeof flags["worktree-path"] === "string" ? flags["worktree-path"] : null,
 		});
-		await persist(team);
+		await persist(team, dir);
 		process.stdout.write(`bound member ${flags.id} to thread ${flags.thread}.\n`);
 	},
 
 	async "member-prompt"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const { team } = await loadTeam(cwd, sessionId);
 		process.stdout.write(`${buildMemberPrompt(team, requireFlag(flags, "id"))}\n`);
 	},
 
 	async "set-status"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const { dir, team } = await loadTeam(cwd, sessionId);
 		setMemberStatus(team, {
 			id: requireFlag(flags, "id"),
 			status: requireFlag(flags, "status"),
 			note: typeof flags.note === "string" ? flags.note : "",
 		});
-		await persist(team);
+		await persist(team, dir);
 		process.stdout.write(`member ${flags.id} -> ${flags.status}\n`);
 	},
 
 	async archive(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const { dir, team } = await loadTeam(cwd, sessionId);
 		archive(team, {
 			id: typeof flags.id === "string" ? flags.id : null,
 			note: typeof flags.note === "string" ? flags.note : "",
 		});
-		await persist(team);
+		await persist(team, dir);
 		process.stdout.write(flags.id ? `archived member ${flags.id}\n` : `archived team ${sessionId} and closed all members\n`);
 	},
 
@@ -165,7 +171,7 @@ const handlers = {
 
 	async status(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const { team } = await loadTeam(cwd, sessionId);
 		process.stdout.write(`Team ${team.teamName} [${team.status}] - leader: main session - ${team.members.length} member(s)\n`);
 		for (const m of team.members) {
 			process.stdout.write(`  ${m.id} (${m.lens}) ${m.focus} -> ${m.deliverable || "(no deliverable)"} [${m.status}]${m.threadId ? ` thread=${m.threadId}` : ""}${m.cwd ? ` cwd=${m.cwd}` : ""}\n`);
@@ -179,8 +185,8 @@ const handlers = {
 
 	async guide(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const team = await readTeam(resolveTeamDir(cwd, sessionId));
-		await writeGuideAtomic(team, buildGuide(team));
+		const { dir, team } = await loadTeam(cwd, sessionId);
+		await writeGuideAtomic(team, buildGuide(team), dir);
 		process.stdout.write(`${team.paths.guide}\n`);
 	},
 };

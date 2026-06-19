@@ -153,6 +153,15 @@ async function mkdirNoSymlink(dir, stopAt) {
 	await mkdir(dir);
 }
 
+async function assertNoSymlinkComponents(dir, stopAt) {
+	if (dir === stopAt) return;
+	const rel = relative(stopAt, dir);
+	if (rel.startsWith("..") || isAbsolute(rel)) throw new Error(`refused: path escapes ${stopAt}: ${dir}`);
+	await assertNoSymlinkComponents(dirname(dir), stopAt);
+	const st = await lstatOrNull(dir);
+	if (st?.isSymbolicLink()) throw new Error(`refused: path component is a symlink: ${dir}`);
+}
+
 export async function ensureTeamDir(cwd, sessionId) {
 	const workspaceRoot = resolve(cwd);
 	const teamsRoot = resolve(cwd, ".omo", "teams");
@@ -160,6 +169,15 @@ export async function ensureTeamDir(cwd, sessionId) {
 	await mkdirNoSymlink(teamsRoot, workspaceRoot);
 	await mkdirNoSymlink(dir, teamsRoot);
 	await mkdirNoSymlink(join(dir, "artifacts"), dir);
+	return dir;
+}
+
+export async function assertSafeTeamDir(cwd, sessionId) {
+	const workspaceRoot = resolve(cwd);
+	const teamsRoot = resolve(cwd, ".omo", "teams");
+	const dir = resolveTeamDir(cwd, sessionId);
+	await assertNoSymlinkComponents(teamsRoot, workspaceRoot);
+	await assertNoSymlinkComponents(dir, teamsRoot);
 	return dir;
 }
 
@@ -171,30 +189,33 @@ export async function teamExists(dir) {
 	return (await lstatOrNull(join(dir, "team.json"))) !== null;
 }
 
-async function persistedFileTarget(team, pathKey, fileName) {
+async function persistedFileTarget(team, pathKey, fileName, expectedDir) {
 	validateTeam(team);
 	if (!team.paths?.dir || !team.paths?.[pathKey]) throw new Error(`invalid team: paths.${pathKey} is required`);
-	const dir = resolve(team.paths.dir);
+	const dir = resolve(expectedDir);
+	if (resolve(team.paths.dir) !== dir) throw new Error(`refused: persisted team dir does not match trusted team dir: ${team.paths.dir}`);
 	const target = resolve(team.paths[pathKey]);
 	if (target !== resolve(dir, fileName)) throw new Error(`refused: ${fileName} persist target escapes team dir: ${team.paths[pathKey]}`);
+	const dirStat = await lstatOrNull(dir);
+	if (dirStat?.isSymbolicLink()) throw new Error(`refused: team dir is a symlink: ${dir}`);
 	const st = await lstatOrNull(target);
 	if (st?.isSymbolicLink()) throw new Error(`refused: ${fileName} is a symlink: ${target}`);
 	if (st && !st.isFile()) throw new Error(`refused: ${fileName} is not a file: ${target}`);
 	return target;
 }
 
-async function writePersistedFileAtomic(team, pathKey, fileName, content) {
-	const target = await persistedFileTarget(team, pathKey, fileName);
+async function writePersistedFileAtomic(team, pathKey, fileName, content, expectedDir) {
+	const target = await persistedFileTarget(team, pathKey, fileName, expectedDir);
 	const tmp = `${target}.tmp-${process.pid}-${randomUUID()}`;
 	await writeFile(tmp, content, { encoding: "utf8", flag: "wx" });
 	await rename(tmp, target);
 	return team;
 }
 
-export async function writeTeamAtomic(team) {
-	return writePersistedFileAtomic(team, "team", "team.json", `${JSON.stringify(team, null, 2)}\n`);
+export async function writeTeamAtomic(team, expectedDir) {
+	return writePersistedFileAtomic(team, "team", "team.json", `${JSON.stringify(team, null, 2)}\n`, expectedDir);
 }
 
-export async function writeGuideAtomic(team, content) {
-	return writePersistedFileAtomic(team, "guide", "guide.md", content);
+export async function writeGuideAtomic(team, content, expectedDir) {
+	return writePersistedFileAtomic(team, "guide", "guide.md", content, expectedDir);
 }
