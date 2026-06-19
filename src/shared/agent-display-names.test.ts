@@ -162,7 +162,6 @@ describe("AGENT_DISPLAY_NAMES", () => {
       trinity: "trinity",
       construct: "construct",
       cipher: "Cipher (DSL Expert)",
-      niobe: "Niobe (Research & EU Expert)",
     }
 
     // when checking the constant

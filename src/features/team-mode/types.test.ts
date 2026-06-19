@@ -64,8 +64,8 @@ describe("team-mode types", () => {
     )
 
     //#then
-    expect(entries).toHaveLength(12)
-    expect(verdictCounts).toEqual({ eligible: 4, conditional: 0, "hard-reject": 8 })
+    expect(entries).toHaveLength(11)
+    expect(verdictCounts).toEqual({ eligible: 4, conditional: 0, "hard-reject": 7 })
     expect(AGENT_ELIGIBILITY_REGISTRY.morpheus.verdict).toBe("eligible")
     expect(AGENT_ELIGIBILITY_REGISTRY.keymaker.verdict).toBe("eligible")
     expect(AGENT_ELIGIBILITY_REGISTRY.architect.verdict).toBe("eligible")
@@ -87,9 +87,6 @@ describe("team-mode types", () => {
     )
     expect(AGENT_ELIGIBILITY_REGISTRY.smith.rejectionMessage).toBe(
       "Agent 'smith' is read-only (plan validator). Cannot write to mailbox as team member. Use delegate-task for plan validation instead.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY.niobe.rejectionMessage).toBe(
-      "Agent 'niobe' is read-only (research specialist). Cannot write to mailbox as team member. Use delegate-task for research queries instead.",
     )
     expect(AGENT_ELIGIBILITY_REGISTRY.sentinel.rejectionMessage).toBe(
       "Agent 'sentinel' is read-only (security auditor). Cannot write to mailbox as team member. Use delegate-task for security analysis instead.",

@@ -26,18 +26,6 @@ export const BuiltinSkillNameSchema = z.enum([
   "dsl-codegen",
   "dsl-metamodel",
   "dsl-tooling",
-  "eu-horizon",
-  "academic-paper-review",
-  "deliverable-writing",
-  "project-management",
-  "technical-lead",
-  "academic-writing",
-  "research-methodology",
-  "literature-review",
-  "grant-writing",
-  "scientific-presentation",
-  "data-management-plan",
-  "ip-exploitation",
   "dsl-textx-ecosystem",
   "dsl-pyecore-advanced",
   "dsl-model-transformation",
@@ -54,6 +42,8 @@ export const BuiltinSkillNameSchema = z.enum([
   "security-infra",
   "security-review",
   "tdd-enforcer",
+  "review-work",
+  "quality-gate",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
