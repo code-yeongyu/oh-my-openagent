@@ -113,7 +113,7 @@ export function createToolExecuteBeforeHandler(args: {
       })
     }
 
-    if (input.tool === "task" || input.tool === "call_omo_agent") {
+    if (input.tool === "task") {
       const category = typeof output.args.category === "string" ? output.args.category : undefined
       const subagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
       const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined

@@ -206,7 +206,7 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("sisyphus-junior")
     })
 
-    test("rewrites call_omo_agent general-purpose delegation to sisyphus-junior", async () => {
+    test("does not rewrite call_omo_agent general-purpose outside its allowed-agent validator", async () => {
       //#given
       const ctx = createCtxWithSessionMessages()
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
@@ -217,7 +217,7 @@ describe("createToolExecuteBeforeHandler", () => {
       await handler(input, output)
 
       //#then
-      expect(output.args.subagent_type).toBe("sisyphus-junior")
+      expect(output.args.subagent_type).toBe("general-purpose")
     })
 
     test("resolves subagent_type from session first message when task_id is provided without subagent_type", async () => {
