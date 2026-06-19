@@ -68,6 +68,31 @@ function memberById(team, id) {
 	return found;
 }
 
+function normalizedFocus(focus) {
+	return focus.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function assertUniqueMemberFocus(team) {
+	const seen = new Map();
+	for (const member of team.members) {
+		const key = normalizedFocus(member.focus ?? "");
+		const previous = seen.get(key);
+		if (previous) {
+			throw new Error(`member focus "${member.focus}" duplicates "${previous.focus}" (no two members may own the same thing)`);
+		}
+		seen.set(key, member);
+	}
+}
+
+function assertTeamReadyForThreadBinding(team) {
+	if (isUnderstaffed(team)) {
+		throw new Error(
+			`cannot bind member threads until the team has at least ${MIN_MEMBERS} distinct members; current count is ${team.members.length}`,
+		);
+	}
+	assertUniqueMemberFocus(team);
+}
+
 export function addMember(team, { id, focus, lens, deliverable = "", branch = null }) {
 	if (!id?.trim()) throw new Error("member id is required");
 	if (!focus?.trim()) throw new Error("member focus is required - a concrete part, ownership area, or perspective");
@@ -75,6 +100,8 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 	const memberId = id.trim();
 	const memberFocus = focus.trim();
 	if (team.members.some((m) => m.id === memberId)) throw new Error(`member id "${memberId}" already exists (duplicate)`);
+	const duplicate = team.members.find((m) => normalizedFocus(m.focus) === normalizedFocus(memberFocus));
+	if (duplicate) throw new Error(`member focus "${memberFocus}" duplicates "${duplicate.focus}" (no two members may own the same thing)`);
 	team.members.push({
 		id: memberId,
 		focus: memberFocus,
@@ -91,6 +118,7 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 
 export function bindThread(team, { id, threadId, cwd = null, worktreePath = null }) {
 	if (!threadId?.trim()) throw new Error("thread id is required");
+	assertTeamReadyForThreadBinding(team);
 	const m = memberById(team, id);
 	m.threadId = threadId.trim();
 	m.status = "active";
@@ -121,6 +149,7 @@ export function validateTeam(team) {
 	if (!team.teamId || !team.teamName) throw new Error("invalid team: teamId and teamName are required");
 	if (team.leader?.kind !== "main-session") throw new Error("invalid team: leader.kind must be main-session");
 	if (!Array.isArray(team.members)) throw new Error("invalid team: members must be an array");
+	assertUniqueMemberFocus(team);
 	return team;
 }
 
