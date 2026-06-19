@@ -11,6 +11,7 @@ import {
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
+import { clearAllSessionPromptParams, getSessionPromptParams } from "../shared/session-prompt-params-state"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -105,6 +106,7 @@ describe("createEventHandler - model fallback", () => {
     readProviderModelsCacheSpy = undefined
     _resetForTesting()
     releaseAllPromptAsyncReservationsForTesting()
+    clearAllSessionPromptParams()
     for (const sessionID of sessionModelTestSessions) clearSessionModel(sessionID)
     sessionModelTestSessions.clear()
   })
@@ -448,11 +450,20 @@ describe("createEventHandler - model fallback", () => {
         modelID: "gpt-5.5",
       },
       variant: "high",
-      reasoningEffort: "high",
+    })
+    expect(promptInputs[0]?.body).not.toHaveProperty("reasoningEffort")
+    expect(promptInputs[0]?.body).not.toHaveProperty("temperature")
+    expect(promptInputs[0]?.body).not.toHaveProperty("top_p")
+    expect(promptInputs[0]?.body).not.toHaveProperty("maxTokens")
+    expect(promptInputs[0]?.body).not.toHaveProperty("thinking")
+    expect(getSessionPromptParams(sessionID)).toEqual({
       temperature: 0,
-      top_p: 0.4,
-      maxTokens: 12345,
-      thinking: { type: "enabled", budgetTokens: 4096 },
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
     })
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })

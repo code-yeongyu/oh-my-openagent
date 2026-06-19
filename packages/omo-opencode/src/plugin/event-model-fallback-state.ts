@@ -14,6 +14,7 @@ import { readConnectedProvidersCache } from "../shared/connected-providers-cache
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
 import { getSessionModel } from "../shared/session-model-state";
+import { applySessionPromptParams } from "../shared/session-prompt-params-helpers";
 import { log } from "../shared/logger";
 import type { PluginEventContext } from "./event-types";
 
@@ -198,17 +199,13 @@ export function createModelFallbackContinuationController(args: {
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
       const launchVariant = fallbackContext?.variant ?? (agentSettings as { variant?: string } | undefined)?.variant;
+      applySessionPromptParams(sessionID, fallbackContext);
       const promptBody = {
         path: { id: sessionID },
         body: {
           ...(launchAgent ? { agent: launchAgent } : {}),
           ...(launchModel ? { model: launchModel } : {}),
           ...(launchVariant ? { variant: launchVariant } : {}),
-          ...(fallbackContext?.reasoningEffort !== undefined ? { reasoningEffort: fallbackContext.reasoningEffort } : {}),
-          ...(fallbackContext?.temperature !== undefined ? { temperature: fallbackContext.temperature } : {}),
-          ...(fallbackContext?.top_p !== undefined ? { top_p: fallbackContext.top_p } : {}),
-          ...(fallbackContext?.maxTokens !== undefined ? { maxTokens: fallbackContext.maxTokens } : {}),
-          ...(fallbackContext?.thinking !== undefined ? { thinking: fallbackContext.thinking } : {}),
           parts: [createInternalAgentContinuationTextPart("continue")],
         },
         query: { directory: pluginContext.directory },
