@@ -29,6 +29,21 @@ async function pathExists(p) {
 	}
 }
 
+// Directory symlinks need Developer Mode / admin on Windows; probe before the symlink test
+// so a runner without that privilege skips rather than fails (mirrors migrate-codex-config.test.mjs).
+async function canCreateSymlink() {
+	const root = await mkdtemp(join(tmpdir(), "tm-symcap-"));
+	try {
+		await mkdir(join(root, "target"), { recursive: true });
+		await symlink(join(root, "target"), join(root, "link"), "dir");
+		return true;
+	} catch {
+		return false;
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+}
+
 test("#given the CLI #when init runs #then it writes team.json + an artifacts dir and a member manual with the hard comms rules", async () => {
 	// given
 	const dir = await mkTmp();
@@ -178,8 +193,12 @@ test("#given an initialized team #when init re-runs #then it is a resume-safe no
 	}
 });
 
-test("#given a symlinked .omo/teams #when init runs #then it refuses before writing through the symlink", async () => {
+test("#given a symlinked .omo/teams #when init runs #then it refuses before writing through the symlink", async (t) => {
 	// given
+	if (!(await canCreateSymlink())) {
+		t.skip("symbolic links are unavailable in this environment");
+		return;
+	}
 	const dir = await mkTmp();
 	const outside = await mkTmp();
 	try {
