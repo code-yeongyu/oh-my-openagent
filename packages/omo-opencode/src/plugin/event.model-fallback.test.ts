@@ -10,6 +10,7 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
+import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -25,6 +26,7 @@ function asEventHandlerInput(input: EventInput): EventHandlerInput {
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
+const sessionModelTestSessions = new Set<string>()
 
 function setupConnectedProviderCacheMocks(): void {
   readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
@@ -103,6 +105,8 @@ describe("createEventHandler - model fallback", () => {
     readProviderModelsCacheSpy = undefined
     _resetForTesting()
     releaseAllPromptAsyncReservationsForTesting()
+    for (const sessionID of sessionModelTestSessions) clearSessionModel(sessionID)
+    sessionModelTestSessions.clear()
   })
 
   test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
@@ -567,6 +571,42 @@ describe("createEventHandler - model fallback", () => {
       modelID: "gpt-5.5",
     })
     expect(promptInputs[1]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("uses session model for name-only session.error before skipping no-op fallback", async () => {
+    //#given
+    const sessionID = "ses_name_only_session_error_uses_session_model"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["openai"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
       providerID: "kimi-for-coding",
       modelID: "k2p5",
     })

@@ -11,6 +11,7 @@ import { getNextReachableFallback } from "../hooks/model-fallback/next-fallback"
 import { isAbortError } from "../shared/is-abort-error";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
+import { getSessionModel } from "../shared/session-model-state";
 import {
   extractErrorMessage,
   extractErrorName,
@@ -269,10 +270,16 @@ export function createModelFallbackEventHandler(args: {
     if (!agentName) return;
 
     const parsed = extractProviderModelFromErrorMessage(params.errorMessage);
+    const sessionModel = getSessionModel(params.sessionID);
+    const lastKnown = lastKnownModelBySession.get(params.sessionID);
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined) || parsed.modelID || "claude-opus-4-7",
+      (params.props?.modelID as string | undefined)
+        || parsed.modelID
+        || sessionModel?.modelID
+        || lastKnown?.modelID
+        || "claude-opus-4-7",
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
