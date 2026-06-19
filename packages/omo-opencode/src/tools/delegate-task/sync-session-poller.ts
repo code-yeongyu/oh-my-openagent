@@ -4,11 +4,11 @@ import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 import { extractErrorMessage } from "../../features/background-agent/error-classifier"
+import { isSessionComplete } from "./sync-session-completion"
 
-const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
-const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
+export { isSessionComplete } from "./sync-session-completion"
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -51,24 +51,6 @@ function getTerminalSessionError(messages: SessionMessage[]): string | null {
 
   const errorMessage = extractErrorMessage((lastAssistant.info as { error?: unknown }).error)
   return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
-}
-
-export function isSessionComplete(messages: SessionMessage[]): boolean {
-  let lastUser: SessionMessage | undefined
-  let lastAssistant: SessionMessage | undefined
-
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
-    if (!lastUser && msg.info?.role === "user") lastUser = msg
-    if (lastUser && lastAssistant) break
-  }
-
-  if (!lastAssistant?.info?.finish) return false
-  if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
-  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
-  if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
-  return lastUser.info.id < lastAssistant.info.id
 }
 
 const DEFAULT_MAX_ASSISTANT_TURNS = 300
