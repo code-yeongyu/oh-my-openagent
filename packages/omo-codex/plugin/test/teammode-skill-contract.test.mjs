@@ -6,30 +6,41 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
+// The v2 skill drives a bundled state script: the team.json/guide shapes are pinned by the
+// script tests (teammode-state.test.mjs / teammode-cli.test.mjs). This contract pins the
+// SKILL.md SURFACE - the leader-facing protocol the model reads - plus the banned runtime.
 const requiredContracts = [
 	["frontmatter name", /^---\r?\nname: teammode\r?\n/m],
 	["Codex-only scope", /Codex-only/i],
 	["team state root", /\.omo\/teams\/\{session_id\}/],
-	["leader state field", /"leader"/],
-	["members state field", /"members"/],
-	["active team state field", /"activeTeam"/],
-	["team name state field", /"teamName"/],
-	["archived state field", /"archived"/],
-	["member threads state field", /"threadId"/],
+	["main session is the leader", /main session[\s\S]{0,40}leader|leader[\s\S]{0,40}main session/i],
+	["compose by ownership", /ownership/i],
+	["compose by perspective", /perspective/i],
+	["vague role is an anti-pattern", /vague role[\s\S]*anti-pattern|anti-pattern[\s\S]*vague role/i],
+	["when to use a team guidance", /when to use a team/i],
+	["subagent alternative", /subagent/i],
+	["runs the bundled state script", /team\.mjs/],
+	["script path is skill-relative", /<skill-root>/],
 	["team thread title format", /\[team name\] \{session name\}/i],
-	["English-only member communication", /English-only|English only/i],
-	["frequent status updates", /frequent/i],
-	["clear member roles", /clear role|explicit role/i],
+	["English-only member communication", /English-only|English only|communication is in English/i],
+	["replies to the user in the user's language", /user'?s own language|user'?s language/i],
+	["finished member reports to the leader", /report[\s\S]{0,60}leader/i],
+	["stale or blocked is not acceptable", /stale[\s\S]{0,80}not\s+acceptable/i],
+	["frequent status updates", /WORKING:/],
+	["artifacts exchange space", /artifacts/i],
+	["worktree concept", /worktree/i],
+	["generated member field manual", /guide\.md/],
 	["team thread creation", /codex_app\.create_thread/],
 	["thread message broadcast", /codex_app\.send_message_to_thread/],
 	["thread status inspection", /codex_app\.read_thread/],
 	["thread title update", /codex_app\.set_thread_title/],
 	["thread archival", /codex_app\.set_thread_archived/],
-	["native subagent fallback", /multi_agent_v1\.spawn_agent/],
+	["native subagent helper lane", /multi_agent_v1\.spawn_agent/],
 	["native subagent waiting", /multi_agent_v1\.wait_agent/],
 	["native subagent cleanup", /multi_agent_v1\.close_agent/],
 	["archive closes members", /archive[\s\S]*member[\s\S]*(?:close|archive)/i],
 	["delete removes team state", /delete[\s\S]*\.omo\/teams\/\{session_id\}/i],
+	["worktree integration respects the user", /merge[\s\S]*PR|PR[\s\S]*merge/i],
 	["upstream inspiration is attributed", /inspired\s+by[\s\S]*oh-my-codex/i],
 ];
 
@@ -44,10 +55,6 @@ const bannedRuntimePatterns = [
 	["pane runtime", /\bpane\b/i],
 ];
 
-async function readSkill(path) {
-	return readFile(path, "utf8");
-}
-
 function assertTeamModeContract(content, label) {
 	for (const [name, pattern] of requiredContracts) {
 		assert.match(content, pattern, `${label} missing contract: ${name}`);
@@ -57,17 +64,26 @@ function assertTeamModeContract(content, label) {
 	}
 }
 
-test("#given Codex teammode source skill #when inspected #then it defines the native team contract", async () => {
-	const content = await readSkill(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"));
+test("#given Codex teammode source skill #when inspected #then it defines the script-driven team contract", async () => {
+	const content = await readFile(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
 
 	assertTeamModeContract(content, "source teammode skill");
 });
 
-test("#given generated Codex teammode skill #when inspected #then it preserves the team contract and metadata", async () => {
+test("#given generated Codex teammode skill #when inspected #then it preserves the team contract, the script, and metadata", async () => {
 	const skillRoot = join(root, "skills", "teammode");
-	const content = await readSkill(join(skillRoot, "SKILL.md"));
-	const metadata = await readSkill(join(skillRoot, "agents", "openai.yaml"));
+	const content = await readFile(join(skillRoot, "SKILL.md"), "utf8");
+	const metadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
 
 	assertTeamModeContract(content, "generated teammode skill");
 	assert.match(metadata, /display_name: "\(OmO\) teammode"/);
+});
+
+test("#given the generated teammode skill #when its scripts are inspected #then the bundled controller and state model ship with it", async () => {
+	const scriptsRoot = join(root, "skills", "teammode", "scripts");
+
+	for (const file of ["team.mjs", "team-state.mjs", "team-guide.mjs"]) {
+		const content = await readFile(join(scriptsRoot, file), "utf8");
+		assert.ok(content.length > 0, `generated teammode skill is missing bundled script: ${file}`);
+	}
 });
