@@ -1420,7 +1420,14 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
       return {
         commands: { "retry-cmd": { name: "retry-cmd", description: "test", template: "test" } },
         skills: {},
-        agents: {},
+        agents: {
+          "retry-agent": {
+            name: "retry-agent",
+            description: "Recovered plugin agent",
+            prompt: "Plugin agent recovered after retry",
+            mode: "subagent",
+          },
+        },
         mcpServers: {},
         hooksConfigs: [],
         plugins: [{ name: "retry-plugin", version: "1.0.0", scope: "project", installPath: "/tmp/retry-plugin", pluginKey: "retry-plugin" }],
@@ -1454,6 +1461,8 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     expect(attempts).toBe(2)
     expect((firstConfig.command as Record<string, unknown>)["retry-cmd"]).toBeUndefined()
     expect((secondConfig.command as Record<string, unknown>)["retry-cmd"]).toBeDefined()
+    expect((firstConfig.agent as Record<string, unknown>)["retry-agent"]).toBeUndefined()
+    expect((secondConfig.agent as Record<string, unknown>)["retry-agent"]).toBeDefined()
   })
 
   test("passes through plugin data on successful load (identity test)", async () => {
