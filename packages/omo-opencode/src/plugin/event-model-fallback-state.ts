@@ -23,6 +23,11 @@ export type FallbackContinuationContext = {
   dedupeProviderID?: string;
   modelID?: string;
   variant?: string;
+  reasoningEffort?: string;
+  temperature?: number;
+  top_p?: number;
+  maxTokens?: number;
+  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number };
 };
 
 type FallbackContinuationDedupeKeys = {
@@ -199,6 +204,11 @@ export function createModelFallbackContinuationController(args: {
           ...(launchAgent ? { agent: launchAgent } : {}),
           ...(launchModel ? { model: launchModel } : {}),
           ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(fallbackContext?.reasoningEffort !== undefined ? { reasoningEffort: fallbackContext.reasoningEffort } : {}),
+          ...(fallbackContext?.temperature !== undefined ? { temperature: fallbackContext.temperature } : {}),
+          ...(fallbackContext?.top_p !== undefined ? { top_p: fallbackContext.top_p } : {}),
+          ...(fallbackContext?.maxTokens !== undefined ? { maxTokens: fallbackContext.maxTokens } : {}),
+          ...(fallbackContext?.thinking !== undefined ? { thinking: fallbackContext.thinking } : {}),
           parts: [createInternalAgentContinuationTextPart("continue")],
         },
         query: { directory: pluginContext.directory },

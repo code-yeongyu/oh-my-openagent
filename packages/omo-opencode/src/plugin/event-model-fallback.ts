@@ -48,6 +48,11 @@ function resolveAutoContinuationFallbackContext(
     dedupeProviderID: fallback.providerID,
     modelID: fallback.modelID,
     variant: fallback.variant,
+    reasoningEffort: fallback.reasoningEffort,
+    temperature: fallback.temperature,
+    top_p: fallback.top_p,
+    maxTokens: fallback.maxTokens,
+    thinking: fallback.thinking,
   };
 }
 
