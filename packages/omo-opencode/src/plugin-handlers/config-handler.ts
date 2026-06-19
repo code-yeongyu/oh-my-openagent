@@ -89,7 +89,6 @@ function replayAgentConfigSideEffects(params: {
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState, runtimeSkillSourceUrl } = deps;
-  let pluginComponentsPromise: ReturnType<typeof loadPluginComponents> | undefined;
   let agentConfigSnapshot: AgentConfigSnapshot | undefined;
 
   return async (config: Record<string, unknown>) => {
@@ -103,12 +102,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     });
     clearFormatterCache()
 
-    pluginComponentsPromise ??= loadPluginComponents({ pluginConfig });
-    const pluginComponents = await pluginComponentsPromise;
+    const pluginComponents = await loadPluginComponents({ pluginConfig });
     const pluginComponentsLoadFailed = pluginComponents.retryableLoadFailure === true;
-    if (pluginComponentsLoadFailed) {
-      pluginComponentsPromise = undefined;
-    }
 
     applyHookConfig({ pluginComponents });
 
