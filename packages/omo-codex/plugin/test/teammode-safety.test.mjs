@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -130,6 +130,50 @@ test("#given team dir is swapped to a symlink #when status reads team state #the
 
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, /path component is a symlink|team dir is a symlink/);
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
+test("#given teams root is a symlink #when delete runs #then outside team state stays untouched", (t) => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-teammode-delete-root-symlink-"));
+	try {
+		const outsideTeams = join(tempRoot, "outside-teams");
+		const outsideTeamDir = join(outsideTeams, "escape");
+		mkdirSync(outsideTeamDir, { recursive: true });
+		writeFileSync(
+			join(outsideTeamDir, "team.json"),
+			`${JSON.stringify(
+				{
+					schemaVersion: 2,
+					teamId: "outside-team",
+					teamName: "Outside",
+					sessionName: "Escape",
+					leader: { kind: "main-session", sessionId: "escape" },
+					status: "archived",
+					members: [],
+				},
+				null,
+				2,
+			)}\n`,
+		);
+		mkdirSync(join(tempRoot, ".omo"), { recursive: true });
+		try {
+			symlinkSync(outsideTeams, join(tempRoot, ".omo", "teams"), "dir");
+		} catch (error) {
+			if (error?.code === "EPERM" || error?.code === "EACCES" || error?.code === "EINVAL") {
+				t.skip(`symlink unavailable on this filesystem: ${error.code}`);
+				return;
+			}
+			throw error;
+		}
+
+		const result = runTeamRaw(tempRoot, "delete", "--team", "escape", "--force");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /path component is a symlink/);
+		assert.equal(existsSync(outsideTeamDir), true);
+		assert.equal(JSON.parse(readFileSync(join(outsideTeamDir, "team.json"), "utf8")).teamId, "outside-team");
 	} finally {
 		rmSync(tempRoot, { recursive: true, force: true });
 	}
