@@ -3,8 +3,7 @@ import { join } from "path"
 import type { MatrixxConfig } from "../../config/schema"
 import { TaskGetInputSchema, TaskObjectSchema } from "./types"
 import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
-
-const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/
+import { TASK_ID_PATTERN } from "./constants"
 
 function parseTaskId(id: string): string | null {
   if (!TASK_ID_PATTERN.test(id)) return null

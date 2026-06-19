@@ -10,8 +10,7 @@ import {
   acquireLock,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
-
-const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/;
+import { TASK_ID_PATTERN } from "./constants";
 
 function parseTaskId(id: string): string | null {
   if (!TASK_ID_PATTERN.test(id)) return null;
