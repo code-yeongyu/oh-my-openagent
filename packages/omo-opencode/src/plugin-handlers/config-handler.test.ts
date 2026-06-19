@@ -9,6 +9,7 @@ import { resolveCategoryConfig } from "./category-config-resolver"
 import * as agents from "../agents"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
 import * as commandLoader from "../features/claude-code-command-loader"
+import { isAgentRegistered } from "../features/claude-code-session-state"
 import * as builtinCommands from "../features/builtin-commands"
 import * as skillLoader from "../features/opencode-skill-loader"
 import * as agentLoader from "../features/claude-code-agent-loader"
@@ -198,6 +199,48 @@ describe("Sisyphus-Junior model inheritance", () => {
     expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe(
       "openai/gpt-5.5"
     )
+  })
+})
+
+describe("Config handler hot path caching", () => {
+  test("reuses the resolved agent roster for repeated config hook invocations with the same model", async () => {
+    // #given
+    const pluginConfig = createPluginConfig({
+      agents: Object.fromEntries(
+        Array.from({ length: 12 }, (_, index) => [
+          `agent-${index}`,
+          {
+            model: `provider/model-${index}`,
+            fallback_models: [`provider/fallback-${index}`],
+          },
+        ]),
+      ),
+      categories: Object.fromEntries(
+        Array.from({ length: 10 }, (_, index) => [
+          `category-${index}`,
+          {
+            model: `provider/category-model-${index}`,
+            fallback_models: [`provider/category-fallback-${index}`],
+          },
+        ]),
+      ),
+    })
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler({ model: "anthropic/claude-opus-4-7", agent: {} })
+    await handler({ model: "anthropic/claude-opus-4-7", agent: {} })
+
+    // #then
+    expect(unsafeTestValue(agents.createBuiltinAgents).mock.calls).toHaveLength(1)
+    expect(isAgentRegistered(getAgentListDisplayName("sisyphus"))).toBe(true)
   })
 })
 
