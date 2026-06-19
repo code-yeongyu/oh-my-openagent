@@ -3,13 +3,13 @@ import { isPromptMessageInspectionAborted } from "../../shared/prompt-async-gate
 import type { PromptMessagesQuery } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import type { PendingParentWake } from "./parent-wake-dedupe"
+import type { ParentWakeSessionMessage } from "./parent-wake-session-message"
 import {
   getParentWakeSessionHistoryDeferralDecision,
   hasAssistantOrToolOutputAfterParentWake,
   hasAssistantOutputAfterParentWakeAdmission,
   hasRecordedParentWakePromptMessage,
   parentWakeUserMessageIsInProgress,
-  type ParentWakeSessionMessage,
   type ToolWaitDeferralDecision,
 } from "./parent-wake-session-history"
 
