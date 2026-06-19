@@ -15,6 +15,11 @@ import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-mode
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
 import { getSessionModel } from "../shared/session-model-state";
 import { applySessionPromptParams } from "../shared/session-prompt-params-helpers";
+import {
+  clearSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../shared/session-prompt-params-state";
 import { log } from "../shared/logger";
 import type { PluginEventContext } from "./event-types";
 
@@ -172,6 +177,8 @@ export function createModelFallbackContinuationController(args: {
 
     continuationsInFlight.add(sessionID);
     let dispatched = false;
+    let promptParamsApplied = false;
+    const previousPromptParams = getSessionPromptParams(sessionID);
     try {
       try {
         await pluginContext.client.session.abort({ path: { id: sessionID } });
@@ -200,6 +207,7 @@ export function createModelFallbackContinuationController(args: {
         : undefined;
       const launchVariant = fallbackContext?.variant ?? (agentSettings as { variant?: string } | undefined)?.variant;
       applySessionPromptParams(sessionID, fallbackContext);
+      promptParamsApplied = true;
       const promptBody = {
         path: { id: sessionID },
         body: {
@@ -238,6 +246,13 @@ export function createModelFallbackContinuationController(args: {
       }
     } finally {
       if (dispatched) markDispatched(sessionID, dedupeContext);
+      else if (promptParamsApplied) {
+        if (previousPromptParams) {
+          setSessionPromptParams(sessionID, previousPromptParams);
+        } else {
+          clearSessionPromptParams(sessionID);
+        }
+      }
       continuationsInFlight.delete(sessionID);
     }
 

@@ -7,11 +7,16 @@ import { _resetForTesting, setMainSession, subagentSessions } from "../features/
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import {
+  dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
-import { clearAllSessionPromptParams, getSessionPromptParams } from "../shared/session-prompt-params-state"
+import {
+  clearAllSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../shared/session-prompt-params-state"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -466,6 +471,81 @@ describe("createEventHandler - model fallback", () => {
       },
     })
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("restores previous prompt params when fallback continuation is skipped by prompt gate", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_skipped_restores_prompt_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    await dispatchInternalPrompt({
+      mode: "async",
+      client: unsafeTestValue({
+        session: {
+          promptAsync: async () => ({}),
+          prompt: async () => ({}),
+        },
+      }),
+      sessionID,
+      input: { path: { id: sessionID }, body: { parts: [] } },
+      source: "test:fallback-param-restore:hold",
+      settleMs: 0,
+    })
+    const { handler, abortCalls, promptCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_skipped_restores_prompt_params",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_skipped_restores_prompt_params",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([])
+    expect(promptAsyncCalls).toEqual([])
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
   })
 
   test("skips auto-continuation when configured fallbacks contain no usable model", async () => {
