@@ -187,7 +187,13 @@ export function createModelFallbackEventHandler(args: {
 
     const providerHint = params.info.providerID as string | undefined;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
-    const rawModel = (params.info.modelID as string | undefined) ?? "claude-opus-4-7";
+    const sessionModel = getSessionModel(params.sessionID);
+    const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const rawModel =
+      (params.info.modelID as string | undefined)
+      ?? sessionModel?.modelID
+      ?? lastKnown?.modelID
+      ?? "claude-opus-4-7";
     const currentModel = normalizeFallbackModelID(rawModel);
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);

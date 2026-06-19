@@ -613,6 +613,50 @@ describe("createEventHandler - model fallback", () => {
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
+  test("uses session model for name-only message.updated before skipping no-op fallback", async () => {
+    //#given
+    const sessionID = "ses_name_only_message_updated_uses_session_model"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["openai"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_name_only_message_updated",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+            },
+            parentID: "msg_user_name_only_message_updated",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {
     //#given
     const sessionID = "ses_message_updated_fallback_eof"
