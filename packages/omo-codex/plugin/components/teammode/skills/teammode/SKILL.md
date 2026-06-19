@@ -73,7 +73,8 @@ subcommand rewrites `guide.md`, so the manual always matches the current team.
 ## Create the team and its threads
 
 1. `init` the team, then `add-member` once per member.
-2. Create a durable thread per member with `codex_app.create_thread`, titled EXACTLY
+2. Create a durable thread per member with `codex_app.create_thread` - ALWAYS this tool for every
+   member, never a spawned agent - titled EXACTLY
    `[team name] {session name}` (keep this convention strictly). If `codex_app.create_thread`
    accepts a working directory / cwd argument, set it to that member's worktree; otherwise the
    member's manual tells it to `cd` there first. Use `codex_app.set_thread_title` if the title
@@ -83,12 +84,14 @@ subcommand rewrites `guide.md`, so the manual always matches the current team.
    is short on purpose: it tells the new thread to READ its `guide.md` and `team.json` rather than
    carrying the whole protocol inline.
 
-For short in-turn helper lanes, `multi_agent_v1.spawn_agent({"fork_context": false, "message": "..."})`
-is fine; wait on `multi_agent_v1.wait_agent` and close with `multi_agent_v1.close_agent`. Durable
-teams should prefer real Codex threads so the team stays visible as a set of threads. A
-`multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived - treat a running
-child as alive. Fallback only when the child completed without the deliverable, is ack-only after
-a follow-up, is explicitly `BLOCKED:`, or is no longer running.
+Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
+not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
+for a team member: a spawned agent is an ephemeral helper that does not show up as a team thread,
+cannot carry the `[team name] {session name}` title, and cannot be inspected, titled, archived, or
+re-opened with the `codex_app.*` thread tools - which defeats the entire point of a durable team.
+A member only counts once you have `bind-thread`-ed it to a real `codex_app.create_thread` thread
+id. If the thread-creation tool is unavailable, STOP and say so (see Stop rules); do not quietly
+fall back to a spawned agent.
 
 ## Communication
 
