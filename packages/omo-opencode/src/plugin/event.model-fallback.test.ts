@@ -665,6 +665,94 @@ describe("createEventHandler - model fallback", () => {
     })
   })
 
+  test("restores previous prompt params when skipped pending fallback is cleared before manual resume", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_skipped_restore_on_clear"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    await dispatchInternalPrompt({
+      mode: "async",
+      client: unsafeTestValue({
+        session: {
+          promptAsync: async () => ({}),
+          prompt: async () => ({}),
+        },
+      }),
+      sessionID,
+      input: { path: { id: sessionID }, body: { parts: [] } },
+      source: "test:fallback-param-clear:hold",
+      settleMs: 0,
+    })
+    const { handler } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_skipped_restore_on_clear",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_skipped_restore_on_clear",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - selected fallback params are present while the pending fallback is still available.
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    //#when - an abort/stopped-message path clears the pending fallback before it is applied.
+    clearPendingModelFallback(modelFallback, sessionID)
+
+    //#then - fallback-only params do not leak into the next normal turn.
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+  })
+
   test("skips auto-continuation when configured fallbacks contain no usable model", async () => {
     //#given
     const sessionID = "ses_auto_continuation_no_usable_fallback"
