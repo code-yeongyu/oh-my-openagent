@@ -713,6 +713,59 @@ describe("createEventHandler - model fallback", () => {
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
+  test("records auto-selected fallback before handling its name-only failure", async () => {
+    //#given
+    const sessionID = "ses_name_only_selected_fallback_recorded"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - first name-only error dispatches auto-continuation to opencode-go/gpt-5.5.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#when - the selected fallback then fails with only an error name.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {
     //#given
     const sessionID = "ses_message_updated_fallback_eof"
