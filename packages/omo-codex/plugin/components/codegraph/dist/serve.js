@@ -132,6 +132,9 @@ function bunWhich(commandName) {
 }
 
 // ../../../../utils/src/codegraph/resolve.ts
+function codegraphCommandRequiresSupportedLocalNode(resolution) {
+  return resolution.source !== "bundled" && resolution.source !== "env" && resolution.source !== "provisioned";
+}
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
 var CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN";
@@ -1516,7 +1519,7 @@ async function runCodegraphServe(options = {}) {
     return 1;
   }
   const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-  if (resolution.source !== "bundled" && resolution.source !== "env" && !nodeSupport.supported) {
+  if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
     (options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
     return 1;
   }
