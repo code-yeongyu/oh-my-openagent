@@ -34,11 +34,17 @@ final synthesis and any integration.
 
 ## Compose by part, ownership, or perspective - not by job title
 
-Define each member by a concrete slice of the work: a specific part of the codebase, an
-ownership area, or a distinct perspective/lens. Assigning a vague role ("backend dev", "release
-analyst", "the tester") is an anti-pattern - it gives the member no real boundary and invites
-overlap. Each member's `focus` must name what they own concretely; the `lens` is one of
-`area`, `ownership`, or `perspective`.
+A team is ALWAYS two or more members - never a single-member team. One worker on an isolated
+job is a subagent (`multi_agent_v1.spawn_agent`), not a team; if you end up with a single member,
+either split off a second distinct slice or drop the team and use a subagent.
+
+Compose the team from what you actually KNOW about the work. Ground the split in real knowledge
+of the problem, then divide it into clear, non-overlapping responsibilities - one per aspect of
+the work - and give each member exactly one. No two members may own the same thing. Define each
+member by a concrete slice: a specific part of the codebase, an ownership area, or a distinct
+perspective/lens. Assigning a vague role ("backend dev", "release analyst", "the tester") is an
+anti-pattern - it gives the member no real boundary and invites overlap. Each member's `focus`
+names what they own concretely; the `lens` is one of `area`, `ownership`, or `perspective`.
 
 ## Run the script - never hand-write team state
 
@@ -103,6 +109,10 @@ worktree is recorded in `team.json`, and rely on the manual to direct each membe
 worktree. Each member commits inside its worktree so you can integrate.
 
 ## Archive, delete, and cleanup
+
+DISBAND the team the moment it is no longer needed. A team exists only to do its work; once that
+work is done, or the user no longer wants it, do not leave it lying around - archive every member,
+then delete the team state. A finished team that is never disbanded is a leak.
 
 - `archive` closes the team: notify each active member, copy anything useful into `artifacts/`,
   archive each member thread with `codex_app.set_thread_archived`, then `archive` flips the team
