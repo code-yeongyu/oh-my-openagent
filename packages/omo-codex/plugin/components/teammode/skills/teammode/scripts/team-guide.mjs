@@ -68,6 +68,12 @@ coordinate with each other, but the leader owns the final decision and integrati
   Team-internal traffic stays English; user-facing replies match the user.
 - **Report to the leader the moment your work is complete.** A finished task that was never
   reported does not count as done.
+- **Over-communicate relentlessly - report even the trivial.** Message constantly and
+  proactively: every finding, decision, hand-off, and even the smallest or most trivial step, the
+  moment it happens, in short lean notes. Never save it up for one final report. When in doubt,
+  send the message - far more and far smaller updates always beats going quiet. The instant
+  anything changes a peer's assumption, push it to them. Too many messages is correct here; the
+  only failure is going quiet.
 - **Stale, stuck, and silently-blocked states are NOT acceptable.** During long work send
   \`WORKING: <your focus> - <phase>\` so the leader can see you are alive. If you truly cannot
   proceed, send \`BLOCKED: <reason>\` immediately and propose the smallest unblock - never sit
