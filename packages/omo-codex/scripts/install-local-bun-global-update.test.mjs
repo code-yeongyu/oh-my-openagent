@@ -29,7 +29,7 @@ test("#given direct bun global lazycodex bin #when running update dry-run #then 
 		}).trim();
 
 		// then
-		assert.equal(output, "bun update -g lazycodex-ai@latest");
+		assert.equal(output, "bun update -g lazycodex-ai@latest\nnpx --yes lazycodex-ai@latest install --no-tui --codex-autonomous");
 	} finally {
 		rmSync(tempHome, { recursive: true, force: true });
 	}

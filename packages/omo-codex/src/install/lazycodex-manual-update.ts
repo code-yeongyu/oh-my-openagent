@@ -64,6 +64,7 @@ export async function runLazyCodexManualUpdate(input: {
   }
   if (input.dryRun) {
     log(`${plan.command} ${plan.args.join(" ")}`)
+    if (plan.postUpdate === "bun-global-trust") log(`${DEFAULT_UPDATE_COMMAND} ${DEFAULT_UPDATE_ARGS.join(" ")}`)
     return 0
   }
   await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env })
@@ -74,6 +75,7 @@ export async function runLazyCodexManualUpdate(input: {
       commandRunner,
       isInteractive: input.isInteractive ?? (process.stdin.isTTY === true && process.stdout.isTTY === true),
     })
+    await commandRunner(DEFAULT_UPDATE_COMMAND, DEFAULT_UPDATE_ARGS, { cwd: process.cwd(), env })
   }
   return 0
 }
