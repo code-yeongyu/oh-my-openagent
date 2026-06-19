@@ -84,6 +84,39 @@ async function createPluginRootWithHookArray({ withGitBashDist }) {
 	return pluginRoot;
 }
 
+async function createPluginRootWithWindowsHook({ withBootstrapScript }) {
+	const pluginRoot = await mkdtemp(join(tmpdir(), "hook-targets-windows-"));
+	await mkdir(join(pluginRoot, "hooks"), { recursive: true });
+	await writeFile(
+		join(pluginRoot, "hooks", "hooks.json"),
+		JSON.stringify(
+			{
+				hooks: {
+					SessionStart: [
+						{
+							hooks: [
+								{
+									type: "command",
+									commandWindows:
+										'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\bootstrap.ps1"',
+								},
+							],
+						},
+					],
+				},
+			},
+			null,
+			"\t",
+		),
+	);
+	if (withBootstrapScript) {
+		const target = join(pluginRoot, "components", "bootstrap", "scripts", "bootstrap.ps1");
+		await mkdir(dirname(target), { recursive: true });
+		await writeFile(target, "");
+	}
+	return pluginRoot;
+}
+
 test("#given a hook command target missing from the payload #when scanning #then exactly that path is reported", async (t) => {
 	const pluginRoot = await createPluginRoot({ withGitBashDist: false });
 	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
@@ -91,6 +124,22 @@ test("#given a hook command target missing from the payload #when scanning #then
 	const missing = await findMissingHookCommandTargets(pluginRoot);
 
 	assert.deepEqual(missing, [join(pluginRoot, "components/git-bash/dist/cli.js")]);
+});
+
+test("#given a Windows hook command target missing from the payload #when scanning #then the backslash path is reported", async (t) => {
+	const pluginRoot = await createPluginRootWithWindowsHook({ withBootstrapScript: false });
+	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
+
+	const missing = await findMissingHookCommandTargets(pluginRoot);
+
+	assert.deepEqual(missing, [join(pluginRoot, "components", "bootstrap", "scripts", "bootstrap.ps1")]);
+});
+
+test("#given a Windows hook command target exists in the payload #when scanning #then nothing is missing", async (t) => {
+	const pluginRoot = await createPluginRootWithWindowsHook({ withBootstrapScript: true });
+	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
+
+	assert.deepEqual(await findMissingHookCommandTargets(pluginRoot), []);
 });
 
 test("#given a complete payload #when scanning #then nothing is missing", async (t) => {
