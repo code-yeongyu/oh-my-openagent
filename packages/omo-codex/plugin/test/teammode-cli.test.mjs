@@ -238,3 +238,30 @@ test("#given a symlinked .omo/teams #when init runs #then it refuses before writ
 		await rm(outside, { recursive: true, force: true });
 	}
 });
+
+test("#given team.mjs invoked through a symlinked scripts dir #when init runs #then the main guard still fires", async (t) => {
+	// given --- mirror a symlinked install: the skills dir is a symlink to the repo, so the
+	// script is invoked through a symlink path while node resolves its module url to the realpath.
+	if (!(await canCreateSymlink())) {
+		t.skip("symbolic links are unavailable in this environment");
+		return;
+	}
+	const dir = await mkTmp();
+	try {
+		const linkedScripts = join(dir, "linked-scripts");
+		await symlink(join(root, "skills", "teammode", "scripts"), linkedScripts, "dir");
+
+		// when --- run the script through the symlink path
+		const res = spawnSync(
+			process.execPath,
+			[join(linkedScripts, "team.mjs"), "init", "--name", "Crew", "--session-name", "s", "--session", "demo"],
+			{ cwd: dir, encoding: "utf8" },
+		);
+
+		// then --- main() runs (the guard matches by realpath, not the literal argv path)
+		assert.equal(res.status, 0, res.stderr);
+		assert.match(res.stdout, /created:/, "the script executes when invoked via a symlinked scripts dir");
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
