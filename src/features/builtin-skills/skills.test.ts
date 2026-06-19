@@ -88,8 +88,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(42)
-		expect(agentBrowserSkills).toHaveLength(42)
+		expect(defaultSkills).toHaveLength(29)
+		expect(agentBrowserSkills).toHaveLength(29)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -105,7 +105,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("dsl-core")
-		expect(skills.length).toBe(41)
+		expect(skills.length).toBe(28)
 	})
 
 	test("should return all skills when disabledSkills set is empty", () => {
@@ -116,7 +116,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(42)
+		expect(skills.length).toBe(29)
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
