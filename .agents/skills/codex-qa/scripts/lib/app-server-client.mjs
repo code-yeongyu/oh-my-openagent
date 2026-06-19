@@ -95,7 +95,12 @@ function main() {
   function finish() {
     if (finished) return;
     finished = true;
-    try { child.kill("SIGTERM"); } catch {}
+    try {
+      child.kill("SIGTERM");
+    } catch (error) {
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      stderr += `\n[driver] failed to terminate app-server: ${message}\n`;
+    }
     const summary = summarizeRun({ turnStatus, assistantText, threadId, turnId, expectHook: EXPECT, hooks, stderr });
     console.log(JSON.stringify(summary, null, 2));
     process.exit(summary.ok ? 0 : 1);
@@ -138,7 +143,12 @@ function main() {
       buf = buf.slice(nl + 1);
       if (!line) continue;
       let msg;
-      try { msg = JSON.parse(line); } catch { continue; }
+      try {
+        msg = JSON.parse(line);
+      } catch (error) {
+        if (error instanceof SyntaxError) continue;
+        throw error;
+      }
       handle(msg);
     }
   });
