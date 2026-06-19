@@ -72,10 +72,12 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 	if (!id?.trim()) throw new Error("member id is required");
 	if (!focus?.trim()) throw new Error("member focus is required - a concrete part, ownership area, or perspective");
 	if (!LENSES.includes(lens)) throw new Error(`invalid lens "${lens}" - use one of: ${LENSES.join(", ")}`);
-	if (team.members.some((m) => m.id === id)) throw new Error(`member id "${id}" already exists (duplicate)`);
+	const memberId = id.trim();
+	const memberFocus = focus.trim();
+	if (team.members.some((m) => m.id === memberId)) throw new Error(`member id "${memberId}" already exists (duplicate)`);
 	team.members.push({
-		id: id.trim(),
-		focus: focus.trim(),
+		id: memberId,
+		focus: memberFocus,
 		lens,
 		deliverable: deliverable.trim(),
 		threadId: null,
@@ -84,7 +86,7 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 		worktree: { path: null, branch: branch ?? null },
 		status: "pending",
 	});
-	return touch(team, "add-member", `member ${id.trim()} (${lens}): ${focus.trim()}`);
+	return touch(team, "add-member", `member ${memberId} (${lens}): ${memberFocus}`);
 }
 
 export function bindThread(team, { id, threadId, cwd = null, worktreePath = null }) {

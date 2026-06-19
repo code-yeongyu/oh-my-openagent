@@ -95,15 +95,16 @@ const handlers = {
 	async "add-member"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
 		const team = await readTeam(resolveTeamDir(cwd, sessionId));
+		const memberId = requireFlag(flags, "id").trim();
 		addMember(team, {
-			id: requireFlag(flags, "id"),
+			id: memberId,
 			focus: requireFlag(flags, "focus"),
 			lens: requireFlag(flags, "lens"),
 			deliverable: typeof flags.deliverable === "string" ? flags.deliverable : "",
 			branch: typeof flags.branch === "string" ? flags.branch : null,
 		});
 		await persist(team);
-		process.stdout.write(`added member ${flags.id} to team ${sessionId}.\n\nSend this as the new thread's first message (title it "${team.threadTitleConvention}"):\n---\n${buildMemberPrompt(team, flags.id)}\n---\n`);
+		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\nSend this as the new thread's first message (title it "${team.threadTitleConvention}"):\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
 	},
 
 	async "bind-thread"(cwd, flags) {
