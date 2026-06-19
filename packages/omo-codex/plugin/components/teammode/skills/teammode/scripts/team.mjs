@@ -157,8 +157,7 @@ const handlers = {
 
 	async delete(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const dir = resolveTeamDir(cwd, sessionId);
-		const team = await readTeam(dir);
+		const { dir, team } = await loadTeam(cwd, sessionId);
 		const active = team.members.filter((m) => m.status !== "archived");
 		if (flags.force !== true && (team.status !== "archived" || active.length > 0)) {
 			throw new Error(
