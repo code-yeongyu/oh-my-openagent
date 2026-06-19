@@ -15,6 +15,13 @@ const internalAllCompleteWake = `<system-reminder>
 [BACKGROUND TASK COMPLETED]
 [ALL BACKGROUND TASKS COMPLETE]
 </system-reminder>
+<!-- OMO_INTERNAL_INITIATOR -->
+<!-- OMO_INTERNAL_NOREPLY -->`
+
+const markerCollisionText = `<system-reminder>
+[BACKGROUND TASK COMPLETED]
+[ALL BACKGROUND TASKS COMPLETE]
+</system-reminder>
 <!-- OMO_INTERNAL_INITIATOR -->`
 
 function createClientForMessages(messages: unknown[]): OpencodeClient {
@@ -77,6 +84,65 @@ describe("pollSyncSession internal all-complete wakes", () => {
       {
         info: { id: "msg_003", role: "user", time: { created: 3000 } },
         parts: [{ type: "text", text: "please continue" }],
+      },
+    ])
+
+    // when
+    const result = await pollSyncSession(toolContext, client, {
+      sessionID: "ses_test",
+      agentToUse: "sisyphus",
+      toastManager: null,
+      taskId: undefined,
+    }, 50)
+
+    // then
+    expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test")
+  })
+
+  test("#given user task text collides with internal markers before terminal assistant turn #when polling #then the sync task completes", async () => {
+    // given
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 1,
+      MAX_POLL_TIME_MS: 50,
+    })
+    const client = createClientForMessages([
+      {
+        info: { id: "msg_001", role: "user", time: { created: 1000 } },
+        parts: [{ type: "text", text: `Please explain ${markerCollisionText}` }],
+      },
+      {
+        info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+        parts: [{ type: "text", text: "Done" }],
+      },
+    ])
+
+    // when
+    const result = await pollSyncSession(toolContext, client, {
+      sessionID: "ses_test",
+      agentToUse: "sisyphus",
+      toastManager: null,
+      taskId: undefined,
+    }, 50)
+
+    // then
+    expect(result).toBeNull()
+  })
+
+  test("#given latest user turn collides with internal markers but is not no-reply #when polling #then completion is not reported early", async () => {
+    // given
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 1,
+      MAX_POLL_TIME_MS: 50,
+    })
+    const client = createClientForMessages([
+      { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+      {
+        info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+        parts: [{ type: "text", text: "Done" }],
+      },
+      {
+        info: { id: "msg_003", role: "user", time: { created: 3000 } },
+        parts: [{ type: "text", text: markerCollisionText }],
       },
     ])
 

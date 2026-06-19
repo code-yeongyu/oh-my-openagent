@@ -2,13 +2,14 @@ import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
-import { normalizeSDKResponse } from "../../shared"
+import { isTerminalNoReplyUserMessage, normalizeSDKResponse } from "../../shared"
 import { extractErrorMessage } from "../../features/background-agent/error-classifier"
-import { isSessionComplete } from "./sync-session-completion"
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
-export { isSessionComplete } from "./sync-session-completion"
+const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
+const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
+const ALL_BACKGROUND_TASKS_COMPLETE_MARKER = "[ALL BACKGROUND TASKS COMPLETE]"
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -28,6 +29,37 @@ function abortSyncSession(client: OpencodeClient, sessionID: string, reason: str
 
 function isActiveSessionStatus(status: { type: string } | undefined): boolean {
   return status !== undefined && ACTIVE_SESSION_STATUSES.has(status.type)
+}
+
+function getTextParts(message: SessionMessage): string {
+  return (message.parts ?? [])
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("\n")
+}
+
+function isInternalAllCompleteWake(message: SessionMessage): boolean {
+  return isTerminalNoReplyUserMessage(message) && getTextParts(message).includes(ALL_BACKGROUND_TASKS_COMPLETE_MARKER)
+}
+
+export function isSessionComplete(messages: SessionMessage[]): boolean {
+  let lastRelevantUser: SessionMessage | undefined
+  let lastAssistant: SessionMessage | undefined
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
+    if (!lastRelevantUser && msg.info?.role === "user" && !isInternalAllCompleteWake(msg)) {
+      lastRelevantUser = msg
+    }
+    if (lastRelevantUser && lastAssistant) break
+  }
+
+  if (!lastAssistant?.info?.finish) return false
+  if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
+  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
+  if (!lastRelevantUser?.info?.id || !lastAssistant?.info?.id) return false
+  return lastRelevantUser.info.id < lastAssistant.info.id
 }
 
 async function fetchSessionMessages(
@@ -127,11 +159,12 @@ export async function pollSyncSession(
           finalMessages = await fetchSessionMessages(client, input.sessionID)
           break
         } catch (error) {
+          const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
           log("[task] Final messages fetch failed after abort, retrying", {
             sessionID: input.sessionID,
             attempt,
             maxAttempts: abortFetchAttempts,
-            error: String(error),
+            error: errorMessage,
           })
           if (attempt < abortFetchAttempts) {
             await wait(syncTiming.POLL_INTERVAL_MS)
@@ -186,7 +219,8 @@ export async function pollSyncSession(
     try {
       messages = await fetchSessionMessages(client, input.sessionID)
     } catch (error) {
-      log("[task] Poll messages fetch failed, retrying", { sessionID: input.sessionID, error: String(error) })
+      const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      log("[task] Poll messages fetch failed, retrying", { sessionID: input.sessionID, error: errorMessage })
       continue
     }
 
