@@ -23,6 +23,7 @@ type BoulderWork = {
 type BoulderState = {
 	readonly works: readonly BoulderWork[];
 	readonly mirrorWork: BoulderWork | null;
+	readonly hasWorksMap: boolean;
 };
 
 export type ContinuationState = {
@@ -117,7 +118,8 @@ function parseBoulderState(value: unknown): BoulderState | null {
 
 	const works: BoulderWork[] = [];
 	const worksValue = value["works"];
-	if (isRecord(worksValue)) {
+	const hasWorksMap = isRecord(worksValue);
+	if (hasWorksMap) {
 		for (const workValue of Object.values(worksValue)) {
 			const work = parseBoulderWork(workValue);
 			if (work !== null) works.push(work);
@@ -126,7 +128,7 @@ function parseBoulderState(value: unknown): BoulderState | null {
 
 	const mirrorWork = parseBoulderWork(value);
 	if (works.length === 0 && mirrorWork === null) return null;
-	return { works, mirrorWork };
+	return { works, mirrorWork, hasWorksMap };
 }
 
 function parseBoulderWork(value: unknown): BoulderWork | null {
@@ -168,6 +170,7 @@ function getWorkForSession(state: BoulderState, normalizedSessionId: string): Bo
 	}
 
 	if (newestWork !== null) return newestWork;
+	if (state.hasWorksMap) return null;
 	if (state.mirrorWork?.sessionIds.includes(normalizedSessionId) === true) return state.mirrorWork;
 	return null;
 }
