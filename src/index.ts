@@ -80,10 +80,6 @@ const MatrixxPlugin: Plugin = async (ctx) => {
       output: { context: string[] },
     ): Promise<void> => {
       await hooks.compactionTodoPreserver?.capture(_input.sessionID)
-      await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
-        _input,
-        output,
-      )
       if (hooks.compactionContextInjector) {
         output.context.push(hooks.compactionContextInjector(_input.sessionID))
       }

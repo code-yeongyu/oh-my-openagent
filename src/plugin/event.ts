@@ -31,7 +31,6 @@ export function createEventHandler(args: {
 
   const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
-    await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
     await Promise.resolve(hooks.sessionNotification?.(input))
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input))

@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { MatrixLoopOptions, MatrixLoopState } from "./types"
-import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
+import { getTranscriptPath as getDefaultTranscriptPath } from "../../shared/transcript-path"
 import { createLoopSessionRecovery } from "./loop-session-recovery"
 import { createLoopStateController } from "./loop-state-controller"
 import { createMatrixLoopEventHandler } from "./matrix-loop-event-handler"

@@ -29,28 +29,27 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 			} as any,
 			hooks: {
 				autoUpdateChecker: { event: mockDispatchToHooks as any },
-				claudeCodeHooks: { event: async () => {} },
-				backgroundNotificationHook: { event: async () => {} },
-				sessionNotification: async () => {},
-				todoContinuationEnforcer: { handler: async () => {} },
-				unstableAgentBabysitter: { event: async () => {} },
-				contextWindowMonitor: { event: async () => {} },
-				directoryAgentsInjector: { event: async () => {} },
-				directoryReadmeInjector: { event: async () => {} },
-				rulesInjector: { event: async () => {} },
-				thinkMode: { event: async () => {} },
-				anthropicContextWindowLimitRecovery: { event: async () => {} },
-				agentUsageReminder: { event: async () => {} },
-				categorySkillReminder: { event: async () => {} },
-				interactiveBashSession: { event: async () => {} },
-				matrixLoop: { event: async () => {} },
-				stopContinuationGuard: { event: async () => {} },
-				compactionTodoPreserver: { event: async () => {} },
-				atlasHook: { handler: async () => {} },
-			} as any,
-		})
+			backgroundNotificationHook: { event: async () => {} },
+			sessionNotification: async () => {},
+			todoContinuationEnforcer: { handler: async () => {} },
+			unstableAgentBabysitter: { event: async () => {} },
+			contextWindowMonitor: { event: async () => {} },
+			directoryAgentsInjector: { event: async () => {} },
+			directoryReadmeInjector: { event: async () => {} },
+			rulesInjector: { event: async () => {} },
+			thinkMode: { event: async () => {} },
+			anthropicContextWindowLimitRecovery: { event: async () => {} },
+			agentUsageReminder: { event: async () => {} },
+			categorySkillReminder: { event: async () => {} },
+			interactiveBashSession: { event: async () => {} },
+			matrixLoop: { event: async () => {} },
+			stopContinuationGuard: { event: async () => {} },
+			compactionTodoPreserver: { event: async () => {} },
+			atlasHook: { handler: async () => {} },
+		} as any,
+	})
 
-		const sessionId = "ses_test123"
+	const sessionId = "ses_test123"
 
 		//#when - session.status with idle (generates synthetic idle first)
 		await eventHandler({
@@ -106,7 +105,6 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 			} as any,
 			hooks: {
 				autoUpdateChecker: { event: mockDispatchToHooks as any },
-				claudeCodeHooks: { event: async () => {} },
 				backgroundNotificationHook: { event: async () => {} },
 				sessionNotification: async () => {},
 				todoContinuationEnforcer: { handler: async () => {} },
@@ -176,7 +174,6 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 			} as any,
 			hooks: {
 				autoUpdateChecker: { event: async () => {} },
-				claudeCodeHooks: { event: async () => {} },
 				backgroundNotificationHook: { event: async () => {} },
 				sessionNotification: async () => {},
 				todoContinuationEnforcer: { handler: async () => {} },
@@ -269,7 +266,6 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 						dispatchCalls.push(input)
 					},
 				},
-				claudeCodeHooks: { event: async () => {} },
 				backgroundNotificationHook: { event: async () => {} },
 				sessionNotification: async () => {},
 				todoContinuationEnforcer: { handler: async () => {} },
@@ -327,7 +323,6 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 						}
 					},
 				},
-				claudeCodeHooks: { event: async () => {} },
 				backgroundNotificationHook: { event: async () => {} },
 				sessionNotification: async () => {},
 				todoContinuationEnforcer: { handler: async () => {} },

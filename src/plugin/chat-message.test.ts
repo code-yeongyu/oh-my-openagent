@@ -20,7 +20,6 @@ function createMockHandlerArgs(overrides?: {
     hooks: {
       stopContinuationGuard: null,
       keywordDetector: null,
-      claudeCodeHooks: null,
       autoSlashCommand: null,
       startWork: null,
       ralphLoop: null,

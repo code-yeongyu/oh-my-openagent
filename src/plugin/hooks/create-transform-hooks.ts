@@ -2,7 +2,6 @@ import type { MatrixxConfig } from "../../config"
 import type { PluginContext } from "../types"
 
 import {
-  createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
   createToolPairValidatorHook,
@@ -14,7 +13,6 @@ import {
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
 export type TransformHooks = {
-  claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook>
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
@@ -29,15 +27,6 @@ export function createTransformHooks(args: {
 }): TransformHooks {
   const { ctx, pluginConfig, isHookEnabled } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
-
-  const claudeCodeHooks = createClaudeCodeHooksHook(
-    ctx,
-    {
-      disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
-      keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
-    },
-    contextCollector,
-  )
 
   const keywordDetector = isHookEnabled("keyword-detector")
     ? safeCreateHook(
@@ -67,7 +56,6 @@ export function createTransformHooks(args: {
     : null
 
   return {
-    claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,

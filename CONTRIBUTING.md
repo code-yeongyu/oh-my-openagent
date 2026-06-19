@@ -147,7 +147,7 @@ bun run build:schema
 |------------|------|
 | Package Manager | **Bun only** (`bun run`, `bun build`, `bunx`) |
 | Types | Use `bun-types`, not `@types/node` |
-| Directory Naming | kebab-case (`ast-grep/`, `claude-code-hooks/`) |
+| Directory Naming | kebab-case (`ast-grep/`, `keyword-detector/`) |
 | File Operations | Never use bash commands (mkdir/touch/rm) for file creation in code |
 | Tool Structure | Each tool: `index.ts`, `types.ts`, `constants.ts`, `tools.ts`, `utils.ts` |
 | Hook Pattern | `createXXXHook(input: PluginInput)` function naming |
