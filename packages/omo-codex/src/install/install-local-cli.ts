@@ -35,6 +35,7 @@ export async function runLazyCodexInstallLocalCli(input: {
   readonly argv: readonly string[]
   readonly defaultRepoRoot: string
   readonly entrypointPath: string
+  readonly invokedPath?: string
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
   readonly log: (line: string) => void
@@ -68,7 +69,7 @@ export async function runLazyCodexInstallLocalCli(input: {
       input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
       return 0
     }
-    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log })
+    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath })
   }
 
   const repoRoot = parsed.repoRoot ? resolve(parsed.repoRoot) : input.defaultRepoRoot
