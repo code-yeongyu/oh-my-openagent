@@ -46,10 +46,18 @@ FAKE_LLM_LOG=""     # set after evidence dir is known
 while [ $# -gt 0 ]; do
   case "$1" in
     --expect)
+      if [ $# -lt 2 ] || [ "${2#--}" != "$2" ]; then
+        printf 'error: --expect requires reproduced or fixed\n' >&2
+        exit 2
+      fi
       EXPECT_MODE="$2"
       shift 2
       ;;
     --evidence-dir)
+      if [ $# -lt 2 ] || [ "${2#--}" != "$2" ]; then
+        printf 'error: --evidence-dir requires a directory\n' >&2
+        exit 2
+      fi
       EVIDENCE_DIR="$2"
       shift 2
       ;;
@@ -513,6 +521,33 @@ swsp_self_test() {
       swsp_log "FAIL: fake-LLM /health did not return 200"
       fails=$((fails+1))
     fi
+  fi
+
+  local missing_expect_out missing_expect_err missing_evidence_out missing_evidence_err
+  missing_expect_out="$(mktemp -t swsp-missing-expect-out.XXXXXX)"
+  missing_expect_err="$(mktemp -t swsp-missing-expect-err.XXXXXX)"
+  missing_evidence_out="$(mktemp -t swsp-missing-evidence-out.XXXXXX)"
+  missing_evidence_err="$(mktemp -t swsp-missing-evidence-err.XXXXXX)"
+  OQA_TMPDIRS+=("$missing_expect_out" "$missing_expect_err" "$missing_evidence_out" "$missing_evidence_err")
+
+  if bash "${BASH_SOURCE[0]}" --expect >"$missing_expect_out" 2>"$missing_expect_err"; then
+    swsp_log "FAIL: missing --expect operand unexpectedly succeeded"
+    fails=$((fails+1))
+  elif grep -q "error: --expect requires reproduced or fixed" "$missing_expect_err"; then
+    swsp_info "PASS: missing --expect operand fails with usage error"
+  else
+    swsp_log "FAIL: missing --expect operand did not emit usage error"
+    fails=$((fails+1))
+  fi
+
+  if bash "${BASH_SOURCE[0]}" --evidence-dir --self-test >"$missing_evidence_out" 2>"$missing_evidence_err"; then
+    swsp_log "FAIL: missing --evidence-dir operand unexpectedly succeeded"
+    fails=$((fails+1))
+  elif grep -q "error: --evidence-dir requires a directory" "$missing_evidence_err"; then
+    swsp_info "PASS: missing --evidence-dir operand fails with usage error"
+  else
+    swsp_log "FAIL: missing --evidence-dir operand did not emit usage error"
+    fails=$((fails+1))
   fi
 
   # Sandbox + opencode serve
