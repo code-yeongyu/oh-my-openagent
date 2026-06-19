@@ -132,11 +132,14 @@ export function createModelFallbackEventHandler(args: {
       }
       if (continuation.shouldSkipFallbackContinuation(sessionID, source, continuationContext)) return;
 
+      const dispatchDedupeContext = fallbackContext.dedupeProviderID
+        ? fallbackContext
+        : { ...fallbackContext, dedupeProviderID: currentProvider };
       const dispatched = await continuation.autoContinueAfterFallback(
         sessionID,
         source,
         continuationContext,
-        fallbackContext,
+        dispatchDedupeContext,
       );
       if (dispatched) {
         const advancedFallback = args.modelFallback?.getNextFallback?.(sessionID);
