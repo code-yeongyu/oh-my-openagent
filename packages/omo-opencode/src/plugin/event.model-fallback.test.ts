@@ -690,6 +690,113 @@ describe("createEventHandler - model fallback", () => {
     })
   })
 
+  test("clears prior fallback prompt params before provider-only fallback retry", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_provider_only_clears_prior_fallback_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    const { handler, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - first fallback with overrides is selected.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_provider_only_clears_prior_params_first",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_provider_only_clears_prior_params_first",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    //#when - the override fallback fails and the next fallback has no generation overrides.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_provider_only_clears_prior_params_second",
+            sessionID,
+            role: "assistant",
+            time: { created: 3, completed: 4 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: gpt-5.5 is not supported",
+            },
+            parentID: "msg_user_provider_only_clears_prior_params_second",
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - fallback A's override params do not leak into fallback B.
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(promptInputs[1]?.body).not.toHaveProperty("reasoningEffort")
+    expect(promptInputs[1]?.body).not.toHaveProperty("temperature")
+    expect(promptInputs[1]?.body).not.toHaveProperty("top_p")
+    expect(promptInputs[1]?.body).not.toHaveProperty("maxTokens")
+    expect(promptInputs[1]?.body).not.toHaveProperty("thinking")
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
   test("keeps selected fallback prompt params when prompt gate skip leaves fallback pending for manual resume", async () => {
     //#given
     const sessionID = "ses_auto_continuation_skipped_keeps_prompt_params_for_resume"

@@ -16,6 +16,7 @@ import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-c
 import { getSessionModel } from "../shared/session-model-state";
 import {
   armPendingFallbackPromptParamsRestore,
+  clearSessionPromptParams,
   getSessionPromptParams,
   type SessionPromptParams,
   setSessionPromptParams,
@@ -55,21 +56,29 @@ function hasFallbackPromptParamOverrides(fallbackContext: FallbackContinuationCo
     || fallbackContext?.thinking !== undefined;
 }
 
+function restoreSessionPromptParams(sessionID: string, promptParams: SessionPromptParams | undefined): void {
+  if (promptParams) {
+    setSessionPromptParams(sessionID, promptParams);
+  } else {
+    clearSessionPromptParams(sessionID);
+  }
+}
+
 function applyFallbackPromptParamOverrides(
   sessionID: string,
   fallbackContext: FallbackContinuationContext | undefined,
-  previousPromptParams: SessionPromptParams | undefined,
+  basePromptParams: SessionPromptParams | undefined,
 ): boolean {
   if (!hasFallbackPromptParamOverrides(fallbackContext)) return false;
 
-  const previousOptions = previousPromptParams?.options ?? {};
+  const previousOptions = basePromptParams?.options ?? {};
   const options = {
     ...previousOptions,
     ...(fallbackContext?.reasoningEffort !== undefined ? { reasoningEffort: fallbackContext.reasoningEffort } : {}),
     ...(fallbackContext?.thinking !== undefined ? { thinking: fallbackContext.thinking } : {}),
   };
   setSessionPromptParams(sessionID, {
-    ...(previousPromptParams ?? {}),
+    ...(basePromptParams ?? {}),
     ...(fallbackContext?.temperature !== undefined ? { temperature: fallbackContext.temperature } : {}),
     ...(fallbackContext?.top_p !== undefined ? { topP: fallbackContext.top_p } : {}),
     ...(fallbackContext?.maxTokens !== undefined ? { maxOutputTokens: fallbackContext.maxTokens } : {}),
@@ -105,6 +114,7 @@ export function createModelFallbackContinuationController(args: {
 }) {
   const { pluginConfig, pluginContext, lastKnownModelBySession, continuationsInFlight } = args;
   const lastDispatchedContinuationKeys = args.lastDispatchedContinuationKeys;
+  const fallbackPromptParamRestoreBySession = new Map<string, SessionPromptParams | undefined>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const normalizedProviderHint = providerHint?.trim();
@@ -210,6 +220,9 @@ export function createModelFallbackContinuationController(args: {
     let dispatched = false;
     let promptParamsApplied = false;
     const previousPromptParams = getSessionPromptParams(sessionID);
+    const fallbackPromptParamsBase = fallbackPromptParamRestoreBySession.has(sessionID)
+      ? fallbackPromptParamRestoreBySession.get(sessionID)
+      : previousPromptParams;
     try {
       try {
         await pluginContext.client.session.abort({ path: { id: sessionID } });
@@ -237,7 +250,15 @@ export function createModelFallbackContinuationController(args: {
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
       const launchVariant = fallbackContext?.variant ?? (agentSettings as { variant?: string } | undefined)?.variant;
-      promptParamsApplied = applyFallbackPromptParamOverrides(sessionID, fallbackContext, previousPromptParams);
+      if (hasFallbackPromptParamOverrides(fallbackContext)) {
+        if (!fallbackPromptParamRestoreBySession.has(sessionID)) {
+          fallbackPromptParamRestoreBySession.set(sessionID, previousPromptParams);
+        }
+        promptParamsApplied = applyFallbackPromptParamOverrides(sessionID, fallbackContext, fallbackPromptParamsBase);
+      } else if (fallbackPromptParamRestoreBySession.has(sessionID)) {
+        restoreSessionPromptParams(sessionID, fallbackPromptParamsBase);
+        fallbackPromptParamRestoreBySession.delete(sessionID);
+      }
       const promptBody = {
         path: { id: sessionID },
         body: {
