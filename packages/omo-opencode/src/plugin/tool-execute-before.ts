@@ -11,6 +11,23 @@ import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
 
 import type { CreatedHooks } from "../create-hooks"
+import type { BackgroundManager } from "../features/background-agent"
+
+const BACKGROUND_WAIT_BLOCK_MESSAGE = [
+  "Background task wait is already managed by the plugin.",
+  "End this response now and wait for the <system-reminder> completion notification.",
+  "After that reminder arrives, call background_output with the task_id from the launch result.",
+].join(" ")
+
+function isPureSleepCommand(command: string): boolean {
+  const commandLines = command
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"))
+
+  return commandLines.length > 0
+    && commandLines.every((line) => /^sleep\s+\d+(?:\.\d+)?[smhd]?\s*$/i.test(line))
+}
 
 function getLoopCommandArguments(args: Record<string, unknown>, command: "ralph-loop" | "ulw-loop"): string {
   const rawUserMessage = typeof args.user_message === "string" ? args.user_message.trim() : ""
@@ -25,11 +42,12 @@ function getLoopCommandArguments(args: Record<string, unknown>, command: "ralph-
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
+  backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks">
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks } = args
+  const { ctx, hooks, backgroundManager } = args
 
   function buildUltraworkOracleVerificationPrompt(prompt: string, originalTask: string, verificationAttemptId: string): string {
     const verificationPrompt = [
@@ -72,6 +90,13 @@ export function createToolExecuteBeforeHandler(args: {
           sessionID: input.sessionID,
           callID: input.callID,
         })
+      }
+
+      if (
+        isPureSleepCommand(output.args.command)
+        && backgroundManager?.hasActiveChildTasks(input.sessionID) === true
+      ) {
+        throw new Error(BACKGROUND_WAIT_BLOCK_MESSAGE)
       }
     }
 
