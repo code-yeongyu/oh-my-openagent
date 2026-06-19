@@ -105,12 +105,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     pluginComponentsPromise ??= loadPluginComponents({ pluginConfig });
     const pluginComponents = await pluginComponentsPromise;
+    const pluginComponentsLoadFailed = pluginComponents.retryableLoadFailure === true;
+    if (pluginComponentsLoadFailed) {
+      pluginComponentsPromise = undefined;
+    }
 
     applyHookConfig({ pluginComponents });
 
     const agentCacheKey = createAgentConfigCacheKey(config);
     let agentResult: Record<string, unknown>;
-    if (agentConfigSnapshot?.cacheKey === agentCacheKey) {
+    if (!pluginComponentsLoadFailed && agentConfigSnapshot?.cacheKey === agentCacheKey) {
       config.agent = cloneAgentConfig(agentConfigSnapshot.agents);
       if (agentConfigSnapshot.defaultAgent !== undefined) {
         config.default_agent = agentConfigSnapshot.defaultAgent;
@@ -129,12 +133,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ctx,
         pluginComponents,
       });
-      agentConfigSnapshot = {
-        cacheKey: agentCacheKey,
-        configuredDefaultAgent,
-        defaultAgent: config.default_agent,
-        agents: cloneAgentConfig(agentResult),
-      };
+      agentConfigSnapshot = pluginComponentsLoadFailed
+        ? undefined
+        : {
+            cacheKey: agentCacheKey,
+            configuredDefaultAgent,
+            defaultAgent: config.default_agent,
+            agents: cloneAgentConfig(agentResult),
+          };
     }
 
     applyToolConfig({ config, pluginConfig, agentResult });
