@@ -174,12 +174,29 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     void Promise.resolve(onCleared?.({ sessionID })).catch(() => {})
   }
 
+  const setPending = (
+    sessionID: string,
+    agentName: string,
+    currentProviderID: string,
+    currentModelID: string,
+  ): boolean => {
+    const hadAutoContinuationMarker = autoContinuationPendingSessions.has(sessionID)
+    const armed = controller.setPendingModelFallback(
+      sessionID,
+      agentName,
+      currentProviderID,
+      currentModelID,
+    )
+    if (armed && hadAutoContinuationMarker) autoContinuationPendingSessions.delete(sessionID)
+    return armed
+  }
+
   return {
     lastToastKey: controller.lastToastKey,
     setSessionFallbackChain: controller.setSessionFallbackChain,
     getSessionFallbackChain: controller.getSessionFallbackChain,
     clearSessionFallbackChain: controller.clearSessionFallbackChain,
-    setPendingModelFallback: controller.setPendingModelFallback,
+    setPendingModelFallback: setPending,
     getNextFallback: controller.getNextFallback,
     clearPendingModelFallback: clearPending,
     clearLastFailedModelFallback: controller.clearLastFailedModelFallback,
