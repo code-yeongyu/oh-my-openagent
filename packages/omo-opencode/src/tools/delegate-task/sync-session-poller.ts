@@ -1,15 +1,14 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
+import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
-import { isTerminalNoReplyUserMessage, normalizeSDKResponse } from "../../shared"
-import { extractErrorMessage } from "../../features/background-agent/error-classifier"
+import { normalizeSDKResponse } from "../../shared"
+
+export { isSessionComplete } from "./sync-session-turns"
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
-const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
-const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
-const ALL_BACKGROUND_TASKS_COMPLETE_MARKER = "[ALL BACKGROUND TASKS COMPLETE]"
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -31,37 +30,6 @@ function isActiveSessionStatus(status: { type: string } | undefined): boolean {
   return status !== undefined && ACTIVE_SESSION_STATUSES.has(status.type)
 }
 
-function getTextParts(message: SessionMessage): string {
-  return (message.parts ?? [])
-    .filter((part) => part.type === "text")
-    .map((part) => part.text ?? "")
-    .join("\n")
-}
-
-function isInternalAllCompleteWake(message: SessionMessage): boolean {
-  return isTerminalNoReplyUserMessage(message) && getTextParts(message).includes(ALL_BACKGROUND_TASKS_COMPLETE_MARKER)
-}
-
-export function isSessionComplete(messages: SessionMessage[]): boolean {
-  let lastRelevantUser: SessionMessage | undefined
-  let lastAssistant: SessionMessage | undefined
-
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
-    if (!lastRelevantUser && msg.info?.role === "user" && !isInternalAllCompleteWake(msg)) {
-      lastRelevantUser = msg
-    }
-    if (lastRelevantUser && lastAssistant) break
-  }
-
-  if (!lastAssistant?.info?.finish) return false
-  if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
-  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
-  if (!lastRelevantUser?.info?.id || !lastAssistant?.info?.id) return false
-  return lastRelevantUser.info.id < lastAssistant.info.id
-}
-
 async function fetchSessionMessages(
   client: OpencodeClient,
   sessionID: string
@@ -69,20 +37,6 @@ async function fetchSessionMessages(
   const messagesResult = await client.session.messages({ path: { id: sessionID } })
   const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
   return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
-}
-
-function getTerminalSessionError(messages: SessionMessage[]): string | null {
-  const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
-  const lastUser = [...messages].reverse().find((msg) => msg.info?.role === "user")
-  if (lastUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastUser.info.id) {
-    return null
-  }
-  if (!lastAssistant?.info || !("error" in lastAssistant.info)) {
-    return null
-  }
-
-  const errorMessage = extractErrorMessage((lastAssistant.info as { error?: unknown }).error)
-  return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
 }
 
 const DEFAULT_MAX_ASSISTANT_TURNS = 300
