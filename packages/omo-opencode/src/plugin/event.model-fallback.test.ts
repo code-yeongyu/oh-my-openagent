@@ -535,9 +535,9 @@ describe("createEventHandler - model fallback", () => {
     })
   })
 
-  test("restores previous prompt params when fallback continuation is skipped by prompt gate", async () => {
+  test("keeps selected fallback prompt params when prompt gate skip leaves fallback pending for manual resume", async () => {
     //#given
-    const sessionID = "ses_auto_continuation_skipped_restores_prompt_params"
+    const sessionID = "ses_auto_continuation_skipped_keeps_prompt_params_for_resume"
     setMainSession(sessionID)
     setSessionPromptParams(sessionID, {
       temperature: 0.2,
@@ -567,12 +567,35 @@ describe("createEventHandler - model fallback", () => {
       }),
       sessionID,
       input: { path: { id: sessionID }, body: { parts: [] } },
-      source: "test:fallback-param-restore:hold",
+      source: "test:fallback-param-resume:hold",
       settleMs: 0,
     })
     const { handler, abortCalls, promptCalls, promptAsyncCalls } = createHandler({
       hooks: { modelFallback },
       promptAsync: async () => ({}),
+    })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
     })
 
     //#when
@@ -581,7 +604,7 @@ describe("createEventHandler - model fallback", () => {
         type: "message.updated",
         properties: {
           info: {
-            id: "msg_auto_continuation_skipped_restores_prompt_params",
+            id: "msg_auto_continuation_skipped_keeps_prompt_params_for_resume",
             sessionID,
             role: "assistant",
             time: { created: 1, completed: 2 },
@@ -589,7 +612,7 @@ describe("createEventHandler - model fallback", () => {
               name: "ModelNotSupportedError",
               message: "model_not_supported: claude-opus-4-7 is not supported",
             },
-            parentID: "msg_user_auto_continuation_skipped_restores_prompt_params",
+            parentID: "msg_user_auto_continuation_skipped_keeps_prompt_params_for_resume",
             modelID: "claude-opus-4-7",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
@@ -599,14 +622,46 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    //#then
+    //#then - the gate skipped the internal retry, so the pending fallback remains for manual resume.
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([])
     expect(promptAsyncCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
     expect(getSessionPromptParams(sessionID)).toEqual({
-      temperature: 0.2,
-      topP: 0.8,
-      options: { reasoningEffort: "low" },
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    //#when - a real user resume consumes the same fallback model.
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then - the manually consumed fallback keeps its selected generation params.
+    expect(output.message["model"]).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
     })
   })
 
