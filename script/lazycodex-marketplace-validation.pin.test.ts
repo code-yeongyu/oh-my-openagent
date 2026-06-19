@@ -9,20 +9,6 @@ async function writePluginMcpManifest(pluginRoot: string, manifest: unknown): Pr
   await writeFile(join(pluginRoot, ".mcp.json"), `${JSON.stringify(manifest, null, 2)}\n`)
 }
 
-async function expectRejectsWith(promise: Promise<void>, expectedMessage: string): Promise<void> {
-  let validationError: unknown
-  try {
-    await promise
-  } catch (error) {
-    validationError = error
-  }
-  if (!(validationError instanceof Error)) {
-    expect(validationError).toBeInstanceOf(Error)
-    return
-  }
-  expect(validationError.message).toContain(expectedMessage)
-}
-
 describe("lazycodex marketplace validation guards", () => {
   test("#given a root per-hook manifest references a missing command #when validating the plugin bundle #then the target is rejected", async () => {
     // given
@@ -55,7 +41,7 @@ describe("lazycodex marketplace validation guards", () => {
       const validated = validateLazycodexPluginBundle(pluginRoot)
 
       // then
-      await expectRejectsWith(validated, "missing hook command target")
+      await expect(validated).rejects.toThrow("missing hook command target")
     } finally {
       await rm(pluginRoot, { recursive: true, force: true })
     }
@@ -71,7 +57,7 @@ describe("lazycodex marketplace validation guards", () => {
       const validated = validateLazycodexPluginBundle(pluginRoot)
 
       // then
-      await expectRejectsWith(validated, "mcpServers must be object")
+      await expect(validated).rejects.toThrow("mcpServers must be object")
     } finally {
       await rm(pluginRoot, { recursive: true, force: true })
     }
@@ -87,7 +73,7 @@ describe("lazycodex marketplace validation guards", () => {
       const validated = validateLazycodexPluginBundle(pluginRoot)
 
       // then
-      await expectRejectsWith(validated, "invalid MCP manifest")
+      await expect(validated).rejects.toThrow("invalid MCP manifest")
     } finally {
       await rm(pluginRoot, { recursive: true, force: true })
     }
