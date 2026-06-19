@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildGuide, buildMemberPrompt } from "./team-guide.mjs";
 import {
@@ -33,6 +33,7 @@ import {
 	resolveTeamDir,
 	setMemberStatus,
 	teamExists,
+	writeGuideAtomic,
 	writeTeamAtomic,
 } from "./team-state.mjs";
 
@@ -64,7 +65,7 @@ function requireFlag(flags, name) {
 
 async function persist(team) {
 	await writeTeamAtomic(team);
-	await writeFile(team.paths.guide, buildGuide(team), "utf8");
+	await writeGuideAtomic(team, buildGuide(team));
 }
 
 const handlers = {
@@ -178,7 +179,7 @@ const handlers = {
 	async guide(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
 		const team = await readTeam(resolveTeamDir(cwd, sessionId));
-		await writeFile(team.paths.guide, buildGuide(team), "utf8");
+		await writeGuideAtomic(team, buildGuide(team));
 		process.stdout.write(`${team.paths.guide}\n`);
 	},
 };

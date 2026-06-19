@@ -169,13 +169,30 @@ export async function teamExists(dir) {
 	return (await lstatOrNull(join(dir, "team.json"))) !== null;
 }
 
-export async function writeTeamAtomic(team) {
+async function persistedFileTarget(team, pathKey, fileName) {
 	validateTeam(team);
-	const target = team.paths.team;
+	if (!team.paths?.dir || !team.paths?.[pathKey]) throw new Error(`invalid team: paths.${pathKey} is required`);
+	const dir = resolve(team.paths.dir);
+	const target = resolve(team.paths[pathKey]);
+	if (target !== resolve(dir, fileName)) throw new Error(`refused: ${fileName} persist target escapes team dir: ${team.paths[pathKey]}`);
 	const st = await lstatOrNull(target);
-	if (st?.isSymbolicLink()) throw new Error(`refused: team.json is a symlink: ${target}`);
-	const tmp = `${target}.tmp-${process.pid}`;
-	await writeFile(tmp, `${JSON.stringify(team, null, 2)}\n`, "utf8");
+	if (st?.isSymbolicLink()) throw new Error(`refused: ${fileName} is a symlink: ${target}`);
+	if (st && !st.isFile()) throw new Error(`refused: ${fileName} is not a file: ${target}`);
+	return target;
+}
+
+async function writePersistedFileAtomic(team, pathKey, fileName, content) {
+	const target = await persistedFileTarget(team, pathKey, fileName);
+	const tmp = `${target}.tmp-${process.pid}-${randomUUID()}`;
+	await writeFile(tmp, content, { encoding: "utf8", flag: "wx" });
 	await rename(tmp, target);
 	return team;
+}
+
+export async function writeTeamAtomic(team) {
+	return writePersistedFileAtomic(team, "team", "team.json", `${JSON.stringify(team, null, 2)}\n`);
+}
+
+export async function writeGuideAtomic(team, content) {
+	return writePersistedFileAtomic(team, "guide", "guide.md", content);
 }
