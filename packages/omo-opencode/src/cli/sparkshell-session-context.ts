@@ -222,7 +222,7 @@ function formatSessionContextBlock(sessionId: string, context: ExtractedSessionC
   }
 
   const lines: string[] = [
-    "===== codex session context (auto-attached by sparkshell) =====",
+    "===== codex session context (for sparkshell relevance ranking) =====",
     `thread: ${sessionId} | ${context.userMessageCount} user request(s), ${context.conversationMessageCount} conversation message(s) so far`,
   ]
   if (metaParts.length > 0) {
@@ -246,7 +246,7 @@ function formatSessionContextBlock(sessionId: string, context: ExtractedSessionC
 
   lines.push(
     "",
-    "Combine this session context with the shell result above to keep follow-up instructions aligned with the user's actual goals.",
+    "Use this session context only to rank command-output relevance; do not echo it in the command output.",
     "===== end codex session context =====",
   )
   return lines.join("\n")

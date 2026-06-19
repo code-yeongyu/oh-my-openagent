@@ -22,6 +22,7 @@ export const expectedSkills = [
 	"review-work",
 	"rules",
 	"start-work",
+	"teammode",
 	"ultraresearch",
 	"ulw-loop",
 	"ulw-plan",
@@ -32,6 +33,7 @@ export const componentSkillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
+	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];

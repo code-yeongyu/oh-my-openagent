@@ -54,3 +54,17 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/web
           command: ${{ inputs.environment && format('deploy --env {0}', inputs.environment) || 'deploy' }}
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: Web deploy
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the web app with OpenNext for Cloudflare.
+            - Deploys the Worker through Wrangler.
+            - Uses the requested Wrangler environment when provided.
+          JOB_SUMMARY_NEXT: Check build output first, then Wrangler authentication, account, or environment errors.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

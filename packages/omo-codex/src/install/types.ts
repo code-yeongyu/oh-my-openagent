@@ -19,7 +19,7 @@ export interface MarketplaceManifest {
 export interface PluginManifest {
   readonly name: string
   readonly version?: string
-  readonly hooks?: string
+  readonly hooks?: string | readonly string[]
 }
 
 export interface InstalledPlugin {

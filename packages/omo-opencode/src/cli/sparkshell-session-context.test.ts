@@ -138,6 +138,8 @@ describe("sparkshell session context", () => {
 
     // then
     expect(block).toContain("codex session context")
+    expect(block).toContain("for sparkshell relevance ranking")
+    expect(block).not.toContain("auto-attached")
     expect(block).toContain(`thread: ${SESSION_ID}`)
     expect(block).toContain("workspace: /work/repo")
     expect(block).toContain("originator: codex-tui")
@@ -169,6 +171,7 @@ describe("sparkshell session context", () => {
     expect(details?.firstUserRequest).toBe("first request: fix the flaky login test")
     expect(details?.latestUserRequest).toBe("latest request: ship it after green tests")
     expect(details?.block).toContain("codex session context")
+    expect(details?.block).toContain("do not echo it in the command output")
   })
 
   test("#given the kill switch #when loading details #then returns null", () => {

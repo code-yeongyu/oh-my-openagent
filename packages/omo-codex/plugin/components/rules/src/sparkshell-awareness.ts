@@ -85,9 +85,9 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env, dep
 		`- Use \`${command} sparkshell --shell '<command>'\` only when shell metacharacters are required.`,
 		`- Use \`${command} sparkshell --tmux-pane <pane-id> --tail-lines 400\` to inspect an existing tmux pane. Tail lines must stay between 100 and 1000.`,
 		"- When no native sidecar or appserver is available, Sparkshell silently falls back to raw command execution. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
-		"- When `CODEX_THREAD_ID` identifies a Codex session, Sparkshell appends recent session context (first/latest user request + last 5 conversation messages) after the shell result so output consumers stay aligned with the session goals. `OMO_SPARKSHELL_SESSION_CONTEXT=0` disables it.",
+		"- When `CODEX_THREAD_ID` identifies a Codex session, Sparkshell feeds recent session context (first/latest user request + last 5 conversation messages) into oversized-output condensation for relevance ranking, but never appends that context to command output. `OMO_SPARKSHELL_SESSION_CONTEXT=0` disables the lookup.",
 		`- Route potentially huge output (full log files, big diffs, \`cat\`/\`grep\` over large artifacts) through \`${command} sparkshell\` instead of reading it raw: oversized output is condensed to a budget while preserving error signatures, repeated patterns, session-goal-relevant lines, and head/tail. Tune with \`--budget <chars>\`; disable with \`OMO_SPARKSHELL_CONDENSE=0\`.`,
-		"- Oversized output is first summarized by the spark model (`codex exec`, default `gpt-5.3-codex-spark`) fed with the session context: the summary reproduces the output as-is (no masking) and ends with a `[sparkshell caption]` line describing what ran and which lines were omitted. `OMO_SPARKSHELL_SPARK=0` skips the model and uses deterministic condensation directly.",
+		"- Oversized output is first summarized by the spark model (`codex exec`, default `gpt-5.3-codex-spark`) fed with the shell output plus session context: the summary keeps selected output as-is (no masking) and ends with a `[sparkshell caption]` line describing what ran, what the full output contained, and which lines were omitted. `OMO_SPARKSHELL_SPARK=0` skips the model and uses deterministic condensation directly.",
 	].join("\n");
 }
 

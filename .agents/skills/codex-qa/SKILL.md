@@ -12,7 +12,7 @@ an isolated `CODEX_HOME` + a local mock model means no real API call and the rea
 that asserts its scenario against the live machine, so the scripts are both the
 QA tools and their own regression checks.
 
-Verified against `codex-cli 0.139.0` (node, jq, tmux, bun on macOS). Confirm with
+Verified against `codex-cli 0.140.0` (node, jq, tmux, bun on macOS). Confirm with
 `codex --version`; check a flag with `codex <cmd> --help`.
 
 ## Golden rules (read before running anything)
@@ -41,6 +41,12 @@ Verified against `codex-cli 0.139.0` (node, jq, tmux, bun on macOS). Confirm wit
 cd <this-skill-dir>                        # .agents/skills/codex-qa
 bash scripts/lib/common.sh --self-check    # confirm deps + isolation harness
 ```
+
+**Docker is the default QA surface.** Run this QA inside a disposable container
+that has the latest codex and a copy of your config, with the host `~/.codex`
+untouched: `script/agent/qa-docker.sh` (see [references/docker-qa.md](references/docker-qa.md)).
+The local scripts below are the fallback for when Docker is unavailable or on
+Windows.
 
 ## Router: pick your case
 

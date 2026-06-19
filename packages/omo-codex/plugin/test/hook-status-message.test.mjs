@@ -68,6 +68,19 @@ async function readPluginVersion() {
 	return (await readJson(".codex-plugin/plugin.json")).version;
 }
 
+async function readAggregateHookManifests() {
+	const manifest = await readJson(".codex-plugin/plugin.json");
+	const hookPaths = Array.isArray(manifest.hooks) ? manifest.hooks : [manifest.hooks];
+	return Promise.all(
+		hookPaths
+			.filter((hookPath) => typeof hookPath === "string")
+			.map(async (hookPath) => {
+				const source = hookPath.replace(/^\.\//, "");
+				return { source, version: await readPluginVersion(), hooks: await readJson(source) };
+			}),
+	);
+}
+
 async function readComponentVersion(componentName) {
 	return (await readJson(join("components", componentName, "package.json"))).version;
 }
@@ -114,7 +127,7 @@ function collectCommandHooks(hooks, source, version) {
 	return commandHooks;
 }
 
-test("#given hook status label #when formatting #then prefixes LazyCodex with current version", async () => {
+test("#given hook status label #when formatting #then prefixes OmO display namespace", async () => {
 	// given
 	const version = (await readRepoJson("package.json")).version;
 	const label = "Checking Comments";
@@ -123,10 +136,10 @@ test("#given hook status label #when formatting #then prefixes LazyCodex with cu
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
+	assert.equal(message, "(OmO) Checking Comments");
 });
 
-test("#given hook status label with blank version #when formatting #then prefixes LazyCodex with local version", () => {
+test("#given hook status label with blank version #when formatting #then still prefixes OmO display namespace", () => {
 	// given
 	const version = "  ";
 	const label = "Checking Comments";
@@ -135,7 +148,7 @@ test("#given hook status label with blank version #when formatting #then prefixe
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-	assert.equal(message, "LazyCodex(local): Checking Comments");
+	assert.equal(message, "(OmO) Checking Comments");
 });
 
 test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", async () => {
@@ -149,7 +162,7 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 
 	// then
 	assert.equal(normalized, "Checking Comments");
-	assert.equal(message, `LazyCodex(${version}): Checking Comments`);
+	assert.equal(message, "(OmO) Checking Comments");
 });
 
 test("#given LazyCodex appears inside hook label #when normalizing #then product casing is preserved", async () => {
@@ -163,7 +176,7 @@ test("#given LazyCodex appears inside hook label #when normalizing #then product
 
 	// then
 	assert.equal(normalized, "Verifying LazyCodex Executor Evidence");
-	assert.equal(message, `LazyCodex(${version}): Verifying LazyCodex Executor Evidence`);
+	assert.equal(message, "(OmO) Verifying LazyCodex Executor Evidence");
 });
 
 test("#given MCP appears inside hook label #when normalizing #then protocol casing is preserved", () => {
@@ -176,31 +189,29 @@ test("#given MCP appears inside hook label #when normalizing #then protocol casi
 
 	// then
 	assert.equal(normalized, "Recommending Git Bash MCP");
-	assert.equal(message, "LazyCodex(4.10.0): Recommending Git Bash MCP");
+	assert.equal(message, "(OmO) Recommending Git Bash MCP");
 });
-test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
+test("#given aggregate comment-checker hook #when status is inspected #then it uses OmO comments label", async () => {
 	// given
-	const aggregateVersion = await readPluginVersion();
-	const aggregateHooks = await readJson("hooks/hooks.json");
+	const aggregateManifests = await readAggregateHookManifests();
 
 	// when
-	const hooks = collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion);
-	const commentCheckerHook = hooks.find((hook) => hook.id === "hooks/hooks.json:PostToolUse:0:0");
+	const hooks = aggregateManifests.flatMap((manifest) => collectCommandHooks(manifest.hooks, manifest.source, manifest.version));
+	const commentCheckerHook = hooks.find((hook) => hook.command.includes("components/comment-checker/dist/cli.js"));
 
 	// then
-	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage(aggregateVersion, "Checking Comments"));
-	assert.doesNotMatch(JSON.stringify(aggregateHooks), /checking\s+OMO\s+comments/i);
+	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage("", "Checking Comments"));
+	assert.doesNotMatch(JSON.stringify(aggregateManifests), /checking\s+OMO\s+comments/i);
 });
 
-test("#given aggregate and component hooks #when status messages are inspected #then all use the LazyCodex formatter", async () => {
+test("#given aggregate and component hooks #when status messages are inspected #then all use the OmO formatter", async () => {
 	// given
-	const aggregateVersion = await readPluginVersion();
-	const aggregateHooks = await readJson("hooks/hooks.json");
+	const aggregateManifests = await readAggregateHookManifests();
 	const componentManifests = await readComponentHookManifests();
 
 	// when
 	const commandHooks = [
-		...collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion),
+		...aggregateManifests.flatMap((manifest) => collectCommandHooks(manifest.hooks, manifest.source, manifest.version)),
 		...componentManifests.flatMap((manifest) => collectCommandHooks(manifest.hooks, manifest.source, manifest.version)),
 	];
 	const expectedLabels = new Map([...AGGREGATE_EXPECTED_LABELS, ...COMPONENT_EXPECTED_LABELS]);
@@ -219,6 +230,6 @@ test("#given aggregate and component hooks #when status messages are inspected #
 	const actualLabels = new Set(commandHooks.map((hook) => parseLazyCodexHookStatusMessage(hook.statusMessage)?.label));
 	assert.deepEqual([...expectedLabels.values()].filter((label) => !actualLabels.has(label)), []);
 	for (const hook of commandHooks) {
-		assert.doesNotMatch(hook.statusMessage, /\bOMO\b/i);
+		assert.match(hook.statusMessage, /^\(OmO\) /);
 	}
 });

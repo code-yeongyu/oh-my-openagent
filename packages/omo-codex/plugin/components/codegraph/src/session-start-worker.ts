@@ -6,9 +6,10 @@ import { cwd as processCwd, env as processEnv, stderr as processStderr } from "n
 
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
-import { evaluateCodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
+import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
 import {
+	codegraphCommandRequiresSupportedLocalNode,
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 } from "../../../../../utils/src/codegraph/resolve.ts";
@@ -47,11 +48,8 @@ export async function runCodegraphSessionStartWorker(options: SessionStartWorker
 		return finish("skipped-disabled", { projectRoot }, logOutcome);
 	}
 
-	if (!evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion }).supported) {
-		return finish("skipped-unsupported-node", { projectRoot }, logOutcome);
-	}
-
-	return runBootstrap(projectRoot, config.codegraph ?? {}, env, homeDir, { ...defaultDeps, ...options.deps }, logOutcome);
+	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
+	return runBootstrap(projectRoot, config.codegraph ?? {}, env, homeDir, nodeSupport, { ...defaultDeps, ...options.deps }, logOutcome);
 }
 
 async function runBootstrap(
@@ -59,13 +57,17 @@ async function runBootstrap(
 	config: CodegraphConfig,
 	env: Record<string, string | undefined>,
 	homeDir: string,
+	nodeSupport: CodegraphNodeSupport,
 	deps: CodegraphSessionStartDeps,
 	logOutcome: (outcome: CodegraphSessionStartOutcome) => void,
 ): Promise<{ readonly action: WorkerAction }> {
 	try {
-		const command = await resolveOrProvisionCommand(deps, config, env, homeDir);
+		const command = await resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport);
 		if (command.kind === "unavailable") {
 			return finish("skipped-unavailable", { error: command.error, projectRoot, source: command.source }, logOutcome);
+		}
+		if (command.kind === "unsupported-node") {
+			return finish("skipped-unsupported-node", { projectRoot }, logOutcome);
 		}
 
 		deps.prepareWorkspace(projectRoot, { homeDir });
@@ -90,11 +92,24 @@ function finish(action: WorkerAction, detail: Omit<CodegraphSessionStartOutcome,
 
 type ResolutionResult =
 	| { readonly kind: "resolved"; readonly resolution: CodegraphCommandResolution }
+	| { readonly kind: "unsupported-node" }
 	| { readonly error: string; readonly kind: "unavailable"; readonly projectRoot?: string; readonly source: CodegraphCommandResolution["source"] };
 
-async function resolveOrProvisionCommand(deps: CodegraphSessionStartDeps, config: CodegraphConfig, env: Record<string, string | undefined>, homeDir: string): Promise<ResolutionResult> {
+async function resolveOrProvisionCommand(
+	deps: CodegraphSessionStartDeps,
+	config: CodegraphConfig,
+	env: Record<string, string | undefined>,
+	homeDir: string,
+	nodeSupport: CodegraphNodeSupport,
+): Promise<ResolutionResult> {
 	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(config.install_dir) });
-	if (resolved.exists) return { kind: "resolved", resolution: resolved };
+	if (resolved.exists) {
+		if (codegraphCommandRequiresSupportedLocalNode(resolved) && !nodeSupport.supported) {
+			return { kind: "unsupported-node" };
+		}
+		return { kind: "resolved", resolution: resolved };
+	}
+	if (!nodeSupport.supported) return { kind: "unsupported-node" };
 	if (config.auto_provision === false) return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
 
 	const installDir = config.install_dir ?? join(homeDir, ".omo", "codegraph");

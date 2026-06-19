@@ -126,6 +126,22 @@ describe("createSisyphusAgent", () => {
     });
   });
 
+  describe("#given a GLM Sisyphus model", () => {
+    test("#when creating the agent #then uses the GLM-native prompt with bare config", () => {
+      // given
+      const model = "zai/glm-5.2";
+
+      // when
+      const agent = createSisyphusAgent(model);
+
+      // then
+      expect(agent.prompt).toContain("running on GLM 5.2");
+      expect(agent.prompt).toContain("<glm_52_calibration>");
+      expect(agent.thinking).toBeUndefined();
+      expect(agent.reasoningEffort).toBeUndefined();
+    });
+  });
+
   describe("#given a Gemini model", () => {
     test("#when creating the agent #then injects Gemini corrective anchors before constraints", () => {
       // given

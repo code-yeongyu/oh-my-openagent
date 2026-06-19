@@ -153,3 +153,25 @@ jobs:
           custom-allsigned-prcomment: |
             All contributors have signed the CLA. Thank you! ✅
           lock-pullrequest-aftermerge: false
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## CLA Assistant"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Checks stored CLA signatures for pull requests."
+            echo "- Runs Contributor Assistant only when a signature action is needed."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Check the signature file on \`dev\`, contributor allowlist, and GitHub token permissions."
+          } >> "$GITHUB_STEP_SUMMARY"
