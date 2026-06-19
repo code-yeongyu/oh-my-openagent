@@ -1,3 +1,5 @@
+import { isObject } from "../../shared"
+
 type MessageTime = { created?: number }
 
 type MessageInfo = {
@@ -13,10 +15,6 @@ type MessagePart = {
 type SessionMessage = {
   info?: MessageInfo
   parts?: unknown
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
 }
 
 function asSessionMessage(value: unknown): SessionMessage | null {
