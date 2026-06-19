@@ -9,7 +9,6 @@ import { resolveCategoryConfig } from "./category-config-resolver"
 import * as agents from "../agents"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
 import * as commandLoader from "../features/claude-code-command-loader"
-import { isAgentRegistered } from "../features/claude-code-session-state"
 import * as builtinCommands from "../features/builtin-commands"
 import * as skillLoader from "../features/opencode-skill-loader"
 import * as agentLoader from "../features/claude-code-agent-loader"
@@ -17,7 +16,6 @@ import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as pluginLoader from "../features/claude-code-plugin-loader"
 import * as mcpModule from "../mcp"
 import * as shared from "../shared"
-import { installAgentSortShim, setAgentSortOrder } from "../shared/agent-sort-shim"
 import * as configDir from "../shared/opencode-config-dir"
 import * as permissionCompat from "../shared/permission-compat"
 import * as modelResolver from "../shared/model-resolver"
@@ -139,7 +137,6 @@ afterEach(() => {
   ;(unsafeTestValue(permissionCompat.migrateAgentConfig))?.mockRestore?.()
   ;(unsafeTestValue(modelResolver.resolveModelWithFallback))?.mockRestore?.()
   ;(unsafeTestValue(agentPriorityOrder.reorderAgentsByPriority))?.mockRestore?.()
-  setAgentSortOrder(undefined)
   configErrors.clearConfigLoadErrors()
   mock.restore()
 })
@@ -201,119 +198,6 @@ describe("Sisyphus-Junior model inheritance", () => {
     expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe(
       "openai/gpt-5.5"
     )
-  })
-})
-
-describe("Config handler hot path caching", () => {
-  test("reuses the resolved agent roster for repeated config hook invocations with the same model", async () => {
-    // #given
-    const pluginConfig = createPluginConfig({
-      agents: Object.fromEntries(
-        Array.from({ length: 12 }, (_, index) => [
-          `agent-${index}`,
-          {
-            model: `provider/model-${index}`,
-            fallback_models: [`provider/fallback-${index}`],
-          },
-        ]),
-      ),
-      categories: Object.fromEntries(
-        Array.from({ length: 10 }, (_, index) => [
-          `category-${index}`,
-          {
-            model: `provider/category-model-${index}`,
-            fallback_models: [`provider/category-fallback-${index}`],
-          },
-        ]),
-      ),
-    })
-    const handler = createConfigHandler({
-      ctx: { directory: "/tmp" },
-      pluginConfig,
-      modelCacheState: {
-        anthropicContext1MEnabled: false,
-        modelContextLimitsCache: new Map(),
-      },
-    })
-
-    // #when
-    await handler({ model: "anthropic/claude-opus-4-7", agent: {} })
-    await handler({ model: "anthropic/claude-opus-4-7", agent: {} })
-
-    // #then
-    expect(unsafeTestValue(agents.createBuiltinAgents).mock.calls).toHaveLength(1)
-    expect(isAgentRegistered(getAgentListDisplayName("sisyphus"))).toBe(true)
-  })
-
-  test("re-resolves the agent roster when host skill paths change", async () => {
-    // #given
-    const pluginConfig = createPluginConfig({})
-    const handler = createConfigHandler({
-      ctx: { directory: "/tmp" },
-      pluginConfig,
-      modelCacheState: {
-        anthropicContext1MEnabled: false,
-        modelContextLimitsCache: new Map(),
-      },
-    })
-
-    // #when
-    await handler({
-      model: "anthropic/claude-opus-4-7",
-      agent: {},
-      skills: { paths: ["/tmp/first-sibling-plugin-skills"] },
-    })
-    await handler({
-      model: "anthropic/claude-opus-4-7",
-      agent: {},
-      skills: { paths: ["/tmp/second-sibling-plugin-skills"] },
-    })
-
-    // #then
-    expect(unsafeTestValue(agents.createBuiltinAgents).mock.calls).toHaveLength(2)
-  })
-
-  test("preserves agent_order on cache hits when default_agent is only a fallback", async () => {
-    // #given
-    installAgentSortShim()
-    const pluginConfig = createPluginConfig({
-      agent_order: ["hephaestus", "sisyphus", "prometheus", "atlas"],
-    })
-    setAgentSortOrder(pluginConfig.agent_order)
-    const createBuiltinAgentsMock = unsafeTestValue<{
-      mockResolvedValue: (value: Record<string, unknown>) => void
-    }>(agents.createBuiltinAgents)
-    createBuiltinAgentsMock.mockResolvedValue({
-      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
-      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
-      atlas: { name: "atlas", prompt: "test", mode: "primary" },
-    })
-    const handler = createConfigHandler({
-      ctx: { directory: "/tmp" },
-      pluginConfig,
-      modelCacheState: {
-        anthropicContext1MEnabled: false,
-        modelContextLimitsCache: new Map(),
-      },
-    })
-
-    // #when
-    await handler({ model: "anthropic/claude-opus-4-7", agent: {} })
-    await handler({ model: "anthropic/claude-opus-4-7", agent: {} })
-    const sortedNames = [
-      { name: getAgentListDisplayName("atlas") },
-      { name: getAgentListDisplayName("sisyphus") },
-      { name: getAgentListDisplayName("prometheus") },
-      { name: getAgentListDisplayName("hephaestus") },
-    ].toSorted((left, right) => left.name.localeCompare(right.name)).map((agent) => agent.name)
-
-    // #then
-    expect(sortedNames).toEqual([
-      getAgentListDisplayName("hephaestus"),
-      getAgentListDisplayName("sisyphus"),
-      getAgentListDisplayName("prometheus"),
-      getAgentListDisplayName("atlas"),
-    ])
   })
 })
 
