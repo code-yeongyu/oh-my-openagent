@@ -1,12 +1,12 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
+import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
-import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 
-const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
-const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
+export { isSessionComplete } from "./sync-session-turns"
+
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
 
@@ -39,38 +39,6 @@ async function fetchSessionMessages(
   return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
 }
 
-function getTerminalSessionError(messages: SessionMessage[]): string | null {
-  const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
-  const lastUser = [...messages].reverse().find((msg) => msg.info?.role === "user")
-  if (lastUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastUser.info.id) {
-    return null
-  }
-  if (!lastAssistant?.info || !("error" in lastAssistant.info)) {
-    return null
-  }
-
-  const errorMessage = extractErrorMessage((lastAssistant.info as { error?: unknown }).error)
-  return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
-}
-
-export function isSessionComplete(messages: SessionMessage[]): boolean {
-  let lastUser: SessionMessage | undefined
-  let lastAssistant: SessionMessage | undefined
-
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
-    if (!lastUser && msg.info?.role === "user") lastUser = msg
-    if (lastUser && lastAssistant) break
-  }
-
-  if (!lastAssistant?.info?.finish) return false
-  if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
-  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
-  if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
-  return lastUser.info.id < lastAssistant.info.id
-}
-
 const DEFAULT_MAX_ASSISTANT_TURNS = 300
 
 export async function pollSyncSession(
@@ -84,6 +52,7 @@ export async function pollSyncSession(
     anchorMessageCount?: number
     maxAssistantTurns?: number
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
+    hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
   },
   timeoutMs?: number
@@ -97,19 +66,34 @@ export async function pollSyncSession(
   let timedOut = false
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
-  const childWakeGraceMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
+  const childSettleMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
   let childWaitAssistantId: string | undefined
-  let childWaitStartedAt = 0
-  const shouldWaitForChildTasks = (currentAssistantId: string | undefined): boolean => {
-    if (input.hasActiveChildBackgroundTasks?.(input.sessionID)) {
+  let childSettleStartedAt = 0
+  // A sync subagent can end its turn and then be re-woken by a parent-wake
+  // notification once its background children finish. The task is only truly done
+  // when no direct child work remains AND no wake is queued/in-flight for this
+  // session. (Direct children only: a grandchild's completion wake is addressed to
+  // its immediate parent, never to this session, so gating on grandchildren would
+  // block on continuations this session can never receive.)
+  // hasPendingParentWake bridges the notification dispatch window (debounce + queue +
+  // promptAsync gate), which routinely exceeds a fixed grace; the settle window then
+  // covers only the sub-second gap between a child reaching terminal status and the
+  // wake being enqueued. Once a new turn appears the assistant id changes and we stop
+  // waiting to evaluate it. The outer inactivity timeout remains the safety bound.
+  const isAwaitingChildContinuation = (currentAssistantId: string | undefined): boolean => {
+    const continuationOwed =
+      (input.hasActiveChildBackgroundTasks?.(input.sessionID) ?? false) ||
+      (input.hasPendingParentWake?.(input.sessionID) ?? false)
+    if (continuationOwed) {
       childWaitAssistantId = currentAssistantId
-      childWaitStartedAt = 0
-    } else if (childWaitAssistantId === undefined || currentAssistantId !== childWaitAssistantId) {
-      return false
-    } else {
-      childWaitStartedAt ||= Date.now()
+      childSettleStartedAt = 0
+      return true
     }
-    return childWaitStartedAt === 0 || Date.now() - childWaitStartedAt < childWakeGraceMs
+    if (childWaitAssistantId === undefined || currentAssistantId !== childWaitAssistantId) {
+      return false
+    }
+    childSettleStartedAt ||= Date.now()
+    return Date.now() - childSettleStartedAt < childSettleMs
   }
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
@@ -129,11 +113,12 @@ export async function pollSyncSession(
           finalMessages = await fetchSessionMessages(client, input.sessionID)
           break
         } catch (error) {
+          const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
           log("[task] Final messages fetch failed after abort, retrying", {
             sessionID: input.sessionID,
             attempt,
             maxAttempts: abortFetchAttempts,
-            error: String(error),
+            error: errorMessage,
           })
           if (attempt < abortFetchAttempts) {
             await wait(syncTiming.POLL_INTERVAL_MS)
@@ -188,7 +173,8 @@ export async function pollSyncSession(
     try {
       messages = await fetchSessionMessages(client, input.sessionID)
     } catch (error) {
-      log("[task] Poll messages fetch failed, retrying", { sessionID: input.sessionID, error: String(error) })
+      const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      log("[task] Poll messages fetch failed, retrying", { sessionID: input.sessionID, error: errorMessage })
       continue
     }
 
@@ -204,7 +190,7 @@ export async function pollSyncSession(
 
     if (isSessionComplete(messages)) {
       const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
-      if (shouldWaitForChildTasks(currentAssistantId)) {
+      if (isAwaitingChildContinuation(currentAssistantId)) {
         continue
       }
       log("[task] Poll complete - terminal finish detected", { sessionID: input.sessionID, pollCount })
@@ -239,7 +225,7 @@ export async function pollSyncSession(
     })
 
     if (!lastAssistant?.info?.finish && hasAssistantText) {
-      if (shouldWaitForChildTasks(lastAssistant?.info?.id)) {
+      if (isAwaitingChildContinuation(lastAssistant?.info?.id)) {
         continue
       }
       log("[task] Poll complete - assistant text detected (fallback)", {

@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import * as configManager from "./config-manager"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import * as codexInstaller from "./install-codex"
 import { runCliInstaller } from "./cli-installer"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import { getNoModelProvidersWarning } from "./provider-availability"
+import { PLUGIN_NAME } from "../shared"
 import type { InstallArgs } from "./types"
 
 describe("runCliInstaller", () => {
@@ -17,6 +22,7 @@ describe("runCliInstaller", () => {
     console.error = mockConsoleError
     mockConsoleLog.mockClear()
     mockConsoleError.mockClear()
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -127,6 +133,74 @@ describe("runCliInstaller", () => {
 
     for (const spy of restoreSpies) {
       spy.mockRestore()
+    }
+  })
+
+  it("registers the TUI plugin entry after adding the OpenCode server plugin", async () => {
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const configDir = mkdtempSync(join(tmpdir(), "omo-cli-tui-entry-"))
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    try {
+      const restoreSpies = [
+        spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+          isInstalled: false,
+          installedVersion: null,
+          hasClaude: false,
+          isMax20: false,
+          hasOpenAI: false,
+          hasGemini: false,
+          hasCopilot: false,
+          hasCodex: false,
+          hasOpencodeZen: false,
+          hasZaiCodingPlan: false,
+          hasKimiForCoding: false,
+          hasOpencodeGo: false,
+          hasBailianCodingPlan: false,
+          hasMinimaxCnCodingPlan: false,
+          hasMinimaxCodingPlan: false,
+          hasVercelAiGateway: false,
+        }),
+        spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+        spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+        spyOn(configManager, "addPluginToOpenCodeConfig").mockImplementation(async () => {
+          writeFileSync(join(configDir, "opencode.json"), JSON.stringify({ plugin: [PLUGIN_NAME] }), "utf-8")
+          return { success: true, configPath: join(configDir, "opencode.json") }
+        }),
+        spyOn(configManager, "writeOmoConfig").mockReturnValue({
+          success: true,
+          configPath: join(configDir, "oh-my-openagent.jsonc"),
+        }),
+      ]
+
+      const args: InstallArgs = {
+        tui: false,
+        platform: "opencode",
+        claude: "no",
+        openai: "yes",
+        gemini: "no",
+        copilot: "no",
+        opencodeZen: "no",
+        zaiCodingPlan: "no",
+        kimiForCoding: "no",
+        opencodeGo: "no",
+      }
+
+      const result = await runCliInstaller(args, "3.4.0")
+
+      expect(result).toBe(0)
+      expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
+
+      for (const spy of restoreSpies) {
+        spy.mockRestore()
+      }
+    } finally {
+      rmSync(configDir, { recursive: true, force: true })
+      if (originalConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+      }
     }
   })
 

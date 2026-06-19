@@ -4,7 +4,7 @@ import { chmod, lstat, mkdir, readFile, readlink, symlink, writeFile } from "nod
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { linkCachedPluginBins, linkRootRuntimeBin } from "./install/cache.mjs";
+import { linkCachedPluginBins, linkRootRuntimeBin } from "./install-dist/install-local.mjs";
 import { makeTempDir, writeJson } from "./install-test-fixtures.mjs";
 
 async function writeRuntimeWrapperFixture({ withNodeCli = false } = {}) {
@@ -370,7 +370,7 @@ test("#given package bin name escapes bin directory #when linking bins #then rej
 
 	await assert.rejects(
 		linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" }),
-		/invalid package bin name/,
+		/Invalid package bin command name/,
 	);
 	await assert.rejects(lstat(escapedLink));
 });
@@ -390,7 +390,7 @@ test("#given package bin target escapes plugin root #when linking bins #then rej
 
 	await assert.rejects(
 		linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" }),
-		/escapes package root/,
+		/Package bin target must stay inside package root/,
 	);
 	await assert.rejects(readlink(join(binDir, "omo")));
 });

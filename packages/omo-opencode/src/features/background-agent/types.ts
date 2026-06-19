@@ -101,6 +101,14 @@ export interface BackgroundTask {
   consecutiveMissedPolls?: number
 }
 
+export interface BackgroundTaskSnapshot {
+  readonly title: string
+  readonly status: BackgroundTaskStatus
+  readonly toolCalls: number | null
+  readonly lastTool: string | null
+  readonly agent: string
+}
+
 export interface LaunchInput {
   description: string
   prompt: string
@@ -121,6 +129,8 @@ export interface LaunchInput {
   category?: string
   sessionPermission?: SessionPermissionRule[]
   onSessionCreated?: (sessionId: string) => void | Promise<void>
+  /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
+  userPermission?: Record<string, "ask" | "allow" | "deny">
 }
 
 export interface ResumeInput {

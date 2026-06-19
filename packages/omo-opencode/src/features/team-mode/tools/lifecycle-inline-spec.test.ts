@@ -8,7 +8,7 @@ import path from "node:path"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
-import type { RuntimeState, TeamSpec } from "../types"
+import type { RuntimeState, TeamSpec } from "@oh-my-opencode/team-core/types"
 import { parseTeamCreateArgs } from "./lifecycle-inline-spec"
 
 const runtimes = new Map<string, RuntimeState>()

@@ -212,10 +212,10 @@ describe("sparkshell CLI", () => {
     expect(stderr.join("")).toContain("tmux is required for --tmux-pane mode")
   })
 
-  test("#given a resolvable Codex session #when a command runs #then appends the session context after the shell result", async () => {
+  test("#given a resolvable Codex session #when a command runs #then keeps session context out of the shell result", async () => {
     // given
     const stdout: string[] = []
-    const contextEnvs: Array<Readonly<Record<string, string | undefined>>> = []
+    let contextLoads = 0
 
     // when
     const exitCode = await runSparkShell(["git", "status"], {
@@ -226,16 +226,16 @@ describe("sparkshell CLI", () => {
       },
       writeStderr: () => {},
       spawn: (): SparkShellSpawnResult => ({ status: 3, stdout: "shell-output\n" }),
-      loadSessionContext: (env) => {
-        contextEnvs.push(env)
+      loadSessionContext: () => {
+        contextLoads += 1
         return { block: "===== codex session context =====", firstUserRequest: "", latestUserRequest: "" }
       },
     })
 
     // then
     expect(exitCode).toBe(3)
-    expect(stdout.join("")).toBe("shell-output\n\n===== codex session context =====\n")
-    expect(contextEnvs).toEqual([{ CODEX_THREAD_ID: "019eafa2-a15f-73e1-b622-f7e4038f818e" }])
+    expect(stdout.join("")).toBe("shell-output\n")
+    expect(contextLoads).toBe(0)
   })
 
   test("#given the top-level --json flag #when a command runs #then keeps output free of the session context", async () => {
@@ -353,13 +353,11 @@ describe("sparkshell CLI", () => {
 
     // then
     const combined = stdout.join("")
-    const commandOutput = combined.slice(0, combined.indexOf("CTX-BLOCK"))
     expect(exitCode).toBe(0)
     expect(combined).toContain("[sparkshell] condensed:")
     expect(combined).toContain("applying fable-fallback.ts migration step")
-    expect(combined).toContain("CTX-BLOCK")
-    expect(commandOutput.length).toBeLessThanOrEqual(5200)
-    expect(combined.indexOf("[sparkshell] condensed:")).toBeLessThan(combined.indexOf("CTX-BLOCK"))
+    expect(combined).not.toContain("CTX-BLOCK")
+    expect(combined.length).toBeLessThanOrEqual(5200)
   })
 
   test("#given the condense kill switch #when oversized output flows #then passes it through raw", async () => {
@@ -383,6 +381,7 @@ describe("sparkshell CLI", () => {
     expect(exitCode).toBe(0)
     expect(stdout.join("")).toContain(hugeLog)
     expect(stdout.join("")).not.toContain("[sparkshell] condensed:")
+    expect(stdout.join("")).not.toContain("CTX-BLOCK")
   })
 
   test("#given the top-level --json flag #when oversized output flows #then never condenses", async () => {
@@ -480,6 +479,52 @@ describe("sparkshell CLI", () => {
     expect(stderr.join("")).not.toContain("failed to launch")
   })
 
+  test("#given a metacharacter command without --shell #when the spawn reports ENOENT #then hints to re-run with --shell", async () => {
+    // given
+    const stderr: string[] = []
+    const enoentError = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
+
+    // when
+    const exitCode = await runSparkShell(["pwd && ls"], {
+      env: {},
+      appServerClient: null,
+      commandExists: () => false,
+      writeStdout: () => {},
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
+      spawn: (): SparkShellSpawnResult => ({ status: null, error: enoentError }),
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(stderr.join("")).toContain("failed to launch")
+    expect(stderr.join("")).toContain("--shell")
+  })
+
+  test("#given a plain missing command without metacharacters #when the spawn reports ENOENT #then does not hint --shell", async () => {
+    // given
+    const stderr: string[] = []
+    const enoentError = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
+
+    // when
+    const exitCode = await runSparkShell(["definitely-not-a-cmd"], {
+      env: {},
+      appServerClient: null,
+      commandExists: () => false,
+      writeStdout: () => {},
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
+      spawn: (): SparkShellSpawnResult => ({ status: null, error: enoentError }),
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(stderr.join("")).toContain("failed to launch")
+    expect(stderr.join("")).not.toContain("--shell")
+  })
+
   test("#given native sidecar override #when running Sparkshell #then delegates original args to sidecar", async () => {
     // given
     const calls: string[][] = []
@@ -535,8 +580,7 @@ describe("sparkshell CLI", () => {
     expect(combined).toContain("[sparkshell] spark summary")
     expect(combined).toContain("[sparkshell caption]")
     expect(combined).not.toContain("worker 1999 idle")
-    expect(combined).toContain("CTX-BLOCK")
-    expect(combined.indexOf("[sparkshell] spark summary")).toBeLessThan(combined.indexOf("CTX-BLOCK"))
+    expect(combined).not.toContain("CTX-BLOCK")
   })
 
   test("#given a failing spark summarizer #when oversized output flows #then falls back to deterministic condensation", async () => {

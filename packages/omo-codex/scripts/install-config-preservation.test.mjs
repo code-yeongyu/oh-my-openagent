@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
+import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
 test("#given unrelated Codex config tables #when script installer updates config #then preserves them", async () => {
 	// given

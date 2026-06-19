@@ -115,12 +115,12 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 | OpenCode example | Codex tool to use |
 | --- | --- |
-| \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ...","fork_turns":"none"})\` |
-| \`background_output(task_id="...")\` | \`wait_agent(...)\` for mailbox signals; after a timeout, run one \`list_agents\` check for the named child if reassurance is needed |
+| \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ..."})\` |
+| \`background_output(task_id="...")\` | \`wait_agent(...)\` for mailbox signals |
 
-Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained \`message\` and usually should use a non-full-history fork mode such as \`fork_turns="none"\`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+Obsolete generated compatibility prose.
 
-For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`wait_agent\` timeout only means no new mailbox update arrived. Treat a running child or latest \`WORKING:\` message as alive. Do not use \`list_agents\` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
+More obsolete generated compatibility prose.
 
 When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
 
@@ -137,8 +137,8 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	assert.match(adapted, /fork_context":false/);
 	assert.match(adapted, /"agent_type":"explorer"/);
 	assert.match(adapted, /multi_agent_v1\.wait_agent/);
-	assert.doesNotMatch(adapted, /fork_turns="none"/);
-	assert.doesNotMatch(adapted, /list_agents/);
+	assert.doesNotMatch(adapted, /task_name/);
+	assert.doesNotMatch(adapted, /Obsolete generated compatibility prose/);
 });
 
 test("#given generated guidance before a template export #when adapting a skill #then the export wrapper is preserved", () => {

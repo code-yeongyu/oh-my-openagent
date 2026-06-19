@@ -1,12 +1,32 @@
 import { lstatSync, realpathSync } from "fs"
 import { promises as fs } from "fs"
+import { access, lstat } from "fs/promises"
 
 function normalizeDarwinRealpath(filePath: string): string {
   return filePath.startsWith("/private/var/") ? filePath.slice("/private".length) : filePath
 }
 
 export function isMarkdownFile(entry: { name: string; isFile: () => boolean }): boolean {
-  return !entry.name.startsWith(".") && entry.name.endsWith(".md") && entry.isFile()
+	return !entry.name.startsWith(".") && entry.name.endsWith(".md") && entry.isFile()
+}
+
+export async function fileExists(filePath: string): Promise<boolean> {
+	try {
+		await access(filePath)
+		return true
+	} catch {
+		return false
+	}
+}
+
+export async function fileExistsStrict(filePath: string): Promise<boolean> {
+	try {
+		await lstat(filePath)
+		return true
+	} catch (error) {
+		if (isNodeErrorWithCode(error) && error.code === "ENOENT") return false
+		throw error
+	}
 }
 
 export function isSymbolicLink(filePath: string): boolean {
@@ -39,5 +59,9 @@ export async function resolveSymlinkAsync(filePath: string): Promise<string> {
       throw error
     }
     return filePath
-  }
+	}
+}
+
+function isNodeErrorWithCode(error: unknown): error is NodeJS.ErrnoException {
+	return typeof error === "object" && error !== null && "code" in error
 }

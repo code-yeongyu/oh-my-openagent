@@ -20,6 +20,25 @@ export function printJson(value: unknown): void {
 	process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
+export function printJsonError(error: unknown): void {
+	if (error instanceof UlwLoopError) {
+		printJson({
+			ok: false,
+			error: {
+				code: error.code,
+				message: error.message,
+				...(error.details === undefined ? {} : { details: error.details }),
+			},
+		});
+		return;
+	}
+	if (error instanceof Error) {
+		printJson({ ok: false, error: { code: "ULW_LOOP_UNEXPECTED", message: error.message } });
+		return;
+	}
+	printJson({ ok: false, error: { code: "ULW_LOOP_UNKNOWN", message: "unknown error" } });
+}
+
 function criteriaCounts(goal: UlwLoopItem): CriteriaCounts {
 	let pass = 0;
 	for (const criterion of goal.successCriteria) if (criterion.status === "pass") pass += 1;

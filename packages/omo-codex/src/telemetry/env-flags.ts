@@ -1,43 +1,26 @@
 import {
-  DEFAULT_POSTHOG_API_KEY,
-  DEFAULT_POSTHOG_HOST,
-} from "./product-identity"
+  getTelemetryApiKey,
+  getTelemetryHost,
+  hasTelemetryApiKey,
+  shouldDisableTelemetry,
+} from "@oh-my-opencode/telemetry-core"
 
-function normalizeEnvValue(value: string | undefined): string | undefined {
-  return value?.trim().toLowerCase()
-}
-
-function isDisableFlag(value: string | undefined): boolean {
-  const normalized = normalizeEnvValue(value)
-  return normalized === "1" || normalized === "true"
-}
-
-function isTelemetryOptOutFlag(value: string | undefined): boolean {
-  const normalized = normalizeEnvValue(value)
-  return normalized === "0" || normalized === "false" || normalized === "no"
-}
+import { createCodexTelemetryProductConfig } from "./product-identity"
 
 export function shouldDisablePostHog(): boolean {
-  return (
-    isDisableFlag(process.env.OMO_DISABLE_POSTHOG) ||
-    isTelemetryOptOutFlag(process.env.OMO_SEND_ANONYMOUS_TELEMETRY) ||
-    isDisableFlag(process.env.OMO_CODEX_DISABLE_POSTHOG) ||
-    isTelemetryOptOutFlag(process.env.OMO_CODEX_SEND_ANONYMOUS_TELEMETRY)
-  )
+  return shouldDisableTelemetry({
+    productEnvPrefix: createCodexTelemetryProductConfig().productEnvPrefix,
+  })
 }
 
 export function getPostHogApiKey(): string {
-  const explicit = process.env.POSTHOG_API_KEY
-  if (explicit === undefined) {
-    return DEFAULT_POSTHOG_API_KEY
-  }
-  return explicit.trim()
+  return getTelemetryApiKey(process.env, createCodexTelemetryProductConfig().defaultApiKey)
 }
 
 export function hasPostHogApiKey(): boolean {
-  return getPostHogApiKey().length > 0
+  return hasTelemetryApiKey(process.env, createCodexTelemetryProductConfig().defaultApiKey)
 }
 
 export function getPostHogHost(): string {
-  return process.env.POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST
+  return getTelemetryHost(process.env, createCodexTelemetryProductConfig().defaultHost)
 }

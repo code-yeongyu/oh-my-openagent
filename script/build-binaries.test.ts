@@ -71,6 +71,20 @@ describe("build-binaries", () => {
       expect(packageDirs).toContain("oh-my-opencode-linux-x64-musl-baseline");
       expect(packageDirs).toContain("oh-my-opencode-darwin-x64-baseline");
       expect(packageDirs).toContain("oh-my-opencode-windows-x64-baseline");
+      expect(packageDirs).toContain("oh-my-opencode-windows-arm64");
+    });
+
+    it("includes a windows-arm64 entry for Windows-on-ARM hosts", async () => {
+      // given
+      const module = await import("./build-binaries.ts");
+      const platforms = (module as { PLATFORMS: { platform: string; packageName: string; packageDir: string }[] }).PLATFORMS;
+
+      // when
+      const windowsArm64 = platforms.find((p) => p.platform === "windows-arm64");
+
+      // then
+      expect(windowsArm64?.packageName).toBe("oh-my-opencode-windows-arm64");
+      expect(windowsArm64?.packageDir).toBe("oh-my-opencode-windows-arm64");
     });
 
     it("uses JavaScript launcher names for baseline platforms", async () => {

@@ -13,7 +13,6 @@ const result = await Bun.build({
   outdir: `${repoRoot}dist/cli-node`,
   target: "node",
   format: "esm",
-  external: ["@ast-grep/napi"],
   plugins: [
     {
       name: "jsonc-parser-esm",

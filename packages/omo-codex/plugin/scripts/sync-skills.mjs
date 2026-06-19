@@ -12,9 +12,12 @@ const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
+	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
+const componentSkillNames = new Set(skillSources.map(([name]) => name));
+const skillDisplayPrefix = "(OmO) ";
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
@@ -27,12 +30,12 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 | \`call_omo_agent(subagent_type="explore", ...)\` | \`multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","agent_type":"explorer","fork_context":false})\` |
 | \`call_omo_agent(subagent_type="librarian", ...)\` | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","agent_type":"librarian","fork_context":false})\` |
 | \`task(subagent_type="plan", ...)\` | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a planning agent. ...","agent_type":"plan","fork_context":false})\` |
-| \`task(subagent_type="oracle", ...)\` for final verification | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"codex-ultrawork-reviewer","fork_context":false})\` |
+| \`task(subagent_type="oracle", ...)\` for final verification | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})\` |
 | \`task(category="...", ...)\` for implementation or QA | \`multi_agent_v1.spawn_agent({"message":"TASK: act as an implementation or QA worker. ...","fork_context":false})\` |
 | \`background_output(task_id="...")\` | \`multi_agent_v1.wait_agent(...)\` for mailbox signals |
 | \`team_*(...)\` | Use Codex native subagents via \`multi_agent_v1.spawn_agent\`, \`multi_agent_v1.send_input\`, \`multi_agent_v1.wait_agent\`, and \`multi_agent_v1.close_agent\` |
 
-Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, and \`codex-ultrawork-reviewer\` — pass the matching name as \`agent_type\` so the child gets that role's model and instructions. On \`multi_agent_v2\` sessions the same \`agent_type\` applies (the OMO installer exposes it) with \`fork_turns\` instead of \`fork_context\`. If the spawn tool exposes no \`agent_type\` parameter, omit it and describe the role inside \`message\`. If a code block below conflicts with this section, this section wins.
+Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, \`lazycodex-code-reviewer\`, \`lazycodex-qa-executor\`, and \`lazycodex-gate-reviewer\` - pass the matching name as \`agent_type\` so the child gets that role's model and instructions. If the spawn tool exposes no \`agent_type\` parameter, omit it and describe the role inside \`message\`. If a code block below conflicts with this section, this section wins.
 
 For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`multi_agent_v1.wait_agent\` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
 
@@ -41,8 +44,6 @@ For work likely to exceed one wait cycle, require the child to send \`WORKING: <
 const codexCompatibilityEndMarkers = [
 	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
 	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `wait_agent` timeout only means no new mailbox update arrived. Treat a running child or latest `WORKING:` message as alive. Do not use `list_agents` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
-	"Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained `message` and usually should use a non-full-history fork mode such as `fork_turns=\"none\"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 ];
@@ -152,6 +153,40 @@ function applyCodexSkillOverlays(skillName, content) {
 	return content;
 }
 
+function readSkillFrontmatterName(content, fallbackName) {
+	const frontmatter = content.match(/^---\n(?<body>[\s\S]*?)\n---\n+/);
+	const rawName = frontmatter?.groups?.body.match(/^name:\s*"?([^"\n]+)"?\s*$/m)?.[1]?.trim();
+	return rawName && rawName.length > 0 ? rawName : fallbackName;
+}
+
+function upsertDisplayName(metadata, displayName) {
+	const content = metadata.endsWith("\n") ? metadata : `${metadata}\n`;
+	if (/^\s*display_name:/m.test(metadata)) {
+		return content.replace(/^(\s*display_name:\s*).+$/m, `$1"${displayName}"`);
+	}
+	if (/^interface:\s*$/m.test(metadata)) {
+		return content.replace(/^interface:\s*$/m, `interface:\n  display_name: "${displayName}"`);
+	}
+	return `interface:\n  display_name: "${displayName}"\n${content}`;
+}
+
+async function writeCodexSkillDisplayMetadata(skillName) {
+	const skillRoot = join(skillsRoot, skillName);
+	const skillPath = join(skillRoot, "SKILL.md");
+	const content = await readFile(skillPath, "utf8");
+	const frontmatterName = readSkillFrontmatterName(content, skillName);
+	const metadataDir = join(skillRoot, "agents");
+	const metadataPath = join(metadataDir, "openai.yaml");
+	await mkdir(metadataDir, { recursive: true });
+	let metadata = "interface:\n";
+	try {
+		metadata = await readFile(metadataPath, "utf8");
+	} catch (error) {
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+	}
+	await writeFile(metadataPath, upsertDisplayName(metadata, `${skillDisplayPrefix}${frontmatterName}`), "utf8");
+}
+
 async function adaptSkillForCodex(skillName) {
 	const skillPath = join(skillsRoot, skillName, "SKILL.md");
 	const content = await readFile(skillPath, "utf8");
@@ -159,10 +194,11 @@ async function adaptSkillForCodex(skillName) {
 	if (adapted !== content) {
 		await writeFile(skillPath, adapted, "utf8");
 	}
+	await writeCodexSkillDisplayMetadata(skillName);
 }
 
 async function syncSkills() {
-	await rm(skillsRoot, { recursive: true, force: true });
+	await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	await mkdir(skillsRoot, { recursive: true });
 
 	for (const [name, source] of skillSources) {
@@ -177,6 +213,7 @@ async function syncSkills() {
 		.sort();
 
 	for (const skillName of sharedSkillNames) {
+		if (componentSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
 			filter: (source) => !sourceTestFilePattern.test(source),
 			recursive: true,

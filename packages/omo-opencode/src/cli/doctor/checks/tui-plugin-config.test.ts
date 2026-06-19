@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { PLUGIN_NAME } from "../../../shared"
+import { ensureTuiPluginEntry } from "../../config-manager/add-tui-plugin-to-tui-config"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
 
 let testConfigDir: string
@@ -65,10 +66,12 @@ describe("tui-plugin-config check", () => {
     }
   })
 
-  it("passes when both server and TUI entries are registered", async () => {
-    //#given opencode.json has the server entry and tui.json has the TUI entry
+  it("passes when both server and TUI package entries are registered", async () => {
+    //#given opencode.json has the server entry, the installed package exports ./tui,
+    //#      and tui.json has the package entry that OpenCode resolves as kind=tui
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
     writeOpenCodeConfig([PLUGIN_NAME])
-    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+    writeTuiConfig([PLUGIN_NAME])
 
     //#when running the check
     const result = await checkTuiPluginConfig()
@@ -77,6 +80,18 @@ describe("tui-plugin-config check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toHaveLength(0)
     expect(result.name).toBe("TUI Plugin")
+  })
+
+  it("passes after ensureTuiPluginEntry adds the missing package TUI entry", async () => {
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+
+    const ensureResult = ensureTuiPluginEntry({ configDir: testConfigDir })
+    const result = await checkTuiPluginConfig()
+
+    expect(ensureResult).toEqual({ changed: true, reason: "added" })
+    expect(result.status).toBe("pass")
+    expect(result.message).toContain("Server and TUI plugin entries are both registered")
   })
 
   it("warns when server is registered but TUI entry is missing", async () => {
@@ -128,6 +143,22 @@ describe("tui-plugin-config check", () => {
     expect(result.issues[0].fix).toContain("Remove")
   })
 
+  it("warns to remove a package subpath TUI entry even when the package exports tui", async () => {
+    //#given opencode.json has the server entry, tui.json has the package subpath,
+    //#      and the package does export ./tui
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then doctor still flags the package subpath because OpenCode installs the spec first
+    expect(result.status).toBe("warn")
+    expect(result.issues[0].title).toContain("unresolvable")
+    expect(result.issues[0].fix).toContain(`add "${PLUGIN_NAME}"`)
+  })
+
   it("does not warn for a file TUI entry when the server package has no tui export", async () => {
     //#given opencode.json has the server entry, the installed package has no ./tui export,
     //#       and tui.json uses a file: URL pointing at a local package that exports ./tui
@@ -154,14 +185,14 @@ describe("tui-plugin-config check", () => {
     writeInstalledPackage(PLUGIN_NAME)
     writeInstalledPackage("oh-my-opencode", { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
     writeOpenCodeConfig([PLUGIN_NAME])
-    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+    writeTuiConfig([PLUGIN_NAME])
 
     //#when running the check
     const result = await checkTuiPluginConfig()
 
     //#then doctor diagnoses the canonical installed package instead of the legacy folder
     expect(result.status).toBe("warn")
-    expect(result.issues[0].title).toContain("unresolvable")
+    expect(result.issues[0].title).toContain("does not expose")
   })
 
   it("warns when server is registered but tui.json does not exist", async () => {
@@ -197,9 +228,9 @@ describe("tui-plugin-config check", () => {
   })
 
   it("warns when tui.json has our entry but server plugin is missing from opencode.json", async () => {
-    //#given tui.json has the TUI entry but opencode.json does not have the server entry
+    //#given tui.json has the TUI package entry but opencode.json does not have the server entry
     writeOpenCodeConfig(["some-other-plugin"])
-    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+    writeTuiConfig([PLUGIN_NAME])
 
     //#when running the check
     const result = await checkTuiPluginConfig()
@@ -226,10 +257,10 @@ describe("tui-plugin-config check", () => {
     expect(result.message).toContain("not registered")
   })
 
-  it("passes when legacy server entry is paired with legacy TUI entry", async () => {
+  it("passes when legacy server entry is paired with legacy TUI package entry", async () => {
     //#given legacy package names in both configs
     writeOpenCodeConfig(["oh-my-opencode"])
-    writeTuiConfig(["oh-my-opencode/tui"])
+    writeTuiConfig(["oh-my-opencode"])
 
     //#when running the check
     const result = await checkTuiPluginConfig()

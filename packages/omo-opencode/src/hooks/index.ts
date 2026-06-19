@@ -23,6 +23,8 @@ export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
+export { createCodegraphBootstrapHook } from "./codegraph-bootstrap";
+export { createAstGrepSgProvisionHook } from "./ast-grep-sg-provision";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
 export { createKeywordDetectorHook } from "./keyword-detector";
@@ -66,3 +68,4 @@ export { createLegacyPluginToastHook } from "./legacy-plugin-toast"
 export { createFsyncSkipWarningHook } from "./fsync-skip-warning"
 export { createNotepadWriteGuardHook } from "./notepad-write-guard"
 export { createPlanFormatValidatorHook } from "./plan-format-validator"
+export { createMonitorStatusInjectorHook } from "./monitor-status-injector"

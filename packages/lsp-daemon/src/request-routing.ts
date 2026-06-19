@@ -1,5 +1,5 @@
-import { handleLspMcpRequest, type JsonRpcResponse } from "@code-yeongyu/lsp-tools-mcp/dist/mcp.js";
-import { type RequestContext, runWithRequestContext } from "@code-yeongyu/lsp-tools-mcp/dist/request-context.js";
+import { handleLspMcpRequest, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
+import { type RequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
 
 export const CONTEXT_KEY = "_context";
 

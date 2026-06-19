@@ -27,7 +27,7 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
 export function createExploreAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions(
     ["write", "edit", "apply_patch", "task", "call_omo_agent"],
-    ["lsp_symbols", "lsp_goto_definition", "lsp_find_references", "lsp_diagnostics", "ast_grep_search"],
+    ["lsp_symbols", "lsp_goto_definition", "lsp_find_references", "lsp_diagnostics"],
   )
 
   return {
@@ -108,7 +108,7 @@ Your response has **FAILED** if:
 
 Use the right tool for the job:
 - **Semantic search** (definitions, references): LSP tools
-- **Structural patterns** (function shapes, class structures): ast_grep_search  
+- **Structural patterns** (function shapes, class structures): use the \`ast-grep\` skill helper (\`python3 scripts/ast_grep_helper.py search\`) when loaded, or ask the caller to load it
 - **Text patterns** (strings, comments, logs): grep
 - **File patterns** (find by name/extension): glob
 - **History/evolution** (when added, who changed): git commands

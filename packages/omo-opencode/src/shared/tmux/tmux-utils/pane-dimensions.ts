@@ -1,23 +1,14 @@
-import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
-
-export interface PaneDimensions {
-	paneWidth: number
-	windowWidth: number
-}
+import { getPaneDimensions as getPaneDimensionsCore } from "@oh-my-opencode/tmux-core"
+import type { PaneDimensions } from "@oh-my-opencode/tmux-core"
 
 export async function getPaneDimensions(
 	paneId: string,
 ): Promise<PaneDimensions | null> {
-	const tmux = await getTmuxPath()
-	if (!tmux) return null
-	const { runTmuxCommand } = await import("../runner")
-
-	const result = await runTmuxCommand(tmux, ["display", "-p", "-t", paneId, "#{pane_width},#{window_width}"])
-
-	if (result.exitCode !== 0) return null
-
-	const [paneWidth, windowWidth] = result.output.trim().split(",").map(Number)
-	if (Number.isNaN(paneWidth) || Number.isNaN(windowWidth)) return null
-
-	return { paneWidth, windowWidth }
+  const [{ getTmuxPath }, { runTmuxCommand }] = await Promise.all([
+    import("../../../tools/interactive-bash/tmux-path-resolver"),
+    import("../runner"),
+  ])
+	return getPaneDimensionsCore(paneId, { getTmuxPath, runTmuxCommand })
 }
+
+export type { PaneDimensions }

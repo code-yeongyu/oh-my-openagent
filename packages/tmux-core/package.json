@@ -1,0 +1,21 @@
+{
+  "name": "@oh-my-opencode/tmux-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-neutral tmux session, pane, layout, and runner primitives for oh-my-opencode.",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./index.d.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/utils": "workspace:*"
+  }
+}

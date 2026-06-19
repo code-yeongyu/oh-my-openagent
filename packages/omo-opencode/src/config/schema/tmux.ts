@@ -1,18 +1,10 @@
 import { z } from "zod"
+import { TMUX_ISOLATION_VALUES, TMUX_LAYOUT_VALUES } from "@oh-my-opencode/tmux-core"
+import type { TmuxConfig, TmuxIsolation, TmuxLayout } from "@oh-my-opencode/tmux-core"
 
-export const TmuxLayoutSchema = z.enum([
-  "main-horizontal", // main pane top, agent panes bottom stack
-  "main-vertical", // main pane left, agent panes right stack (default)
-  "tiled", // all panes same size grid
-  "even-horizontal", // all panes horizontal row
-  "even-vertical", // all panes vertical stack
-])
+export const TmuxLayoutSchema = z.enum(TMUX_LAYOUT_VALUES)
 
-export const TmuxIsolationSchema = z.enum([
-  "inline",   // panes split in user's current window (legacy behavior)
-  "window",   // panes created in a separate tmux window (same session)
-  "session",  // panes created in a detached tmux session (full isolation)
-])
+export const TmuxIsolationSchema = z.enum(TMUX_ISOLATION_VALUES)
 
 export const TmuxConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -21,8 +13,6 @@ export const TmuxConfigSchema = z.object({
   main_pane_min_width: z.number().min(40).default(120),
   agent_pane_min_width: z.number().min(20).default(40),
   isolation: TmuxIsolationSchema.default("inline"),
-})
+}) satisfies z.ZodType<TmuxConfig>
 
-export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
-export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
-export type TmuxIsolation = z.infer<typeof TmuxIsolationSchema>
+export type { TmuxConfig, TmuxIsolation, TmuxLayout }

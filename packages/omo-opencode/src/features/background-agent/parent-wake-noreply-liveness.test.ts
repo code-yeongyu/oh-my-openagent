@@ -639,9 +639,12 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       expect(parentWakeNotifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      // regression: the reply-required wake must be scheduled for re-flush
+      expect(parentWakeNotifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
 
       // when: activity goes stale and the gate hold expires
       now = 110_000
+      parentWakeNotifier.clearPendingParentWakeTimer("parent-1")
       releaseParentWakeHold("parent-1")
       await flushPendingParentWake.call(manager, "parent-1")
 

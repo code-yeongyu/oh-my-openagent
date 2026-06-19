@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
+import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
@@ -67,9 +68,16 @@ function reserveSession(sessionID: string, holdMs: number): void {
   })
 }
 
+async function flushPromptGateMicrotasks(): Promise<void> {
+  for (let index = 0; index < 5; index += 1) {
+    await Promise.resolve()
+  }
+}
+
 describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
   afterEach(() => {
     releaseAllPromptAsyncReservationsForTesting()
+    restoreRuntimeFallbackTestClock()
   })
 
   test("#given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned", async () => {
@@ -82,9 +90,13 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     reserveSession(sessionID, 250)
+    const clock = installRuntimeFallbackTestClock()
 
     // when
-    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    const retryPromise = helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    await flushPromptGateMicrotasks()
+    await clock.advanceBy(500)
+    await retryPromise
 
     // then
     expect(promptCalls.count).toBe(1)
@@ -106,13 +118,70 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     state.pendingFallbackModel = "openai/gpt-5.4"
     deps.sessionStates.set(sessionID, state)
     reserveSession(sessionID, 250)
+    const clock = installRuntimeFallbackTestClock()
 
     // when
-    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    const retryPromise = helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    await flushPromptGateMicrotasks()
+    await clock.advanceBy(500)
+    await retryPromise
 
     // then
     expect(promptCalls.count).toBe(1)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
+  })
+
+  test("#given the failed assistant is still active #when auto retry runs #then the fallback dispatch is queued until the assistant unblocks", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-active-assistant-then-unblocked"
+    let assistantIsActive = true
+    deps.ctx.client.session.messages = async () => ({
+      data: assistantIsActive
+        ? [
+            {
+              info: { role: "user" },
+              parts: [{ type: "text", text: "retry this" }],
+            },
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "reasoning", text: "still resolving failed stream" }],
+            },
+          ]
+        : [
+            {
+              info: { role: "user" },
+              parts: [{ type: "text", text: "retry this" }],
+            },
+            {
+              info: { role: "assistant", finish: true },
+              parts: [],
+            },
+          ],
+    })
+    deps.ctx.client.session.promptAsync = async () => {
+      promptCalls.count += 1
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    expect(promptCalls.count).toBe(0)
+    assistantIsActive = false
+    await flushPromptGateMicrotasks()
+    await clock.advanceBy(DEFAULT_PROMPT_QUEUE_RETRY_MS)
+    await flushPromptGateMicrotasks()
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
 })

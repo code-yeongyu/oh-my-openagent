@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { install } from "./install"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import * as configManager from "./config-manager"
 import type { InstallArgs } from "./types"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
@@ -34,6 +35,8 @@ describe("install CLI - binary check behavior", () => {
     // Capture console output
     console.log = mockConsoleLog
     mockConsoleLog.mockClear()
+
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -50,6 +53,7 @@ describe("install CLI - binary check behavior", () => {
     isOpenCodeInstalledSpy?.mockRestore()
     getOpenCodeVersionSpy?.mockRestore()
     globalThis.fetch = originalFetch
+    mock.restore()
   })
 
   test("non-TUI mode: should show warning but continue when OpenCode binary not found", async () => {

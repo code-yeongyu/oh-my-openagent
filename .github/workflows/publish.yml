@@ -39,24 +39,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
@@ -65,30 +63,52 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release test gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages before release tests.
+            - Runs the full root `bun test` suite before publishing.
+          JOB_SUMMARY_NEXT: Fix the first failing test or vendored package build before rerunning release.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Type check
         run: bun run typecheck
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release typecheck gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP tooling.
+            - Runs `bun run typecheck` before any publish job can start.
+          JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; release jobs stay blocked until this is green.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   codex-compatibility:
     runs-on: ${{ matrix.os }}
@@ -97,24 +117,22 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
@@ -122,6 +140,18 @@ jobs:
 
       - name: Run Codex compatibility tests
         run: bun run test:codex
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release Codex compatibility (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds MCP runtime prerequisites.
+            - Runs `bun run test:codex` across the supported OS matrix.
+          JOB_SUMMARY_NEXT: Inspect the first failing Codex component or installer test for `${{ matrix.os }}`.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   preflight-trust:
     runs-on: ubuntu-latest
@@ -156,7 +186,7 @@ jobs:
             exit 1
           fi
 
-          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
           ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
           if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
             ALL_PACKAGES+=(lazycodex-ai)
@@ -204,6 +234,28 @@ jobs:
 
           echo
           echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Trusted publishing preflight"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| LazyCodex publish | \`${{ inputs.publish_lazycodex }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Requires the LazyCodex sync token for stable releases."
+            echo "- Verifies npm trusted-publisher mappings before release writes begin."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Configure the missing npm trusted publisher or required sync secret before rerunning."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   release-metadata:
     runs-on: ubuntu-latest
@@ -254,6 +306,29 @@ jobs:
           echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Release metadata"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Version | \`${{ steps.version.outputs.version || 'not calculated' }}\` |"
+            echo "| Dist tag | \`${{ steps.version.outputs.dist_tag || 'latest' }}\` |"
+            echo "| Previous LazyCodex | \`${{ steps.version.outputs.previous_lazycodex_version || 'none' }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Resolves the release version from manual inputs."
+            echo "- Computes the npm dist tag and previous LazyCodex comparison version."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Check the requested version format, bump input, or npm metadata lookup."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish-main:
     runs-on: ubuntu-latest
     needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]
@@ -267,7 +342,7 @@ jobs:
       needs.release-metadata.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -287,14 +362,12 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Verify platform packages are published
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
           FAILED=()
           for platform in "${PLATFORMS[@]}"; do
             for family in oh-my-opencode oh-my-openagent; do
@@ -367,7 +440,7 @@ jobs:
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
-          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             package_dir="packages/oh-my-opencode-${platform}"
             jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
             mv tmp.json "${package_dir}/package.json"
@@ -465,7 +538,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
+            .files = ["dist/cli", "dist/cli-node", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |
@@ -535,6 +608,19 @@ jobs:
         run: |
           git checkout -- package.json
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Wrapper package publish
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Verifies platform packages exist before wrapper publish.
+            - Publishes `oh-my-opencode`, `oh-my-openagent`, and optionally `lazycodex-ai`.
+            - Smoke-tests the published LazyCodex package when it was published.
+          JOB_SUMMARY_NEXT: Check package existence probes first, then npm publish logs and the LazyCodex smoke section.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   publish-platform:
     needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
     if: >-
@@ -561,7 +647,7 @@ jobs:
       needs.publish-main.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -573,8 +659,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Generate changelog
         run: |
@@ -616,7 +700,7 @@ jobs:
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
-          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             package_dir="packages/oh-my-opencode-${platform}"
             jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
             mv tmp.json "${package_dir}/package.json"
@@ -635,7 +719,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/hooks.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
@@ -675,7 +759,7 @@ jobs:
 
       - name: Checkout LazyCodex marketplace
         if: needs.release-metadata.outputs.dist_tag == ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: code-yeongyu/lazycodex
           path: lazycodex-marketplace
@@ -693,7 +777,6 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
           mv tmp.json packages/omo-codex/plugin/package.json
           npm --prefix packages/omo-codex/plugin ci
-          bun run build:ast-grep-mcp
           bun run build:git-bash-mcp
           bun run build:lsp-tools-mcp
           bun run build:lsp-daemon
@@ -787,3 +870,17 @@ jobs:
           git checkout master
           git reset --hard "v${VERSION}"
           git push -f origin master || echo "::warning::Failed to push to master"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release finalization
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Applies and commits release state when needed.
+            - Creates or reuses the release tag.
+            - Syncs LazyCodex marketplace payload and creates GitHub releases.
+            - Attempts the protected `master` mirror update after release.
+          JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

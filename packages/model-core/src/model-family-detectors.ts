@@ -44,10 +44,30 @@ export function isClaudeOpus47OrLaterModel(model: string): boolean {
   return major > 4 || (major === 4 && minor >= 7)
 }
 
+/**
+ * Claude Fable / Mythos family (e.g. claude-fable-5, claude-mythos-5,
+ * claude-mythos-preview). Like Opus 4.7+, these are adaptive-only: they reject
+ * thinking.type "enabled" with a 400 and require adaptive thinking + effort,
+ * which OpenCode core derives from the model variant.
+ */
+const CLAUDE_FABLE_OR_MYTHOS_RE = /claude-(?:fable|mythos)-(?:\d+|preview)/
+
+export function isClaudeFableOrMythosModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return CLAUDE_FABLE_OR_MYTHOS_RE.test(modelName)
+}
+
 export function isKimiK2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   if (modelName.includes("kimi")) return true
-  if (/k2[-.]?p[56]/.test(modelName)) return true
+  if (/k2[-.]?p[567]/.test(modelName)) return true
+  return false
+}
+
+export function isKimiK27Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  if (/kimi-k2[.\-]?7/.test(modelName)) return true
+  if (/k2[-.]?p7/.test(modelName)) return true
   return false
 }
 

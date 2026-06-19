@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { collectCommandHooks, readJson, root } from "./aggregate-plugin-fixture.mjs";
+import { collectCommandHooks, readAggregateHookManifests, readJson, root } from "./aggregate-plugin-fixture.mjs";
 
 const BOOTSTRAP_SCRIPT_RELATIVE_PATH = join("components", "bootstrap", "scripts", "bootstrap.ps1");
-const HOOK_MANIFEST_SOURCES = ["hooks/hooks.json", "components/bootstrap/hooks/hooks.json"];
+const BOOTSTRAP_AGGREGATE_HOOK_SOURCE = "hooks/session-start-checking-bootstrap-provisioning.json";
+const HOOK_MANIFEST_SOURCES = [BOOTSTRAP_AGGREGATE_HOOK_SOURCE, "components/bootstrap/hooks/hooks.json"];
 const BOOTSTRAP_PS1_COMMAND_WINDOWS_TARGET = "\\components\\bootstrap\\scripts\\bootstrap.ps1";
 const TLS12_LINE_PATTERN =
 	/\[Net\.ServicePointManager\]::SecurityProtocol\s*=\s*\[Net\.ServicePointManager\]::SecurityProtocol\s+-bor\s+\[Net\.SecurityProtocolType\]::Tls12/;
@@ -114,9 +115,12 @@ test("#given bootstrap.ps1 #when every character is inspected #then the script i
 });
 
 test("#given the aggregate and bootstrap component hook manifests #when commandWindows entries are read #then the bootstrap SessionStart hook launches bootstrap.ps1", async () => {
+	const aggregateHooks = await readAggregateHookManifests();
 	for (const source of HOOK_MANIFEST_SOURCES) {
 		// given
-		const hooks = await readJson(source);
+		const hooks =
+			aggregateHooks.find((manifest) => manifest.source === source)?.hooks ??
+			(await readJson(source));
 
 		// when
 		const launchers = collectCommandHooks(hooks, source)

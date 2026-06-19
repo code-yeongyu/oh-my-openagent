@@ -1,9 +1,12 @@
 import { existsSync } from "node:fs"
 import { createRequire } from "node:module"
+import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
-import type { DependencyInfo } from "../types"
-import { spawnWithTimeout } from "../spawn-with-timeout"
+import { astGrepRuntimeDir, findSgBinarySync } from "@oh-my-opencode/utils"
+
+import type { DependencyInfo } from "../framework/types"
+import { spawnWithTimeout } from "../framework/spawn-with-timeout"
 import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
 import { bunWhich } from "../../../shared/bun-which-shim"
 import { isModuleResolutionFailure } from "../../../shared/module-resolution-failure"
@@ -36,77 +39,27 @@ async function getBinaryVersion(binary: string): Promise<string | null> {
 }
 
 export async function checkAstGrepCli(): Promise<DependencyInfo> {
-  const binaryCheck = await checkBinaryExists("sg")
-  const altBinaryCheck = !binaryCheck.exists ? await checkBinaryExists("ast-grep") : null
-
-  const binary = binaryCheck.exists ? binaryCheck : altBinaryCheck
-  if (!binary || !binary.exists) {
+  const runtimeDir = astGrepRuntimeDir(join(homedir(), ".omo"))
+  const sgPath = findSgBinarySync({ runtimeDir })
+  if (sgPath === null) {
     return {
       name: "AST-Grep CLI",
       required: false,
       installed: false,
       version: null,
       path: null,
-      installHint: "Install: npm install -g @ast-grep/cli",
+      installHint: "Provisioned automatically by the bundled ast-grep skill; reinstall or start a new OpenCode session to retry.",
     }
   }
 
-  const version = await getBinaryVersion(binary.path)
+  const version = await getBinaryVersion(sgPath)
 
   return {
     name: "AST-Grep CLI",
     required: false,
     installed: true,
     version,
-    path: binary.path,
-  }
-}
-
-export async function checkAstGrepNapi(
-  importNapiProbe: () => Promise<unknown> = () => import("@ast-grep/napi"),
-): Promise<DependencyInfo> {
-  // Try dynamic import first (works in bunx temporary environments)
-  try {
-    await importNapiProbe()
-    return {
-      name: "AST-Grep NAPI",
-      required: false,
-      installed: true,
-      version: null,
-      path: null,
-    }
-  } catch (error) {
-    if (!(error instanceof Error) && !isModuleResolutionFailure(error)) throw error
-    // Fallback: check common installation paths
-    const { existsSync } = await import("fs")
-    const { join } = await import("path")
-    const { homedir } = await import("os")
-
-    const pathsToCheck = [
-      join(homedir(), ".config", "opencode", "node_modules", "@ast-grep", "napi"),
-      join(process.cwd(), "node_modules", "@ast-grep", "napi"),
-    ]
-
-    for (const napiPath of pathsToCheck) {
-      if (existsSync(napiPath)) {
-        return {
-          name: "AST-Grep NAPI",
-          required: false,
-          installed: true,
-          version: null,
-          path: napiPath,
-        }
-      }
-    }
-
-    return {
-      name: "AST-Grep NAPI",
-      required: false,
-      installed: false,
-      version: null,
-      path: null,
-      installHint: "Will use CLI fallback if available",
-    }
+    path: sgPath,
   }
 }
 

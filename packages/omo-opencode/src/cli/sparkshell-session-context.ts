@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -221,7 +222,7 @@ function formatSessionContextBlock(sessionId: string, context: ExtractedSessionC
   }
 
   const lines: string[] = [
-    "===== codex session context (auto-attached by sparkshell) =====",
+    "===== codex session context (for sparkshell relevance ranking) =====",
     `thread: ${sessionId} | ${context.userMessageCount} user request(s), ${context.conversationMessageCount} conversation message(s) so far`,
   ]
   if (metaParts.length > 0) {
@@ -245,7 +246,7 @@ function formatSessionContextBlock(sessionId: string, context: ExtractedSessionC
 
   lines.push(
     "",
-    "Combine this session context with the shell result above to keep follow-up instructions aligned with the user's actual goals.",
+    "Use this session context only to rank command-output relevance; do not echo it in the command output.",
     "===== end codex session context =====",
   )
   return lines.join("\n")
@@ -297,9 +298,7 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null
-}
+
 
 function isFalsy(value: string | undefined): boolean {
   if (value === undefined) {

@@ -1,9 +1,1 @@
-import { GIT_MASTER_COMMIT_ATOMIC_PLANNING_SECTION } from "./commit-atomic-planning"
-import { GIT_MASTER_COMMIT_CONTEXT_ANALYSIS_SECTION } from "./commit-context-analysis"
-import { GIT_MASTER_COMMIT_EXECUTION_VERIFICATION_SECTION } from "./commit-execution-verification"
-
-export const GIT_MASTER_COMMIT_WORKFLOW_SECTION = [
-	GIT_MASTER_COMMIT_CONTEXT_ANALYSIS_SECTION,
-	GIT_MASTER_COMMIT_ATOMIC_PLANNING_SECTION,
-	GIT_MASTER_COMMIT_EXECUTION_VERIFICATION_SECTION,
-].join("\n\n---\n\n")
+export * from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/git-master-sections/commit-workflow"

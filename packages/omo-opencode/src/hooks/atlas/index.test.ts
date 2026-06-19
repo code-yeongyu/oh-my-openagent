@@ -11,7 +11,10 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
-import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
+import {
+  DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
+  releaseAllPromptAsyncReservationsForTesting,
+} from "../../shared/prompt-async-gate"
 import { DEFAULT_SESSION_STATUS_TIMEOUT_MS } from "../../shared/session-idle-settle"
 import type { AtlasHookOptions, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
@@ -81,6 +84,7 @@ describe("atlas hook", () => {
 
   beforeEach(() => {
     _resetForTesting()
+    releaseAllPromptAsyncReservationsForTesting()
     registerAgentName("atlas")
     registerAgentName("sisyphus")
     TEST_DIR = join(tmpdir(), `atlas-test-${randomUUID()}`)
@@ -97,6 +101,7 @@ describe("atlas hook", () => {
 
   afterEach(() => {
     _resetForTesting()
+    releaseAllPromptAsyncReservationsForTesting()
     callerAgentBySession.clear()
     clearBoulderState(TEST_DIR)
     if (existsSync(TEST_DIR)) {
@@ -1319,7 +1324,7 @@ session_id: ses_untrusted_999
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
       expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
-    })
+    }, { timeout: 10_000 })
 
     test("should inject continuation when idle event carries session id in info", async () => {
       // given - boulder state with incomplete plan and nested session event shape

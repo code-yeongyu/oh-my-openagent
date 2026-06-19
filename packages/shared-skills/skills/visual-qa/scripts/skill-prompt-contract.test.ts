@@ -5,6 +5,15 @@ import { dirname, join } from "node:path"
 const repoRoot = findRepoRoot(import.meta.dir)
 const sharedSkillPath = join(repoRoot, "packages", "shared-skills", "skills", "visual-qa", "SKILL.md")
 const codexSkillPath = join(repoRoot, "packages", "omo-codex", "plugin", "skills", "visual-qa", "SKILL.md")
+const referencesPath = join(
+	repoRoot,
+	"packages",
+	"shared-skills",
+	"skills",
+	"visual-qa",
+	"references",
+	"agent-browser-setup.md",
+)
 
 type PromptFixture = {
 	readonly label: string
@@ -30,10 +39,11 @@ function findRepoRoot(start: string): string {
 }
 
 function fixtures(): readonly PromptFixture[] {
-	return [
-		{ label: "shared skill", text: readPrompt(sharedSkillPath) },
-		{ label: "codex plugin copy", text: readPrompt(codexSkillPath) },
-	]
+	const promptFixtures: PromptFixture[] = [{ label: "shared skill", text: readPrompt(sharedSkillPath) }]
+	if (existsSync(codexSkillPath)) {
+		promptFixtures.push({ label: "codex plugin copy", text: readPrompt(codexSkillPath) })
+	}
+	return promptFixtures
 }
 
 function sectionBetween(text: string, startMarker: string, endMarker: string): string {
@@ -78,6 +88,40 @@ describe("visual-qa skill prompt contract", () => {
 			expect(lowerCheckBlock, fixture.label).toContain("reused primitives")
 			expect(lowerCheckBlock, fixture.label).toContain("blocking")
 			expect(outputBlock, fixture.label).toContain("BLOCKING:")
+		}
+	})
+
+	test("#given the Web capture path #when no browser tooling is configured #then it falls back to agent-browser", () => {
+		for (const fixture of fixtures()) {
+			const web = sectionBetween(fixture.text, "### Web", "### TUI")
+
+			expect(web, fixture.label).toContain("agent-browser")
+			expect(fixture.text, fixture.label).toContain("bun add -g agent-browser")
+			expect(fixture.text, fixture.label).toContain("https://github.com/vercel-labs/agent-browser")
+			expect(fixture.text, fixture.label).toContain("references/agent-browser-setup.md")
+		}
+	})
+
+	test("#given the agent-browser fallback #when documenting setup #then a references doc lists install, link, and help", () => {
+		expect(existsSync(referencesPath)).toBe(true)
+		const doc = readFileSync(referencesPath, "utf8")
+
+		expect(doc).toContain("bun add -g agent-browser")
+		expect(doc).toContain("agent-browser install")
+		expect(doc).toContain("https://github.com/vercel-labs/agent-browser")
+		expect(doc).toContain("agent-browser --help")
+	})
+
+	test("#given a clone/design-port task #when in clone-coding mode #then dual pixel + code-fidelity verification loops until both pass", () => {
+		for (const fixture of fixtures()) {
+			const cloneMode = sectionBetween(fixture.text, "## Step 5", "## Reference evidence is not the verdict")
+			const lowerCloneMode = cloneMode.toLowerCase()
+
+			expect(lowerCloneMode, fixture.label).toContain("clone")
+			expect(cloneMode, fixture.label).toContain("pixel-by-pixel")
+			expect(cloneMode, fixture.label).toContain("image-diff")
+			expect(cloneMode, fixture.label).toContain("lazycodex-clone-fidelity-reviewer")
+			expect(lowerCloneMode, fixture.label).toContain("retry")
 		}
 	})
 })

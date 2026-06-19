@@ -11,6 +11,7 @@ import { normalizeSDKResponse } from "../../shared"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
+import { getPersistedBackgroundTaskDescription } from "./background-task-description"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -29,8 +30,9 @@ export async function executeUnstableAgentTask(
   try {
     const tddEnabled = sisyphusAgentConfig?.tdd
     const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
+    const persistedDescription = getPersistedBackgroundTaskDescription(args, agentToUse)
     const task = await manager.launch({
-      description: args.description,
+      description: persistedDescription,
       prompt: effectivePrompt,
       agent: agentToUse,
       parentSessionId: parentContext.sessionID,
