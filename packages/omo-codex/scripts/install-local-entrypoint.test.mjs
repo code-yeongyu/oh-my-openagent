@@ -167,7 +167,7 @@ test("#given bun global lazycodex wrapper #when running update dry-run #then pri
 		}).trim();
 
 		// then
-		assert.equal(output, "bun update -g lazycodex-ai@latest");
+		assert.equal(output, "bun update -g lazycodex-ai@latest\nnpx --yes lazycodex-ai@latest install --no-tui --codex-autonomous");
 	} finally {
 		rmSync(tempHome, { recursive: true, force: true });
 	}
@@ -201,8 +201,8 @@ test("#given bun global lazycodex wrapper and untrusted known scripts #when upda
 		// then
 		assert.match(commandLog, /^bun update -g lazycodex-ai@latest$/m);
 		assert.match(commandLog, /^bun pm -g untrusted$/m);
+		assert.match(commandLog, /^npx --yes lazycodex-ai@latest install --no-tui --codex-autonomous$/m);
 		assert.doesNotMatch(commandLog, /^bun pm -g trust/m);
-		assert.doesNotMatch(commandLog, /^npx /m);
 		assert.match(output, /bun pm -g trust oh-my-openagent @code-yeongyu\/comment-checker/);
 		assert.doesNotMatch(output, /left-pad/);
 	} finally {
