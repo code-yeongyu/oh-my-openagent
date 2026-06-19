@@ -1,9 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getPlanChecklist } from "@oh-my-opencode/boulder-state";
 import { afterEach, describe, expect, it } from "vitest";
-import { readContinuationState } from "../src/boulder-reader.js";
+import { getPlanChecklist, readContinuationState } from "../src/boulder-reader.js";
 
 const cleanupRoots: string[] = [];
 
@@ -109,6 +108,21 @@ describe("start-work boulder state reader", () => {
 		expect(state).toBeNull();
 	});
 
+	it("#given paused codex work with remaining checklist #when state is read #then continuation is present", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ status: "paused", sessionIds: ["codex:sess_abc"] }),
+			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state?.planName).toBe("launch-plan");
+		expect(state?.checklist).toEqual({ completed: 0, remaining: 1, total: 1, nextTaskLabel: "First" });
+	});
+
 	it("#given no remaining top-level checklist items #when state is read #then continuation is absent", () => {
 		// given
 		const workspace = createWorkspace({
@@ -127,6 +141,20 @@ describe("start-work boulder state reader", () => {
 		// given
 		const workspace = createWorkspace({
 			boulderJson: "{",
+			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state).toBeNull();
+	});
+
+	it("#given bare boulder session id #when codex state is read #then continuation is absent", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ status: "active", sessionIds: ["sess_abc"] }),
 			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n",
 		});
 
