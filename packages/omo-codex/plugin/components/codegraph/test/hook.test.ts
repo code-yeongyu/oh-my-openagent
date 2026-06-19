@@ -14,7 +14,7 @@ import {
 } from "../src/hook.ts";
 
 const pluginRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
-const hooksConfigPath = resolve(pluginRoot, "hooks/hooks.json");
+const pluginConfigPath = resolve(pluginRoot, ".codex-plugin/plugin.json");
 
 describe("CodeGraph SessionStart hook", () => {
 	it("#given hook session-start cli args #when invoked with empty JSON input #then it emits valid JSON and exits zero", async () => {
@@ -537,18 +537,18 @@ describe("CodeGraph SessionStart hook", () => {
 
 	it("#given plugin hook config #when inspected #then CodeGraph is registered after bootstrap SessionStart", () => {
 		// given
-		const hooksConfig = JSON.parse(readFileSync(hooksConfigPath, "utf8"));
+		const pluginConfig: unknown = JSON.parse(readFileSync(pluginConfigPath, "utf8"));
 
 		// when
-		const sessionStartHooks = hooksConfig.hooks.SessionStart;
-		const commands = sessionStartHooks.map((entry: { readonly hooks: readonly [{ readonly command: string }] }) => {
-			return entry.hooks[0].command;
-		});
+		const hookPaths =
+			typeof pluginConfig === "object" && pluginConfig !== null && "hooks" in pluginConfig && Array.isArray(pluginConfig.hooks)
+				? pluginConfig.hooks.filter((hookPath): hookPath is string => typeof hookPath === "string")
+				: [];
 
 		// then
-		expect(commands).toContain('node "${PLUGIN_ROOT}/components/codegraph/dist/cli.js" hook session-start');
-		expect(commands.indexOf('node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start')).toBeLessThan(
-			commands.indexOf('node "${PLUGIN_ROOT}/components/codegraph/dist/cli.js" hook session-start'),
+		expect(hookPaths).toContain("./hooks/session-start-checking-codegraph-bootstrap.json");
+		expect(hookPaths.indexOf("./hooks/session-start-checking-bootstrap-provisioning.json")).toBeLessThan(
+			hookPaths.indexOf("./hooks/session-start-checking-codegraph-bootstrap.json"),
 		);
 	});
 });

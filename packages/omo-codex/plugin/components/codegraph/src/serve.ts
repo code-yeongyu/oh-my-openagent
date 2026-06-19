@@ -17,6 +17,7 @@ import {
 	evaluateCodegraphNodeSupport,
 } from "../../../../../utils/src/codegraph/node-support.ts";
 import {
+	codegraphCommandRequiresSupportedLocalNode,
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 	type ResolveCodegraphCommandOptions,
@@ -88,7 +89,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	}
 
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-	if (resolution.source !== "bundled" && resolution.source !== "env" && !nodeSupport.supported) {
+	if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
 		(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
 		return 1;
 	}

@@ -16,6 +16,12 @@ export interface CodegraphCommandResolution {
   readonly source: CodegraphCommandSource
 }
 
+export function codegraphCommandRequiresSupportedLocalNode(
+  resolution: CodegraphCommandResolution,
+): boolean {
+  return resolution.source !== "bundled" && resolution.source !== "env" && resolution.source !== "provisioned"
+}
+
 export interface ResolveCodegraphCommandOptions {
   readonly env?: Record<string, string | undefined>
   readonly fileExists?: (filePath: string) => boolean

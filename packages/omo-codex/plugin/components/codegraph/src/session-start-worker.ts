@@ -9,6 +9,7 @@ import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
 import {
+	codegraphCommandRequiresSupportedLocalNode,
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 } from "../../../../../utils/src/codegraph/resolve.ts";
@@ -103,7 +104,7 @@ async function resolveOrProvisionCommand(
 ): Promise<ResolutionResult> {
 	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(config.install_dir) });
 	if (resolved.exists) {
-		if (resolved.source !== "bundled" && resolved.source !== "env" && !nodeSupport.supported) {
+		if (codegraphCommandRequiresSupportedLocalNode(resolved) && !nodeSupport.supported) {
 			return { kind: "unsupported-node" };
 		}
 		return { kind: "resolved", resolution: resolved };
