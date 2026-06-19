@@ -1514,11 +1514,15 @@ async function runCodegraphServe(options = {}) {
     provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir)
   };
   const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+  const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
   if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync4)) {
+    if (resolution.source === "path" && !nodeSupport.supported) {
+      (options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
+      return 1;
+    }
     (options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
     return 1;
   }
-  const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
   if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
     (options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
     return 1;
