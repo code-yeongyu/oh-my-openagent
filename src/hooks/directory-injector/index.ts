@@ -1,0 +1,1 @@
+export { createDirectoryInjectorHook } from "./factory";
