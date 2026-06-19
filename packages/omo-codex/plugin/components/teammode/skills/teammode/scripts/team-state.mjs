@@ -14,6 +14,13 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 export const LENSES = ["area", "ownership", "perspective"];
 export const MEMBER_STATUSES = ["pending", "active", "reported", "blocked", "archived"];
+// A team is never a single member: two or more distinct slices is the minimum. One isolated
+// job is a subagent, not a team.
+export const MIN_MEMBERS = 2;
+
+export function isUnderstaffed(team) {
+	return team.members.length < MIN_MEMBERS;
+}
 // A team dir is a single child of .omo/teams. This pattern alone blocks "/", "\", and a
 // leading "." so ".." and "a/b" can never name a team dir (the escape guard).
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
