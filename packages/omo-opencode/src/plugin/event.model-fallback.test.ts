@@ -473,6 +473,68 @@ describe("createEventHandler - model fallback", () => {
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
+  test("preserves existing prompt params when accepted fallback has no generation overrides", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_provider_only_preserves_prompt_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["openai"], model: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_provider_only_preserves_prompt_params",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_provider_only_preserves_prompt_params",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+    })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
   test("restores previous prompt params when fallback continuation is skipped by prompt gate", async () => {
     //#given
     const sessionID = "ses_auto_continuation_skipped_restores_prompt_params"

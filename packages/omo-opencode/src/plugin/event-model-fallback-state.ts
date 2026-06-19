@@ -14,10 +14,10 @@ import { readConnectedProvidersCache } from "../shared/connected-providers-cache
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
 import { getSessionModel } from "../shared/session-model-state";
-import { applySessionPromptParams } from "../shared/session-prompt-params-helpers";
 import {
   clearSessionPromptParams,
   getSessionPromptParams,
+  type SessionPromptParams,
   setSessionPromptParams,
 } from "../shared/session-prompt-params-state";
 import { log } from "../shared/logger";
@@ -46,6 +46,37 @@ type FallbackContinuationDedupeState = {
   providerModelKeys: Set<string>;
   providerlessModelKeys: Set<string>;
 };
+
+function hasFallbackPromptParamOverrides(fallbackContext: FallbackContinuationContext | undefined): boolean {
+  return fallbackContext?.reasoningEffort !== undefined
+    || fallbackContext?.temperature !== undefined
+    || fallbackContext?.top_p !== undefined
+    || fallbackContext?.maxTokens !== undefined
+    || fallbackContext?.thinking !== undefined;
+}
+
+function applyFallbackPromptParamOverrides(
+  sessionID: string,
+  fallbackContext: FallbackContinuationContext | undefined,
+  previousPromptParams: SessionPromptParams | undefined,
+): boolean {
+  if (!hasFallbackPromptParamOverrides(fallbackContext)) return false;
+
+  const previousOptions = previousPromptParams?.options ?? {};
+  const options = {
+    ...previousOptions,
+    ...(fallbackContext?.reasoningEffort !== undefined ? { reasoningEffort: fallbackContext.reasoningEffort } : {}),
+    ...(fallbackContext?.thinking !== undefined ? { thinking: fallbackContext.thinking } : {}),
+  };
+  setSessionPromptParams(sessionID, {
+    ...(previousPromptParams ?? {}),
+    ...(fallbackContext?.temperature !== undefined ? { temperature: fallbackContext.temperature } : {}),
+    ...(fallbackContext?.top_p !== undefined ? { topP: fallbackContext.top_p } : {}),
+    ...(fallbackContext?.maxTokens !== undefined ? { maxOutputTokens: fallbackContext.maxTokens } : {}),
+    ...(Object.keys(options).length > 0 ? { options } : {}),
+  });
+  return true;
+}
 
 export function applyUserConfiguredFallbackChain(
   modelFallback: Pick<ModelFallbackHook, "setSessionFallbackChain"> | null | undefined,
@@ -206,8 +237,7 @@ export function createModelFallbackContinuationController(args: {
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
       const launchVariant = fallbackContext?.variant ?? (agentSettings as { variant?: string } | undefined)?.variant;
-      applySessionPromptParams(sessionID, fallbackContext);
-      promptParamsApplied = true;
+      promptParamsApplied = applyFallbackPromptParamOverrides(sessionID, fallbackContext, previousPromptParams);
       const promptBody = {
         path: { id: sessionID },
         body: {
