@@ -16,6 +16,7 @@ import {
   registerAgentName,
 } from "../features/claude-code-session-state";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
+import { getConfiguredDefaultAgent } from "./agent-config-assembly";
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -40,6 +41,7 @@ export interface ConfigHandlerDeps {
 
 type AgentConfigSnapshot = {
   readonly cacheKey: string;
+  readonly configuredDefaultAgent: string | undefined;
   readonly defaultAgent: unknown;
   readonly agents: Record<string, unknown>;
 }
@@ -67,14 +69,16 @@ function createAgentConfigCacheKey(config: Record<string, unknown>): string {
     agent: config.agent,
     default_agent: config.default_agent,
     model: config.model,
+    skills: config.skills,
   })
 }
 
 function replayAgentConfigSideEffects(params: {
   agentResult: Record<string, unknown>;
+  configuredDefaultAgent: string | undefined;
   defaultAgent: unknown;
 }): void {
-  if (typeof params.defaultAgent === "string") {
+  if (params.configuredDefaultAgent && typeof params.defaultAgent === "string") {
     setDefaultAgentForSort(params.defaultAgent)
   }
   clearRegisteredAgentNames()
@@ -114,9 +118,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentResult = config.agent as Record<string, unknown>;
       replayAgentConfigSideEffects({
         agentResult,
+        configuredDefaultAgent: agentConfigSnapshot.configuredDefaultAgent,
         defaultAgent: config.default_agent,
       })
     } else {
+      const configuredDefaultAgent = getConfiguredDefaultAgent(config);
       agentResult = await applyAgentConfig({
         config,
         pluginConfig,
@@ -125,6 +131,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       });
       agentConfigSnapshot = {
         cacheKey: agentCacheKey,
+        configuredDefaultAgent,
         defaultAgent: config.default_agent,
         agents: cloneAgentConfig(agentResult),
       };
