@@ -128,7 +128,9 @@ export function createToolExecuteBeforeHandler(args: {
       }
 
       const normalizedSubagentType =
-        typeof output.args.subagent_type === "string" ? stripInvisibleAgentCharacters(output.args.subagent_type) : undefined
+        typeof output.args.subagent_type === "string"
+          ? stripInvisibleAgentCharacters(output.args.subagent_type).trim().toLowerCase()
+          : undefined
 
       if (normalizedSubagentType === "general" || normalizedSubagentType === "general-purpose") {
         replaceToolArgs(output, { category: "quick", subagent_type: undefined })

@@ -208,6 +208,26 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBeUndefined()
     })
 
+    test("rewrites whitespace and case variants of native general aliases to quick category", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const outputs = [
+        { args: { subagent_type: "general-purpose ", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> },
+        { args: { subagent_type: " General", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> },
+      ]
+
+      //#when
+      for (const output of outputs) await handler(input, output)
+
+      //#then
+      for (const output of outputs) {
+        expect(output.args.category).toBe("quick")
+        expect(output.args.subagent_type).toBeUndefined()
+      }
+    })
+
     test("does not rewrite call_omo_agent general-purpose outside its allowed-agent validator", async () => {
       //#given
       const ctx = createCtxWithSessionMessages()
