@@ -148,7 +148,7 @@ describe("createEventHandler - model fallback", () => {
 
     //#then
     expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
-    expect(notedModels).toEqual([{ providerID: "anthropic", modelID: "claude-opus-4-7" }])
+    expect(notedModels).toEqual([{ providerID: "openai", modelID: "gpt-5.5" }])
   })
 
   test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
@@ -385,6 +385,126 @@ describe("createEventHandler - model fallback", () => {
       modelID: "gpt-5.5",
     })
     expect(duplicateOutput.message["model"]).toBeUndefined()
+    expect(fallbackFailureOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+  })
+
+  test("advances non-auto fallback chain when the consumed fallback later fails without model metadata", async () => {
+    //#given
+    const sessionID = "ses_non_auto_name_only_consumed_fallback_failure"
+    subagentSessions.add(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when - original failure arms the first fallback, then the user resume consumes it.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_non_auto_name_only_original_failure",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7-thinking is not supported",
+            },
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+    const firstOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      firstOutput,
+    )
+
+    //#when - OpenCode stores that user turn with fallback provider/model.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_non_auto_name_only_fallback_user",
+            sessionID,
+            role: "user",
+            agent: "Sisyphus - Ultraworker",
+            providerID: "opencode-go",
+            modelID: "gpt-5.5",
+          },
+        },
+      },
+    })
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7-thinking" })
+
+    //#when - the consumed fallback later fails with name-only metadata.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+    const fallbackFailureOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      },
+      fallbackFailureOutput,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(firstOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
     expect(fallbackFailureOutput.message["model"]).toEqual({
       providerID: "opencode-go",
       modelID: "kimi-k2.6",

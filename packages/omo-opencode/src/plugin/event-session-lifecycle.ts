@@ -14,7 +14,6 @@ import {
 import { resetMessageCursor } from "../shared";
 import {
   clearSessionModel,
-  getSessionModel,
   restoreSessionModelFallback,
   setSessionModel,
 } from "../shared/session-model-state";
@@ -148,8 +147,7 @@ export function handleMessageUpdatedSessionState(args: {
     const modelID = info?.modelID as string | undefined;
     if (providerID && modelID && !isCompactionMessage) {
       if (restoreSessionModelFallback(sessionID, { providerID, modelID })) {
-        const restoredModel = getSessionModel(sessionID);
-        if (restoredModel) args.noteSessionModel(sessionID, restoredModel);
+        args.noteSessionModel(sessionID, { providerID, modelID });
         return { info, sessionID, agent, role };
       }
       args.noteSessionModel(sessionID, { providerID, modelID });
