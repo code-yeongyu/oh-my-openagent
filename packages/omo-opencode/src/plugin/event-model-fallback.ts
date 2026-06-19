@@ -11,7 +11,7 @@ import { getNextReachableFallback } from "../hooks/model-fallback/next-fallback"
 import { isAbortError } from "../shared/is-abort-error";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
-import { getSessionModel, setSessionModel } from "../shared/session-model-state";
+import { getSessionModel } from "../shared/session-model-state";
 import {
   extractErrorMessage,
   extractErrorName,
@@ -153,7 +153,6 @@ export function createModelFallbackEventHandler(args: {
           advancedState.providerID = advancedFallback.providerID;
           advancedState.modelID = advancedFallback.modelID;
           setLastKnownModel(sessionID, { providerID: advancedFallback.providerID, modelID: advancedFallback.modelID });
-          setSessionModel(sessionID, { providerID: advancedFallback.providerID, modelID: advancedFallback.modelID });
         }
         args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
       }
@@ -197,13 +196,14 @@ export function createModelFallbackEventHandler(args: {
 
     const providerHint = params.info.providerID as string | undefined;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
-    const sessionModel = getSessionModel(params.sessionID);
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
-    const dedupeProviderID = providerHint ?? sessionModel?.providerID ?? lastKnown?.providerID;
+    const sessionModel = getSessionModel(params.sessionID);
+    const explicitModelID = params.info.modelID as string | undefined;
+    const dedupeProviderID = providerHint ?? (explicitModelID ? undefined : lastKnown?.providerID ?? sessionModel?.providerID);
     const rawModel =
-      (params.info.modelID as string | undefined)
-      ?? sessionModel?.modelID
+      explicitModelID
       ?? lastKnown?.modelID
+      ?? sessionModel?.modelID
       ?? "claude-opus-4-7";
     const currentModel = normalizeFallbackModelID(rawModel);
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };
@@ -247,11 +247,11 @@ export function createModelFallbackEventHandler(args: {
     if (!agentName) return false;
 
     const parsed = extractProviderModelFromErrorMessage(retryMessage);
-    const sessionModel = getSessionModel(params.sessionID);
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
-    const dedupeProviderID = parsed.providerID ?? sessionModel?.providerID ?? lastKnown?.providerID;
+    const sessionModel = getSessionModel(params.sessionID);
+    const dedupeProviderID = parsed.providerID ?? (parsed.modelID ? undefined : lastKnown?.providerID ?? sessionModel?.providerID);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
-    const currentModel = normalizeFallbackModelID(parsed.modelID ?? sessionModel?.modelID ?? lastKnown?.modelID ?? "claude-opus-4-7");
+    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? sessionModel?.modelID ?? "claude-opus-4-7");
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
@@ -289,16 +289,16 @@ export function createModelFallbackEventHandler(args: {
     if (!agentName) return;
 
     const parsed = extractProviderModelFromErrorMessage(params.errorMessage);
-    const sessionModel = getSessionModel(params.sessionID);
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const sessionModel = getSessionModel(params.sessionID);
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
-    const dedupeProviderID = providerHint ?? sessionModel?.providerID ?? lastKnown?.providerID;
+    const dedupeProviderID = providerHint ?? (parsed.modelID ? undefined : lastKnown?.providerID ?? sessionModel?.providerID);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
       (params.props?.modelID as string | undefined)
         || parsed.modelID
-        || sessionModel?.modelID
         || lastKnown?.modelID
+        || sessionModel?.modelID
         || "claude-opus-4-7",
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };

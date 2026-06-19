@@ -107,6 +107,46 @@ describe("model fallback hook", () => {
     expect(output.message["variant"]).toBe("max")
   })
 
+  test("clears fallback title state after a fallback is applied", async () => {
+    const clearedSessions: string[] = []
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(createModelFallbackHook({
+      onCleared: ({ sessionID }) => {
+        clearedSessions.push(sessionID)
+      },
+    }))
+    const sessionID = "ses_model_fallback_title_applied_clear"
+
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+    expect(clearedSessions).toEqual([sessionID])
+  })
+
   test("clears stale auto-continuation pending fallback on real user resume", async () => {
     const clearedSessions: string[] = []
     const hook = unsafeTestValue<{

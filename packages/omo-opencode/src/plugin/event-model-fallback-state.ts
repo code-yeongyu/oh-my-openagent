@@ -110,11 +110,11 @@ export function createModelFallbackContinuationController(args: {
     const normalizedProviderHint = providerHint?.trim();
     if (normalizedProviderHint) return normalizedProviderHint;
 
-    const sessionModel = getSessionModel(sessionID);
-    if (sessionModel?.providerID) return sessionModel.providerID;
-
     const lastKnownModel = lastKnownModelBySession.get(sessionID);
     if (lastKnownModel?.providerID) return lastKnownModel.providerID;
+
+    const sessionModel = getSessionModel(sessionID);
+    if (sessionModel?.providerID) return sessionModel.providerID;
 
     const connectedProvider = readConnectedProvidersCache()?.[0];
     if (connectedProvider) return connectedProvider;

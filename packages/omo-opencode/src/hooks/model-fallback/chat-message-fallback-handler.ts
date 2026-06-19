@@ -1,6 +1,7 @@
 import { log } from "../../shared/logger"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ChatMessageHandlerOutput, ChatMessageInput } from "../../plugin/chat-message"
+import { markSessionModelFallback } from "../../shared/session-model-state"
 
 export async function applyFallbackToChatMessage(params: {
   input: ChatMessageInput
@@ -23,6 +24,11 @@ export async function applyFallbackToChatMessage(params: {
   const { input, output, fallback, toast, onApplied, lastToastKey } = params
   const { sessionID } = input
   if (!sessionID) return
+
+  markSessionModelFallback(sessionID, {
+    providerID: fallback.providerID,
+    modelID: fallback.modelID,
+  })
 
   output.message["model"] = {
     providerID: fallback.providerID,

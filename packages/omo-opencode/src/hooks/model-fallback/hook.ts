@@ -243,6 +243,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
         lastToastKey: controller.lastToastKey,
       })
       discardPendingFallbackPromptParamsRestore(sessionID)
+      void Promise.resolve(onCleared?.({ sessionID })).catch(() => {})
     },
   }
 }

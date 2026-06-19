@@ -12,7 +12,12 @@ import {
   restoreBackgroundOutputConsumption,
 } from "../shared/background-output-consumption";
 import { resetMessageCursor } from "../shared";
-import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
+import {
+  clearSessionModel,
+  getSessionModel,
+  restoreSessionModelFallback,
+  setSessionModel,
+} from "../shared/session-model-state";
 import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
@@ -142,6 +147,11 @@ export function handleMessageUpdatedSessionState(args: {
     const providerID = info?.providerID as string | undefined;
     const modelID = info?.modelID as string | undefined;
     if (providerID && modelID && !isCompactionMessage) {
+      if (restoreSessionModelFallback(sessionID, { providerID, modelID })) {
+        const restoredModel = getSessionModel(sessionID);
+        if (restoredModel) args.noteSessionModel(sessionID, restoredModel);
+        return { info, sessionID, agent, role };
+      }
       args.noteSessionModel(sessionID, { providerID, modelID });
       setSessionModel(sessionID, { providerID, modelID });
     }

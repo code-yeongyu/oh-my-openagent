@@ -3,6 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
+import { handleMessageUpdatedSessionState } from "./event-session-lifecycle"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
@@ -11,7 +12,12 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
-import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
+import {
+  clearSessionModel,
+  getSessionModel,
+  markSessionModelFallback,
+  setSessionModel,
+} from "../shared/session-model-state"
 import {
   clearAllSessionPromptParams,
   getSessionPromptParams,
@@ -114,6 +120,35 @@ describe("createEventHandler - model fallback", () => {
     clearAllSessionPromptParams()
     for (const sessionID of sessionModelTestSessions) clearSessionModel(sessionID)
     sessionModelTestSessions.clear()
+  })
+
+  test("restores the original session model when a fallback user message is stored", () => {
+    //#given
+    const sessionID = "ses_fallback_user_message_restore"
+    sessionModelTestSessions.add(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    markSessionModelFallback(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    const notedModels: Array<{ providerID: string; modelID: string }> = []
+
+    //#when
+    handleMessageUpdatedSessionState({
+      props: {
+        info: {
+          sessionID,
+          role: "user",
+          agent: "Sisyphus - Ultraworker",
+          providerID: "openai",
+          modelID: "gpt-5.5",
+        },
+      },
+      noteSessionModel: (_sessionID, model) => {
+        notedModels.push(model)
+      },
+    })
+
+    //#then
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(notedModels).toEqual([{ providerID: "anthropic", modelID: "claude-opus-4-7" }])
   })
 
   test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
@@ -874,6 +909,8 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_auto_continuation_advances_fallback_state"
     setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    sessionModelTestSessions.add(sessionID)
     const modelFallback = createModelFallbackHook()
     modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
       { providers: ["opencode-go"], model: "gpt-5.5" },
@@ -932,6 +969,7 @@ describe("createEventHandler - model fallback", () => {
       providerID: "kimi-for-coding",
       modelID: "k2p5",
     })
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
