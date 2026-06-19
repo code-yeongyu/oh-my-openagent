@@ -55,6 +55,20 @@ test("#given addMember #when members are added #then lens is constrained and ids
 	assert.throws(() => addMember(team, { id: "C", focus: "   ", lens: "area", deliverable: "d" }), /focus/i);
 });
 
+test("#given MIN_MEMBERS and isUnderstaffed #when a team has fewer than two members #then it is flagged understaffed", async () => {
+	// given
+	const { buildTeam, addMember, MIN_MEMBERS, isUnderstaffed } = await import(stateModuleUrl);
+	let team = buildTeam({ teamName: "T", sessionName: "s", sessionId: "demo", dir: "/abs/.omo/teams/demo" });
+
+	// then --- a team is never a single member: two or more is mandatory
+	assert.equal(MIN_MEMBERS, 2);
+	assert.equal(isUnderstaffed(team), true);
+	team = addMember(team, { id: "A", focus: "a", lens: "area", deliverable: "d" });
+	assert.equal(isUnderstaffed(team), true, "one member is still understaffed");
+	team = addMember(team, { id: "B", focus: "b", lens: "perspective", deliverable: "d" });
+	assert.equal(isUnderstaffed(team), false, "two distinct members satisfy the minimum");
+});
+
 test("#given bindThread and setMemberStatus #when a member is wired to a thread #then thread, cwd, and status update with a log entry", async () => {
 	// given
 	const { buildTeam, addMember, bindThread, setMemberStatus } = await import(stateModuleUrl);

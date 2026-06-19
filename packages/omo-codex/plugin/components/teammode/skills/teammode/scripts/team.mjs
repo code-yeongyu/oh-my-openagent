@@ -26,6 +26,8 @@ import {
 	bindThread,
 	buildTeam,
 	ensureTeamDir,
+	isUnderstaffed,
+	MIN_MEMBERS,
 	readTeam,
 	resolveTeamDir,
 	setMemberStatus,
@@ -164,6 +166,11 @@ const handlers = {
 		process.stdout.write(`Team ${team.teamName} [${team.status}] - leader: main session - ${team.members.length} member(s)\n`);
 		for (const m of team.members) {
 			process.stdout.write(`  ${m.id} (${m.lens}) ${m.focus} -> ${m.deliverable || "(no deliverable)"} [${m.status}]${m.threadId ? ` thread=${m.threadId}` : ""}${m.cwd ? ` cwd=${m.cwd}` : ""}\n`);
+		}
+		if (isUnderstaffed(team)) {
+			process.stdout.write(
+				`WARNING: a team needs at least ${MIN_MEMBERS} members; this team has ${team.members.length}. A single-member team is not a team - add another distinct slice or use a subagent.\n`,
+			);
 		}
 	},
 
