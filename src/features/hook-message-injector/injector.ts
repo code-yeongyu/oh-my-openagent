@@ -61,10 +61,16 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
  */
 export async function findNearestMessageWithFieldsFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
+  timeoutMs = 5000
 ): Promise<StoredMessage | null> {
   try {
-    const response = await client.session.messages({ path: { id: sessionID } })
+    const response = await Promise.race([
+      client.session.messages({ path: { id: sessionID } }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`SDK messages timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ])
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -94,10 +100,16 @@ export async function findNearestMessageWithFieldsFromSDK(
  */
 export async function findFirstMessageWithAgentFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
+  timeoutMs = 5000
 ): Promise<string | null> {
   try {
-    const response = await client.session.messages({ path: { id: sessionID } })
+    const response = await Promise.race([
+      client.session.messages({ path: { id: sessionID } }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`SDK messages timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ])
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 
     for (const msg of messages) {

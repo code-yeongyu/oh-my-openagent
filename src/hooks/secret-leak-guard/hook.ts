@@ -36,8 +36,8 @@ export function createSecretLeakGuardHook(ctx: PluginInput, config?: SecretLeakG
 
       const cwd = (output.args.workdir as string) ?? ctx.directory
       const result = isGitPush(command)
-        ? runGitleaksPrePushScan(cwd, extractRemoteBranch(command))
-        : runGitleaksStagedScan(cwd)
+        ? await runGitleaksPrePushScan(cwd, extractRemoteBranch(command))
+        : await runGitleaksStagedScan(cwd)
 
       if (!result.available) return
 

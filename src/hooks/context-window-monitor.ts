@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { updateTokenCache, clearTokenCache } from "../shared/token-cache"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const ANTHROPIC_ACTUAL_LIMIT =
@@ -75,6 +76,7 @@ export function createContextWindowMonitorHook(_ctx: PluginInput) {
       if (sessionInfo?.id) {
         remindedSessions.delete(sessionInfo.id)
         tokenCache.delete(sessionInfo.id)
+        clearTokenCache(sessionInfo.id)
       }
     }
 
@@ -91,6 +93,11 @@ export function createContextWindowMonitorHook(_ctx: PluginInput) {
       if (!info.sessionID || !info.providerID || !info.tokens) return
 
       tokenCache.set(info.sessionID, {
+        providerID: info.providerID,
+        tokens: info.tokens,
+      })
+
+      updateTokenCache(info.sessionID, {
         providerID: info.providerID,
         tokens: info.tokens,
       })

@@ -1,5 +1,6 @@
 import type { MatrixxConfig } from "../config"
 import type { ContextLimitModelCacheState } from "../shared/context-limit-resolver"
+import { updateTokenCache, clearTokenCache } from "../shared/token-cache"
 import { runPreemptiveCompactionIfNeeded } from "./preemptive-compaction-trigger"
 import {
   createPostCompactionDegradationMonitor,
@@ -66,6 +67,7 @@ export function createPreemptiveCompactionHook(
         tokenCache.delete(id)
         lastCompactionTime.delete(id)
         degradationMonitor.clear(id)
+        clearTokenCache(id)
       }
       return
     }
@@ -87,6 +89,12 @@ export function createPreemptiveCompactionHook(
       tokenCache.set(info.sessionID, {
         providerID: info.providerID,
         modelID: info.modelID ?? "",
+        tokens: info.tokens,
+      })
+
+      updateTokenCache(info.sessionID, {
+        providerID: info.providerID,
+        modelID: info.modelID,
         tokens: info.tokens,
       })
 

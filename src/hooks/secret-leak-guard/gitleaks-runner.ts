@@ -1,5 +1,3 @@
-import { execSync } from "child_process"
-
 import { log } from "../../shared"
 
 export interface GitleaksResult {
@@ -18,11 +16,17 @@ export interface GitleaksFinding {
 }
 
 let gitleaksAvailable: boolean | null = null
+const GITLEAKS_VERSION_TIMEOUT_MS = 5_000
+const GITLEAKS_SCAN_TIMEOUT_MS = 30_000
 
-function checkGitleaksAvailable(): boolean {
+async function checkGitleaksAvailable(): Promise<boolean> {
   if (gitleaksAvailable !== null) return gitleaksAvailable
   try {
-    execSync("gitleaks version", { stdio: "pipe", timeout: 5000 })
+    const proc = Bun.spawn(["gitleaks", "version"], { stdout: "pipe", stderr: "pipe" })
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => { proc.kill(); reject(new Error("timeout")) }, GITLEAKS_VERSION_TIMEOUT_MS)
+    )
+    await Promise.race([proc.exited, timeout])
     gitleaksAvailable = true
   } catch {
     gitleaksAvailable = false
@@ -31,51 +35,51 @@ function checkGitleaksAvailable(): boolean {
   return gitleaksAvailable
 }
 
-export function runGitleaksStagedScan(cwd: string): GitleaksResult {
-  if (!checkGitleaksAvailable()) {
+async function runGitleaksWithArgs(args: string[], cwd: string): Promise<GitleaksResult> {
+  if (!await checkGitleaksAvailable()) {
     return { available: false, findings: [] }
   }
   try {
-    execSync("gitleaks detect --staged --report-format json --report-path /dev/stdout --no-banner --exit-code 0", {
+    const proc = Bun.spawn(["gitleaks", ...args], {
       cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 30000,
+      stdout: "pipe",
+      stderr: "pipe",
     })
-    return { available: true, findings: [] }
-  } catch (err: unknown) {
-    return parseGitleaksError(err)
-  }
-}
-
-export function runGitleaksPrePushScan(cwd: string, remoteBranch: string): GitleaksResult {
-  if (!checkGitleaksAvailable()) {
-    return { available: false, findings: [] }
-  }
-  const logOpts = `${remoteBranch}..HEAD`
-  try {
-    execSync(`gitleaks detect --log-opts="${logOpts}" --report-format json --report-path /dev/stdout --no-banner --exit-code 0`, {
-      cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 30000,
-    })
-    return { available: true, findings: [] }
-  } catch (err: unknown) {
-    return parseGitleaksError(err)
-  }
-}
-
-function parseGitleaksError(err: unknown): GitleaksResult {
-  const execErr = err as { stdout?: Buffer; stderr?: Buffer; status?: number }
-  if (execErr.stdout) {
-    try {
-      const findings = JSON.parse(execErr.stdout.toString()) as GitleaksFinding[]
-      if (Array.isArray(findings) && findings.length > 0) {
-        return { available: true, findings }
-      }
-    } catch {
-      // JSON parse failed — treat as non-finding error
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => { proc.kill(); reject(new Error("timeout")) }, GITLEAKS_SCAN_TIMEOUT_MS)
+    )
+    const exitCode = await Promise.race([proc.exited, timeout])
+    if (exitCode === 0) {
+      return { available: true, findings: [] }
     }
+    const stdout = await new Response(proc.stdout).text()
+    return parseGitleaksOutput(stdout, "")
+  } catch {
+    return { available: true, findings: [], error: "gitleaks timed out or failed to start" }
   }
-  const stderr = execErr.stderr?.toString() ?? ""
-  return { available: true, findings: [], error: stderr || "gitleaks exited unexpectedly" }
+}
+
+export async function runGitleaksStagedScan(cwd: string): Promise<GitleaksResult> {
+  return runGitleaksWithArgs(
+    ["detect", "--staged", "--report-format", "json", "--no-banner", "--exit-code", "0"],
+    cwd,
+  )
+}
+
+export async function runGitleaksPrePushScan(cwd: string, remoteBranch: string): Promise<GitleaksResult> {
+  return runGitleaksWithArgs(
+    ["detect", "--log-opts", `${remoteBranch}..HEAD`, "--report-format", "json", "--no-banner", "--exit-code", "0"],
+    cwd,
+  )
+}
+
+function parseGitleaksOutput(stdout: string, stderr: string): GitleaksResult {
+  try {
+    const findings = JSON.parse(stdout) as GitleaksFinding[]
+    if (Array.isArray(findings) && findings.length > 0) {
+      return { available: true, findings }
+    }
+  } catch {
+  }
+  return { available: true, findings: [], error: stderr || "gitleaks exited with non-zero status" }
 }

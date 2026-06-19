@@ -5,9 +5,9 @@ const execAsync = promisify(exec)
 
 type ExecError = { stdout?: Buffer; stderr?: Buffer; message?: string }
 
-export async function executeCommand(command: string): Promise<string> {
+export async function executeCommand(command: string, timeoutMs = 30000): Promise<string> {
 	try {
-		const { stdout, stderr } = await execAsync(command)
+		const { stdout, stderr } = await execAsync(command, { timeout: timeoutMs })
 
 		const out = stdout?.toString().trim() ?? ""
 		const err = stderr?.toString().trim() ?? ""
