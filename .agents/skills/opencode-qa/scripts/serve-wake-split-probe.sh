@@ -8,7 +8,8 @@
 #
 # Two assertion modes:
 #   --expect reproduced   exit 0 if terminal_stops>1 OR child_task_sessions>1 OR mechanism arm true
-#   --expect fixed        exit 0 if terminal_stops==1, child_task_sessions==1, and fixed branch counts hold
+#   --expect fixed        exit 0 if terminal_stops==1, child_task_sessions==1, fixed branch counts hold,
+#                         and the wake dispatch used the live listener for this probe session
 #
 # Usage:
 #   serve-wake-split-probe.sh [--expect reproduced|fixed] [--evidence-dir DIR]
@@ -362,6 +363,15 @@ swsp_detect_wake_during_parent() {
   fi
 }
 
+swsp_has_session_live_dispatch() {
+  local route_prov="$1"
+  local session_id="$2"
+  [ -n "$session_id" ] || return 1
+  printf '%s\n' "$route_prov" \
+    | grep -F "dispatch via live listener" \
+    | grep -F "\"sessionID\":\"${session_id}\"" >/dev/null 2>&1
+}
+
 # Verify branch-count guard: all required branches fired.
 # Returns 0 if OK, 1 if any required branch missing (also sets RESULT=HARNESS_ERROR).
 swsp_check_branch_counts() {
@@ -377,12 +387,7 @@ swsp_check_branch_counts() {
 
   swsp_info "branch counts: parent-tool-call=$ptc parent-hold=$pc child=$cc wake=$wc"
 
-  local wake_required=0
-  if [ "$mode" = "reproduced" ]; then
-    wake_required=1
-  fi
-
-  if [ "$ptc" -lt 1 ] || [ "$pc" -lt 1 ] || [ "$cc" -lt 1 ] || { [ "$wake_required" -eq 1 ] && [ "$wc" -lt 1 ]; }; then
+  if [ "$ptc" -lt 1 ] || [ "$pc" -lt 1 ] || [ "$cc" -lt 1 ]; then
     printf 'RESULT=HARNESS_ERROR branch_counts parent-tool-call=%s parent-hold=%s child=%s wake=%s\n' \
       "$ptc" "$pc" "$cc" "$wc"
     return 1
@@ -449,6 +454,32 @@ swsp_self_test() {
       swsp_log "FAIL: omo config merge wrong: _probe='$probe_val' explore_model='$explore_model'"
       fails=$((fails+1))
     fi
+  fi
+
+  local route_fixture
+  route_fixture='[2026-06-19T00:00:00.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_other","source":"background-agent-parent-wake"}
+[2026-06-19T00:00:01.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_probe","source":"background-agent-parent-wake"}'
+  if swsp_has_session_live_dispatch "$route_fixture" "ses_probe" \
+    && ! swsp_has_session_live_dispatch "$route_fixture" "ses_missing"; then
+    swsp_info "PASS: live dispatch detection is scoped to the probe session"
+  else
+    swsp_log "FAIL: live dispatch detection accepted an unrelated session"
+    fails=$((fails+1))
+  fi
+
+  local branch_log
+  branch_log="$(mktemp -t swsp-branch-log.XXXXXX)"
+  OQA_TMPDIRS+=("$branch_log")
+  {
+    printf '[2026-06-19T00:00:00.000Z] branch=parent-tool-call\n'
+    printf '[2026-06-19T00:00:01.000Z] branch=parent-hold\n'
+    printf '[2026-06-19T00:00:02.000Z] branch=child\n'
+  } >"$branch_log"
+  if swsp_check_branch_counts "$branch_log" reproduced >/dev/null 2>&1; then
+    swsp_info "PASS: reproduced branch guard accepts mechanism-only evidence"
+  else
+    swsp_log "FAIL: reproduced branch guard still requires wake branch"
+    fails=$((fails+1))
   fi
 
   swsp_stop_fake_llm
@@ -632,11 +663,14 @@ swsp_run_probe() {
   printf '%s\n' "$plugin_inits" >"$evidence_dir/plugin-init-count.txt"
 
   # Step 9: Route provenance
-  local route_prov=""
+  local route_prov_all="" route_prov=""
   if [ -f "$omo_log" ]; then
-    route_prov="$(tail -c "+$((omo_log_offset + 1))" "$omo_log" 2>/dev/null \
+    route_prov_all="$(tail -c "+$((omo_log_offset + 1))" "$omo_log" 2>/dev/null \
       | grep -E "live-server-route" || true)"
+    route_prov="$(printf '%s\n' "$route_prov_all" \
+      | awk -v dir="$OQA_PROJ" -v sid="\"sessionID\":\"${ses_id}\"" 'index($0, dir) || index($0, sid)' || true)"
   fi
+  printf '%s\n' "$route_prov_all" >"$evidence_dir/route-provenance-all.log"
   printf '%s\n' "$route_prov" >"$evidence_dir/route-provenance.log"
   swsp_info "route-provenance lines: $(printf '%s' "$route_prov" | wc -l | tr -d ' ')"
 
@@ -690,7 +724,7 @@ swsp_run_probe() {
   # Arm 2: Mechanism signal (wake dispatched during parent turn + in-process path)
   # in-process path: no live-server-route dispatch line for this wake
   local has_live_dispatch=false
-  if printf '%s' "$route_prov" | grep -q "dispatch via live listener" 2>/dev/null; then
+  if swsp_has_session_live_dispatch "$route_prov" "$ses_id"; then
     has_live_dispatch=true
   fi
   if [ "$wake_during_parent" = "true" ] && [ "$has_live_dispatch" = "false" ]; then
@@ -704,7 +738,8 @@ swsp_run_probe() {
     && [ "${ptc:-0}" -eq 1 ] \
     && [ "${pc:-0}" -eq 1 ] \
     && [ "${cc:-0}" -eq 1 ] \
-    && [ "${wc:-0}" -eq 0 ] 2>/dev/null; then
+    && [ "${wc:-0}" -eq 0 ] \
+    && [ "$has_live_dispatch" = "true" ] 2>/dev/null; then
     result="FIXED"
   fi
 
