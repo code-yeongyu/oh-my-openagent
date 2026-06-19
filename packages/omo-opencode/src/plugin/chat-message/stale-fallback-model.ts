@@ -36,6 +36,14 @@ function sameModel(a: SessionModel | undefined, b: SessionModel | undefined): bo
   return !!a && !!b && a.providerID === b.providerID && a.modelID === b.modelID
 }
 
+function outputModel(value: unknown): SessionModel | undefined {
+  if (!value || typeof value !== "object") return undefined
+  const candidate = value as { readonly providerID?: unknown; readonly modelID?: unknown }
+  return typeof candidate.providerID === "string" && typeof candidate.modelID === "string"
+    ? { providerID: candidate.providerID, modelID: candidate.modelID }
+    : undefined
+}
+
 function messageModel(message: SessionMessage): SessionModel | undefined {
   const info = message.info
   if (isCompactionAgent(info?.agent)) return undefined
@@ -80,7 +88,7 @@ export async function recoverStaleFallbackSessionModel(args: {
   readonly modelFallback: { hasPendingModelFallback?: (sessionID: string) => boolean } | null | undefined
 }): Promise<void> {
   const { ctx, input, output, modelFallback } = args
-  if (!input.sessionID || !input.model) return
+  if (!input.sessionID) return
   if (subagentSessions.has(input.sessionID)) return
   if (getMainSessionID() !== input.sessionID) return
   if (modelFallback?.hasPendingModelFallback?.(input.sessionID)) return
@@ -98,7 +106,8 @@ export async function recoverStaleFallbackSessionModel(args: {
   const rawTitle = sessionInfo?.title
   const fallback = parseFallbackMarker(rawTitle)
   if (!fallback) return
-  if (!sameModel(input.model, fallback)) return
+  const effectiveModel = input.model ?? outputModel(output.message.model)
+  if (!sameModel(effectiveModel, fallback)) return
 
   const restored = await findPreviousNonFallbackModel(ctx, input.sessionID, fallback).catch(() => undefined)
   if (!restored) return
