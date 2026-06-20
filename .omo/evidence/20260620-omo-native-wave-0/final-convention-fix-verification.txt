@@ -1,0 +1,68 @@
+omo-native Wave 0 final convention-fix verification
+UTC 2026-06-20T10:26:06Z
+
+## package convention
+packages/omo-native/package.json:21:    "bun-types": "1.3.14",
+packages/omo-native/tsconfig.json:19:    "types": [
+packages/omo-native/tsconfig.json:20:      "bun-types"
+
+## no package-local @types/node declaration
+no package-local @types/node declaration
+
+## frozen install
+bun install v1.3.14 (0d9b296a)
+
+4 packages installed [92.00ms]
+
+## root direct build
+
+## root build:native
+$ bun run --cwd packages/omo-native build
+$ node build.mjs
+
+## dynamic import
+function
+
+## typecheck
+$ tsgo --noEmit -p tsconfig.json
+
+## intentional seam audit red
+$ vitest run
+
+ RUN  v4.1.8 /Users/yeongyu/local-workspaces/omo-wt/code-yeongyu/omo-native-wave0/packages/omo-native
+
+ ❯ src/__tests__/seam-boundary-audit.test.ts (2 tests | 1 failed) 4ms
+     × requires the senpi seam to own at least one real senpi type-layer import 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/seam-boundary-audit.test.ts > omo-native seam boundary audit > requires the senpi seam to own at least one real senpi type-layer import
+AssertionError: Expected src/senpi/** to contain at least one `import type` or `export type` from the real senpi/pi type layer. This Wave 0 RED proves the seam is still a stub.: expected 0 to be greater than 0
+ ❯ src/__tests__/seam-boundary-audit.test.ts:142:7
+    140|       typeLayerImports.length,
+    141|       "Expected src/senpi/** to contain at least one `import type` or …
+    142|     ).toBeGreaterThan(0)
+       |       ^
+    143|   })
+    144| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  19:26:07
+   Duration  102ms (transform 11ms, setup 0ms, import 15ms, tests 4ms, environment 0ms)
+
+error: script "test" exited with code 1
+seam audit exit: 1 (expected non-zero until Wave 1 real senpi type import)
+
+## cleanup/status
+dist cleaned
+tmux cleanup confirmed: no ulw-qa-omo-native-wave0-terminal
+A  .gitmodules
+ M bun.lock
+ M bunfig.toml
+ M package.json
+A  packages/senpi
+?? packages/omo-native/

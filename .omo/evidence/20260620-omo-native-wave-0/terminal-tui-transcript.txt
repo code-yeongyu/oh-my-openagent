@@ -1,0 +1,22 @@
++--------------------------------------------------------------------------------+
+| omo-native Wave 0 terminal QA                                                  |
++--------------------------------------------------------------------------------+
+| worktree: omo-wt/code-yeongyu/omo-native-wave0 |
+| branch:   code-yeongyu/omo-native-wave0 |
++--------------------------------------------------------------------------------+
+| PASS bun install --frozen-lockfile --ignore-scripts                            |
+| PASS node packages/omo-native/build.mjs                                        |
+| PASS bun run build:native                                                      |
+| PASS dynamic import -> function                                                |
+| PASS bun run --cwd packages/omo-native typecheck                               |
+| RED  seam-boundary audit positive check (planned Wave 1 seam import proof)     |
++--------------------------------------------------------------------------------+
+
+$ bun install --frozen-lockfile --ignore-scripts
+4 packages installed [fresh check]
+
+$ node -e import dist -> function
+function
+
+$ git submodule status packages/senpi
+ 4ce93bcfbc7c681a709f2579f664b1bbf92fbc1b packages/senpi

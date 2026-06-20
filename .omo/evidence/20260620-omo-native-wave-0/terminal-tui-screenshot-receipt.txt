@@ -1,0 +1,11 @@
+# Terminal TUI screenshot capture receipt
+Sat Jun 20 10:19:02 UTC 2026
+channel: tmux terminal pane rendered to PNG with Pillow/Menlo
+tmux invocation: tmux new-session -d -s ulw-qa-omo-native-wave0-terminal -x 120 -y 34 ...
+transcript: .omo/evidence/20260620-omo-native-wave-0/terminal-tui-transcript.txt
+screenshot: .omo/evidence/20260620-omo-native-wave-0/terminal-tui.png
+.omo/evidence/20260620-omo-native-wave-0/terminal-tui.png: PNG image data, 1600 x 1118, 8-bit/color RGB, non-interlaced
+-rw-r--r--  1 yeongyu  staff   1245 Jun 20 19:18 .omo/evidence/20260620-omo-native-wave-0/terminal-tui-transcript.txt
+-rw-r--r--  1 yeongyu  staff  85306 Jun 20 19:19 .omo/evidence/20260620-omo-native-wave-0/terminal-tui.png
+cleanup: tmux kill-session -t ulw-qa-omo-native-wave0-terminal
+cleanup-confirmed: no tmux session remains
