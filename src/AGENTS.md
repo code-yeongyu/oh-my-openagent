@@ -23,7 +23,7 @@ src/
 ├── mcp/                              # Built-in MCPs (6 files) — see mcp/AGENTS.md
 ├── plugin/                           # Plugin interface composition (21 files)
 ├── plugin-handlers/                  # Config loading, plan inheritance (15 files) — see plugin-handlers/AGENTS.md
-├── shared/                           # Cross-cutting utilities (96 files) — see shared/AGENTS.md
+├── shared/                           # Cross-cutting utilities (~85 files) — see shared/AGENTS.md
 └── tools/                            # 26 tools (14 dirs) — see tools/AGENTS.md
 ```
 
