@@ -153,6 +153,15 @@ async function runBootstrap(
       return
     }
 
+    const autoInit = config.auto_init !== false
+    const codegraphPath = join(projectRoot, ".codegraph")
+    if (!autoInit && !existsSync(codegraphPath)) {
+      deps.log("[codegraph-bootstrap] CodeGraph auto_init disabled and .codegraph not present; skipping bootstrap", {
+        projectRoot,
+      })
+      return
+    }
+
     const workspace = deps.prepareWorkspace(projectRoot)
     deps.ensureGitignored(projectRoot)
     const env = codegraphEnv(deps, config)
