@@ -34,6 +34,7 @@
 		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
 		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
 		"./hooks/post-tool-use-matching-project-rules.json",
+		"./hooks/post-tool-use-checking-thread-title-hygiene.json",
 		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
 		"./hooks/post-compact-resetting-project-rule-cache.json",
 		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",

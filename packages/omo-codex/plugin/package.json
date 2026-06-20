@@ -13,6 +13,7 @@
 		"components/rules",
 		"components/lsp",
 		"components/telemetry",
+		"components/teammode",
 		"components/start-work-continuation",
 		"components/ulw-loop",
 		"components/ultrawork"
