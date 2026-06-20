@@ -9,6 +9,7 @@ import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { PICKUP_TEMPLATE } from "./templates/pickup"
 import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
 import { PROFILE_TEMPLATE } from "./templates/profile"
+import { END_ULTRAWORK_TEMPLATE } from "./templates/end-ultrawork"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -125,6 +126,17 @@ ${PROFILE_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[list|show|set <name> [--global|--project]]",
+  },
+  "end-ultrawork": {
+    description: "(builtin) Deactivate ultrawork mode and return to default Matrixx behavior for the current session",
+    template: `<command-instruction>
+${END_ULTRAWORK_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[optional follow-up task]",
   },
 }
 

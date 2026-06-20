@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
+import { END_ULTRAWORK_TEMPLATE } from "./templates/end-ultrawork"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
@@ -113,6 +114,61 @@ describe("loadBuiltinCommands - remove-deadcode", () => {
 
     //#then
     expect(commands["remove-deadcode"].description).toContain("dead code")
+  })
+})
+
+describe("loadBuiltinCommands - end-ultrawork", () => {
+  test("should include end-ultrawork command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["end-ultrawork"]).toBeDefined()
+    expect(commands["end-ultrawork"].name).toBe("end-ultrawork")
+  })
+
+  test("should exclude end-ultrawork when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["end-ultrawork"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["end-ultrawork"]).toBeUndefined()
+  })
+
+  test("should include end-ultrawork template content in command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["end-ultrawork"].template).toContain(END_ULTRAWORK_TEMPLATE)
+  })
+
+  test("should include $ARGUMENTS in end-ultrawork template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["end-ultrawork"].template).toContain("$ARGUMENTS")
+  })
+
+  test("should have correct description for end-ultrawork", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["end-ultrawork"].description).toContain("ultrawork")
   })
 })
 
