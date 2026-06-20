@@ -1,10 +1,20 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 import * as realFs from "node:fs"
+import * as realFsPromises from "node:fs/promises"
 
-// Capture real readFileSync via require before mock.module replaces it
+// Capture real readFile via require before mock.module replaces it
+// (mirrors the original readFileSync capture pattern)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const realReadFile: typeof realFsPromises.readFile = require("node:fs/promises").readFile
+
+// Capture real readFileSync to verify the refactor is not silently re-introduced
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const realReadFileSync: typeof realFs.readFileSync = require("node:fs").readFileSync
 
+const readFileMock = mock(async (path: string, encoding: string) => {
+  if (typeof path === "string" && path.endsWith("README.md")) return "# README"
+  return realReadFile(path, encoding as BufferEncoding)
+})
 const readFileSyncMock = mock((path: string, encoding: string) => {
   if (typeof path === "string" && path.endsWith("README.md")) return "# README"
   return realReadFileSync(path, encoding as BufferEncoding)
@@ -13,6 +23,11 @@ const findReadmeMdUpMock = mock((_: { startDir: string; rootDir: string }) => []
 const resolveFilePathMock = mock((_: string, path: string) => path)
 const loadInjectedPathsMock = mock((_: string) => new Set<string>())
 const saveInjectedPathsMock = mock((_: string, __: Set<string>) => {})
+
+mock.module("node:fs/promises", () => ({
+  ...realFsPromises,
+  readFile: readFileMock,
+}))
 
 mock.module("node:fs", () => ({
   ...realFs,
@@ -32,11 +47,13 @@ mock.module("./storage", () => ({
 const { processFilePathForReadmeInjection } = await import("./injector")
 
 afterAll(() => {
+  mock.module("node:fs/promises", () => realFsPromises)
   mock.module("node:fs", () => realFs)
 })
 
 describe("processFilePathForReadmeInjection", () => {
   beforeEach(() => {
+    readFileMock.mockClear()
     readFileSyncMock.mockClear()
     findReadmeMdUpMock.mockClear()
     resolveFilePathMock.mockClear()
@@ -123,5 +140,34 @@ describe("processFilePathForReadmeInjection", () => {
     expect(saveInjectedPathsMock).toHaveBeenCalledTimes(1)
     const saveCall = saveInjectedPathsMock.mock.calls[0]
     expect((saveCall[1] as Set<string>).has("/repo/new-dir")).toBe(true)
+  })
+
+  it("uses fs.promises.readFile not readFileSync", async () => {
+    //#given
+    const sessionID = "session-4"
+    loadInjectedPathsMock.mockReturnValueOnce(new Set())
+    findReadmeMdUpMock.mockReturnValueOnce(["/repo/src/README.md"])
+
+    const truncator = {
+      truncate: mock(async () => ({ result: "trimmed", truncated: false })),
+    }
+
+    //#when
+    await processFilePathForReadmeInjection({
+      ctx: { directory: "/repo" } as never,
+      truncator: truncator as never,
+      sessionCaches: new Map(),
+      filePath: "/repo/src/file.ts",
+      sessionID,
+      output: { title: "Result", output: "", metadata: {} },
+    })
+
+    //#then
+    // The injector must call the async readFile from node:fs/promises
+    expect(readFileMock).toHaveBeenCalledTimes(1)
+    expect(readFileMock.mock.calls[0]?.[0]).toBe("/repo/src/README.md")
+    expect(readFileMock.mock.calls[0]?.[1]).toBe("utf-8")
+    // And it must NOT have fallen back to the blocking sync readFileSync
+    expect(readFileSyncMock).not.toHaveBeenCalled()
   })
 })
