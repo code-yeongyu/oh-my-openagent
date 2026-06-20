@@ -24,7 +24,7 @@ features/
 ├── skill-mcp-manager/          # MCP client lifecycle per session (12 files, 1769 LOC)
 │   └── manager.ts              # SkillMcpManager class (150 lines)
 ├── builtin-skills/             # Built-in skills (8 files, ~1700 LOC)
-│   └── skills/                 # git-master (1111), playwright, dev-browser, frontend-ui-ux
+│   └── skills/                 # dev-browser, frontend-ui-ux, git-master (1111), matrixx-self-config, playwright
 ├── builtin-commands/           # 6 command templates (11 files, 1511 LOC)
 │   └── templates/              # refactor, matrix-loop, init-deep, handoff, start-work, stop-continuation
 ├── claude-tasks/               # Task schema + storage (7 files, 1165 LOC)
