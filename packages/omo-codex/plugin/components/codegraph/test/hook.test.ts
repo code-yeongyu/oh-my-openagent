@@ -247,7 +247,7 @@ describe("CodeGraph SessionStart hook", () => {
 		}
 	});
 
-	it("#given an unsupported local Node and a PATH CodeGraph command #when worker runs #then it skips without touching the workspace", async () => {
+	it("#given an unsupported local Node and a PATH CodeGraph command with auto provisioning disabled #when worker runs #then it skips without touching the workspace", async () => {
 		// given
 		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-"));
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-home-"));
@@ -256,6 +256,7 @@ describe("CodeGraph SessionStart hook", () => {
 		try {
 			// when
 			const result = await runCodegraphSessionStartWorker({
+				config: { codegraph: { auto_provision: false, enabled: true }, sources: [], warnings: [] },
 				cwd: workspace,
 				env: { HOME: homeDir },
 				nodeVersion: "26.3.0",
@@ -280,6 +281,52 @@ describe("CodeGraph SessionStart hook", () => {
 			expect(result).toEqual({ action: "skipped-unsupported-node" });
 			expect(existsSync(join(workspace, ".codegraph"))).toBe(false);
 			expect(outcomes).toEqual([{ action: "skipped-unsupported-node", projectRoot: workspace }]);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
+
+	it("#given an unsupported local Node and a PATH CodeGraph command #when auto provisioning succeeds #then it bootstraps with the provisioned binary", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-provision-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-provision-home-"));
+		const binPath = join(homeDir, ".omo", "codegraph", "bin", "codegraph");
+		const calls: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
+		const outcomes: unknown[] = [];
+
+		try {
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				cwd: workspace,
+				env: { HOME: homeDir },
+				nodeVersion: "26.3.0",
+				logOutcome: (outcome) => outcomes.push(outcome),
+				deps: {
+					ensureGitignored: () => true,
+					ensureProvisioned: () => Promise.resolve({ binPath, provisioned: true }),
+					prepareWorkspace: () => ({
+						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
+						dataRoot: join(homeDir, ".omo/codegraph"),
+						linked: true,
+						mode: "global-linked",
+						projectLink: join(workspace, ".codegraph"),
+					}),
+					resolveCommand: () => ({ argsPrefix: [], command: "/usr/local/bin/codegraph", exists: true, source: "path" }),
+					runCommand: (_projectRoot, command, args) => {
+						calls.push({ args, command });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "initialized" });
+			expect(calls).toEqual([
+				{ args: ["status", "--json"], command: binPath },
+				{ args: ["init"], command: binPath },
+			]);
+			expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "provisioned", timedOut: false }]);
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });
 			rmSync(homeDir, { recursive: true, force: true });
