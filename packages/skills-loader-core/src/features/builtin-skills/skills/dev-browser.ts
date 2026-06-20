@@ -1,3 +1,4 @@
+import { join } from "node:path"
 import type { BuiltinSkill } from "../types"
 
 export const devBrowserSkill: BuiltinSkill = {
@@ -218,4 +219,5 @@ console.log({
 await client.disconnect();
 EOF
 \`\`\``,
+  resolvedPath: join(import.meta.dir, "..", "dev-browser"),
 }
