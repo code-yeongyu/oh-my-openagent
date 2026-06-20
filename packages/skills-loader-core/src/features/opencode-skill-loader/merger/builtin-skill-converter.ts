@@ -1,3 +1,5 @@
+import { join } from "node:path"
+import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
 import type { BuiltinSkill } from "../../builtin-skills/types"
 import type { CommandDefinition } from "@oh-my-opencode/claude-code-compat-core/claude-code-command-loader/types"
 import type { LoadedSkill } from "../types"
@@ -22,5 +24,6 @@ export function builtinToLoadedSkill(builtin: BuiltinSkill): LoadedSkill {
     metadata: builtin.metadata as Record<string, string> | undefined,
     allowedTools: builtin.allowedTools,
     mcpConfig: builtin.mcpConfig,
+    resolvedPath: join(sharedSkillsRootPath(), builtin.name),
   }
 }
