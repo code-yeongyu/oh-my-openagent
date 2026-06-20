@@ -1,0 +1,33 @@
+CI-like no-submodule install repro from pushed fix
+UTC 2026-06-20T10:32:35Z
+e59250899
+-4ce93bcfbc7c681a709f2579f664b1bbf92fbc1b packages/senpi
+no install-time senpi package links remain
+bun install v1.3.14 (0d9b296a)
+
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260518.1
++ bun-types@1.3.14
++ typescript@6.0.3
++ @clack/prompts@1.5.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.29.0
++ @opencode-ai/plugin@1.15.13
++ @opencode-ai/sdk@1.15.13
++ @opentui/core@0.2.16
++ @opentui/keymap@0.2.16
++ @opentui/solid@0.2.16
++ commander@14.0.3
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@4.2.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.4
++ posthog-node@5.35.12
++ vscode-jsonrpc@8.2.1
++ zod@4.4.3
+
+576 packages installed [354.00ms]
+$ tsgo --noEmit -p tsconfig.json
