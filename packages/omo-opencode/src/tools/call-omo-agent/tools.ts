@@ -13,6 +13,9 @@ import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-m
 import { log } from "../../shared"
 import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { parseModelString } from "../../shared"
+import { fuzzyMatchModel } from "../../shared/model-availability"
+import { getAvailableModelsForDelegateTask } from "../delegate-task/available-models"
+import { resolveRequestedModelOverride } from "@oh-my-opencode/delegate-core"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
 import { resolveCallableAgents } from "./agent-resolver"
@@ -147,6 +150,14 @@ export function createCallOmoAgent(
         .string()
         .describe("Existing Task session to continue")
         .optional(),
+      model: tool.schema
+        .string()
+        .describe("Optional. Override the model for THIS call at your discretion. Format \"provider/model\" or \"provider/model variant\" (e.g. \"openai/gpt-5.5 xhigh\"). Must be a connected/available model or the call is rejected — call `list_models` first to see connected models and valid reasoning values. Omit to use the agent's configured default.")
+        .optional(),
+      reasoning_effort: tool.schema
+        .string()
+        .describe("Optional. Reasoning/variant for THIS call (e.g. \"low\", \"medium\", \"high\", \"xhigh\", \"max\"). Takes precedence over a variant embedded in `model`.")
+        .optional(),
     },
     async execute(args: CallOmoAgentArgs, toolContext) {
       const toolCtx = toolContext as ToolContextWithMetadata;
@@ -178,11 +189,32 @@ export function createCallOmoAgent(
         return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`
       }
 
-      const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({
+      const { model: configResolvedModel, fallbackChain } = resolveModelAndFallbackChain({
         subagentType: args.subagent_type,
         agentOverrides,
         userCategories,
       })
+
+      // Orchestrator per-call model override (gated to connected/available models).
+      let resolvedModel = configResolvedModel
+      if (args.model) {
+        const availableModels = await getAvailableModelsForDelegateTask(ctx.client)
+        const override = resolveRequestedModelOverride(
+          { model: args.model, reasoningEffort: args.reasoning_effort },
+          { availableModels, parseModelString, fuzzyMatchModel },
+        )
+        if (override.kind === "error") {
+          return `Invalid model override: ${override.message}`
+        }
+        if (override.kind === "resolved") {
+          resolvedModel = override.model
+          log("[call_omo_agent] orchestrator model override accepted", {
+            requested: args.model,
+            matched: override.matched,
+            variant: override.model.variant,
+          })
+        }
+      }
 
       if (args.run_in_background) {
         if (args.session_id) {

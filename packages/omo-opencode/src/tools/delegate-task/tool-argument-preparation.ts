@@ -83,6 +83,10 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
 
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
+  const model = typeof args.model === "string" && args.model.trim() !== "" ? args.model : undefined
+  const reasoningEffort = typeof args.reasoning_effort === "string" && args.reasoning_effort.trim() !== ""
+    ? args.reasoning_effort
+    : undefined
 
 
   return {
@@ -96,5 +100,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     task_id: taskID,
     command,
     load_skills: normalizedLoadSkills,
+    model,
+    reasoning_effort: reasoningEffort,
   }
 }

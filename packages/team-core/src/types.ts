@@ -31,6 +31,12 @@ const MemberBaseSchema = z.object({
   backendType: z.enum(["in-process", "tmux"]).default("in-process"),
   color: z.string().optional(),
   isActive: z.boolean().default(true),
+  // Optional per-member model override chosen by the lead/orchestrator at team
+  // definition time, e.g. "openai/gpt-5.5" or "openai/gpt-5.5 xhigh". Gated to
+  // connected/available models when the member is resolved. Omit to use the
+  // category/subagent configured default.
+  model: z.string().optional(),
+  reasoning_effort: z.string().optional(),
 }).strict()
 
 export const CategoryMemberSchema = MemberBaseSchema.extend({

@@ -1,5 +1,6 @@
 export { createGrepTools } from "./grep"
 export { createGlobTools } from "./glob"
+export { createListModelsTools } from "./list-models"
 export { createSkillTool } from "./skill"
 export { discoverCommandsSync } from "./slashcommand"
 export { createSessionManagerTools } from "./session-manager"

@@ -20,6 +20,7 @@ import {
   createGlobTools,
   createGrepTools,
   createHashlineEditTool,
+  createListModelsTools,
   createLookAt,
   createMonitorTools,
   createSessionManagerTools,
@@ -42,6 +43,7 @@ export type ToolRegistryFactories = {
   createSkillTool: typeof createSkillTool
   createGrepTools: typeof createGrepTools
   createGlobTools: typeof createGlobTools
+  createListModelsTools: typeof createListModelsTools
   createSessionManagerTools: typeof createSessionManagerTools
   createDelegateTask: typeof createDelegateTask
   discoverCommandsSync: typeof discoverCommandsSync
@@ -74,6 +76,7 @@ export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createSkillTool,
   createGrepTools,
   createGlobTools,
+  createListModelsTools,
   createSessionManagerTools,
   createDelegateTask,
   discoverCommandsSync,
