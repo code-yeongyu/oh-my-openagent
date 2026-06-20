@@ -1,16 +1,22 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { describe, expect, test } from "bun:test"
-import { normalize } from "node:path"
+import { existsSync } from "node:fs"
+import { join, normalize } from "node:path"
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 import { createBuiltinSkills } from "./skills"
-import { createSharedSkillTemplateLoader, loadSharedSkillTemplate } from "./skill-file-loader"
+import {
+  createSharedSkillTemplateLoader,
+  getBuiltinSkillSourceDir,
+  getSharedSkillSourceDir,
+  loadSharedSkillTemplate,
+} from "./skill-file-loader"
 
 declare const Bun: {
   file(path: string): { text(): Promise<string> }
 }
 
-const SHARED_BUILTIN_SKILLS = ["remove-ai-slops", "review-work", "frontend", "init-deep", "debugging"] as const
+const SHARED_BUILTIN_SKILLS = ["remove-ai-slops", "review-work", "frontend", "init-deep", "debugging", "visual-qa"] as const
 
 describe("shared builtin skill file loader", () => {
   test("#given extracted shared skill files #when builtin skills are created #then templates load from SKILL.md bodies", async () => {
@@ -67,6 +73,20 @@ describe("shared builtin skill file loader", () => {
 
     // then
     expect(loader("layout")).toBe("Layout body")
+  })
+
+  test("#given builtin skills with reference files #when source dirs are resolved #then relative references have a stable base", () => {
+    // given
+    const sharedSourceDir = getSharedSkillSourceDir("debugging")
+    const builtinSourceDir = getBuiltinSkillSourceDir("dev-browser")
+
+    // when
+    const debuggingReferencePath = join(sharedSourceDir, "references", "runtimes", "node.md")
+    const devBrowserReferencePath = join(builtinSourceDir, "references", "installation.md")
+
+    // then
+    expect(existsSync(debuggingReferencePath)).toBe(true)
+    expect(existsSync(devBrowserReferencePath)).toBe(true)
   })
 
   test("#given a missing shared skill file #when loading the template #then the loader fails fast", () => {

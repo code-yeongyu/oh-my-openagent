@@ -1,9 +1,21 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 
 type SkillFileReader = (path: string, encoding: "utf8") => string
+
+export function getSharedSkillSourceDir(skillName: string): string {
+	return join(sharedSkillsRootPath(), skillName)
+}
+
+export function getBuiltinSkillSourceDir(skillName: string): string {
+	const moduleDir = dirname(fileURLToPath(import.meta.url))
+	const sourceDir = join(moduleDir, skillName)
+	if (moduleDir.endsWith(join("src", "features", "builtin-skills")) || existsSync(sourceDir)) return sourceDir
+	return join(dirname(sharedSkillsRootPath()), "builtin-skills", skillName)
+}
 
 export function createSharedSkillTemplateLoader(
 	readFile: SkillFileReader = readFileSync,

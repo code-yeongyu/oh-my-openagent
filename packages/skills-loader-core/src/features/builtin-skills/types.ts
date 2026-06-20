@@ -4,6 +4,7 @@ export interface BuiltinSkill {
   name: string
   description: string
   template: string
+  sourceDir?: string
   license?: string
   compatibility?: string
   metadata?: Record<string, unknown>
