@@ -17,6 +17,7 @@ import {
   MIN_IDLE_TIME_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
   POLLING_INTERVAL_MS,
+  PRUNE_THROTTLE_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
@@ -89,6 +90,7 @@ export class BackgroundManager {
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
   private pollingInFlight = false
+  private lastPruneAt = 0
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
@@ -1650,7 +1652,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
-    this.pruneStaleTasksAndNotifications()
+    // Throttle prune to once per PRUNE_THROTTLE_MS. Stale tasks age out at
+    // TASK_TTL_MS (30 minutes), so a 30s cadence is 60× the minimum useful
+    // frequency and saves ~9 of every 10 prune invocations when polling
+    // runs every POLLING_INTERVAL_MS (3s). The check lives here (not inside
+    // pruneStaleTasksAndNotifications) so the function stays pure and
+    // testable in isolation.
+    if (Date.now() - this.lastPruneAt >= PRUNE_THROTTLE_MS) {
+      this.pruneStaleTasksAndNotifications()
+      this.lastPruneAt = Date.now()
+    }
 
     const statusResult = await this.client.session.status()
     const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
@@ -1847,6 +1858,20 @@ export function getMessageDir(sessionID: string): string | null {
 
 export function _resetMessageDirCacheForTesting(): void {
   messageDirCache.clear()
+}
+
+export function _resetPruneThrottleForTesting(): void {
+  // Access the private static instance set via a typed cast — `private static`
+  // is a per-class visibility modifier, so a module-level function in the
+  // same file needs the cast to read it. Mirrors the _resetMessageDirCacheForTesting
+  // pattern: a thin module-level export that resets module/instance state for
+  // test isolation.
+  const instances = (BackgroundManager as unknown as {
+    cleanupManagers: Set<BackgroundManager>
+  }).cleanupManagers
+  for (const m of instances) {
+    ;(m as unknown as { lastPruneAt: number }).lastPruneAt = 0
+  }
 }
 
 function isCompactionAgent(agent: string | undefined): boolean {

@@ -1,7 +1,7 @@
 import { describe, expect, mock, spyOn, test } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { BackgroundManager } from "./manager"
+import { _resetPruneThrottleForTesting, BackgroundManager } from "./manager"
 
 function createManagerWithStatus(statusImpl: () => Promise<{ data: Record<string, { type: string }> }>): BackgroundManager {
   const client = {
@@ -93,6 +93,39 @@ describe("BackgroundManager polling overlap", () => {
       (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks()
     )
     await Promise.all(concurrentCalls)
+
+    //#then
+    expect(pruneSpy.mock.calls.length).toBe(1)
+
+    pruneSpy.mockRestore()
+    manager.shutdown()
+  })
+
+  test("pruneStaleTasksAndNotifications throttled to 30s", async () => {
+    //#given
+    // Throttle test: pollRunningTasks() fires every 3s (POLLING_INTERVAL_MS),
+    // but pruneStaleTasksAndNotifications only needs to run every 30s — stale
+    // tasks age out at TASK_TTL_MS (30 minutes), so 30s is 60× the minimum
+    // useful frequency. Throttle lives INSIDE pollRunningTasks (not in prune
+    // itself) so the function stays pure. We make 10 SEQUENTIAL awaited calls
+    // so each one enters the body — the B5 test uses concurrent calls which
+    // are blocked by the pollingInFlight guard. The first call updates
+    // lastPruneAt; the 9 subsequent calls see the throttle active and skip.
+    _resetPruneThrottleForTesting()
+    const manager = createManagerWithStatus(async () => ({ data: {} }))
+
+    const pruneSpy = spyOn(
+      manager as unknown as { pruneStaleTasksAndNotifications: () => void },
+      "pruneStaleTasksAndNotifications"
+    )
+    pruneSpy.mockImplementation(() => {})
+
+    const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks.bind(manager)
+
+    //#when
+    for (let i = 0; i < 10; i++) {
+      await poll()
+    }
 
     //#then
     expect(pruneSpy.mock.calls.length).toBe(1)
