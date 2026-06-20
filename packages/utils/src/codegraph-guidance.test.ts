@@ -93,7 +93,7 @@ describe("CodeGraph initialization guidance", () => {
 
   test("#given an uninitialized project #when guidance is built #then it points to the OMO global store", () => {
     // when
-    const guidance = buildCodegraphInitGuidance("/Users/me/project", { homeDir: "/Users/me" })
+    const guidance = normalizeDisplayPaths(buildCodegraphInitGuidance("/Users/me/project", { homeDir: "/Users/me" }))
 
     // then
     expect(guidance).toContain('CodeGraph is not initialized for "/Users/me/project"')
@@ -112,3 +112,7 @@ describe("CodeGraph initialization guidance", () => {
     expect(guidance).not.toContain("project`\nINJECT")
   })
 })
+
+function normalizeDisplayPaths(value: string): string {
+  return value.replaceAll("\\\\", "/").replaceAll("\\", "/")
+}

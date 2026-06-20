@@ -195,9 +195,10 @@ describe("createToolExecuteAfterHandler", () => {
     )
 
     // then
-    expect(output.output).toContain('CodeGraph is not initialized for "/Users/me/project"')
-    expect(output.output).toContain(".omo/codegraph/projects/project-")
-    expect(output.output).toContain('run `codegraph init` from "/Users/me/project"')
+    const normalizedOutput = normalizeDisplayPaths(output.output)
+    expect(normalizedOutput).toContain('CodeGraph is not initialized for "/Users/me/project"')
+    expect(normalizedOutput).toContain(".omo/codegraph/projects/project-")
+    expect(normalizedOutput).toContain('run `codegraph init` from "/Users/me/project"')
   })
 
   it("#given non-CodeGraph tool output contains a CodeGraph phrase #when tool.execute.after runs #then guidance is not appended", async () => {
@@ -247,7 +248,12 @@ describe("createToolExecuteAfterHandler", () => {
     )
 
     // then
-    expect(output.output).toContain('CodeGraph is not initialized for "/Users/me/project"')
-    expect(output.output).toContain(".omo/codegraph/projects/project-")
+    const normalizedOutput = normalizeDisplayPaths(output.output)
+    expect(normalizedOutput).toContain('CodeGraph is not initialized for "/Users/me/project"')
+    expect(normalizedOutput).toContain(".omo/codegraph/projects/project-")
   })
 })
+
+function normalizeDisplayPaths(value: string): string {
+  return value.replaceAll("\\\\", "/").replaceAll("\\", "/")
+}
