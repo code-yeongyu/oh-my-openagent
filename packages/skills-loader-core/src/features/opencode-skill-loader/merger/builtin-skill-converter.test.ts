@@ -1,5 +1,3 @@
-/// <reference path="../../../../../bun-test.d.ts" />
-
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 import { builtinToLoadedSkill } from "./builtin-skill-converter"
