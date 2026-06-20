@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test"
-import { buildOrchestratorReminder, buildCompletionGate } from "./verification-reminders"
+import {
+  buildOrchestratorReminder,
+  buildCompletionGate,
+  buildMissingVerdictEscalation,
+  buildAdvanceDirective,
+} from "./verification-reminders"
 
 // Test helpers for given/when/then pattern
 const given = describe
@@ -88,6 +93,75 @@ describe("buildOrchestratorReminder", () => {
         const verificationIndex = reminder.indexOf("VERIFICATION_REMINDER")
         expect(gateIndex).toBeGreaterThanOrEqual(0)
         expect(gateIndex).toBeLessThan(verificationIndex)
+      })
+    })
+  })
+})
+
+describe("buildMissingVerdictEscalation", () => {
+  given("a plan name, task label, and session id", () => {
+    const planName = "atlas-loop-compaction-bg-fixes"
+    const taskLabel = "T13: add builders"
+    const sessionId = "ses_review_abc"
+
+    when("buildMissingVerdictEscalation is called", () => {
+      const message = buildMissingVerdictEscalation(planName, taskLabel, sessionId)
+
+      then("output names the task label", () => {
+        expect(message).toContain(taskLabel)
+      })
+
+      then("output names the plan", () => {
+        expect(message).toContain(planName)
+      })
+
+      then("output says the boulder is paused", () => {
+        expect(message.toLowerCase()).toContain("paused")
+      })
+
+      then("output includes a reuse hint for the session", () => {
+        expect(message).toContain(sessionId)
+      })
+
+      then("output asks to confirm or re-run the review", () => {
+        expect(message.toLowerCase()).toContain("re-run the review")
+        expect(message).toContain("VERDICT: APPROVE")
+        expect(message).toContain("VERDICT: REJECT")
+      })
+    })
+  })
+})
+
+describe("buildAdvanceDirective", () => {
+  given("a plan name", () => {
+    const planName = "atlas-loop-compaction-bg-fixes"
+
+    when("buildAdvanceDirective is called", () => {
+      const directive = buildAdvanceDirective(planName)
+
+      then("output names the next unchecked task", () => {
+        expect(directive.toLowerCase()).toContain("next unchecked")
+      })
+
+      then("output names the plan file path", () => {
+        expect(directive).toContain(`.omo/plans/${planName}.md`)
+      })
+
+      then("output says do NOT re-verify finished work", () => {
+        expect(directive.toLowerCase()).toContain("do not re-verify")
+      })
+
+      then("output is short", () => {
+        expect(directive.length).toBeLessThan(600)
+      })
+
+      then("output does NOT contain 4-phase PROBABLY LYING content", () => {
+        expect(directive).not.toContain("PROBABLY LYING")
+        expect(directive).not.toContain("PHASE 1")
+        expect(directive).not.toContain("PHASE 2")
+        expect(directive).not.toContain("PHASE 3")
+        expect(directive).not.toContain("PHASE 4")
+        expect(directive).not.toContain("VERIFICATION_REMINDER")
       })
     })
   })

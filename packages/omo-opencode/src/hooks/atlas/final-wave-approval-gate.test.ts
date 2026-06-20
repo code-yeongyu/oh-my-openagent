@@ -7,10 +7,94 @@ import { createOpencodeClient } from "@opencode-ai/sdk"
 import type { AssistantMessage, Session } from "@opencode-ai/sdk"
 import type { BoulderState } from "../../features/boulder-state"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { classifyFinalWaveVerdict } from "./final-wave-approval-gate"
 import { createAtlasHook } from "./index"
 
 type AtlasHookContext = Parameters<typeof createAtlasHook>[0]
 type PromptMock = ReturnType<typeof mock>
+
+describe("classifyFinalWaveVerdict", () => {
+  test("returns approve when the output carries an APPROVE verdict", () => {
+    // given
+    const output = "Tasks [4/4 compliant] | VERDICT: APPROVE"
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("approve")
+  })
+
+  test("returns reject when the output carries a REJECT verdict", () => {
+    // given
+    const output = "Tasks [2/4 compliant] | VERDICT: REJECT"
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("reject")
+  })
+
+  test("returns missing when the output has no verdict token", () => {
+    // given
+    const output = "Implementation finished successfully with all checks green"
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("missing")
+  })
+
+  test("returns missing when the output ends on a bash call with no verdict", () => {
+    // given
+    const output = `Ran the test suite
+
+\`\`\`bash
+bun test packages/omo-opencode/src/hooks/atlas/final-wave-approval-gate.test.ts
+\`\`\``
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("missing")
+  })
+
+  test("matches the approve verdict case-insensitively", () => {
+    // given
+    const output = "summary line\nverdict: approve"
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("approve")
+  })
+
+  test("matches the reject verdict case-insensitively", () => {
+    // given
+    const output = "summary line\nVeRdIcT: ReJeCt"
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("reject")
+  })
+
+  test("prefers approve over reject when both tokens appear", () => {
+    // given
+    const output = "VERDICT: REJECT then revised to VERDICT: APPROVE"
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("approve")
+  })
+})
 
 describe("Atlas final verification approval gate", () => {
   let testDirectory = ""

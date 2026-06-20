@@ -2,6 +2,19 @@ import type { SessionState } from "./types"
 import { readFinalWavePlanState } from "./final-wave-plan-state"
 
 const APPROVE_VERDICT_PATTERN = /\bVERDICT:\s*APPROVE\b/i
+const REJECT_VERDICT_PATTERN = /\bVERDICT:\s*REJECT\b/i
+
+export function classifyFinalWaveVerdict(output: string): "approve" | "reject" | "missing" {
+  if (APPROVE_VERDICT_PATTERN.test(output)) {
+    return "approve"
+  }
+
+  if (REJECT_VERDICT_PATTERN.test(output)) {
+    return "reject"
+  }
+
+  return "missing"
+}
 
 function clearFinalWaveApprovalTracking(sessionState: SessionState): void {
   sessionState.pendingFinalWaveTaskCount = undefined
