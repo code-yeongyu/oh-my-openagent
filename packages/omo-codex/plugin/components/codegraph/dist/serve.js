@@ -132,6 +132,9 @@ function bunWhich(commandName) {
 }
 
 // ../../../../utils/src/codegraph/resolve.ts
+function codegraphCommandRequiresSupportedLocalNode(resolution) {
+  return resolution.source !== "bundled" && resolution.source !== "env" && resolution.source !== "provisioned";
+}
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
 var CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN";
@@ -1511,12 +1514,16 @@ async function runCodegraphServe(options = {}) {
     provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir)
   };
   const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+  const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
   if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync4)) {
+    if (resolution.source === "path" && !nodeSupport.supported) {
+      (options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
+      return 1;
+    }
     (options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
     return 1;
   }
-  const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-  if (resolution.source !== "bundled" && resolution.source !== "env" && !nodeSupport.supported) {
+  if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
     (options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
     return 1;
   }

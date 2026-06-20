@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -148,6 +148,69 @@ test("#given stale lazycodex version #when running update dry-run #then prints t
 	assert.equal(output, "npx --yes lazycodex-ai@latest install --no-tui --codex-autonomous");
 });
 
+test("#given bun global lazycodex wrapper #when running update dry-run #then prints bun global update command", { skip: process.platform === "win32" }, () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+	const tempHome = mkdtempSync(join(tmpdir(), "lazycodex-bun-global-dry-run-"));
+	const binPath = createBunGlobalLazyCodexSymlink(tempHome, scriptPath);
+
+	try {
+		// when
+		const output = execFileSync(process.execPath, [binPath, "--dry-run", "update"], {
+			encoding: "utf8",
+			env: {
+				...process.env,
+				HOME: tempHome,
+				LAZYCODEX_CURRENT_VERSION: "1.0.0",
+				LAZYCODEX_LATEST_VERSION: "1.0.1",
+			},
+		}).trim();
+
+		// then
+		assert.equal(output, "bun update -g lazycodex-ai@latest\nnpx --yes lazycodex-ai@latest install --no-tui --codex-autonomous");
+	} finally {
+		rmSync(tempHome, { recursive: true, force: true });
+	}
+});
+
+test("#given bun global lazycodex wrapper and untrusted known scripts #when update runs noninteractively #then prints manual scoped trust command", { skip: process.platform === "win32" }, () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+	const tempHome = mkdtempSync(join(tmpdir(), "lazycodex-bun-global-trust-"));
+	const tempBin = mkdtempSync(join(tmpdir(), "lazycodex-bun-bin-"));
+	const commandLogPath = join(tempHome, "commands.log");
+	const binPath = createBunGlobalLazyCodexSymlink(tempHome, scriptPath);
+	writeFakeBunCommand(tempBin);
+	writeFakeNpxCommand(tempBin);
+
+	try {
+		// when
+		const output = execFileSync(process.execPath, [binPath, "update"], {
+			encoding: "utf8",
+			env: {
+				...process.env,
+				HOME: tempHome,
+				LAZYCODEX_CURRENT_VERSION: "1.0.0",
+				LAZYCODEX_LATEST_VERSION: "1.0.1",
+				LAZYCODEX_TEST_COMMAND_LOG: commandLogPath,
+				PATH: `${tempBin}:${process.env.PATH ?? ""}`,
+			},
+		});
+		const commandLog = readFileSync(commandLogPath, "utf8");
+
+		// then
+		assert.match(commandLog, /^bun update -g lazycodex-ai@latest$/m);
+		assert.match(commandLog, /^bun pm -g untrusted$/m);
+		assert.match(commandLog, /^npx --yes lazycodex-ai@latest install --no-tui --codex-autonomous$/m);
+		assert.doesNotMatch(commandLog, /^bun pm -g trust/m);
+		assert.match(output, /bun pm -g trust oh-my-openagent @code-yeongyu\/comment-checker/);
+		assert.doesNotMatch(output, /left-pad/);
+	} finally {
+		rmSync(tempHome, { recursive: true, force: true });
+		rmSync(tempBin, { recursive: true, force: true });
+	}
+});
+
 test("#given current lazycodex version #when running update dry-run #then reports already current", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
@@ -165,6 +228,51 @@ test("#given current lazycodex version #when running update dry-run #then report
 	// then
 	assert.equal(output, "lazycodex-ai 1.0.1 is already up to date.");
 });
+
+function createBunGlobalLazyCodexSymlink(homeDir, scriptPath) {
+	const packageBinDir = join(homeDir, ".bun", "install", "global", "node_modules", "lazycodex-ai", "bin");
+	mkdirSync(packageBinDir, { recursive: true });
+	const binPath = join(packageBinDir, "lazycodex-ai");
+	symlinkSync(scriptPath, binPath);
+	return binPath;
+}
+
+function writeExecutable(path, source) {
+	writeFileSync(path, source);
+	chmodSync(path, 0o755);
+}
+
+function writeFakeBunCommand(binDir) {
+	writeExecutable(
+		join(binDir, "bun"),
+		`#!/bin/sh
+printf '%s\\n' "bun $*" >> "$LAZYCODEX_TEST_COMMAND_LOG"
+if [ "$1" = "pm" ] && [ "$2" = "-g" ] && [ "$3" = "untrusted" ]; then
+  cat <<'EOF'
+./node_modules/oh-my-openagent @4.9.2
+ » [postinstall]: node postinstall.mjs
+
+./node_modules/left-pad @1.0.0
+ » [postinstall]: node postinstall.js
+
+./node_modules/@code-yeongyu/comment-checker @0.8.0
+ » [postinstall]: node postinstall.js
+EOF
+fi
+exit 0
+`,
+	);
+}
+
+function writeFakeNpxCommand(binDir) {
+	writeExecutable(
+		join(binDir, "npx"),
+		`#!/bin/sh
+printf '%s\\n' "npx $*" >> "$LAZYCODEX_TEST_COMMAND_LOG"
+exit 0
+`,
+	);
+}
 
 test("#given dry-run ulw-loop #when running the Node installer entrypoint #then prints delegated ulw-loop command", () => {
 	// given

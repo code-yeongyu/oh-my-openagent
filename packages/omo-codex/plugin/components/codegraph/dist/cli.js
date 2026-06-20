@@ -1595,6 +1595,9 @@ function bunWhich(commandName) {
 }
 
 // ../../utils/src/codegraph/resolve.ts
+function codegraphCommandRequiresSupportedLocalNode(resolution) {
+  return resolution.source !== "bundled" && resolution.source !== "env" && resolution.source !== "provisioned";
+}
 var CODEGRAPH_PACKAGE = "@colbymchenry/codegraph";
 var CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN";
 var CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN";
@@ -1864,7 +1867,7 @@ function finish(action, detail, logOutcome) {
 async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport) {
   const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(config.install_dir) });
   if (resolved.exists) {
-    if (resolved.source !== "bundled" && resolved.source !== "env" && !nodeSupport.supported) {
+    if (codegraphCommandRequiresSupportedLocalNode(resolved) && !nodeSupport.supported) {
       return { kind: "unsupported-node" };
     }
     return { kind: "resolved", resolution: resolved };
@@ -1990,7 +1993,6 @@ async function executeCodegraphSessionStartHook(options = {}) {
   const homeDir = resolveHomeDir2(env);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
   if (config.codegraph?.enabled === false) {
-    writeHookJson(options.stdout ?? processStdout, "skipped-disabled");
     return { action: "skipped-disabled", exitCode: 0 };
   }
   (options.spawnWorker ?? spawnDetachedWorker)({
@@ -1998,11 +2000,16 @@ async function executeCodegraphSessionStartHook(options = {}) {
     command: process.execPath,
     env: { ...env, [SESSION_START_CWD_ENV]: projectRoot }
   });
-  writeHookJson(options.stdout ?? processStdout, "spawned");
+  writeHookJson(options.stdout ?? processStdout);
   return { action: "spawned", exitCode: 0 };
 }
-function writeHookJson(stdout, action) {
-  const output = action === "spawned" ? { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: CODEGRAPH_SESSION_START_NOTICE }, codegraph: { action } } : { hookSpecificOutput: { hookEventName: "SessionStart" }, codegraph: { action } };
+function writeHookJson(stdout) {
+  const output = {
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: CODEGRAPH_SESSION_START_NOTICE
+    }
+  };
   stdout.write(`${JSON.stringify(output)}
 `);
 }
@@ -2078,12 +2085,16 @@ async function runCodegraphServe(options = {}) {
     provisioned: () => provisionedBinFromInstallDir2(codegraphConfig.install_dir)
   };
   const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+  const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
   if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync7)) {
+    if (resolution.source === "path" && !nodeSupport.supported) {
+      (options.stderr ?? processStderr2).write(buildCodegraphNodeSkipHint(nodeSupport));
+      return 1;
+    }
     (options.stderr ?? processStderr2).write(CODEGRAPH_SKIP_HINT);
     return 1;
   }
-  const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-  if (resolution.source !== "bundled" && resolution.source !== "env" && !nodeSupport.supported) {
+  if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
     (options.stderr ?? processStderr2).write(buildCodegraphNodeSkipHint(nodeSupport));
     return 1;
   }

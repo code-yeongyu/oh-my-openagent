@@ -42,3 +42,16 @@ jobs:
           delete-branch: true
           labels: |
             maintenance
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Model capability refresh
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Refreshes the bundled model capability snapshot.
+            - Runs model capability guardrail tests.
+            - Opens or updates the automated refresh pull request.
+          JOB_SUMMARY_NEXT: Check snapshot generation first, then guardrail failures or create-pull-request output.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

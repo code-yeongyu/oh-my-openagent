@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { readJson, root } from "./aggregate-plugin-fixture.mjs";
+import { readAggregateHookManifests, readJson, root } from "./aggregate-plugin-fixture.mjs";
 import { componentHookContractCases } from "./component-hook-contract-cases.mjs";
 
 const HOOK_EVENTS_BY_COMPONENT = {
@@ -142,8 +142,8 @@ test("#given malformed comment-checker stdin #when executed through dist CLI con
 
 test("#given aggregate hook manifest #when command hooks are inspected #then component CLI invocation contract is unchanged", async () => {
 	// given
-	const hooks = await readJson("hooks/hooks.json");
-	const commands = collectHookCommands(hooks.hooks);
+	const manifests = await readAggregateHookManifests();
+	const commands = manifests.flatMap(({ hooks }) => collectHookCommands(hooks.hooks));
 	const components = await workspaceComponents();
 
 	// when

@@ -12,7 +12,7 @@ describe("ultrawork prompt variants", () => {
     const codexVariant = codexUltraworkPromptVariants.codex
 
     // then
-    expect(ultraworkVariantNames).toEqual(["planner", "gpt", "gemini", "default"])
+    expect(ultraworkVariantNames).toEqual(["planner", "gpt", "gemini", "glm", "default"])
     expect(codexVariant.kind).toBe("bundled")
     expect(codexVariant.filePath).toBe(codexPromptPath)
     expect(codexVariant.content).toBe(readFileSync(codexPromptPath, "utf8"))

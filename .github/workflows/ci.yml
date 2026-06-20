@@ -50,6 +50,29 @@ jobs:
           echo "PR was auto-closed because it targeted 'master'."
           exit 1
 
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## PR target guard"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Base branch | \`${{ github.base_ref || 'n/a' }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Blocks pull requests that target \`master\`."
+            echo "- Leaves non-master pull requests alone."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Retarget the pull request to \`dev\`; release automation owns \`master\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -91,6 +114,19 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Root test suite (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages before tests.
+            - Runs `npm test` for `packages/lsp-daemon`.
+            - Runs the full root `bun test` suite on `${{ matrix.os }}`.
+          JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   typecheck:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -130,6 +166,19 @@ jobs:
       - name: Type check script tooling
         run: bun run typecheck:script
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: TypeScript checks (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages required by the workspace.
+            - Runs root `bun run typecheck`.
+            - Runs `bun run typecheck:script` for release/build tooling.
+          JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; shared package failures can cascade into adapters.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   codex-compatibility:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -166,6 +215,19 @@ jobs:
       - name: Run Codex compatibility tests
         run: bun run test:codex
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Codex compatibility (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the MCP runtimes needed by the Codex adapter.
+            - Runs the hermetic `bun run test:codex` gate.
+            - Covers Linux, macOS, and Windows compatibility.
+          JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   lazycodex-published-smoke:
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -201,6 +263,29 @@ jobs:
           if [ "$npx_doctor_output" != "npx --yes --package oh-my-openagent omo doctor" ]; then
             echo "::warning::lazycodex-ai doctor dry-run output changed: $npx_doctor_output"
           fi
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Published LazyCodex smoke"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Ref | \`${{ github.ref_name }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Runs non-blocking smoke checks against \`lazycodex-ai@latest\`."
+            echo "- Verifies dry-run install and doctor command routing from an isolated temp directory."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Treat warnings as registry or alias drift signals; this job is intentionally non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     runs-on: ubuntu-latest
@@ -241,6 +326,19 @@ jobs:
 
       - name: Verify dist bundle tests
         run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Root build
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the distributable OpenCode/Codex packages.
+            - Confirms `dist/index.js` and `dist/index.d.ts` exist.
+            - Runs dist bundle regression tests.
+          JOB_SUMMARY_NEXT: Fix the first failing build prerequisite before debugging downstream dist checks.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   auto-commit-schema:
     runs-on: ubuntu-latest
@@ -287,6 +385,18 @@ jobs:
             git commit -m "chore: auto-update schema.json"
             git push
           fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Schema auto-commit
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Rebuilds the schema artifact on `master` pushes.
+            - Commits `assets/oh-my-opencode.schema.json` only when generation changes it.
+          JOB_SUMMARY_NEXT: If this fails, inspect schema generation first, then check bot write permissions.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   draft-release:
     runs-on: ubuntu-latest
@@ -343,3 +453,15 @@ jobs:
           $NOTES
           EOF
           fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Draft release notes
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Generates changelog notes from the current `dev` branch.
+            - Creates or updates the `next` draft release.
+          JOB_SUMMARY_NEXT: Check changelog generation output first, then GitHub release permissions.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

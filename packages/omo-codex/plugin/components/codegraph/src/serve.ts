@@ -17,6 +17,7 @@ import {
 	evaluateCodegraphNodeSupport,
 } from "../../../../../utils/src/codegraph/node-support.ts";
 import {
+	codegraphCommandRequiresSupportedLocalNode,
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 	type ResolveCodegraphCommandOptions,
@@ -82,13 +83,17 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir),
 	} satisfies ResolveCodegraphCommandOptions;
 	const resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
+	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
 	if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync)) {
+		if (resolution.source === "path" && !nodeSupport.supported) {
+			(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
+			return 1;
+		}
 		(options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
 		return 1;
 	}
 
-	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-	if (resolution.source !== "bundled" && resolution.source !== "env" && !nodeSupport.supported) {
+	if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
 		(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
 		return 1;
 	}

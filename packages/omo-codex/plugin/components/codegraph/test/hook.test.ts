@@ -14,7 +14,7 @@ import {
 } from "../src/hook.ts";
 
 const pluginRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
-const hooksConfigPath = resolve(pluginRoot, "hooks/hooks.json");
+const pluginConfigPath = resolve(pluginRoot, ".codex-plugin/plugin.json");
 
 describe("CodeGraph SessionStart hook", () => {
 	it("#given hook session-start cli args #when invoked with empty JSON input #then it emits valid JSON and exits zero", async () => {
@@ -42,7 +42,6 @@ describe("CodeGraph SessionStart hook", () => {
 					hookEventName: "SessionStart",
 					additionalContext: "LazyCodex CodeGraph bootstrap scheduled in background",
 				},
-				codegraph: { action: "spawned" },
 			});
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
@@ -66,10 +65,7 @@ describe("CodeGraph SessionStart hook", () => {
 		// then
 		expect(result).toEqual({ action: "skipped-disabled", exitCode: 0 });
 		expect(spawned).toEqual([]);
-		expect(JSON.parse(stdout.join(""))).toEqual({
-			hookSpecificOutput: { hookEventName: "SessionStart" },
-			codegraph: { action: "skipped-disabled" },
-		});
+		expect(stdout.join("")).toBe("");
 	});
 
 	it("#given HOME OMO config disables Codex CodeGraph #when SessionStart fires #then it skips without spawning", async () => {
@@ -97,7 +93,7 @@ describe("CodeGraph SessionStart hook", () => {
 			// then
 			expect(result).toEqual({ action: "skipped-disabled", exitCode: 0 });
 			expect(spawned).toEqual([]);
-			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+			expect(stdout.join("")).toBe("");
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(workspace, { recursive: true, force: true });
@@ -128,7 +124,7 @@ describe("CodeGraph SessionStart hook", () => {
 			// then
 			expect(result).toEqual({ action: "skipped-disabled", exitCode: 0 });
 			expect(spawned).toEqual([]);
-			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+			expect(stdout.join("")).toBe("");
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(workspace, { recursive: true, force: true });
@@ -191,7 +187,12 @@ describe("CodeGraph SessionStart hook", () => {
 					},
 				},
 			]);
-			expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "spawned" });
+			expect(JSON.parse(stdout.join(""))).toEqual({
+				hookSpecificOutput: {
+					additionalContext: "LazyCodex CodeGraph bootstrap scheduled in background",
+					hookEventName: "SessionStart",
+				},
+			});
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });
 		}
@@ -514,7 +515,7 @@ describe("CodeGraph SessionStart hook", () => {
 		}
 	});
 
-	it("#given malformed hook input #when SessionStart fires #then it still emits JSON and exits zero", async () => {
+	it("#given malformed hook input with CodeGraph disabled #when SessionStart fires #then it stays silent and exits zero", async () => {
 		// given
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
@@ -531,23 +532,23 @@ describe("CodeGraph SessionStart hook", () => {
 		// then
 		expect(result.exitCode).toBe(0);
 		expect(spawned).toEqual([]);
-		expect(JSON.parse(stdout.join("")).codegraph).toEqual({ action: "skipped-disabled" });
+		expect(stdout.join("")).toBe("");
 	});
 
 	it("#given plugin hook config #when inspected #then CodeGraph is registered after bootstrap SessionStart", () => {
 		// given
-		const hooksConfig = JSON.parse(readFileSync(hooksConfigPath, "utf8"));
+		const pluginConfig: unknown = JSON.parse(readFileSync(pluginConfigPath, "utf8"));
 
 		// when
-		const sessionStartHooks = hooksConfig.hooks.SessionStart;
-		const commands = sessionStartHooks.map((entry: { readonly hooks: readonly [{ readonly command: string }] }) => {
-			return entry.hooks[0].command;
-		});
+		const hookPaths =
+			typeof pluginConfig === "object" && pluginConfig !== null && "hooks" in pluginConfig && Array.isArray(pluginConfig.hooks)
+				? pluginConfig.hooks.filter((hookPath): hookPath is string => typeof hookPath === "string")
+				: [];
 
 		// then
-		expect(commands).toContain('node "${PLUGIN_ROOT}/components/codegraph/dist/cli.js" hook session-start');
-		expect(commands.indexOf('node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start')).toBeLessThan(
-			commands.indexOf('node "${PLUGIN_ROOT}/components/codegraph/dist/cli.js" hook session-start'),
+		expect(hookPaths).toContain("./hooks/session-start-checking-codegraph-bootstrap.json");
+		expect(hookPaths.indexOf("./hooks/session-start-checking-bootstrap-provisioning.json")).toBeLessThan(
+			hookPaths.indexOf("./hooks/session-start-checking-codegraph-bootstrap.json"),
 		);
 	});
 });

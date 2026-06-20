@@ -58,3 +58,17 @@ jobs:
         run: bunx opennextjs-cloudflare build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: Web CI
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Installs the web package dependencies.
+            - Generates docs content from repo-root docs.
+            - Runs format, lint, typecheck, and OpenNext Cloudflare build checks.
+          JOB_SUMMARY_NEXT: Start with the first web check failure; docs generation can affect later build output.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

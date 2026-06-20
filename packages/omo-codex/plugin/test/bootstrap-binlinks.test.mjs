@@ -50,7 +50,7 @@ async function writeVersionedRoot(root, version, { withRuntimeCli = false } = {}
 						hooks: [
 							{
 								command: 'node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start',
-								statusMessage: `LazyCodex(${version}): Checking Bootstrap Provisioning`,
+								statusMessage: "(OmO) Checking Bootstrap Provisioning",
 								timeout: 30,
 								type: "command",
 							},

@@ -4,6 +4,7 @@ import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
+import { assertHookCommandTargets } from "./codex-hook-targets"
 import type { InstalledPlugin, RunCommand } from "./types"
 
 type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
@@ -33,6 +34,7 @@ export async function installCachedPlugin(input: {
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
+    await assertHookCommandTargets(tempPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
   } catch (error) {
     await rm(tempPath, { recursive: true, force: true })
