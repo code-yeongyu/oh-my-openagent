@@ -1,0 +1,17 @@
+Command: bun test script/package-registration-audit.test.ts
+Started: 2026-06-20T10:43:16Z
+bun test v1.3.14 (0d9b296a)
+
+script/package-registration-audit.test.ts:
+(pass) package registration audit > #given managed packages #when root registration is audited #then workspaces typecheck and dev deps stay aligned [1.75ms]
+(pass) package registration audit > #given shared extraction guard #when audited #then every core package is covered [0.30ms]
+(pass) package registration audit > #given package test scripts #when nested tests exist #then recursive globs are registered [4.39ms]
+(pass) package registration audit > #given package dependencies #when ROADMAP layers are checked #then reverse edges stay at zero [1.23ms]
+(pass) package registration audit > #given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present [90.64ms]
+
+ 5 pass
+ 0 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [158.00ms]
+Completed: 2026-06-20T10:43:16Z
+Exit: 0

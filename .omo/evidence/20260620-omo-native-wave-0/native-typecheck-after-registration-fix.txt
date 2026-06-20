@@ -1,0 +1,5 @@
+Command: bun run --cwd packages/omo-native typecheck
+Started: 2026-06-20T10:43:16Z
+$ tsgo --noEmit -p tsconfig.json
+Completed: 2026-06-20T10:43:16Z
+Exit: 0

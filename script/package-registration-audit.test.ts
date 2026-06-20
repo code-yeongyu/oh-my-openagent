@@ -29,6 +29,7 @@ const mcpPackagePaths: readonly string[] = [
   "packages/lsp-daemon",
   "packages/lsp-tools-mcp",
 ] as const
+const nativePackagePaths: readonly string[] = ["packages/omo-native"] as const
 const adapterPackagePaths: readonly string[] = ["packages/omo-codex", "packages/omo-opencode"] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
@@ -162,6 +163,7 @@ function isManagedWorkspacePackage(path: string): boolean {
   return (
     corePackagePaths.includes(path) ||
     mcpPackagePaths.includes(path) ||
+    nativePackagePaths.includes(path) ||
     adapterPackagePaths.includes(path) ||
     skillPackagePaths.includes(path)
   )
@@ -212,7 +214,7 @@ describe("package registration audit", () => {
     const expectedDevDependencyNames = (
       await Promise.all(
         managedWorkspacePaths
-          .filter((path) => path !== "packages/omo-opencode")
+          .filter((path) => path !== "packages/omo-opencode" && !nativePackagePaths.includes(path))
           .map((path) => readManifest(join(path, "package.json")).then((manifest) => manifest.name)),
       )
     ).toSorted()

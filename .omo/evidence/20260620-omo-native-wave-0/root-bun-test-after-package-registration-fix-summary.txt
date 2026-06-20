@@ -1,0 +1,54 @@
+Command: bun test
+Artifact source: .omo/evidence/20260620-omo-native-wave-0/root-bun-test-after-package-registration-fix.txt
+Sanitized tail for PR visibility:
+
+(pass) findPluginEntry > finds legacy plugin entry [24.99ms]
+(pass) findPluginEntry > finds preferred plugin entry with pinned version [25.65ms]
+(pass) findPluginEntry > returns null for unrelated plugin entry [25.19ms]
+(pass) findPluginEntry > reads user config from profile dir even when OPENCODE_CONFIG_DIR changes after import [26.19ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/catch-fallbacks.test.ts:
+(pass) auto-update checker catch fallbacks > returns null when latest version fetch throws an Error [0.30ms]
+(pass) auto-update checker catch fallbacks > returns null when latest version fetch throws a non-Error [0.11ms]
+(pass) auto-update checker catch fallbacks > returns null when local dev package JSON is malformed [0.94ms]
+(pass) auto-update checker catch fallbacks > returns null when local dev version read throws a non-Error [0.59ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/hook/background-update-check.test.ts:
+(pass) createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318) > #given import.meta.url resolves outside the flat cache workspace and config-dir #when auto-update fires with autoUpdate=true #then bun install is skipped and only the update-available toast is shown (not 'Updated!') [0.33ms]
+(pass) createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318) > #given import.meta.url resolves inside the flat cache workspace #when auto-update fires with autoUpdate=true #then existing install flow runs unchanged [0.20ms]
+(pass) createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318) > #given bun install throws a non-Error #when auto-update fires #then it falls back to update-available notification [0.15ms]
+
+packages/omo-opencode/src/hooks/keyword-detector/ultrawork/ultrawork-source-routing.test.ts:
+(pass) Ultrawork source routing > #given agent and model #then getUltraworkSource routes to the expected variant [0.11ms]
+
+packages/omo-opencode/src/hooks/claude-code-hooks/handlers/session-event-handler-retry.test.ts:
+(pass) createSessionEventHandler retry behavior > #given transient parent lookup failure #when the next idle succeeds #then stop hooks receive the later parent session id [0.47ms]
+(pass) createSessionEventHandler retry behavior > #given parent lookup throws a non-Error value #when the next idle succeeds #then stop hooks receive the later parent session id [0.09ms]
+(pass) createSessionEventHandler retry behavior > #given a parentless idle session #when stop hooks execute #then the context carries the session transcript path [0.09ms]
+
+packages/omo-opencode/src/hooks/claude-code-hooks/handlers/session-event-handler.test.ts:
+(pass) createSessionEventHandler > #given deleted session with retained caches #when session deleted arrives #then per-session resources are cleared [1.42ms]
+(pass) createSessionEventHandler > #given active singleton state #when dispose runs #then all shared caches are cleared [0.34ms]
+(pass) createSessionEventHandler > #given repeated idle events for one session #when stop hook preparation runs #then parent session lookup is reused [0.09ms]
+(pass) createSessionEventHandler > #given deleted session #when it idles again #then parent session lookup is fetched again [0.08ms]
+
+packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-before-handler.test.ts:
+(pass) createToolExecuteBeforeHandler > #given todowrite JSON parsing throws a non-Error value #when handler runs #then it reports the same parse error [0.29ms]
+(pass) createToolExecuteBeforeHandler > #given denial toast rejects with a non-Error value #when hook denies #then the hook denial still wins [0.18ms]
+
+packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-after-handler.test.ts:
+(pass) createToolExecuteAfterHandler > #given diff-heavy metadata #when transcript entry is appended #then it keeps concise output with compact metadata [0.42ms]
+(pass) createToolExecuteAfterHandler > #given multiline PostToolUse context on empty tool output #when output is appended #then it renders clean normalized sections [0.14ms]
+(pass) createToolExecuteAfterHandler > #given warning toast rejects with a non-Error value #when PostToolUse blocks #then output still receives hook sections [0.09ms]
+
+2 tests skipped:
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
+
+ 10072 pass
+ 2 skip
+ 0 fail
+ 23720 expect() calls
+Ran 10074 tests across 1220 files. [123.67s]
+Completed: 2026-06-20T10:46:00Z
+Exit: 0

@@ -1,0 +1,6 @@
+Command: bun run build:native
+Started: 2026-06-20T10:43:16Z
+$ bun run --cwd packages/omo-native build
+$ node build.mjs
+Completed: 2026-06-20T10:43:16Z
+Exit: 0
