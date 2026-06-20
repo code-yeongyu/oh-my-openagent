@@ -35,7 +35,7 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node25-"));
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node25-home-"));
 		const installDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node25-install-"));
-		const binPath = join(installDir, "bin", "codegraph");
+		const binPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
 		const calls: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
 		const outcomes: unknown[] = [];
 

@@ -17,6 +17,7 @@ describe("runCodegraphServe", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
+			config: { codegraph: { auto_provision: false, enabled: true }, sources: [], warnings: [] },
 			env: { PATH: "/bin" },
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
