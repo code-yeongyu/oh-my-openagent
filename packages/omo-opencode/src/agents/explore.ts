@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentToolAllowlist } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
 
@@ -25,10 +25,17 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createExploreAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions(
-    ["write", "edit", "apply_patch", "task", "call_omo_agent"],
-    ["lsp_symbols", "lsp_goto_definition", "lsp_find_references", "lsp_diagnostics"],
-  )
+  // ponytail: deny-all allowlist, not a write-tool blocklist; a blocklist leaves bash + MCP write tools open.
+  const restrictions = createAgentToolAllowlist([
+    "read",
+    "grep",
+    "glob",
+    "list",
+    "lsp_symbols",
+    "lsp_goto_definition",
+    "lsp_find_references",
+    "lsp_diagnostics",
+  ])
 
   return {
     description:

@@ -29,6 +29,20 @@ const TEAM_TOOL_NAMES = [
 
 describe("read-only agent tool restrictions", () => {
   const FILE_WRITE_TOOLS = ["write", "edit", "apply_patch"]
+  // tools that must NOT be reachable on a deny-all allowlist agent: bash leaks
+  // (echo > file, sed -i) and MCP write tools were the actual bypass paths.
+  const LEAK_TOOLS = ["bash", "mcpm_morphllm-fast-apply_edit_file"]
+  const REQUIRED_READ_TOOLS = ["read", "grep", "glob", "list"]
+
+  const expectDenyAllAllowlist = (permission: Record<string, string>) => {
+    expect(permission["*"]).toBe("deny")
+    for (const tool of [...FILE_WRITE_TOOLS, ...LEAK_TOOLS]) {
+      expect(permission[tool]).not.toBe("allow")
+    }
+    for (const tool of REQUIRED_READ_TOOLS) {
+      expect(permission[tool]).toBe("allow")
+    }
+  }
 
   test("denies team tools for every delegated subagent prompt", () => {
     // given
@@ -69,7 +83,7 @@ describe("read-only agent tool restrictions", () => {
   })
 
   describe("Oracle", () => {
-    test("denies all file-writing tools", () => {
+    test("uses deny-all allowlist blocking bash and MCP writers", () => {
       // given
       const agent = createOracleAgent(TEST_MODEL)
 
@@ -77,12 +91,10 @@ describe("read-only agent tool restrictions", () => {
       const permission = agent.permission as Record<string, string>
 
       // then
-      for (const tool of FILE_WRITE_TOOLS) {
-        expect(permission[tool]).toBe("deny")
-      }
+      expectDenyAllAllowlist(permission)
     })
 
-    test("denies task but allows call_omo_agent for research", () => {
+    test("does not grant task or call_omo_agent", () => {
       // given
       const agent = createOracleAgent(TEST_MODEL)
 
@@ -90,13 +102,13 @@ describe("read-only agent tool restrictions", () => {
       const permission = agent.permission as Record<string, string>
 
       // then
-      expect(permission["task"]).toBe("deny")
-      expect(permission["call_omo_agent"]).toBeUndefined()
+      expect(permission["task"]).not.toBe("allow")
+      expect(permission["call_omo_agent"]).not.toBe("allow")
     })
   })
 
   describe("Librarian", () => {
-    test("denies all file-writing tools", () => {
+    test("denies all file-writing tools (blocklist: needs bash for gh/git)", () => {
       // given
       const agent = createLibrarianAgent(TEST_MODEL)
 
@@ -111,7 +123,7 @@ describe("read-only agent tool restrictions", () => {
   })
 
   describe("Explore", () => {
-    test("denies all file-writing tools", () => {
+    test("uses deny-all allowlist blocking bash and MCP writers", () => {
       // given
       const agent = createExploreAgent(TEST_MODEL)
 
@@ -119,14 +131,12 @@ describe("read-only agent tool restrictions", () => {
       const permission = agent.permission as Record<string, string>
 
       // then
-      for (const tool of FILE_WRITE_TOOLS) {
-        expect(permission[tool]).toBe("deny")
-      }
+      expectDenyAllAllowlist(permission)
     })
   })
 
   describe("Momus", () => {
-    test("denies all file-writing tools", () => {
+    test("uses deny-all allowlist blocking bash and MCP writers", () => {
       // given
       const agent = createMomusAgent(TEST_MODEL)
 
@@ -134,12 +144,10 @@ describe("read-only agent tool restrictions", () => {
       const permission = agent.permission as Record<string, string>
 
       // then
-      for (const tool of FILE_WRITE_TOOLS) {
-        expect(permission[tool]).toBe("deny")
-      }
+      expectDenyAllAllowlist(permission)
     })
 
-    test("allows task delegation while remaining ineligible for team membership", () => {
+    test("does not grant task delegation and stays ineligible for team membership", () => {
       // given
       const agent = createMomusAgent(TEST_MODEL)
 
@@ -148,13 +156,13 @@ describe("read-only agent tool restrictions", () => {
       const sessionRestrictions = getAgentToolRestrictions("momus")
 
       // then
-      expect(permission["task"]).toBeUndefined()
+      expect(permission["task"]).not.toBe("allow")
       expect(sessionRestrictions["task"]).toBeUndefined()
     })
   })
 
   describe("Metis", () => {
-    test("denies all file-writing tools", () => {
+    test("uses deny-all allowlist blocking bash and MCP writers", () => {
       // given
       const agent = createMetisAgent(TEST_MODEL)
 
@@ -162,12 +170,10 @@ describe("read-only agent tool restrictions", () => {
       const permission = agent.permission as Record<string, string>
 
       // then
-      for (const tool of FILE_WRITE_TOOLS) {
-        expect(permission[tool]).toBe("deny")
-      }
+      expectDenyAllAllowlist(permission)
     })
 
-    test("allows task delegation while remaining ineligible for team membership", () => {
+    test("does not grant task delegation and stays ineligible for team membership", () => {
       // given
       const agent = createMetisAgent(TEST_MODEL)
 
@@ -176,7 +182,7 @@ describe("read-only agent tool restrictions", () => {
       const sessionRestrictions = getAgentToolRestrictions("metis")
 
       // then
-      expect(permission["task"]).toBeUndefined()
+      expect(permission["task"]).not.toBe("allow")
       expect(sessionRestrictions["task"]).toBeUndefined()
     })
   })

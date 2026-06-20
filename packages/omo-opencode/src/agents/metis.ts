@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { buildClaudeThinkingConfig, isKimiK27Model } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentToolAllowlist } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
 
@@ -389,10 +389,17 @@ For Build and Research, run the exploration yourself before questioning. Prompt 
 **ALWAYS**: classify first; be specific ("change UserService only, or AuthService too?"); explore before asking for Build and Research intents; give Prometheus actionable directives; and include the agent-executable QA directives in every output.
 </critical_rules>`
 
-const metisRestrictions = createAgentToolRestrictions([
-  "write",
-  "edit",
-  "apply_patch",
+// ponytail: deny-all allowlist, not a write-tool blocklist; a blocklist leaves bash + MCP write tools open.
+const metisRestrictions = createAgentToolAllowlist([
+  "read",
+  "grep",
+  "glob",
+  "list",
+  "webfetch",
+  "lsp_symbols",
+  "lsp_goto_definition",
+  "lsp_find_references",
+  "lsp_diagnostics",
 ])
 
 export function createMetisAgent(model: string): AgentConfig {
