@@ -5907,7 +5907,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.11.1",
+    version: "4.12.0",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -7139,6 +7139,8 @@ async function installCachedPlugin(input) {
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
+    if (input.buildSource === false)
+      await maybeRunNpmSyncSkills(tempPath, input.runCommand);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
     await assertHookCommandTargets(tempPath);
@@ -7164,6 +7166,17 @@ async function maybeRunNpmBuild(cwd, runCommand) {
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string")
     return;
   await runCommand("npm", ["run", "build"], { cwd });
+}
+async function maybeRunNpmSyncSkills(cwd, runCommand) {
+  if (!await fileExistsStrict(join9(cwd, "package.json")))
+    return;
+  const packageJson = JSON.parse(await readFile7(join9(cwd, "package.json"), "utf8"));
+  if (!isPlainRecord(packageJson))
+    return;
+  const scripts = packageJson.scripts;
+  if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string")
+    return;
+  await runCommand("npm", ["run", "sync:skills"], { cwd });
 }
 function createTempSiblingPath(targetPath) {
   return join9(dirname3(targetPath), `.tmp-${basename2(targetPath)}-${process.pid}-${Date.now()}`);

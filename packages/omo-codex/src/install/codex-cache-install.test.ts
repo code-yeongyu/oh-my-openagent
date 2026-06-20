@@ -77,4 +77,44 @@ describe("codex-cache install", () => {
     expect(await readFile(join(cacheRoot, "package.json"), "utf8")).toBe(JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }))
     expect(await readdir(join(codexHome, "plugins", "cache", "debug", "omo"))).toEqual(["0.1.0"])
   })
+
+  test("#given packaged plugin has stale aggregate skills #when caching plugin #then syncs skills after production dependencies install", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-skills-"))
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(root, "plugin")
+    const commands: string[] = []
+    await mkdir(join(sourceRoot, "scripts"), { recursive: true })
+    await mkdir(join(sourceRoot, "skills", "ulw-plan"), { recursive: true })
+    await writeFile(join(sourceRoot, "skills", "ulw-plan", "SKILL.md"), "---\nname: ulw-plan\n---\n")
+    await writeFile(
+      join(sourceRoot, "package.json"),
+      JSON.stringify({
+        name: "@scope/omo",
+        version: "0.1.0",
+        scripts: { "sync:skills": "node scripts/sync-skills.mjs" },
+      }),
+    )
+
+    // when
+    const installed = await installCachedPlugin({
+      buildSource: false,
+      codexHome,
+      marketplaceName: "debug",
+      name: "omo",
+      sourcePath: sourceRoot,
+      version: "0.1.0",
+      runCommand: async (command, args, options) => {
+        commands.push(`${command} ${args.join(" ")}`)
+        if (command === "npm" && args.join(" ") === "run sync:skills") {
+          await mkdir(join(options.cwd, "skills", "ultraresearch"), { recursive: true })
+          await writeFile(join(options.cwd, "skills", "ultraresearch", "SKILL.md"), "---\nname: ultraresearch\n---\n")
+        }
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm ci --omit=dev", "npm run sync:skills"])
+    expect(await readFile(join(installed.path, "skills", "ultraresearch", "SKILL.md"), "utf8")).toContain("name: ultraresearch")
+  })
 })
