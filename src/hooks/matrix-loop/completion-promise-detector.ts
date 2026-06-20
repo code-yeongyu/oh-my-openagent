@@ -4,7 +4,7 @@ import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 import { withTimeout } from "./with-timeout"
 
-interface OpenCodeSessionMessage {
+export interface OpenCodeSessionMessage {
 	info?: { role?: string }
 	parts?: Array<{ type: string; text?: string }>
 }
@@ -52,30 +52,15 @@ export async function detectCompletionInSessionMessages(
 		promise: string
 		apiTimeoutMs: number
 		directory: string
+		preFetchedMessages?: OpenCodeSessionMessage[]
 	},
 ): Promise<boolean> {
 	try {
-		const response = await withTimeout(
-			ctx.client.session.messages({
-				path: { id: options.sessionID },
-				query: { directory: options.directory },
-			}),
-			options.apiTimeoutMs,
-		)
+		const messageArray: OpenCodeSessionMessage[] = options.preFetchedMessages
+			? options.preFetchedMessages
+			: await fetchSessionMessages(ctx, options.sessionID, options.directory, options.apiTimeoutMs)
 
-		const messagesResponse: unknown = response
-		const responseData =
-			typeof messagesResponse === "object" && messagesResponse !== null && "data" in messagesResponse
-				? (messagesResponse as { data?: unknown }).data
-				: undefined
-
-		const messageArray: unknown[] = Array.isArray(messagesResponse)
-			? messagesResponse
-			: Array.isArray(responseData)
-				? responseData
-				: []
-
-		const assistantMessages = (messageArray as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
+		const assistantMessages = messageArray.filter((msg) => msg.info?.role === "assistant")
 		if (assistantMessages.length === 0) return false
 
 		const pattern = buildPromisePattern(options.promise)
@@ -104,4 +89,29 @@ export async function detectCompletionInSessionMessages(
 		}, 0)
 		return false
 	}
+}
+
+async function fetchSessionMessages(
+	ctx: PluginInput,
+	sessionID: string,
+	directory: string,
+	apiTimeoutMs: number,
+): Promise<OpenCodeSessionMessage[]> {
+	const response = await withTimeout(
+		ctx.client.session.messages({
+			path: { id: sessionID },
+			query: { directory },
+		}),
+		apiTimeoutMs,
+	)
+
+	const messagesResponse: unknown = response
+	const responseData =
+		typeof messagesResponse === "object" && messagesResponse !== null && "data" in messagesResponse
+			? (messagesResponse as { data?: unknown }).data
+			: undefined
+
+	if (Array.isArray(messagesResponse)) return messagesResponse as OpenCodeSessionMessage[]
+	if (Array.isArray(responseData)) return responseData as OpenCodeSessionMessage[]
+	return []
 }
