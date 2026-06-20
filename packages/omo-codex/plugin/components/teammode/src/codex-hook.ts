@@ -54,15 +54,10 @@ export async function runTeammodeHookCli(
 	stdin: NodeJS.ReadableStream,
 	stdout: NodeJS.WritableStream,
 ): Promise<void> {
-	try {
-		const payload = parsePostToolUsePayload(await readAll(stdin));
-		if (payload === null) return;
-		const output = runPostToolUseHook(payload);
-		if (output.length > 0) stdout.write(output);
-	} catch (error) {
-		if (error instanceof Error) return;
-		return;
-	}
+	const payload = parsePostToolUsePayload(await readAll(stdin));
+	if (payload === null) return;
+	const output = runPostToolUseHook(payload);
+	if (output.length > 0) stdout.write(output);
 }
 
 function threadTitleReminder(threadReference: ThreadCreationReference): string {
