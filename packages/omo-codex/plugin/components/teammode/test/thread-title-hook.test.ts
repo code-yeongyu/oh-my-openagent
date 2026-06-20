@@ -57,6 +57,43 @@ describe("thread title PostToolUse guidance", () => {
 		// then
 		expect(actual).toBe("");
 	});
+
+	it("#given worktree-backed thread creation is pending #when the hook runs #then it tells Codex to title the thread once the thread id exists", () => {
+		// given
+		const output = runPostToolUseHook({
+			hook_event_name: "PostToolUse",
+			session_id: "s-team",
+			turn_id: "t-team",
+			transcript_path: null,
+			cwd: "/repo",
+			model: "gpt-5.5",
+			permission_mode: "default",
+			tool_name: "codex_app.create_thread",
+			tool_use_id: "tool-create-thread",
+			tool_input: {
+				prompt: "Fix CodeGraph provisioned launcher skip on Node 25",
+				target: {
+					type: "project",
+					projectId: "/repo",
+					environment: { type: "worktree", startingState: { type: "working-tree" } },
+				},
+			},
+			tool_response: {
+				pendingWorktreeId: "remote-control:env:test-worktree",
+			},
+		});
+
+		// when
+		const parsed: unknown = JSON.parse(output);
+
+		// then
+		expect(isHookOutput(parsed)).toBe(true);
+		if (!isHookOutput(parsed)) return;
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("pendingWorktreeId");
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("remote-control:env:test-worktree");
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("As soon as the real threadId is available");
+		expect(parsed.hookSpecificOutput.additionalContext).toContain("codex_app.set_thread_title");
+	});
 });
 
 interface HookOutput {
