@@ -1,0 +1,3 @@
+[submodule "packages/senpi"]
+	path = packages/senpi
+	url = https://github.com/code-yeongyu/senpi

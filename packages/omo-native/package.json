@@ -1,0 +1,25 @@
+{
+  "name": "@oh-my-opencode/omo-native",
+  "type": "module",
+  "private": true,
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@oh-my-opencode/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-agent-core": "file:../senpi/packages/agent",
+    "@typescript/native-preview": "7.0.0-dev.20260518.1",
+    "bun-types": "1.3.14",
+    "esbuild": "0.28.1",
+    "vitest": "4.1.8"
+  }
+}
