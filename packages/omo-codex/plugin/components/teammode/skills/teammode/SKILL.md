@@ -45,6 +45,9 @@ member by a concrete slice: a specific part of the codebase, an ownership area, 
 perspective/lens. Assigning a vague role ("backend dev", "release analyst", "the tester") is an
 anti-pattern - it gives the member no real boundary and invites overlap. Each member's `focus`
 names what they own concretely; the `lens` is one of `area`, `ownership`, or `perspective`.
+Give each member a short, distinct `--name` too - its role or what it watches (e.g.
+`app-server-lifecycle`, `mailbox-delivery`) - because that name titles its thread; never reuse
+one name for two members.
 
 ## Run the script - never hand-write team state
 
@@ -54,7 +57,7 @@ Replace `<skill-root>` with this skill's own directory.
 
 ```
 node "<skill-root>/scripts/team.mjs" init        --name "<team>" --session-name "<session>" [--session <leader_session_id>] [--worktree] [--base-branch dev]
-node "<skill-root>/scripts/team.mjs" add-member  --team <session_id> --id A --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>" [--branch <branch>]
+node "<skill-root>/scripts/team.mjs" add-member  --team <session_id> --id A --name "<short role>" --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>" [--branch <branch>]
 node "<skill-root>/scripts/team.mjs" bind-thread  --team <session_id> --id A --thread <thread_id> [--cwd <path>]
 node "<skill-root>/scripts/team.mjs" member-prompt --team <session_id> --id A
 node "<skill-root>/scripts/team.mjs" set-status   --team <session_id> --id A --status reported|blocked|active|archived [--note "<...>"]
@@ -74,11 +77,11 @@ subcommand rewrites `guide.md`, so the manual always matches the current team.
 
 1. `init` the team, then `add-member` once per member.
 2. Create a durable thread per member with `codex_app.create_thread` - ALWAYS this tool for every
-   member, never a spawned agent - titled EXACTLY
-   `[team name] {session name}` (keep this convention strictly). If `codex_app.create_thread`
-   accepts a working directory / cwd argument, set it to that member's worktree; otherwise the
-   member's manual tells it to `cd` there first. Use `codex_app.set_thread_title` if the title
-   did not land at creation.
+   member, never a spawned agent - titled `[team name] <member name>`, using THAT member's own
+   name (its role / what it watches), so no two threads share a title. `add-member` prints the
+   exact title to use. If `codex_app.create_thread` accepts a working directory / cwd argument,
+   set it to that member's worktree; otherwise the member's manual tells it to `cd` there first.
+   Use `codex_app.set_thread_title` if the title did not land at creation.
 3. `bind-thread` to record each thread id (and `--cwd`), then send that member's bootstrap
    trigger (printed by `add-member` / `member-prompt`) as the thread's first message. The trigger
    is short on purpose: it tells the new thread to READ its `guide.md` and `team.json` rather than
@@ -87,7 +90,7 @@ subcommand rewrites `guide.md`, so the manual always matches the current team.
 Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
 not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
 for a team member: a spawned agent is an ephemeral helper that does not show up as a team thread,
-cannot carry the `[team name] {session name}` title, and cannot be inspected, titled, archived, or
+cannot carry the `[team name] <member name>` title, and cannot be inspected, titled, archived, or
 re-opened with the `codex_app.*` thread tools - which defeats the entire point of a durable team.
 A member only counts once you have `bind-thread`-ed it to a real `codex_app.create_thread` thread
 id. If the thread-creation tool is unavailable, STOP and say so (see Stop rules); do not quietly

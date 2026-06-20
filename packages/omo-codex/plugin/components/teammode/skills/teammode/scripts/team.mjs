@@ -7,7 +7,7 @@
 // macOS, Linux, and Windows.
 //
 //   node "<skill-root>/scripts/team.mjs" init        --name "<team>" --session-name "<sess>" [--session <id>] [--worktree] [--base-branch dev]
-//   node "<skill-root>/scripts/team.mjs" add-member  --team <id> --id A --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>" [--branch <b>]
+//   node "<skill-root>/scripts/team.mjs" add-member  --team <id> --id A --name "<short role>" --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>" [--branch <b>]
 //   node "<skill-root>/scripts/team.mjs" bind-thread  --team <id> --id A --thread <thread-id> [--cwd <path>]
 //   node "<skill-root>/scripts/team.mjs" member-prompt --team <id> --id A
 //   node "<skill-root>/scripts/team.mjs" set-status   --team <id> --id A --status reported|blocked|active|archived [--note "<...>"]
@@ -95,7 +95,7 @@ const handlers = {
 		await persist(team, dir);
 		process.stdout.write(`created: ${dir}\n`);
 		process.stdout.write(`team.json + guide.md written; artifacts/ ready. session id: ${sessionId}\n`);
-		process.stdout.write(`next: add-member --team ${sessionId} --id A --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>"\n`);
+		process.stdout.write(`next: add-member --team ${sessionId} --id A --name "<short role>" --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>"\n`);
 	},
 
 	async "add-member"(cwd, flags) {
@@ -104,13 +104,15 @@ const handlers = {
 		const memberId = requireFlag(flags, "id").trim();
 		addMember(team, {
 			id: memberId,
+			name: typeof flags.name === "string" ? flags.name : null,
 			focus: requireFlag(flags, "focus"),
 			lens: requireFlag(flags, "lens"),
 			deliverable: typeof flags.deliverable === "string" ? flags.deliverable : "",
 			branch: typeof flags.branch === "string" ? flags.branch : null,
 		});
 		await persist(team, dir);
-		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\nSend this as the new thread's first message (title it "${team.threadTitleConvention}"):\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
+		const member = team.members.find((m) => m.id === memberId);
+		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\nSend this as the new thread's first message (title the thread "${member.threadTitle}"):\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
 	},
 
 	async "bind-thread"(cwd, flags) {

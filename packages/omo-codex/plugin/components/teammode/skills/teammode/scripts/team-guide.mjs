@@ -8,7 +8,9 @@
 function memberLine(member) {
 	const thread = member.threadId ? ` | thread ${member.threadId}` : " | thread not created yet";
 	const wt = member.worktree?.path ? ` | worktree ${member.worktree.path}` : "";
-	return `- **${member.id}** (${member.lens}) - ${member.focus}${member.deliverable ? ` -> ${member.deliverable}` : ""}${thread}${wt} [${member.status}]`;
+	const name = member.name ? ` "${member.name}"` : "";
+	const title = member.threadTitle ? ` | thread title \`${member.threadTitle}\`` : "";
+	return `- **${member.id}**${name} (${member.lens}) - ${member.focus}${member.deliverable ? ` -> ${member.deliverable}` : ""}${title}${thread}${wt} [${member.status}]`;
 }
 
 function worktreeSection(team) {
@@ -43,7 +45,7 @@ export function buildGuide(team) {
 
 - Team: **${team.teamName}** (id \`${team.teamId}\`)
 - Team state: \`${teamJson}\`
-- Thread/session title convention (use it EXACTLY): \`${team.threadTitleConvention}\`
+- Thread title convention: \`${team.threadTitleConvention}\` - each member's thread takes its OWN title from its name (your row below shows yours); two members never share a title
 
 ## Who you are (your identity is fixed)
 
@@ -103,7 +105,7 @@ export function buildMemberPrompt(team, id) {
 	const guide = team.paths?.guide ?? ".omo/teams/<session_id>/guide.md";
 	const teamJson = team.paths?.team ?? ".omo/teams/<session_id>/team.json";
 	const where = member.cwd ? `Work inside \`${member.cwd}\`.` : "Work from the repository root unless your manual assigns a worktree.";
-	return `You are member ${member.id} of team ${team.teamName} - owner of: ${member.focus}.
+	return `You are member ${member.id}${member.name ? ` (${member.name})` : ""} of team ${team.teamName} - owner of: ${member.focus}. Your thread title is \`${member.threadTitle}\`.
 FIRST read your field manual at \`${guide}\`, then the team state at \`${teamJson}\`; they define your scope, deliverable, the leader, the artifacts directory, and the communication rules.
 ${where}
 Communicate with the team and leader in English; reply to the end user in the user's own language.

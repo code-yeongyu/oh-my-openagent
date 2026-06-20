@@ -39,7 +39,7 @@ export function buildTeam({ teamName, sessionName, sessionId = null, dir = null,
 		teamName: teamName.trim(),
 		sessionName: sessionName.trim(),
 		sessionId,
-		threadTitleConvention: `[${teamName.trim()}] ${sessionName.trim()}`,
+		threadTitleConvention: `[${teamName.trim()}] <member name>`,
 		status: "active",
 		createdAt: ts,
 		updatedAt: ts,
@@ -93,22 +93,26 @@ function assertTeamReadyForThreadBinding(team) {
 	assertUniqueMemberFocus(team);
 }
 
-export function addMember(team, { id, focus, lens, deliverable = "", branch = null }) {
+export function addMember(team, { id, focus, lens, deliverable = "", branch = null, name = null }) {
 	if (!id?.trim()) throw new Error("member id is required");
 	if (!focus?.trim()) throw new Error("member focus is required - a concrete part, ownership area, or perspective");
 	if (!LENSES.includes(lens)) throw new Error(`invalid lens "${lens}" - use one of: ${LENSES.join(", ")}`);
 	const memberId = id.trim();
 	const memberFocus = focus.trim();
+	// The member name is the short role label that titles this member's thread. Fall back to the
+	// focus so the title is ALWAYS per-member and never the shared team-wide session name.
+	const memberName = name?.trim() || memberFocus;
 	if (team.members.some((m) => m.id === memberId)) throw new Error(`member id "${memberId}" already exists (duplicate)`);
 	const duplicate = team.members.find((m) => normalizedFocus(m.focus) === normalizedFocus(memberFocus));
 	if (duplicate) throw new Error(`member focus "${memberFocus}" duplicates "${duplicate.focus}" (no two members may own the same thing)`);
 	team.members.push({
 		id: memberId,
+		name: memberName,
 		focus: memberFocus,
 		lens,
 		deliverable: deliverable.trim(),
 		threadId: null,
-		threadTitle: team.threadTitleConvention,
+		threadTitle: `[${team.teamName}] ${memberName}`,
 		cwd: null,
 		worktree: { path: null, branch: branch ?? null },
 		status: "pending",
