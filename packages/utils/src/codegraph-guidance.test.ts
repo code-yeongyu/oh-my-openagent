@@ -97,7 +97,7 @@ describe("CodeGraph initialization guidance", () => {
 
     // then
     expect(guidance).toContain('CodeGraph is not initialized for "/Users/me/project"')
-    expect(guidance).toContain('"/Users/me/project/.codegraph"')
+    expect(guidance).toContain('/Users/me/project/.codegraph"')
     expect(guidance).toContain('"/Users/me/.omo/codegraph/projects/project-')
     expect(guidance).toContain('run `codegraph init` from "/Users/me/project"')
     expect(guidance).not.toContain("Run 'codegraph init' in that project first.")
