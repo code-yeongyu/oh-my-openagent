@@ -1,3 +1,4 @@
+import { CompactionConfigSchema } from "../config/schema/compaction"
 import type { OhMyOpenCodeConfig } from "../config"
 import {
   resolveActualContextLimit,
@@ -12,8 +13,6 @@ import type {
 } from "./preemptive-compaction-types"
 
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 60_000
-const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
-const PREEMPTIVE_COMPACTION_COOLDOWN_MS = 60_000
 
 declare function setTimeout(handler: () => void, timeout?: number): unknown
 declare function clearTimeout(timeoutID: unknown): void
@@ -45,6 +44,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
   compactionInProgress: Set<string>
   compactedSessions: Set<string>
   lastCompactionTime: Map<string, number>
+  toolName?: string
 }): Promise<void> {
   const {
     ctx,
@@ -55,12 +55,18 @@ export async function runPreemptiveCompactionIfNeeded(args: {
     compactionInProgress,
     compactedSessions,
     lastCompactionTime,
+    toolName,
   } = args
+
+  const compactionConfig = CompactionConfigSchema.parse(pluginConfig.compaction ?? {})
+  if (!compactionConfig.enabled) return
 
   if (compactedSessions.has(sessionID) || compactionInProgress.has(sessionID)) return
 
   const lastTime = lastCompactionTime.get(sessionID)
-  if (lastTime && Date.now() - lastTime < PREEMPTIVE_COMPACTION_COOLDOWN_MS) return
+  if (lastTime && Date.now() - lastTime < compactionConfig.cooldown_ms) return
+
+  if (toolName === "background_output") return
 
   const cached = tokenCache.get(sessionID)
   if (!cached) return
@@ -81,7 +87,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
 
   const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
   const usageRatio = totalInputTokens / actualLimit
-  if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
+  if (usageRatio < compactionConfig.preemptive_threshold || !cached.modelID) return
 
   compactionInProgress.add(sessionID)
   lastCompactionTime.set(sessionID, Date.now())
@@ -116,7 +122,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
     ctx.client.tui.showToast({
       body: {
         title: "Preemptive compaction failed",
-        message: `Context window is above ${Math.round(PREEMPTIVE_COMPACTION_THRESHOLD * 100)}% and auto-compaction could not run. The session may grow large. Error: ${errorMessage}`,
+        message: `Context window is above ${Math.round(compactionConfig.preemptive_threshold * 100)}% and auto-compaction could not run. The session may grow large. Error: ${errorMessage}`,
         variant: "warning",
         duration: 10000,
       },

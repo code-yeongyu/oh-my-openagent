@@ -569,15 +569,12 @@ describe("preemptive-compaction", () => {
     }
   })
 
-  // #given first compaction succeeded and context grew again
-  // #when tool.execute.after runs after new high-token message
-  // #then should trigger compaction again (re-compaction)
-  it("should allow re-compaction when context grows after successful compaction", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
-    const sessionID = "ses_recompact"
-
-    // given - first compaction cycle (810K > 78% of 1M GA limit)
-    await hook.event({
+  function emitAssistantMessage(
+    hook: ReturnType<typeof createPreemptiveCompactionHook>,
+    sessionID: string,
+    inputTokens: number,
+  ): Promise<void> {
+    return hook.event({
       event: {
         type: "message.updated",
         properties: {
@@ -588,7 +585,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 800000,
+              input: inputTokens,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -597,46 +594,106 @@ describe("preemptive-compaction", () => {
         },
       },
     })
+  }
 
+  // #given first compaction succeeded and a subsequent assistant message still reports high usage
+  // #when tool.execute.after runs after that still-high message (cooldown elapsed)
+  // #then should NOT re-arm — summarize must not fire a second time
+  it("should NOT re-arm when ratio stays high after a successful compaction", async () => {
+    // given - first compaction cycle (810K > 78% of 1M GA limit)
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_no_rearm_high"
+
+    await emitAssistantMessage(hook, sessionID, 800000)
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
       { title: "", output: "test", metadata: null }
     )
-
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
 
-    // when - advance past the 60s cooldown window, then new message with high tokens
+    // when - cooldown elapses, but the next assistant message is still ~81% (above threshold - margin = 63%)
     const originalNow = Date.now
     Date.now = () => originalNow() + 61_000
-    await hook.event({
-      event: {
-        type: "message.updated",
-        properties: {
-          info: {
-            role: "assistant",
-            sessionID,
-            providerID: "anthropic",
-            modelID: "claude-sonnet-4-6",
-            finish: true,
-            tokens: {
-              input: 800000,
-              output: 0,
-              reasoning: 0,
-              cache: { read: 10000, write: 0 },
-            },
-          },
-        },
-      },
-    })
+    try {
+      await emitAssistantMessage(hook, sessionID, 800000)
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_2" },
+        { title: "", output: "test", metadata: null }
+      )
 
+      // then - the compacted guard is still set, so no second compaction
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
+  // #given a successful compaction followed by a message whose ratio dropped below (threshold - margin)
+  // #when context later grows back above the threshold
+  // #then compaction re-arms and fires again
+  it("should re-arm and re-compact once ratio drops below (threshold - REARM_MARGIN) then grows", async () => {
+    // given - first compaction cycle (810K > 78% of 1M GA limit)
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_rearm_after_drop"
+
+    await emitAssistantMessage(hook, sessionID, 800000)
     await hook["tool.execute.after"](
-      { tool: "bash", sessionID, callID: "call_2" },
+      { tool: "bash", sessionID, callID: "call_1" },
       { title: "", output: "test", metadata: null }
     )
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
 
-    // then - summarize should fire again
-    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
-    Date.now = originalNow
+    const originalNow = Date.now
+    Date.now = () => originalNow() + 61_000
+    try {
+      // when - post-compaction drop: 100K + 10K cache = 110K / 1M = 11% < (78% - 15% = 63%) -> re-arm
+      await emitAssistantMessage(hook, sessionID, 100000)
+      // then context grows back above threshold (810K -> 81%)
+      await emitAssistantMessage(hook, sessionID, 800000)
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_2" },
+        { title: "", output: "test", metadata: null }
+      )
+
+      // then - summarize fires a second time
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
+  // #given a successful compaction followed by several same-step high-usage messages
+  // #when tool.execute.after runs after each (cooldown elapsed)
+  // #then transient same-step re-bloat must not double-compact
+  it("should not double-compact on same-step re-bloat (ratio stays high)", async () => {
+    // given - first compaction cycle
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_no_double_rebloat"
+
+    await emitAssistantMessage(hook, sessionID, 800000)
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+    // when - cooldown elapses and multiple consecutive messages all stay high (no genuine drop)
+    const originalNow = Date.now
+    Date.now = () => originalNow() + 61_000
+    try {
+      await emitAssistantMessage(hook, sessionID, 810000)
+      await emitAssistantMessage(hook, sessionID, 805000)
+      await emitAssistantMessage(hook, sessionID, 820000)
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_2" },
+        { title: "", output: "test", metadata: null }
+      )
+
+      // then - never re-armed, so summarize stays at one call
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+    } finally {
+      Date.now = originalNow
+    }
   })
 
   // #given compaction already succeeded for a session
