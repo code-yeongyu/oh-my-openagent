@@ -1,6 +1,7 @@
 const PRODUCT_PREFIX = "(OmO)";
 
 const WORD_OVERRIDES = new Map([
+	["codegraph", "CodeGraph"],
 	["lazycodex", "LazyCodex"],
 	["lsp", "LSP"],
 	["mcp", "MCP"],

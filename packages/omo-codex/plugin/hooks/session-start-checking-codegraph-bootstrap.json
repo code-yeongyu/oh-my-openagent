@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/codegraph/dist/cli.js\" hook session-start",
 						"timeout": 5,
-						"statusMessage": "(OmO) Checking Codegraph Bootstrap"
+						"statusMessage": "(OmO) Checking CodeGraph Bootstrap"
 					}
 				]
 			}
