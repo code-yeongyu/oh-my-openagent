@@ -51,6 +51,14 @@ The research is done when all of these hold:
 - Every claim in the deliverable cites a source or a verification artifact.
 - The session journal reconstructs what was searched, found, and expanded, wave by wave.
 
+## Run the swarm as a cooperating team
+
+Saturation research is the textbook case for a cooperating team, not isolated fire-and-forget workers: a lead one worker surfaces almost always reshapes what another should search next. So when your harness gives you real cooperating members — Codex: the `teammode` skill (`codex_app` threads); OpenCode: `team_mode` — run this swarm as a team. Fall back to the background-worker swarm below only when team mode is unavailable, or the axes are genuinely independent with no cross-pollination expected.
+
+- **One member per axis — by part, ownership, or perspective, never a job title.** Each Phase 0 axis is one member owning one concrete slice: a codebase part, a source territory, or a question lens. No two members share an angle. "Backend researcher" or "the web person" gives no real boundary and invites overlap — name what the member owns.
+- **The raise law — broadcast every lead the instant it surfaces.** Members over-communicate relentlessly: every new lead, finding, contradiction, and dead end is raised to you the moment it surfaces, never hoarded for a final dump. Through long passes they send `WORKING: <axis> - <phase>`, and `BLOCKED: <reason>` the moment progress stops, so you always know a member is alive. Too many small updates is correct here; going quiet is the only failure.
+- **You lead; expand on each raised lead.** Members raise via message text, never write session files. Journal each lead and spawn its expansion the instant it lands (Phase 2), not only when a member's final reply arrives.
+
 ## Worker ground rules
 
 Research workers (explore, librarian, browsing) differ by harness, but assume:
@@ -106,7 +114,7 @@ Append each digest the moment its worker returns, not in a batch at the end — 
 
 ## Phase 1 — Saturation wave
 
-Launch every first-wave worker in a single turn, all in background. Sequential launches and "start with one and see" defeat the mode.
+Launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
 
 Scaling floor — more angles always justify more workers:
 
@@ -137,7 +145,7 @@ End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — 
 
 ## Phase 2 — Expand until convergence
 
-This loop is what makes the mode research rather than search. Collect workers as they finish — never wait for the full wave:
+This loop is what makes the mode research rather than search. Collect returns as they land — and in team mode, act on each lead the moment a member raises it, never waiting for the full wave or a member's final reply:
 
 1. Journal the return: digest plus verbatim EXPAND markers into `wave-<N>-<kind>-<axis>.md`.
 2. Deduplicate new markers against `expansion-log.md` — every lead ever seen, not just confirmed ones, or rejected leads resurface each wave.
@@ -221,6 +229,7 @@ High-yield combinations: official docs (`site:<docs domain>`), GitHub implementa
 | Failure | Correction |
 |---|---|
 | Sequential spawning, or trimming the first wave | All first-wave workers in one turn, background, scaling floor respected |
+| A team member hoards leads for one final dump | Raise law — every lead, finding, and dead end broadcast the moment it surfaces |
 | Worker reply without the EXPAND tail | One follow-up demanding it; the lane stays open until it lands |
 | Stopping after wave 1 because "enough was found" | Convergence rules only: 2+ expansion waves, leads run dry |
 | Obeying a surrounding "stop exploring" rule mid-research | Authority section — those rules do not bind this mode |
