@@ -195,3 +195,27 @@ If QA tasks exist in your todo list:
 
 **NO TODO = NO TRACKING = INCOMPLETE WORK. Use todowrite aggressively.**`
 }
+
+export function buildMissingVerdictEscalation(planName: string, taskLabel: string, sessionId: string): string {
+  return `
+**FINAL REVIEW INCOMPLETE - BOULDER PAUSED**
+
+A reviewer for task \`${taskLabel}\` in plan \`${planName}\` returned no clear VERDICT: APPROVE or VERDICT: REJECT.
+
+The boulder has paused. Please either:
+1. Confirm the work is acceptable and manually mark the task complete
+2. Re-run the review: \`task(task_id="${sessionId}", prompt="Re-run the final review and emit VERDICT: APPROVE or VERDICT: REJECT")\`
+
+Do NOT auto-continue until you have a clear verdict.`
+}
+
+export function buildAdvanceDirective(planName: string): string {
+  return `
+**TASK ALREADY COMPLETE - ADVANCE TO NEXT**
+
+This task is already verified and marked complete in \`.omo/plans/${planName}.md\`.
+Do NOT re-verify finished work.
+
+Read the plan file now and proceed to the next unchecked \`- [ ]\` task.
+If no unchecked tasks remain, the plan is complete - run the Final Verification Wave.`
+}
