@@ -112,62 +112,73 @@ Profile defaults merge first; any `agents` or `categories` override takes preced
 
 ## The Agent Team
 
-<table>
-<tr>
-<td width="50%">
+### 01. Morpheus — *The Orchestrator*
 
-### Morpheus — *The Orchestrator*
-<img src=".github/assets/morpheus.png" width="120" align="right"/>
+<img src=".github/assets/morpheus.png" width="140" align="right"/>
 
-**Claude Opus 4.6** · Primary agent
+*The one who sees the code for what it truly is.*
 
-Plans, delegates, and executes. Fires background agents in parallel, leverages LSP for surgical refactoring, and never stops until the TODO list is empty.
+**Role:** Master orchestrator and strategic coordinator
 
-</td>
-<td width="50%">
+**Model:** Claude Opus 4.6 · `temperature: 0.1`
 
-### Keymaker — *The Craftsman*
-<img src=".github/assets/keymaker.png" width="120" align="right"/>
+Plans, delegates, and executes. Fires background agents in parallel, leverages LSP and AST-Grep for surgical refactoring, and never stops until the TODO list is empty. Morpheus sees the code for what it truly is — and routes every task to the agent best suited for it.
 
-**GPT 5.3 Codex** · Autonomous deep worker
+---
 
-Give him a goal, not a recipe. Explores the codebase, matches your patterns, and delivers end-to-end.
+### 02. Keymaker — *The Craftsman*
 
-</td>
-</tr>
-<tr>
-<td>
+<img src=".github/assets/keymaker.png" width="140" align="right"/>
 
-### Cipher — *The Language Architect*
-<img src=".github/assets/cipher.png" width="120" align="right"/>
+*Give him a goal, not a recipe.*
 
-**Claude Opus 4.6** · DSL specialist
+**Role:** Autonomous deep worker
 
-Grammars, parsers, type systems, code generators, metamodels. 11 composable skills covering textX, ANTLR4, tree-sitter, PyEcore, and more.
+**Model:** GPT 5.3 Codex · `temperature: 0.1`
 
-</td>
-<td>
+Explores the codebase, matches your patterns, and delivers end-to-end. Keymaker doesn't need step-by-step instructions — give him a destination and he'll find the path, writing production-quality code along the way.
 
-### Sentinel — *The Security Auditor*
-<img src=".github/assets/sentinel.png" width="120" align="right"/>
+---
 
-**Claude Opus 4.6** · Read-only security specialist
+### 03. Cipher — *The Language Architect*
 
-Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, dependency CVEs, secret detection, crypto audit, infrastructure hardening.
+<img src=".github/assets/cipher.png" width="140" align="right"/>
 
-</td>
-</tr>
-</table>
+*Grammars, parsers, and the art of formal languages.*
+
+**Role:** DSL engineering specialist
+
+**Model:** Claude Opus 4.6 · `temperature: 0.1`
+
+Grammars, parsers, type systems, code generators, metamodels. 11 composable skills covering textX, ANTLR4, tree-sitter, PyEcore, and more. If it involves defining a language or transforming code, Cipher is your specialist.
+
+---
+
+### 04. Sentinel — *The Security Auditor*
+
+<img src=".github/assets/sentinel.png" width="140" align="right"/>
+
+*Reads every line. Changes nothing. Reports everything.*
+
+**Role:** Read-only security specialist
+
+**Model:** Claude Opus 4.6 · `temperature: 0.1`
+
+Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, dependency CVEs, secret detection, crypto audit, infrastructure hardening. 9 composable security skills. Sentinel reports findings with CWE IDs, exact locations, and actionable remediation.
+
+---
+
+### The Rest of the Team
 
 | Agent | Role | Model |
 |-------|------|-------|
-| **Oracle** | Strategic planning with interview mode | Claude Opus 4.6 |
-| **Merovingian** | Architecture decisions & debugging | GPT 5.2 |
-| **Architect** | Plan execution orchestrator | Claude Sonnet 4.6 |
-| **Seraph** | Pre-planning analysis | Claude Opus 4.6 |
-| **Smith** | Plan validation & review | GPT 5.2 |
-| **Operator** | Documentation & OSS search | GLM 4.7 |
-| **Trinity** | Blazing fast codebase grep | Grok Code Fast |
+| **Oracle** | Strategic planning, architecture decisions, debugger of last resort | Claude Opus 4.6 |
+| **Merovingian** | High-IQ consultation, hard debugging, architecture design | GPT 5.2 |
+| **Architect** | Plan execution orchestrator, session coordination | Claude Sonnet 4.6 |
+| **Seraph** | Pre-planning analysis, ambiguity detection, AI failure prevention | Claude Opus 4.6 |
+| **Smith** | Plan validation, completeness review, gap detection | GPT 5.2 |
+| **Operator** | External documentation, OSS search, library research | GLM 4.7 |
+| **Trinity** | Blazing fast codebase grep, pattern discovery | Grok Code Fast |
 | **Construct** | PDF, image & diagram analysis | Gemini 3 Flash |
 
 Every agent, model, temperature, and permission is fully customizable. [**Meet the full team →**](docs/agents.md)
