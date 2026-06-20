@@ -9,6 +9,7 @@ import { runCodegraphCli } from "../src/cli.ts";
 import {
 	executeCodegraphSessionStartHook,
 	resolveCodegraphCommandInvocation,
+	runCodegraphPostToolUseHook,
 	runCodegraphSessionStartWorker,
 	type WorkerSpawnInvocation,
 } from "../src/hook.ts";
@@ -46,6 +47,54 @@ describe("CodeGraph SessionStart hook", () => {
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 		}
+	});
+
+	it("#given CodeGraph MCP reports an uninitialized project #when PostToolUse fires #then it emits OMO global-store init guidance", async () => {
+		// given
+		const output = runCodegraphPostToolUseHook(
+			{
+				cwd: "/Users/me/project",
+				tool_name: "codegraph.codegraph_status",
+				tool_response: {
+					error: [
+						"Tool execution failed: CodeGraph not initialized in /Users/me/project.",
+						"Run 'codegraph init' in that project first.",
+					].join(" "),
+				},
+			},
+			{ homeDir: "/Users/me" },
+		);
+
+		// when
+		const parsed = JSON.parse(output);
+
+		// then
+		expect(parsed).toEqual({
+			hookSpecificOutput: {
+				hookEventName: "PostToolUse",
+				additionalContext: expect.stringContaining('"/Users/me/.omo/codegraph/projects/project-'),
+			},
+		});
+		expect(parsed.hookSpecificOutput.additionalContext).toContain('run `codegraph init` from "/Users/me/project"');
+	});
+
+	it("#given real CodeGraph status output has no MCP path phrase #when PostToolUse fires #then it emits OMO global-store init guidance", async () => {
+		// given
+		const output = runCodegraphPostToolUseHook(
+			{
+				cwd: "/Users/me/project",
+				tool_name: "mcp__codegraph__codegraph_status",
+				tool_response: ['Project: /Users/me/project', "Not initialized", 'Run "codegraph init" to initialize'].join("\n"),
+			},
+			{ homeDir: "/Users/me" },
+		);
+
+		// when
+		const parsed = JSON.parse(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.additionalContext).toContain('CodeGraph is not initialized for "/Users/me/project"');
+		expect(parsed.hookSpecificOutput.additionalContext).toContain('"/Users/me/.omo/codegraph/projects/project-');
 	});
 
 	it("#given CodeGraph is disabled by Codex SOT config #when SessionStart fires #then it skips without spawning", async () => {
