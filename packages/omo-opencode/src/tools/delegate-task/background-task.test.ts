@@ -609,4 +609,46 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(launchCalls).toHaveLength(1)
     expectFn(launchCalls[0].agent).toBe("Hephaestus - Deep Agent")
   })
+
+  testFn("does not advertise background_output CTA in launch return (issue #5221)", async () => {
+    //#given - a successful launch
+    const manager = {
+      launch: async () => ({
+        id: "bg_cta_check",
+        sessionId: "ses_cta_check",
+        description: "CTA check",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionId: "ses_cta_check" }),
+    }
+
+    //#when
+    const result = await executeBackgroundTask(
+      {
+        description: "CTA check",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_cta",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_cta" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - no polling CTA, anti-polling instruction preserved
+    expectFn(result).not.toContain("Use `background_output` with task_id=")
+    expectFn(result).not.toContain("to check.")
+    expectFn(result).toContain("Do NOT call background_output now")
+    expectFn(result).toContain("<system-reminder>")
+  })
 })
