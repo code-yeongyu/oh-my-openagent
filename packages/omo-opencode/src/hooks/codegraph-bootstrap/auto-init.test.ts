@@ -134,4 +134,30 @@ describe("codegraph-bootstrap auto_init", () => {
     // then
     expect(events.some((event) => event.startsWith("prepare:"))).toBe(true)
   })
+
+  // #given auto_init is false and auto_provision defaults to true
+  // #when bootstrap runs and .codegraph does not exist
+  // #then ensureProvisioned should NOT be called (minimal side effects)
+  test("#given auto_init false with default auto_provision and no .codegraph #when bootstrap runs #then ensureProvisioned is not called", async () => {
+    // given
+    workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-no-provision-"))
+    expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: workspace },
+      { auto_init: false, enabled: true },
+      createDeps(events),
+    )
+
+    // when
+    hook.event?.({
+      event: { type: "session.created", properties: { info: { id: "ses_no_provision" } } } as never,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    // then — ensureProvisioned should NOT be called (no binary download)
+    expect(events).not.toContain("provision")
+    expect(events.some((event) => event.startsWith("prepare:"))).toBe(false)
+    expect(events.some((event) => event.startsWith("run:"))).toBe(false)
+  })
 })

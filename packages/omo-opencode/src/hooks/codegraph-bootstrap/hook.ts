@@ -138,6 +138,15 @@ async function runBootstrap(
   deps: CodegraphBootstrapDeps,
 ): Promise<void> {
   try {
+    const autoInit = config.auto_init !== false
+    const codegraphPath = join(projectRoot, ".codegraph")
+    if (!autoInit && !existsSync(codegraphPath)) {
+      deps.log("[codegraph-bootstrap] CodeGraph auto_init disabled and .codegraph not present; skipping bootstrap", {
+        projectRoot,
+      })
+      return
+    }
+
     const command = await resolveOrProvisionCommand(deps, config)
     if (command === null) {
       deps.log("[codegraph-bootstrap] CodeGraph unavailable; skipping bootstrap", { projectRoot })
@@ -149,15 +158,6 @@ async function runBootstrap(
         major: nodeSupport.major,
         projectRoot,
         reason: nodeSupport.reason,
-      })
-      return
-    }
-
-    const autoInit = config.auto_init !== false
-    const codegraphPath = join(projectRoot, ".codegraph")
-    if (!autoInit && !existsSync(codegraphPath)) {
-      deps.log("[codegraph-bootstrap] CodeGraph auto_init disabled and .codegraph not present; skipping bootstrap", {
-        projectRoot,
       })
       return
     }
