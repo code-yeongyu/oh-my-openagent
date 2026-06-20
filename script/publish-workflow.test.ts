@@ -122,10 +122,14 @@ describe("test workflows", () => {
         codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
     const runsCodexCommand = codexCompatibilityJob.includes("run: bun run test:codex")
     const publishMainNeedsCodex =
-      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
+      workflow.includes(
+        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+      ) &&
       workflow.includes("needs.codex-compatibility.result == 'success'")
     const publishPlatformNeedsCodex =
-      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]") &&
+      workflow.includes(
+        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]",
+      ) &&
       workflow.includes("needs.codex-compatibility.result == 'success'")
 
     // #then
@@ -296,7 +300,9 @@ describe("test workflows", () => {
     const computesVersionOnce = (workflow.match(/id: version/g) ?? []).length === 1
     const platformUsesMetadata = workflow.includes("version: ${{ needs.release-metadata.outputs.version }}") &&
       workflow.includes("dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}")
-    const mainWaitsForPlatform = workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
+    const mainWaitsForPlatform = workflow.includes(
+      "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+    ) &&
       workflow.includes("inputs.skip_platform == true || needs.publish-platform.result == 'success'")
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")
     const wrappersVerifyPlatformPackages = workflow.includes("name: Verify platform packages are published") &&
@@ -504,7 +510,7 @@ describe("test workflows", () => {
     expect(publishIds, "PLATFORM_PACKAGE_IDS must match build-binaries PLATFORMS exactly").toEqual(
       buildBinariesPlatforms,
     )
-    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 2 version-bump loops").toBe(4)
+    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 3 version-bump loops").toBe(5)
     for (const publishYmlList of publishYmlLists) {
       expect(publishYmlList, "every publish.yml platform list must match build-binaries PLATFORMS exactly").toEqual(
         buildBinariesPlatforms,
