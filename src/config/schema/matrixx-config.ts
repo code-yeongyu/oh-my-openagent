@@ -16,6 +16,7 @@ import { HookNameSchema } from "./hooks"
 import { SecurityConfigSchema } from "./security"
 import { NotificationConfigSchema } from "./notification"
 import { MatrixLoopConfigSchema } from "./matrix-loop"
+import { MatrixxSelfConfigSkillConfigSchema } from "./matrixx-self-config"
 import { SkillsConfigSchema } from "./skills"
 import { MorpheusConfigSchema } from "./morpheus"
 import { MorpheusAgentConfigSchema } from "./morpheus-agent"
@@ -65,6 +66,8 @@ export const MatrixxConfigSchema = z.object({
   agent_definitions: AgentDefinitionsConfigSchema.optional(),
   /** Dynamic model capabilities refresh configuration */
   model_capabilities: ModelCapabilitiesConfigSchema.optional(),
+  /** Enable matrixx-self-config skill (default: false - opt-in feature) */
+  matrixx_self_config: MatrixxSelfConfigSkillConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })
