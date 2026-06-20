@@ -329,9 +329,143 @@ jobs:
             echo "Check the requested version format, bump input, or npm metadata lookup."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  prepare-release-state:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      needs.test.result == 'success' &&
+      needs.typecheck.result == 'success' &&
+      needs.codex-compatibility.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success'
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      pull-requests: write
+    outputs:
+      release_sha: ${{ steps.prepare.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare and merge release state before publishing
+        id: prepare
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_REF: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${RELEASE_REF:-dev}"
+          RELEASE_BRANCH="release/v${VERSION}-source-state"
+
+          git fetch origin "${BASE_REF}" --tags
+
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            RELEASE_SHA="$(git rev-list --max-count=1 "refs/tags/v${VERSION}")"
+            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Release tag v${VERSION} already exists locally at ${RELEASE_SHA}"
+            exit 0
+          fi
+
+          RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
+          if [ -n "$RELEASE_SHA" ]; then
+            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Release commit already exists on origin/${BASE_REF}: ${RELEASE_SHA}"
+            exit 0
+          fi
+
+          git checkout -B "$RELEASE_BRANCH" "origin/${BASE_REF}"
+
+          CURRENT_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+            RELEASE_SHA="$(git rev-parse HEAD)"
+            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "origin/${BASE_REF} is already stamped as v${VERSION}: ${RELEASE_SHA}"
+            exit 0
+          fi
+
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
+          done
+
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
+          node packages/omo-codex/plugin/scripts/sync-version.mjs
+          node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          bun install --lockfile-only
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+          git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
+
+          PR_NUMBER="$(gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_URL="$(gh pr create --base "$BASE_REF" --head "$RELEASE_BRANCH" --title "release: v${VERSION}" --body "Automated release-state PR for v${VERSION}. This must merge before npm publication starts so protected-branch push failures cannot create a half-published release.")"
+            PR_NUMBER="${PR_URL##*/}"
+          fi
+
+          gh pr merge "$PR_NUMBER" --merge --auto --delete-branch=false
+
+          for attempt in $(seq 1 120); do
+            PR_STATE="$(gh pr view "$PR_NUMBER" --json state --jq '.state')"
+            if [ "$PR_STATE" = "MERGED" ]; then
+              RELEASE_SHA="$(gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+              echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
+              exit 0
+            fi
+
+            FAILURES="$(gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
+            if [ "$FAILURES" != "0" ]; then
+              echo "::error::Release-state PR #${PR_NUMBER} has failing required checks; refusing to publish npm packages."
+              gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}'
+              exit 1
+            fi
+
+            echo "Waiting for release-state PR #${PR_NUMBER} to merge (attempt ${attempt}/120)"
+            sleep 30
+          done
+
+          echo "::error::Timed out waiting for release-state PR #${PR_NUMBER} to merge; refusing to publish npm packages."
+          exit 1
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release source-state gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Ensures the `release: v${{ needs.release-metadata.outputs.version }}` source-state commit exists on the release branch before npm publish starts.
+            - Creates and auto-merges a release-state PR when source manifests need stamping.
+            - Refuses to publish packages if protected-branch rules or required checks prevent that PR from merging.
+          JOB_SUMMARY_NEXT: If this fails, merge the release-state PR or fix its checks before rerunning publish.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   publish-main:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]
+    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -340,6 +474,7 @@ jobs:
       needs.codex-compatibility.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
+      needs.prepare-release-state.result == 'success' &&
       (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
       - uses: actions/checkout@v5
@@ -622,7 +757,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-platform:
-    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
+    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -631,7 +766,8 @@ jobs:
       needs.typecheck.result == 'success' &&
       needs.codex-compatibility.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
-      needs.release-metadata.result == 'success'
+      needs.release-metadata.result == 'success' &&
+      needs.prepare-release-state.result == 'success'
     uses: ./.github/workflows/publish-platform.yml
     with:
       version: ${{ needs.release-metadata.outputs.version }}
