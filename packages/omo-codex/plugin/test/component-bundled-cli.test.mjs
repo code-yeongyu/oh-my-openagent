@@ -17,6 +17,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	rules: "session-start",
 	"start-work-continuation": "stop",
 	telemetry: "session-start",
+	teammode: "post-tool-use",
 	ultrawork: "user-prompt-submit",
 	"ulw-loop": "pre-tool-use",
 };
