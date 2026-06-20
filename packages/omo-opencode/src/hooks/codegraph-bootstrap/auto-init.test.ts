@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -9,9 +9,14 @@ import {
   clearCodegraphBootstrapProjectsForTesting,
   createCodegraphBootstrapHook,
   type CodegraphBootstrapDeps,
+  type CodegraphBootstrapEventInput,
 } from "./index"
 
-function createDeps(events: string[], overrides: Partial<CodegraphBootstrapDeps> = {}): CodegraphBootstrapDeps {
+function createDeps(
+  events: string[],
+  overrides: Partial<CodegraphBootstrapDeps> = {},
+  scheduledTasks: Promise<void>[] = [],
+): CodegraphBootstrapDeps {
   return {
     buildEnv: () => ({ CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph", CODEGRAPH_NO_DOWNLOAD: "1", CODEGRAPH_TELEMETRY: "0", DO_NOT_TRACK: "1" }),
     ensureGitignored: (projectRoot) => {
@@ -44,10 +49,16 @@ function createDeps(events: string[], overrides: Partial<CodegraphBootstrapDeps>
     nodeSupport: () => ({ major: 22, override: false, supported: true }),
     schedule: (task) => {
       events.push("scheduled")
-      void task()
+      const scheduledTask = task()
+      scheduledTasks.push(scheduledTask)
+      void scheduledTask
     },
     ...overrides,
   }
+}
+
+function sessionCreatedInput(id: string): CodegraphBootstrapEventInput {
+  return { event: { type: "session.created", properties: { info: { id } } } }
 }
 
 describe("codegraph-bootstrap auto_init", () => {
@@ -66,17 +77,16 @@ describe("codegraph-bootstrap auto_init", () => {
     workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-skip-"))
     expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
     const events: string[] = []
+    const scheduledTasks: Promise<void>[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
       { auto_init: false, auto_provision: false, enabled: true },
-      createDeps(events),
+      createDeps(events, {}, scheduledTasks),
     )
 
     // when
-    hook.event?.({
-      event: { type: "session.created", properties: { info: { id: "ses_auto_init_skip" } } } as never,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    hook.event?.(sessionCreatedInput("ses_auto_init_skip"))
+    await Promise.all(scheduledTasks)
 
     // then
     expect(events.some((event) => event.startsWith("prepare:"))).toBe(false)
@@ -90,22 +100,19 @@ describe("codegraph-bootstrap auto_init", () => {
   test("#given auto_init is false and .codegraph already exists #when bootstrap runs #then it continues with sync", async () => {
     // given
     workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-existing-"))
-    // Create .codegraph directory to simulate existing workspace
-    const { mkdirSync } = await import("node:fs")
     mkdirSync(join(workspace, ".codegraph"), { recursive: true })
     expect(existsSync(join(workspace, ".codegraph"))).toBe(true)
     const events: string[] = []
+    const scheduledTasks: Promise<void>[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
       { auto_init: false, auto_provision: false, enabled: true },
-      createDeps(events),
+      createDeps(events, {}, scheduledTasks),
     )
 
     // when
-    hook.event?.({
-      event: { type: "session.created", properties: { info: { id: "ses_auto_init_existing" } } } as never,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    hook.event?.(sessionCreatedInput("ses_auto_init_existing"))
+    await Promise.all(scheduledTasks)
 
     // then
     expect(events.some((event) => event.startsWith("prepare:"))).toBe(true)
@@ -119,17 +126,16 @@ describe("codegraph-bootstrap auto_init", () => {
     workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-true-"))
     expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
     const events: string[] = []
+    const scheduledTasks: Promise<void>[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
       { auto_init: true, auto_provision: false, enabled: true },
-      createDeps(events),
+      createDeps(events, {}, scheduledTasks),
     )
 
     // when
-    hook.event?.({
-      event: { type: "session.created", properties: { info: { id: "ses_auto_init_true" } } } as never,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    hook.event?.(sessionCreatedInput("ses_auto_init_true"))
+    await Promise.all(scheduledTasks)
 
     // then
     expect(events.some((event) => event.startsWith("prepare:"))).toBe(true)
@@ -143,19 +149,18 @@ describe("codegraph-bootstrap auto_init", () => {
     workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-no-provision-"))
     expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
     const events: string[] = []
+    const scheduledTasks: Promise<void>[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
       { auto_init: false, enabled: true },
-      createDeps(events),
+      createDeps(events, {}, scheduledTasks),
     )
 
     // when
-    hook.event?.({
-      event: { type: "session.created", properties: { info: { id: "ses_no_provision" } } } as never,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    hook.event?.(sessionCreatedInput("ses_no_provision"))
+    await Promise.all(scheduledTasks)
 
-    // then — ensureProvisioned should NOT be called (no binary download)
+    // then
     expect(events).not.toContain("provision")
     expect(events.some((event) => event.startsWith("prepare:"))).toBe(false)
     expect(events.some((event) => event.startsWith("run:"))).toBe(false)
