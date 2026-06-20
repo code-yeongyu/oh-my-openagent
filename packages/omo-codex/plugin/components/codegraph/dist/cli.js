@@ -1962,13 +1962,10 @@ function finish(action, detail, logOutcome) {
 }
 async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport) {
   const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(config.install_dir) });
-  if (resolved.exists) {
-    if (codegraphCommandRequiresSupportedLocalNode(resolved) && !nodeSupport.supported) {
-      return { kind: "unsupported-node" };
-    }
+  if (resolved.exists && canUseResolvedCommand(resolved, nodeSupport)) {
     return { kind: "resolved", resolution: resolved };
   }
-  if (!nodeSupport.supported)
+  if (resolved.exists && config.auto_provision === false)
     return { kind: "unsupported-node" };
   if (config.auto_provision === false)
     return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
@@ -1978,6 +1975,9 @@ async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport
     return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
   }
   return { kind: "resolved", resolution: { argsPrefix: [], command: provisioned.binPath, exists: true, source: "provisioned" } };
+}
+function canUseResolvedCommand(resolved, nodeSupport) {
+  return !codegraphCommandRequiresSupportedLocalNode(resolved) || nodeSupport.supported;
 }
 function decideStartupAction(status) {
   if (status.timedOut)
