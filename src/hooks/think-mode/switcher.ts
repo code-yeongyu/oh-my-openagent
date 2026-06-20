@@ -201,6 +201,20 @@ const THINKING_CAPABLE_MODELS = {
   "zai-coding-plan": ["glm"],
 } as const satisfies Record<string, readonly string[]>
 
+/**
+ * Precomputed lowercase version of `THINKING_CAPABLE_MODELS`.
+ * Each pattern's `.toLowerCase()` is computed ONCE at module load
+ * (≈16 calls total) instead of on every `getThinkingConfig` call
+ * (was: N patterns × every invocation = 100×N for 100 invocations).
+ *
+ * Lookup is keyed by the same provider ID as `THINKING_CAPABLE_MODELS`.
+ * Patterns are already lowercase, so `baseLower.includes(pattern)` is
+ * safe without per-call `.toLowerCase()`.
+ */
+const THINKING_CAPABLE_MODELS_LOWER: Record<string, string[]> = Object.fromEntries(
+  Object.entries(THINKING_CAPABLE_MODELS).map(([k, v]) => [k, v.map((s) => s.toLowerCase())])
+)
+
 export function getHighVariant(modelID: string): string | null {
   const normalized = normalizeModelID(modelID)
   const { prefix, base } = extractModelPrefix(normalized)
@@ -253,12 +267,14 @@ export function getThinkingConfig(
   }
 
   const config = THINKING_CONFIGS[resolvedProvider]
-  const capablePatterns = THINKING_CAPABLE_MODELS[resolvedProvider]
+  const capablePatterns = THINKING_CAPABLE_MODELS_LOWER[resolvedProvider]
 
-  // Check capability using base model name (without prefix)
+  // Check capability using base model name (without prefix).
+  // Patterns come pre-lowercased from `THINKING_CAPABLE_MODELS_LOWER` (module load),
+  // so no per-pattern `.toLowerCase()` is needed here.
   const baseLower = base.toLowerCase()
   const isCapable = capablePatterns.some((pattern) =>
-    baseLower.includes(pattern.toLowerCase())
+    baseLower.includes(pattern)
   )
 
   return isCapable ? config : null

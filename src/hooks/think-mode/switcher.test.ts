@@ -592,4 +592,47 @@ describe("think-mode switcher", () => {
       execSpy.mockRestore()
     })
   })
+
+  describe("THINKING_CAPABLE_MODELS precomputed lowercase at module load (Task T3.23)", () => {
+    it("THINKING_CAPABLE_MODELS precomputed lowercase at module load", () => {
+      //#given a spy on String.prototype.toLowerCase that counts only calls on pattern strings
+      // Patterns for anthropic from switcher.ts:THINKING_CAPABLE_MODELS
+      const anthropicPatterns = ["claude-sonnet-4", "claude-opus-4", "claude-3"]
+      const originalToLowerCase = String.prototype.toLowerCase
+      let patternToLowerCaseCount = 0
+      const lowerSpy = spyOn(String.prototype, "toLowerCase").mockImplementation(function (
+        this: string
+      ) {
+        // Only count calls where `this` is one of the pattern strings.
+        // The precomputation (module load) already happened BEFORE this spy was set up,
+        // so we should see ZERO pattern.toLowerCase() calls during the 100 invocations.
+        // base.toLowerCase() calls (1 per invocation = 100 total) are intentionally not counted
+        // — they are the runtime work, not the pattern cache we're verifying.
+        if (anthropicPatterns.includes(this)) {
+          patternToLowerCaseCount++
+        }
+        return originalToLowerCase.call(this)
+      })
+
+      try {
+        //#when getThinkingConfig is called 100 times for the same provider
+        for (let i = 0; i < 100; i++) {
+          getThinkingConfig("anthropic", "claude-opus-4-6")
+        }
+
+        //#then pattern.toLowerCase() was called at most capablePatterns.length times
+        // (precomputation moved this work to module load; the spy is set up after import,
+        // so the count during the 100 invocations is exactly 0 — well within the bound)
+        expect(patternToLowerCaseCount).toBeLessThanOrEqual(anthropicPatterns.length)
+        // Strong assertion: the precomputation should fully eliminate per-call pattern.toLowerCase()
+        expect(patternToLowerCaseCount).toBe(0)
+        //#and functional correctness is preserved (100 invocations return non-null thinking config)
+        const result = getThinkingConfig("anthropic", "claude-opus-4-6")
+        expect(result).not.toBeNull()
+        expect(result?.thinking).toBeDefined()
+      } finally {
+        lowerSpy.mockRestore()
+      }
+    })
+  })
 })
