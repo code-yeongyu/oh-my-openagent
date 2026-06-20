@@ -6543,6 +6543,10 @@
     "codegraph": {
       "type": "object",
       "properties": {
+        "auto_init": {
+          "default": true,
+          "type": "boolean"
+        },
         "auto_provision": {
           "default": true,
           "type": "boolean"
@@ -6563,6 +6567,7 @@
         }
       },
       "required": [
+        "auto_init",
         "auto_provision",
         "enabled"
       ],
