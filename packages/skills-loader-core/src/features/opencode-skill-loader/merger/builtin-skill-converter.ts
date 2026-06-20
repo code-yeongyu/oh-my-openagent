@@ -1,16 +1,13 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { BuiltinSkill } from "../../builtin-skills/types"
-import { getSharedSkillSourceDir, getBuiltinSkillSourceDir } from "../../builtin-skills/skill-file-loader"
+import { getSharedSkillSourceDir } from "../../builtin-skills/skill-file-loader"
 import type { CommandDefinition } from "@oh-my-opencode/claude-code-compat-core/claude-code-command-loader/types"
 import type { LoadedSkill } from "../types"
 
 function inferBuiltinSourceDir(name: string): string | undefined {
   const sharedDir = getSharedSkillSourceDir(name)
   if (existsSync(join(sharedDir, "SKILL.md"))) return sharedDir
-
-  const builtinDir = getBuiltinSkillSourceDir(name)
-  if (existsSync(builtinDir)) return builtinDir
 
   return undefined
 }

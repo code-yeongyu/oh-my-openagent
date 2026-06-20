@@ -7,7 +7,6 @@ import { parseFrontmatter } from "@oh-my-opencode/utils"
 import { createBuiltinSkills } from "./skills"
 import {
   createSharedSkillTemplateLoader,
-  getBuiltinSkillSourceDir,
   getSharedSkillSourceDir,
   loadSharedSkillTemplate,
 } from "./skill-file-loader"
@@ -75,18 +74,15 @@ describe("shared builtin skill file loader", () => {
     expect(loader("layout")).toBe("Layout body")
   })
 
-  test("#given builtin skills with reference files #when source dirs are resolved #then relative references have a stable base", () => {
+  test("#given shared skill with reference files #when source dir is resolved #then relative references have a stable base", () => {
     // given
     const sharedSourceDir = getSharedSkillSourceDir("debugging")
-    const builtinSourceDir = getBuiltinSkillSourceDir("dev-browser")
 
     // when
     const debuggingReferencePath = join(sharedSourceDir, "references", "runtimes", "node.md")
-    const devBrowserReferencePath = join(builtinSourceDir, "references", "installation.md")
 
     // then
     expect(existsSync(debuggingReferencePath)).toBe(true)
-    expect(existsSync(devBrowserReferencePath)).toBe(true)
   })
 
   test("#given a missing shared skill file #when loading the template #then the loader fails fast", () => {

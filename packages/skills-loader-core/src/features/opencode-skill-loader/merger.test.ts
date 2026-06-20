@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { createBuiltinSkills } from "../builtin-skills/skills"
-import { getBuiltinSkillSourceDir, getSharedSkillSourceDir } from "../builtin-skills/skill-file-loader"
+import { getSharedSkillSourceDir } from "../builtin-skills/skill-file-loader"
 import type { BuiltinSkill } from "../builtin-skills/types"
 import type { CommandDefinition } from "@oh-my-opencode/claude-code-compat-core/claude-code-command-loader/types"
 import { mergeSkills } from "./merger"
@@ -71,7 +71,7 @@ describe("mergeSkills", () => {
     expect(visualQa?.resolvedPath).toBe(getSharedSkillSourceDir("visual-qa"))
   })
 
-  it("populates resolvedPath for builtin-skills-backed skills", () => {
+  it("leaves resolvedPath undefined for non-shared builtin skills", () => {
     // given
     const builtinSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
@@ -80,7 +80,7 @@ describe("mergeSkills", () => {
     const devBrowser = merged.find((s) => s.name === "dev-browser")
 
     // then
-    expect(devBrowser?.resolvedPath).toBe(getBuiltinSkillSourceDir("dev-browser"))
+    expect(devBrowser?.resolvedPath).toBeUndefined()
   })
 
   it("prefers explicit sourceDir over inferred path", () => {
