@@ -25,8 +25,8 @@ export function createChatMessageHandler(deps: HookDeps) {
 
     const reqLower = requestedModel ? requestedModel.toLowerCase() : undefined
 
-    if (reqLower && reqLower !== stripVariant(state.currentModel)) {
-      if (state.pendingFallbackModel && stripVariant(state.pendingFallbackModel) === reqLower) {
+    if (reqLower && reqLower !== stripVariant(state.currentModel).toLowerCase()) {
+      if (state.pendingFallbackModel && stripVariant(state.pendingFallbackModel).toLowerCase() === reqLower) {
         state.pendingFallbackModel = undefined
         state.pendingFallbackPromptMayHaveBeenAccepted = false
         return
@@ -37,7 +37,7 @@ export function createChatMessageHandler(deps: HookDeps) {
         from: state.currentModel,
         to: requestedModel,
         debug_reqLower: reqLower,
-        debug_stripVariant: stripVariant(state.currentModel)
+        debug_stripVariant: stripVariant(state.currentModel).toLowerCase()
       })
       state = createFallbackState(requestedModel!)
       sessionStates.set(sessionID, state)
@@ -61,7 +61,7 @@ export function createChatMessageHandler(deps: HookDeps) {
       if (parts.length >= 2) {
         output.message.model = {
           providerID: parts[0],
-          modelID: parts.slice(1).join("/"),
+          modelID: stripVariant(parts.slice(1).join("/")),
         }
       }
       return
@@ -85,7 +85,7 @@ export function createChatMessageHandler(deps: HookDeps) {
         // Failing to strip the variant will result in a ProviderModelNotFoundError and break the fallback chain.
         output.message.model = {
           providerID: parts[0],
-          modelID: parts.slice(1).join("/").replace(/\(.*?\)$/, ""),
+          modelID: stripVariant(parts.slice(1).join("/")),
         }
       }
     }

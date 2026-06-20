@@ -11,6 +11,9 @@ import type { RuntimeFallbackConfig } from "../../config"
 export const stringifyRuntimeModel = stringifyRuntimeFallbackModel
 export const stringifyRuntimeModelWithVariant = stringifyRuntimeFallbackModelWithVariant
 
+export function stripVariant(model: string): string {
+  return model.trim().replace(/\(.*?\)$/, "")
+}
 
 export function areRuntimeModelsEquivalent(candidate: string | undefined, current: string | undefined): boolean {
   return areRuntimeFallbackModelsEquivalent(candidate, current)
