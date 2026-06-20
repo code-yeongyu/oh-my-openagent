@@ -32,6 +32,7 @@
 		"./hooks/pre-tool-use-enforcing-unlimited-goal-budget.json",
 		"./hooks/post-tool-use-checking-comments.json",
 		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
+		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
 		"./hooks/post-tool-use-matching-project-rules.json",
 		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
 		"./hooks/post-compact-resetting-project-rule-cache.json",
