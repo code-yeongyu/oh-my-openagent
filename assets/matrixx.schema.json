@@ -88,7 +88,8 @@
           "tdd-enforcer",
           "review-work",
           "quality-gate",
-          "software-dev"
+          "software-dev",
+          "matrixx-self-config"
         ]
       }
     },
