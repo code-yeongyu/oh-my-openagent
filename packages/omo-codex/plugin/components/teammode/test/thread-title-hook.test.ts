@@ -29,10 +29,9 @@ describe("thread title PostToolUse guidance", () => {
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
 		expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("codex_app.set_thread_title");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("thread-123");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("immediately");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("descriptive");
+		expect(parsed.hookSpecificOutput.additionalContext).toBe(
+			"THREAD ID thread-123: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE.",
+		);
 	});
 
 	it("#given an unrelated tool completed #when the hook runs #then it stays silent", () => {
@@ -89,10 +88,9 @@ describe("thread title PostToolUse guidance", () => {
 		// then
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("pendingWorktreeId");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("remote-control:env:test-worktree");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("As soon as the real threadId is available");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("codex_app.set_thread_title");
+		expect(parsed.hookSpecificOutput.additionalContext).toBe(
+			"PENDING WORKTREE ID remote-control:env:test-worktree: CALL codex_app.set_thread_title AS SOON AS THREAD ID EXISTS. USE THE REAL TASK/ROLE.",
+		);
 	});
 });
 

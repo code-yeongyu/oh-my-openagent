@@ -62,20 +62,9 @@ export async function runTeammodeHookCli(
 
 function threadTitleReminder(threadReference: ThreadCreationReference): string {
 	const id = formatIdentifier(threadReference.id);
-	const reminder =
-		threadReference.kind === "thread"
-			? [
-					`codex_app.create_thread created thread ${id}.`,
-					"Call codex_app.set_thread_title immediately for that thread before doing any other follow-up work.",
-					"Use a concise, descriptive title that reflects the thread's concrete task or team role, not a generic auto-generated title.",
-				]
-			: [
-					`codex_app.create_thread returned pendingWorktreeId ${id} for a worktree-backed thread.`,
-					"As soon as the real threadId is available, call codex_app.set_thread_title before doing any other follow-up work.",
-					"Use a concise, descriptive title that reflects the pending thread's concrete task or team role, not a generic auto-generated title.",
-				];
-	reminder.push("Do not leave the new thread with a vague default title.");
-	return reminder.join(" ");
+	return threadReference.kind === "thread"
+		? `THREAD ID ${id}: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE.`
+		: `PENDING WORKTREE ID ${id}: CALL codex_app.set_thread_title AS SOON AS THREAD ID EXISTS. USE THE REAL TASK/ROLE.`;
 }
 
 function formatIdentifier(value: string): string {
