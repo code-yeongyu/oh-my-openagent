@@ -11,6 +11,14 @@ function makeMessage(id: string, role: "user" | "assistant", text: string, time:
   }
 }
 
+function makeToolResultMessage(id: string, output: string, time: number) {
+  return {
+    id,
+    info: { role: "assistant" as const, time },
+    parts: [{ type: "tool_result", output }],
+  }
+}
+
 function makeClient(messages: ReturnType<typeof makeMessage>[]): BackgroundOutputClient {
   return {
     session: {
@@ -136,5 +144,85 @@ describe("formatFullSession", () => {
     expect(output).not.toContain("PROMPT_1")
     expect(output).not.toContain("RESPONSE_1")
     expect(output).not.toContain("PROMPT_2")
+  })
+
+  test("#given 25 messages, fromEnd=true and NO messageLimit #when formatFullSession runs #then at most 20 messages are returned and the LAST message is present", async () => {
+    // given
+    const messages = Array.from({ length: 25 }, (_, i) =>
+      makeMessage(`msg_${String(i + 1).padStart(2, "0")}`, "assistant", `TAIL_BODY_${i + 1}`, 1778525000000 + (i + 1) * 1000),
+    )
+    const client = makeClient(messages)
+
+    // when
+    const output = await formatFullSession(makeTask(), client, {
+      includeThinking: false,
+      includeToolResults: false,
+      fromEnd: true,
+    })
+
+    // then
+    expect(output).toContain("TAIL_BODY_25")
+    expect(output).toContain("Returned: 20")
+    expect(output).not.toContain("TAIL_BODY_5\n")
+    expect(output).not.toContain("TAIL_BODY_1\n")
+  })
+
+  test("#given a tool_result longer than 2000 chars #when formatFullSession runs with includeToolResults #then it is truncated with an ellipsis suffix", async () => {
+    // given
+    const hugeOutput = "X".repeat(5000)
+    const messages = [makeToolResultMessage("msg_tool", hugeOutput, 1778525000100)] as unknown as ReturnType<
+      typeof makeMessage
+    >[]
+    const client = makeClient(messages)
+
+    // when
+    const output = await formatFullSession(makeTask(), client, {
+      includeThinking: false,
+      includeToolResults: true,
+    })
+
+    // then
+    expect(output).toContain("...")
+    expect(output).not.toContain("X".repeat(2001))
+    expect(output).toContain("X".repeat(2000))
+  })
+
+  test("#given messageLimit provided (default direction) #when formatFullSession runs #then output is byte-identical to the documented head-slice behavior (regression guard)", async () => {
+    // given
+    const messages = [
+      makeMessage("msg_1", "user", "REG_FIRST", 1778525000100),
+      makeMessage("msg_2", "assistant", "REG_SECOND", 1778525000200),
+      makeMessage("msg_3", "assistant", "REG_THIRD", 1778525000300),
+    ]
+    const client = makeClient(messages)
+
+    // when
+    const output = await formatFullSession(makeTask(), client, {
+      includeThinking: false,
+      includeToolResults: false,
+      messageLimit: 2,
+    })
+
+    // then
+    const expected = [
+      "# Full Session Output",
+      "",
+      "Task ID: bg_test",
+      "Description: test task",
+      "Status: completed",
+      "Session ID: ses_child",
+      "Total messages: 3",
+      "Returned: 2",
+      "Has more: true",
+      "",
+      "## Messages",
+      "",
+      "[user] Unknown time id=msg_1",
+      "REG_FIRST",
+      "",
+      "[assistant] Unknown time id=msg_2",
+      "REG_SECOND",
+    ].join("\n")
+    expect(output).toBe(expected)
   })
 })
