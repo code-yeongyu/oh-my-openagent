@@ -1,16 +1,95 @@
 import type { BackgroundTask } from "../../features/background-agent"
 import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 import { consumeNewMessages } from "../../shared/session-cursor"
-import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
+import type { BackgroundOutputClient, BackgroundOutputMessage, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatDuration } from "./time-format"
+import { truncateText } from "./truncate-text"
 import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sdk-call-timeout"
+
+const TOOL_RESULT_MAX_CHARS = 2000
+const DEFAULT_FROM_END_TAIL = 20
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
+function extractAssistantText(message: BackgroundOutputMessage): string {
+  const texts: string[] = []
+  for (const part of message.parts ?? []) {
+    if ((part.type === "text" || part.type === "reasoning") && part.text) {
+      texts.push(part.text)
+    }
+  }
+  return texts.join("\n\n")
+}
+
+function extractMessageContent(message: BackgroundOutputMessage): string {
+  const chunks: string[] = []
+  for (const part of message.parts ?? []) {
+    if ((part.type === "text" || part.type === "reasoning") && part.text) {
+      chunks.push(part.text)
+      continue
+    }
+
+    if (part.type === "tool_result") {
+      const content = part.content
+      if (typeof content === "string" && content) {
+        chunks.push(truncateText(content, TOOL_RESULT_MAX_CHARS))
+        continue
+      }
+
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if ((block.type === "text" || block.type === "reasoning") && block.text) {
+            chunks.push(truncateText(block.text, TOOL_RESULT_MAX_CHARS))
+          }
+        }
+      }
+    }
+  }
+  return chunks.filter((chunk) => chunk.length > 0).join("\n\n")
+}
+
+function findLastAssistantIndex(messages: BackgroundOutputMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.info?.role === "assistant" && extractAssistantText(messages[index]!).length > 0) {
+      return index
+    }
+  }
+  return -1
+}
+
+function buildResultBody(newMessages: BackgroundOutputMessage[], olderContextTail: number): string {
+  const finalAnswerIndex = findLastAssistantIndex(newMessages)
+  const finalAnswerText = finalAnswerIndex >= 0 ? extractAssistantText(newMessages[finalAnswerIndex]!) : ""
+
+  const olderMessages = newMessages.filter((_, index) => index !== finalAnswerIndex).slice(-olderContextTail)
+  const olderContext = olderMessages
+    .map((message) => extractMessageContent(message))
+    .filter((text) => text.length > 0)
+    .join("\n\n")
+
+  const sections: string[] = []
+  if (finalAnswerText) {
+    sections.push(`## Final answer\n\n${finalAnswerText}`)
+  }
+  if (olderContext) {
+    sections.push(`## Older context\n\n${olderContext}`)
+  }
+  sections.push("> Full detail available via `full_session:true`")
+
+  if (!finalAnswerText && !olderContext) {
+    return "(No text output)"
+  }
+  return sections.join("\n\n")
+}
+
+export async function formatTaskResult(
+  task: BackgroundTask,
+  client: BackgroundOutputClient,
+  options?: { fromEnd?: boolean; messageLimit?: number },
+): Promise<string> {
   if (!task.sessionId) {
     return `Error: Task has no sessionID`
   }
@@ -96,33 +175,11 @@ Session ID: ${task.sessionId}
 (No new output since last check)`
   }
 
-  const extractedContent: string[] = []
-  for (const message of newMessages) {
-    for (const part of message.parts ?? []) {
-      if ((part.type === "text" || part.type === "reasoning") && part.text) {
-        extractedContent.push(part.text)
-        continue
-      }
-
-      if (part.type === "tool_result") {
-        const toolResult = part as { content?: string | Array<{ type: string; text?: string }> }
-        if (typeof toolResult.content === "string" && toolResult.content) {
-          extractedContent.push(toolResult.content)
-          continue
-        }
-
-        if (Array.isArray(toolResult.content)) {
-          for (const block of toolResult.content) {
-            if ((block.type === "text" || block.type === "reasoning") && block.text) {
-              extractedContent.push(block.text)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const textContent = extractedContent.filter((text) => text.length > 0).join("\n\n")
+  const olderContextTail =
+    typeof options?.messageLimit === "number" && options.messageLimit > 0
+      ? options.messageLimit
+      : DEFAULT_FROM_END_TAIL
+  const body = buildResultBody(newMessages, olderContextTail)
   const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
   return `Task Result
@@ -134,5 +191,5 @@ Session ID: ${task.sessionId}
 
 ---
 
-${textContent || "(No text output)"}`
+${body}`
 }
