@@ -1,8 +1,9 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, spyOn } from "bun:test"
 import {
   getHighVariant,
   getThinkingConfig,
   isAlreadyHighVariant,
+  _resetNormalizeModelCacheForTesting,
   THINKING_CONFIGS,
 } from "./switcher"
 
@@ -561,6 +562,34 @@ describe("think-mode switcher", () => {
         "zai-coding-plan"
       ] as Record<string, unknown>
       expect(zaiOptions?.extra_body).toBeDefined()
+    })
+  })
+
+  describe("normalizeModelID cache (Task T3.22)", () => {
+    it("normalizeModelID cached for same input", () => {
+      //#given a fresh cache and a spy on RegExp.prototype.exec
+      _resetNormalizeModelCacheForTesting()
+      const execSpy = spyOn(RegExp.prototype, "exec")
+      const callsBeforeFirst = execSpy.mock.calls.length
+
+      //#when getHighVariant is called the first time with the input
+      const result1 = getHighVariant("claude-opus-4.6")
+      const callsAfterFirst = execSpy.mock.calls.length
+
+      //#and when getHighVariant is called the second time with the same input
+      const callsBeforeSecond = callsAfterFirst
+      const result2 = getHighVariant("claude-opus-4.6")
+      const callsAfterSecond = execSpy.mock.calls.length
+
+      //#then the first call should execute the normalization regex at least once
+      expect(callsAfterFirst - callsBeforeFirst).toBeGreaterThanOrEqual(1)
+      //#and the second call should NOT execute the regex (cache hit)
+      expect(callsAfterSecond - callsBeforeSecond).toBe(0)
+      //#and both calls should return the same high variant
+      expect(result1).toBe(result2)
+      expect(result1).toBe("claude-opus-4-6-high")
+
+      execSpy.mockRestore()
     })
   })
 })

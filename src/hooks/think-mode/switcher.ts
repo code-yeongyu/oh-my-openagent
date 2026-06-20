@@ -36,6 +36,10 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
   }
 }
 
+// Module-level LRU cache for normalizeModelID results (cap 500).
+const NORMALIZE_MODEL_CACHE_MAX = 500
+const normalizeModelCache = new Map<string, string>()
+
 /**
  * Normalizes model IDs to use consistent hyphen formatting.
  * GitHub Copilot may use dots (claude-opus-4.6) but our maps use hyphens (claude-opus-4-6).
@@ -48,9 +52,27 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
  * normalizeModelID("vertex_ai/claude-opus-4.6") // "vertex_ai/claude-opus-4-6"
  */
 function normalizeModelID(modelID: string): string {
+  const cached = normalizeModelCache.get(modelID)
+  if (cached !== undefined) {
+    // Bump LRU: delete + set re-inserts at the most recent position.
+    normalizeModelCache.delete(modelID)
+    normalizeModelCache.set(modelID, cached)
+    return cached
+  }
   // Replace dots with hyphens when followed by a digit
   // This handles version numbers like 4.5 → 4-5, 5.2 → 5-2
-  return modelID.replace(/\.(\d+)/g, "-$1")
+  const result = modelID.replace(/\.(\d+)/g, "-$1")
+  // Evict oldest entry if at cap (Map preserves insertion order, so first key is oldest).
+  if (normalizeModelCache.size >= NORMALIZE_MODEL_CACHE_MAX) {
+    const oldest = normalizeModelCache.keys().next().value
+    if (oldest !== undefined) normalizeModelCache.delete(oldest)
+  }
+  normalizeModelCache.set(modelID, result)
+  return result
+}
+
+export function _resetNormalizeModelCacheForTesting(): void {
+  normalizeModelCache.clear()
 }
 
 /**
@@ -199,8 +221,11 @@ export function getHighVariant(modelID: string): string | null {
 }
 
 export function isAlreadyHighVariant(modelID: string): boolean {
-  const normalized = normalizeModelID(modelID)
-  const { base } = extractModelPrefix(normalized)
+  return isAlreadyHighVariantNormalized(normalizeModelID(modelID))
+}
+
+function isAlreadyHighVariantNormalized(normalizedModelID: string): boolean {
+  const { base } = extractModelPrefix(normalizedModelID)
   return ALREADY_HIGH.has(base) || base.endsWith("-high")
 }
 
@@ -217,7 +242,7 @@ export function getThinkingConfig(
   const normalized = normalizeModelID(modelID)
   const { base } = extractModelPrefix(normalized)
 
-  if (isAlreadyHighVariant(normalized)) {
+  if (isAlreadyHighVariantNormalized(normalized)) {
     return null
   }
 
