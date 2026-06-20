@@ -124,3 +124,51 @@ test("#given ultraresearch worker sizing #when spawn guidance is inspected #then
 		);
 	}
 });
+
+test("#given ultraresearch execution substrate #when team usage is inspected #then it prefers a cooperating team with harness-native team tools", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/cooperating team/i,
+			`${copy.label}: body must encourage running the swarm as a cooperating team`,
+		);
+		assert.match(copy.content, /\bteammode\b/i, `${copy.label}: body must name the Codex teammode skill`);
+		assert.match(copy.content, /team_mode/i, `${copy.label}: body must name the OpenCode team_mode path`);
+	}
+});
+
+test("#given ultraresearch team composition #when member slicing is inspected #then members map to part/ownership/perspective, never job titles", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/by part, ownership, or perspective/i,
+			`${copy.label}: body must compose members by part, ownership, or perspective`,
+		);
+		assert.match(
+			copy.content,
+			/never a job title|not (?:a |by )?job title/i,
+			`${copy.label}: body must forbid vague job-title members`,
+		);
+	}
+});
+
+test("#given ultraresearch team communication #when the raise law is inspected #then members broadcast every lead immediately rather than hoarding", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/raise law|broadcast every lead/i,
+			`${copy.label}: body must state the raise/broadcast law`,
+		);
+		assert.match(copy.content, /over-communicate/i, `${copy.label}: body must demand over-communication`);
+		assert.match(
+			copy.content,
+			/the (?:moment|instant) it (?:surfaces|appears|lands)/i,
+			`${copy.label}: body must require raising leads the moment they surface`,
+		);
+		assert.match(
+			copy.content,
+			/hoard/i,
+			`${copy.label}: body must reject hoarding leads for a final dump`,
+		);
+	}
+});
