@@ -25,6 +25,7 @@ export async function updateCodexConfig(input: {
   readonly marketplaceSource: CodexMarketplaceSource
   readonly pluginNames: readonly string[]
   readonly platform?: CodexInstallPlatform
+  readonly codegraphMcpEnabled?: boolean
   readonly gitBashEnabled?: boolean
   readonly trustedHookStates?: readonly TrustedHookState[]
   readonly agentConfigs?: readonly CodexAgentConfig[]

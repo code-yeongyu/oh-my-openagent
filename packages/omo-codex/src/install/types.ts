@@ -84,6 +84,7 @@ export interface CodexInstallOptions {
   readonly platform?: CodexInstallPlatform
   readonly env?: { readonly [key: string]: string | undefined }
   readonly gitBashResolver?: GitBashResolver
+  readonly codegraphMcpEnabled?: boolean
   readonly autonomousPermissions?: boolean
   readonly astGrepInstaller?: RunAstGrepSkillInstall
   readonly runCommand?: RunCommand

@@ -12,12 +12,14 @@ export function ensureOmoBuiltinMcpPolicies(config: string, input: {
   readonly marketplaceName: string
   readonly pluginNames: readonly string[]
   readonly platform?: CodexInstallPlatform
+  readonly codegraphMcpEnabled?: boolean
   readonly gitBashEnabled?: boolean
 }): string {
   if (input.marketplaceName !== "sisyphuslabs" || !input.pluginNames.includes("omo")) return config
+  const codegraphEnabled = input.codegraphMcpEnabled ?? true
   const gitBashEnabled = (input.platform ?? process.platform) === "win32" && input.gitBashEnabled === true
   let nextConfig = ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "context7", true)
-  nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "codegraph", true)
+  nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "codegraph", codegraphEnabled)
   nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", gitBashEnabled)
   return nextConfig
 }
