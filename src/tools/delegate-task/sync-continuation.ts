@@ -86,7 +86,7 @@ export async function executeSyncContinuation(
     const tools = {
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,
-      call_omo_agent: true,
+      delegate_agent: true,
       question: false,
     }
     setSessionTools(continuationID!, tools)

@@ -21,7 +21,7 @@ export async function promptSubagentSession(
 		return { ok: true }
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error)
-		log("[call_omo_agent] Prompt error", { error: errorMessage })
+		log("[delegate_agent] Prompt error", { error: errorMessage })
 		return { ok: false, error: errorMessage }
 	}
 }

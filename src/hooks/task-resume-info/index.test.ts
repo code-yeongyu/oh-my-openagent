@@ -48,7 +48,7 @@ describe("createTaskResumeInfoHook", () => {
   describe("#given target tool with session ID in output", () => {
     describe("#when output contains a session ID", () => {
       it("#then should append resume info", async () => {
-        const input = createInput("call_omo_agent")
+        const input = createInput("delegate_agent")
         const output = {
           title: "delegate_task",
           output: "Task completed.\nSession ID: ses_abc123",

@@ -44,7 +44,7 @@ export async function sendSyncPrompt(
   const allowTask = isPlanFamily(input.agentToUse)
   const tools = {
     task: allowTask,
-    call_omo_agent: true,
+    delegate_agent: true,
     question: false,
     ...getAgentToolRestrictions(input.agentToUse),
   }

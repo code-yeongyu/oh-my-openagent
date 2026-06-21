@@ -617,7 +617,7 @@ export function createKeymakerAgent(
     maxTokens: 32000,
     prompt,
     color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman
-    permission: { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"],
+    permission: { question: "allow", delegate_agent: "deny" } as AgentConfig["permission"],
     reasoningEffort: "medium",
   }
 }

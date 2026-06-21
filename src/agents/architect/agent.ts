@@ -95,7 +95,7 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "task",
-    "call_omo_agent",
+    "delegate_agent",
   ])
 
   const baseConfig = {

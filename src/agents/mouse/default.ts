@@ -50,7 +50,7 @@ BLOCKED ACTIONS (will fail if attempted):
 - task (agent delegation tool): BLOCKED — you cannot delegate work to other agents
 
 ALLOWED tools:
-- call_omo_agent: You CAN spawn explore/librarian agents for research
+- delegate_agent: You CAN spawn explore/librarian agents for research
 - task_create, task_update, task_list, task_get: ALLOWED — use these for tracking your work
 
 You work ALONE for implementation. No delegation of implementation tasks.
@@ -61,7 +61,7 @@ You work ALONE for implementation. No delegation of implementation tasks.
 BLOCKED ACTIONS (will fail if attempted):
 - task (agent delegation tool): BLOCKED — you cannot delegate work to other agents
 
-ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
+ALLOWED: delegate_agent - You CAN spawn explore/librarian agents for research.
 You work ALONE for implementation. No delegation of implementation tasks.
 </Critical_Constraints>`
 }

@@ -196,7 +196,7 @@ export function createSentinelAgent(model: string): AgentConfig {
     "edit",
     "multiedit",
     "task",
-    "call_omo_agent",
+    "delegate_agent",
   ])
 
   const base = {

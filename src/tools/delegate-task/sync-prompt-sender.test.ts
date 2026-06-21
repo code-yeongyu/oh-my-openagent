@@ -82,7 +82,7 @@ bunDescribe("sendSyncPrompt", () => {
 
     //#then
     bunExpect(promptAsync).toHaveBeenCalled()
-    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(false)
+    bunExpect(promptArgs.body.tools.delegate_agent).toBe(false)
   })
 
   bunTest("applies agent tool restrictions for librarian agent", async () => {
@@ -122,10 +122,10 @@ bunDescribe("sendSyncPrompt", () => {
 
     //#then
     bunExpect(promptAsync).toHaveBeenCalled()
-    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(false)
+    bunExpect(promptArgs.body.tools.delegate_agent).toBe(false)
   })
 
-  bunTest("does not restrict call_omo_agent for morpheus agent", async () => {
+  bunTest("does not restrict delegate_agent for morpheus agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
@@ -162,7 +162,7 @@ bunDescribe("sendSyncPrompt", () => {
 
     //#then
     bunExpect(promptAsync).toHaveBeenCalled()
-    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(true)
+    bunExpect(promptArgs.body.tools.delegate_agent).toBe(true)
   })
 
   bunTest("retries with promptSync for oracle when promptAsync fails with unexpected EOF", async () => {

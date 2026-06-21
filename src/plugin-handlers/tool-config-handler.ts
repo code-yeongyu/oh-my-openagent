@@ -44,7 +44,7 @@ export function applyToolConfig(params: {
     architect.permission = {
       ...architect.permission,
       task: "allow",
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
@@ -54,7 +54,7 @@ export function applyToolConfig(params: {
   if (morpheus) {
     morpheus.permission = {
       ...morpheus.permission,
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       task: "allow",
       question: questionPermission,
       "task_*": "allow",
@@ -66,7 +66,7 @@ export function applyToolConfig(params: {
   if (keymaker) {
     keymaker.permission = {
       ...keymaker.permission,
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       task: "allow",
       question: questionPermission,
       ...denyTodoTools,
@@ -76,7 +76,7 @@ export function applyToolConfig(params: {
   if (oracle) {
     oracle.permission = {
       ...oracle.permission,
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       task: "allow",
       question: questionPermission,
       "task_*": "allow",

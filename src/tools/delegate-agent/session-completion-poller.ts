@@ -37,7 +37,7 @@ export async function waitForSessionCompletion(
 
 	while (Date.now() - pollStart < options.maxPollTimeMs) {
 		if (options.abortSignal?.aborted) {
-			log("[call_omo_agent] Aborted by user")
+			log("[delegate_agent] Aborted by user")
 			return { ok: false, reason: "aborted" }
 		}
 
@@ -62,7 +62,7 @@ export async function waitForSessionCompletion(
 		if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
 			stablePolls++
 			if (stablePolls >= options.stabilityRequired) {
-				log("[call_omo_agent] Session complete", { messageCount: currentMsgCount })
+				log("[delegate_agent] Session complete", { messageCount: currentMsgCount })
 				return { ok: true }
 			}
 		} else {
@@ -71,6 +71,6 @@ export async function waitForSessionCompletion(
 		}
 	}
 
-	log("[call_omo_agent] Timeout reached")
+	log("[delegate_agent] Timeout reached")
 	return { ok: false, reason: "timeout" }
 }

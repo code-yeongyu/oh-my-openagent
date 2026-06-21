@@ -9,8 +9,6 @@ dist/
 # Platform binaries (built by CI, not committed)
 packages/*/bin/matrixx
 packages/*/bin/matrixx.exe
-packages/*/bin/oh-my-opencode
-packages/*/bin/oh-my-opencode.exe
 
 # IDE
 .idea/

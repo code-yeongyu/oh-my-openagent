@@ -380,11 +380,11 @@ describe("oracle-md-only", () => {
       expect(output.args.prompt).toContain("READ-ONLY")
     })
 
-    test("should inject read-only warning when Oracle calls call_omo_agent", async () => {
+    test("should inject read-only warning when Oracle calls delegate_agent", async () => {
       // given
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "call_omo_agent",
+        tool: "delegate_agent",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }

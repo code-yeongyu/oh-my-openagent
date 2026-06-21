@@ -139,7 +139,7 @@ Dense and useful beats long and thorough.
 
 export function createCipherAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
-    "call_omo_agent",
+    "delegate_agent",
   ])
 
   const base = {

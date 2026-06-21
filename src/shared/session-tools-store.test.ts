@@ -20,14 +20,14 @@ describe("session-tools-store", () => {
   test("stores and retrieves tools for a session", () => {
     //#given
     const sessionID = "ses_abc123"
-    const tools = { question: false, task: true, call_omo_agent: true }
+    const tools = { question: false, task: true, delegate_agent: true }
 
     //#when
     setSessionTools(sessionID, tools)
     const result = getSessionTools(sessionID)
 
     //#then
-    expect(result).toEqual({ question: false, task: true, call_omo_agent: true })
+    expect(result).toEqual({ question: false, task: true, delegate_agent: true })
   })
 
   test("overwrites existing tools for same session", () => {

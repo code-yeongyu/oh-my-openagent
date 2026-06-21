@@ -515,7 +515,7 @@ export function createMorpheusAgent(
     ? buildDynamicMorpheusPrompt(availableAgents, tools, skills, categories, useTaskSystem)
     : buildDynamicMorpheusPrompt([], tools, skills, categories, useTaskSystem)
 
-  const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
+  const permission = { question: "allow", delegate_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Morpheus - Matrixx)",

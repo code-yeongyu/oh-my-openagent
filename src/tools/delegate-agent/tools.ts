@@ -31,7 +31,7 @@ export function createDelegateAgent(
     },
     async execute(args: DelegateAgentArgs, toolContext) {
       const toolCtx = toolContext as ToolContextWithMetadata
-      log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
+      log(`[delegate_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
       // Case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
       if (

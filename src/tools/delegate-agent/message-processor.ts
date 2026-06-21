@@ -11,12 +11,12 @@ export async function processMessages(
   })
 
   if (messagesResult.error) {
-    log(`[call_omo_agent] Messages error:`, messagesResult.error)
+    log(`[delegate_agent] Messages error:`, messagesResult.error)
     throw new Error(`Failed to get messages: ${messagesResult.error}`)
   }
 
   const messages = messagesResult.data
-  log(`[call_omo_agent] Got ${messages.length} messages`)
+  log(`[delegate_agent] Got ${messages.length} messages`)
 
   // Include both assistant messages AND tool messages
   // Tool results (grep, glob, bash output) come from role "tool" (not in SDK type union)
@@ -25,12 +25,12 @@ export async function processMessages(
   )
 
   if (relevantMessages.length === 0) {
-    log(`[call_omo_agent] No assistant or tool messages found`)
-    log(`[call_omo_agent] All messages:`, JSON.stringify(messages, null, 2))
+    log(`[delegate_agent] No assistant or tool messages found`)
+    log(`[delegate_agent] All messages:`, JSON.stringify(messages, null, 2))
     throw new Error("No assistant or tool response found")
   }
 
-  log(`[call_omo_agent] Found ${relevantMessages.length} relevant messages`)
+  log(`[delegate_agent] Found ${relevantMessages.length} relevant messages`)
 
   // Sort by time ascending (oldest first) to process messages in order
   const sortedMessages = [...relevantMessages].sort((a, b) => {
@@ -75,7 +75,7 @@ export async function processMessages(
     .filter((text) => text.length > 0)
     .join("\n\n")
 
-  log(`[call_omo_agent] Got response, length: ${responseText.length}`)
+  log(`[delegate_agent] Got response, length: ${responseText.length}`)
 
   return responseText
 }

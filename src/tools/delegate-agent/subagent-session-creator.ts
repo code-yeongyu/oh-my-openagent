@@ -11,12 +11,12 @@ export async function resolveOrCreateSessionId(
 	toolContext: ToolContextWithMetadata,
 ): Promise<{ ok: true; sessionID: string } | { ok: false; error: string }> {
 	if (args.session_id) {
-		log(`[call_omo_agent] Using existing session: ${args.session_id}`)
+		log(`[delegate_agent] Using existing session: ${args.session_id}`)
 		const sessionResult = await ctx.client.session.get({
 			path: { id: args.session_id },
 		})
 		if (sessionResult.error) {
-			log("[call_omo_agent] Session get error", { error: sessionResult.error })
+			log("[delegate_agent] Session get error", { error: sessionResult.error })
 			return {
 				ok: false,
 				error: `Error: Failed to get existing session: ${sessionResult.error}`,
@@ -25,11 +25,11 @@ export async function resolveOrCreateSessionId(
 		return { ok: true, sessionID: args.session_id }
 	}
 
-	log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)
+	log(`[delegate_agent] Creating new session with parent: ${toolContext.sessionID}`)
 	const parentSession = await ctx.client.session
 		.get({ path: { id: toolContext.sessionID } })
 		.catch((err: unknown) => {
-			log("[call_omo_agent] Failed to get parent session", { error: String(err) })
+			log("[delegate_agent] Failed to get parent session", { error: String(err) })
 			return null
 		})
 	const parentDirectory = resolveSessionDirectory({
@@ -48,7 +48,7 @@ export async function resolveOrCreateSessionId(
 	})
 
 	if (createResult.error) {
-		log("[call_omo_agent] Session create error", { error: createResult.error })
+		log("[delegate_agent] Session create error", { error: createResult.error })
 		const errorStr = String(createResult.error)
 		if (errorStr.toLowerCase().includes("unauthorized")) {
 			return {
@@ -67,7 +67,7 @@ Original error: ${createResult.error}`,
 	}
 
 	const sessionID = createResult.data.id
-	log(`[call_omo_agent] Created session: ${sessionID}`)
+	log(`[delegate_agent] Created session: ${sessionID}`)
 	subagentSessions.add(sessionID)
 	return { ok: true, sessionID }
 }

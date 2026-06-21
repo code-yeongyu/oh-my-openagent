@@ -99,7 +99,7 @@ BLOCKED (will fail if attempted):
 ALLOWED:
 | Tool | Usage |
 |------|-------|
-| call_omo_agent | Spawn explore/librarian for research ONLY |
+| delegate_agent | Spawn explore/librarian for research ONLY |
 | task_create | Create tasks to track your work |
 | task_update | Update task status (in_progress, completed) |
 | task_list | List active tasks |
@@ -118,7 +118,7 @@ BLOCKED (will fail if attempted):
 ALLOWED:
 | Tool | Usage |
 |------|-------|
-| call_omo_agent | Spawn explore/librarian for research ONLY |
+| delegate_agent | Spawn explore/librarian for research ONLY |
 
 You work ALONE for implementation. No delegation.
 </blocked_actions>`

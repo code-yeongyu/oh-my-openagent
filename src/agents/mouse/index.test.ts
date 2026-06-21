@@ -143,13 +143,13 @@ describe("createMouseAgentWithOverrides", () => {
     })
   })
 
-  describe("tool safety (task blocked, call_omo_agent allowed)", () => {
-    test("task remains blocked, call_omo_agent is allowed via tools format", () => {
+  describe("tool safety (task blocked, delegate_agent allowed)", () => {
+    test("task remains blocked, delegate_agent is allowed via tools format", () => {
       // given
       const override = {
         tools: {
           task: true,
-          call_omo_agent: true,
+          delegate_agent: true,
           read: true,
         },
       }
@@ -162,14 +162,14 @@ describe("createMouseAgentWithOverrides", () => {
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
         expect(tools.task).toBe(false)
-        // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
-        expect(tools.call_omo_agent).toBe(true)
+        // delegate_agent is NOW ALLOWED for subagents to spawn explore/librarian
+        expect(tools.delegate_agent).toBe(true)
         expect(tools.read).toBe(true)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
-        // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
-        expect(permission.call_omo_agent).toBe("allow")
+        // delegate_agent is NOW ALLOWED for subagents to spawn explore/librarian
+        expect(permission.delegate_agent).toBe("allow")
       }
     })
 
@@ -178,7 +178,7 @@ describe("createMouseAgentWithOverrides", () => {
       const override = {
         permission: {
           task: "allow",
-          call_omo_agent: "allow",
+          delegate_agent: "allow",
           read: "allow",
         },
       } as { permission: Record<string, string> }
@@ -186,16 +186,16 @@ describe("createMouseAgentWithOverrides", () => {
       // when
       const result = createMouseAgentWithOverrides(override as Parameters<typeof createMouseAgentWithOverrides>[0])
 
-      // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
+      // then - task blocked, but delegate_agent allowed for explore/librarian spawning
       const tools = result.tools as Record<string, boolean> | undefined
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
         expect(tools.task).toBe(false)
-        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.delegate_agent).toBe(true)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
-        expect(permission.call_omo_agent).toBe("allow")
+        expect(permission.delegate_agent).toBe("allow")
       }
     })
   })

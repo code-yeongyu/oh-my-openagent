@@ -7,7 +7,7 @@ import { getAgentFromSession } from "./agent-resolution"
 import { isOracleAgent } from "./agent-matcher"
 import { isAllowedFile } from "./path-policy"
 
-const TASK_TOOLS = ["task", "call_omo_agent"]
+const TASK_TOOLS = ["task", "delegate_agent"]
 
 export function createOracleMdOnlyHook(ctx: PluginInput) {
   return {
