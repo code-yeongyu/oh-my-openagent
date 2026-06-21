@@ -22,6 +22,7 @@ import {
   armPendingFallbackPromptParamsRestore,
   clearSessionPromptParams,
   getSessionPromptParams,
+  hasPendingFallbackPromptParamsRestore,
   markAppliedFallbackPromptParams,
   type SessionPromptParams,
   setSessionPromptParams,
@@ -226,6 +227,12 @@ export function createModelFallbackContinuationController(args: {
     let promptParamsApplied = false;
     let appliedFallbackPromptParams: SessionPromptParams | undefined;
     let temporarySessionModelFallback: { providerID: string; modelID: string } | undefined;
+    if (
+      fallbackPromptParamRestoreBySession.has(sessionID)
+      && !hasPendingFallbackPromptParamsRestore(sessionID)
+    ) {
+      fallbackPromptParamRestoreBySession.delete(sessionID);
+    }
     const previousPromptParams = getSessionPromptParams(sessionID);
     const fallbackPromptParamsBase = fallbackPromptParamRestoreBySession.has(sessionID)
       ? fallbackPromptParamRestoreBySession.get(sessionID)

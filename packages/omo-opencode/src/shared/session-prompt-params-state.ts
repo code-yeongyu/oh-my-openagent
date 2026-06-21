@@ -62,6 +62,10 @@ export function markAppliedFallbackPromptParams(sessionID: string): void {
   appliedPendingFallbackPromptParamSessions.add(sessionID)
 }
 
+export function hasPendingFallbackPromptParamsRestore(sessionID: string): boolean {
+  return pendingFallbackPromptParamRestores.has(sessionID)
+}
+
 export function discardPendingFallbackPromptParamsRestore(sessionID: string): void {
   pendingFallbackPromptParamRestores.delete(sessionID)
   pendingFallbackPromptParams.delete(sessionID)
