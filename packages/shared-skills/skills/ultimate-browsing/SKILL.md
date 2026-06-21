@@ -124,7 +124,7 @@ Cookies apply on next navigation — reload after injecting. Google services use
 CLOAK_CDP_PORT=9242              # CloakBrowser CDP port (default 9242)
 AGENT_BROWSER_USER_AGENT="..."   # override UA to hide HeadlessChrome
 AGENT_BROWSER_HEADED=1           # show the browser window
-TWITTER_AUTH_TOKEN=... TWITTER_CT0=...   # agent-reach Twitter, only if you have access
+# agent-reach auth: set the channel-specific env vars from each tool's docs only if you have access
 # insane-search needs no env vars — it auto-installs deps on first run
 ```
 
