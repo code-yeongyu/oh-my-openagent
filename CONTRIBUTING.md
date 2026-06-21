@@ -134,7 +134,7 @@ All harnesses delegate to these scripts:
 | Codex App (local environments) | `.codex/setup.sh` runs at project root on worktree creation |
 | OpenCode (this plugin's own harness) | reads `AGENTS.md` + `CLAUDE.md` (a symlink); run `script/agent/setup.sh` directly |
 
-The single source of truth is `script/agent/setup.sh`. Maintenance means editing that one script and the pinned Dockerfile versions.
+The single source of truth is the `script/agent/` dev-environment contract: `setup.sh`, `cleanup.sh`, and harness launchers such as `cleanup-hook.sh`. Maintenance means keeping those scripts, harness wiring files, and pinned Dockerfile versions in sync.
 
 ## Credentials & Isolation
 

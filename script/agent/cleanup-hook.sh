@@ -8,7 +8,20 @@ set -u
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 CLEANUP_SCRIPT="$PROJECT_DIR/script/agent/cleanup.sh"
-LOG_FILE="${OMO_AGENT_CLEANUP_LOG:-${TMPDIR:-/tmp}/oh-my-openagent-cleanup.log}"
+LOG_DIR="${TMPDIR:-/tmp}"
+
+case "$LOG_DIR" in
+  *..* | "")
+    LOG_DIR="/tmp"
+    ;;
+  /tmp | /tmp/* | /private/tmp | /private/tmp/* | /var/folders/*)
+    ;;
+  *)
+    LOG_DIR="/tmp"
+    ;;
+esac
+
+LOG_FILE="${LOG_DIR%/}/oh-my-openagent-cleanup.log"
 
 if [ ! -f "$CLEANUP_SCRIPT" ]; then
   printf '[cleanup-hook] missing cleanup script: %s\n' "$CLEANUP_SCRIPT" >&2
