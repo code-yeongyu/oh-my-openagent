@@ -121,6 +121,7 @@ The cross-harness one-command bootstrap is the single source of truth for all de
 
 - **`script/agent/setup.sh`** verifies Bun, Node, and git, warns if tmux is missing, runs `bun install`, and builds when `dist/index.js` is missing or `OMO_AGENT_FORCE_BUILD=1` is set.
 - **`script/agent/cleanup.sh`** removes regenerable transients by default. Pass `--deep` to also drop `dist/` and `node_modules/`.
+- **`script/agent/cleanup-hook.sh`** launches cleanup from Claude Code `SessionEnd` without blocking shutdown.
 
 All harnesses delegate to these scripts:
 
@@ -129,7 +130,7 @@ All harnesses delegate to these scripts:
 | GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.3.12 + tmux) |
 | Plain Docker | `script/agent/docker-dev.sh` builds the Dockerfile and opens a shell |
 | Cursor cloud agents | `.cursor/environment.json` `install` runs setup on environment creation |
-| Claude Code | `.claude/settings.json` `SessionStart` hook runs setup; `SessionEnd` hook runs cleanup |
+| Claude Code | `.claude/settings.json` `SessionStart` hook runs setup; `SessionEnd` hook launches cleanup |
 | Codex App (local environments) | `.codex/setup.sh` runs at project root on worktree creation |
 | OpenCode (this plugin's own harness) | reads `AGENTS.md` + `CLAUDE.md` (a symlink); run `script/agent/setup.sh` directly |
 

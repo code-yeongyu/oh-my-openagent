@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const AGENT_DIR = join(import.meta.dir, "agent")
@@ -47,6 +48,7 @@ describe("agent dev-environment scripts", () => {
 
   describe("cleanup.sh", () => {
     const cleanup = join(AGENT_DIR, "cleanup.sh")
+    const cleanupHook = join(AGENT_DIR, "cleanup-hook.sh")
 
     test("#given the teardown #when inspected #then it is an executable strict bash script with a --deep mode", () => {
       // given / when / then
@@ -60,6 +62,19 @@ describe("agent dev-environment scripts", () => {
       expect(body).toContain("--deep")
     })
 
+    test("#given the Claude SessionEnd launcher #when inspected #then it detaches cleanup and exits successfully", () => {
+      // given / when / then
+      expect(existsSync(cleanupHook), "script/agent/cleanup-hook.sh must exist").toBe(true)
+      if (process.platform !== "win32") {
+        expect(isExecutable(cleanupHook), "cleanup-hook.sh must be executable").toBe(true)
+      }
+      const body = read(cleanupHook)
+      expect(body.startsWith("#!/usr/bin/env bash")).toBe(true)
+      expect(body).toContain("nohup")
+      expect(body).toContain("cleanup.sh")
+      expect(body).toContain("exit 0")
+    })
+
     test("#given the teardown #when inspected for safety #then it guards repo root and never nukes source or host", () => {
       // given
       const body = read(join(AGENT_DIR, "cleanup.sh"))
@@ -69,6 +84,41 @@ describe("agent dev-environment scripts", () => {
       const dangerous = ["rm -rf /", "rm -rf ~", "rm -rf $HOME", "rm -rf src", "rm -rf packages"]
       for (const pattern of dangerous) {
         expect(body, `cleanup must never contain '${pattern}'`).not.toContain(pattern)
+      }
+    })
+
+    test("#given transient files in source and skipped trees #when cleanup runs #then it prunes skipped trees", () => {
+      // given
+      const repo = mkdtempSync(join(tmpdir(), "omo-cleanup-test-"))
+      const tmpAgentDir = join(repo, "script", "agent")
+      mkdirSync(tmpAgentDir, { recursive: true })
+      mkdirSync(join(repo, "src"), { recursive: true })
+      mkdirSync(join(repo, "node_modules", "pkg"), { recursive: true })
+      mkdirSync(join(repo, ".git", "objects"), { recursive: true })
+      copyFileSync(cleanup, join(tmpAgentDir, "cleanup.sh"))
+      writeFileSync(join(repo, "package.json"), '{ "name": "oh-my-openagent" }\n')
+      writeFileSync(join(repo, "src", "app.tsbuildinfo"), "source transient")
+      writeFileSync(join(repo, "src", ".DS_Store"), "source os transient")
+      writeFileSync(join(repo, "node_modules", "pkg", "cache.tsbuildinfo"), "dependency cache")
+      writeFileSync(join(repo, ".git", "objects", "cache.tsbuildinfo"), "git cache")
+
+      try {
+        // when
+        const result = Bun.spawnSync({
+          cmd: ["bash", join(tmpAgentDir, "cleanup.sh")],
+          cwd: repo,
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+
+        // then
+        expect(result.exitCode).toBe(0)
+        expect(existsSync(join(repo, "src", "app.tsbuildinfo"))).toBe(false)
+        expect(existsSync(join(repo, "src", ".DS_Store"))).toBe(false)
+        expect(existsSync(join(repo, "node_modules", "pkg", "cache.tsbuildinfo"))).toBe(true)
+        expect(existsSync(join(repo, ".git", "objects", "cache.tsbuildinfo"))).toBe(true)
+      } finally {
+        rmSync(repo, { recursive: true, force: true })
       }
     })
   })
