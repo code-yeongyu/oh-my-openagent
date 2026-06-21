@@ -10,7 +10,7 @@ import { resolveAutoUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-updat
 
 const SCRIPT_PATH = fileURLToPath(new URL("../scripts/auto-update.mjs", import.meta.url));
 const STARTED_NOTICE =
-	"[LazyCodex] Auto-update started in the background: v1.0.0 -> v1.0.1. Tell the user a new LazyCodex version is installing and that they should start a new Codex session after it completes to apply it.";
+	"[LazyCodex] Auto-update started in the background: v1.0.0 -> v1.0.1. Tell the user, in the user's preferred tone, that a new LazyCodex version is installing; recommend starting a new Codex session after it completes to apply the update. Release notes for v1.0.1 were not available.";
 const COMPLETED_NOTICE =
 	"[LazyCodex] Auto-update completed: v1.0.0 -> v1.0.1. This session is already running the new version. Tell the user the auto-update was applied.";
 
