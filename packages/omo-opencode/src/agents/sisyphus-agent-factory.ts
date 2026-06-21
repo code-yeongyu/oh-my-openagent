@@ -9,6 +9,7 @@ import {
   buildClaudeSisyphusAgentConfig,
   buildGlmSisyphusAgentConfig,
   buildGptSisyphusAgentConfig,
+  buildGenericSisyphusAgentConfig,
 } from "./sisyphus-agent-config";
 import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
@@ -26,7 +27,6 @@ import {
   isClaudeOpus48Model,
   isGlmModel,
   isGpt5_5Model,
-  isGptModel,
   isGptNativeSisyphusModel,
   isKimiK2Model,
   isKimiK27Model,
@@ -126,19 +126,15 @@ export function createSisyphusAgent(
         model,
         buildGlm52SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-    case "fallback": {
-      const prompt = buildFallbackSisyphusPrompt(
+    case "fallback":
+      // For all unrecognized models (e.g., local llama.cpp via Gemma4/Qwen),
+      // use generic config instead of forcing GPT/Claude-specific behavior.
+      return buildGenericSisyphusAgentConfig(
+        MODE,
         model,
-        agents,
-        tools,
-        skills,
-        categories,
-        useTaskSystem,
+        buildFallbackSisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-      return isGptModel(model)
-        ? buildGptSisyphusAgentConfig(MODE, model, prompt)
-        : buildClaudeSisyphusAgentConfig(MODE, model, prompt);
-    }
   }
 }
+
 createSisyphusAgent.mode = MODE;
