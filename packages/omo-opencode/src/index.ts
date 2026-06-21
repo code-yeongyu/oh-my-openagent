@@ -3,7 +3,7 @@ import { createPluginModule } from "./testing/create-plugin-module"
 
 const pluginModule: PluginModule = createPluginModule()
 
-export default pluginModule
+export const omoPlugin = pluginModule.server
 
 export type {
   AgentName,
