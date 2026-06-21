@@ -311,14 +311,14 @@ export function createModelFallbackContinuationController(args: {
       if (dispatched) {
         markDispatched(sessionID, dedupeContext);
         if (promptParamsApplied) {
-          armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams, appliedFallbackPromptParams);
+          armPendingFallbackPromptParamsRestore(sessionID, fallbackPromptParamsBase, appliedFallbackPromptParams);
           markAppliedFallbackPromptParams(sessionID);
         }
       } else {
         if (temporarySessionModelFallback) restoreSessionModelFallback(sessionID, temporarySessionModelFallback);
         if (promptParamsApplied) {
-          armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams, appliedFallbackPromptParams);
-          restoreSessionPromptParams(sessionID, previousPromptParams);
+          armPendingFallbackPromptParamsRestore(sessionID, fallbackPromptParamsBase, appliedFallbackPromptParams);
+          restoreSessionPromptParams(sessionID, fallbackPromptParamsBase);
         }
       }
       continuationsInFlight.delete(sessionID);

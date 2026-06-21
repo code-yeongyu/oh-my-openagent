@@ -877,6 +877,136 @@ describe("createEventHandler - model fallback", () => {
     })
   })
 
+  test("restores base prompt params after chained override fallback consumes chat params", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_chained_override_restores_base_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+      {
+        providers: ["opencode-go"],
+        model: "gpt-5.5",
+        reasoningEffort: "low",
+        temperature: 0.1,
+        top_p: 0.5,
+        maxTokens: 6789,
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    ]))
+    const { handler, promptInputs } = createHandler({ hooks: { modelFallback } })
+    const chatParamsHandler = createChatParamsHandler()
+
+    //#when - fallback A with overrides is selected.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_chained_override_restores_base_first",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_chained_override_restores_base_first",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    //#when - fallback A fails before its chat.params restore runs, then fallback B is selected.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_chained_override_restores_base_second",
+            sessionID,
+            role: "assistant",
+            time: { created: 3, completed: 4 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: gpt-5.5 is not supported",
+            },
+            parentID: "msg_user_chained_override_restores_base_second",
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - fallback B is based on the original prompt params, not fallback A's overrides.
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.1,
+      topP: 0.5,
+      maxOutputTokens: 6789,
+      options: {
+        reasoningEffort: "low",
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    })
+
+    const output = { options: {} as Record<string, unknown> }
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      provider: { id: "opencode-go" },
+      message: {},
+    }), output)
+
+    //#then - fallback B restore returns to the chain's base snapshot, not fallback A's stale overrides.
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
   test("keeps selected fallback prompt params when prompt gate skip leaves fallback pending for manual resume", async () => {
     //#given
     const sessionID = "ses_auto_continuation_skipped_keeps_prompt_params_for_resume"
