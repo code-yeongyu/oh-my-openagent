@@ -9,7 +9,7 @@ import type { PluginContext, ToolsRecord } from "./types"
 import {
   builtinTools,
   createBackgroundTools,
-  createCallOmoAgent,
+  createDelegateAgent,
   createLookAt,
   createSkillTool,
   createSkillMcpTool,
@@ -49,7 +49,7 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
+  const delegateAgent = createDelegateAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "construct",
@@ -128,7 +128,7 @@ export function createToolRegistry(args: {
     ...createAstGrepTools(ctx),
     ...createSessionManagerTools(ctx),
     ...backgroundTools,
-    call_omo_agent: callOmoAgent,
+    delegate_agent: delegateAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
     skill: skillTool,
