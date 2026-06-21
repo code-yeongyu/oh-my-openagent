@@ -13,7 +13,7 @@ Internally each component remains isolated under `components/`:
 - `components/ulw-loop`
 - `components/telemetry`
 
-The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and plugin-scoped MCP servers for `grep_app`, `context7`, `git_bash`, and `lsp`. AST-aware search ships as the `ast-grep` skill, not as an MCP server.
+The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and plugin-scoped MCP servers for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`. AST-aware search ships as the `ast-grep` skill, not as an MCP server.
 
 ## Telemetry
 
