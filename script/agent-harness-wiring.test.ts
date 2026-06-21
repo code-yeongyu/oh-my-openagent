@@ -30,7 +30,7 @@ describe("cross-harness env wiring", () => {
     expect(raw).toContain("script/agent/setup.sh")
   })
 
-  test("#given Claude Code #when reading .claude/settings.json #then SessionStart runs setup and SessionEnd runs cleanup", () => {
+  test("#given Claude Code #when reading .claude/settings.json #then SessionStart runs setup and SessionEnd launches cleanup", () => {
     // given
     const path = join(REPO_ROOT, ".claude", "settings.json")
 
@@ -41,7 +41,7 @@ describe("cross-harness env wiring", () => {
     expect(raw).toContain("SessionStart")
     expect(raw).toContain("SessionEnd")
     expect(raw).toContain("script/agent/setup.sh")
-    expect(raw).toContain("script/agent/cleanup.sh")
+    expect(raw).toContain("script/agent/cleanup-hook.sh")
   })
 
   test("#given Codex App local environments #when reading .codex/setup.sh #then it delegates to the shared setup script", () => {
