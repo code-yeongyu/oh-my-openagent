@@ -6191,6 +6191,9 @@
             },
             "notify_on_fallback": {
               "type": "boolean"
+            },
+            "restore_primary_after_cooldown": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
