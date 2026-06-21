@@ -64,13 +64,13 @@ agents/
 
 | Agent | Denied | Allowed |
 |-------|--------|---------|
-| Merovingian | write, edit, task, call_omo_agent | Read-only consultation |
-| Operator | write, edit, task, call_omo_agent | Research tools only |
-| Trinity | write, edit, task, call_omo_agent | Search tools only |
+| Merovingian | write, edit, task, delegate_agent | Read-only consultation |
+| Operator | write, edit, task, delegate_agent | Research tools only |
+| Trinity | write, edit, task, delegate_agent | Search tools only |
 | Construct | ALL except `read` | Vision-only |
 | Mouse | task | No delegation |
-| Architect | task, call_omo_agent | Orchestration only |
-| Sentinel | write, edit, multiedit, task, call_omo_agent | Read-only security auditing |
+| Architect | task, delegate_agent | Orchestration only |
+| Sentinel | write, edit, multiedit, task, delegate_agent | Read-only security auditing |
 
 ## THINKING / REASONING
 

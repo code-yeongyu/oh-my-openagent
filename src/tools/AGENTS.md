@@ -31,7 +31,7 @@ tools/
 | `task_list` | Task | Factory | List active tasks with summary (excludes completed/deleted) |
 | `task_get` | Task | Factory | Retrieve full task object by ID |
 | `task_update` | Task | Factory | Update task fields, supports addBlocks/addBlockedBy for dependencies |
-| `call_omo_agent` | Agent | Factory | Direct explore/librarian invocation |
+| `delegate_agent` | Agent | Factory | Direct explore/librarian invocation |
 | `background_output` | Background | Factory | Retrieve background task result |
 | `background_cancel` | Background | Factory | Cancel running background tasks |
 | `lsp_goto_definition` | LSP | Direct | Jump to symbol definition |
