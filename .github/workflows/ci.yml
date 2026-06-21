@@ -201,12 +201,12 @@ jobs:
       - name: Auto-commit schema changes
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
-          if git diff --quiet assets/oh-my-opencode.schema.json; then
+          if git diff --quiet assets/matrixx.schema.json; then
             echo "No schema changes to commit"
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add assets/oh-my-opencode.schema.json
+            git add assets/matrixx.schema.json
             git commit -m "chore: auto-update schema.json"
             git push
           fi
