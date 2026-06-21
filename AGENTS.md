@@ -44,7 +44,7 @@ feature branches (your work)
 
 ### This is an OpenCode Plugin
 
-Matrixx (formerly Oh-My-OpenCode) is a **plugin for OpenCode**. You will frequently need to examine OpenCode's source code to:
+Matrixx is a **plugin for OpenCode**. You will frequently need to examine OpenCode's source code to:
 - Understand plugin APIs and hooks
 - Debug integration issues
 - Implement features that interact with OpenCode internals
@@ -106,7 +106,7 @@ Matrixx is a multi-agent orchestration **plugin for OpenCode**. It coordinates 1
 |---|---|
 | Package | `opencode-matrixx` (npm, v1.1.1) |
 | Entry | `src/index.ts` → `MatrixxPlugin` |
-| Binaries | `bin/matrixx.js`, `bin/oh-my-opencode.js` (platform wrappers in `bin/`) |
+| Binaries | `bin/matrixx.js` (platform wrappers in `bin/`) |
 | Stack | Bun + TypeScript 5.7 + Zod v4 + Biome (linter only) |
 | License | SUL-1.0 (Morpheus Use License) |
 
@@ -201,7 +201,7 @@ MatrixxPlugin(ctx)
 | New MCP | `src/mcp/` | Add to `createBuiltinMcps()` |
 | New built-in skill | `src/features/builtin-skills/skills/` | Export from `skills/index.ts`; add to `createBuiltinSkills()` |
 | New command | `src/features/builtin-commands/` | Add template + register in `commands.ts` |
-| Schema field | `src/config/schema/` (21 component files) | Run `bun run build:schema` to regenerate `dist/matrixx.schema.json` AND `assets/oh-my-opencode.schema.json` |
+| Schema field | `src/config/schema/` (21 component files) | Run `bun run build:schema` to regenerate `dist/matrixx.schema.json` AND `assets/matrixx.schema.json` |
 | New skill (user-facing) | `.opencode/skills/<name>/SKILL.md` | Loaded by OpenCode for the current dev session — not the plugin |
 
 ## OPENCODE PLUGIN API (`@opencode-ai/plugin` v1.3.15)
@@ -280,7 +280,7 @@ For full model/temp/fallback details see the per-agent file or `src/agents/AGENT
 2. Open PR → `dev` (CI: typecheck + lint + test + build)
 3. After merge to `dev`, `draft-release` job creates `next` draft release
 4. Release: `gh workflow run publish -f bump=patch` (or `minor`/`major`); can override with `version` input. `skip_platform=true` skips native binary builds.
-5. `master` is auto-updated by the publish workflow; CI auto-commits schema changes to `assets/oh-my-opencode.schema.json` on push to `master`
+5. `master` is auto-updated by the publish workflow; CI auto-commits schema changes to `assets/matrixx.schema.json` on push to `master`
 
 **Never** `bun publish` directly. **Never** bump `package.json` version locally.
 
