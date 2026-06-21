@@ -35,6 +35,7 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 	await runJsonRpcStdioServer({
 		input,
 		output,
+		idleTimeoutMs: 0,
 		handler: handleProxyRequest,
 		handlerOptions: callOptions,
 		onHandlerError: (error: unknown) => {
