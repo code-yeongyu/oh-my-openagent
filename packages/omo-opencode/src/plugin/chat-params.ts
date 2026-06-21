@@ -1,5 +1,8 @@
 import { isRecord } from "@oh-my-opencode/utils"
-import { getSessionPromptParams } from "../shared/session-prompt-params-state"
+import {
+  getSessionPromptParams,
+  restorePendingFallbackPromptParams,
+} from "../shared/session-prompt-params-state"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
@@ -187,5 +190,7 @@ export function createChatParamsHandler(_args: {
         delete output.options.thinking
       }
     }
+
+    restorePendingFallbackPromptParams(normalizedInput.sessionID)
   }
 }

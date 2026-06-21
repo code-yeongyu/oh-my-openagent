@@ -13,7 +13,11 @@ import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
-import { getSessionModel } from "../shared/session-model-state";
+import {
+  getSessionModel,
+  markSessionModelFallback,
+  restoreSessionModelFallback,
+} from "../shared/session-model-state";
 import {
   armPendingFallbackPromptParamsRestore,
   clearSessionPromptParams,
@@ -219,6 +223,7 @@ export function createModelFallbackContinuationController(args: {
     continuationsInFlight.add(sessionID);
     let dispatched = false;
     let promptParamsApplied = false;
+    let temporarySessionModelFallback: { providerID: string; modelID: string } | undefined;
     const previousPromptParams = getSessionPromptParams(sessionID);
     const fallbackPromptParamsBase = fallbackPromptParamRestoreBySession.has(sessionID)
       ? fallbackPromptParamRestoreBySession.get(sessionID)
@@ -245,6 +250,10 @@ export function createModelFallbackContinuationController(args: {
       const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
         ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
         : undefined;
+      if (launchModel) {
+        markSessionModelFallback(sessionID, launchModel);
+        temporarySessionModelFallback = launchModel;
+      }
       const agentConfigKey = fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : undefined;
       const agentSettings = agentConfigKey
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
@@ -296,8 +305,13 @@ export function createModelFallbackContinuationController(args: {
         });
       }
     } finally {
-      if (dispatched) markDispatched(sessionID, dedupeContext);
-      else if (promptParamsApplied) armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams);
+      if (dispatched) {
+        markDispatched(sessionID, dedupeContext);
+        if (promptParamsApplied) armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams);
+      } else {
+        if (temporarySessionModelFallback) restoreSessionModelFallback(sessionID, temporarySessionModelFallback);
+        if (promptParamsApplied) armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams);
+      }
       continuationsInFlight.delete(sessionID);
     }
 

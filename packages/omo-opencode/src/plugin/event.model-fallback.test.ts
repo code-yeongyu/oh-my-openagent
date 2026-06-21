@@ -3,6 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
+import { createChatParamsHandler } from "./chat-params"
 import { handleMessageUpdatedSessionState } from "./event-session-lifecycle"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
@@ -628,6 +629,85 @@ describe("createEventHandler - model fallback", () => {
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
+  test("restores fallback prompt params after dispatched retry turn consumes chat params", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_restores_prompt_params_after_chat_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 2048,
+      options: { reasoningEffort: "low" },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    const { handler, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatParamsHandler = createChatParamsHandler()
+
+    //#when - fallback retry is dispatched with generation overrides.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_restores_prompt_params_after_chat_params",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_restores_prompt_params_after_chat_params",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - fallback params are active only until chat.params consumes the retry turn.
+    expect(promptCalls).toEqual([sessionID])
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    const output = { options: {} as Record<string, unknown> }
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: {},
+    }), output)
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 2048,
+      options: { reasoningEffort: "low" },
+    })
+  })
+
   test("preserves existing prompt params when accepted fallback has no generation overrides", async () => {
     //#given
     const sessionID = "ses_auto_continuation_provider_only_preserves_prompt_params"
@@ -925,6 +1005,22 @@ describe("createEventHandler - model fallback", () => {
         thinking: { type: "enabled", budgetTokens: 4096 },
       },
     })
+
+    const chatParamsHandler = createChatParamsHandler()
+    const chatParamsOutput = { options: {} as Record<string, unknown> }
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: {},
+    }), chatParamsOutput)
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
   })
 
   test("restores previous prompt params when skipped pending fallback is cleared before manual resume", async () => {
@@ -1130,6 +1226,66 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([])
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
     expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("keeps dispatched auto-continuation fallback model temporary after synthetic user update", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_temporary_model"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["openai"], model: "gpt-5.5" },
+    ]))
+    const { handler, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - an assistant model error dispatches an internal retry on the fallback model.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_temporary_model_error",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_temporary_model_error",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_temporary_model_user",
+            sessionID,
+            role: "user",
+            time: { created: 3 },
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - the synthetic retry model does not become the durable main-session model.
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
   })
 
   test("auto-continuation advances fallback state before the selected fallback model can retry", async () => {

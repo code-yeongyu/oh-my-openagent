@@ -1,10 +1,7 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
 import { isRealUserTextPart } from "../../shared"
-import {
-  discardPendingFallbackPromptParamsRestore,
-  restorePendingFallbackPromptParams,
-} from "../../shared/session-prompt-params-state"
+import { restorePendingFallbackPromptParams } from "../../shared/session-prompt-params-state"
 import { applyFallbackToChatMessage } from "./chat-message-fallback-handler"
 import {
   createModelFallbackStateController,
@@ -242,7 +239,6 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
         onApplied,
         lastToastKey: controller.lastToastKey,
       })
-      discardPendingFallbackPromptParamsRestore(sessionID)
       void Promise.resolve(onCleared?.({ sessionID })).catch(() => {})
     },
   }
