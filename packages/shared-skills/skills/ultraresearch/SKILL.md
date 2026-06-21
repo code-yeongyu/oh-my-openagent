@@ -130,7 +130,7 @@ Role protocols — embed the relevant one in each spawn message; every worker ge
 
 - **Codebase (explore), 2-4 workers.** Grep with 3+ keyword variations; structural/AST search; LSP definitions and references; file-name globs; `git log --all -S '<keyword>'` and `--grep` for history including deleted code. Cross-validate hits across tools. Report absolute file paths, patterns with `file:line`, and how findings connect.
 - **Web (librarian), 3-6 workers.** At least 10 distinct websearch queries per worker, each with a different operator or angle (see Search craft); fetch the full page for every result that matters — snippets lie. Context7 with 3+ queries per known library. grep.app and `gh search code|repos|issues` for real-world usage. Official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages.
-- **Browsing, 0-3 workers.** Pages plain fetch cannot read (WAF, dynamic rendering, login): use the browsing skill; capture screenshots when visual context matters.
+- **Browsing, 0-3 workers.** Pages plain fetch cannot read (WAF, 403, Cloudflare, dynamic rendering, login): the worker loads the `ultimate-browsing` skill and escalates through its tiers — Tier-1 insane-search engine first, then Tier-2 Chrome stealth — rather than abandoning the source. Capture screenshots when visual context matters. When one blocked territory hides many leads, fan out more browsing subagents in parallel for breadth instead of serializing one worker through them.
 - **Repo deep-dive (librarian), 0-2 workers.** Shallow-clone the most relevant repos to `${TMPDIR:-/tmp}`, pin the HEAD SHA, read core modules, follow call chains, return SHA-pinned permalinks.
 
 Example spawn (codebase axis; librarian, browsing, and repo-dive follow the same contract with their own protocol):
@@ -179,6 +179,25 @@ Reply with: the exact code, the full output, environment (OS, runtime, dependenc
 
 Journal each verdict to `verify-<slug>.md`.
 
+## Phase 3b — Lock non-code claims through a claim ledger
+
+Code settles code-shaped claims (Phase 3). Numeric, market-share, legal, dated, causal, and financial claims cannot be run — so they pass through a data-flow-lock instead (the verification idea adapted from fivetaku/insane-research): the synthesis may assert a high-risk non-code claim **only** if it cleared this gate, and the gate's output is the sole allowlist the synthesis draws from. Skip the gate and there is nothing to synthesize — the lock is self-enforcing.
+
+The claim ledger is orchestrator-owned. Workers only return verified-claim markers as message text, the same channel as EXPAND markers — never a file. As leads resolve, you record one ledger entry per asserted claim and compute its status; workers report claim candidates in their replies, and you decide.
+
+A high-risk claim clears the gate to `verified-claims` only when all hold:
+
+- **>= 2 independent source domains** corroborate it (two pages on the same domain count once).
+- **One counter-search** actively looked for a refutation and did not find a stronger one.
+- **A primary source** (the standard, filing, dataset, or first-party doc) backs it, not only secondary commentary.
+
+Anything that fails goes to an `Unresolved` (insufficient evidence) or `Refuted` (counter-search won) annex — abstention is a correct outcome, not a gap to paper over. Maintain `claim-ledger.md` with one row per claim — `claim | risk | domains | counter-search | primary? | status (verified/unresolved/refuted)` — and write the cleared rows into a `verified-claims` digest. Worker reply marker (message text, same channel as EXPAND):
+
+```
+## CLAIMS
+- CLAIM: <non-code assertion> — RISK: high|normal — SOURCES: <domain1, domain2> — COUNTER: <refutation search result> — PRIMARY: <primary source or none>
+```
+
 ## Phase 4 — Synthesize
 
 After convergence and all verifications, re-read the whole journal and write `SYNTHESIS.md`:
@@ -191,13 +210,13 @@ Workers: <total> · Waves: <count> · Sources: <count> · Verifications: <count>
 ## Findings by theme        — per theme: consensus, evidence links, key quote (<20 words, attributed), verified yes/no
 ## Codebase findings        — absolute paths with line references
 ## Sources (ranked)         — URL, what it contains, reliability, access date
-## Verified claims          — claim | verdict | verify-<slug>.md
+## Verified claims          — code: claim | verdict | verify-<slug>.md · non-code: only rows cleared into verified-claims
 ## Contradictions           — source A vs source B, resolution with evidence
-## Gaps                     — what saturation could not answer
+## Gaps                     — what saturation could not answer · unresolved/refuted claim-ledger rows
 ## Expansion trace          — per wave: workers → markers; convergence reason
 ```
 
-Deliver the synthesis with inline `[Source N]` citations on every claim. When no report was requested, this is the deliverable.
+Deliver the synthesis with inline `[Source N]` citations on every claim. Every high-risk non-code claim you assert must be a verified-claims row from Phase 3b — assert nothing the gate left in the unresolved/refuted annex. When no report was requested, this is the deliverable.
 
 ## Phase 5 — Report (only when requested)
 

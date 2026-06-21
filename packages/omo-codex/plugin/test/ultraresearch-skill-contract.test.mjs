@@ -172,3 +172,33 @@ test("#given ultraresearch team communication #when the raise law is inspected #
 		);
 	}
 });
+
+test("#given ultraresearch non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/claim ledger|verified-claims/i,
+			`${copy.label}: body must define the non-code claim-ledger verification gate`,
+		);
+	}
+});
+
+test("#given ultraresearch claim ledger #when ownership is inspected #then workers never write the ledger / verified-claims artifact", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.doesNotMatch(
+			copy.content,
+			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:ledger|verified-claims)/i,
+			`${copy.label}: workers must not be instructed to write/append/create the ledger or verified-claims`,
+		);
+	}
+});
+
+test("#given ultraresearch blocked sources #when escalation is inspected #then it routes through the ultimate-browsing skill", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/ultimate-browsing/,
+			`${copy.label}: body must escalate blocked sources via the ultimate-browsing skill`,
+		);
+	}
+});
