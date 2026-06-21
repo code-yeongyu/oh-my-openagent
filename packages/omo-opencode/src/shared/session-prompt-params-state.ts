@@ -7,6 +7,7 @@ export type SessionPromptParams = {
 
 const sessionPromptParams = new Map<string, SessionPromptParams>()
 const pendingFallbackPromptParamRestores = new Map<string, SessionPromptParams | undefined>()
+const pendingFallbackPromptParams = new Map<string, SessionPromptParams>()
 
 function cloneSessionPromptParams(params: SessionPromptParams): SessionPromptParams {
   return {
@@ -29,17 +30,33 @@ export function getSessionPromptParams(sessionID: string): SessionPromptParams |
 export function clearSessionPromptParams(sessionID: string): void {
   sessionPromptParams.delete(sessionID)
   pendingFallbackPromptParamRestores.delete(sessionID)
+  pendingFallbackPromptParams.delete(sessionID)
 }
 
 export function armPendingFallbackPromptParamsRestore(
   sessionID: string,
   previousParams: SessionPromptParams | undefined,
+  fallbackParams?: SessionPromptParams | undefined,
 ): void {
   pendingFallbackPromptParamRestores.set(sessionID, previousParams ? cloneSessionPromptParams(previousParams) : undefined)
+  if (fallbackParams) {
+    pendingFallbackPromptParams.set(sessionID, cloneSessionPromptParams(fallbackParams))
+  } else {
+    pendingFallbackPromptParams.delete(sessionID)
+  }
+}
+
+export function applyPendingFallbackPromptParams(sessionID: string): boolean {
+  const params = pendingFallbackPromptParams.get(sessionID)
+  if (!params) return false
+
+  setSessionPromptParams(sessionID, params)
+  return true
 }
 
 export function discardPendingFallbackPromptParamsRestore(sessionID: string): void {
   pendingFallbackPromptParamRestores.delete(sessionID)
+  pendingFallbackPromptParams.delete(sessionID)
 }
 
 export function restorePendingFallbackPromptParams(sessionID: string): void {
@@ -47,6 +64,7 @@ export function restorePendingFallbackPromptParams(sessionID: string): void {
 
   const previousParams = pendingFallbackPromptParamRestores.get(sessionID)
   pendingFallbackPromptParamRestores.delete(sessionID)
+  pendingFallbackPromptParams.delete(sessionID)
   if (previousParams) {
     setSessionPromptParams(sessionID, previousParams)
   } else {
@@ -57,4 +75,5 @@ export function restorePendingFallbackPromptParams(sessionID: string): void {
 export function clearAllSessionPromptParams(): void {
   sessionPromptParams.clear()
   pendingFallbackPromptParamRestores.clear()
+  pendingFallbackPromptParams.clear()
 }

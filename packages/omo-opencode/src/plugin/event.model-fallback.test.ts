@@ -964,19 +964,15 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    //#then - the gate skipped the internal retry, so the pending fallback remains for manual resume.
+    //#then - the gate skipped the internal retry, so fallback params are not left on unrelated prompts.
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([])
     expect(promptAsyncCalls).toEqual([])
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
     expect(getSessionPromptParams(sessionID)).toEqual({
-      temperature: 0,
-      topP: 0.4,
-      maxOutputTokens: 12345,
-      options: {
-        reasoningEffort: "high",
-        thinking: { type: "enabled", budgetTokens: 4096 },
-      },
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
     })
 
     //#when - a real user resume consumes the same fallback model.
@@ -1087,16 +1083,12 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    //#then - selected fallback params are present while the pending fallback is still available.
+    //#then - skipped retry params are held for fallback consumption but not left globally active.
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
     expect(getSessionPromptParams(sessionID)).toEqual({
-      temperature: 0,
-      topP: 0.4,
-      maxOutputTokens: 12345,
-      options: {
-        reasoningEffort: "high",
-        thinking: { type: "enabled", budgetTokens: 4096 },
-      },
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
     })
 
     //#when - an abort/stopped-message path clears the pending fallback before it is applied.
@@ -1856,6 +1848,55 @@ describe("createEventHandler - model fallback", () => {
       modelID: "kimi-k2.6",
     })
     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("uses resolved provider dedupe for model-only fallback failures", async () => {
+    //#given
+    const sessionID = "ses_model_only_failure_uses_resolved_provider_dedupe"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["openai"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - the first model-only failure resolves to the stored OpenAI provider.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#when - the same model id then fails after the selected fallback provider became last-known.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#then - provider-qualified dedupe allows the chain to advance across providers sharing a model id.
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "kimi-for-coding", modelID: "k2p5" })
   })
 
   test("does not collapse fallback continuations for different providers with the same model id", async () => {

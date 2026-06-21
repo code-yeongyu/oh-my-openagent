@@ -223,6 +223,7 @@ export function createModelFallbackContinuationController(args: {
     continuationsInFlight.add(sessionID);
     let dispatched = false;
     let promptParamsApplied = false;
+    let appliedFallbackPromptParams: SessionPromptParams | undefined;
     let temporarySessionModelFallback: { providerID: string; modelID: string } | undefined;
     const previousPromptParams = getSessionPromptParams(sessionID);
     const fallbackPromptParamsBase = fallbackPromptParamRestoreBySession.has(sessionID)
@@ -264,6 +265,7 @@ export function createModelFallbackContinuationController(args: {
           fallbackPromptParamRestoreBySession.set(sessionID, previousPromptParams);
         }
         promptParamsApplied = applyFallbackPromptParamOverrides(sessionID, fallbackContext, fallbackPromptParamsBase);
+        appliedFallbackPromptParams = promptParamsApplied ? getSessionPromptParams(sessionID) : undefined;
       } else if (fallbackPromptParamRestoreBySession.has(sessionID)) {
         restoreSessionPromptParams(sessionID, fallbackPromptParamsBase);
         fallbackPromptParamRestoreBySession.delete(sessionID);
@@ -307,10 +309,15 @@ export function createModelFallbackContinuationController(args: {
     } finally {
       if (dispatched) {
         markDispatched(sessionID, dedupeContext);
-        if (promptParamsApplied) armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams);
+        if (promptParamsApplied) {
+          armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams, appliedFallbackPromptParams);
+        }
       } else {
         if (temporarySessionModelFallback) restoreSessionModelFallback(sessionID, temporarySessionModelFallback);
-        if (promptParamsApplied) armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams);
+        if (promptParamsApplied) {
+          armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams, appliedFallbackPromptParams);
+          restoreSessionPromptParams(sessionID, previousPromptParams);
+        }
       }
       continuationsInFlight.delete(sessionID);
     }

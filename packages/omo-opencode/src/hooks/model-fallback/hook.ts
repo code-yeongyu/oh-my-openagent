@@ -1,7 +1,10 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
 import { isRealUserTextPart } from "../../shared"
-import { restorePendingFallbackPromptParams } from "../../shared/session-prompt-params-state"
+import {
+  applyPendingFallbackPromptParams,
+  restorePendingFallbackPromptParams,
+} from "../../shared/session-prompt-params-state"
 import { applyFallbackToChatMessage } from "./chat-message-fallback-handler"
 import {
   createModelFallbackStateController,
@@ -230,6 +233,8 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
         return
       }
       autoContinuationPendingSessions.delete(sessionID)
+
+      applyPendingFallbackPromptParams(sessionID)
 
       await applyFallbackToChatMessage({
         input,

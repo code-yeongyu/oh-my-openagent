@@ -56,6 +56,26 @@ function resolveAutoContinuationFallbackContext(
   };
 }
 
+function resolveDedupeProviderID(
+  providerHint: string | undefined,
+  modelID: string | undefined,
+  lastKnown: { providerID: string; modelID: string } | undefined,
+  sessionModel: { providerID: string; modelID: string } | undefined,
+): string | undefined {
+  if (providerHint) return providerHint;
+
+  if (!modelID) return lastKnown?.providerID ?? sessionModel?.providerID;
+
+  const normalizedModelID = normalizeFallbackModelID(modelID);
+  if (lastKnown && normalizeFallbackModelID(lastKnown.modelID) === normalizedModelID) {
+    return lastKnown.providerID;
+  }
+  if (sessionModel && normalizeFallbackModelID(sessionModel.modelID) === normalizedModelID) {
+    return sessionModel.providerID;
+  }
+  return undefined;
+}
+
 export function createModelFallbackEventHandler(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
@@ -199,7 +219,7 @@ export function createModelFallbackEventHandler(args: {
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
     const sessionModel = getSessionModel(params.sessionID);
     const explicitModelID = params.info.modelID as string | undefined;
-    const dedupeProviderID = providerHint ?? (explicitModelID ? undefined : lastKnown?.providerID ?? sessionModel?.providerID);
+    const dedupeProviderID = resolveDedupeProviderID(providerHint, explicitModelID, lastKnown, sessionModel);
     const rawModel =
       explicitModelID
       ?? lastKnown?.modelID
@@ -249,7 +269,7 @@ export function createModelFallbackEventHandler(args: {
     const parsed = extractProviderModelFromErrorMessage(retryMessage);
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
     const sessionModel = getSessionModel(params.sessionID);
-    const dedupeProviderID = parsed.providerID ?? (parsed.modelID ? undefined : lastKnown?.providerID ?? sessionModel?.providerID);
+    const dedupeProviderID = resolveDedupeProviderID(parsed.providerID, parsed.modelID, lastKnown, sessionModel);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
     const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? sessionModel?.modelID ?? "claude-opus-4-7");
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };
@@ -292,11 +312,11 @@ export function createModelFallbackEventHandler(args: {
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
     const sessionModel = getSessionModel(params.sessionID);
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
-    const dedupeProviderID = providerHint ?? (parsed.modelID ? undefined : lastKnown?.providerID ?? sessionModel?.providerID);
+    const explicitModelID = (params.props?.modelID as string | undefined) || parsed.modelID;
+    const dedupeProviderID = resolveDedupeProviderID(providerHint, explicitModelID, lastKnown, sessionModel);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined)
-        || parsed.modelID
+      explicitModelID
         || lastKnown?.modelID
         || sessionModel?.modelID
         || "claude-opus-4-7",
