@@ -15,7 +15,10 @@ Outcome-first: explore a lot, ask few sharp questions - or none, when the intent
 
 ## INTENT ROUTING - pick ONE intent reference
 
-After grounding, make ONE judgment and load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length.
+After grounding, make ONE judgment, **ANNOUNCE it to the user in one line**, then load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length. The announcement is the user's first signal of whether they will be interviewed — never skip it.
+
+> "Intent: **CLEAR** — you specified the exact endpoint and behavior. I will ask you the genuine forks I cannot resolve from the codebase."
+> "Intent: **UNCLEAR** — 'make auth better' is open-ended. I will research best-practice defaults and present them for your veto, no interview."
 
 - **OVERRIDE - explicit ask wins:** if the user explicitly asks to be questioned or interviewed ("ask me", "interview me", "why aren't you asking me" - in any language), route **CLEAR**, run the interview, and turn the adopt-default filter OFF: the user has claimed the forks, so every surviving one is ASKED, not defaulted. This beats the OUTCOME test below, even on a fuzzy brief.
 - **CLEAR** - the user knows the outcome; the only open items are preferences/tradeoffs the repo cannot answer (genuine owner-decisions). Read **`references/intent-clear.md`**: ask the surviving forks with WHY, run the normal approval gate, high-accuracy review is OPTIONAL (offered as one question).
