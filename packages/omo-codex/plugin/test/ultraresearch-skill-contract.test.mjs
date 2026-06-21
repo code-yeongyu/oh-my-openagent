@@ -192,3 +192,13 @@ test("#given ultraresearch claim ledger #when ownership is inspected #then worke
 		);
 	}
 });
+
+test("#given ultraresearch blocked sources #when escalation is inspected #then it routes through the ultimate-browsing skill", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/ultimate-browsing/,
+			`${copy.label}: body must escalate blocked sources via the ultimate-browsing skill`,
+		);
+	}
+});
