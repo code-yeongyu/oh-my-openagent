@@ -68,16 +68,21 @@ If English isn't your first language, don't worry! We value your contributions r
 ### Development Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/code-yeongyu/oh-my-openagent.git
+# Clone the repository (with the frontend provenance submodules)
+git clone --recurse-submodules https://github.com/code-yeongyu/oh-my-openagent.git
 cd oh-my-openagent
+
+# If you cloned without --recurse-submodules, initialize them now (non-fatal offline):
+git submodule update --init --recursive
 
 # Install dependencies (bun only - never use npm/yarn)
 bun install
 
-# Build the project
+# Build the project (materializes the frontend third-party references from the submodules)
 bun run build
 ```
+
+> The frontend skill's brand / taste / ui-ux references are third-party content kept ONLY as pinned git submodules under `packages/shared-skills/upstreams/`. The repo contains zero committed copies; the build materializes them into `packages/shared-skills/skills/frontend/references/` (gitignored locally, shipped in the published package). `script/agent/setup.sh` runs the submodule init + materialize for you (both non-fatal, so an offline checkout still builds, just without the brand refs).
 
 ### Testing Your Changes Locally
 
@@ -119,8 +124,8 @@ After making changes, you can test your local build in OpenCode:
 
 The cross-harness one-command bootstrap is the single source of truth for all development environments.
 
-- **`script/agent/setup.sh`** verifies Bun, Node, and git, warns if tmux is missing, runs `bun install`, and builds when `dist/index.js` is missing or `OMO_AGENT_FORCE_BUILD=1` is set.
-- **`script/agent/cleanup.sh`** removes regenerable transients by default. Pass `--deep` to also drop `dist/` and `node_modules/`.
+- **`script/agent/setup.sh`** verifies Bun, Node, and git, warns if tmux is missing, runs `bun install`, initializes the frontend provenance submodules and materializes their references (both non-fatal so an offline checkout still builds), and builds when `dist/index.js` is missing or `OMO_AGENT_FORCE_BUILD=1` is set.
+- **`script/agent/cleanup.sh`** removes regenerable transients by default. Pass `--deep` to also drop `dist/` and `node_modules/`; it leaves the `packages/shared-skills/upstreams/` submodules in place.
 - **`script/agent/cleanup-hook.sh`** launches cleanup from Claude Code `SessionEnd` without blocking shutdown.
 
 All harnesses delegate to these scripts:
