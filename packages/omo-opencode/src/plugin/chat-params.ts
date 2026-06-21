@@ -1,7 +1,7 @@
 import { isRecord } from "@oh-my-opencode/utils"
 import {
   getSessionPromptParams,
-  restorePendingFallbackPromptParams,
+  restoreAppliedFallbackPromptParams,
 } from "../shared/session-prompt-params-state"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
 
@@ -191,6 +191,6 @@ export function createChatParamsHandler(_args: {
       }
     }
 
-    restorePendingFallbackPromptParams(normalizedInput.sessionID)
+    restoreAppliedFallbackPromptParams(normalizedInput.sessionID)
   }
 }

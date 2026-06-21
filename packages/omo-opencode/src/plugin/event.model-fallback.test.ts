@@ -975,6 +975,24 @@ describe("createEventHandler - model fallback", () => {
       options: { reasoningEffort: "low" },
     })
 
+    //#when - another prompt reaches chat.params before the fallback prompt is consumed.
+    const unrelatedChatParamsHandler = createChatParamsHandler()
+    const unrelatedChatParamsOutput = { options: {} as Record<string, unknown> }
+    await unrelatedChatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      provider: { id: "anthropic" },
+      message: {},
+    }), unrelatedChatParamsOutput)
+
+    //#then - unrelated chat.params does not delete the held fallback-only params.
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+
     //#when - a real user resume consumes the same fallback model.
     const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
     await chatMessageHandler(

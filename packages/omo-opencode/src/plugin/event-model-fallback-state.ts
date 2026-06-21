@@ -22,6 +22,7 @@ import {
   armPendingFallbackPromptParamsRestore,
   clearSessionPromptParams,
   getSessionPromptParams,
+  markAppliedFallbackPromptParams,
   type SessionPromptParams,
   setSessionPromptParams,
 } from "../shared/session-prompt-params-state";
@@ -311,6 +312,7 @@ export function createModelFallbackContinuationController(args: {
         markDispatched(sessionID, dedupeContext);
         if (promptParamsApplied) {
           armPendingFallbackPromptParamsRestore(sessionID, previousPromptParams, appliedFallbackPromptParams);
+          markAppliedFallbackPromptParams(sessionID);
         }
       } else {
         if (temporarySessionModelFallback) restoreSessionModelFallback(sessionID, temporarySessionModelFallback);
