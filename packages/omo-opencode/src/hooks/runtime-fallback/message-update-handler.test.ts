@@ -1,7 +1,10 @@
-import { describe, expect, it } from "bun:test"
-import type { RuntimeFallbackPluginInput } from "./types"
+import { afterEach, describe, expect, it } from "bun:test"
+import type { AutoRetryHelpers } from "./auto-retry"
+import { createMessageUpdateHandler } from "./message-update-handler"
+import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -78,5 +81,109 @@ describe("hasVisibleAssistantResponse", () => {
 
     // then
     expect(result).toBe(false)
+  })
+})
+
+function createRuntimeFallbackContext(operations: string[]): RuntimeFallbackPluginInput {
+  return {
+    client: {
+      session: {
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        promptAsync: async () => ({}),
+      },
+      tui: {
+        showToast: async () => {
+          operations.push("toast")
+          return {}
+        },
+      },
+    },
+    directory: "/test/dir",
+  }
+}
+
+function createRuntimeFallbackDeps(operations: string[]): HookDeps {
+  return {
+    ctx: createRuntimeFallbackContext(operations),
+    config: {
+      enabled: true,
+      retry_on_errors: [429, 503, 529],
+      max_fallback_attempts: 3,
+      cooldown_seconds: 60,
+      timeout_seconds: 30,
+      notify_on_fallback: true,
+      restore_primary_after_cooldown: false,
+    },
+    options: undefined,
+    pluginConfig: {
+      categories: {
+        test: {
+          fallback_models: ["litellm/openai.eu.gpt-5.5"],
+        },
+      },
+    },
+    sessionStates: new Map(),
+    sessionLastAccess: new Map(),
+    sessionRetryInFlight: new Set(),
+    sessionAwaitingFallbackResult: new Set(),
+    sessionFallbackTimeouts: new Map(),
+    sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
+  }
+}
+
+function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): AutoRetryHelpers {
+  return {
+    abortSessionRequest: async (_sessionID: string, source: string) => {
+      operations.push(`abort:${source}`)
+      if (source === "message.updated.quota-fallback") {
+        deps.internallyAbortedSessions.add(_sessionID)
+      }
+    },
+    clearSessionFallbackTimeout: () => {},
+    scheduleSessionFallbackTimeout: () => {},
+    autoRetryWithFallback: async (_sessionID: string, model: string) => {
+      operations.push(`retry:${model}`)
+      return { accepted: true, status: "dispatched" }
+    },
+    resolveAgentForSessionFromContext: async () => undefined,
+    cleanupStaleSessions: () => {},
+  }
+}
+
+describe("createMessageUpdateHandler runtime fallback dispatch", () => {
+  afterEach(() => {
+    SessionCategoryRegistry.clear()
+  })
+
+  it("#given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast", async () => {
+    // given
+    const sessionID = "session-quota-fallback"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    // then
+    expect(operations).toEqual([
+      "abort:message.updated.quota-fallback",
+      "retry:litellm/openai.eu.gpt-5.5",
+      "toast",
+    ])
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
   })
 })
