@@ -23,6 +23,7 @@ export const expectedSkills = [
 	"rules",
 	"start-work",
 	"teammode",
+	"ultimate-browsing",
 	"ultraresearch",
 	"ulw-loop",
 	"ulw-plan",
