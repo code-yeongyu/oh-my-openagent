@@ -20,6 +20,18 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/programming/scripts/python/new-script.py",
   "packages/omo-codex/plugin/skills/programming/scripts/rust/check-no-excuse-rules.py",
   "packages/omo-codex/plugin/skills/programming/scripts/rust/new-project.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/__init__.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/__main__.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/bias_check.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/executor.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/fetch_chain.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/url_transforms.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/validators.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/waf_detector.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/cookie_crypto.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/cookie_paths.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/extract_cookies.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/tests/test_extract_cookies.py",
 ] as const
 const retainedPythonFiles = [
   ...requiredRetainedPythonFiles,
