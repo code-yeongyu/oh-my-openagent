@@ -75,6 +75,19 @@ describe("agent dev-environment scripts", () => {
       expect(body).toContain(".env") // credential sourcing
       expect(body).toContain("--ignore-scripts")
       expect(body).toContain("1.3.12")
+      expect(body).toContain("submodule update --init") // provenance submodules
+      expect(body).toContain("materialize-frontend-refs") // frontend ref materialize
+    })
+
+    test("#given the submodule + materialize steps #when setup runs offline #then both are non-fatal", () => {
+      // given
+      const body = read(join(AGENT_DIR, "setup.sh"))
+      const submoduleLine = body.split("\n").find((line) => line.includes("submodule update --init"))
+      const materializeLine = body.split("\n").find((line) => line.includes("materialize-frontend-refs.mjs"))
+
+      // then both steps tolerate failure with a warn-and-continue fallback
+      expect(submoduleLine).toContain("||")
+      expect(materializeLine).toContain("||")
     })
   })
 
