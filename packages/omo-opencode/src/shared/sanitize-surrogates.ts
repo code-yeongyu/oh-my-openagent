@@ -4,8 +4,19 @@ function isHexDigit(char: string): boolean {
   return /^[0-9a-fA-F]$/.test(char)
 }
 
+function isEscapedBackslash(input: string, startIndex: number): boolean {
+  let precedingBackslashes = 0
+  for (let index = startIndex - 1; index >= 0 && input[index] === "\\"; index -= 1) {
+    precedingBackslashes += 1
+  }
+  return precedingBackslashes % 2 === 1
+}
+
 function readUnicodeEscape(input: string, startIndex: number): { raw: string; codePoint: number } | null {
   if (input.slice(startIndex, startIndex + 2) !== "\\u") {
+    return null
+  }
+  if (isEscapedBackslash(input, startIndex)) {
     return null
   }
 

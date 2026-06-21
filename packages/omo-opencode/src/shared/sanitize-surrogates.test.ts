@@ -16,6 +16,11 @@ describe("fixJsonSurrogateEscapes", () => {
     const input = "smile: \\uD83D\\uDE00"
     expect(fixJsonSurrogateEscapes(input)).toBe(input)
   })
+
+  it("preserves escaped unicode escape text", () => {
+    const input = String.raw`literal \\uD83D\\uDE00`
+    expect(fixJsonSurrogateEscapes(input)).toBe(input)
+  })
 })
 
 describe("sanitizeSurrogates", () => {

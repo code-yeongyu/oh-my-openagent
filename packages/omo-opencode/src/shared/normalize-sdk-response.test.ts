@@ -69,4 +69,38 @@ describe("normalizeSDKResponse", () => {
     //#then
     expect(result).toEqual(fallback)
   })
+
+  it("sanitizes malformed surrogate strings from response data", () => {
+    //#given
+    const response = {
+      data: [{
+        id: "1",
+        text: `before ${String.fromCharCode(0xd800)} after`,
+        nested: {
+          escaped: "value=\\uD800",
+          literalEscapeText: String.raw`literal \\uD83D\\uDE00`,
+        },
+      }],
+    }
+
+    //#when
+    const result = normalizeSDKResponse(response, [] as Array<{
+      id: string
+      text: string
+      nested: {
+        escaped: string
+        literalEscapeText: string
+      }
+    }>)
+
+    //#then
+    expect(result).toEqual([{
+      id: "1",
+      text: "before \uFFFD after",
+      nested: {
+        escaped: "value=\\uFFFD",
+        literalEscapeText: String.raw`literal \\uD83D\\uDE00`,
+      },
+    }])
+  })
 })
