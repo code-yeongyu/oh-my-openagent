@@ -1,6 +1,6 @@
-import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
-import { truncateUntilTargetTokens } from "./storage"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import * as storage from "./storage"
+import { truncateUntilTargetTokens } from "./storage"
 
 // Mock the entire module
 mock.module("./storage", () => {

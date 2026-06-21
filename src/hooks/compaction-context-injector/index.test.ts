@@ -14,8 +14,8 @@ mock.module("../../shared/system-directive", () => ({
   },
 }))
 
-import { createCompactionContextInjector } from "./index"
 import { TaskHistory } from "../../features/background-agent/task-history"
+import { createCompactionContextInjector } from "./index"
 
 describe("createCompactionContextInjector", () => {
   describe("Agent Verification State preservation", () => {

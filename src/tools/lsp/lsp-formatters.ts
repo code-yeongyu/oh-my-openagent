@@ -1,4 +1,4 @@
-import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
+import { SEVERITY_MAP, SYMBOL_KIND_MAP } from "./constants"
 import { uriToPath } from "./lsp-client-wrapper"
 import type {
   Diagnostic,

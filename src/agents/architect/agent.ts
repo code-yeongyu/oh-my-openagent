@@ -10,22 +10,22 @@
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel } from "../types"
-import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
-import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
+import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
+import type { AgentMode, AgentPromptMetadata } from "../types"
+import { isGptModel } from "../types"
 
 import { getDefaultAtlasPrompt } from "./default"
 import { getGptAtlasPrompt } from "./gpt"
 import {
-  getCategoryDescription,
   buildAgentSelectionSection,
   buildCategorySection,
-  buildSkillsSection,
   buildDecisionMatrix,
+  buildSkillsSection,
+  getCategoryDescription,
 } from "./prompt-section-builder"
 
 const MODE: AgentMode = "primary"

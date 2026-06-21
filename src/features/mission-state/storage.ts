@@ -4,10 +4,10 @@
  * Handles reading/writing mission.json for active plan tracking.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
-import { dirname, join, basename } from "node:path"
-import type { MissionState, PlanProgress } from "./types"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 import { MISSION_DIR, MISSION_FILE, ORACLE_PLANS_DIR } from "./constants"
+import type { MissionState, PlanProgress } from "./types"
 
 export function getMissionFilePath(directory: string): string {
   return join(directory, MISSION_DIR, MISSION_FILE)

@@ -1,9 +1,9 @@
-import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
-import { DEFAULT_CONFIG } from "./constants"
 import { createAutoRetryHelpers } from "./auto-retry"
+import { createChatMessageHandler } from "./chat-message-handler"
+import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createMessageUpdateHandler } from "./message-update-handler"
-import { createChatMessageHandler } from "./chat-message-handler"
+import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void

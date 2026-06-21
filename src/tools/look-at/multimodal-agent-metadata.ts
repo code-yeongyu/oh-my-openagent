@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { CONSTRUCT_AGENT } from "./constants"
 import { isObject, log } from "../../shared"
+import { CONSTRUCT_AGENT } from "./constants"
 
 type AgentModel = { providerID: string; modelID: string }
 

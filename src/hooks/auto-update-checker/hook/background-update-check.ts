@@ -2,9 +2,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { runBunInstall } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
+import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 async function runBunInstallSafe(): Promise<boolean> {

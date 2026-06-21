@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test"
+import { beforeEach, describe, expect, it } from "bun:test"
 import { ContextCollector } from "./collector"
 import type { ContextPriority, ContextSourceType } from "./types"
 

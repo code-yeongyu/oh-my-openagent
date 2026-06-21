@@ -1,10 +1,10 @@
-import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
-import { ALLOWED_AGENTS, CALL_DELEGATE_AGENT_DESCRIPTION } from "./constants"
-import type { AllowedAgentType, DelegateAgentArgs, ToolContextWithMetadata } from "./types"
+import { type PluginInput, type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared"
 import { executeBackground } from "./background-executor"
+import { ALLOWED_AGENTS, CALL_DELEGATE_AGENT_DESCRIPTION } from "./constants"
 import { executeSync } from "./sync-executor"
+import type { AllowedAgentType, DelegateAgentArgs, ToolContextWithMetadata } from "./types"
 
 export function createDelegateAgent(
   ctx: PluginInput,

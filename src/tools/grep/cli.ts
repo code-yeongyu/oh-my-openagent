@@ -1,17 +1,17 @@
 import { spawn } from "bun"
 import {
-  resolveGrepCli,
-  type GrepBackend,
+  DEFAULT_MAX_COLUMNS,
+  DEFAULT_MAX_COUNT,
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_FILESIZE,
-  DEFAULT_MAX_COUNT,
-  DEFAULT_MAX_COLUMNS,
-  DEFAULT_TIMEOUT_MS,
   DEFAULT_MAX_OUTPUT_BYTES,
-  RG_SAFETY_FLAGS,
+  DEFAULT_TIMEOUT_MS,
   GREP_SAFETY_FLAGS,
+  type GrepBackend,
+  RG_SAFETY_FLAGS,
+  resolveGrepCli,
 } from "./constants"
-import type { GrepOptions, GrepMatch, GrepResult, CountResult } from "./types"
+import type { CountResult, GrepMatch, GrepOptions, GrepResult } from "./types"
 
 function buildRgArgs(options: GrepOptions): string[] {
   const args: string[] = [

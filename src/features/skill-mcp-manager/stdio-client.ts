@@ -1,8 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
-import { createCleanMcpEnvironment } from "./env-cleaner"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
+import { createCleanMcpEnvironment } from "./env-cleaner"
 import type { ManagedClient, SkillMcpClientConnectionParams } from "./types"
 
 function getStdioCommand(config: ClaudeCodeMcpServer, serverName: string): string {

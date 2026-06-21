@@ -102,13 +102,13 @@ from pyecore.notification import EObserver
 
 # motra-style transformation (conceptual — pyecore/experimental/m2m/)
 class EObjectProxy:
-    \"\"\"Wraps target objects for lazy reference resolution.\"\"\"
+    """Wraps target objects for lazy reference resolution."""
     def __init__(self, instance):
         self.wrapped = instance
         self.wrapped_eClass = instance.eClass
 
 class TransformationTrace:
-    \"\"\"Records source→target mappings for reference resolution.\"\"\"
+    """Records source→target mappings for reference resolution."""
     def __init__(self):
         self._trace = {}
 
@@ -134,7 +134,7 @@ Why two phases? Cross-references may point to elements not yet created in Phase 
 
 \`\`\`python
 class TraceLink:
-    \"\"\"Records the mapping between source and target elements.\"\"\"
+    """Records the mapping between source and target elements."""
     def __init__(self, source, target, rule_name):
         self.source = source        # source model element
         self.target = target        # target model element
@@ -176,7 +176,7 @@ for step in pipeline:
 
 \`\`\`python
 def inline_single_attribute_entities(model):
-    \"\"\"Refactoring: replace entities with single attribute by their attribute type.\"\"\"
+    """Refactoring: replace entities with single attribute by their attribute type."""
     to_inline = [e for e in model.entities if len(e.attrs) == 1]
 
     for entity in to_inline:
@@ -192,7 +192,7 @@ def inline_single_attribute_entities(model):
 
 \`\`\`python
 def remove_unreachable_states(state_machine):
-    \"\"\"Remove states not reachable from the initial state.\"\"\"
+    """Remove states not reachable from the initial state."""
     reachable = set()
     queue = [state_machine.initial_state]
     while queue:
@@ -231,7 +231,7 @@ from typing import Optional, List
 
 @dataclass
 class {{ entity.name }}:
-    \"\"\"Generated from {{ entity.name }} entity.\"\"\"
+    """Generated from {{ entity.name }} entity."""
 {% for attr in entity.attrs %}
     {{ attr.name }}: {{ types.python_type(attr.type) }}{{ types.default(attr) }}
 {% endfor %}
@@ -255,7 +255,7 @@ PROTECTED_REGION_RE = re.compile(
 )
 
 def merge_with_protected_regions(generated: str, existing: str) -> str:
-    \"\"\"Preserve user-written code within protected regions.\"\"\"
+    """Preserve user-written code within protected regions."""
     regions = {}
     for match in PROTECTED_REGION_RE.finditer(existing):
         regions[match.group(1)] = match.group(2)

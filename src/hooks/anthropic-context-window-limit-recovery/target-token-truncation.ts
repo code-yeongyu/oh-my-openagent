@@ -1,9 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { normalizeSDKResponse } from "../../shared"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import type { AggressiveTruncateResult } from "./tool-part-types"
 import { findToolResultsBySize, truncateToolResult } from "./tool-result-storage"
 import { truncateToolResultAsync } from "./tool-result-storage-sdk"
-import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 

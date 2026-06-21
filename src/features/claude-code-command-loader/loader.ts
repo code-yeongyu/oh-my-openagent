@@ -1,11 +1,11 @@
-import { promises as fs, type Dirent } from "fs"
-import { join, basename } from "path"
-import { parseFrontmatter } from "../../shared/frontmatter"
-import { sanitizeModelField } from "../../shared/model-sanitizer"
-import { isMarkdownFile } from "../../shared/file-utils"
+import { type Dirent, promises as fs } from "fs"
+import { basename, join } from "path"
 import { getClaudeConfigDir, getOpenCodeConfigDir } from "../../shared"
+import { isMarkdownFile } from "../../shared/file-utils"
+import { parseFrontmatter } from "../../shared/frontmatter"
 import { log } from "../../shared/logger"
-import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
+import { sanitizeModelField } from "../../shared/model-sanitizer"
+import type { CommandDefinition, CommandFrontmatter, CommandScope, LoadedCommand } from "./types"
 
 async function loadCommandsFromDir(
   commandsDir: string,
@@ -92,7 +92,6 @@ $ARGUMENTS
       })
     } catch (error) {
       log(`Failed to parse command: ${commandPath}`, error)
-      continue
     }
   }
 

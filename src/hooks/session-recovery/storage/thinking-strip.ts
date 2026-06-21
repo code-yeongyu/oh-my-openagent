@@ -1,10 +1,9 @@
 import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { deletePart, isSqliteBackend, log, normalizeSDKResponse } from "../../../shared"
 import { PART_STORAGE, THINKING_TYPES } from "../constants"
 import type { StoredPart } from "../types"
-import { log, isSqliteBackend, deletePart } from "../../../shared"
-import { normalizeSDKResponse } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -29,7 +28,6 @@ export function stripThinkingParts(messageID: string): boolean {
         anyRemoved = true
       }
     } catch {
-      continue
     }
   }
 

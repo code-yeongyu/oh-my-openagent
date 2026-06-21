@@ -1,5 +1,5 @@
-import { consumeToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
+import { consumeToolMetadata } from "../features/tool-metadata-store"
 
 export function createToolExecuteAfterHandler(args: {
   hooks: CreatedHooks

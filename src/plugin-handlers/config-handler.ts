@@ -4,8 +4,8 @@ import { log } from "../shared";
 import { applyAgentConfig } from "./agent-config-handler";
 import { applyCommandConfig } from "./command-config-handler";
 import { applyMcpConfig } from "./mcp-config-handler";
-import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
+import { applyProviderConfig } from "./provider-config-handler";
 import { applyToolConfig } from "./tool-config-handler";
 
 export { resolveCategoryConfig } from "./category-config-resolver";

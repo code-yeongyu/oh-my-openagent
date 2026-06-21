@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import {
-  createMouseAgentWithOverrides,
-  MOUSE_DEFAULTS,
-  getMousePromptSource,
   buildMousePrompt,
+  createMouseAgentWithOverrides,
+  getMousePromptSource,
+  MOUSE_DEFAULTS,
 } from "./index"
 
 describe("createMouseAgentWithOverrides", () => {

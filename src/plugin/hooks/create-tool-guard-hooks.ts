@@ -1,26 +1,24 @@
 import type { HookName, MatrixxConfig } from "../../config"
-import type { PluginContext } from "../types"
-
 import {
+  createBashFileReadGuardHook,
   createCommentCheckerHooks,
-  createToolOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
   createDirectoryReadmeInjectorHook,
   createEmptyTaskResponseDetectorHook,
-  createRulesInjectorHook,
-  createTasksTodowriteDisablerHook,
-  createWriteExistingFileGuardHook,
-  createHashlineReadEnhancerHook,
-  createSecretLeakGuardHook,
   createEnvFileWriteGuardHook,
-  createJsonErrorRecoveryHook,
-  createBashFileReadGuardHook,
-  createTodoDescriptionOverrideHook,
-  createReadImageResizerHook,
-  createWebFetchRedirectGuardHook,
   createHashlineEditDiffEnhancerHook,
+  createHashlineReadEnhancerHook,
+  createJsonErrorRecoveryHook,
   createQualityGateHook,
+  createReadImageResizerHook,
+  createRulesInjectorHook,
+  createSecretLeakGuardHook,
   createTaskNotepadHook,
+  createTasksTodowriteDisablerHook,
+  createTodoDescriptionOverrideHook,
+  createToolOutputTruncatorHook,
+  createWebFetchRedirectGuardHook,
+  createWriteExistingFileGuardHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -29,6 +27,7 @@ import {
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import type { PluginContext } from "../types"
 
 export type ToolGuardHooks = {
   commentChecker: ReturnType<typeof createCommentCheckerHooks> | null

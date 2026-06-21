@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test"
-import { createCipherAgent, CIPHER_PROMPT_METADATA } from "./cipher"
+import { describe, expect, test } from "bun:test"
+import { CIPHER_PROMPT_METADATA, createCipherAgent } from "./cipher"
 
 describe("createCipherAgent", () => {
   //#given a Claude model

@@ -1,9 +1,9 @@
 import type { BackgroundTask } from "../../features/background-agent"
-import type { BackgroundOutputClient, BackgroundOutputMessagesResult, BackgroundOutputMessage } from "./clients"
+import type { BackgroundOutputClient, BackgroundOutputMessage, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
+import { formatTaskStatus } from "./task-status-format"
 import { formatMessageTime } from "./time-format"
 import { truncateText } from "./truncate-text"
-import { formatTaskStatus } from "./task-status-format"
 
 const MAX_MESSAGE_LIMIT = 100
 const THINKING_MAX_CHARS = 2000

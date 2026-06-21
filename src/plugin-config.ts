@@ -1,15 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
-import { MatrixxConfigSchema, type MatrixxConfig } from "./config";
+import { type MatrixxConfig, MatrixxConfigSchema } from "./config";
 import { expandProfile, PROFILE_NAMES } from "./config/profiles";
 import {
-  log,
-  deepMerge,
-  getOpenCodeConfigDir,
   addConfigLoadError,
-  parseJsonc,
+  deepMerge,
   detectConfigFile,
+  getOpenCodeConfigDir,
+  log,
   migrateConfigFile,
+  parseJsonc,
 } from "./shared";
 
 export function parseConfigPartially(

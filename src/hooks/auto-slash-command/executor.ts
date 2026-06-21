@@ -1,17 +1,17 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
-import { join, basename, dirname } from "path"
+import { basename, dirname, join } from "path"
+import { loadBuiltinCommands } from "../../features/builtin-commands"
+import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
+import { discoverAllSkills, type LazyContentLoader, type LoadedSkill } from "../../features/opencode-skill-loader"
 import {
+  getClaudeConfigDir,
+  getOpenCodeConfigDir,
   parseFrontmatter,
   resolveCommandsInText,
   resolveFileReferencesInText,
   sanitizeModelField,
-  getClaudeConfigDir,
-  getOpenCodeConfigDir,
 } from "../../shared"
-import { loadBuiltinCommands } from "../../features/builtin-commands"
-import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import type { ParsedSlashCommand } from "./types"
 
 interface CommandScope {
@@ -72,7 +72,6 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope["type"
         scope,
       })
     } catch {
-      continue
     }
   }
 

@@ -1,21 +1,21 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import {
+  SESSION_INFO_DESCRIPTION,
   SESSION_LIST_DESCRIPTION,
   SESSION_READ_DESCRIPTION,
   SESSION_SEARCH_DESCRIPTION,
-  SESSION_INFO_DESCRIPTION,
 } from "./constants"
-import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
 import {
   filterSessionsByDate,
+  formatSearchResults,
   formatSessionInfo,
   formatSessionList,
   formatSessionMessages,
-  formatSearchResults,
   searchInSession,
 } from "./session-formatter"
-import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
+import type { SearchResult, SessionInfoArgs, SessionListArgs, SessionReadArgs, SessionSearchArgs } from "./types"
 
 const SEARCH_TIMEOUT_MS = 60_000
 const MAX_SESSIONS_TO_SCAN = 50
@@ -42,7 +42,7 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
     execute: async (args: SessionListArgs, _context) => {
       try {
         const directory = args.project_path ?? ctx.directory
-        let sessions = await getMainSessions({ directory })
+        const sessions = await getMainSessions({ directory })
         let sessionIDs = sessions.map((s) => s.id)
 
         if (args.from_date || args.to_date) {

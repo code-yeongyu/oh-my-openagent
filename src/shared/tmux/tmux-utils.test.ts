@@ -1,11 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import {
+  applyLayout,
+  closeTmuxPane,
   isInsideTmux,
   isServerRunning,
   resetServerCheck,
   spawnTmuxPane,
-  closeTmuxPane,
-  applyLayout,
 } from "./tmux-utils"
 
 describe("isInsideTmux", () => {

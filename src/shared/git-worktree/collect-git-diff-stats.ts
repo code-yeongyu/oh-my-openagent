@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parseGitStatusPorcelain } from "./parse-status-porcelain"
 import { parseGitDiffNumstat } from "./parse-diff-numstat"
+import { parseGitStatusPorcelain } from "./parse-status-porcelain"
 import type { GitFileStat } from "./types"
 
 export function collectGitDiffStats(directory: string): GitFileStat[] {

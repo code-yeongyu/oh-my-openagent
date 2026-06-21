@@ -1,9 +1,9 @@
 /// <reference types="bun-types/test-globals" />
 import type { Task } from "../../features/claude-tasks/types";
 import {
-  syncTaskToTodo,
   syncAllTasksToTodos,
   syncTaskTodoUpdate,
+  syncTaskToTodo,
   type TodoInfo,
 } from "./todo-sync";
 

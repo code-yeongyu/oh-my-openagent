@@ -1,4 +1,4 @@
-import { consumeNewMessages, type CursorMessage } from "../../shared/session-cursor"
+import { type CursorMessage, consumeNewMessages } from "../../shared/session-cursor"
 
 type SessionMessagePart = {
 	type: string

@@ -1,7 +1,7 @@
-import type { HookDeps } from "./types"
+import type { extractAutoRetrySignal } from "./error-classifier"
 import type { SessionMessage, SessionMessagePart } from "./session-messages"
 import { extractSessionMessages } from "./session-messages"
-import { extractAutoRetrySignal } from "./error-classifier"
+import type { HookDeps } from "./types"
 
 function getLastUserMessageIndex(messages: SessionMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index--) {

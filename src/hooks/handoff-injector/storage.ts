@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, renameSync } from "node:fs"
 import { join } from "node:path"
-import { HANDOFF_FILE_PATH, HANDOFF_CONSUMED_FILE_PATH } from "./constants"
+import { HANDOFF_CONSUMED_FILE_PATH, HANDOFF_FILE_PATH } from "./constants"
 
 export function getHandoffFilePath(directory: string): string {
   return join(directory, HANDOFF_FILE_PATH)

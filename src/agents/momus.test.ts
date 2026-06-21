@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { SMITH_SYSTEM_PROMPT } from "./smith"
 
 function escapeRegExp(value: string) {

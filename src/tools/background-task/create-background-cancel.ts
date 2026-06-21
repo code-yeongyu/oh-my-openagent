@@ -1,8 +1,8 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { BackgroundCancelArgs } from "./types"
 import type { BackgroundCancelClient } from "./clients"
 import { BACKGROUND_CANCEL_DESCRIPTION } from "./constants"
+import type { BackgroundCancelArgs } from "./types"
 
 export function createBackgroundCancel(manager: BackgroundManager, _client: BackgroundCancelClient): ToolDefinition {
   return tool({

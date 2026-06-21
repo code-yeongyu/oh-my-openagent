@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { parseFrontmatter } from "../../shared/frontmatter"
+import { DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS, DEFAULT_STATE_FILE } from "./constants"
 import type { MatrixLoopState } from "./types"
-import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS } from "./constants"
 
 export function getStateFilePath(directory: string, customPath?: string): string {
   return customPath

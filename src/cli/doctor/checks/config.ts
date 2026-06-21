@@ -4,8 +4,8 @@ import { MatrixxConfigSchema } from "../../../config"
 import { detectConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
-import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
+import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import type { MatrixxConfig } from "./model-resolution-types"
 
 const USER_CONFIG_BASE = join(getOpenCodeConfigDir({ binary: "opencode" }), PACKAGE_NAME)

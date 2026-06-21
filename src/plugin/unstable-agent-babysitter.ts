@@ -1,8 +1,8 @@
 import type { MatrixxConfig } from "../config"
-import type { PluginContext } from "./types"
+import type { BackgroundManager } from "../features/background-agent"
 
 import { createUnstableAgentBabysitterHook } from "../hooks"
-import type { BackgroundManager } from "../features/background-agent"
+import type { PluginContext } from "./types"
 
 export function createUnstableAgentBabysitter(args: {
   ctx: PluginContext

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from "bun:test"
-import { generateUnifiedDiff, countLineDiffs, toHashlineContent } from "./diff-utils"
+import { countLineDiffs, generateUnifiedDiff, toHashlineContent } from "./diff-utils"
 
 describe("generateUnifiedDiff", () => {
   it("includes --- and +++ file headers", () => {

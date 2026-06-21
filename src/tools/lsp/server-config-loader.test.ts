@@ -1,8 +1,8 @@
-import { describe, it, expect } from "bun:test"
-import { writeFileSync, unlinkSync, mkdirSync, rmSync } from "fs"
-import { join } from "path"
+import { describe, expect, it } from "bun:test"
+import { mkdirSync, rmSync, unlinkSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
-import { loadJsonFile, getConfigPaths, getMergedServers } from "./server-config-loader"
+import { join } from "path"
+import { getConfigPaths, getMergedServers, loadJsonFile } from "./server-config-loader"
 
 describe("loadJsonFile", () => {
   it("parses JSONC config files with comments correctly", () => {

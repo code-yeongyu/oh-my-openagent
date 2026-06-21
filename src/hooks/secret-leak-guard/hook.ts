@@ -2,8 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { log } from "../../shared"
 import { isGitCommitOrPush, isGitPush } from "./git-command-detector"
-import { runGitleaksStagedScan, runGitleaksPrePushScan } from "./gitleaks-runner"
-import { formatFindings, extractRemoteBranch } from "./result-formatter"
+import { runGitleaksPrePushScan, runGitleaksStagedScan } from "./gitleaks-runner"
+import { extractRemoteBranch, formatFindings } from "./result-formatter"
 
 export interface SecretLeakGuardOptions {
   enabled?: boolean

@@ -2,11 +2,11 @@ import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
-import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { getMessageDir } from "../../shared/opencode-message-dir"
-import type { SessionMessage, SessionInfo, TodoItem, SessionMetadata } from "./types"
 import { normalizeSDKResponse } from "../../shared"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
+import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
 
 export interface GetMainSessionsOptions {
   directory?: string
@@ -67,7 +67,6 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
 
           sessions.push(meta)
         } catch {
-          continue
         }
       }
     }
@@ -212,7 +211,6 @@ export async function readSessionMessages(sessionID: string): Promise<SessionMes
           parts,
         })
       } catch {
-        continue
       }
     }
   } catch {
@@ -240,7 +238,6 @@ async function readParts(messageID: string): Promise<Array<{ id: string; type: s
         const content = await readFile(join(partDir, file), "utf-8")
         parts.push(JSON.parse(content))
       } catch {
-        continue
       }
     }
   } catch {
@@ -292,7 +289,6 @@ export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
           }))
         }
       } catch {
-        continue
       }
     }
   } catch {

@@ -1,5 +1,5 @@
-import { computeLegacyLineHash, computeLineHash } from "./hash-computation"
 import { HASHLINE_REF_PATTERN } from "./constants"
+import { computeLegacyLineHash, computeLineHash } from "./hash-computation"
 
 export interface LineRef {
   line: number

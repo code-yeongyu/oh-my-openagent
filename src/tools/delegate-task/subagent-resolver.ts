@@ -1,14 +1,14 @@
-import type { DelegateTaskArgs } from "./types"
-import type { ExecutorContext } from "./executor-types"
-import { isPlanFamily } from "./constants"
-import { SISYPHUS_JUNIOR_AGENT } from "./mouse-agent"
-import { parseModelString } from "./model-string-parser"
-import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
+import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAvailableModelsForDelegateTask } from "./available-models"
+import { isPlanFamily } from "./constants"
+import type { ExecutorContext } from "./executor-types"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { parseModelString } from "./model-string-parser"
+import { SISYPHUS_JUNIOR_AGENT } from "./mouse-agent"
+import type { DelegateTaskArgs } from "./types"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,

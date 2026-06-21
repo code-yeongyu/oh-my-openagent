@@ -1,3 +1,11 @@
+import { findOldestAgentPane, type SessionMapping } from "./oldest-agent-pane"
+import {
+	canSplitPane,
+	findMinimalEvictions,
+	isSplittableAtCount,
+} from "./pane-split-availability"
+import { findSpawnTarget } from "./spawn-target-finder"
+import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
 import type {
 	CapacityConfig,
 	PaneAction,
@@ -5,14 +13,6 @@ import type {
 	TmuxPaneInfo,
 	WindowState,
 } from "./types"
-import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
-import {
-	canSplitPane,
-	findMinimalEvictions,
-	isSplittableAtCount,
-} from "./pane-split-availability"
-import { findSpawnTarget } from "./spawn-target-finder"
-import { findOldestAgentPane, type SessionMapping } from "./oldest-agent-pane"
 
 export function decideSpawnActions(
 	state: WindowState,

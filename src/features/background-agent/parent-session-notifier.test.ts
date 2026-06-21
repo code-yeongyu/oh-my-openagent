@@ -1,7 +1,8 @@
 declare const require: (name: string) => any
 const { describe, test, expect } = require("bun:test")
-import type { BackgroundTask } from "./types"
+
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
+import type { BackgroundTask } from "./types"
 
 describe("notifyParentSession", () => {
   test("displays INTERRUPTED for interrupted tasks", () => {

@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TrackedTask, TaskStatus, ModelFallbackInfo } from "./types"
 import type { ConcurrencyManager } from "../background-agent/concurrency"
+import type { ModelFallbackInfo, TaskStatus, TrackedTask } from "./types"
 
 type OpencodeClient = PluginInput["client"]
 

@@ -1,9 +1,9 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { getSessionTools } from "../../shared/session-tools-store"
+import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTimingConfig } from "./timing"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { formatDetailedError } from "./error-formatting"
-import { getSessionTools } from "../../shared/session-tools-store"
+import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,

@@ -1,16 +1,15 @@
 import type { HookName, MatrixxConfig } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { PluginContext } from "../types"
-
 import {
-  createTodoContinuationEnforcer,
+  createAtlasHook,
   createBackgroundNotificationHook,
-  createStopContinuationGuardHook,
   createCompactionContextInjector,
   createCompactionTodoPreserverHook,
-  createAtlasHook,
+  createStopContinuationGuardHook,
+  createTodoContinuationEnforcer,
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import type { PluginContext } from "../types"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
 
 export type ContinuationHooks = {

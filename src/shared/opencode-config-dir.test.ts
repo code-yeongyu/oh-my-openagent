@@ -1,11 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import {
+  detectExistingConfigDir,
   getOpenCodeConfigDir,
   getOpenCodeConfigPaths,
   isDevBuild,
-  detectExistingConfigDir,
   TAURI_APP_IDENTIFIER,
   TAURI_APP_IDENTIFIER_DEV,
 } from "./opencode-config-dir"

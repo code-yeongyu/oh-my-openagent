@@ -5,12 +5,11 @@ import type { HookName } from "./config"
 import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
 import { createTools } from "./create-tools"
-import { createPluginInterface } from "./plugin-interface"
-
 import { loadPluginConfig } from "./plugin-config"
+import { createPluginInterface } from "./plugin-interface"
 import { createModelCacheState } from "./plugin-state"
-import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
+import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { startTmuxCheck } from "./tools"
 
 const MatrixxPlugin: Plugin = async (ctx) => {
@@ -90,13 +89,13 @@ const MatrixxPlugin: Plugin = async (ctx) => {
 export default MatrixxPlugin
 
 export type {
-  MatrixxConfig,
   AgentName,
   AgentOverrideConfig,
   AgentOverrides,
-  McpName,
-  HookName,
   BuiltinCommandName,
+  HookName,
+  MatrixxConfig,
+  McpName,
 } from "./config"
 
 // NOTE: Do NOT export functions from main index.ts!

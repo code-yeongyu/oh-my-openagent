@@ -535,7 +535,7 @@ IF style == SHORT:
 
 If ANY check fails -> REWRITE message.
 \`\`\`
-\</execution>
+</execution>
 
 ---
 

@@ -1,6 +1,6 @@
 import pc from "picocolors"
-import type { OpencodeClient } from "./types"
 import { serializeError } from "./events"
+import type { OpencodeClient } from "./types"
 
 const SESSION_CREATE_MAX_RETRIES = 3
 const SESSION_CREATE_RETRY_DELAY_MS = 1000

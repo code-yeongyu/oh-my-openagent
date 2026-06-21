@@ -1,6 +1,6 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
+import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { forceReconnect } from "./cleanup"
 import { getConnectionType } from "./connection-type"
 import { createHttpClient } from "./http-client"

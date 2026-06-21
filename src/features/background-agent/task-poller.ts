@@ -1,16 +1,14 @@
-import { log } from "../../shared"
-
 import type { BackgroundTaskConfig } from "../../config/schema"
-import type { BackgroundTask } from "./types"
+import { log } from "../../shared"
 import type { ConcurrencyManager } from "./concurrency"
-import type { OpencodeClient } from "./opencode-client"
-
 import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
   TASK_TTL_MS,
 } from "./constants"
+import type { OpencodeClient } from "./opencode-client"
+import type { BackgroundTask } from "./types"
 
 export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>

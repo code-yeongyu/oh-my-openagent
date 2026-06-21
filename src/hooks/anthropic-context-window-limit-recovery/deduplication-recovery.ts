@@ -1,11 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { ParsedTokenLimitError } from "./types"
 import type { ExperimentalConfig } from "../../config"
+import { log } from "../../shared/logger"
 import type { DeduplicationConfig } from "./pruning-deduplication"
-import type { PruningState } from "./pruning-types"
 import { executeDeduplication } from "./pruning-deduplication"
 import { truncateToolOutputsByCallId } from "./pruning-tool-output-truncation"
-import { log } from "../../shared/logger"
+import type { PruningState } from "./pruning-types"
+import type { ParsedTokenLimitError } from "./types"
 
 type OpencodeClient = PluginInput["client"]
 

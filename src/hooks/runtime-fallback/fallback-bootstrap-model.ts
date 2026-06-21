@@ -1,6 +1,6 @@
 import type { MatrixxConfig } from "../../config"
-import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { HOOK_NAME } from "./constants"
 import { SessionCategoryRegistry } from "./session-category-registry"
 
 type ResolveFallbackBootstrapModelOptions = {

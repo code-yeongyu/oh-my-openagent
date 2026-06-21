@@ -1,7 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-
-import { findNearestMessageWithFields } from "../../features/hook-message-injector"
-import { findNearestMessageWithFieldsFromSDK } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findNearestMessageWithFieldsFromSDK } from "../../features/hook-message-injector"
 import { getMessageDir, isSqliteBackend } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]

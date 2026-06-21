@@ -1,4 +1,4 @@
-import { relative, resolve, isAbsolute } from "node:path"
+import { isAbsolute, relative, resolve } from "node:path"
 
 import { ALLOWED_EXTENSIONS } from "./constants"
 

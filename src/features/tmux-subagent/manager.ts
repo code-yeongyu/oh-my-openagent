@@ -1,17 +1,18 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
-import type { TrackedSession, CapacityConfig } from "./types"
 import { log, normalizeSDKResponse } from "../../shared"
 import {
-  isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
+  isInsideTmux as defaultIsInsideTmux,
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
+import { executeAction, executeActions } from "./action-executor"
+import { decideCloseAction, decideSpawnActions, type SessionMapping } from "./decision-engine"
 import { queryWindowState } from "./pane-state-querier"
-import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
-import { executeActions, executeAction } from "./action-executor"
 import { TmuxPollingManager } from "./polling-manager"
+import type { CapacityConfig, TrackedSession } from "./types"
+
 type OpencodeClient = PluginInput["client"]
 
 interface SessionCreatedEvent {

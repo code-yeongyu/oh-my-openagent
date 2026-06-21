@@ -1,13 +1,13 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import {
+  type AvailableAgent,
+  type AvailableCategory,
+  type AvailableSkill,
   buildCategorySkillsDelegationGuide,
   buildUltraworkSection,
   formatCustomSkillsBlock,
-  type AvailableSkill,
-  type AvailableCategory,
-  type AvailableAgent,
 } from "./dynamic-agent-prompt-builder"
 
 describe("buildCategorySkillsDelegationGuide", () => {

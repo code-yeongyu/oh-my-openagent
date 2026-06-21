@@ -1,4 +1,4 @@
-import type { SkillsConfig, SkillDefinition } from "../../../config/schema"
+import type { SkillDefinition, SkillsConfig } from "../../../config/schema"
 
 export function normalizeSkillsConfig(config: SkillsConfig | undefined): {
   sources: Array<string | { path: string; recursive?: boolean; glob?: string }>

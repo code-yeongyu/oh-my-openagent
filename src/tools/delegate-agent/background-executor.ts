@@ -1,11 +1,11 @@
-import type { DelegateAgentArgs } from "./types"
-import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
-import { resolveMessageContext } from "../../features/hook-message-injector"
+import type { BackgroundManager } from "../../features/background-agent"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import { getMessageDir } from "./message-dir"
+import { resolveMessageContext } from "../../features/hook-message-injector"
+import { log } from "../../shared"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { getMessageDir } from "./message-dir"
+import type { DelegateAgentArgs } from "./types"
 
 export async function executeBackground(
   args: DelegateAgentArgs,

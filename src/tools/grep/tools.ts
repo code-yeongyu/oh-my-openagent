@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { runRg } from "./cli"
 import { formatGrepResult } from "./result-formatter"
 

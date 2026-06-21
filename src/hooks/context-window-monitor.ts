@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
-import { updateTokenCache, clearTokenCache } from "../shared/token-cache"
+import { clearTokenCache, updateTokenCache } from "../shared/token-cache"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const ANTHROPIC_ACTUAL_LIMIT =

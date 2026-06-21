@@ -1,6 +1,6 @@
-import type { InteractiveBashSessionState } from "./types";
-import { loadInteractiveBashSessionState } from "./storage";
 import { MATRIXX_SESSION_PREFIX } from "./constants";
+import { loadInteractiveBashSessionState } from "./storage";
+import type { InteractiveBashSessionState } from "./types";
 
 export function getOrCreateState(sessionID: string, sessionStates: Map<string, InteractiveBashSessionState>): InteractiveBashSessionState {
   if (!sessionStates.has(sessionID)) {

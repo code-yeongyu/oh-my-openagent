@@ -1,8 +1,8 @@
 import { createBuiltinSkills } from "../builtin-skills/skills"
-import type { LoadedSkill } from "./types"
-import type { SkillResolutionOptions } from "./skill-resolution-options"
-import { getAllSkills } from "./skill-discovery"
 import { extractSkillTemplate } from "./loaded-skill-template-extractor"
+import { getAllSkills } from "./skill-discovery"
+import type { SkillResolutionOptions } from "./skill-resolution-options"
+import type { LoadedSkill } from "./types"
 
 export function resolveSkillContent(skillName: string, options?: SkillResolutionOptions): string | null {
 	const skills = createBuiltinSkills({

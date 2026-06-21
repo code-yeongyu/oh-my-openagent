@@ -1,10 +1,10 @@
 import { log } from "../../../shared/logger"
 import type { UpdateCheckResult } from "../types"
 import { extractChannel } from "../version-channel"
-import { isLocalDevMode } from "./local-dev-path"
-import { findPluginEntry } from "./plugin-entry"
 import { getCachedVersion } from "./cached-version"
 import { getLatestVersion } from "./latest-version"
+import { isLocalDevMode } from "./local-dev-path"
+import { findPluginEntry } from "./plugin-entry"
 
 export async function checkForUpdate(directory: string): Promise<UpdateCheckResult> {
   if (isLocalDevMode(directory)) {

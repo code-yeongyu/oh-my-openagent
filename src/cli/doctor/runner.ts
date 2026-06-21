@@ -1,7 +1,7 @@
-import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./types"
-import { getAllCheckDefinitions, gatherSystemInfo, gatherToolsSummary } from "./checks"
+import { gatherSystemInfo, gatherToolsSummary, getAllCheckDefinitions } from "./checks"
 import { EXIT_CODES } from "./constants"
 import { formatDoctorOutput, formatJsonOutput } from "./formatter"
+import type { CheckDefinition, CheckResult, DoctorOptions, DoctorResult, DoctorSummary } from "./types"
 
 export async function runCheck(check: CheckDefinition): Promise<CheckResult> {
   const start = performance.now()

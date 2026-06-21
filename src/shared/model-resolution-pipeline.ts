@@ -1,5 +1,5 @@
-import { log } from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { log } from "./logger"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 

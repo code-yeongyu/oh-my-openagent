@@ -1,7 +1,7 @@
-import type { HookDeps } from "./types"
-import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { HOOK_NAME } from "./constants"
 import { createFallbackState } from "./fallback-state"
+import type { HookDeps } from "./types"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps

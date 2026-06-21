@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "bun:test"
-import { mkdirSync, writeFileSync, symlinkSync, rmSync } from "fs"
-import { join } from "path"
+import { afterAll, beforeAll, describe, expect, it } from "bun:test"
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
-import { resolveSymlink, resolveSymlinkAsync, isSymbolicLink } from "./file-utils"
+import { join } from "path"
+import { isSymbolicLink, resolveSymlink, resolveSymlinkAsync } from "./file-utils"
 
 const testDir = join(tmpdir(), "file-utils-test-" + Date.now())
 

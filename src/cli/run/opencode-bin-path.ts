@@ -1,5 +1,5 @@
-import { delimiter, dirname } from "node:path"
 import { createRequire } from "node:module"
+import { delimiter, dirname } from "node:path"
 
 type EnvLike = Record<string, string | undefined>
 

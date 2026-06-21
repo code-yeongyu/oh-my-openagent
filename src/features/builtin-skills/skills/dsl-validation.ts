@@ -27,7 +27,7 @@ export const dslValidationSkill: BuiltinSkill = {
 from textx import get_location, TextXSemanticError
 
 def validate_entity(entity):
-    \"\"\"Validate an Entity model element.\"\"\"
+    """Validate an Entity model element."""
     # Rule 1: Entity must have at least one attribute
     if len(entity.attrs) == 0:
         raise TextXSemanticError(
@@ -51,7 +51,7 @@ mm.register_obj_processors({'Entity': validate_entity})
 
 \`\`\`python
 def validate_model(model):
-    \"\"\"Model-level validation — runs after all elements are parsed.\"\"\"
+    """Model-level validation — runs after all elements are parsed."""
     # Global uniqueness of entity names
     names = [e.name for e in model.entities]
     if len(names) != len(set(names)):
@@ -136,7 +136,7 @@ invariants = [
 
 \`\`\`python
 def check_multiplicity(element, feature_name, min_count, max_count=-1):
-    \"\"\"Validate collection size against multiplicity constraints.\"\"\"
+    """Validate collection size against multiplicity constraints."""
     collection = getattr(element, feature_name, [])
     count = len(collection) if isinstance(collection, list) else (1 if collection else 0)
 
@@ -160,7 +160,7 @@ check_multiplicity(function, 'params', min_count=0, max_count=10)  # 0..10
 
 \`\`\`python
 def check_referential_integrity(model):
-    \"\"\"Ensure all cross-references point to valid targets.\"\"\"
+    """Ensure all cross-references point to valid targets."""
     errors = []
 
     # Collect all named elements
@@ -196,7 +196,7 @@ TYPE_HIERARCHY = {
 }
 
 def is_type_compatible(target_type, source_type):
-    \"\"\"Check if source_type can be assigned to target_type.\"\"\"
+    """Check if source_type can be assigned to target_type."""
     compatible = TYPE_HIERARCHY.get(target_type, set())
     return source_type in compatible
 
@@ -213,7 +213,7 @@ def validate_assignment(assignment):
 
 \`\`\`python
 def detect_cycle(start, get_next):
-    \"\"\"Generic cycle detection using DFS.\"\"\"
+    """Generic cycle detection using DFS."""
     visited = set()
     path = []
 

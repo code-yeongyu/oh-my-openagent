@@ -1,5 +1,5 @@
+import type { AgentOverrides, BrowserAutomationProvider, CategoriesConfig } from "../../config/schema"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type { OpencodeClient } from "./types"
 
 export interface ExecutorContext {

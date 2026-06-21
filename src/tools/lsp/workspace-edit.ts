@@ -12,7 +12,7 @@ export interface ApplyResult {
 
 function applyTextEditsToFile(filePath: string, edits: TextEdit[]): { success: boolean; editCount: number; error?: string } {
   try {
-    let content = readFileSync(filePath, "utf-8")
+    const content = readFileSync(filePath, "utf-8")
     const lines = content.split("\n")
 
     const sortedEdits = [...edits].sort((a, b) => {

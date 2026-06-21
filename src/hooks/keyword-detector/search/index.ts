@@ -1,1 +1,1 @@
-export { SEARCH_PATTERN, SEARCH_MESSAGE } from "./default"
+export { SEARCH_MESSAGE, SEARCH_PATTERN } from "./default"

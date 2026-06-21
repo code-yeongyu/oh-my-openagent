@@ -1,7 +1,7 @@
-import { existsSync, appendFileSync } from "fs"
-import { join } from "path"
-import { homedir, tmpdir } from "os"
+import { appendFileSync, existsSync } from "fs"
 import { createRequire } from "module"
+import { homedir, tmpdir } from "os"
+import { join } from "path"
 import {
   cleanupArchive,
   downloadArchive,

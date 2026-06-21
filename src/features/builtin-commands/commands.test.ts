@@ -1,8 +1,8 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
+import { END_ULTRAWORK_TEMPLATE } from "./templates/end-ultrawork"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
-import { END_ULTRAWORK_TEMPLATE } from "./templates/end-ultrawork"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {

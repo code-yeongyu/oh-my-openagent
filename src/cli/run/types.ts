@@ -1,4 +1,5 @@
 import type { OpencodeClient } from "@opencode-ai/sdk"
+
 export type { OpencodeClient }
 
 export interface RunOptions {

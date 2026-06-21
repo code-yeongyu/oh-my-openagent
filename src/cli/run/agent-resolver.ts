@@ -1,7 +1,7 @@
 import pc from "picocolors"
-import type { RunOptions } from "./types"
 import type { MatrixxConfig } from "../../config"
 import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
+import type { RunOptions } from "./types"
 
 const CORE_AGENT_ORDER = ["morpheus", "keymaker", "oracle", "architect"] as const
 const DEFAULT_AGENT = "morpheus"

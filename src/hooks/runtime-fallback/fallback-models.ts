@@ -1,9 +1,9 @@
 import type { MatrixxConfig } from "../../config"
+import { log } from "../../shared/logger"
 import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
+import { flattenToFallbackModelStrings, normalizeFallbackModels } from "./model-utils"
 import { SessionCategoryRegistry } from "./session-category-registry"
-import { normalizeFallbackModels, flattenToFallbackModelStrings } from "./model-utils"
 
 export function getFallbackModelsForSession(
   sessionID: string,

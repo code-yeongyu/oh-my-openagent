@@ -1,11 +1,11 @@
-import type { MatrixLoopOptions, MatrixLoopState } from "./types"
+import { log } from "../../shared/logger"
 import {
 	DEFAULT_COMPLETION_PROMISE,
 	DEFAULT_MAX_ITERATIONS,
 	HOOK_NAME,
 } from "./constants"
 import { clearState, incrementIteration, readState, writeState } from "./storage"
-import { log } from "../../shared/logger"
+import type { MatrixLoopOptions, MatrixLoopState } from "./types"
 
 export function createLoopStateController(options: {
 	directory: string

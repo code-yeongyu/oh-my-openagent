@@ -5,8 +5,8 @@ import {
   PROJECT_RULE_SUBDIRS,
   USER_RULE_DIR,
 } from "./constants";
-import type { RuleFileCandidate } from "./types";
 import { findRuleFilesRecursive, safeRealpathSync } from "./rule-file-scanner";
+import type { RuleFileCandidate } from "./types";
 
 /**
  * Find all rule files for a given context.

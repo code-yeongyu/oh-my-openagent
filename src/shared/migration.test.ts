@@ -1,15 +1,15 @@
-import { describe, test, expect, afterEach } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import * as fs from "fs"
 import * as path from "path"
 import {
   AGENT_NAME_MAP,
   HOOK_NAME_MAP,
   MODEL_VERSION_MAP,
+  migrateAgentConfigToCategory,
   migrateAgentNames,
+  migrateConfigFile,
   migrateHookNames,
   migrateModelVersions,
-  migrateConfigFile,
-  migrateAgentConfigToCategory,
   shouldDeleteAgentConfig,
 } from "./migration"
 

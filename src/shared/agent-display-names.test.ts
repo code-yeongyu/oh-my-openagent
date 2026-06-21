@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import { AGENT_DISPLAY_NAMES, getAgentDisplayName } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {

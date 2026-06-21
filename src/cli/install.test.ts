@@ -1,9 +1,9 @@
-import { describe, expect, test, mock, beforeEach, afterEach, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { install } from "./install"
 import * as configManager from "./config-manager"
+import { install } from "./install"
 import type { InstallArgs } from "./types"
 
 // Mock console methods to capture output

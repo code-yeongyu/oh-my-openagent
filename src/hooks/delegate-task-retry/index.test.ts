@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 import {
+  buildRetryGuidance,
   DELEGATE_TASK_ERROR_PATTERNS,
   detectDelegateTaskError,
-  buildRetryGuidance,
 } from "./index"
 
 describe("morpheus-task-retry", () => {

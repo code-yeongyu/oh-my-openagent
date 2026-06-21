@@ -1,7 +1,4 @@
 export * from "./detector"
-export * from "./switcher"
-export * from "./types"
-
 export {
   _getThinkModeStateSizeForTesting,
   _resetThinkModeStateForTesting,
@@ -10,3 +7,5 @@ export {
   getThinkModeState,
   setThinkModeState,
 } from "./hook"
+export * from "./switcher"
+export * from "./types"

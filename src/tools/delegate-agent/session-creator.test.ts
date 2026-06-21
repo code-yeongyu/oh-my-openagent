@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
-
-import { createOrGetSession } from "./session-creator"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { createOrGetSession } from "./session-creator"
 
 describe("delegate-agent createOrGetSession", () => {
   test("creates child session without overriding permission and tracks it as subagent session", async () => {

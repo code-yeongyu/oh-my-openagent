@@ -1,6 +1,6 @@
-import { describe, it, expect } from "bun:test"
-import { parseLineRef, validateLineRef, normalizeLineRef } from "./validation"
+import { describe, expect, it } from "bun:test"
 import { computeLineHash } from "./hash-computation"
+import { normalizeLineRef, parseLineRef, validateLineRef } from "./validation"
 
 describe("parseLineRef", () => {
   it("parses valid LINE#ID reference", () => {

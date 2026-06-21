@@ -1,11 +1,11 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { MessageData } from "./types"
-import { findMessagesWithThinkingBlocks, stripThinkingParts } from "./storage"
-import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { stripThinkingPartsAsync } from "./storage/thinking-strip"
-import { THINKING_TYPES } from "./constants"
-import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { log } from "../../shared/logger"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { THINKING_TYPES } from "./constants"
+import { findMessagesWithThinkingBlocks, stripThinkingParts } from "./storage"
+import { stripThinkingPartsAsync } from "./storage/thinking-strip"
+import type { MessageData } from "./types"
 
 type Client = ReturnType<typeof createOpencodeClient>
 

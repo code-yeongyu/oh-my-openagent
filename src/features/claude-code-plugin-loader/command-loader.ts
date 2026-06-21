@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { basename, join } from "path"
-import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { sanitizeModelField } from "../../shared/model-sanitizer"
+import { parseFrontmatter } from "../../shared/frontmatter"
 import { log } from "../../shared/logger"
+import { sanitizeModelField } from "../../shared/model-sanitizer"
 import type { CommandDefinition, CommandFrontmatter } from "../claude-code-command-loader/types"
 import type { LoadedPlugin } from "./types"
 

@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test"
-import { createSessionManagerTools } from "./tools"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { createSessionManagerTools } from "./tools"
 
 const projectDir = "/Users/yeongyu/local-workspaces/matrixx"
 

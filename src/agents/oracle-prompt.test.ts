@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { ORACLE_SYSTEM_PROMPT } from "./oracle"
 
 describe("ORACLE_SYSTEM_PROMPT Smith invocation policy", () => {

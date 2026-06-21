@@ -1,4 +1,4 @@
-import { THINKING_TYPES, META_TYPES } from "../constants"
+import { META_TYPES, THINKING_TYPES } from "../constants"
 import type { StoredPart, StoredTextPart } from "../types"
 import { readParts } from "./parts-reader"
 

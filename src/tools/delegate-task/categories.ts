@@ -1,9 +1,9 @@
-import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
-import { resolveModel } from "../../shared/model-resolver"
+import type { CategoriesConfig, CategoryConfig } from "../../config/schema"
+import { log } from "../../shared/logger"
 import { isModelAvailable } from "../../shared/model-availability"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { log } from "../../shared/logger"
+import { resolveModel } from "../../shared/model-resolver"
+import { CATEGORY_PROMPT_APPENDS, DEFAULT_CATEGORIES } from "./constants"
 
 export interface ResolveCategoryConfigOptions {
   userCategories?: CategoriesConfig

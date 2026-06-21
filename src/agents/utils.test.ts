@@ -1,12 +1,12 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
-import { createBuiltinAgents } from "./builtin-agents"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
+import * as shared from "../shared"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import * as modelAvailability from "../shared/model-availability"
-import * as shared from "../shared"
+import { createBuiltinAgents } from "./builtin-agents"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-6"
 

@@ -1,16 +1,14 @@
-import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { MatrixxConfig } from "./config"
-
-import { createChatParamsHandler } from "./plugin/chat-params"
-import { createChatMessageHandler } from "./plugin/chat-message"
-import { createMessagesTransformHandler } from "./plugin/messages-transform"
-import { createEventHandler } from "./plugin/event"
-import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
-import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
-import { createToolDefinitionHandler } from "./plugin/tool-definition"
-
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
+import { createChatMessageHandler } from "./plugin/chat-message"
+import { createChatParamsHandler } from "./plugin/chat-params"
+import { createEventHandler } from "./plugin/event"
+import { createMessagesTransformHandler } from "./plugin/messages-transform"
+import { createToolDefinitionHandler } from "./plugin/tool-definition"
+import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
+import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 
 export function createPluginInterface(args: {
   ctx: PluginContext

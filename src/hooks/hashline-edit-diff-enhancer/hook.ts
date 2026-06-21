@@ -1,5 +1,5 @@
 import { log } from "../../shared"
-import { generateUnifiedDiff, countLineDiffs } from "../../tools/hashline-edit/diff-utils"
+import { countLineDiffs, generateUnifiedDiff } from "../../tools/hashline-edit/diff-utils"
 
 interface HashlineEditDiffEnhancerConfig {
   hashline_edit?: { enabled: boolean }

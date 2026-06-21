@@ -1,9 +1,9 @@
 import type { TmuxConfig } from "../../config/schema"
-import type { TrackedSession } from "./types"
 import { log } from "../../shared"
-import { queryWindowState } from "./pane-state-querier"
-import { decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeAction } from "./action-executor"
+import { decideCloseAction, type SessionMapping } from "./decision-engine"
+import { queryWindowState } from "./pane-state-querier"
+import type { TrackedSession } from "./types"
 
 export interface SessionDeletedHandlerDeps {
   tmuxConfig: TmuxConfig

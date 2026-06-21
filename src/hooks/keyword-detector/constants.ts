@@ -1,13 +1,12 @@
 export { CODE_BLOCK_PATTERN, INLINE_CODE_PATTERN } from "../../shared"
-
+export { ANALYZE_MESSAGE, ANALYZE_PATTERN } from "./analyze"
+export { SEARCH_MESSAGE, SEARCH_PATTERN } from "./search"
 // Re-export from submodules
-export { isPlannerAgent, getUltraworkMessage } from "./ultrawork"
-export { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
-export { ANALYZE_PATTERN, ANALYZE_MESSAGE } from "./analyze"
+export { getUltraworkMessage, isPlannerAgent } from "./ultrawork"
 
+import { ANALYZE_MESSAGE, ANALYZE_PATTERN } from "./analyze"
+import { SEARCH_MESSAGE, SEARCH_PATTERN } from "./search"
 import { getUltraworkMessage } from "./ultrawork"
-import { SEARCH_PATTERN, SEARCH_MESSAGE } from "./search"
-import { ANALYZE_PATTERN, ANALYZE_MESSAGE } from "./analyze"
 
 export type KeywordDetector = {
   pattern: RegExp

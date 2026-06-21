@@ -1,10 +1,10 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
-import { join, basename } from "path"
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { parseFrontmatter } from "../../shared/frontmatter"
-import { isMarkdownFile } from "../../shared/file-utils"
+import { existsSync, readdirSync, readFileSync } from "fs"
+import { basename, join } from "path"
 import { getClaudeConfigDir } from "../../shared"
-import type { AgentScope, AgentFrontmatter, LoadedAgent } from "./types"
+import { isMarkdownFile } from "../../shared/file-utils"
+import { parseFrontmatter } from "../../shared/frontmatter"
+import type { AgentFrontmatter, AgentScope, LoadedAgent } from "./types"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
@@ -60,7 +60,6 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
         scope,
       })
     } catch {
-      continue
     }
   }
 

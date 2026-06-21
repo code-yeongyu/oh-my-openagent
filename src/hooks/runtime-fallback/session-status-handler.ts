@@ -1,13 +1,13 @@
-import type { HookDeps } from "./types"
+import { log } from "../../shared/logger"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
-import { log } from "../../shared/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
-import { getFallbackModelsForSession } from "./fallback-models"
-import { normalizeRetryStatusMessage, extractRetryAttempt } from "./retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { getFallbackModelsForSession } from "./fallback-models"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { createFallbackState } from "./fallback-state"
+import { extractRetryAttempt, normalizeRetryStatusMessage } from "./retry-status-utils"
+import type { HookDeps } from "./types"
 
 export function createSessionStatusHandler(
   deps: HookDeps,

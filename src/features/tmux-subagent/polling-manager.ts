@@ -1,9 +1,7 @@
+import { log, normalizeSDKResponse } from "../../shared"
+import { POLL_INTERVAL_BACKGROUND_MS, SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
 import type { OpencodeClient } from "../../tools/delegate-task/types"
-import { POLL_INTERVAL_BACKGROUND_MS } from "../../shared/tmux"
 import type { TrackedSession } from "./types"
-import { SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
-import { log } from "../../shared"
-import { normalizeSDKResponse } from "../../shared"
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000

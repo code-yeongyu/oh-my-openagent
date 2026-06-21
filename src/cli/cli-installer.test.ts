@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
-import * as configManager from "./config-manager"
 import { runCliInstaller } from "./cli-installer"
+import * as configManager from "./config-manager"
 import type { InstallArgs } from "./types"
 
 describe("runCliInstaller", () => {

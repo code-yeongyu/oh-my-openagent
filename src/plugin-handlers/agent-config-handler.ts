@@ -1,8 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createMouseAgentWithOverrides } from "../agents/mouse";
 import type { MatrixxConfig } from "../config";
-import { log, migrateAgentConfig } from "../shared";
-import { AGENT_NAME_MAP } from "../shared/migration";
+import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
 import {
   discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
@@ -10,11 +9,12 @@ import {
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
-import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
-import type { PluginComponents } from "./plugin-components-loader";
+import { log, migrateAgentConfig } from "../shared";
+import { AGENT_NAME_MAP } from "../shared/migration";
 import { reorderAgentsByPriority } from "./agent-priority-order";
-import { buildOracleAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
+import type { PluginComponents } from "./plugin-components-loader";
+import { buildOracleAgentConfig } from "./prometheus-agent-config-builder";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;

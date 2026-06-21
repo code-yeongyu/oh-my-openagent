@@ -4,35 +4,33 @@ import type {
   AvailableCategory,
 } from "../agents/dynamic-agent-prompt-builder"
 import type { MatrixxConfig } from "../config"
-import type { PluginContext, ToolsRecord } from "./types"
-
+import type { Managers } from "../create-managers"
+import { getMainSessionID } from "../features/claude-code-session-state"
+import { log } from "../shared"
+import { filterDisabledTools } from "../shared/disabled-tools"
 import {
   builtinTools,
+  createAstGrepTools,
   createBackgroundTools,
   createDelegateAgent,
-  createLookAt,
-  createSkillTool,
-  createSkillMcpTool,
-  createSlashcommandTool,
-  createGrepTools,
-  createGlobTools,
-  createAstGrepTools,
-  createSessionManagerTools,
   createDelegateTask,
-  discoverCommandsSync,
-  interactive_bash,
+  createGlobTools,
+  createGrepTools,
+  createHashlineEditTool,
+  createLookAt,
+  createSessionManagerTools,
+  createSkillMcpTool,
+  createSkillTool,
+  createSlashcommandTool,
   createTaskCreateTool,
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
-  createHashlineEditTool,
+  discoverCommandsSync,
+  interactive_bash,
 } from "../tools"
-import { getMainSessionID } from "../features/claude-code-session-state"
-import { filterDisabledTools } from "../shared/disabled-tools"
-import { log } from "../shared"
-
-import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
+import type { PluginContext, ToolsRecord } from "./types"
 
 export type ToolRegistryResult = {
   filteredTools: ToolsRecord

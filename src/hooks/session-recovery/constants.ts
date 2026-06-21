@@ -1,4 +1,4 @@
-export { OPENCODE_STORAGE, MESSAGE_STORAGE, PART_STORAGE } from "../../shared"
+export { MESSAGE_STORAGE, OPENCODE_STORAGE, PART_STORAGE } from "../../shared"
 
 export const THINKING_TYPES = new Set(["thinking", "redacted_thinking", "reasoning"])
 export const META_TYPES = new Set(["step-start", "step-finish"])

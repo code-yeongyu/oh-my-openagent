@@ -11,8 +11,8 @@ import {
   extractPromptText,
   findMostRecentPlanFile,
   hasPhaseTransition,
-  planHasConstruct,
   type MessagePart,
+  planHasConstruct,
 } from "./phase-detector"
 
 type ChatMessageInput = {

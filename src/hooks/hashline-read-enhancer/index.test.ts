@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "bun:test"
-import { createHashlineReadEnhancerHook } from "./hook"
+import { beforeEach, describe, expect, it } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createHashlineReadEnhancerHook } from "./hook"
 
 //#given - Test setup helpers
 function createMockContext(): PluginInput {
@@ -127,7 +127,7 @@ describe("createHashlineReadEnhancerHook", () => {
       //#then
       const lines = output.output.split("\n")
       expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|function hello\(\) \{$/)
-      expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|  console\.log\('world'\)$/)
+      expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\| {2}console\.log\('world'\)$/)
       expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}\|\}$/)
     })
 

@@ -1,10 +1,9 @@
-import type { DelegateAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
-import { getAgentToolRestrictions } from "../../shared"
-import { createOrGetSession } from "./session-creator"
+import { getAgentToolRestrictions, log } from "../../shared"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
+import { createOrGetSession } from "./session-creator"
+import type { DelegateAgentArgs } from "./types"
 
 type ExecuteSyncDeps = {
   createOrGetSession: typeof createOrGetSession

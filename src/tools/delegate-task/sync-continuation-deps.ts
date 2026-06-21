@@ -1,5 +1,5 @@
-import { pollSyncSession } from "./sync-session-poller"
 import { fetchSyncResult } from "./sync-result-fetcher"
+import { pollSyncSession } from "./sync-session-poller"
 
 export const syncContinuationDeps = {
   pollSyncSession,

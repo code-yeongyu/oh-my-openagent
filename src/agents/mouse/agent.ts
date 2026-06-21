@@ -10,13 +10,13 @@
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode } from "../types"
-import { isGptModel, isAnthropicModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
 } from "../../shared/permission-compat"
+import type { AgentMode } from "../types"
+import { isAnthropicModel, isGptModel } from "../types"
 
 import { buildDefaultMousePrompt } from "./default"
 import { buildGptMousePrompt } from "./gpt"

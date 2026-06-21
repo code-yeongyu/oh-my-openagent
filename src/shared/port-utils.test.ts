@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from "bun:test"
+import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import {
-  isPortAvailable,
+  DEFAULT_SERVER_PORT,
   findAvailablePort,
   getAvailableServerPort,
-  DEFAULT_SERVER_PORT,
+  isPortAvailable,
 } from "./port-utils"
 
 describe("port-utils", () => {

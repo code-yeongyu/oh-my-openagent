@@ -2,12 +2,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-
-import type { ImageDimensions, ResizeResult } from "./types"
-import * as imageDimensions from "./image-dimensions"
-import * as imageResizer from "./image-resizer"
 import * as sessionModelState from "../../shared/session-model-state"
 import { createReadImageResizerHook } from "./hook"
+import * as imageDimensions from "./image-dimensions"
+import * as imageResizer from "./image-resizer"
+import type { ImageDimensions, ResizeResult } from "./types"
 
 const mockParseImageDimensions = mock((): ImageDimensions | null => null)
 const mockCalculateTargetDimensions = mock((): ImageDimensions | null => null)

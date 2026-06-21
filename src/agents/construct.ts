@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolAllowlist } from "../shared/permission-compat"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 
 const MODE: AgentMode = "subagent"
 

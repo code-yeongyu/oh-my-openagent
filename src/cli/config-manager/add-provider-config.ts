@@ -1,13 +1,13 @@
-import { readFileSync, writeFileSync, copyFileSync } from "node:fs"
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs"
+import { parseJsonc } from "../../shared/jsonc-parser"
 import type { ConfigMergeResult, InstallConfig } from "../types"
+import { ANTIGRAVITY_PROVIDER_CONFIG } from "./antigravity-provider-configuration"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
-import { detectConfigFormat } from "./opencode-config-format"
-import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
-import { ANTIGRAVITY_PROVIDER_CONFIG } from "./antigravity-provider-configuration"
 import { modifyProviderInJsonc } from "./jsonc-provider-editor"
-import { parseJsonc } from "../../shared/jsonc-parser"
+import { detectConfigFormat } from "./opencode-config-format"
+import { type OpenCodeConfig, parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 
 export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   try {

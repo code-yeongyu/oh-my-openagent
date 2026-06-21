@@ -1,12 +1,12 @@
-import { join } from "path"
 import { homedir } from "os"
+import { join } from "path"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
-import type { LoadedSkill } from "./types"
-import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
 import { deduplicateSkillsByName } from "./skill-deduplication"
+import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
 import { loadSkillsFromDir } from "./skill-directory-loader"
+import type { LoadedSkill } from "./types"
 
 export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {
   const userSkillsDir = join(getClaudeConfigDir(), "skills")

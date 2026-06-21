@@ -1,11 +1,11 @@
 import type { MatrixxConfig } from "../config"
 import type { ContextLimitModelCacheState } from "../shared/context-limit-resolver"
-import { updateTokenCache, clearTokenCache } from "../shared/token-cache"
-import { runPreemptiveCompactionIfNeeded } from "./preemptive-compaction-trigger"
+import { clearTokenCache, updateTokenCache } from "../shared/token-cache"
 import {
-  createPostCompactionDegradationMonitor,
   type AssistantCompactionMessageInfo,
+  createPostCompactionDegradationMonitor,
 } from "./preemptive-compaction-degradation-monitor"
+import { runPreemptiveCompactionIfNeeded } from "./preemptive-compaction-trigger"
 import type {
   CachedCompactionState,
   PreemptiveCompactionContext,

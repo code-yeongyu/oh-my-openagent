@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { isServerInstalled } from "./config"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "fs"
-import { join } from "path"
 import { tmpdir } from "os"
+import { join } from "path"
+import { isServerInstalled } from "./config"
 
 describe("isServerInstalled", () => {
   let tempDir: string

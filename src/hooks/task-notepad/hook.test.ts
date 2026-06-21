@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import {
   existsSync,
   mkdirSync,
@@ -10,10 +10,9 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
+import { HOOK_NAME, NOTEPAD_DIR_NAME, PLAN_DIR_NAME, TASK_NOTEPAD_FRAGMENT } from "./constants"
 import { createTaskNotepadHook } from "./hook"
 import type { TaskNotepadContext } from "./types"
-import { HOOK_NAME, PLAN_DIR_NAME, NOTEPAD_DIR_NAME, TASK_NOTEPAD_FRAGMENT } from "./constants"
 
 interface TodoFixture {
   id: string

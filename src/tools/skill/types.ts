@@ -1,4 +1,4 @@
-import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-loader/types"
+import type { LoadedSkill, SkillScope } from "../../features/opencode-skill-loader/types"
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
 export interface SkillArgs {
   name: string

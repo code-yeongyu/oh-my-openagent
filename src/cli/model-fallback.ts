@@ -2,10 +2,6 @@ import {
 	AGENT_MODEL_REQUIREMENTS,
 	CATEGORY_MODEL_REQUIREMENTS,
 } from "../shared/model-requirements"
-import type { InstallConfig } from "./types"
-
-import type { AgentConfig, CategoryConfig, GeneratedMatrixxConfig } from "./model-fallback-types"
-import { toProviderAvailability } from "./provider-availability"
 import {
 	getMorpheusFallbackChain,
 	isAnyFallbackEntryAvailable,
@@ -13,6 +9,10 @@ import {
 	isRequiredProviderAvailable,
 	resolveModelFromChain,
 } from "./fallback-chain-resolution"
+
+import type { AgentConfig, CategoryConfig, GeneratedMatrixxConfig } from "./model-fallback-types"
+import { toProviderAvailability } from "./provider-availability"
+import type { InstallConfig } from "./types"
 
 export type { GeneratedMatrixxConfig } from "./model-fallback-types"
 

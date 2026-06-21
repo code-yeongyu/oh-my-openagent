@@ -1,6 +1,6 @@
 import type { BrowserAutomationProvider } from "../../config/schema"
-import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
+import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 
 export async function resolveSkillContent(
   skills: string[],

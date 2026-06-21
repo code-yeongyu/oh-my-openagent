@@ -1,13 +1,12 @@
-import { describe, expect, it, beforeEach, mock, spyOn } from "bun:test"
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+// Import real shared module to avoid mock leaking to other test files
+import * as shared from "../../shared"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
   CommandExecuteBeforeInput,
   CommandExecuteBeforeOutput,
 } from "./types"
-
-// Import real shared module to avoid mock leaking to other test files
-import * as shared from "../../shared"
 
 // Spy on log instead of mocking the entire module
 const logMock = spyOn(shared, "log").mockImplementation(() => {})

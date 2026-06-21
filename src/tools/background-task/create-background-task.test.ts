@@ -1,8 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, mock } from "bun:test"
-import type { BackgroundManager } from "../../features/background-agent"
+import { describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../../features/background-agent"
 import { createBackgroundTask } from "./create-background-task"
 
 describe("createBackgroundTask", () => {

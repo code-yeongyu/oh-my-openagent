@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { parse, ParseError, printParseErrorCode } from "jsonc-parser"
+import { type ParseError, parse, printParseErrorCode } from "jsonc-parser"
 
 export interface JsoncParseResult<T> {
   data: T | null

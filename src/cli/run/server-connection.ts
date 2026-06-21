@@ -1,9 +1,9 @@
 import { createOpencode, createOpencodeClient } from "@opencode-ai/sdk"
 import pc from "picocolors"
-import type { ServerConnection } from "./types"
-import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
-import { withWorkingOpencodePath } from "./opencode-binary-resolver"
+import { DEFAULT_SERVER_PORT, getAvailableServerPort, isPortAvailable } from "../../shared/port-utils"
 import { prependResolvedOpencodeBinToPath } from "./opencode-bin-path"
+import { withWorkingOpencodePath } from "./opencode-binary-resolver"
+import type { ServerConnection } from "./types"
 
 export async function createServerConnection(options: {
   port?: number

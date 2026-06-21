@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
-
-import { LEGACY_NPM_PACKAGE_NAME, NPM_PACKAGE_NAME } from "../constants"
 import { getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import { LEGACY_NPM_PACKAGE_NAME, NPM_PACKAGE_NAME } from "../constants"
 
 export interface PluginInfo {
   registered: boolean

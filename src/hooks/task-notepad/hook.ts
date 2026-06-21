@@ -9,10 +9,10 @@ import {
   PLAN_DIR_NAME,
   PLAN_EXTENSION,
   PLANS_SUBDIR,
+  TASK_NOTEPAD_FRAGMENT,
   TASKS_SUBDIR,
   TODO_FETCH_ERROR_FRAGMENT,
   TODO_TOOL_NAMES,
-  TASK_NOTEPAD_FRAGMENT,
 } from "./constants"
 import type { PlanFile, TaskNotepadContext, TodoSnapshot } from "./types"
 
@@ -96,7 +96,6 @@ function resolveActivePlan(directory: string): PlanFile | null {
         best = candidate
       }
     } catch {
-      continue
     }
   }
   return best

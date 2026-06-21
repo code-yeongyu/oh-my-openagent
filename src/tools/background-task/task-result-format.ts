@@ -1,8 +1,8 @@
 import type { BackgroundTask } from "../../features/background-agent"
+import { formatDuration } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
-import { formatDuration } from "../../shared"
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""

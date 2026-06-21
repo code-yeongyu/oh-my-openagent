@@ -1,12 +1,12 @@
-import type { DelegateTaskArgs, OpencodeClient } from "./types"
-import { isPlanFamily } from "./constants"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
-import { formatDetailedError } from "./error-formatting"
-import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { isPlanFamily } from "./constants"
+import { formatDetailedError } from "./error-formatting"
+import type { DelegateTaskArgs, OpencodeClient } from "./types"
 
 type SendSyncPromptDeps = {
   promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry

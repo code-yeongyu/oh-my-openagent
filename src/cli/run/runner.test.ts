@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, spyOn, afterEach } from "bun:test"
+import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import type { MatrixxConfig } from "../../config"
 import { resolveRunAgent, waitForEventProcessorShutdown } from "./runner"
 

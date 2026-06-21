@@ -1,17 +1,17 @@
 import pc from "picocolors"
-import type { RunContext, EventPayload } from "./types"
-import type { EventState } from "./event-state"
 import { logEventVerbose } from "./event-formatting"
 import {
+  handleMessagePartUpdated,
+  handleMessageUpdated,
   handleSessionError,
   handleSessionIdle,
   handleSessionStatus,
-  handleMessagePartUpdated,
-  handleMessageUpdated,
   handleToolExecute,
   handleToolResult,
   handleTuiToast,
 } from "./event-handlers"
+import type { EventState } from "./event-state"
+import type { EventPayload, RunContext } from "./types"
 
 export async function processEvents(
   ctx: RunContext,

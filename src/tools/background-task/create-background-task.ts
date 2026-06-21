@@ -1,13 +1,13 @@
-import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
+import { type PluginInput, type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { BackgroundTaskArgs } from "./types"
-import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
-import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { resolveMessageContext } from "../../features/hook-message-injector"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
+import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { getMessageDir } from "./message-dir"
+import type { BackgroundTaskArgs } from "./types"
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -87,7 +87,7 @@ export function createBackgroundTask(
           await delay(WAIT_FOR_SESSION_INTERVAL_MS)
           const updated = manager.getTask(task.id)
           if (!updated || updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
-            return `Task ${!updated ? "was deleted" : `entered error state`}\.\n\nTask ID: ${task.id}`
+            return `Task ${!updated ? "was deleted" : `entered error state`}.\n\nTask ID: ${task.id}`
           }
           sessionId = updated?.sessionID
         }

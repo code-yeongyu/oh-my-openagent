@@ -1,7 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import { existsSync } from "fs"
-import { resolve, isAbsolute, join, normalize, sep } from "path"
+import { isAbsolute, join, normalize, resolve, sep } from "path"
 
 import { log } from "../../shared"
 

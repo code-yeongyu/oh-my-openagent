@@ -1,4 +1,4 @@
-import type { LoadedSkill, LazyContentLoader } from "../../features/opencode-skill-loader"
+import type { LazyContentLoader, LoadedSkill } from "../../features/opencode-skill-loader"
 
 export type CommandScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project"
 

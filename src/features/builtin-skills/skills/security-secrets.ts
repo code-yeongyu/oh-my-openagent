@@ -36,7 +36,7 @@ Manually look for these patterns if automated tools fail:
 - **AWS Keys**: \`AKIA[0-9A-Z]{16}\`
 - **GitHub Tokens**: \`ghp_[a-zA-Z0-9]{36}\`, \`gho_[a-zA-Z0-9]{36}\`, \`ghs_[a-zA-Z0-9]{36}\`
 - **Private Keys**: \`-----BEGIN RSA PRIVATE KEY-----\`, \`-----BEGIN OPENSSH PRIVATE KEY-----\`
-- **JWT Tokens**: \`eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\`
+- **JWT Tokens**: \`eyJ[a-zA-Z0-9_-]*.[a-zA-Z0-9_-]*.[a-zA-Z0-9_-]*\`
 - **Database Connection Strings**: \`postgres://user:pass@host:port/db\`, \`mongodb+srv://...\`
 - **API Keys**: High entropy strings assigned to variables like \`API_KEY\`, \`SECRET\`, \`TOKEN\`, \`PASSWORD\`.
 

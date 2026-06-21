@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "bun:test"
-import type { RunResult } from "./types"
+import { beforeEach, describe, expect, it } from "bun:test"
 import { createJsonOutputManager } from "./json-output"
+import type { RunResult } from "./types"
 
 interface MockWriteStream {
   write: (chunk: string) => boolean

@@ -1,11 +1,11 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentOverrides } from "../types"
 import type { CategoriesConfig, CategoryConfig } from "../../config/schema"
-import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared"
+import { createAtlasAgent } from "../architect"
+import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-builder"
+import type { AgentOverrides } from "../types"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution } from "./model-resolution"
-import { createAtlasAgent } from "../architect"
 
 export function maybeCreateAtlasConfig(input: {
   disabledAgents: string[]

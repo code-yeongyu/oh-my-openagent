@@ -1,5 +1,5 @@
-import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 import { withTimeout } from "./with-timeout"
@@ -36,7 +36,6 @@ export function detectCompletionInTranscript(
 				if (entry.type === "user") continue
 				if (pattern.test(line)) return true
 			} catch {
-				continue
 			}
 		}
 		return false

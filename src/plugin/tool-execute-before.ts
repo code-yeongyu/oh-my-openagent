@@ -1,11 +1,10 @@
-import type { PluginContext } from "./types"
+import type { CreatedHooks } from "../create-hooks"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearMissionState } from "../features/mission-state"
 import { log } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
-
-import type { CreatedHooks } from "../create-hooks"
+import type { PluginContext } from "./types"
 
 // Module-level regex constants for the slashcommand branches. Precompiled
 // once at module load (Task T1.6) so the regex template `.compile()` cost

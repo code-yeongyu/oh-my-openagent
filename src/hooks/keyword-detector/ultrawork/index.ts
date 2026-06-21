@@ -7,16 +7,16 @@
  * 3. Default (Claude, etc.) → default.ts (optimized for Claude series)
  */
 
-export { isPlannerAgent, isGptModel, getUltraworkSource } from "./source-detector"
+export { getDefaultUltraworkMessage, ULTRAWORK_DEFAULT_MESSAGE } from "./default"
+export { getGptUltraworkMessage, ULTRAWORK_GPT_MESSAGE } from "./gpt5.2"
+export { getPlannerUltraworkMessage, ULTRAWORK_PLANNER_SECTION } from "./planner"
 export type { UltraworkSource } from "./source-detector"
-export { ULTRAWORK_PLANNER_SECTION, getPlannerUltraworkMessage } from "./planner"
-export { ULTRAWORK_GPT_MESSAGE, getGptUltraworkMessage } from "./gpt5.2"
-export { ULTRAWORK_DEFAULT_MESSAGE, getDefaultUltraworkMessage } from "./default"
+export { getUltraworkSource, isGptModel, isPlannerAgent } from "./source-detector"
 
-import { getUltraworkSource } from "./source-detector"
-import { getPlannerUltraworkMessage } from "./planner"
-import { getGptUltraworkMessage } from "./gpt5.2"
 import { getDefaultUltraworkMessage } from "./default"
+import { getGptUltraworkMessage } from "./gpt5.2"
+import { getPlannerUltraworkMessage } from "./planner"
+import { getUltraworkSource } from "./source-detector"
 
 /**
  * Gets the appropriate ultrawork message based on agent and model context.

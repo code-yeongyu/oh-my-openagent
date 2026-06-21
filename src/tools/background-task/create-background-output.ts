@@ -1,15 +1,14 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
-import type { BackgroundOutputArgs } from "./types"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
-
-import { getAgentDisplayName } from "../../shared/agent-display-names"
+import type { BackgroundOutputArgs } from "./types"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("mouse")
 

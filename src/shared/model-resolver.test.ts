@@ -1,7 +1,7 @@
-import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
-import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
-import * as logger from "./logger"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import * as logger from "./logger"
+import { type ExtendedModelResolutionInput, type ModelResolutionInput, type ModelResolutionResult, type ModelSource, resolveModel, resolveModelWithFallback } from "./model-resolver"
 
 describe("resolveModel", () => {
   describe("priority chain", () => {

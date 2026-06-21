@@ -1,11 +1,11 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect } from "bun:test"
-import { createBackgroundCancel, createBackgroundOutput } from "./tools"
-import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
+import { describe, expect, test } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
-import { consumeToolMetadata, clearPendingStore } from "../../features/tool-metadata-store"
+import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
+import { clearPendingStore, consumeToolMetadata } from "../../features/tool-metadata-store"
+import type { BackgroundCancelClient, BackgroundOutputClient, BackgroundOutputManager } from "./tools"
+import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 
 const projectDir = "/Users/yeongyu/local-workspaces/matrixx"
 

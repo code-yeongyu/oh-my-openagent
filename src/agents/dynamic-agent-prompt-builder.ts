@@ -1,5 +1,5 @@
-import type { AgentPromptMetadata } from "./types"
 import { truncateDescription } from "../shared/truncate-description"
+import type { AgentPromptMetadata } from "./types"
 
 export interface AvailableAgent {
   name: string

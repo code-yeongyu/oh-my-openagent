@@ -1,9 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
-import { resolveSessionDirectory } from "../../shared"
 import { subagentSessions } from "../../features/claude-code-session-state"
-import type { DelegateAgentArgs } from "./types"
+import { log, resolveSessionDirectory } from "../../shared"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
+import type { DelegateAgentArgs } from "./types"
 
 export async function resolveOrCreateSessionId(
 	ctx: PluginInput,

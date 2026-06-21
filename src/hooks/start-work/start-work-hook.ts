@@ -1,16 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { updateSessionAgent } from "../../features/claude-code-session-state"
 import {
+  appendSessionId,
+  clearMissionState,
+  createMissionState,
+  findOraclePlans,
+  getPlanName,
+  getPlanProgress,
   readMissionState,
   writeMissionState,
-  appendSessionId,
-  findOraclePlans,
-  getPlanProgress,
-  createMissionState,
-  getPlanName,
-  clearMissionState,
 } from "../../features/mission-state"
 import { log } from "../../shared/logger"
-import { updateSessionAgent } from "../../features/claude-code-session-state"
 
 export const HOOK_NAME = "start-work" as const
 

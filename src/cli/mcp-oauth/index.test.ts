@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test"
-import { Command } from "commander"
+import { describe, expect, it } from "bun:test"
+import type { Command } from "commander"
 import { createMcpOAuthCommand } from "./index"
 
 describe("mcp oauth command", () => {

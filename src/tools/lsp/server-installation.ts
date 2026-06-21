@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import { join } from "path"
 
-import { getOpenCodeConfigDir, getDataDir } from "../../shared"
+import { getDataDir, getOpenCodeConfigDir } from "../../shared"
 
 export function isServerInstalled(command: string[]): boolean {
   if (command.length === 0) return false

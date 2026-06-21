@@ -1,8 +1,8 @@
 import type { TmuxConfig } from "../../config/schema"
 import { log } from "../../shared"
-import type { TrackedSession } from "./types"
-import { queryWindowState } from "./pane-state-querier"
 import { executeAction } from "./action-executor"
+import { queryWindowState } from "./pane-state-querier"
+import type { TrackedSession } from "./types"
 
 export async function cleanupTmuxSessions(params: {
   tmuxConfig: TmuxConfig

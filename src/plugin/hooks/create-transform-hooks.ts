@@ -1,5 +1,8 @@
 import type { MatrixxConfig } from "../../config"
-import type { PluginContext } from "../types"
+import {
+  contextCollector,
+  createContextInjectorMessagesTransformHook,
+} from "../../features/context-injector"
 
 import {
   createDesignIntentPreserverHook,
@@ -7,11 +10,8 @@ import {
   createThinkingBlockValidatorHook,
   createToolPairValidatorHook,
 } from "../../hooks"
-import {
-  contextCollector,
-  createContextInjectorMessagesTransformHook,
-} from "../../features/context-injector"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import type { PluginContext } from "../types"
 
 export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null

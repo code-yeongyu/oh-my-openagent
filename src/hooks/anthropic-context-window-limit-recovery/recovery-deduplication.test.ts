@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
 import * as originalDeduplicationRecovery from "./deduplication-recovery"

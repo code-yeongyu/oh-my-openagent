@@ -1,8 +1,8 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 
 import { DEFAULT_MAX_REFERENCES } from "./constants"
-import { formatLocation } from "./lsp-formatters"
 import { withLspClient } from "./lsp-client-wrapper"
+import { formatLocation } from "./lsp-formatters"
 import type { Location } from "./types"
 
 export const lsp_find_references: ToolDefinition = tool({

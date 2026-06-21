@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { getClaudeConfigDir } from "./claude-config-dir"

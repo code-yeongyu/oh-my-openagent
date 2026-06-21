@@ -1,11 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { clearSessionAgent, setSessionAgent } from "../../features/claude-code-session-state"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,

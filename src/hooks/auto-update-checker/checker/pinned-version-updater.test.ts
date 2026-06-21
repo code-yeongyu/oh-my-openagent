@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
-import * as path from "node:path"
 import * as os from "node:os"
-import { updatePinnedVersion, revertPinnedVersion } from "./pinned-version-updater"
+import * as path from "node:path"
+import { revertPinnedVersion, updatePinnedVersion } from "./pinned-version-updater"
 
 describe("pinned-version-updater", () => {
   let tmpDir: string

@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn, afterAll } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { SkillMcpManager } from "./manager"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
-import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 
 // Mock the MCP SDK transports to avoid network calls
 const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))

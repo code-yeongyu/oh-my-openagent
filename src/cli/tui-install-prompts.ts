@@ -1,11 +1,11 @@
-import * as p from "@clack/prompts"
 import type { Option } from "@clack/prompts"
+import * as p from "@clack/prompts"
+import { detectedToInitialValues } from "./install-validators"
 import type {
   ClaudeSubscription,
   DetectedConfig,
   InstallConfig,
 } from "./types"
-import { detectedToInitialValues } from "./install-validators"
 
 async function selectOrCancel<TValue extends Readonly<string | boolean | number>>(params: {
   message: string

@@ -1,6 +1,6 @@
 import color from "picocolors"
-import type { DoctorResult } from "./types"
 import { formatHeader, formatStatusMark } from "./format-shared"
+import type { DoctorResult } from "./types"
 
 export function formatStatus(result: DoctorResult): string {
   const lines: string[] = []

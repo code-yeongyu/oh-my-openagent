@@ -1,8 +1,7 @@
 import { log } from "../../shared"
-
-import type { BackgroundTask } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient } from "./opencode-client"
+import type { BackgroundTask } from "./types"
 
 export async function tryCompleteBackgroundTask(args: {
   task: BackgroundTask

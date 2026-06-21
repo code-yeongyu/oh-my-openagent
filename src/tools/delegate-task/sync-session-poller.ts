@@ -1,8 +1,8 @@
-import type { ToolContextWithMetadata, OpencodeClient } from "./types"
+import { normalizeSDKResponse } from "../../shared"
+import { log } from "../../shared/logger"
 import type { SessionMessage } from "./executor-types"
 import { getTimingConfig } from "./timing"
-import { log } from "../../shared/logger"
-import { normalizeSDKResponse } from "../../shared"
+import type { OpencodeClient, ToolContextWithMetadata } from "./types"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 

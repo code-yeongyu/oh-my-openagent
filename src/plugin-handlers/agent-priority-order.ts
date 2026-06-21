@@ -7,7 +7,7 @@ export function reorderAgentsByPriority(
   const seen = new Set<string>();
 
   for (const key of CORE_AGENT_ORDER) {
-    if (Object.prototype.hasOwnProperty.call(agents, key)) {
+    if (Object.hasOwn(agents, key)) {
       ordered[key] = agents[key];
       seen.add(key);
     }

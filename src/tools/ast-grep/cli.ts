@@ -1,15 +1,14 @@
 import { spawn } from "bun"
 import { existsSync } from "fs"
+import { getAstGrepPath } from "./cli-binary-path-resolution"
 import {
-	getSgCliPath,
 	DEFAULT_TIMEOUT_MS,
+	getSgCliPath,
 } from "./constants"
 import { ensureAstGrepBinary } from "./downloader"
-import type { CliLanguage, SgResult } from "./types"
-
-import { getAstGrepPath } from "./cli-binary-path-resolution"
 import { collectProcessOutputWithTimeout } from "./process-output-timeout"
 import { createSgResultFromStdout } from "./sg-compact-json-output"
+import type { CliLanguage, SgResult } from "./types"
 
 export {
 	ensureCliAvailable,

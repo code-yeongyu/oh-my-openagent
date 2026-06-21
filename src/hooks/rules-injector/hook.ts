@@ -1,8 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
-import { getRuleInjectionFilePath } from "./output-path";
 import { createSessionCacheStore } from "./cache";
 import { createRuleInjectionProcessor } from "./injector";
+import { getRuleInjectionFilePath } from "./output-path";
 
 interface ToolExecuteInput {
   tool: string;

@@ -3,12 +3,12 @@ export {
   createContextInjectorMessagesTransformHook,
 } from "./injector"
 export type {
-  ContextSourceType,
-  ContextPriority,
   ContextEntry,
-  RegisterContextOptions,
-  PendingContext,
+  ContextPriority,
+  ContextSourceType,
+  InjectionStrategy,
   MessageContext,
   OutputParts,
-  InjectionStrategy,
+  PendingContext,
+  RegisterContextOptions,
 } from "./types"

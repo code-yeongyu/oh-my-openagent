@@ -1,9 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { MatrixLoopOptions, MatrixLoopState } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../../shared/transcript-path"
 import { createLoopSessionRecovery } from "./loop-session-recovery"
 import { createLoopStateController } from "./loop-state-controller"
 import { createMatrixLoopEventHandler } from "./matrix-loop-event-handler"
+import type { MatrixLoopOptions, MatrixLoopState } from "./types"
 
 export interface MatrixLoopHook {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>

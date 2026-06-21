@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import {
-  hasSystemReminder,
-  removeSystemReminders,
-  isSystemDirective,
   createSystemDirective,
+  hasSystemReminder,
+  isSystemDirective,
+  removeSystemReminders,
 } from "./system-directive"
 
 describe("system-directive utilities", () => {

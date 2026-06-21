@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync, chmodSync } from "fs"
-import { join } from "path"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
+import { join } from "path"
 import type { LoadedSkill } from "./types"
 
 const TEST_DIR = join(tmpdir(), "async-loader-test-" + Date.now())

@@ -1,10 +1,9 @@
 import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
-import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
-import { LOOK_AT_DESCRIPTION, CONSTRUCT_AGENT } from "./constants"
-import type { LookAtArgs } from "./types"
+import { type PluginInput, type ToolDefinition, tool } from "@opencode-ai/plugin"
 import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
+import { CONSTRUCT_AGENT, LOOK_AT_DESCRIPTION } from "./constants"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
 import { normalizeArgs, validateArgs } from "./look-at-arguments"
 import {
@@ -13,6 +12,7 @@ import {
   inferMimeTypeFromFilePath,
 } from "./mime-type-inference"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
+import type { LookAtArgs } from "./types"
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 

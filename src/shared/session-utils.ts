@@ -1,9 +1,9 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import { findNearestMessageWithFields, findNearestMessageWithFieldsFromSDK } from "../features/hook-message-injector"
+import { getAgentConfigKey } from "./agent-display-names"
+import { log } from "./logger"
 import { getMessageDir } from "./opencode-message-dir"
 import { isSqliteBackend } from "./opencode-storage-detection"
-import { log } from "./logger"
-import { getAgentConfigKey } from "./agent-display-names"
-import type { PluginInput } from "@opencode-ai/plugin"
 
 export async function isCallerOrchestrator(sessionID?: string, client?: PluginInput["client"]): Promise<boolean> {
   if (!sessionID) return false

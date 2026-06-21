@@ -1,12 +1,12 @@
-import type { PaneAction } from "./types"
-import { applyLayout, spawnTmuxPane, closeTmuxPane, enforceMainPaneWidth, replaceTmuxPane } from "../../shared/tmux"
 import { log } from "../../shared"
+import { applyLayout, closeTmuxPane, enforceMainPaneWidth, replaceTmuxPane, spawnTmuxPane } from "../../shared/tmux"
 import type {
   ActionExecutorDeps,
   ActionResult,
   ExecuteContext,
 } from "./action-executor-core"
 import { executeActionWithDeps } from "./action-executor-core"
+import type { PaneAction } from "./types"
 
 export type { ActionExecutorDeps, ActionResult, ExecuteContext } from "./action-executor-core"
 

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "bun:test"
-import { mergeCategories } from "./merge-categories"
+import { describe, expect, it } from "bun:test"
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
+import { mergeCategories } from "./merge-categories"
 
 describe("mergeCategories", () => {
   it("returns all default categories when no user config provided", () => {

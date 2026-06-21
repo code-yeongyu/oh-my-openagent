@@ -1,5 +1,5 @@
-import type { HashlineEdit } from "./types"
 import { toNewLines } from "./edit-text-normalization"
+import type { HashlineEdit } from "./types"
 import { normalizeLineRef } from "./validation"
 
 function normalizeEditPayload(payload: string | string[]): string {

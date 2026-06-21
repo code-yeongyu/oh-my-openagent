@@ -1,11 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-
-import { findNearestMessageWithFields, findFirstMessageWithAgent } from "../../features/hook-message-injector"
-import {
-  findFirstMessageWithAgentFromSDK,
-  findNearestMessageWithFieldsFromSDK,
-} from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { findFirstMessageWithAgent, 
+  findFirstMessageWithAgentFromSDK,findNearestMessageWithFields, 
+  findNearestMessageWithFieldsFromSDK,} from "../../features/hook-message-injector"
 import { readMissionState } from "../../features/mission-state"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"

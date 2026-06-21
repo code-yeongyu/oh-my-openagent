@@ -1,10 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { basename, join } from "path"
-import { parseFrontmatter, sanitizeModelField, getOpenCodeConfigDir } from "../../shared"
-import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
-import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
+import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
+import { getClaudeConfigDir, getOpenCodeConfigDir, parseFrontmatter, sanitizeModelField } from "../../shared"
+import { isMarkdownFile } from "../../shared/file-utils"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -41,7 +40,6 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
         scope,
       })
     } catch {
-      continue
     }
   }
 

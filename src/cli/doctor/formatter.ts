@@ -1,7 +1,7 @@
-import type { DoctorResult, DoctorMode } from "./types"
 import { formatDefault } from "./format-default"
 import { formatStatus } from "./format-status"
 import { formatVerbose } from "./format-verbose"
+import type { DoctorMode, DoctorResult } from "./types"
 
 export function formatDoctorOutput(result: DoctorResult, mode: DoctorMode): string {
   switch (mode) {

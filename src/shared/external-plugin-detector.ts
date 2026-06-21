@@ -4,10 +4,10 @@
  */
 
 import * as fs from "node:fs"
-import * as path from "node:path"
 import * as os from "node:os"
-import { log } from "./logger"
+import * as path from "node:path"
 import { parseJsoncSafe } from "./jsonc-parser"
+import { log } from "./logger"
 
 interface OpencodeConfig {
   plugin?: string[]
@@ -58,7 +58,6 @@ function loadOpencodePlugins(directory: string): string[] {
         return result.data.plugin ?? []
       }
     } catch {
-      continue
     }
   }
   return []

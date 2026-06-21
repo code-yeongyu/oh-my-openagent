@@ -1,5 +1,5 @@
-import picomatch from "picomatch"
 import { basename } from "path"
+import picomatch from "picomatch"
 
 const DEFAULT_BLOCKED_PATTERNS = [
   ".env",

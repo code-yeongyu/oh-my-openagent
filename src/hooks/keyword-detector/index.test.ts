@@ -1,9 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { createKeywordDetectorHook } from "./index"
-import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import * as sessionState from "../../features/claude-code-session-state"
+import { _resetForTesting, clearSessionAgent, setMainSession, updateSessionAgent } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
-import * as sessionState from "../../features/claude-code-session-state"
+import { createKeywordDetectorHook } from "./index"
 
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>

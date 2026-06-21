@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { modifyProviderInJsonc } from "./jsonc-provider-editor"
 import { parseJsonc } from "../../shared/jsonc-parser"
+import { modifyProviderInJsonc } from "./jsonc-provider-editor"
 
 describe("modifyProviderInJsonc", () => {
   describe("Test 1: Basic JSONC with existing provider", () => {

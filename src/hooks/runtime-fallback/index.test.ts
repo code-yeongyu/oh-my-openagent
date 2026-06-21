@@ -1,5 +1,5 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import type { RuntimeFallbackConfig, MatrixxConfig } from "../../config"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import type { MatrixxConfig, RuntimeFallbackConfig } from "../../config"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "./session-category-registry"
 

@@ -1,6 +1,6 @@
 import pc from "picocolors"
-import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { normalizeSDKResponse } from "../../shared"
+import type { ChildSession, RunContext, SessionStatus, Todo } from "./types"
 
 export async function checkCompletionConditions(ctx: RunContext): Promise<boolean> {
   try {

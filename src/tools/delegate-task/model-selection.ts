@@ -1,5 +1,5 @@
-import type { FallbackEntry } from "../../shared/model-requirements"
 import { fuzzyMatchModel } from "../../shared/model-availability"
+import type { FallbackEntry } from "../../shared/model-requirements"
 
 function normalizeModel(model?: string): string | undefined {
   const trimmed = model?.trim()

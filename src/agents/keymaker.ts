@@ -1,18 +1,18 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode } from "./types"
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+import type { AvailableAgent, AvailableCategory, AvailableSkill, AvailableTool } from "./dynamic-agent-prompt-builder"
 import {
-  buildKeyTriggersSection,
-  buildToolSelectionTable,
-  buildExploreSection,
-  buildLibrarianSection,
+  buildAntiPatternsSection,
   buildCategorySkillsDelegationGuide,
   buildDelegationTable,
-  buildOracleSection,
+  buildExploreSection,
   buildHardBlocksSection,
-  buildAntiPatternsSection,
+  buildKeyTriggersSection,
+  buildLibrarianSection,
+  buildOracleSection,
+  buildToolSelectionTable,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
+import type { AgentMode } from "./types"
 
 const MODE: AgentMode = "primary"
 

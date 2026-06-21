@@ -1,5 +1,5 @@
-import type { BuildSystemContentInput } from "./types"
 import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
+import type { BuildSystemContentInput } from "./types"
 
 /**
  * Build the system content to inject into the agent prompt.

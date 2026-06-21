@@ -1,6 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
-import { normalizeSDKResponse } from "../../shared"
+import { log, normalizeSDKResponse } from "../../shared"
 
 export async function waitForCompletion(
   sessionID: string,

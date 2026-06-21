@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import { HOOK_NAME, DEFAULT_VERIFICATION_AGENT, DEFAULT_VERIFICATION_TIMEOUT_MS } from "./constants"
 import type { OpenCodeSessionMessage } from "./completion-promise-detector"
+import { DEFAULT_VERIFICATION_AGENT, DEFAULT_VERIFICATION_TIMEOUT_MS, HOOK_NAME } from "./constants"
 
 export interface VerificationResult {
 	verified: boolean

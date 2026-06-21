@@ -1,10 +1,10 @@
-export type { SkillResolutionOptions } from "./skill-resolution-options"
+export { extractSkillTemplate } from "./loaded-skill-template-extractor"
 
 export { clearSkillCache, getAllSkills } from "./skill-discovery"
-export { extractSkillTemplate } from "./loaded-skill-template-extractor"
+export type { SkillResolutionOptions } from "./skill-resolution-options"
 export {
-	resolveSkillContent,
 	resolveMultipleSkills,
-	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
+	resolveSkillContent,
+	resolveSkillContentAsync,
 } from "./skill-template-resolver"

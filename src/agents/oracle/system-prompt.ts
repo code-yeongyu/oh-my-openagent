@@ -1,9 +1,9 @@
+import { ORACLE_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
+import { ORACLE_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { ORACLE_IDENTITY_CONSTRAINTS } from "./identity-constraints"
 import { ORACLE_INTERVIEW_MODE } from "./interview-mode"
 import { ORACLE_PLAN_GENERATION } from "./plan-generation"
-import { ORACLE_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { ORACLE_PLAN_TEMPLATE } from "./plan-template"
-import { ORACLE_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 
 /**
  * Combined Oracle system prompt.

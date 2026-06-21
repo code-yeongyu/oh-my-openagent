@@ -6,7 +6,7 @@ export const PLANS_DIR = ".matrixx/plans"
 export const PHASE_TRANSITION_PATTERN = /\bphase[\s\-:]*(\d+)\b/i
 
 // Matches construct category, web-designer agent, frontend-ui-ux skill, @designer
-export const CONSTRUCT_INDICATORS = /\b(?:construct|web[\s\-]?designer|frontend[\s\-]?ui[\s\-]?ux)\b|@designer/i
+export const CONSTRUCT_INDICATORS = /\b(?:construct|web[\s-]?designer|frontend[\s-]?ui[\s-]?ux)\b|@designer/i
 
 export const IDEMPOTENCY_MARKER = "<design-intent-preservation>"
 

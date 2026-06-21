@@ -1,8 +1,7 @@
+import { describe, expect, it, spyOn } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
-import { describe, expect, it, spyOn } from "bun:test"
 
 describe("spawnProcess", () => {
   it("proceeds to node spawn on Windows when command is available", async () => {

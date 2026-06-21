@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { applyHashlineEdits, applyHashlineEditsWithReport } from "./edit-operations"
 import { applyAppend, applyInsertAfter, applyPrepend, applyReplaceLines, applySetLine } from "./edit-operation-primitives"
+import { applyHashlineEdits, applyHashlineEditsWithReport } from "./edit-operations"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
 

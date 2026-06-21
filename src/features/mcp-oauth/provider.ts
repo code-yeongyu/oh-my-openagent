@@ -1,10 +1,8 @@
-import type { OAuthTokenData } from "./storage"
-import { loadToken, saveToken } from "./storage"
-import { discoverOAuthServerMetadata } from "./discovery"
-import type { OAuthServerMetadata } from "./discovery"
-import { getOrRegisterClient } from "./dcr"
-import type { ClientCredentials, ClientRegistrationStorage } from "./dcr"
 import { findAvailablePort } from "./callback-server"
+import type { ClientCredentials, ClientRegistrationStorage } from "./dcr"
+import { getOrRegisterClient } from "./dcr"
+import type { OAuthServerMetadata } from "./discovery"
+import { discoverOAuthServerMetadata } from "./discovery"
 import {
   buildAuthorizationUrl,
   generateCodeChallenge,
@@ -12,6 +10,8 @@ import {
   runAuthorizationCodeRedirect,
   startCallbackServer,
 } from "./oauth-authorization-flow"
+import type { OAuthTokenData } from "./storage"
+import { loadToken, saveToken } from "./storage"
 
 export type McpOAuthProviderOptions = {
   serverUrl: string
@@ -169,4 +169,4 @@ export class McpOAuthProvider {
   }
 }
 
-export { generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl, startCallbackServer }
+export { buildAuthorizationUrl, generateCodeChallenge, generateCodeVerifier, startCallbackServer }

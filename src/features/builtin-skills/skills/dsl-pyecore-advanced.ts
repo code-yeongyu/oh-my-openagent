@@ -237,7 +237,7 @@ class StateMachine:
     current_state = Ecore.EReference()
 
     def step(self, event):
-        \"\"\"Execute one step of the state machine.\"\"\"
+        """Execute one step of the state machine."""
         for transition in self.current_state.transitions:
             if transition.trigger == event:
                 self.current_state = transition.target

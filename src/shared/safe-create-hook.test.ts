@@ -1,4 +1,4 @@
-import { describe, test, expect, spyOn, afterEach } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as shared from "./logger"
 import { safeCreateHook } from "./safe-create-hook"
 

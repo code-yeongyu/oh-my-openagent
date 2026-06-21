@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
-import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
+import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
+import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
+import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 
 export interface StoredMessage {
   agent?: string
@@ -157,7 +157,6 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
           return msg
         }
       } catch {
-        continue
       }
     }
 
@@ -169,7 +168,6 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
           return msg
         }
       } catch {
-        continue
       }
     }
   } catch {
@@ -207,7 +205,6 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
           return msg.agent
         }
       } catch {
-        continue
       }
     }
   } catch {

@@ -1,23 +1,22 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, spyOn, beforeEach, afterEach, afterAll, mock } from "bun:test"
-import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
-import type { CategoryConfig } from "../config/schema"
-import type { MatrixxConfig } from "../config"
-
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as agents from "../agents"
 import * as mouse from "../agents/mouse"
-import * as commandLoader from "../features/claude-code-command-loader"
+import type { MatrixxConfig } from "../config"
+import type { CategoryConfig } from "../config/schema"
 import * as builtinCommands from "../features/builtin-commands"
-import * as skillLoader from "../features/opencode-skill-loader"
 import * as agentLoader from "../features/claude-code-agent-loader"
+import * as commandLoader from "../features/claude-code-command-loader"
 import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as pluginLoader from "../features/claude-code-plugin-loader"
+import * as skillLoader from "../features/opencode-skill-loader"
 import * as mcpModule from "../mcp"
 import * as shared from "../shared"
+import * as modelResolver from "../shared/model-resolver"
 import * as configDir from "../shared/opencode-config-dir"
 import * as permissionCompat from "../shared/permission-compat"
-import * as modelResolver from "../shared/model-resolver"
+import { createConfigHandler, resolveCategoryConfig } from "./config-handler"
 
 const realResolveModelWithFallback = require("../shared/model-resolver").resolveModelWithFallback
 const realResolveModelPipeline = require("../shared/model-resolution-pipeline").resolveModelPipeline

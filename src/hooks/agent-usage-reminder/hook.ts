@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import { AGENT_TOOLS, REMINDER_MESSAGE, TARGET_TOOLS } from "./constants";
 import {
+  clearAgentUsageState,
   loadAgentUsageState,
   saveAgentUsageState,
-  clearAgentUsageState,
 } from "./storage";
-import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
 import type { AgentUsageState } from "./types";
 
 interface ToolExecuteInput {

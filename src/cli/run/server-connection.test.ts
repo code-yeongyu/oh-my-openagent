@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"

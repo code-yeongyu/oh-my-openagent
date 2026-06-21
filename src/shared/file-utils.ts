@@ -1,5 +1,4 @@
-import { lstatSync, realpathSync } from "fs"
-import { promises as fs } from "fs"
+import { promises as fs, lstatSync, realpathSync } from "fs"
 
 function normalizeDarwinRealpath(filePath: string): string {
   return filePath.startsWith("/private/var/") ? filePath.slice("/private".length) : filePath

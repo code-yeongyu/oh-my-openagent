@@ -1,5 +1,5 @@
-import type { OpencodeClient } from "./constants"
 import { isObject, log } from "../../shared"
+import type { OpencodeClient } from "./constants"
 
 type SessionMessagePart = {
   type?: string

@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { StoredMessageMeta } from "../types"
-import { getMessageDir } from "./message-dir"
 import { isSqliteBackend, normalizeSDKResponse } from "../../../shared"
 import { isRecord } from "../../../shared/record-type-guard"
+import type { StoredMessageMeta } from "../types"
+import { getMessageDir } from "./message-dir"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -44,7 +44,6 @@ export function readMessages(sessionID: string): StoredMessageMeta[] {
       const content = readFileSync(join(messageDir, file), "utf-8")
       messages.push(JSON.parse(content))
     } catch {
-      continue
     }
   }
 

@@ -1,14 +1,14 @@
 import type { MatrixxConfig } from "../config"
 import {
-  resolveActualContextLimit,
   type ContextLimitModelCacheState,
+  resolveActualContextLimit,
 } from "../shared/context-limit-resolver"
 import { log } from "../shared/logger"
-import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 import type {
   CachedCompactionState,
   PreemptiveCompactionContext,
 } from "./preemptive-compaction-types"
+import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 60_000
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78

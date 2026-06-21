@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log, getAgentToolRestrictions } from "../../shared"
+import { getAgentToolRestrictions, log } from "../../shared"
 
 export async function promptSubagentSession(
 	ctx: PluginInput,

@@ -1,9 +1,9 @@
 import { describe, expect, it, spyOn } from "bun:test"
 import {
+  _resetNormalizeModelCacheForTesting,
   getHighVariant,
   getThinkingConfig,
   isAlreadyHighVariant,
-  _resetNormalizeModelCacheForTesting,
   THINKING_CONFIGS,
 } from "./switcher"
 

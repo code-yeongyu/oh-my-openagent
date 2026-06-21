@@ -1,10 +1,10 @@
-import { log } from "../../shared/logger"
-import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
-import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { log } from "../../shared/logger"
+import { isCallerOrchestrator } from "../../shared/session-utils"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { HOOK_NAME } from "./hook-name"
-import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isMatrixPath } from "./matrix-path"
+import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
 export function createToolExecuteBeforeHandler(input: {

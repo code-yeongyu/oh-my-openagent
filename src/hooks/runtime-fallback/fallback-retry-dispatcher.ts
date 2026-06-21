@@ -1,8 +1,8 @@
-import type { AutoRetryHelpers } from "./auto-retry"
-import type { HookDeps, FallbackState } from "./types"
-import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import type { AutoRetryHelpers } from "./auto-retry"
+import { HOOK_NAME } from "./constants"
 import { prepareFallback } from "./fallback-state"
+import type { FallbackState, HookDeps } from "./types"
 
 type DispatchFallbackRetryOptions = {
   sessionID: string

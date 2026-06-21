@@ -1,7 +1,7 @@
-import { createSyncSession } from "./sync-session-creator"
 import { sendSyncPrompt } from "./sync-prompt-sender"
-import { pollSyncSession } from "./sync-session-poller"
 import { fetchSyncResult } from "./sync-result-fetcher"
+import { createSyncSession } from "./sync-session-creator"
+import { pollSyncSession } from "./sync-session-poller"
 
 export const syncTaskDeps = {
   createSyncSession,

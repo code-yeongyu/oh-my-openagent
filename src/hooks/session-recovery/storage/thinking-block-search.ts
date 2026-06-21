@@ -1,6 +1,6 @@
 import { THINKING_TYPES } from "../constants"
-import { hasContent } from "./part-content"
 import { readMessages } from "./messages-reader"
+import { hasContent } from "./part-content"
 import { readParts } from "./parts-reader"
 
 export function findMessagesWithThinkingBlocks(sessionID: string): string[] {

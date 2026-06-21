@@ -1,6 +1,4 @@
 import { dedupeEdits } from "./edit-deduplication"
-import { collectLineRefs, detectOverlappingRanges, getEditLineNumber } from "./edit-ordering"
-import type { HashlineEdit } from "./types"
 import {
   applyAppend,
   applyInsertAfter,
@@ -9,6 +7,8 @@ import {
   applyReplaceLines,
   applySetLine,
 } from "./edit-operation-primitives"
+import { collectLineRefs, detectOverlappingRanges, getEditLineNumber } from "./edit-ordering"
+import type { HashlineEdit } from "./types"
 import { validateLineRefs } from "./validation"
 
 function arraysEqual(a: string[], b: string[]): boolean {

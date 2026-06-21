@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { createTaskList } from "./task-list"
-import { writeJsonAtomic } from "../../features/claude-tasks/storage"
-import type { TaskObject } from "./types"
-import { join } from "path"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { existsSync, rmSync } from "fs"
+import { join } from "path"
+import { writeJsonAtomic } from "../../features/claude-tasks/storage"
+import { createTaskList } from "./task-list"
+import type { TaskObject } from "./types"
 
 const testProjectDir = "/tmp/task-list-test"
 

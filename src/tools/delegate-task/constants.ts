@@ -1,8 +1,8 @@
-import type { CategoryConfig } from "../../config/schema"
 import type {
    AvailableCategory,
    AvailableSkill,
  } from "../../agents/dynamic-agent-prompt-builder"
+import type { CategoryConfig } from "../../config/schema"
 import { truncateDescription } from "../../shared/truncate-description"
 
 export const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>

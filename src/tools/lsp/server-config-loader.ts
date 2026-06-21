@@ -1,10 +1,9 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
-
+import { getOpenCodeConfigDir } from "../../shared"
+import { detectConfigFile, parseJsonc } from "../../shared/jsonc-parser"
 import { BUILTIN_SERVERS } from "./constants"
 import type { ResolvedServer } from "./types"
-import { getOpenCodeConfigDir } from "../../shared"
-import { parseJsonc, detectConfigFile } from "../../shared/jsonc-parser"
 
 interface LspEntry {
   disabled?: boolean

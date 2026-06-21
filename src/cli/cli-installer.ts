@@ -1,5 +1,4 @@
 import color from "picocolors"
-import type { InstallArgs } from "./types"
 import {
   addAuthPlugins,
   addPluginToOpenCodeConfig,
@@ -10,7 +9,6 @@ import {
   writeMatrixxConfig,
 } from "./config-manager"
 import {
-  SYMBOLS,
   argsToConfig,
   detectedToInitialValues,
   formatConfigSummary,
@@ -21,8 +19,10 @@ import {
   printStep,
   printSuccess,
   printWarning,
+  SYMBOLS,
   validateNonTuiArgs,
 } from "./install-validators"
+import type { InstallArgs } from "./types"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)

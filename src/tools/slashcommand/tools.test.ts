@@ -1,7 +1,7 @@
-import { describe, it, expect } from "bun:test"
+import { describe, expect, it } from "bun:test"
+import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { createSlashcommandTool } from "./tools"
 import type { CommandInfo } from "./types"
-import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
 function createMockCommand(name: string, description = ""): CommandInfo {
   return {

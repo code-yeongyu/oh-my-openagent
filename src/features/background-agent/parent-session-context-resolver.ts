@@ -1,7 +1,7 @@
+import { getMessageDir, isObject } from "../../shared"
+import { findNearestMessageWithFields } from "../hook-message-injector"
 import type { OpencodeClient } from "./constants"
 import type { BackgroundTask } from "./types"
-import { findNearestMessageWithFields } from "../hook-message-injector"
-import { isObject, getMessageDir } from "../../shared"
 
 type AgentModel = { providerID: string; modelID: string }
 

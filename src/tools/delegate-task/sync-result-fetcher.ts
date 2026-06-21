@@ -1,6 +1,6 @@
-import type { OpencodeClient } from "./types"
-import type { SessionMessage } from "./executor-types"
 import { normalizeSDKResponse } from "../../shared"
+import type { SessionMessage } from "./executor-types"
+import type { OpencodeClient } from "./types"
 
 /**
  * Extract all text (text + reasoning parts) from a session message.

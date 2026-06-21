@@ -2,8 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
-import { MISSION_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentModelForSession } from "./recent-model-resolver"
+import { MISSION_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import type { SessionState } from "./types"
 
 export async function injectMissionContinuation(input: {

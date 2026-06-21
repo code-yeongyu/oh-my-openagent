@@ -1,7 +1,7 @@
 import type { BackgroundTaskConfig } from "../../config/schema"
 import {
-  DEFAULT_CIRCUIT_BREAKER_ENABLED,
   DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD,
+  DEFAULT_CIRCUIT_BREAKER_ENABLED,
   DEFAULT_MAX_TOOL_CALLS,
 } from "./constants"
 import type { ToolCallWindow } from "./types"

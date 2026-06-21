@@ -1,8 +1,8 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 
 import { DEFAULT_MAX_SYMBOLS } from "./constants"
-import { formatDocumentSymbol, formatSymbolInfo } from "./lsp-formatters"
 import { withLspClient } from "./lsp-client-wrapper"
+import { formatDocumentSymbol, formatSymbolInfo } from "./lsp-formatters"
 import type { DocumentSymbol, SymbolInfo } from "./types"
 
 export const lsp_symbols: ToolDefinition = tool({

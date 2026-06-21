@@ -1,6 +1,6 @@
-import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateMatrixxConfig } from "./config-manager"
+import { ANTIGRAVITY_PROVIDER_CONFIG, fetchNpmDistTags, generateMatrixxConfig, getPluginNameWithVersion } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {

@@ -1,11 +1,11 @@
+import { subagentSessions } from "../../features/claude-code-session-state";
+import { buildSessionReminderMessage, MATRIXX_SESSION_PREFIX } from "./constants";
 import {
+  clearInteractiveBashSessionState,
   loadInteractiveBashSessionState,
   saveInteractiveBashSessionState,
-  clearInteractiveBashSessionState,
 } from "./storage";
-import { MATRIXX_SESSION_PREFIX, buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
-import { subagentSessions } from "../../features/claude-code-session-state";
 
 type AbortSession = (args: { path: { id: string } }) => Promise<unknown>
 

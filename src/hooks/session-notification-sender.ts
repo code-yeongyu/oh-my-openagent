@@ -1,14 +1,14 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
-import {
-  getOsascriptPath,
-  getNotifySendPath,
-  getPowershellPath,
-  getAfplayPath,
-  getPaplayPath,
-  getAplayPath,
-} from "./session-notification-utils"
 import { buildWindowsToastScript, escapeAppleScriptText, escapePowerShellSingleQuotedText } from "./session-notification-formatting"
+import {
+  getAfplayPath,
+  getAplayPath,
+  getNotifySendPath,
+  getOsascriptPath,
+  getPaplayPath,
+  getPowershellPath,
+} from "./session-notification-utils"
 
 export type Platform = "darwin" | "linux" | "win32" | "unsupported"
 

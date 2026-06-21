@@ -1,8 +1,8 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { MessageData } from "./types"
-import { extractMessageIndex } from "./detect-error-type"
-import { META_TYPES, THINKING_TYPES } from "./constants"
 import { normalizeSDKResponse } from "../../shared"
+import { META_TYPES, THINKING_TYPES } from "./constants"
+import { extractMessageIndex } from "./detect-error-type"
+import type { MessageData } from "./types"
 
 type Client = ReturnType<typeof createOpencodeClient>
 

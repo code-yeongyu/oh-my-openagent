@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "fs"
-import { join, isAbsolute } from "path"
+import { isAbsolute, join } from "path"
 
 interface FileMatch {
   fullMatch: string

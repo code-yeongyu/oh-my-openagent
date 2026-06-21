@@ -9,17 +9,18 @@ export const MORPHEUS_PROMPT_METADATA: AgentPromptMetadata = {
   promptAlias: "Morpheus",
   triggers: [],
 }
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+
+import type { AvailableAgent, AvailableCategory, AvailableSkill, AvailableTool } from "./dynamic-agent-prompt-builder"
 import {
-  buildKeyTriggersSection,
-  buildToolSelectionTable,
-  buildExploreSection,
-  buildLibrarianSection,
-  buildDelegationTable,
-  buildCategorySkillsDelegationGuide,
-  buildOracleSection,
-  buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildCategorySkillsDelegationGuide,
+  buildDelegationTable,
+  buildExploreSection,
+  buildHardBlocksSection,
+  buildKeyTriggersSection,
+  buildLibrarianSection,
+  buildOracleSection,
+  buildToolSelectionTable,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
 

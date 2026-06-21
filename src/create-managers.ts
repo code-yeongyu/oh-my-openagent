@@ -1,13 +1,12 @@
 import type { MatrixxConfig } from "./config"
-import type { ModelCacheState } from "./plugin-state"
-import type { PluginContext, TmuxConfig } from "./plugin/types"
-
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
+import type { PluginContext, TmuxConfig } from "./plugin/types"
 import { createConfigHandler } from "./plugin-handlers"
+import type { ModelCacheState } from "./plugin-state"
 import { log } from "./shared"
 
 export type Managers = {

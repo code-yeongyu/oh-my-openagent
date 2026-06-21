@@ -1,11 +1,11 @@
-import { createWebsearchConfig } from "./websearch"
-import { context7 } from "./context7"
-import { grep_app } from "./grep-app"
-import { document_reader } from "./document-reader"
-import { semantic_scholar } from "./semantic-scholar"
 import type { MatrixxConfig } from "../config/schema"
+import { context7 } from "./context7"
+import { document_reader } from "./document-reader"
+import { grep_app } from "./grep-app"
+import { semantic_scholar } from "./semantic-scholar"
+import { createWebsearchConfig } from "./websearch"
 
-export { McpNameSchema, type McpName } from "./types"
+export { type McpName, McpNameSchema } from "./types"
 
 type RemoteMcpConfig = {
   type: "remote"

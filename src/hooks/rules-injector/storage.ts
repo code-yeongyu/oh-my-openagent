@@ -2,8 +2,8 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  writeFileSync,
   unlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
 import { RULES_INJECTOR_STORAGE } from "./constants";

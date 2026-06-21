@@ -1,15 +1,15 @@
 import { existsSync, readFileSync } from "fs"
-import { join } from "path"
 import { homedir } from "os"
+import { join } from "path"
 import { getClaudeConfigDir } from "../../shared"
+import { log } from "../../shared/logger"
+import { transformMcpServer } from "./transformer"
 import type {
   ClaudeCodeMcpConfig,
   LoadedMcpServer,
   McpLoadResult,
   McpScope,
 } from "./types"
-import { transformMcpServer } from "./transformer"
-import { log } from "../../shared/logger"
 
 interface McpConfigPath {
   path: string
@@ -61,7 +61,6 @@ export function getSystemMcpServerNames(): Set<string> {
         names.add(name)
       }
     } catch {
-      continue
     }
   }
 

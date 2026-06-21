@@ -1,12 +1,12 @@
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs"
-import { modify, applyEdits } from "jsonc-parser"
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
+import { applyEdits, modify } from "jsonc-parser"
+import { parseJsonc } from "../../shared/jsonc-parser"
 import type { ConfigMergeResult, InstallConfig } from "../types"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { detectConfigFormat } from "./opencode-config-format"
-import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
-import { parseJsonc } from "../../shared/jsonc-parser"
+import { type OpenCodeConfig, parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 
 export async function fetchLatestVersion(packageName: string): Promise<string | null> {
   try {

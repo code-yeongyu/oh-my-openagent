@@ -1,9 +1,9 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { tmpdir } from "node:os"
-import { resolveSkillContent, resolveMultipleSkills, resolveSkillContentAsync, resolveMultipleSkillsAsync } from "./skill-content"
+import { join } from "node:path"
+import { resolveMultipleSkills, resolveMultipleSkillsAsync, resolveSkillContent, resolveSkillContentAsync } from "./skill-content"
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string

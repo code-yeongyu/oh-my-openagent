@@ -1,16 +1,15 @@
 
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type {
-  BackgroundTask,
-  LaunchInput,
-  ResumeInput,
-} from "./types"
-import { TaskHistory } from "./task-history"
-import { log, getAgentToolRestrictions, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
-import { setSessionTools } from "../../shared/session-tools-store"
-import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import { getAgentToolRestrictions, log, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
+import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
+import { subagentSessions } from "../claude-code-session-state"
+import { MESSAGE_STORAGE, type StoredMessage } from "../hook-message-injector"
+import { getTaskToastManager } from "../task-toast-manager"
+import { ConcurrencyManager } from "./concurrency"
 import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
@@ -22,17 +21,17 @@ import {
   TASK_TTL_MS,
 } from "./constants"
 import {
-  resolveCircuitBreakerSettings,
-  recordToolCall,
-  detectRepetitiveToolUse,
   type CircuitBreakerSettings,
+  detectRepetitiveToolUse,
+  recordToolCall,
+  resolveCircuitBreakerSettings,
 } from "./loop-detector"
-
-import { subagentSessions } from "../claude-code-session-state"
-import { getTaskToastManager } from "../task-toast-manager"
-import { MESSAGE_STORAGE, type StoredMessage } from "../hook-message-injector"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { TaskHistory } from "./task-history"
+import type {
+  BackgroundTask,
+  LaunchInput,
+  ResumeInput,
+} from "./types"
 
 type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 

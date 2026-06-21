@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
-
-import { resolveOrCreateSessionId } from "./subagent-session-creator"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { resolveOrCreateSessionId } from "./subagent-session-creator"
 
 describe("delegate-agent resolveOrCreateSessionId", () => {
   const originalPlatform = process.platform

@@ -1,5 +1,5 @@
-import { describe, it, expect, mock, spyOn } from "bun:test"
-import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
+import { describe, expect, it, mock, spyOn } from "bun:test"
+import type { ChildSession, RunContext, SessionStatus, Todo } from "./types"
 
 const createMockContext = (overrides: {
   todo?: Todo[]

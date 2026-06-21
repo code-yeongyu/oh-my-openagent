@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 
 describe("pending-calls cleanup interval", () => {
   test("starts cleanup once and unrefs timer", async () => {

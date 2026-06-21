@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isSqliteBackend, log, patchPart } from "../../../shared"
 import { PART_STORAGE } from "../constants"
 import type { StoredTextPart } from "../types"
 import { generatePartId } from "./part-id"
-import { log, isSqliteBackend, patchPart } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
 

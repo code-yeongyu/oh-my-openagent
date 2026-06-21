@@ -1,14 +1,15 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
-import { resolveCategoryConfig } from "./tools"
+
 import type { CategoryConfig } from "../../config/schema"
-import type { DelegateTaskArgs } from "./types"
-import { __resetModelCache } from "../../shared/model-availability"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
-import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import { __resetModelCache } from "../../shared/model-availability"
+import { CATEGORY_DESCRIPTIONS, CATEGORY_PROMPT_APPENDS, DEFAULT_CATEGORIES, isPlanAgent, isPlanFamily, PLAN_AGENT_NAMES, PLAN_FAMILY_NAMES } from "./constants"
 import * as executor from "./executor"
+import { __resetTimingConfig, __setTimingConfig } from "./timing"
+import { resolveCategoryConfig } from "./tools"
+import type { DelegateTaskArgs } from "./types"
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 

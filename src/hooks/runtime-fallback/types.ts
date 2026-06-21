@@ -1,4 +1,4 @@
-import type { RuntimeFallbackConfig, MatrixxConfig } from "../../config"
+import type { MatrixxConfig, RuntimeFallbackConfig } from "../../config"
 
 export interface RuntimeFallbackInterval {
   unref: () => void

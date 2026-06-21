@@ -1,10 +1,10 @@
 /// <reference types="bun-types" />
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createMatrixLoopHook } from "./index"
-import { readState, writeState, clearState } from "./storage"
+import { clearState, readState, writeState } from "./storage"
 import type { MatrixLoopState } from "./types"
 
 describe("matrix-loop", () => {
