@@ -30,7 +30,7 @@ from cookie_crypto import (
     macos_keyring_secret,
     windows_oscrypt_key,
 )
-from cookie_paths import BROWSERS, UnsupportedPlatform, platform_base, resolve_cookie_db
+from cookie_paths import BROWSERS, BrowserSpec, UnsupportedPlatform, platform_base, resolve_cookie_db
 
 _SAMESITE = {-1: "None", 0: "None", 1: "Lax", 2: "Strict"}
 
@@ -61,16 +61,6 @@ class CdpCookie(TypedDict):
     httpOnly: bool
     sameSite: str
     expires: NotRequired[int]
-
-
-class BrowserDirs(TypedDict, total=False):
-    win32: str
-
-
-class BrowserSpec(TypedDict):
-    kind: str
-    safe_storage: str
-    dirs: BrowserDirs
 
 
 _CDP_SET_COOKIES_SCRIPT = r"""
@@ -206,11 +196,7 @@ def _browser_spec(browser: str) -> BrowserSpec:
     spec = BROWSERS.get(browser)
     if spec is None:
         raise UnsupportedPlatform(f"unsupported browser: {browser!r}")
-    return {
-        "kind": spec["kind"],
-        "safe_storage": spec.get("safe_storage", ""),
-        "dirs": spec.get("dirs", {}),
-    }
+    return spec
 
 
 def default_keyring_reader(platform: str, spec: BrowserSpec) -> Callable[[str], bytes]:
@@ -238,7 +224,10 @@ def extract_cookies(
     if spec["kind"] == "firefox":
         return extract_firefox(db, domains)
     reader = keyring_reader or default_keyring_reader(platform, spec)
-    key = derive_key(platform, reader(spec["safe_storage"]))
+    safe_storage = spec["safe_storage"]
+    if safe_storage is None:
+        raise UnsupportedPlatform(f"browser {browser!r} has no keyring storage name")
+    key = derive_key(platform, reader(safe_storage))
     return extract_chromium(db, domains, platform, key)
 
 
