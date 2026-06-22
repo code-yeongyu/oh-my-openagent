@@ -23,10 +23,48 @@ async function readStdinJson() {
   });
 }
 
+function describeError(error) {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+}
+
+function warnBestEffort(action, error) {
+  process.stderr.write(`best-effort ${action} failed: ${describeError(error)}\n`);
+}
+
+function isMissingTopLevelModule(error, moduleName) {
+  return (
+    error instanceof Error &&
+    error.code === 'MODULE_NOT_FOUND' &&
+    typeof error.message === 'string' &&
+    error.message.includes(`Cannot find module '${moduleName}'`)
+  );
+}
+
+function requireOptionalModule(moduleName) {
+  let resolvedModule;
+  try {
+    resolvedModule = require.resolve(moduleName);
+  } catch (e) {
+    if (isMissingTopLevelModule(e, moduleName)) {
+      warnBestEffort(`optional module ${moduleName}`, e);
+      return null;
+    }
+    throw e;
+  }
+  return require(resolvedModule);
+}
+
 async function main() {
   const args = await readStdinJson();
   const url = args.url;
-  if (!url) { process.stderr.write('missing url\n'); process.exit(2); }
+  if (!url) {
+    process.stderr.write('missing url\n');
+    process.exitCode = 2;
+    return;
+  }
 
   const profileDir = args.profileDir || '/tmp/.insane_pw_mobile_profile';
   const deviceName = args.device || 'iPhone 13 Pro';
@@ -35,18 +73,21 @@ async function main() {
   const headless = args.headless ?? false;
 
   let chromium, devices;
-  try {
-    ({ chromium, devices } = require('playwright-extra'));
-    const stealth = require('puppeteer-extra-plugin-stealth')();
+  const playwrightExtra = requireOptionalModule('playwright-extra');
+  const stealthPlugin = playwrightExtra ? requireOptionalModule('puppeteer-extra-plugin-stealth') : null;
+  if (playwrightExtra && stealthPlugin) {
+    ({ chromium, devices } = playwrightExtra);
+    const stealth = stealthPlugin();
     chromium.use(stealth);
-  } catch (_e) {
+  } else {
     ({ chromium, devices } = require('playwright'));
   }
 
   const dev = devices[deviceName];
   if (!dev) {
     process.stderr.write(`unknown device: ${deviceName}\n`);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
 
   let ctx;
@@ -63,17 +104,25 @@ async function main() {
     if (waitSelector) {
       try {
         await page.waitForSelector(waitSelector, { timeout: Math.min(timeoutMs, 20000) });
-      } catch (_e) {}
+      } catch (e) {
+        warnBestEffort('waitSelector', e);
+      }
     }
 
     const html = await page.content();
     process.stdout.write(html);
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   } catch (e) {
-    process.stderr.write(`${e.name || 'Error'}: ${e.message || e}\n`);
-    process.exit(1);
+    process.stderr.write(`${describeError(e)}\n`);
+    process.exitCode = 1;
+    return;
   } finally {
-    try { if (ctx) await ctx.close(); } catch (_e) {}
+    try {
+      if (ctx) await ctx.close();
+    } catch (e) {
+      warnBestEffort('browser context close', e);
+    }
   }
 }
 
