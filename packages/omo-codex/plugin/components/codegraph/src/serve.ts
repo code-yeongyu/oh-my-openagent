@@ -7,8 +7,11 @@ import {
 	cwd as processCwd,
 	env as processEnv,
 	execPath as processExecPath,
+	stdin as processStdin,
 	stderr as processStderr,
+	stdout as processStdout,
 } from "node:process";
+import type { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
@@ -28,6 +31,7 @@ import {
 } from "../../../../../utils/src/codegraph/resolve.ts";
 import { getCodexOmoConfig, type CodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import type { CodegraphConfig } from "./hook.js";
+import { runUnavailableCodegraphMcpServer } from "./mcp-unavailable.js";
 
 export type ServeStdio = "inherit";
 
@@ -61,6 +65,8 @@ export interface RunCodegraphServeOptions {
 	readonly cwd?: string;
 	readonly env?: Record<string, string | undefined>;
 	readonly homeDir?: string;
+	readonly stdin?: Readable;
+	readonly stdout?: Writable;
 	readonly nodeVersion?: string;
 	readonly resolve?: (options: ResolveCodegraphCommandOptions) => ReturnType<typeof resolveCodegraphCommand>;
 	readonly runProcess?: CodegraphServeProcessRunner;
@@ -82,8 +88,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	const config = options.config ?? getCodexOmoConfig({ cwd: options.cwd ?? processCwd(), env, homeDir });
 	const codegraphConfig = config.codegraph ?? {};
 	if (codegraphConfig.enabled === false) {
-		(options.stderr ?? processStderr).write(CODEGRAPH_DISABLED_HINT);
-		return 1;
+		return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
 	}
 
 	const resolutionOptions = {
@@ -95,8 +100,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
 	if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync)) {
 		if (resolution.source === "path" && !nodeSupport.supported) {
-			(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
-			return 1;
+			return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
 		}
 		const provisioned = await provisionMissingCodegraph({
 			config: codegraphConfig,
@@ -105,15 +109,13 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 			resolution,
 		});
 		if (provisioned === null) {
-			(options.stderr ?? processStderr).write(CODEGRAPH_SKIP_HINT);
-			return 1;
+			return runUnavailableMcp(CODEGRAPH_SKIP_HINT, options);
 		}
 		resolution = provisioned;
 	}
 
 	if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
-		(options.stderr ?? processStderr).write(buildCodegraphNodeSkipHint(nodeSupport));
-		return 1;
+		return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
 	}
 
 	const runProcess = options.runProcess ?? runChildProcess;
@@ -126,6 +128,17 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		env: mergedEnv,
 		stdio: "inherit",
 	});
+}
+
+async function runUnavailableMcp(reason: string, options: RunCodegraphServeOptions): Promise<number> {
+	(options.stderr ?? processStderr).write(reason);
+	await runUnavailableCodegraphMcpServer({
+		input: options.stdin ?? processStdin,
+		output: options.stdout ?? processStdout,
+		reason,
+		serverVersion: CODEGRAPH_VERSION,
+	});
+	return 0;
 }
 
 async function provisionMissingCodegraph(options: {
