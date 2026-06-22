@@ -81,6 +81,9 @@ export function createFallbackTimeoutHelpers(
         const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
         if (!dispatchOutcome.accepted) {
           restoreFallbackState(state, stateSnapshot)
+          if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
+            scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
+          }
           log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
             sessionID,
             status: dispatchOutcome.status,
