@@ -110,7 +110,7 @@ async function resolveOrProvisionCommand(
 	if (config.auto_provision === false) return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
 
 	const installDir = config.install_dir ?? join(homeDir, ".omo", "codegraph");
-	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, "locks"), version: CODEGRAPH_VERSION });
+	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, ".locks"), version: CODEGRAPH_VERSION });
 	if (!provisioned.provisioned || provisioned.binPath === undefined) {
 		return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
 	}
