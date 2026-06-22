@@ -30,6 +30,7 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/result_schema.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/summary.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_fetch_chain.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_playwright_templates.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/url_transforms.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/validators.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/waf_detector.py",
