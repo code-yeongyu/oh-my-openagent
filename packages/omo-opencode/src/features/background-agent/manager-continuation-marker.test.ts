@@ -64,6 +64,24 @@ function createManager(directory: string): BackgroundManager {
   return new BackgroundManager({ pluginContext })
 }
 
+async function waitForBackgroundTaskMarkerState(
+  directory: string,
+  parentSessionID: string,
+  expectedState: "active" | "idle",
+): Promise<void> {
+  const deadline = Date.now() + 1_000
+  let observedState: string | undefined
+  while (Date.now() < deadline) {
+    const marker = readContinuationMarker(directory, parentSessionID)
+    observedState = marker?.sources["background-task"]?.state
+    if (observedState === expectedState) {
+      return
+    }
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  throw new Error(`Timed out waiting for background-task marker ${expectedState}; last state: ${observedState ?? "missing"}`)
+}
+
 describe("BackgroundManager run continuation marker parent-wake races", () => {
   test("#given no active child tasks but a completion parent wake is preparing #when refreshing the run marker #then the marker remains active", () => {
     // given
@@ -110,6 +128,27 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       // then
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
       expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("#given a completion parent wake is queued on the scheduled timer #when the timer flush accepts it #then the marker returns idle", async () => {
+    // given
+    const directory = createTestDirectory()
+    const parentSessionID = "parent-timer-wake"
+    const manager = createManager(directory)
+    const internals = unsafeTestValue<BackgroundManagerMarkerInternals>(manager)
+    const notification = "ALL BACKGROUND TASKS COMPLETE\nTask bg_456 completed."
+
+    try {
+      // when
+      internals.queuePendingParentWake(parentSessionID, notification, {}, true, 0)
+      await waitForBackgroundTaskMarkerState(directory, parentSessionID, "idle")
+
+      // then
+      const marker = readContinuationMarker(directory, parentSessionID)
+      expect(marker?.sources["background-task"]?.state).toBe("idle")
     } finally {
       manager.shutdown()
     }
