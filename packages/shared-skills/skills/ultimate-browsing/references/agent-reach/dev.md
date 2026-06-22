@@ -1,6 +1,6 @@
 # 开发工具
 
-GitHub CLI 
+GitHub CLI
 
 ## GitHub (gh CLI)
 
