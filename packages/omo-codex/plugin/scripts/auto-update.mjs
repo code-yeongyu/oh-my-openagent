@@ -16,6 +16,7 @@ import {
 import { detectInstallFlow, resolveInstallSnapshotPath } from "./install-flow.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 import { migrateOmoSotConfig } from "./migrate-omo-sot.mjs";
+import { repairOmoCodexConfig } from "./repair-omo-config.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
@@ -203,6 +204,13 @@ async function recordUpdateStartedNotice({ env, now, notices, pendingNotice }) {
 }
 
 async function runConfigMigration({ env }) {
+	if (env.LAZYCODEX_CONFIG_REPAIR_DISABLED !== "1" && env.OMO_CODEX_CONFIG_REPAIR_DISABLED !== "1") {
+		try {
+			await repairOmoCodexConfig({ env });
+		} catch (error) {
+			if (!(error instanceof Error)) throw error;
+		}
+	}
 	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return;
 	try {
 		await migrateOmoSotConfig({ env, seed: true });
