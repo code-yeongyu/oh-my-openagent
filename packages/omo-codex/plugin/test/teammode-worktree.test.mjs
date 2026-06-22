@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw, teamDir } from "./teammode-safety-fixture.mjs";
+import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw, teamDir, teamJsonPath } from "./teammode-safety-fixture.mjs";
 
 // team.mjs derives paths from process.cwd(), which is the realpath; on macOS the temp dir is a
 // symlink (/var -> /private/var), so compare against the resolved root, not the symlink form.
@@ -192,6 +192,28 @@ test("#given two members edited the same line #when integrate hits the conflict 
 		assert.notEqual(conflict.status, 0, "a merge conflict must surface as a non-zero exit");
 		assert.match(`${conflict.stdout}${conflict.stderr}`, /conflict/i);
 		assert.match(`${conflict.stdout}${conflict.stderr}`, /\bB\b/);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given a member branch that cannot be merged #when integrate runs #then it surfaces git's real reason, not a fake conflict", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-wt-fatal-");
+	try {
+		initGitRepo(tempRoot);
+		bootstrapTeam(tempRoot, "wt-fatal", { worktree: true });
+		runTeam(tempRoot, "worktree-add", "--team", "wt-fatal", "--id", "A");
+		// point member A at a branch that does not exist: a fatal git error, NOT a content conflict
+		const team = readTeamJson(tempRoot, "wt-fatal");
+		team.members.find((m) => m.id === "A").worktree.branch = "ghost-branch-404";
+		writeFileSync(teamJsonPath(tempRoot, "wt-fatal"), `${JSON.stringify(team, null, 2)}\n`);
+
+		const result = runTeamRaw(tempRoot, "integrate", "--team", "wt-fatal", "--id", "A");
+
+		const out = `${result.stdout}${result.stderr}`;
+		assert.notEqual(result.status, 0);
+		assert.match(out, /could not integrate|not something we can merge|ghost-branch-404/i, "must surface git's actual reason");
+		assert.doesNotMatch(out, /Conflicting files/, "a non-conflict failure must NOT be mislabeled as a merge conflict");
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

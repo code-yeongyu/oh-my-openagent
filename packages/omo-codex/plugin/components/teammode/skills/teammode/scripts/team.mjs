@@ -187,9 +187,15 @@ const handlers = {
 		for (const member of targets) {
 			const result = integrateMemberBranch(cwd, member.worktree.branch);
 			if (!result.merged) {
-				process.stdout.write(`member ${member.id} (${member.worktree.branch}): CONFLICT into ${result.into}\n`);
+				if (result.conflicts.length > 0) {
+					process.stdout.write(`member ${member.id} (${member.worktree.branch}): CONFLICT into ${result.into}\n`);
+					throw new Error(
+						`merge conflict integrating member ${member.id} (branch ${member.worktree.branch}). Resolve the conflict, commit the merge, then re-run integrate. Conflicting files: ${result.conflicts.join(", ")}`,
+					);
+				}
+				process.stdout.write(`member ${member.id} (${member.worktree.branch}): could not start merge into ${result.into}\n`);
 				throw new Error(
-					`merge conflict integrating member ${member.id} (branch ${member.worktree.branch}). Resolve it, commit the merge, then re-run integrate. Conflicting files: ${result.conflicts.join(", ") || "(see git status)"}`,
+					`could not integrate member ${member.id} (branch ${member.worktree.branch}): ${result.message || "git merge failed; see git status"}`,
 				);
 			}
 			process.stdout.write(`member ${member.id} (${member.worktree.branch}): merged into ${result.into}\n`);

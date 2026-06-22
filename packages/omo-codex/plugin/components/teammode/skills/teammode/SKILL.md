@@ -123,9 +123,9 @@ cannot clobber each other. Decide this whenever you see the collision - at team 
 not only up front. For each colliding member run `worktree-add --team <id> --id <member>`: it creates
 the worktree off the base branch on a derived branch, flips the team into worktree mode, records it in
 `team.json`, and prints the `cd` path to hand that member. The member works and commits only inside
-its own worktree. To land the work, `integrate --team <id>` merges every member branch back with a
-merge commit (never a squash or rebase); resolve any conflict it reports, then `worktree-remove` each
-worktree at cleanup.
+its own worktree. To land the work, `integrate --team <id>` merges every member branch into your
+current branch with a merge commit (never a squash or rebase); resolve any conflict it reports, then
+`worktree-remove` each worktree at cleanup.
 
 ## Run a ulw-plan in parallel
 
