@@ -13,6 +13,7 @@ import {
   isTerminalNoReplyUserMessage,
   OMO_INTERNAL_INITIATOR_MARKER,
   OMO_INTERNAL_INITIATOR_METADATA_KEY,
+  OMO_INTERNAL_NOREPLY_MARKER,
   stripInternalInitiatorMarkers,
   withInternalNoReplyMarker,
 } from "./internal-initiator-marker"
@@ -241,7 +242,10 @@ describe("internal-initiator-marker", () => {
 
       // then
       expect(part.synthetic).toBe(true)
-      expect(part.metadata).toEqual({ compaction_continue: true })
+      expect(part.metadata).toEqual({
+        [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true,
+        compaction_continue: true,
+      })
       expect(hasInternalNoReplyMarker(part.text)).toBe(true)
     })
 
