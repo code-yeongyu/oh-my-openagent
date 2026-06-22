@@ -87,17 +87,20 @@ test("#given dry-run install opt-out #when running the Node installer entrypoint
 	assert.equal(output, "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --no-codex-autonomous");
 });
 
-test("#given dry-run doctor #when running the Node installer entrypoint #then prints delegated doctor command", () => {
+test("#given dry-run doctor #when running the Node installer entrypoint #then prints Codex LazyCodex doctor workflow command", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
 
 	// when
-	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor"], {
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor", "--json"], {
 		encoding: "utf8",
 	}).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo doctor");
+	assert.match(output, /^codex exec /);
+	assert.match(output, /Use \$omo:lcx-doctor/);
+	assert.match(output, /Requested doctor arguments: --json/);
+	assert.doesNotMatch(output, /oh-my-openagent omo doctor/);
 });
 
 test("#given dry-run cleanup #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {

@@ -13352,7 +13352,8 @@ function formatLazyCodexInstallHelp() {
     "`uninstall` removes managed Codex Light state; `cleanup` is a backward-compatible alias.",
     "`update` refreshes the installed Codex Light edition in place.",
     "",
-    `Pass-through commands delegated to the omo CLI: ${passthrough}.`
+    `Commands supported by lazycodex-ai: ${passthrough}.`,
+    "`doctor` runs the Codex LazyCodex doctor workflow; other pass-through commands delegate to the omo CLI."
   ].join(`
 `);
 }
@@ -13364,10 +13365,12 @@ async function runDelegatedOmoCommand(parsed, options) {
     options.log(`${invocation.command} ${invocation.args.join(" ")}`);
     return;
   }
-  const env3 = { ...process.env, OMO_INVOCATION_NAME: "omo" };
+  const env3 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo" } : process.env;
   await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env3 });
 }
 function buildDelegatedOmoInvocation(parsed) {
+  if (parsed.command === "doctor")
+    return buildLazyCodexDoctorInvocation(parsed.args);
   const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
   if (parsed.command === "install") {
     args.push("--platform=codex");
@@ -13386,7 +13389,32 @@ function buildDelegatedOmoInvocation(parsed) {
   } else {
     args.push(...parsed.args);
   }
-  return { command: "npx", args };
+  return { command: "npx", args, delegatesToOmo: true };
+}
+function buildLazyCodexDoctorInvocation(doctorArgs) {
+  return {
+    command: "codex",
+    args: [
+      "exec",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--cd",
+      ".",
+      buildLazyCodexDoctorPrompt(doctorArgs)
+    ],
+    delegatesToOmo: false
+  };
+}
+function buildLazyCodexDoctorPrompt(doctorArgs) {
+  return [
+    "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
+    "This command is already the lazycodex doctor surface, so do not invoke lazycodex doctor recursively.",
+    "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
+    "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
+    doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none"
+  ].join(" ");
 }
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
