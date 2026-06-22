@@ -8216,18 +8216,20 @@ function isRootSetting2(line, key) {
 }
 
 // packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
+var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
-var CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION = 1e4;
+var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
 function ensureCodexMultiAgentV2Config(config) {
-  const normalizedConfig = removeLegacyAgentsMaxThreadsSetting(removeFeatureFlagSetting(config, "multi_agent_v2"));
-  const section = findTomlSection(normalizedConfig, CODEX_MULTI_AGENT_V2_HEADER);
-  const maxThreadsValue = CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION.toString();
+  const normalizedConfig = removeFeatureFlagSetting(config, "multi_agent_v2");
+  const agentsConfig = ensureAgentsMaxThreads(normalizedConfig);
+  const section = findTomlSection(agentsConfig, CODEX_MULTI_AGENT_V2_HEADER);
+  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
   if (!section) {
-    return appendBlock(normalizedConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+    return appendBlock(agentsConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
 max_concurrent_threads_per_session = ${maxThreadsValue}
 `);
   }
-  return replaceOrInsertSetting(normalizedConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+  return replaceOrInsertSetting(agentsConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
 }
 function removeFeatureFlagSetting(config, featureName) {
   const section = findTomlSection(config, "features");
@@ -8235,11 +8237,15 @@ function removeFeatureFlagSetting(config, featureName) {
     return config;
   return removeSetting(config, section, featureName);
 }
-function removeLegacyAgentsMaxThreadsSetting(config) {
-  const section = findTomlSection(config, "agents");
-  if (!section)
-    return config;
-  return removeSetting(config, section, "max_threads");
+function ensureAgentsMaxThreads(config) {
+  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+  if (!section) {
+    return appendBlock(config, `[${CODEX_AGENTS_HEADER}]
+max_threads = ${maxThreadsValue}
+`);
+  }
+  return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue);
 }
 
 // packages/omo-codex/src/install/codex-config-toml.ts

@@ -78,7 +78,7 @@ describe("codex-config-toml", () => {
     const v2Section = content.slice(content.indexOf("[features.multi_agent_v2]"))
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2Section).not.toContain("enabled")
-    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
   })
 
   test("#given stale queue multi-agent mode #when updating config #then removes unsupported root key", async () => {
@@ -194,7 +194,7 @@ describe("codex-config-toml", () => {
     expect(content).toContain("[features.multi_agent_v2]")
     expect(content).toContain("enabled = false")
     expect(content).toContain("usage_hint_enabled = false")
-    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
     expect(content).not.toContain("max_concurrent_threads_per_session = 4")
   })
 
@@ -309,10 +309,10 @@ describe("codex-config-toml", () => {
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2LegacySection).not.toContain("enabled")
     expect(content).toContain("usage_hint_enabled = false")
-    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
   })
 
-  test("#given legacy agents max_threads #when updating config #then removes the conflicting legacy thread cap", async () => {
+  test("#given legacy agents max_threads #when updating config #then raises the root subagent thread cap", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))
     const configPath = join(root, "config.toml")
@@ -342,14 +342,15 @@ describe("codex-config-toml", () => {
     const v2ThreadsSection = content.slice(content.indexOf("[features.multi_agent_v2]"))
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2ThreadsSection).not.toContain("enabled")
-    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
     expect(content).toContain("[agents]")
-    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).toContain("max_threads = 1000")
+    expect(content).not.toContain("max_threads = 16")
     expect(content).toContain("max_depth = 4")
     expect(content).toContain("job_max_runtime_seconds = 3600")
   })
 
-  test("#given managed agent role sections #when updating config #then preserves role config while removing only root agents max_threads", async () => {
+  test("#given managed agent role sections #when updating config #then preserves role config while raising only root agents max_threads", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))
     const configPath = join(root, "config.toml")
@@ -378,7 +379,8 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).toContain("max_threads = 1000")
+    expect(content).not.toContain("max_threads = 16")
     expect(content).toContain("[agents.explorer]")
     expect(content).toContain('description = "read-only explorer"')
     expect(content).toContain('config_file = "./agents/explorer.toml"')
