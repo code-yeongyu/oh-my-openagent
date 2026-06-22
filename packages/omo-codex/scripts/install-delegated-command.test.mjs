@@ -5,7 +5,7 @@ import { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./install-l
 
 test("#given a lazycodex passthrough command #when delegating to omo #then resets OMO_INVOCATION_NAME so the delegate does not re-enter the lazycodex path", async () => {
 	// given
-	const parsed = { kind: "command", command: "doctor", args: [] };
+	const parsed = { kind: "command", command: "boulder", args: [] };
 	let received;
 	const options = {
 		cwd: "/tmp/project",
@@ -55,9 +55,9 @@ test("#given OMO_INVOCATION_NAME=lazycodex in the parent env #when delegating a 
 	assert.equal(received.env.OMO_INVOCATION_NAME, "omo");
 });
 
-test("#given a dry-run passthrough #when delegating #then logs the invocation without invoking runCommand", async () => {
+test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCodex doctor workflow", async () => {
 	// given
-	const parsed = { kind: "command", command: "doctor", dryRun: true, args: [] };
+	const parsed = { kind: "command", command: "doctor", dryRun: true, args: ["--json"] };
 	let logged;
 	let ran = false;
 
@@ -74,5 +74,8 @@ test("#given a dry-run passthrough #when delegating #then logs the invocation wi
 
 	// then
 	assert.equal(ran, false);
-	assert.match(logged, /npx --yes --package oh-my-openagent omo doctor/);
+	assert.match(logged, /^codex exec /);
+	assert.match(logged, /Use \$omo:lcx-doctor/);
+	assert.match(logged, /Requested doctor arguments: --json/);
+	assert.doesNotMatch(logged, /oh-my-openagent omo doctor/);
 });

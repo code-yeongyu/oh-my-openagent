@@ -6,6 +6,7 @@ export type LazyCodexDelegatedCommand = Extract<LazyCodexInstallCliArgs, { reado
 export type DelegatedOmoInvocation = {
   readonly command: string
   readonly args: readonly string[]
+  readonly delegatesToOmo: boolean
 }
 
 export async function runDelegatedOmoCommand(
@@ -21,11 +22,13 @@ export async function runDelegatedOmoCommand(
     options.log(`${invocation.command} ${invocation.args.join(" ")}`)
     return
   }
-  const env = { ...process.env, OMO_INVOCATION_NAME: "omo" }
+  const env = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo" } : process.env
   await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env })
 }
 
 export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): DelegatedOmoInvocation {
+  if (parsed.command === "doctor") return buildLazyCodexDoctorInvocation(parsed.args)
+
   const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command]
   if (parsed.command === "install") {
     args.push("--platform=codex")
@@ -39,5 +42,32 @@ export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): 
   } else {
     args.push(...parsed.args)
   }
-  return { command: "npx", args }
+  return { command: "npx", args, delegatesToOmo: true }
+}
+
+function buildLazyCodexDoctorInvocation(doctorArgs: readonly string[]): DelegatedOmoInvocation {
+  return {
+    command: "codex",
+    args: [
+      "exec",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--cd",
+      ".",
+      buildLazyCodexDoctorPrompt(doctorArgs),
+    ],
+    delegatesToOmo: false,
+  }
+}
+
+function buildLazyCodexDoctorPrompt(doctorArgs: readonly string[]): string {
+  return [
+    "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
+    "This command is already the lazycodex doctor surface, so do not invoke lazycodex doctor recursively.",
+    "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
+    "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
+    doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none",
+  ].join(" ")
 }
