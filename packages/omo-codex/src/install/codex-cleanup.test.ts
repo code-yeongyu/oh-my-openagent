@@ -312,12 +312,13 @@ describe("codex cleanup", () => {
   test("#given an artifact recreated after the first removal pass #when removeManagedPathBestEffort runs #then the retry clears it within one call", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-retry-"))
-    const bootstrapDir = join(root, "bootstrap")
+    const bootstrapDir = join(root, "plugins", "data", "omo-sisyphuslabs", "bootstrap")
     const statePath = join(bootstrapDir, "state.json")
     await writeFixtureFile(statePath, "{}\n")
 
     // when
     const removed = await removeManagedPathBestEffort(bootstrapDir, {
+      codexHome: root,
       afterFirstAttempt: async () => {
         await writeFixtureFile(statePath, "{}\n")
       },
