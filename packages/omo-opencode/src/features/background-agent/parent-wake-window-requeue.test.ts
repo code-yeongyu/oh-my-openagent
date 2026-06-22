@@ -19,7 +19,9 @@ type SessionMessageStub = {
 
 const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
 
-function createNotifier(): {
+function createNotifier(options: {
+  readonly onPendingWakeRequeued?: (sessionID: string) => void
+} = {}): {
   readonly notifier: ParentWakeNotifier
   readonly promptAsyncCalls: readonly PromptAsyncCall[]
 } {
@@ -50,6 +52,7 @@ function createNotifier(): {
       enqueueNotificationForParent: async (_sessionID, operation) => {
         await operation()
       },
+      ...(options.onPendingWakeRequeued ? { onPendingWakeRequeued: options.onPendingWakeRequeued } : {}),
     },
     {
       pendingRetryMs: 1_000,
@@ -94,6 +97,34 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
       // then
       expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
       expect(notifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([FINAL_WAKE])
+      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a parent wake is accepted but produces no assistant output #when recovery requeues it #then the manager callback fires before the retry timer settles", async () => {
+    // given
+    const requeuedSessionIDs: string[] = []
+    const { notifier, promptAsyncCalls } = createNotifier({
+      onPendingWakeRequeued: (sessionID) => {
+        requeuedSessionIDs.push(sessionID)
+      },
+    })
+    const sessionID = "parent-window-requeue-callback"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+
+      // when
+      await waitForTimer()
+
+      // then
+      expect(requeuedSessionIDs).toEqual([sessionID])
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(true)
       expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
     } finally {
       notifier.shutdown()

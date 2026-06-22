@@ -306,6 +306,7 @@ export class BackgroundManager {
         client: this.client,
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
+        onPendingWakeRequeued: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
         onScheduledFlushSettled: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
       },
       {

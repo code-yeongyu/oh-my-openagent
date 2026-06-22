@@ -12,6 +12,8 @@ import { BackgroundManager } from "./manager"
 type ParentWakeNotifierForMarkerTest = {
   readonly reserveNotificationPreparation: (sessionID: string) => void
   readonly releaseNotificationPreparation: (sessionID: string) => void
+  readonly requeueDispatchedParentWake: (sessionID: string, reason: string) => Promise<boolean>
+  readonly requeueDispatchedParentWakeAfterEmptyAssistantTurn: (sessionID: string) => boolean
 }
 
 type BackgroundManagerMarkerInternals = BackgroundManager & {
@@ -149,6 +151,63 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       // then
       const marker = readContinuationMarker(directory, parentSessionID)
       expect(marker?.sources["background-task"]?.state).toBe("idle")
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("#given a dispatched completion wake is requeued after session.error #when the prompt failure requeue returns #then the marker is active immediately", async () => {
+    // given
+    const directory = createTestDirectory()
+    const parentSessionID = "parent-session-error-requeue"
+    const manager = createManager(directory)
+    const internals = unsafeTestValue<BackgroundManagerMarkerInternals>(manager)
+    const notification = "ALL BACKGROUND TASKS COMPLETE\nTask bg_789 completed."
+
+    try {
+      internals.queuePendingParentWake(parentSessionID, notification, {}, true, 10_000)
+      await internals.flushPendingParentWake(parentSessionID)
+      const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
+      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+
+      // when
+      const requeued = await internals.parentWakeNotifier.requeueDispatchedParentWake(
+        parentSessionID,
+        "session.error",
+      )
+
+      // then
+      expect(requeued).toBe(true)
+      const requeuedMarker = readContinuationMarker(directory, parentSessionID)
+      expect(requeuedMarker?.sources["background-task"]?.state).toBe("active")
+      expect(requeuedMarker?.sources["background-task"]?.reason).toBe(BACKGROUND_COMPLETION_WAKE_PENDING_REASON)
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("#given a dispatched completion wake is requeued after an empty assistant turn #when the retry is queued #then the marker is active immediately", async () => {
+    // given
+    const directory = createTestDirectory()
+    const parentSessionID = "parent-empty-assistant-turn-requeue"
+    const manager = createManager(directory)
+    const internals = unsafeTestValue<BackgroundManagerMarkerInternals>(manager)
+    const notification = "ALL BACKGROUND TASKS COMPLETE\nTask bg_empty completed."
+
+    try {
+      internals.queuePendingParentWake(parentSessionID, notification, {}, true, 10_000)
+      await internals.flushPendingParentWake(parentSessionID)
+      const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
+      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+
+      // when
+      const requeued = internals.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(parentSessionID)
+
+      // then
+      expect(requeued).toBe(true)
+      const requeuedMarker = readContinuationMarker(directory, parentSessionID)
+      expect(requeuedMarker?.sources["background-task"]?.state).toBe("active")
+      expect(requeuedMarker?.sources["background-task"]?.reason).toBe(BACKGROUND_COMPLETION_WAKE_PENDING_REASON)
     } finally {
       manager.shutdown()
     }
