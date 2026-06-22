@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, statSync } from "fs"
-import { isAbsolute, join } from "path"
+import { existsSync, readFileSync, statSync } from "node:fs"
+import { isAbsolute, join } from "node:path"
 
 interface FileMatch {
   fullMatch: string
@@ -12,11 +12,10 @@ const FILE_REFERENCE_PATTERN = /@([^\s@]+)/g
 
 function findFileReferences(text: string): FileMatch[] {
   const matches: FileMatch[] = []
-  let match: RegExpExecArray | null
 
   FILE_REFERENCE_PATTERN.lastIndex = 0
 
-  while ((match = FILE_REFERENCE_PATTERN.exec(text)) !== null) {
+  for (let match = FILE_REFERENCE_PATTERN.exec(text); match !== null; match = FILE_REFERENCE_PATTERN.exec(text)) {
     matches.push({
       fullMatch: match[0],
       filePath: match[1],

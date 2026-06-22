@@ -17,6 +17,8 @@ export const SYMBOLS = {
   star: color.yellow("*"),
 }
 
+const ANSI_ESCAPE_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g")
+
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
   const status = enabled ? SYMBOLS.check : color.dim("○")
   const label = enabled ? color.white(name) : color.dim(name)
@@ -82,7 +84,7 @@ export function printBox(content: string, title?: string): void {
   const lines = content.split("\n")
   const maxWidth =
     Math.max(
-      ...lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").length),
+      ...lines.map((line) => line.replace(ANSI_ESCAPE_RE, "").length),
       title?.length ?? 0,
     ) + 4
   const border = color.dim("─".repeat(maxWidth))
@@ -100,9 +102,9 @@ export function printBox(content: string, title?: string): void {
   }
 
   for (const line of lines) {
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "")
+    const stripped = line.replace(ANSI_ESCAPE_RE, "")
     const padding = maxWidth - stripped.length
-    console.log(color.dim("│") + ` ${line}${" ".repeat(padding - 1)}` + color.dim("│"))
+    console.log(`${color.dim("│")} ${line}${" ".repeat(padding - 1)}${color.dim("│")}`)
   }
 
   console.log(color.dim("└") + border + color.dim("┘"))

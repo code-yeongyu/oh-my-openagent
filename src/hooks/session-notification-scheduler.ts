@@ -29,19 +29,19 @@ export function createIdleNotificationScheduler(options: {
     const maxSessions = options.config.maxTrackedSessions
     if (notifiedSessions.size > maxSessions) {
       const sessionsToRemove = Array.from(notifiedSessions).slice(0, notifiedSessions.size - maxSessions)
-      sessionsToRemove.forEach((id) => notifiedSessions.delete(id))
+      sessionsToRemove.forEach((id) => { notifiedSessions.delete(id) })
     }
     if (sessionActivitySinceIdle.size > maxSessions) {
       const sessionsToRemove = Array.from(sessionActivitySinceIdle).slice(0, sessionActivitySinceIdle.size - maxSessions)
-      sessionsToRemove.forEach((id) => sessionActivitySinceIdle.delete(id))
+      sessionsToRemove.forEach((id) => { sessionActivitySinceIdle.delete(id) })
     }
     if (notificationVersions.size > maxSessions) {
       const sessionsToRemove = Array.from(notificationVersions.keys()).slice(0, notificationVersions.size - maxSessions)
-      sessionsToRemove.forEach((id) => notificationVersions.delete(id))
+      sessionsToRemove.forEach((id) => { notificationVersions.delete(id) })
     }
     if (executingNotifications.size > maxSessions) {
       const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
-      sessionsToRemove.forEach((id) => executingNotifications.delete(id))
+      sessionsToRemove.forEach((id) => { executingNotifications.delete(id) })
     }
   }
 

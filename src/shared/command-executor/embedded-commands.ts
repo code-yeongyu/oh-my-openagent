@@ -9,11 +9,10 @@ const COMMAND_PATTERN = /!`([^`]+)`/g
 
 export function findEmbeddedCommands(text: string): CommandMatch[] {
 	const matches: CommandMatch[] = []
-	let match: RegExpExecArray | null
 
 	COMMAND_PATTERN.lastIndex = 0
 
-	while ((match = COMMAND_PATTERN.exec(text)) !== null) {
+	for (let match = COMMAND_PATTERN.exec(text); match !== null; match = COMMAND_PATTERN.exec(text)) {
 		matches.push({
 			fullMatch: match[0],
 			command: match[1],
