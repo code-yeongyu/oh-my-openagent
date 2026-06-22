@@ -72,6 +72,14 @@ function normalizedFocus(focus) {
 	return focus.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function normalizedMemberName(name) {
+	return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizedThreadTitle(title) {
+	return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function assertUniqueMemberFocus(team) {
 	const seen = new Map();
 	for (const member of team.members) {
@@ -84,6 +92,35 @@ function assertUniqueMemberFocus(team) {
 	}
 }
 
+function assertUniqueMemberName(team) {
+	const seen = new Map();
+	for (const member of team.members) {
+		const memberName = member.name ?? member.focus ?? "";
+		const key = normalizedMemberName(memberName);
+		const previous = seen.get(key);
+		if (previous) {
+			throw new Error(`member name "${memberName}" duplicates "${previous.name ?? previous.focus}" (no two members may produce the same thread title)`);
+		}
+		seen.set(key, member);
+	}
+}
+
+function assertUniqueMemberThreadTitle(team) {
+	const seen = new Map();
+	for (const member of team.members) {
+		const threadTitle = member.threadTitle;
+		if (typeof threadTitle !== "string" || !threadTitle.trim()) {
+			throw new Error(`member "${member.id ?? member.name ?? member.focus ?? "(unknown)"}" has invalid threadTitle (non-empty string required)`);
+		}
+		const key = normalizedThreadTitle(threadTitle);
+		const previous = seen.get(key);
+		if (previous) {
+			throw new Error(`member threadTitle "${threadTitle}" duplicates "${previous.threadTitle}" (no two members may produce the same thread title)`);
+		}
+		seen.set(key, member);
+	}
+}
+
 function assertTeamReadyForThreadBinding(team) {
 	if (isUnderstaffed(team)) {
 		throw new Error(
@@ -91,6 +128,8 @@ function assertTeamReadyForThreadBinding(team) {
 		);
 	}
 	assertUniqueMemberFocus(team);
+	assertUniqueMemberName(team);
+	assertUniqueMemberThreadTitle(team);
 }
 
 export function addMember(team, { id, focus, lens, deliverable = "", branch = null, name = null }) {
@@ -105,6 +144,10 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 	if (team.members.some((m) => m.id === memberId)) throw new Error(`member id "${memberId}" already exists (duplicate)`);
 	const duplicate = team.members.find((m) => normalizedFocus(m.focus) === normalizedFocus(memberFocus));
 	if (duplicate) throw new Error(`member focus "${memberFocus}" duplicates "${duplicate.focus}" (no two members may own the same thing)`);
+	const duplicateName = team.members.find((m) => normalizedMemberName(m.name ?? m.focus ?? "") === normalizedMemberName(memberName));
+	if (duplicateName) {
+		throw new Error(`member name "${memberName}" duplicates "${duplicateName.name ?? duplicateName.focus}" (no two members may produce the same thread title)`);
+	}
 	team.members.push({
 		id: memberId,
 		name: memberName,
@@ -172,6 +215,8 @@ export function validateTeam(team) {
 	if (team.leader?.kind !== "main-session") throw new Error("invalid team: leader.kind must be main-session");
 	if (!Array.isArray(team.members)) throw new Error("invalid team: members must be an array");
 	assertUniqueMemberFocus(team);
+	assertUniqueMemberName(team);
+	assertUniqueMemberThreadTitle(team);
 	return team;
 }
 
