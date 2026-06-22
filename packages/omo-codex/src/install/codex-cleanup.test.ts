@@ -389,6 +389,27 @@ describe("codex cleanup", () => {
     expect(cleaned).not.toContain("hooks.state")
     expect(cleaned).not.toContain("[agents.explorer]")
   })
+
+  test("#given single-quoted managed hook state table #when config text cleanup runs #then removes the managed hook state", () => {
+    // given
+    const config = String.raw`[features]
+plugins = true
+
+[hooks.state.'omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0']
+trusted_hash = "sha256:managed"
+
+[hooks.state.'other@local:hooks/hooks.json:post_tool_use:0:0']
+trusted_hash = "sha256:user"
+`
+
+    // when
+    const cleaned = cleanupCodexLightConfigText(config)
+
+    // then
+    expect(cleaned).toContain("[features]")
+    expect(cleaned).not.toContain("omo@sisyphuslabs")
+    expect(cleaned).toContain("other@local")
+  })
 })
 
 async function writeFixtureFile(path: string, contents: string): Promise<void> {
