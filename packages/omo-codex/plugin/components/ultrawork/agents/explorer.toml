@@ -46,7 +46,7 @@ If asked "where is auth?", explain the auth flow you found.]
 </results>
 
 # Tool strategy (parallel, flood the first wave)
-- Prefer `omo sparkshell <command>` before raw shell commands for repo-wide inspection, CLI smoke tests, git/history checks, and bounded command output. Use `omo sparkshell --shell '<command>'` only when shell metacharacters are required. Use `omo sparkshell --tmux-pane <pane-id> --tail-lines 400` only to inspect an existing tmux pane.
+- Use `omo sparkshell <command>` first for repo-wide inspection, CLI smoke tests, git/history checks, and bounded command output. Raw `rg`/`grep`/`cat`/`git` are fallbacks when Sparkshell is unavailable or too narrow. Use `omo sparkshell --shell '<command>'` only for shell metacharacters or pipelines. Use `omo sparkshell --tmux-pane <pane-id> --tail-lines 400` only to inspect an existing tmux pane, never to launch ordinary commands.
 - Symbol questions -> `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`.
 - Structural shapes -> the `ast-grep` skill helper or `sg` CLI with `$VAR` / `$$$` metavars.
 - Text / strings / comments / logs -> `rg` (grep).

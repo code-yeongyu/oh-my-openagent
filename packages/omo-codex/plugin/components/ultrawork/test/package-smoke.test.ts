@@ -52,9 +52,11 @@ describe("codex ultrawork package metadata", () => {
 	it("#given explorer guidance #when inspected #then starts codebase inspection with Sparkshell", () => {
 		// given
 		const explorer = readTextFile("agents/explorer.toml");
+		const directive = readTextFile("directive.md");
 
 		// when
 		const guidance = explorer.toLowerCase();
+		const directiveGuidance = directive.toLowerCase().replace(/\s+/g, " ");
 		const sparkshellIndex = guidance.indexOf("omo sparkshell <command>");
 		const lspIndex = guidance.indexOf("lsp_goto_definition");
 		const structuralIndex = guidance.indexOf("ast-grep");
@@ -63,9 +65,15 @@ describe("codex ultrawork package metadata", () => {
 		expect(sparkshellIndex).toBeGreaterThanOrEqual(0);
 		expect(lspIndex).toBeGreaterThan(sparkshellIndex);
 		expect(structuralIndex).toBeGreaterThan(sparkshellIndex);
-		expect(guidance).toContain("prefer `omo sparkshell <command>` before raw shell commands");
-		expect(guidance).toContain("--shell '<command>'");
-		expect(guidance).toContain("--tmux-pane");
+		expect(guidance).toContain("use `omo sparkshell <command>` first for repo-wide inspection");
+		expect(guidance).toContain("raw `rg`/`grep`/`cat`/`git` are fallbacks");
+		expect(guidance).toContain("sparkshell is unavailable or too narrow");
+		expect(guidance).toContain("sparkshell --shell '<command>'` only for shell metacharacters or pipelines");
+		expect(guidance).toContain("sparkshell --tmux-pane <pane-id> --tail-lines 400` only to inspect an existing tmux pane, never to launch ordinary commands");
+		expect(directiveGuidance).toContain("use `omo sparkshell <command>` first");
+		expect(directiveGuidance).toContain("raw `rg`/`grep`/`cat`/`git` are fallbacks when sparkshell is unavailable or too narrow");
+		expect(directiveGuidance).toContain("`--shell` is only for shell metacharacters or pipelines");
+		expect(directiveGuidance).toContain("`--tmux-pane` is only for inspecting an existing pane, never for launching ordinary commands");
 	});
 
 	it("#given librarian guidance #when inspected #then names the packaged research MCP surfaces", () => {
