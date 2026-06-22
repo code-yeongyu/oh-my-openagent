@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
 import test from "node:test";
 
-import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam } from "./teammode-safety-fixture.mjs";
+import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw, teamJsonPath } from "./teammode-safety-fixture.mjs";
 
 function addMember(tempRoot, sessionId, { id, name, focus, lens, deliverable }) {
 	const args = ["add-member", "--team", sessionId, "--id", id, "--focus", focus, "--lens", lens, "--deliverable", deliverable];
@@ -46,6 +47,122 @@ test("#given a member added without an explicit name #when state is read #then t
 		assert.equal(byId.A.threadTitle, "[Recovery] installer config");
 		assert.equal(byId.B.threadTitle, "[Recovery] runtime qa");
 		assert.notEqual(byId.A.threadTitle, byId.B.threadTitle);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given a member name already exists #when add-member receives the same name with different spacing and case #then state is not partially mutated", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-title-duplicate-name-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Recovery", "--session-name", "shared-session", "--session", "title-duplicate-name");
+		addMember(tempRoot, "title-duplicate-name", {
+			id: "A",
+			name: "App Server",
+			focus: "app-server lifecycle",
+			lens: "area",
+			deliverable: "lifecycle map",
+		});
+
+		const result = runTeamRaw(
+			tempRoot,
+			"add-member",
+			"--team",
+			"title-duplicate-name",
+			"--id",
+			"B",
+			"--name",
+			" app   server ",
+			"--focus",
+			"mailbox delivery",
+			"--lens",
+			"ownership",
+			"--deliverable",
+			"delivery audit",
+		);
+		const team = readTeamJson(tempRoot, "title-duplicate-name");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member name "app   server" duplicates "App Server"/);
+		assert.equal(team.members.length, 1);
+		assert.deepEqual(
+			team.members.map((member) => ({ id: member.id, name: member.name, threadTitle: member.threadTitle })),
+			[{ id: "A", name: "App Server", threadTitle: "[Recovery] App Server" }],
+		);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given persisted team.json has duplicate member names #when a command loads the team #then stale state is rejected", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-title-stale-duplicate-name-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Recovery", "--session-name", "shared-session", "--session", "title-stale-duplicate-name");
+		addMember(tempRoot, "title-stale-duplicate-name", {
+			id: "A",
+			name: "App Server",
+			focus: "app-server lifecycle",
+			lens: "area",
+			deliverable: "lifecycle map",
+		});
+		addMember(tempRoot, "title-stale-duplicate-name", {
+			id: "B",
+			name: "Mailbox Delivery",
+			focus: "mailbox delivery",
+			lens: "ownership",
+			deliverable: "delivery audit",
+		});
+		const path = teamJsonPath(tempRoot, "title-stale-duplicate-name");
+		const team = JSON.parse(readFileSync(path, "utf8"));
+		team.members[1].name = " app   server ";
+		writeFileSync(path, `${JSON.stringify(team, null, 2)}\n`);
+
+		const result = runTeamRaw(tempRoot, "status", "--team", "title-stale-duplicate-name");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member name " app   server " duplicates "App Server"/);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given persisted team.json has duplicate thread titles with distinct member names #when bind-thread runs #then state is rejected before activation", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-title-stale-duplicate-title-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Recovery", "--session-name", "shared-session", "--session", "title-stale-duplicate-title");
+		addMember(tempRoot, "title-stale-duplicate-title", {
+			id: "A",
+			name: "App Server",
+			focus: "app-server lifecycle",
+			lens: "area",
+			deliverable: "lifecycle map",
+		});
+		addMember(tempRoot, "title-stale-duplicate-title", {
+			id: "B",
+			name: "Mailbox Delivery",
+			focus: "mailbox delivery",
+			lens: "ownership",
+			deliverable: "delivery audit",
+		});
+		const path = teamJsonPath(tempRoot, "title-stale-duplicate-title");
+		const team = JSON.parse(readFileSync(path, "utf8"));
+		team.members[0].threadTitle = "[Legacy] Alpha";
+		team.members[1].threadTitle = "[Legacy] Alpha";
+		writeFileSync(path, `${JSON.stringify(team, null, 2)}\n`);
+
+		const result = runTeamRaw(tempRoot, "bind-thread", "--team", "title-stale-duplicate-title", "--id", "A", "--thread", "thread-a");
+		const persisted = readTeamJson(tempRoot, "title-stale-duplicate-title");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member threadTitle "\[Legacy\] Alpha" duplicates "\[Legacy\] Alpha"/);
+		assert.deepEqual(
+			persisted.members.map((member) => ({ id: member.id, status: member.status, threadId: member.threadId })),
+			[
+				{ id: "A", status: "pending", threadId: null },
+				{ id: "B", status: "pending", threadId: null },
+			],
+		);
+		assert.equal(persisted.log.some((entry) => entry.event === "bind-thread"), false);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}
