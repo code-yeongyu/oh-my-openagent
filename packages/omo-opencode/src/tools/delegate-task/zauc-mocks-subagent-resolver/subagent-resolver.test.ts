@@ -176,13 +176,13 @@ describe("resolveSubagentExecution", () => {
   test("allows delegating to a primary agent when allowPrimaryAgentDelegation is enabled (team-mode path)", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
-      models: { anthropic: ["claude-opus-4-7"] },
+      models: { anthropic: ["claude-opus-4-8"] },
       connected: ["anthropic"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
     const args = createBaseArgs({ subagent_type: "sisyphus" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "Sisyphus - ultraworker", mode: "primary", model: "anthropic/claude-opus-4-7" },
+      { name: "Sisyphus - ultraworker", mode: "primary", model: "anthropic/claude-opus-4-8" },
       { name: "oracle", mode: "subagent" },
     ]))
 
@@ -306,13 +306,13 @@ describe("resolveSubagentExecution", () => {
   test("preserves hidden sort-prefixed plan agent model instead of using fallback", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
-      models: { anthropic: ["claude-opus-4-7"] },
+      models: { anthropic: ["claude-opus-4-8"] },
       connected: ["anthropic"],
       updatedAt: "2026-03-03T00:00:00.000Z",
     })
     const args = createBaseArgs({ subagent_type: "plan" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "1|plan", mode: "subagent", hidden: true, model: "anthropic/claude-opus-4-7" },
+      { name: "1|plan", mode: "subagent", hidden: true, model: "anthropic/claude-opus-4-8" },
       { name: "oracle", mode: "subagent" },
     ]))
 
@@ -322,7 +322,7 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("plan")
-    expect(result.categoryModel).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(result.categoryModel).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
   })
 
   test("allows OpenCode-hidden-list plan fallback when planner_enabled and replace_plan are true", async () => {

@@ -29,7 +29,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
     })
     expect(second).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
@@ -125,7 +125,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("prometheus has claude-opus-4-7 as primary", () => {
+  test("prometheus has claude-opus-4-8 as primary", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
@@ -136,7 +136,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
     })
   })
@@ -156,7 +156,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
       model: "claude-sonnet-4-6",
     })
-    expect(opusFallback?.model).toBe("claude-opus-4-7")
+    expect(opusFallback?.model).toBe("claude-opus-4-8")
     expect(opusFallback?.variant).toBe("max")
     expect(openAiFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],

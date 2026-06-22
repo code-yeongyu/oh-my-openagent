@@ -71,7 +71,7 @@ describe("mergeCategories", () => {
   it("user overrides merge with defaults", () => {
     //#given
     const userCategories = {
-      "ultrabrain": { model: "anthropic/claude-opus-4-7" },
+      "ultrabrain": { model: "anthropic/claude-opus-4-8" },
     }
 
     //#when
@@ -79,6 +79,6 @@ describe("mergeCategories", () => {
 
     //#then
     expect(result["ultrabrain"]).toBeDefined()
-    expect(result["ultrabrain"].model).toBe("anthropic/claude-opus-4-7")
+    expect(result["ultrabrain"].model).toBe("anthropic/claude-opus-4-8")
   })
 })

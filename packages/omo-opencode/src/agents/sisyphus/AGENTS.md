@@ -16,7 +16,7 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 | File | Purpose |
 |------|---------|
 | `default.ts` | Base/Claude variant: task management, delegation guides, 542 LOC |
-| `claude-opus-4-7.ts` | Opus 4.7-native: literal-instruction tuning, bounded exploration/thinking |
+| `claude-opus-4-8.ts` | Opus 4.8-native: literal-instruction tuning, bounded exploration/thinking |
 | `claude-opus-4-8.ts` | Opus 4.8-native: silence-default narration, small-decision autonomy, bounded exploration |
 | `claude-fable-5.ts` | Fable 5-native: top-tier model, Opus 4.8 tuning direction |
 | `gemini.ts` | Gemini-optimized: stricter tool-usage rules, 5 NEVER rules |
@@ -33,7 +33,7 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 - GPT-5.4+ -> `gpt-5-4.ts`
 - Contains "claude-fable-5" -> `claude-fable-5.ts`
 - Contains "claude-opus-4-8" -> `claude-opus-4-8.ts`
-- Contains "claude-opus-4-7" -> `claude-opus-4-7.ts`
+- Contains "claude-opus-4-8" -> `claude-opus-4-8.ts`
 - Default -> fallback prompt (Claude, GLM, etc.; Gemini gets corrective overlays)
 
 ## KEY EXPORTS

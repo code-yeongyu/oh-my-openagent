@@ -94,7 +94,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
 
     // when
     const modelLimit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
-    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-7")
+    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-8")
     const defaultLimit = manager.getConcurrencyLimit("google/gemini-3.1-pro")
 
     // then
@@ -168,7 +168,7 @@ describe("ConcurrencyManager.getConcurrencyKey", () => {
 
     // when
     const firstKey = manager.getConcurrencyKey("anthropic/claude-sonnet-4-6")
-    const secondKey = manager.getConcurrencyKey("anthropic/claude-opus-4-7")
+    const secondKey = manager.getConcurrencyKey("anthropic/claude-opus-4-8")
 
     // then
     expect(firstKey).toBe("anthropic")

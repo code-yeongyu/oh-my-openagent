@@ -9,7 +9,7 @@ describe("provider model ID transforms", () => {
 	test("preserves hyphenated Anthropic IDs for direct API calls", () => {
 		// #given Anthropic model IDs in config-display form
 		const provider = "anthropic"
-		const models = ["claude-haiku-4-5", "claude-opus-4-7"] as const
+		const models = ["claude-haiku-4-5", "claude-opus-4-8"] as const
 
 		for (const model of models) {
 			// #when both model-core transform variants are called
@@ -32,8 +32,8 @@ describe("provider model ID transforms", () => {
 			},
 			{
 				provider: "github-copilot",
-				model: "claude-opus-4-7",
-				expected: "claude-opus-4.7",
+				model: "claude-opus-4-8",
+				expected: "claude-opus-4.8",
 			},
 			{
 				provider: "vercel",
@@ -42,8 +42,8 @@ describe("provider model ID transforms", () => {
 			},
 			{
 				provider: "vercel",
-				model: "anthropic/claude-opus-4-7",
-				expected: "anthropic/claude-opus-4.7",
+				model: "anthropic/claude-opus-4-8",
+				expected: "anthropic/claude-opus-4.8",
 			},
 		] as const
 
@@ -62,7 +62,7 @@ describe("provider model ID transforms", () => {
 			{ provider: "openai", model: "gpt-4o" },
 			{ provider: "google", model: "gemini-2.5-pro" },
 			{ provider: "github-copilot", model: "gemini-3-flash" },
-			{ provider: "vercel", model: "claude-opus-4-7" },
+			{ provider: "vercel", model: "claude-opus-4-8" },
 		] as const
 
 		for (const scenario of scenarios) {

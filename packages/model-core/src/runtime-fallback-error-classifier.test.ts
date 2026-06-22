@@ -148,7 +148,7 @@ describe("runtime fallback error classifier", () => {
   test("extracts provider auto-retry signals from status summary or details", () => {
     //#given
     const retryInfo = {
-      summary: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+      summary: "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 56s attempt #1]",
     }
 
     //#when

@@ -224,7 +224,7 @@ describe("remapAgentKeysToDisplayNames", () => {
         sisyphus: { prompt: "test", mode: "primary" },
       }
       const overrides = {
-        sisyphus: { model: "claude-opus-4-7" },
+        sisyphus: { model: "claude-opus-4-8" },
       }
 
       // when remapping with overrides that have no displayName

@@ -206,7 +206,7 @@ describe("TaskToastManager", () => {
         description: "Task with inherited model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "cliproxy/claude-opus-4-7", type: "inherited" as const },
+        modelInfo: { model: "cliproxy/claude-opus-4-8", type: "inherited" as const },
       }
 
       // when - addTask is called
@@ -216,7 +216,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("cliproxy/claude-opus-4-7")
+      expect(call.body.message).toContain("cliproxy/claude-opus-4-8")
       expect(call.body.message).toContain("(inherited from parent)")
     })
 

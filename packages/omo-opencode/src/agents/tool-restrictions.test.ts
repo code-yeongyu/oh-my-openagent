@@ -218,7 +218,7 @@ describe("read-only agent tool restrictions", () => {
     test("deny grep and glob for Opus 4.7 and GPT 5.5 models", () => {
       // given
       const frontierAgents = [
-        createSisyphusAgent("anthropic/claude-opus-4-7"),
+        createSisyphusAgent("anthropic/claude-opus-4-8"),
         createSisyphusAgent("anthropic/claude-opus-4.7"),
         createSisyphusAgent("openai/gpt-5.5"),
         createHephaestusAgent("openai/gpt-5.5"),

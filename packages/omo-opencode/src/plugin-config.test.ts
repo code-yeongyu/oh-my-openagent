@@ -1210,7 +1210,7 @@ describe("loadPluginConfig", () => {
             ],
           },
           oracle: {
-            model: "anthropic/claude-opus-4-7",
+            model: "anthropic/claude-opus-4-8",
             fallback_models: [
               "github-copilot/claude-sonnet-4.6",
               "opencode-go/glm-5.1",
@@ -1248,7 +1248,7 @@ describe("loadPluginConfig", () => {
       | { model?: string; fallback_models?: Array<string | { model: string }> }
       | undefined
     // Primary is allowed -> untouched. Chain has the disabled entry removed.
-    expect(oracle?.model).toBe("anthropic/claude-opus-4-7")
+    expect(oracle?.model).toBe("anthropic/claude-opus-4-8")
     expect(oracle?.fallback_models).toEqual(["opencode-go/glm-5.1"])
 
     const deep = config.categories?.deep as

@@ -1451,7 +1451,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		const retryStatus = {
 			type: "retry",
 			attempt: 1,
-			message: "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in 7m 56s attempt #1]",
+			message: "All credentials for model claude-opus-4-8-thinking are cooling down [retrying in 7m 56s attempt #1]",
 			next: 476,
 		} as const
 
@@ -1463,7 +1463,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 						id: "msg_user_retry_rearm",
 						sessionID,
 						role: "user",
-						modelID: "claude-opus-4-7-thinking",
+						modelID: "claude-opus-4-8-thinking",
 						providerID: "anthropic",
 						agent: "Sisyphus - Ultraworker",
 					},
@@ -1485,7 +1485,7 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 			{
 				sessionID,
 				agent: "sisyphus",
-				model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+				model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
 			},
 			firstOutput,
 		)

@@ -59,7 +59,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `artistry` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Creative / unconventional approaches |
 | `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | anthropic/claude-sonnet-4-6 | anthropic-categories.ts | Moderate effort fallback |
-| `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
+| `unspecified-high` | anthropic/claude-opus-4-8 (variant: max) | anthropic-categories.ts | High effort fallback |
 | `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.

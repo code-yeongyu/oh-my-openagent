@@ -52,7 +52,7 @@ describe("createRuntimeFallbackHook dispose retry-key cleanup", () => {
     await hook.event({
       event: {
         type: "session.created",
-        properties: { info: { id: sessionID, model: "quotio/claude-opus-4-7" } },
+        properties: { info: { id: sessionID, model: "quotio/claude-opus-4-8" } },
       },
     })
 
@@ -64,7 +64,7 @@ describe("createRuntimeFallbackHook dispose retry-key cleanup", () => {
           status: {
             type: "retry",
             attempt: 1,
-            message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+            message: "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 56s attempt #1]",
           },
         },
       },
@@ -78,7 +78,7 @@ describe("createRuntimeFallbackHook dispose retry-key cleanup", () => {
     await hook.event({
       event: {
         type: "session.created",
-        properties: { info: { id: sessionID, model: "quotio/claude-opus-4-7" } },
+        properties: { info: { id: sessionID, model: "quotio/claude-opus-4-8" } },
       },
     })
     await hook.event(retryEvent)

@@ -56,7 +56,7 @@ Both must agree before marking a task complete. Prevents premature completion on
 
 ## CONCURRENCY MODEL
 
-- Key format: `{providerID}/{modelID}` (e.g., `anthropic/claude-opus-4-7`)
+- Key format: `{providerID}/{modelID}` (e.g., `anthropic/claude-opus-4-8`)
 - Default limit: 5 concurrent per key (configurable via `background_task` config)
 - FIFO queue: tasks wait in order when slots full
 - Slot released on: completion, error, cancellation

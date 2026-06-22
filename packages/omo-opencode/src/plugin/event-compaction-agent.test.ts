@@ -74,7 +74,7 @@ describe("createEventHandler compaction agent filtering", () => {
             role: "user",
             agent: "compaction",
             time: { created: Date.now() },
-            model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+            model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
           },
         },
       },

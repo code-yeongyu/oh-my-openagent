@@ -116,14 +116,14 @@ describe("aggregateStatus", () => {
     const teamRunId = await seedRuntimeState(baseDir, "team-beta", "lead-2", [])
     const backgroundManager = {
       getTasksByParentSession: () => [
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
-        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "running", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
+        { status: "pending", model: { providerID: "anthropic", modelID: "claude-opus-4-8" } },
       ],
       getConcurrencyCounts: () => ({ running: 5, queued: 3 }),
       listTasksByParentSession: () => [{}, {}, {}, {}],

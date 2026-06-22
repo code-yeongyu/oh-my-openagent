@@ -93,7 +93,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "anthropic/claude-opus-4-7-thinking",
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: "claude-opus-4-8",
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
     })
@@ -124,7 +124,7 @@ describe("model-capability-aliases", () => {
 
     expect(result).toEqual({
       requestedModelID: "claude-opus-4-7-thinking",
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: "claude-opus-4-8",
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
     })

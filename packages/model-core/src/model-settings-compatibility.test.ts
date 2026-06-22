@@ -7,7 +7,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("keeps supported Claude Opus variant unchanged", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       desired: { variant: "max" },
     })
 
@@ -21,7 +21,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("uses model metadata first for variant support", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       desired: { variant: "max" },
       capabilities: { variants: ["low", "medium", "high"] },
     })
@@ -43,7 +43,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("prefers metadata over family heuristics even when family would allow a higher level", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       desired: { variant: "max" },
       capabilities: { variants: ["low", "medium"] },
     })
@@ -742,7 +742,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("no-op when desired settings are empty", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       desired: {},
     })
 

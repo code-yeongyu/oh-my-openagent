@@ -36,7 +36,7 @@ function createPluginComponents(): PluginComponents {
 
 function createBaseConfig(): Record<string, unknown> {
   return {
-    model: "anthropic/claude-opus-4-7",
+    model: "anthropic/claude-opus-4-8",
     agent: {},
   }
 }
@@ -348,7 +348,7 @@ describe("applyAgentConfig builtin override protection", () => {
         name: getAgentListDisplayName("sisyphus"),
         prompt: "stale sisyphus prompt",
         mode: "primary",
-        model: "anthropic/claude-opus-4-7",
+        model: "anthropic/claude-opus-4-8",
       },
       [getAgentListDisplayName("explore")]: {
         name: getAgentListDisplayName("explore"),

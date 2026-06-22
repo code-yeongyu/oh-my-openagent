@@ -81,7 +81,7 @@ describe("applyAgentConfig .agents skills", () => {
 
     // when
     await applyAgentConfig({
-      config: { model: "anthropic/claude-opus-4-7", agent: {} },
+      config: { model: "anthropic/claude-opus-4-8", agent: {} },
       pluginConfig: createPluginConfig(),
       ctx: { directory },
       pluginComponents: createPluginComponents(),
@@ -111,7 +111,7 @@ describe("applyAgentConfig .agents skills", () => {
 
     // when
     await applyAgentConfig({
-      config: { model: "anthropic/claude-opus-4-7", agent: {} },
+      config: { model: "anthropic/claude-opus-4-8", agent: {} },
       pluginConfig: createPluginConfig(),
       ctx: { directory: "/tmp/project" },
       pluginComponents: createPluginComponents(),
@@ -190,7 +190,7 @@ describe("applyAgentConfig .agents skills", () => {
 
     // when
     await applyAgentConfig({
-      config: { model: "anthropic/claude-opus-4-7", agent: {} },
+      config: { model: "anthropic/claude-opus-4-8", agent: {} },
       pluginConfig: createPluginConfig(),
       ctx: { directory: "/tmp/project" },
       pluginComponents: createPluginComponents(),

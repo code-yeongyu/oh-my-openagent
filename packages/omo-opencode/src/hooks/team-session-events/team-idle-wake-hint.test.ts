@@ -348,7 +348,7 @@ describe("createTeamIdleWakeHint", () => {
     const worker = runtimeState.members[0]
     if (!worker) throw new Error("worker member missing from fixture")
     worker.subagent_type = "atlas"
-    worker.model = { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" }
+    worker.model = { providerID: "anthropic", modelID: "claude-opus-4-8", variant: "high" }
     await seedRuntimeState(runtimeState, config)
     await seedUnreadMessage(teamRunId, config, randomUUID(), "hello", 100)
 
@@ -377,7 +377,7 @@ describe("createTeamIdleWakeHint", () => {
       throw new Error("expected wake hint prompt input")
     }
     expect(promptInput.body.agent).toBe("atlas")
-    expect(promptInput.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(promptInput.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
     expect(promptInput.body.variant).toBe("high")
   })
 

@@ -511,7 +511,7 @@ describe("createTeamSendMessageTool", () => {
     const memberTwo = state.members.find((member) => member.name === "m2")
     if (!memberTwo) throw new Error("m2 runtime member missing")
     memberTwo.subagent_type = "atlas"
-    memberTwo.model = { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" }
+    memberTwo.model = { providerID: "anthropic", modelID: "claude-opus-4-8", variant: "high" }
     await saveState(state, fixture.config)
 
     const { client, calls } = createRecordingClient()
@@ -528,7 +528,7 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0].sessionId).toBe(fixture.memberTwoSessionId)
     expect(calls[0].agent).toBe("atlas")
-    expect(calls[0].model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(calls[0].model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
     expect(calls[0].variant).toBe("high")
   })
 

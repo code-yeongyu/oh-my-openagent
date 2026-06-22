@@ -121,12 +121,12 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
               name: "APIError",
               data: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
                 isRetryable: true,
               },
             },
             parentID: "msg_user_pin_1",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -141,7 +141,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toContain("Sisyphus")
     expect(body.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
     })
     expectSyntheticContinuation(body)
   })
@@ -161,13 +161,13 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
         properties: {
           sessionID,
           providerID: "anthropic",
-          modelID: "claude-opus-4-7-thinking",
+          modelID: "claude-opus-4-8-thinking",
           error: {
             name: "UnknownError",
             data: {
               error: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
               },
             },
           },
@@ -182,7 +182,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent?.toLowerCase()).toContain("sisyphus")
     expect(body.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
     })
     expectSyntheticContinuation(body)
   })
@@ -206,7 +206,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             id: "msg_user_status_noasync",
             sessionID,
             role: "user",
-            modelID: "claude-opus-4-7-thinking",
+            modelID: "claude-opus-4-8-thinking",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -224,7 +224,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             type: "retry",
             attempt: 1,
             message:
-              "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+              "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
             next: 1234,
           },
         },
@@ -239,7 +239,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     expect(body.agent).toContain("Sisyphus")
     expect(body.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
     })
     expectSyntheticContinuation(body)
   })
@@ -269,13 +269,13 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
         properties: {
           sessionID,
           providerID: "anthropic",
-          modelID: "claude-opus-4-7-thinking",
+          modelID: "claude-opus-4-8-thinking",
           error: {
             name: "UnknownError",
             data: {
               error: {
                 message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-8-thinking\"}}",
               },
             },
           },

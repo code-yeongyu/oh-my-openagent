@@ -35,9 +35,9 @@ The orchestration system uses a three-layer architecture that solves context ove
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5"]
+        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-8 / gpt-5.5 / glm-5"]
+        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-8 / gpt-5.5 / glm-5"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.5 / claude-opus-4-8 / gemini-3.1-pro / glm-5"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
@@ -46,10 +46,10 @@ flowchart TB
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
-        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
+        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-8 / glm-5"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-8"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -304,7 +304,7 @@ This "boulder pushing" mechanism is why the system is named after Sisyphus.
 ```typescript
 // OLD: Model name creates distributional bias
 task({ agent: "gpt-5.5", prompt: "..." }); // Model knows its limitations
-task({ agent: "claude-opus-4-7", prompt: "..." }); // Different self-perception
+task({ agent: "claude-opus-4-8", prompt: "..." }); // Different self-perception
 ```
 
 **The Solution: Semantic Categories:**
@@ -478,7 +478,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.5` (`medium`)                       | `claude-opus-4-7` / `kimi-k2.5` / `gpt-5.5` / `glm-5` depending on setup |
+| **Model**       | `gpt-5.5` (`medium`)                       | `claude-opus-4-8` / `kimi-k2.5` / `gpt-5.5` / `glm-5` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |

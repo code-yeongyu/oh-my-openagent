@@ -95,7 +95,7 @@ describe("runtime-fallback provider matrix quota tests", () => {
       //#given
       const error = {
         name: "AI_APICallError",
-        message: "All credentials for model claude-opus-4-7 are cooling down [retrying in ~2 weeks]",
+        message: "All credentials for model claude-opus-4-8 are cooling down [retrying in ~2 weeks]",
         provider: "anthropic",
       }
 

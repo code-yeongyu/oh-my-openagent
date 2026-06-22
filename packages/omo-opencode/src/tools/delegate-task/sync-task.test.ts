@@ -427,11 +427,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       variant: "max",
     }
     const fallbackChain = [
-      { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+      { providers: ["anthropic"], model: "claude-opus-4-8", variant: "max" },
       { providers: ["opencode-go"], model: "kimi-k2.6" },
     ]
 
@@ -444,7 +444,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(result).toContain("Task completed")
     expect(result).toContain("Model: opencode-go/kimi-k2.6")
     expect(attemptedModels).toEqual([
-      { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8", variant: "max" },
       { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
     ])
   })
@@ -494,11 +494,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       variant: "max",
     }
     const fallbackChain = [
-      { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+      { providers: ["anthropic"], model: "claude-opus-4-8", variant: "max" },
       { providers: ["opencode-go"], model: "kimi-k2.6" },
       { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
     ]
@@ -511,7 +511,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#then
     expect(result).toBe("Final failure")
     expect(attemptedModels).toEqual([
-      { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8", variant: "max" },
       { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
       { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
     ])
@@ -523,7 +523,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const sendPrompt = mock(async () => "promptAsync skipped by gate: reserved")
     const initialModel = {
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       variant: "max",
     }
 
@@ -533,7 +533,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
       initialError: "JSON Parse error: Unexpected EOF",
       categoryModel: initialModel,
       fallbackChain: [
-        { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+        { providers: ["anthropic"], model: "claude-opus-4-8", variant: "max" },
         { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
       ],
       sendPrompt,

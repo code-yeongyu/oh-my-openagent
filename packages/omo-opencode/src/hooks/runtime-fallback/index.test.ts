@@ -684,7 +684,7 @@ describe("runtime-fallback", () => {
     test("should trigger fallback on OpenAI auto-retry signal in message.updated", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
-        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-7"]),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-8"]),
       })
 
       const sessionID = "test-session-openai-auto-retry"
@@ -716,7 +716,7 @@ describe("runtime-fallback", () => {
 
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
-      expect(fallbackLog?.data).toMatchObject({ from: "openai/gpt-5.5", to: "anthropic/claude-opus-4-7" })
+      expect(fallbackLog?.data).toMatchObject({ from: "openai/gpt-5.5", to: "anthropic/claude-opus-4-8" })
     })
 
     test("should trigger fallback on auto-retry signal in assistant text parts", async () => {
@@ -731,7 +731,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-7" } },
+          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-8" } },
         },
       })
 
@@ -742,7 +742,7 @@ describe("runtime-fallback", () => {
             info: {
               sessionID,
               role: "assistant",
-              model: "quotio/claude-opus-4-7",
+              model: "quotio/claude-opus-4-8",
             },
             parts: [
               {
@@ -759,7 +759,7 @@ describe("runtime-fallback", () => {
 
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
-      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-7", to: "openai/gpt-5.5" })
+      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-8", to: "openai/gpt-5.5" })
     })
 
     test("should trigger fallback when auto-retry text parts are nested under info.parts", async () => {
@@ -774,7 +774,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-7" } },
+          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-8" } },
         },
       })
 
@@ -785,7 +785,7 @@ describe("runtime-fallback", () => {
             info: {
               sessionID,
               role: "assistant",
-              model: "quotio/claude-opus-4-7",
+              model: "quotio/claude-opus-4-8",
               parts: [
                 {
                   type: "text",
@@ -802,7 +802,7 @@ describe("runtime-fallback", () => {
 
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
-      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-7", to: "openai/gpt-5.5" })
+      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-8", to: "openai/gpt-5.5" })
     })
 
     test("should trigger fallback on session.status auto-retry signal", async () => {
@@ -836,7 +836,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-7" } },
+          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-8" } },
         },
       })
 
@@ -849,7 +849,7 @@ describe("runtime-fallback", () => {
               type: "retry",
               next: 476,
               attempt: 1,
-              message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+              message: "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 56s attempt #1]",
             },
           },
         },
@@ -860,7 +860,7 @@ describe("runtime-fallback", () => {
 
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
-      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-7", to: "openai/gpt-5.5" })
+      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-8", to: "openai/gpt-5.5" })
       expect(promptCalls.length).toBe(1)
     })
 
@@ -895,7 +895,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-7" } },
+          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-8" } },
         },
       })
 
@@ -908,7 +908,7 @@ describe("runtime-fallback", () => {
               type: "retry",
               next: 476,
               attempt: 1,
-              message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+              message: "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 56s attempt #1]",
             },
           },
         },
@@ -923,7 +923,7 @@ describe("runtime-fallback", () => {
               type: "retry",
               next: 475,
               attempt: 1,
-              message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 55s attempt #1]",
+              message: "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 55s attempt #1]",
             },
           },
         },
@@ -935,7 +935,7 @@ describe("runtime-fallback", () => {
     test("should NOT trigger fallback on auto-retry signal when timeout_seconds is 0", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 0 }),
-        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-7"]),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-8"]),
       })
 
       const sessionID = "test-session-auto-retry-timeout-disabled"
@@ -1933,7 +1933,7 @@ describe("runtime-fallback", () => {
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
             "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
+            "anthropic/claude-opus-4-8",
           ]),
           session_timeout_ms: 20,
         }
@@ -2029,7 +2029,7 @@ describe("runtime-fallback", () => {
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
             "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
+            "anthropic/claude-opus-4-8",
           ]),
           session_timeout_ms: 20,
         }
@@ -2105,7 +2105,7 @@ describe("runtime-fallback", () => {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
+            "anthropic/claude-opus-4-8",
           ]),
           session_timeout_ms: 20,
         }
@@ -2155,7 +2155,7 @@ describe("runtime-fallback", () => {
 
       await clock.advanceBy(60)
 
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("anthropic/claude-opus-4-8")
     })
 
     test("should not clear fallback timeout on assistant non-error update without user-visible content", async () => {
@@ -2182,7 +2182,7 @@ describe("runtime-fallback", () => {
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
             "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
+            "anthropic/claude-opus-4-8",
           ]),
           session_timeout_ms: 20,
         }
@@ -2259,7 +2259,7 @@ describe("runtime-fallback", () => {
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
             "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
+            "anthropic/claude-opus-4-8",
           ]),
           session_timeout_ms: 20,
         }
@@ -2336,7 +2336,7 @@ describe("runtime-fallback", () => {
           pluginConfig: createMockPluginConfigWithCategoryFallback([
             "github-copilot/claude-opus-4.7",
             "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
+            "anthropic/claude-opus-4-8",
           ]),
           session_timeout_ms: 20,
         }
@@ -2455,7 +2455,7 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-7"]),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-8"]),
         }
       )
 
@@ -2486,7 +2486,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("anthropic/claude-opus-4-8")
     })
 
     test("does NOT trigger fallback for normal type:error-free messages", async () => {
@@ -2852,7 +2852,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-7" } },
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-8" } },
         },
       })
 

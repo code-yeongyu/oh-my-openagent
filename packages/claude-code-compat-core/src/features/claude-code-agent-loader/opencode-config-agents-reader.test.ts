@@ -35,7 +35,7 @@ describe("readOpencodeConfigAgents", () => {
         agents: {
           "my-agent": {
             description: "Custom agent",
-            model: "claude-opus-4-7",
+            model: "claude-opus-4-8",
             mode: "subagent",
             prompt: "You are a helpful assistant",
           },

@@ -199,19 +199,19 @@ describe("resolveModelForDelegateTask", () => {
 				const result = resolveModelForDelegateTask({
 					userModel: "opencode/gemini-3.1-pro high",
 					userFallbackModels: [
-						"amazon-bedrock/us.anthropic.claude-opus-4-7 max",
-						"opencode/claude-opus-4-7 max",
+						"amazon-bedrock/us.anthropic.claude-opus-4-8 max",
+						"opencode/claude-opus-4-8 max",
 						"openai/gpt-5.5",
 					],
 					availableModels: new Set([
 						"openai/gpt-5.5",
 						"openai/gpt-5.5-pro",
-						"amazon-bedrock/us.anthropic.claude-opus-4-7",
+						"amazon-bedrock/us.anthropic.claude-opus-4-8",
 					]),
 				})
 
 				expect(result).toEqual({
-					model: "amazon-bedrock/us.anthropic.claude-opus-4-7",
+					model: "amazon-bedrock/us.anthropic.claude-opus-4-8",
 					variant: "max",
 					matchedFallback: true,
 				})

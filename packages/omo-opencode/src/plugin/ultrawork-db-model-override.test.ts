@@ -124,12 +124,12 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_001",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
     )
 
     //#then
     const model = readMessageModel("msg_001")
-    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
   })
 
   test("should update variant and thinking fields when variant provided", async () => {
@@ -139,7 +139,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_002",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
       "max",
     )
 
@@ -154,7 +154,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_nonexistent",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
     )
 
     //#then
@@ -177,7 +177,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_retry_exhausted",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
     )
 
     //#then
@@ -201,12 +201,12 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_003",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
     )
 
     //#then
     const model = readMessageModel("msg_003")
-    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
     expect(readMessageField("msg_003", "variant")).toBeNull()
     expect(readMessageField("msg_003", "thinking")).toBeNull()
   })
@@ -218,7 +218,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_004",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
     )
 
     //#then
@@ -237,7 +237,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_corrupt",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: "anthropic", modelID: "claude-opus-4-8" },
     )
 
     //#then

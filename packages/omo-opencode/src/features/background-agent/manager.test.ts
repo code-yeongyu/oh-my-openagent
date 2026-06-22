@@ -5723,7 +5723,7 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 
 describe("BackgroundManager.handleEvent - session.error", () => {
   const defaultRetryFallbackChain = [
-    { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+    { providers: ["anthropic"], model: "claude-opus-4-8", variant: "max" },
     { providers: ["anthropic"], model: "gpt-5.5", variant: "high" },
   ]
 
@@ -6721,7 +6721,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       description: "task that should retry",
       concurrencyKey,
       fallbackChain: [
-        { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+        { providers: ["anthropic"], model: "claude-opus-4-8", variant: "max" },
         { providers: ["anthropic"], model: "claude-opus-4-5", variant: "max" },
       ],
     })
@@ -6746,7 +6746,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       variant: "max",
     })
     expect(task.concurrencyKey).toBeUndefined()
@@ -6784,7 +6784,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       variant: "max",
     })
 
@@ -6829,7 +6829,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
       variant: "max",
     })
 
