@@ -28,7 +28,7 @@ from typing import Optional
 
 from .validators import Verdict, validate
 from .waf_detector import load_profile
-from .fetch_chain import Attempt
+from .result_schema import Attempt
 
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
