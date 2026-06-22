@@ -32,7 +32,7 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     }))
   })
 
-  test("uses leadSessionId as the getTasksByParentSession key", async () => {
+  test("uses leadSessionId as the getTasksByParentSession key when force deleting", async () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
@@ -55,7 +55,7 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     } satisfies DeleteTeamBackgroundManager
 
     // when
-    await deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr)
+    await deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr, { force: true })
 
     // then
     expect(getTasksByParentSessionMock).toHaveBeenCalledTimes(1)
@@ -98,7 +98,38 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     expect(cancelTaskMock).not.toHaveBeenCalled()
   })
 
-  test("leaves unrelated sibling tasks on the same lead session alive", async () => {
+  test("does not cancel active background tasks after shutdown approval without force", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "shutdown_approved",
+    })
+    const getTasksByParentSessionMock = mock(() => [
+      createBackgroundTask({ id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` }),
+    ])
+    const cancelTaskMock = mock(async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true)
+    const bgMgr = {
+      getTasksByParentSession: getTasksByParentSessionMock,
+      cancelTask: cancelTaskMock,
+    } satisfies DeleteTeamBackgroundManager
+
+    // when
+    let errorMessage = ""
+    try {
+      await deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr)
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
+
+    // then
+    expect(errorMessage).toBe("members still active")
+    expect(getTasksByParentSessionMock).toHaveBeenCalledTimes(1)
+    expect(cancelTaskMock).not.toHaveBeenCalled()
+  })
+
+  test("leaves unrelated sibling tasks on the same lead session alive when force deleting", async () => {
     // given
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
@@ -120,7 +151,7 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     } satisfies DeleteTeamBackgroundManager
 
     // when
-    await deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr)
+    await deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr, { force: true })
 
     // then
     expect(cancelTaskMock).toHaveBeenCalledTimes(1)
