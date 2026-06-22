@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { ContextCollector } from "./collector"
 import {

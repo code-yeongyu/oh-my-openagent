@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
 import type { MessageWithInfo } from "./types"
