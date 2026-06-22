@@ -19,7 +19,7 @@ from typing import Optional
 try:
     import yaml  # PyYAML
 except ImportError:
-    yaml = None  # type: ignore
+    yaml = None
 
 
 PROFILES_PATH = os.path.join(os.path.dirname(__file__), "waf_profiles.yaml")

@@ -18,7 +18,7 @@ from typing import Optional
 try:
     from bs4 import BeautifulSoup
 except ImportError:  # bs4 is a soft dep: only used when selectors given
-    BeautifulSoup = None  # type: ignore
+    BeautifulSoup = None
 
 
 # Markers are WAF-product strings only. Never include site brand / domain.
