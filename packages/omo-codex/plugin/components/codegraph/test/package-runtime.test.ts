@@ -48,6 +48,18 @@ describe("CodeGraph component runtime package metadata", () => {
 		expect(files).toContain("NOTICE");
 		expect(existsSync(resolve(componentRoot, "LICENSE"))).toBe(true);
 		expect(existsSync(resolve(componentRoot, "NOTICE"))).toBe(true);
+		expect(existsSync(resolve(componentRoot, "dist", "cli.d.ts"))).toBe(false);
+		expect(existsSync(resolve(componentRoot, "dist", "serve.d.ts"))).toBe(false);
+	});
+
+	it("#given marketplace payload includes only the plugin tree #when reading CodeGraph NOTICE #then it is self-contained", () => {
+		// given
+		const notice = readFileSync(resolve(componentRoot, "NOTICE"), "utf8");
+
+		expect(notice).toContain("@colbymchenry/codegraph@1.0.1");
+		expect(notice).toContain("MIT license");
+		expect(notice).toContain("Node.js runtime");
+		expect(notice).not.toContain("packages/omo-codex/THIRD-PARTY-NOTICES.md");
 	});
 
 	it("#given third-party notices #when validating CodeGraph component notices #then aggregate Codex notices list CodeGraph as shipped", () => {

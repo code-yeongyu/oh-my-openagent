@@ -148,7 +148,7 @@ describe("runCodegraphServe", () => {
 
 				// when
 				const exitCode = await runCodegraphServe({
-					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
+					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], trustedCodegraphInstallDir: installDir, warnings: [] },
 					env: { HOME: "/tmp/home" },
 					nodeVersion: "22.14.0",
 					homeDir: "/tmp/home",

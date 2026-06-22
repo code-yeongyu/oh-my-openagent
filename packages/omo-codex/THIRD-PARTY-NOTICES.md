@@ -35,6 +35,11 @@ payloads, and component NOTICE files.
 - Notice: `plugin/components/lsp/NOTICE`.
 - Where-bundled: Codex LSP hook component and MCP-facing LSP integration.
 
+### @code-yeongyu/codex-lazycodex-executor-verify@4.12.1
+- License: MIT, from component package metadata.
+- Copyright: Yeongyu Kim and contributors.
+- Where-bundled: Codex `SubagentStop` evidence-verifier hook component.
+
 ### @code-yeongyu/codex-rules@4.10.0
 - License: MIT, from `plugin/components/rules/LICENSE`.
 - Notice: `plugin/components/rules/NOTICE`.
@@ -125,6 +130,11 @@ payloads, and component NOTICE files.
 - License: private project component distributed as part of the codex plugin bundle.
 - Copyright: Yeongyu Kim and contributors.
 - Where-bundled: Codex git-bash reminder hook component.
+
+### @sisyphuslabs/codex-teammode@4.12.1
+- License: private project component distributed as part of the codex plugin bundle.
+- Copyright: Yeongyu Kim and contributors.
+- Where-bundled: Codex team-mode helper hook component and bundled team-mode skills.
 
 ### @sisyphuslabs/omo-codex-plugin@4.10.0
 - License: MIT, from `.codex-plugin/plugin.json`.

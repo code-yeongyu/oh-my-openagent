@@ -2,8 +2,13 @@ codex-codegraph adapts the CodeGraph MCP runtime for the Codex plugin surface.
 
 This component optionally installs @colbymchenry/codegraph@1.0.1. That package
 selects platform bundles for darwin, linux, and win32 on arm64 and x64. The
-CodeGraph packages declare MIT license metadata and may include a Node.js
-runtime plus vendored JavaScript dependencies and tree-sitter WASM payloads.
+CodeGraph packages declare MIT license metadata.
 
-Aggregate third-party notice details for the Codex distribution are recorded in
-packages/omo-codex/THIRD-PARTY-NOTICES.md.
+The selected CodeGraph platform bundles may include a Node.js runtime plus
+vendored JavaScript dependencies and tree-sitter WASM payloads. Their aggregate
+notices remain attributed to CodeGraph, Node.js contributors, and bundled
+dependency contributors.
+
+This NOTICE is self-contained for the marketplace plugin payload. The wider
+Codex distribution also records these details in its aggregate third-party
+notices.

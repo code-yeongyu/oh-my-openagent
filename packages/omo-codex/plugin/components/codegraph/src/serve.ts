@@ -91,10 +91,11 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
 	}
 
+	const trustedInstallDir = config.trustedCodegraphInstallDir;
 	const resolutionOptions = {
 		env,
 		homeDir,
-		provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir),
+		provisioned: () => provisionedBinFromInstallDir(trustedInstallDir),
 	} satisfies ResolveCodegraphCommandOptions;
 	let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
@@ -107,6 +108,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 			ensureProvisioned: options.ensureProvisioned ?? ensureCodegraphProvisioned,
 			homeDir,
 			resolution,
+			...(trustedInstallDir === undefined ? {} : { trustedInstallDir }),
 		});
 		if (provisioned === null) {
 			return runUnavailableMcp(CODEGRAPH_SKIP_HINT, options);
@@ -119,7 +121,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	}
 
 	const runProcess = options.runProcess ?? runChildProcess;
-	const codegraphEnv = codegraphEnvForConfig(codegraphConfig, homeDir, options.buildEnv);
+	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
 	const mergedEnv = {
 		...env,
 		...codegraphEnv,
@@ -146,11 +148,12 @@ async function provisionMissingCodegraph(options: {
 	readonly ensureProvisioned: CodegraphProvisioner;
 	readonly homeDir: string;
 	readonly resolution: CodegraphCommandResolution;
+	readonly trustedInstallDir?: string;
 }): Promise<CodegraphCommandResolution | null> {
 	if (options.resolution.source === "env") return null;
 	if (options.config.auto_provision === false) return null;
 
-	const installDir = options.config.install_dir ?? join(options.homeDir, ".omo", "codegraph");
+	const installDir = options.trustedInstallDir ?? join(options.homeDir, ".omo", "codegraph");
 	const result = await options.ensureProvisioned({
 		installDir,
 		lockDir: join(installDir, ".locks"),
@@ -174,12 +177,12 @@ function looksLikePath(command: string): boolean {
 }
 
 function codegraphEnvForConfig(
-	config: CodegraphConfig,
+	trustedInstallDir: string | undefined,
 	homeDir: string,
 	buildEnv: ((options: { readonly homeDir: string }) => Record<string, string>) | undefined,
 ): Record<string, string> {
 	const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
-	return config.install_dir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.install_dir };
+	return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {

@@ -65,6 +65,11 @@ const CODEX_AGGREGATE_COMPONENTS = [
 
 const CODEX_COMPONENT_NOTICE_REQUIREMENTS = [
   {
+    path: "packages/omo-codex/plugin/components/codegraph",
+    requiredTerms: ["@colbymchenry/codegraph", "Node.js runtime", "MIT license"],
+    forbiddenTerms: ["packages/omo-codex/THIRD-PARTY-NOTICES.md"],
+  },
+  {
     path: "packages/omo-codex/plugin/components/comment-checker",
     requiredTerms: ["pi-comment-checker", "@code-yeongyu/comment-checker"],
   },
@@ -110,15 +115,7 @@ const scopes = {
   codex: {
     noticePath: "packages/omo-codex/THIRD-PARTY-NOTICES.md",
     requiredComponents() {
-      const componentsPath = join(repoRoot, "packages/omo-codex/plugin/components")
-      const componentPackageNames = readdirSync(componentsPath, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => {
-          const packagePath = join(componentsPath, entry.name, "package.json")
-          return JSON.parse(readFileSync(packagePath, "utf8")).name
-        })
-
-      return [...componentPackageNames, ...CODEX_AGGREGATE_COMPONENTS]
+      return [...readComponentPackageNames(), ...CODEX_AGGREGATE_COMPONENTS]
     },
     checkComponents: checkCodexComponentNotices,
   },
@@ -141,6 +138,15 @@ function readJson(path) {
   return JSON.parse(readFileSync(join(repoRoot, path), "utf8"))
 }
 
+function readComponentPackageNames() {
+  const componentsPath = join(repoRoot, "packages/omo-codex/plugin/components")
+  return readdirSync(componentsPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join("packages/omo-codex/plugin/components", entry.name, "package.json"))
+    .filter((packagePath) => existsSync(join(repoRoot, packagePath)))
+    .map((packagePath) => JSON.parse(readFileSync(join(repoRoot, packagePath), "utf8")).name)
+}
+
 function checkCodexComponentNotices() {
   const failures = []
 
@@ -159,6 +165,11 @@ function checkCodexComponentNotices() {
     for (const term of requirement.requiredTerms) {
       if (!noticeText.includes(term)) {
         failures.push(`${requirement.path}/NOTICE is missing required term: ${term}`)
+      }
+    }
+    for (const term of requirement.forbiddenTerms ?? []) {
+      if (noticeText.includes(term)) {
+        failures.push(`${requirement.path}/NOTICE must be self-contained and not reference missing payload path: ${term}`)
       }
     }
   }

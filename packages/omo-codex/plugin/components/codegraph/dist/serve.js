@@ -3,7 +3,7 @@
 // src/serve.ts
 import { spawn } from "node:child_process";
 import { existsSync as existsSync5, realpathSync } from "node:fs";
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 import { basename as basename3, extname, join as join6, resolve as resolve2 } from "node:path";
 import {
   cwd as processCwd,
@@ -474,6 +474,9 @@ function resolveCodegraphCommand(options = {}) {
     source: "path"
   };
 }
+
+// ../../shared/src/config-loader.ts
+import { homedir as homedir5 } from "node:os";
 
 // ../../../../utils/src/omo-config/loader.ts
 import { existsSync as existsSync4, readFileSync } from "node:fs";
@@ -1700,17 +1703,31 @@ function loadOmoConfig(options) {
 
 // ../../shared/src/config-loader.ts
 function getCodexOmoConfig(options = {}) {
+  const env = options.env ?? process.env;
+  const homeDir = resolveHomeDir(options);
   const result = loadOmoConfig({
     ...options.cwd === undefined ? {} : { cwd: options.cwd },
-    ...options.env === undefined ? {} : { env: options.env },
-    ...options.homeDir === undefined ? {} : { homeDir: options.homeDir },
+    env,
+    homeDir,
     harness: "codex"
   });
+  const trustedConfig = loadOmoConfig({
+    cwd: homeDir,
+    env,
+    homeDir,
+    harness: "codex"
+  });
+  const trustedCodegraphInstallDir = trustedConfig.config.codegraph?.install_dir;
   return {
     ...result.config,
     sources: result.sources,
+    ...trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir },
     warnings: result.warnings
   };
+}
+function resolveHomeDir(options) {
+  const env = options.env ?? process.env;
+  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir5();
 }
 
 // ../../../../mcp-stdio-core/src/record.ts
@@ -1969,16 +1986,17 @@ var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv;
-  const homeDir = options.homeDir ?? homedir5();
+  const homeDir = options.homeDir ?? homedir6();
   const config = options.config ?? getCodexOmoConfig({ cwd: options.cwd ?? processCwd(), env, homeDir });
   const codegraphConfig = config.codegraph ?? {};
   if (codegraphConfig.enabled === false) {
     return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
   }
+  const trustedInstallDir = config.trustedCodegraphInstallDir;
   const resolutionOptions = {
     env,
     homeDir,
-    provisioned: () => provisionedBinFromInstallDir(codegraphConfig.install_dir)
+    provisioned: () => provisionedBinFromInstallDir(trustedInstallDir)
   };
   let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
   const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
@@ -1990,7 +2008,8 @@ async function runCodegraphServe(options = {}) {
       config: codegraphConfig,
       ensureProvisioned: options.ensureProvisioned ?? ensureCodegraphProvisioned,
       homeDir,
-      resolution
+      resolution,
+      ...trustedInstallDir === undefined ? {} : { trustedInstallDir }
     });
     if (provisioned === null) {
       return runUnavailableMcp(CODEGRAPH_SKIP_HINT, options);
@@ -2001,7 +2020,7 @@ async function runCodegraphServe(options = {}) {
     return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
   }
   const runProcess = options.runProcess ?? runChildProcess;
-  const codegraphEnv = codegraphEnvForConfig(codegraphConfig, homeDir, options.buildEnv);
+  const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
   const mergedEnv = {
     ...env,
     ...codegraphEnv
@@ -2026,7 +2045,7 @@ async function provisionMissingCodegraph(options) {
     return null;
   if (options.config.auto_provision === false)
     return null;
-  const installDir = options.config.install_dir ?? join6(options.homeDir, ".omo", "codegraph");
+  const installDir = options.trustedInstallDir ?? join6(options.homeDir, ".omo", "codegraph");
   const result = await options.ensureProvisioned({
     installDir,
     lockDir: join6(installDir, ".locks"),
@@ -2046,9 +2065,9 @@ function shouldSkipResolvedCommand(resolution, commandExists) {
 function looksLikePath2(command) {
   return command.includes("/") || command.includes("\\");
 }
-function codegraphEnvForConfig(config, homeDir, buildEnv) {
+function codegraphEnvForConfig(trustedInstallDir, homeDir, buildEnv) {
   const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
-  return config.install_dir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.install_dir };
+  return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
