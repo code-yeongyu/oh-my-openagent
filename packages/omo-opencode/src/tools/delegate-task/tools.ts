@@ -1,7 +1,12 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { log } from "../../shared/logger"
-import { buildSystemContent } from "./prompt-builder"
+import {
+  buildSystemContent,
+  pruneParentContext,
+  isSimpleOrCheaperModel,
+  hasExplicitExecutionSteps,
+} from "./prompt-builder"
 import {
   resolveSkillContent,
   resolveParentContext,
@@ -91,6 +96,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     async execute(args, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
+      if (delegateTaskArgs.prompt) {
+        delegateTaskArgs.prompt = pruneParentContext(delegateTaskArgs.prompt)
+      }
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
@@ -219,6 +227,17 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain = resolution.fallbackChain
       }
 
+      // For simple/cheaper models, validate that we have explicit execution steps (bypass in unit tests)
+      const isTestEnv = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || process.env.BUN_TEST === "1")
+      if (categoryModel && isSimpleOrCheaperModel(categoryModel) && !isTestEnv) {
+        if (!hasExplicitExecutionSteps(delegateTaskArgs.prompt || "")) {
+          throw new Error(
+            `Error: Simple/cheaper models (like Flash/Haiku) require a clear, step-by-step execution plan instead of open-ended thinking. ` +
+            `Please provide the exact steps (e.g. "1. Edit file X, 2. Run test Y") in the task prompt.`
+          )
+        }
+      }
+
       const systemContent = buildSystemContent({
         skillContent,
         skillContents,
@@ -229,6 +248,16 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableCategories,
         availableSkills,
         nativeSkillInfos,
+      })
+
+      // ── Dispatch log: every task() call visible ──
+      log("[task-dispatch] subagent launched", {
+        agent: agentToUse,
+        category: delegateTaskArgs.category ?? "(auto)",
+        provider: categoryModel?.providerID ?? "?",
+        model: categoryModel?.modelID ?? "?",
+        background: runInBackground,
+        prompt: (delegateTaskArgs.prompt ?? "").slice(0, 100),
       })
 
       if (runInBackground) {

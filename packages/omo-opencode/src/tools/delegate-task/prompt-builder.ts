@@ -123,3 +123,72 @@ export function buildTaskPrompt(prompt: string, agentName: string | undefined, t
   const effectiveTdd = tddEnabled ?? true
   return `${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
 }
+
+export function pruneParentContext(prompt: string): string {
+  if (!prompt) return prompt
+
+  // 1. Remove long tool output blocks
+  let pruned = prompt.replace(
+    /=== (glob|grep|bash|read|find|search) output ===[\s\S]*?(=== end \1 ===|=== \w+ output ===|$)/gi,
+    "[Tool output truncated for token budget]"
+  )
+
+  // 2. Remove standard XML-like tool output tags if they are very long (e.g. > 1000 chars)
+  pruned = pruned.replace(
+    /<tool_output>([\s\S]*?)<\/tool_output>/gi,
+    (match, p1) => {
+      if (p1.length > 500) {
+        return "<tool_output>[Tool output truncated for token budget]</tool_output>"
+      }
+      return match
+    }
+  )
+
+  // 3. Remove long markdown code blocks that look like terminal logs/outputs
+  pruned = pruned.replace(
+    /```(bash|sh|console|log)\n([\s\S]*?)```/gi,
+    (match, lang, content) => {
+      if (content.length > 800) {
+        return `\`\`\`${lang}\n[Terminal log output truncated for token budget]\n\`\`\``
+      }
+      return match
+    }
+  )
+
+  return pruned
+}
+
+export function isSimpleOrCheaperModel(model: { providerID: string; modelID: string; variant?: string } | undefined): boolean {
+  if (!model) return false
+  const lower = model.modelID.toLowerCase()
+  return (
+    lower.includes("flash") ||
+    lower.includes("mini") ||
+    lower.includes("lite") ||
+    lower.includes("chat") ||
+    lower.includes("haiku") ||
+    lower.includes("3.5-haiku") ||
+    (lower.includes("3.5") && !lower.includes("sonnet")) ||
+    lower.includes("k2.6") ||
+    lower.includes("m2.7") ||
+    lower.includes("m2.5")
+  )
+}
+
+export function hasExplicitExecutionSteps(prompt: string): boolean {
+  const lower = prompt.toLowerCase()
+  // Check for numbered lists (e.g. "1. ", "2. ") or step references ("step 1", "step 2") or bullet lists
+  const numberedStepRegex = /(?:^|\n)\s*\d+[\.\)]\s+\w+/
+  const stepLabelRegex = /step\s*\d+/i
+  const instructionRegex = /(?:instruction|execute|todo|run|edit|modify|fix):\s*/i
+  
+  return (
+    numberedStepRegex.test(prompt) ||
+    stepLabelRegex.test(lower) ||
+    instructionRegex.test(lower) ||
+    lower.includes("步骤") ||
+    lower.includes("方案") ||
+    lower.includes("具体操作")
+  )
+}
+

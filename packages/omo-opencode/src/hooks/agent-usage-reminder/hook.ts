@@ -77,6 +77,32 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
     clearAgentUsageState(sessionID);
   }
 
+  const toolExecuteBefore = async (
+    input: ToolExecuteInput,
+    _output: { args: unknown },
+  ) => {
+    const { tool, sessionID } = input;
+
+    const agent = getSessionAgent(sessionID);
+    if (agent && !isOrchestratorAgent(agent)) {
+      return;
+    }
+
+    const toolLower = tool.toLowerCase();
+    if (!TARGET_TOOLS.has(toolLower)) {
+      return;
+    }
+
+    const state = getOrCreateState(sessionID);
+    if (!state.agentUsed && state.reminderCount >= MAX_REMINDERS) {
+      throw new Error(
+        `Error: Direct usage of tool '${tool}' is blocked. You have repeatedly called direct search/fetch tools instead of using specialized subagents.\n` +
+        `Please delegate this research/search task to a subagent using the 'delegate-task' (task) tool.\n` +
+        `For example, call task(subagent_type="explore", prompt="Search for X") to search in parallel.`
+      );
+    }
+  };
+
   const toolExecuteAfter = async (
     input: ToolExecuteInput,
     output: ToolExecuteOutput,
@@ -123,6 +149,7 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
   };
 
   return {
+    "tool.execute.before": toolExecuteBefore,
     "tool.execute.after": toolExecuteAfter,
     event: eventHandler,
   };

@@ -99,6 +99,12 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: StartWorkConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, ralph loop) */
   default_mode: DefaultModeConfigSchema.optional(),
+  /** Cost gating threshold tokens (default: 200,000) */
+  cost_gating_threshold_tokens: z.number().optional(),
+  /** Enforce subagent threshold tokens (default: 20,000) */
+  enforce_subagent_threshold_tokens: z.number().optional(),
+  /** Enable model fallback degradation for simple tasks (default: false) */
+  enable_cost_degradation: z.boolean().optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

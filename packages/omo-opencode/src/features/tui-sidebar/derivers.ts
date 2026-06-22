@@ -42,14 +42,28 @@ export function deriveRoster(rows: readonly RosterRow[]): RosterState {
   }
 }
 
-export function deriveAgents(snap: TuiRuntimeSnapshot | null): AgentsState {
+export function deriveAgents(snap: TuiRuntimeSnapshot | null, agentOrder?: readonly string[]): AgentsState {
   if (!snap || snap.activeAgents.length === 0) {
     return { kind: "none" }
   }
 
+  const orderMap = new Map<string, number>()
+  if (agentOrder) {
+    agentOrder.forEach((name, idx) => orderMap.set(name, idx))
+  }
+
+  const sorted = [...snap.activeAgents].sort((left, right) => {
+    const li = orderMap.get(left.name)
+    const ri = orderMap.get(right.name)
+    if (li !== undefined && ri !== undefined) return li - ri
+    if (li !== undefined) return -1
+    if (ri !== undefined) return 1
+    return left.name.localeCompare(right.name)
+  })
+
   return {
     kind: "list",
-    agents: [...snap.activeAgents].sort((left, right) => left.name.localeCompare(right.name)).slice(0, MAX_AGENTS),
+    agents: sorted.slice(0, MAX_AGENTS),
   }
 }
 

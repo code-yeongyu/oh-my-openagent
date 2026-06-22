@@ -86,12 +86,14 @@ export function estimateComplexity(prompt: string): TaskComplexity {
     if (len < 100) scores.trivial += 2
     else if (len < 300) scores.simple += 1
   }
-  if (len > 1500) scores.complex += 2
+  if (len > 4000) scores.architecture += 2
+  else if (len > 1500) scores.complex += 2
   else if (len > 800) scores.medium += 1
 
   // Count file references as complexity signal
   const fileRefs = (prompt.match(/\.(ts|tsx|js|jsx|py|go|rs|java|rb|sql|yaml|json|toml)/g) || []).length
-  if (fileRefs >= 5) scores.complex += 2
+  if (fileRefs >= 8) scores.architecture += 2
+  else if (fileRefs >= 5) scores.complex += 2
   else if (fileRefs >= 3) scores.medium += 1
 
   // Pick the tier with the highest score
@@ -301,7 +303,7 @@ export function buildTierMapFromModels(
     const lower = m.modelId.toLowerCase()
     const entry: TierModelEntry = { provider: m.provider, model: m.modelId }
 
-    // Architecture tier: "pro", "max", "ultra", "opus", "preview" models
+    // Architecture tier: "pro", "max", "ultra", "opus", "preview", "o1", "o3" models
     if (
       lower.includes("-pro") ||
       lower.includes("-max") ||
@@ -310,20 +312,24 @@ export function buildTierMapFromModels(
       lower.includes("3.7") ||
       lower.includes("5.1") ||
       lower.includes("preview") ||
-      lower.includes("reasoner")
+      lower.includes("reasoner") ||
+      lower.includes("o1") ||
+      lower.includes("o3")
     ) {
       arch.push(entry)
       complex.push(entry)
       continue
     }
 
-    // Complex tier: "plus", "coder-plus", "5" series
+    // Complex tier: "plus", "coder-plus", "5" series, "sonnet", "gpt-4"
     if (
       lower.includes("-plus") ||
       lower.includes("coder") ||
       lower.includes("3.6") ||
       lower.includes("k2.7") ||
-      lower.includes("m3")
+      lower.includes("m3") ||
+      lower.includes("sonnet") ||
+      lower.includes("gpt-4")
     ) {
       complex.push(entry)
       medium.push(entry)
