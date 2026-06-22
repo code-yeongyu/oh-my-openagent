@@ -83,7 +83,7 @@ function parseTomlTableHeader(line: string): readonly string[] | null {
   return parseTomlDottedKey(line.slice(1, -1).trim())
 }
 
-function parseTomlDottedKey(input: string): readonly string[] | null {
+export function parseTomlDottedKey(input: string): readonly string[] | null {
   const parts: string[] = []
   let index = 0
   while (index < input.length) {
