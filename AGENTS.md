@@ -100,7 +100,7 @@ Matrixx is a **plugin for OpenCode**. You will frequently need to examine OpenCo
 
 ## OVERVIEW
 
-Matrixx is a multi-agent orchestration **plugin for OpenCode**. It coordinates 12 built-in AI agents via ~41 lifecycle hooks and ~26 custom tools. 262 test files (~144k LOC) cover 1241 TypeScript source files.
+Matrixx is a multi-agent orchestration **plugin for OpenCode**. It coordinates 13 built-in AI agents via ~41 lifecycle hooks and ~26 custom tools. 262 test files (~144k LOC) cover 1241 TypeScript source files.
 
 | Aspect | Value |
 |---|---|
@@ -121,7 +121,7 @@ matrixx/
 │   ├── create-tools.ts             # Tool registry + skill context composition
 │   ├── plugin-config.ts            # Config load + Zod validation
 │   ├── plugin-state.ts             # Model context-limit cache
-│   ├── agents/   → 12 agents + AGENTS.md
+│   ├── agents/   → 13 agents + AGENTS.md
 │   ├── hooks/    → ~41 hooks in 3 tiers
 │   ├── tools/    → 14 dirs (LSP, AST-grep, delegate-task, session, etc.)
 │   ├── features/ → 17 dirs (skills loader, tasks, tmux, MCP, CC compat)
@@ -268,9 +268,9 @@ MANDATORY. Write the test first → `bun test` → fail → implement → pass �
 | Bash | `sleep N` — use conditional waits; `cd dir && cmd` — use `workdir` |
 | Publishing | Direct `bun publish` — CI only. Never bump version locally. |
 
-## AGENT MODELS (built-in, 12 agents via `BuiltinAgentNameSchema`)
+## AGENT MODELS (built-in, 13 agents via `BuiltinAgentNameSchema`)
 
-The `agentSources` registry in `src/agents/builtin-agents.ts` lists 11; `oracle` is built dynamically in `src/plugin-handlers/agent-config-handler.ts`. `mouse` is built via `createMouseAgentWithOverrides` and `OpenCode-Builder` is added when `morpheus_agent.default_builder_enabled`. Fallback chains defined per-agent in `src/agents/<name>.ts`.
+The `agentSources` registry in `src/agents/builtin-agents.ts` lists 12 (including Sati, the frontend specialist); `oracle` is built dynamically in `src/plugin-handlers/agent-config-handler.ts`. `mouse` is built via `createMouseAgentWithOverrides` and `OpenCode-Builder` is added when `morpheus_agent.default_builder_enabled`. Fallback chains defined per-agent in `src/agents/<name>.ts`.
 
 For full model/temp/fallback details see the per-agent file or `src/agents/AGENTS.md`.
 

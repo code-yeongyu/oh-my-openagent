@@ -42,7 +42,7 @@ Morpheus (Claude Opus)     → Plans the implementation
 
 | Problem | Matrixx Solution |
 |---------|------------------|
-| One model does everything poorly | **13 specialists** — right model for the right job |
+| One model does everything poorly | **14 specialists** — right model for the right job |
 | Agent forgets what it was doing | **Todo Continuation** — forces completion, no exceptions |
 | Slow sequential tool calls | **Parallel background agents** — 5+ running simultaneously |
 | AI-generated code looks like AI | **Comment Checker** — code indistinguishable from human-written |
@@ -180,6 +180,7 @@ Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, depe
 | **Operator** | External documentation, OSS search, library research | GLM 4.7 |
 | **Trinity** | Blazing fast codebase grep, pattern discovery | Grok Code Fast |
 | **Construct** | PDF, image & diagram analysis | Gemini 3 Flash |
+| **Sati** | Frontend specialist — components, accessibility, performance, testing | Claude Sonnet 4.6 |
 
 Every agent, model, temperature, and permission is fully customizable. [**Meet the full team →**](docs/agents.md)
 
@@ -189,10 +190,10 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 | | |
 |---|---|
-| **Agent Orchestration** | 13 agents, parallel background execution, category-based routing, session continuity |
+| **Agent Orchestration** | 14 agents, parallel background execution, category-based routing, session continuity |
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **40 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery, quality gate |
-| **30 Built-in Skills** | DSL engineering (11), security (9), browser, git, frontend, software dev pipeline |
+| **37 Built-in Skills** | DSL engineering (11), security (9), browser, git, frontend (7), software dev pipeline |
 | **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search), Document Reader |
 | **Claude Code Compat** | Full compatibility — commands, agents, skills, MCPs, hooks from `settings.json` |
 | **Software Dev Pipeline** | 6-phase TDD workflow (PLAN→BUILD→VERIFY→REVIEW→SECURE→SHIP), 5 team roles, adaptive phases |

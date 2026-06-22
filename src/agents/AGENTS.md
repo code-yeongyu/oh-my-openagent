@@ -58,6 +58,7 @@ agents/
 | Cipher | claude-opus-4-6 | 0.1 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
 | Niobe | claude-opus-4-6 | 0.15 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
 | Sentinel | claude-opus-4-6 | 0.1 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
+| Sati | claude-sonnet-4-6 | 0.1 | claude-sonnet-4-6 → claude-opus-4-6@max | EXPENSIVE |
 | Mouse | claude-sonnet-4-6 | 0.1 | (user-configurable) | EXPENSIVE |
 
 ## TOOL RESTRICTIONS
