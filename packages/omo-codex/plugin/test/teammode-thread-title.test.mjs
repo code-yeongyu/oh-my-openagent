@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam } from "./teammode-safety-fixture.mjs";
+import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw } from "./teammode-safety-fixture.mjs";
 
 function addMember(tempRoot, sessionId, { id, name, focus, lens, deliverable }) {
 	const args = ["add-member", "--team", sessionId, "--id", id, "--focus", focus, "--lens", lens, "--deliverable", deliverable];
@@ -46,6 +46,48 @@ test("#given a member added without an explicit name #when state is read #then t
 		assert.equal(byId.A.threadTitle, "[Recovery] installer config");
 		assert.equal(byId.B.threadTitle, "[Recovery] runtime qa");
 		assert.notEqual(byId.A.threadTitle, byId.B.threadTitle);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given a member name already exists #when add-member receives the same name with different spacing and case #then state is not partially mutated", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-title-duplicate-name-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Recovery", "--session-name", "shared-session", "--session", "title-duplicate-name");
+		addMember(tempRoot, "title-duplicate-name", {
+			id: "A",
+			name: "App Server",
+			focus: "app-server lifecycle",
+			lens: "area",
+			deliverable: "lifecycle map",
+		});
+
+		const result = runTeamRaw(
+			tempRoot,
+			"add-member",
+			"--team",
+			"title-duplicate-name",
+			"--id",
+			"B",
+			"--name",
+			" app   server ",
+			"--focus",
+			"mailbox delivery",
+			"--lens",
+			"ownership",
+			"--deliverable",
+			"delivery audit",
+		);
+		const team = readTeamJson(tempRoot, "title-duplicate-name");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member name "app   server" duplicates "App Server"/);
+		assert.equal(team.members.length, 1);
+		assert.deepEqual(
+			team.members.map((member) => ({ id: member.id, name: member.name, threadTitle: member.threadTitle })),
+			[{ id: "A", name: "App Server", threadTitle: "[Recovery] App Server" }],
+		);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

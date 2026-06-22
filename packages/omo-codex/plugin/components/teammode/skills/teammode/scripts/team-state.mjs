@@ -72,6 +72,10 @@ function normalizedFocus(focus) {
 	return focus.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function normalizedMemberName(name) {
+	return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function assertUniqueMemberFocus(team) {
 	const seen = new Map();
 	for (const member of team.members) {
@@ -103,6 +107,10 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 	// focus so the title is ALWAYS per-member and never the shared team-wide session name.
 	const memberName = name?.trim() || memberFocus;
 	if (team.members.some((m) => m.id === memberId)) throw new Error(`member id "${memberId}" already exists (duplicate)`);
+	const duplicateName = team.members.find((m) => normalizedMemberName(m.name ?? m.focus ?? "") === normalizedMemberName(memberName));
+	if (duplicateName) {
+		throw new Error(`member name "${memberName}" duplicates "${duplicateName.name ?? duplicateName.focus}" (no two members may produce the same thread title)`);
+	}
 	const duplicate = team.members.find((m) => normalizedFocus(m.focus) === normalizedFocus(memberFocus));
 	if (duplicate) throw new Error(`member focus "${memberFocus}" duplicates "${duplicate.focus}" (no two members may own the same thing)`);
 	team.members.push({
