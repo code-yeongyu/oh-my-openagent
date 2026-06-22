@@ -40,14 +40,35 @@ function warnBestEffort(action, error) {
   process.stderr.write(`best-effort ${action} failed: ${describeError(error)}\n`);
 }
 
-function isMissingOptionalDependency(error) {
-  return error instanceof Error && error.code === 'MODULE_NOT_FOUND';
+function isMissingTopLevelModule(error, moduleName) {
+  return (
+    error instanceof Error &&
+    error.code === 'MODULE_NOT_FOUND' &&
+    typeof error.message === 'string' &&
+    error.message.includes(`Cannot find module '${moduleName}'`)
+  );
+}
+
+function requireOptionalModule(moduleName) {
+  try {
+    return require(moduleName);
+  } catch (e) {
+    if (isMissingTopLevelModule(e, moduleName)) {
+      warnBestEffort(`optional module ${moduleName}`, e);
+      return null;
+    }
+    throw e;
+  }
 }
 
 async function main() {
   const args = await readStdinJson();
   const url = args.url;
-  if (!url) { process.stderr.write('missing url\n'); process.exit(2); }
+  if (!url) {
+    process.stderr.write('missing url\n');
+    process.exitCode = 2;
+    return;
+  }
 
   const profileDir = args.profileDir || '/tmp/.insane_pw_profile';
   const waitSelector = args.waitSelector || null;
@@ -56,15 +77,13 @@ async function main() {
   const viewport = args.viewport || { width: 1366, height: 900 };
 
   let chromium;
-  try {
-    ({ chromium } = require('playwright-extra'));
-    const stealth = require('puppeteer-extra-plugin-stealth')();
+  const playwrightExtra = requireOptionalModule('playwright-extra');
+  const stealthPlugin = playwrightExtra ? requireOptionalModule('puppeteer-extra-plugin-stealth') : null;
+  if (playwrightExtra && stealthPlugin) {
+    ({ chromium } = playwrightExtra);
+    const stealth = stealthPlugin();
     chromium.use(stealth);
-  } catch (e) {
-    if (!isMissingOptionalDependency(e)) {
-      throw e;
-    }
-    warnBestEffort('stealth setup', e);
+  } else {
     // Fallback to plain playwright (no stealth). Still uses channel:chrome.
     ({ chromium } = require('playwright'));
   }
@@ -103,7 +122,8 @@ async function main() {
     if (waitSelector) {
       try {
         await page.waitForSelector(waitSelector, { timeout: Math.min(timeoutMs, 20000) });
-      } catch (_e) {
+      } catch (e) {
+        warnBestEffort('waitSelector', e);
         // Selector still missing — try one hard reload in case the first hit
         // landed on a challenge page and the sensor has just cleared.
         try {
@@ -112,7 +132,7 @@ async function main() {
           try {
             await page.waitForSelector(waitSelector, { timeout: 10000 });
           } catch (e2) {
-            warnBestEffort(`retry waitSelector ${waitSelector}`, e2);
+            warnBestEffort('retry waitSelector', e2);
             // Still no luck — caller validates HTML anyway.
           }
         } catch (e3) {
@@ -127,10 +147,12 @@ async function main() {
 
     const html = await page.content();
     process.stdout.write(html);
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   } catch (e) {
     process.stderr.write(`${describeError(e)}\n`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   } finally {
     try {
       if (ctx) await ctx.close();
