@@ -3,14 +3,29 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Final, Literal, TypedDict, assert_never
 
 
 class UnsupportedPlatform(ValueError):
     """Raised when a browser/platform combination is not supported."""
 
 
-BROWSERS: dict[str, dict[str, Any]] = {
+BrowserKind = Literal["chromium", "firefox"]
+
+
+class BrowserDirs(TypedDict):
+    darwin: str
+    linux: str
+    win32: str
+
+
+class BrowserSpec(TypedDict):
+    kind: BrowserKind
+    safe_storage: str | None
+    dirs: BrowserDirs
+
+
+BROWSERS: Final[dict[str, BrowserSpec]] = {
     "chrome": {
         "kind": "chromium",
         "safe_storage": "Chrome Safe Storage",
@@ -37,43 +52,61 @@ BROWSERS: dict[str, dict[str, Any]] = {
     },
 }
 
-CHROMIUM_PROFILE_DIRS = ["Default", "Profile 1", "Profile 2"]
+CHROMIUM_PROFILE_DIRS: Final = ["Default", "Profile 1", "Profile 2"]
 
 
-def platform_base(platform: str, kind: str) -> Path:
+def platform_base(platform: str, kind: BrowserKind) -> Path:
     home = Path.home()
-    if platform == "darwin":
-        return home / "Library" / "Application Support"
-    if platform == "linux":
-        if kind == "firefox":
-            return home
-        return Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config")))
-    if platform == "win32":
-        return Path(os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local")))
-    raise UnsupportedPlatform(f"unsupported platform: {platform!r}")
+    match platform:
+        case "darwin":
+            return home / "Library" / "Application Support"
+        case "linux":
+            match kind:
+                case "firefox":
+                    return home
+                case "chromium":
+                    return Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config")))
+                case unreachable:
+                    assert_never(unreachable)
+        case "win32":
+            return Path(os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local")))
+        case _:
+            raise UnsupportedPlatform(f"unsupported platform: {platform!r}")
 
 
-def resolve_cookie_db(browser: str, platform: str, base_override: Optional[Path] = None) -> Path:
+def browser_dir(spec: BrowserSpec, platform: str) -> str:
+    match platform:
+        case "darwin":
+            return spec["dirs"]["darwin"]
+        case "linux":
+            return spec["dirs"]["linux"]
+        case "win32":
+            return spec["dirs"]["win32"]
+        case _:
+            raise UnsupportedPlatform(f"browser not mapped for platform {platform!r}")
+
+
+def resolve_cookie_db(browser: str, platform: str, base_override: Path | None = None) -> Path:
     spec = BROWSERS.get(browser)
     if spec is None:
         raise UnsupportedPlatform(f"unsupported browser: {browser!r}")
-    if platform not in spec["dirs"]:
-        raise UnsupportedPlatform(f"browser {browser!r} not mapped for platform {platform!r}")
-
     base = base_override if base_override is not None else platform_base(platform, spec["kind"])
-    profile_root = base / spec["dirs"][platform]
+    profile_root = base / browser_dir(spec, platform)
 
-    if spec["kind"] == "firefox":
-        if not profile_root.exists():
-            raise FileNotFoundError(f"no Firefox profile root at {profile_root}")
-        for entry in sorted(profile_root.iterdir()):
-            db = entry / "cookies.sqlite"
-            if db.exists():
-                return db
-        raise FileNotFoundError(f"no cookies.sqlite under {profile_root}")
-
-    for profile in CHROMIUM_PROFILE_DIRS:
-        for candidate in (profile_root / profile / "Cookies", profile_root / profile / "Network" / "Cookies"):
-            if candidate.exists():
-                return candidate
-    raise FileNotFoundError(f"no Cookies DB under {profile_root}")
+    match spec["kind"]:
+        case "firefox":
+            if not profile_root.exists():
+                raise FileNotFoundError(f"no Firefox profile root at {profile_root}")
+            for entry in sorted(profile_root.iterdir()):
+                db = entry / "cookies.sqlite"
+                if db.exists():
+                    return db
+            raise FileNotFoundError(f"no cookies.sqlite under {profile_root}")
+        case "chromium":
+            for profile in CHROMIUM_PROFILE_DIRS:
+                for candidate in (profile_root / profile / "Cookies", profile_root / profile / "Network" / "Cookies"):
+                    if candidate.exists():
+                        return candidate
+            raise FileNotFoundError(f"no Cookies DB under {profile_root}")
+        case unreachable:
+            assert_never(unreachable)
