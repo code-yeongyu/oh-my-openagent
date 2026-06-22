@@ -19,13 +19,13 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -38,9 +38,6 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
       "model": "opencode/glm-4.7-free",
     },
     "trinity": {
-      "model": "opencode/glm-4.7-free",
-    },
-    "zion": {
       "model": "opencode/glm-4.7-free",
     },
   },
@@ -98,15 +95,15 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -120,9 +117,6 @@ exports[`generateModelConfig single native provider uses Claude models when only
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -181,15 +175,15 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -203,9 +197,6 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -259,13 +250,13 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -279,9 +270,6 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
-    },
-    "zion": {
-      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -332,13 +320,13 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -352,9 +340,6 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
-    },
-    "zion": {
-      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -405,13 +390,13 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -425,9 +410,6 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
-    },
-    "zion": {
-      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -478,13 +460,13 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "opencode/glm-4.7-free",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -498,9 +480,6 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
-    },
-    "zion": {
-      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -557,15 +536,15 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -579,9 +558,6 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -640,15 +616,15 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -662,9 +638,6 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -724,15 +697,15 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "opencode/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "opencode/claude-haiku-4-5",
     },
     "oracle": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "opencode/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "opencode/claude-sonnet-4-6",
@@ -746,9 +719,6 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     },
     "trinity": {
       "model": "opencode/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "opencode/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -807,15 +777,15 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "opencode/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "opencode/claude-haiku-4-5",
     },
     "oracle": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "opencode/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "opencode/claude-sonnet-4-6",
@@ -829,9 +799,6 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     },
     "trinity": {
       "model": "opencode/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "opencode/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -891,15 +858,15 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "github-copilot/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "github-copilot/claude-sonnet-4-6",
@@ -913,9 +880,6 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     },
     "trinity": {
       "model": "github-copilot/gpt-5-mini",
-    },
-    "zion": {
-      "model": "github-copilot/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -974,15 +938,15 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "github-copilot/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "github-copilot/claude-sonnet-4-6",
@@ -996,9 +960,6 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     },
     "trinity": {
       "model": "github-copilot/gpt-5-mini",
-    },
-    "zion": {
-      "model": "github-copilot/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1052,13 +1013,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "zai-coding-plan/glm-4.7",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -1072,9 +1033,6 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
-    },
-    "zion": {
-      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -1125,13 +1083,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     "merovingian": {
       "model": "opencode/glm-4.7-free",
     },
-    "niobe": {
-      "model": "opencode/glm-4.7-free",
-    },
     "operator": {
       "model": "zai-coding-plan/glm-4.7",
     },
     "oracle": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sati": {
       "model": "opencode/glm-4.7-free",
     },
     "sentinel": {
@@ -1145,9 +1103,6 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     },
     "trinity": {
       "model": "opencode/gpt-5-nano",
-    },
-    "zion": {
-      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -1204,15 +1159,15 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -1226,9 +1181,6 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1287,15 +1239,15 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "github-copilot/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "github-copilot/claude-sonnet-4-6",
@@ -1309,9 +1261,6 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     },
     "trinity": {
       "model": "github-copilot/gpt-5-mini",
-    },
-    "zion": {
-      "model": "github-copilot/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1370,15 +1319,15 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "zai-coding-plan/glm-4.7",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -1392,9 +1341,6 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1453,15 +1399,15 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -1475,9 +1421,6 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1536,15 +1479,15 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "github-copilot/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "zai-coding-plan/glm-4.7",
     },
     "oracle": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "github-copilot/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "github-copilot/claude-sonnet-4-6",
@@ -1558,9 +1501,6 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     },
     "trinity": {
       "model": "opencode/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "github-copilot/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1619,15 +1559,15 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "zai-coding-plan/glm-4.7",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -1641,9 +1581,6 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1702,15 +1639,15 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
-    "niobe": {
-      "model": "anthropic/claude-sonnet-4-6",
-    },
     "operator": {
       "model": "zai-coding-plan/glm-4.7",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sati": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
     "sentinel": {
       "model": "anthropic/claude-sonnet-4-6",
@@ -1724,9 +1661,6 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     },
     "trinity": {
       "model": "anthropic/claude-haiku-4-5",
-    },
-    "zion": {
-      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
