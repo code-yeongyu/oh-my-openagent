@@ -125,3 +125,45 @@ test("#given persisted team.json has duplicate member names #when a command load
 		cleanupTeamRoot(tempRoot);
 	}
 });
+
+test("#given persisted team.json has duplicate thread titles with distinct member names #when bind-thread runs #then state is rejected before activation", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-title-stale-duplicate-title-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Recovery", "--session-name", "shared-session", "--session", "title-stale-duplicate-title");
+		addMember(tempRoot, "title-stale-duplicate-title", {
+			id: "A",
+			name: "App Server",
+			focus: "app-server lifecycle",
+			lens: "area",
+			deliverable: "lifecycle map",
+		});
+		addMember(tempRoot, "title-stale-duplicate-title", {
+			id: "B",
+			name: "Mailbox Delivery",
+			focus: "mailbox delivery",
+			lens: "ownership",
+			deliverable: "delivery audit",
+		});
+		const path = teamJsonPath(tempRoot, "title-stale-duplicate-title");
+		const team = JSON.parse(readFileSync(path, "utf8"));
+		team.members[0].threadTitle = "[Legacy] Alpha";
+		team.members[1].threadTitle = "[Legacy] Alpha";
+		writeFileSync(path, `${JSON.stringify(team, null, 2)}\n`);
+
+		const result = runTeamRaw(tempRoot, "bind-thread", "--team", "title-stale-duplicate-title", "--id", "A", "--thread", "thread-a");
+		const persisted = readTeamJson(tempRoot, "title-stale-duplicate-title");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member threadTitle "\[Legacy\] Alpha" duplicates "\[Legacy\] Alpha"/);
+		assert.deepEqual(
+			persisted.members.map((member) => ({ id: member.id, status: member.status, threadId: member.threadId })),
+			[
+				{ id: "A", status: "pending", threadId: null },
+				{ id: "B", status: "pending", threadId: null },
+			],
+		);
+		assert.equal(persisted.log.some((entry) => entry.event === "bind-thread"), false);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});

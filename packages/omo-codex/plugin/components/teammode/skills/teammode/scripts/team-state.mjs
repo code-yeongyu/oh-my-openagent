@@ -76,6 +76,10 @@ function normalizedMemberName(name) {
 	return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function normalizedThreadTitle(title) {
+	return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function assertUniqueMemberFocus(team) {
 	const seen = new Map();
 	for (const member of team.members) {
@@ -101,6 +105,22 @@ function assertUniqueMemberName(team) {
 	}
 }
 
+function assertUniqueMemberThreadTitle(team) {
+	const seen = new Map();
+	for (const member of team.members) {
+		const threadTitle = member.threadTitle;
+		if (typeof threadTitle !== "string" || !threadTitle.trim()) {
+			throw new Error(`member "${member.id ?? member.name ?? member.focus ?? "(unknown)"}" has invalid threadTitle (non-empty string required)`);
+		}
+		const key = normalizedThreadTitle(threadTitle);
+		const previous = seen.get(key);
+		if (previous) {
+			throw new Error(`member threadTitle "${threadTitle}" duplicates "${previous.threadTitle}" (no two members may produce the same thread title)`);
+		}
+		seen.set(key, member);
+	}
+}
+
 function assertTeamReadyForThreadBinding(team) {
 	if (isUnderstaffed(team)) {
 		throw new Error(
@@ -109,6 +129,7 @@ function assertTeamReadyForThreadBinding(team) {
 	}
 	assertUniqueMemberFocus(team);
 	assertUniqueMemberName(team);
+	assertUniqueMemberThreadTitle(team);
 }
 
 export function addMember(team, { id, focus, lens, deliverable = "", branch = null, name = null }) {
@@ -195,6 +216,7 @@ export function validateTeam(team) {
 	if (!Array.isArray(team.members)) throw new Error("invalid team: members must be an array");
 	assertUniqueMemberFocus(team);
 	assertUniqueMemberName(team);
+	assertUniqueMemberThreadTitle(team);
 	return team;
 }
 
