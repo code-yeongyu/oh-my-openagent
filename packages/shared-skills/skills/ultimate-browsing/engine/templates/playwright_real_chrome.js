@@ -29,6 +29,21 @@ async function readStdinJson() {
   });
 }
 
+function describeError(error) {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+}
+
+function warnBestEffort(action, error) {
+  process.stderr.write(`best-effort ${action} failed: ${describeError(error)}\n`);
+}
+
+function isMissingOptionalDependency(error) {
+  return error instanceof Error && error.code === 'MODULE_NOT_FOUND';
+}
+
 async function main() {
   const args = await readStdinJson();
   const url = args.url;
@@ -45,7 +60,11 @@ async function main() {
     ({ chromium } = require('playwright-extra'));
     const stealth = require('puppeteer-extra-plugin-stealth')();
     chromium.use(stealth);
-  } catch (_e) {
+  } catch (e) {
+    if (!isMissingOptionalDependency(e)) {
+      throw e;
+    }
+    warnBestEffort('stealth setup', e);
     // Fallback to plain playwright (no stealth). Still uses channel:chrome.
     ({ chromium } = require('playwright'));
   }
@@ -72,7 +91,8 @@ async function main() {
         await page.goto(rootUrl, { waitUntil: 'domcontentloaded', timeout: navTimeout });
         await page.waitForTimeout(3500);   // let sensor JS finish
       }
-    } catch (_e) {
+    } catch (e) {
+      warnBestEffort('warmup navigation', e);
       // warmup is best-effort; continue even if it hiccups
     }
 
@@ -91,10 +111,12 @@ async function main() {
           await page.waitForTimeout(2000);
           try {
             await page.waitForSelector(waitSelector, { timeout: 10000 });
-          } catch (_e2) {
+          } catch (e2) {
+            warnBestEffort(`retry waitSelector ${waitSelector}`, e2);
             // Still no luck — caller validates HTML anyway.
           }
-        } catch (_e3) {
+        } catch (e3) {
+          warnBestEffort('selector recovery reload', e3);
           // reload failed — proceed with whatever we have
         }
       }
@@ -107,10 +129,14 @@ async function main() {
     process.stdout.write(html);
     process.exit(0);
   } catch (e) {
-    process.stderr.write(`${e.name || 'Error'}: ${e.message || e}\n`);
+    process.stderr.write(`${describeError(e)}\n`);
     process.exit(1);
   } finally {
-    try { if (ctx) await ctx.close(); } catch (_e) {}
+    try {
+      if (ctx) await ctx.close();
+    } catch (e) {
+      warnBestEffort('browser context close', e);
+    }
   }
 }
 

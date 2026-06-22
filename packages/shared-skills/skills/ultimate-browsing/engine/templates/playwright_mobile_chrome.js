@@ -23,6 +23,21 @@ async function readStdinJson() {
   });
 }
 
+function describeError(error) {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+}
+
+function warnBestEffort(action, error) {
+  process.stderr.write(`best-effort ${action} failed: ${describeError(error)}\n`);
+}
+
+function isMissingOptionalDependency(error) {
+  return error instanceof Error && error.code === 'MODULE_NOT_FOUND';
+}
+
 async function main() {
   const args = await readStdinJson();
   const url = args.url;
@@ -39,7 +54,11 @@ async function main() {
     ({ chromium, devices } = require('playwright-extra'));
     const stealth = require('puppeteer-extra-plugin-stealth')();
     chromium.use(stealth);
-  } catch (_e) {
+  } catch (e) {
+    if (!isMissingOptionalDependency(e)) {
+      throw e;
+    }
+    warnBestEffort('stealth setup', e);
     ({ chromium, devices } = require('playwright'));
   }
 
@@ -63,17 +82,23 @@ async function main() {
     if (waitSelector) {
       try {
         await page.waitForSelector(waitSelector, { timeout: Math.min(timeoutMs, 20000) });
-      } catch (_e) {}
+      } catch (e) {
+        warnBestEffort(`waitSelector ${waitSelector}`, e);
+      }
     }
 
     const html = await page.content();
     process.stdout.write(html);
     process.exit(0);
   } catch (e) {
-    process.stderr.write(`${e.name || 'Error'}: ${e.message || e}\n`);
+    process.stderr.write(`${describeError(e)}\n`);
     process.exit(1);
   } finally {
-    try { if (ctx) await ctx.close(); } catch (_e) {}
+    try {
+      if (ctx) await ctx.close();
+    } catch (e) {
+      warnBestEffort('browser context close', e);
+    }
   }
 }
 
