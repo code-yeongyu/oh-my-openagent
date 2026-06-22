@@ -5,10 +5,22 @@
 // the skill. team-state.mjs stays the pure state model; this file owns the git side only.
 
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 // A member id that also names a directory and a branch segment: no "/", no "..", no leading dot.
 const MEMBER_ID_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+// Compare two on-disk paths regardless of OS. realpathSync canonicalizes separators, Windows
+// 8.3 short names (RUNNER~1) and drive-letter case, and the macOS /var -> /private/var symlink -
+// none of which plain resolve() reconciles. Returns false if either side no longer exists.
+function samePath(a, b) {
+	try {
+		return realpathSync(a) === realpathSync(b);
+	} catch {
+		return false;
+	}
+}
 
 function git(cwd, args) {
 	const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -65,8 +77,11 @@ export function addMemberWorktree(cwd, team, member, { baseBranch } = {}) {
 	const base = baseBranch || team.worktree?.baseBranch || "dev";
 	const branch = deriveMemberBranch(team, member);
 	const path = memberWorktreePath(team, member);
-	const absolutePath = resolve(cwd, path);
-	if (listWorktrees(cwd).some((w) => resolve(cwd, w.path) === absolutePath)) {
+	// Idempotent: skip if a worktree is already checked out on this member's branch (matched on the
+	// branch ref, which is OS-agnostic) or already lives at this path (matched on realpath, so a
+	// Windows 8.3 git path vs an 8.3-or-long script path still compares equal). Plain string/resolve
+	// comparison missed the 8.3-vs-canonical case and re-`git worktree add`-ed into a fatal error.
+	if (listWorktrees(cwd).some((w) => w.branch === `refs/heads/${branch}` || samePath(resolve(cwd, w.path), resolve(cwd, path)))) {
 		return { path, branch, base, created: false };
 	}
 	const add = branchExists(cwd, branch)
