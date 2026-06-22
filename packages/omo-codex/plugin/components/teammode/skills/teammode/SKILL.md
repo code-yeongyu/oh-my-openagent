@@ -98,17 +98,16 @@ fall back to a spawned agent.
 
 ## Communication
 
-Coordinate with `codex_app.send_message_to_thread` (leader-to-member and peer digests) and inspect
-status with `codex_app.read_thread`. The generated manual already binds members to the hard rules,
-so you mostly enforce them: all member-to-member and member-to-leader communication is in English;
-when the END user addresses a member, that member replies in the user's own language. Members
-over-communicate relentlessly - constant, small, lean updates that report every finding, hand-off,
-and even the smallest or most trivial step as it happens rather than one final dump - and send
-`WORKING:`/`BLOCKED:` markers so the leader always knows their state; stale, stuck, or
-silently-blocked members are not acceptable, and a finished
-member reports to the leader immediately. Members hand off files and
-memos through the team `artifacts/` directory and reference them by path instead of pasting large
-content. Wait for every required member's final report before you declare the team done.
+Members push to you and to one another with `codex_app.send_message_to_thread`; you inspect their
+state with `codex_app.read_thread`. So members can actually reach you, run `init` with
+`--session <your own thread id>` - that makes `leader.sessionId` in team.json a real, messageable
+thread; without it members cannot report to you and you are stuck polling. The generated manual binds
+members to the hard rules, so you mainly keep the channel open: expect frequent small inbound updates
+from each member - findings, `WORKING:`/`BLOCKED:` markers, peer digests - rather than one final
+dump, and act on them as they arrive. All member-to-member and member-to-leader traffic is in English;
+when the END user addresses a member, that member replies in the user's own language. Members hand off
+files and memos through the team `artifacts/` directory and reference them by path. Wait for every
+required member's final report before you declare the team done.
 
 ## Worktrees (optional isolation)
 
