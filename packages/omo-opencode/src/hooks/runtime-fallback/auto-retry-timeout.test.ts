@@ -39,7 +39,7 @@ function createDeps(): HookDeps {
     pluginConfig: {
       categories: {
         test: {
-          fallback_models: ["litellm/openai.eu.gpt-5.5"],
+          fallback_models: ["litellm/openai.eu.gpt-5.5", "google/gemini-2.5-pro"],
         },
       },
     },
@@ -98,5 +98,48 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(state.attemptCount).toBe(0)
     expect(state.pendingFallbackModel).toBe(undefined)
     expect(state.failedModels.size).toBe(0)
+  })
+
+  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed", async () => {
+    // given
+    const sessionID = "session-timeout-awaiting-dispatch-blocked"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    deps.options = {
+      session_timeout_ms: 1,
+    }
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "litellm/openai.eu.gpt-5.5"
+    state.fallbackIndex = 0
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+
+    let resolveRetry: (() => void) | undefined
+    const retryCalled = new Promise<void>((resolve) => {
+      resolveRetry = resolve
+    })
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {},
+      async () => {
+        resolveRetry?.()
+        return { accepted: false, status: "blocked", reason: "test gate blocked dispatch" }
+      },
+    )
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await Promise.race([
+      retryCalled,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timer did not fire")), 1000)
+      }),
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
+    helpers.clearSessionFallbackTimeout(sessionID)
   })
 })
