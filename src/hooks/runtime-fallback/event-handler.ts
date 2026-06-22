@@ -1,15 +1,15 @@
-import type { HookDeps } from "./types"
+import { log } from "../../shared/logger"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
-import { getFallbackModelsForSession } from "./fallback-models"
-import { SessionCategoryRegistry } from "./session-category-registry"
-import { isAbortError } from "./is-abort-error"
+import { classifyErrorType, extractErrorName, extractStatusCode, isRetryableError } from "./error-classifier"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { getFallbackModelsForSession } from "./fallback-models"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { createFallbackState } from "./fallback-state"
+import { isAbortError } from "./is-abort-error"
+import { SessionCategoryRegistry } from "./session-category-registry"
 import { createSessionStatusHandler } from "./session-status-handler"
+import type { HookDeps } from "./types"
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps

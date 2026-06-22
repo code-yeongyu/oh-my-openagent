@@ -1,9 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { ImageAttachment, ImageDimensions } from "./types"
-import { parseImageDimensions } from "./image-dimensions"
-import { calculateTargetDimensions, resizeImage } from "./image-resizer"
 import { log } from "../../shared"
 import { getSessionModel } from "../../shared/session-model-state"
+import { parseImageDimensions } from "./image-dimensions"
+import { calculateTargetDimensions, resizeImage } from "./image-resizer"
+import type { ImageAttachment, ImageDimensions } from "./types"
 
 const SUPPORTED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 const TOKEN_DIVISOR = 750

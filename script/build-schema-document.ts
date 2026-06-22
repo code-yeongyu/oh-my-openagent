@@ -3,7 +3,7 @@ import { MatrixxConfigSchema } from "../src/config/schema"
 
 export function createMatrixxJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(MatrixxConfigSchema, {
-    target: "draft-07",
+    target: "draft-7",
     unrepresentable: "any",
   })
 

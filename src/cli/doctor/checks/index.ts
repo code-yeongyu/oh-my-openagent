@@ -1,12 +1,12 @@
-import type { CheckDefinition } from "../types"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import { checkSystem, gatherSystemInfo } from "./system"
+import type { CheckDefinition } from "../types"
 import { checkConfig } from "./config"
-import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
+import { checkSystem, gatherSystemInfo } from "./system"
+import { checkTools, gatherToolsSummary } from "./tools"
 
-export type { CheckDefinition }
 export * from "./model-resolution-types"
+export type { CheckDefinition }
 export { gatherSystemInfo, gatherToolsSummary }
 
 export function getAllCheckDefinitions(): CheckDefinition[] {

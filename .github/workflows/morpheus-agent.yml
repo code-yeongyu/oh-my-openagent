@@ -14,32 +14,32 @@ on:
 jobs:
   agent:
     runs-on: ubuntu-latest
-    # @sisyphus-dev-ai mention only (maintainers, exclude self)
+    # @github-actions[bot] mention only (maintainers, exclude self)
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
-       contains(github.event.comment.body || '', '@sisyphus-dev-ai') &&
-       (github.event.comment.user.login || '') != 'sisyphus-dev-ai' &&
+       contains(github.event.comment.body || '', '@github-actions[bot]') &&
+       (github.event.comment.user.login || '') != 'github-actions[bot]' &&
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || ''))
 
     permissions:
       contents: read
 
     steps:
-      # Checkout with sisyphus-dev-ai's PAT
+      # Checkout with github-actions[bot]'s PAT
       - uses: actions/checkout@v5
         with:
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0
 
-      # Git config - commits as sisyphus-dev-ai
-      - name: Configure Git as sisyphus-dev-ai
+      # Git config - commits as github-actions[bot]
+      - name: Configure Git as github-actions[bot]
         run: |
-          git config user.name "sisyphus-dev-ai"
-          git config user.email "sisyphus-dev-ai@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # gh CLI auth as sisyphus-dev-ai
-      - name: Authenticate gh CLI as sisyphus-dev-ai
+      # gh CLI auth as github-actions[bot]
+      - name: Authenticate gh CLI as github-actions[bot]
         run: |
           echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
           gh auth status
@@ -102,7 +102,7 @@ jobs:
           fi
           opencode --version
 
-          # Run local oh-my-opencode install (uses built dist)
+          # Run local matrixx install (uses built dist)
           bun run dist/cli/index.js install --no-tui --claude=max20 --openai=no --gemini=no --copilot=no
 
           # Override plugin to use local file reference
@@ -190,7 +190,7 @@ jobs:
             }
           ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
 
-          OMO_JSON=~/.config/opencode/matrixx.json
+          MATRIXX_JSON=~/.config/opencode/matrixx.json
           PROMPT_APPEND=$(cat << 'PROMPT_EOF'
           <ultrawork-mode>
           [CODE RED] Maximum precision required. Ultrathink before acting.
@@ -260,7 +260,7 @@ jobs:
 
           ## GitHub Actions Environment
 
-          You are `sisyphus-dev-ai` in GitHub Actions.
+          You are `github-actions[bot]` in GitHub Actions.
 
           ### CRITICAL: GitHub Comments = Your ONLY Output
 
@@ -316,14 +316,14 @@ jobs:
           - Acknowledge immediately, report when done
 
           ### Git Config
-          - user.name: sisyphus-dev-ai
-          - user.email: sisyphus-dev-ai@users.noreply.github.com
+          - user.name: github-actions[bot]
+          - user.email: github-actions[bot]@users.noreply.github.com
           PROMPT_EOF
           )
-          jq --arg append "$PROMPT_APPEND" '.agents.Morpheus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+          jq --arg append "$PROMPT_APPEND" '.agents.morpheus.prompt_append = $append' "$MATRIXX_JSON" > /tmp/matrixx.json && mv /tmp/matrixx.json "$MATRIXX_JSON"
 
           # Add categories configuration for unspecified-low to use GLM 4.7
-          jq '.categories["unspecified-low"] = { "model": "zai-coding-plan/glm-4.7" }' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+          jq '.categories["unspecified-low"] = { "model": "zai-coding-plan/glm-4.7" }' "$MATRIXX_JSON" > /tmp/matrixx.json && mv /tmp/matrixx.json "$MATRIXX_JSON"
 
           mkdir -p ~/.local/share/opencode
           echo "$OPENCODE_AUTH_JSON" > ~/.local/share/opencode/auth.json
@@ -367,7 +367,7 @@ jobs:
           echo "author=$AUTHOR" >> $GITHUB_OUTPUT
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
 
-      # Add :eyes: reaction (as sisyphus-dev-ai)
+      # Add :eyes: reaction (as github-actions[bot])
       - name: Add eyes reaction
         if: steps.context.outputs.comment_id != ''
         env:
@@ -426,7 +426,7 @@ jobs:
 
           ---
 
-          Your username is @sisyphus-dev-ai, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
+          Your username is @github-actions[bot], mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
 
           ## Context
           - Title: TITLE_PLACEHOLDER
@@ -494,7 +494,7 @@ jobs:
 
           stdbuf -oL -eL bun run dist/cli/index.js run "$PROMPT"
 
-      # Push changes (as sisyphus-dev-ai)
+      # Push changes (as github-actions[bot])
       - name: Push changes
         if: always()
         env:
@@ -502,7 +502,7 @@ jobs:
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git add -A
-            git commit -m "chore: changes by sisyphus-dev-ai" || true
+            git commit -m "chore: changes by github-actions[bot]" || true
           fi
 
           BRANCH=$(git branch --show-current)
@@ -517,7 +517,7 @@ jobs:
         run: |
           if [[ -n "${{ steps.context.outputs.comment_id }}" ]]; then
             REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
-              --jq '.[] | select(.content == "eyes" and .user.login == "sisyphus-dev-ai") | .id' | head -1)
+              --jq '.[] | select(.content == "eyes" and .user.login == "github-actions[bot]") | .id' | head -1)
             if [[ -n "$REACTION_ID" ]]; then
               gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
             fi

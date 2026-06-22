@@ -1,14 +1,14 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { detectExternalNotificationPlugin, getNotificationConflictWarning } from "./external-plugin-detector"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
-import * as path from "node:path"
 import * as os from "node:os"
+import * as path from "node:path"
+import { detectExternalNotificationPlugin, getNotificationConflictWarning } from "./external-plugin-detector"
 
 describe("external-plugin-detector", () => {
   let tempDir: string
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-test-"))
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "matrixx-test-"))
   })
 
   afterEach(() => {

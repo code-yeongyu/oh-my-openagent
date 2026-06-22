@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test"
-import { createTodoDescriptionOverrideHook } from "./hook"
+import { describe, expect, test } from "bun:test"
 import { TODOWRITE_DESCRIPTION } from "./description"
+import { createTodoDescriptionOverrideHook } from "./hook"
 
 describe("todo-description-override", () => {
   describe("tool.definition handler", () => {

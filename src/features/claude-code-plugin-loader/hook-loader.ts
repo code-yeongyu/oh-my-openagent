@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { log } from "../../shared/logger"
-import type { HooksConfig, LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
+import type { HooksConfig, LoadedPlugin } from "./types"
 
 export function loadPluginHooksConfigs(plugins: LoadedPlugin[]): HooksConfig[] {
   const configs: HooksConfig[] = []

@@ -1,6 +1,6 @@
 import type { MatrixxConfig } from "../config"
-import type { PluginContext } from "./types"
-
+import type { CreatedHooks } from "../create-hooks"
+import type { Managers } from "../create-managers"
 import {
   clearSessionAgent,
   getMainSessionID,
@@ -9,11 +9,9 @@ import {
 } from "../features/claude-code-session-state"
 import { resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
-
-import type { CreatedHooks } from "../create-hooks"
-import type { Managers } from "../create-managers"
-import { normalizeSessionStatusToIdle } from "./session-status-normalizer"
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles"
+import { normalizeSessionStatusToIdle } from "./session-status-normalizer"
+import type { PluginContext } from "./types"
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void
@@ -31,7 +29,6 @@ export function createEventHandler(args: {
 
   const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
-    await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
     await Promise.resolve(hooks.sessionNotification?.(input))
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input))

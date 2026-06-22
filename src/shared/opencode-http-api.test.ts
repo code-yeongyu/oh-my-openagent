@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "bun:test"
-import { getServerBaseUrl, patchPart, deletePart } from "./opencode-http-api"
+import { beforeEach, describe, expect, it, vi } from "bun:test"
+import { deletePart, getServerBaseUrl, patchPart } from "./opencode-http-api"
 
 // Mock fetch globally
 const mockFetch = vi.fn()

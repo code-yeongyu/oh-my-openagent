@@ -1,5 +1,4 @@
-export * from "./detector"
 export * from "./constants"
-export * from "./types"
-
+export * from "./detector"
 export { createKeywordDetectorHook } from "./hook"
+export * from "./types"

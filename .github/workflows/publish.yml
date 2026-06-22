@@ -76,6 +76,7 @@ jobs:
           bun test src/cli/run/integration.test.ts
           bun test src/cli/run/server-connection.test.ts
           bun test src/cli/mcp-oauth/login.test.ts
+          bun test src/features/background-agent/manager.test.ts
           # OPENCODE_CONFIG_DIR env var pollution — must run isolated to prevent
           # parallel test interference from other files that modify this global var
           bun test src/cli/config-manager/auth-plugins.test.ts
@@ -191,7 +192,11 @@ jobs:
             src/hooks/write-existing-file-guard \
             src/hooks/session-notification.test.ts \
             src/hooks/tool-output-truncator.test.ts \
-            src/features/background-agent \
+            src/features/background-agent/manager.polling.test.ts \
+            src/features/background-agent/task-poller.test.ts \
+            src/features/background-agent/parent-session-notifier.test.ts \
+            src/features/background-agent/concurrency.test.ts \
+            src/features/background-agent/task-history.test.ts \
             src/features/builtin-commands \
             src/features/builtin-skills \
             src/features/claude-code-session-state \

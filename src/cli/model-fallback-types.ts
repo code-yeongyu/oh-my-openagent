@@ -20,7 +20,7 @@ export interface CategoryConfig {
 	variant?: string
 }
 
-export interface GeneratedOmoConfig {
+export interface GeneratedMatrixxConfig {
 	$schema: string
 	agents?: Record<string, AgentConfig>
 	categories?: Record<string, CategoryConfig>

@@ -3,15 +3,15 @@ import { homedir } from "os"
 import { join } from "path"
 import { log } from "../../shared/logger"
 import type {
-  InstalledPluginsDatabase,
-  PluginInstallation,
-  PluginManifest,
-  LoadedPlugin,
-  PluginLoadResult,
-  PluginLoadError,
-  PluginScope,
   ClaudeSettings,
+  InstalledPluginsDatabase,
+  LoadedPlugin,
+  PluginInstallation,
+  PluginLoadError,
   PluginLoaderOptions,
+  PluginLoadResult,
+  PluginManifest,
+  PluginScope,
 } from "./types"
 
 function getPluginsBaseDir(): string {

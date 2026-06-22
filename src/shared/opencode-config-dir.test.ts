@@ -1,11 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import {
+  detectExistingConfigDir,
   getOpenCodeConfigDir,
   getOpenCodeConfigPaths,
   isDevBuild,
-  detectExistingConfigDir,
   TAURI_APP_IDENTIFIER,
   TAURI_APP_IDENTIFIER_DEV,
 } from "./opencode-config-dir"
@@ -272,7 +272,7 @@ describe("opencode-config-dir", () => {
       expect(paths.configJson).toBe(join(expectedDir, "opencode.json"))
       expect(paths.configJsonc).toBe(join(expectedDir, "opencode.jsonc"))
       expect(paths.packageJson).toBe(join(expectedDir, "package.json"))
-      expect(paths.omoConfig).toBe(join(expectedDir, "matrixx.json"))
+      expect(paths.matrixxConfig).toBe(join(expectedDir, "matrixx.json"))
     })
 
     test("returns all config paths for desktop binary", () => {
@@ -288,7 +288,7 @@ describe("opencode-config-dir", () => {
       expect(paths.configJson).toBe(join(expectedDir, "opencode.json"))
       expect(paths.configJsonc).toBe(join(expectedDir, "opencode.jsonc"))
       expect(paths.packageJson).toBe(join(expectedDir, "package.json"))
-      expect(paths.omoConfig).toBe(join(expectedDir, "matrixx.json"))
+      expect(paths.matrixxConfig).toBe(join(expectedDir, "matrixx.json"))
     })
   })
 

@@ -1,13 +1,13 @@
 import { Readable, Writable } from "node:stream"
 import {
   createMessageConnection,
+  type MessageConnection,
   StreamMessageReader,
   StreamMessageWriter,
-  type MessageConnection,
 } from "vscode-jsonrpc/node"
-import type { Diagnostic, ResolvedServer } from "./types"
-import { spawnProcess, type UnifiedProcess } from "./lsp-process"
 import { log } from "../../shared/logger"
+import { spawnProcess, type UnifiedProcess } from "./lsp-process"
+import type { Diagnostic, ResolvedServer } from "./types"
 export class LSPClientTransport {
   protected proc: UnifiedProcess | null = null
   protected connection: MessageConnection | null = null

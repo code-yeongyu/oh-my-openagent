@@ -1,15 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { appendSessionId, getPlanProgress, readMissionState } from "../../features/mission-state"
+import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
-import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import { HOOK_NAME } from "./hook-name"
-import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isMatrixPath } from "./matrix-path"
 import { extractSessionIdFromOutput } from "./subagent-session-id"
+import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
+import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 import { buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
-import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput

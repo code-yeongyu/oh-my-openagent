@@ -36,6 +36,10 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
   }
 }
 
+// Module-level LRU cache for normalizeModelID results (cap 500).
+const NORMALIZE_MODEL_CACHE_MAX = 500
+const normalizeModelCache = new Map<string, string>()
+
 /**
  * Normalizes model IDs to use consistent hyphen formatting.
  * GitHub Copilot may use dots (claude-opus-4.6) but our maps use hyphens (claude-opus-4-6).
@@ -48,9 +52,27 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
  * normalizeModelID("vertex_ai/claude-opus-4.6") // "vertex_ai/claude-opus-4-6"
  */
 function normalizeModelID(modelID: string): string {
+  const cached = normalizeModelCache.get(modelID)
+  if (cached !== undefined) {
+    // Bump LRU: delete + set re-inserts at the most recent position.
+    normalizeModelCache.delete(modelID)
+    normalizeModelCache.set(modelID, cached)
+    return cached
+  }
   // Replace dots with hyphens when followed by a digit
   // This handles version numbers like 4.5 → 4-5, 5.2 → 5-2
-  return modelID.replace(/\.(\d+)/g, "-$1")
+  const result = modelID.replace(/\.(\d+)/g, "-$1")
+  // Evict oldest entry if at cap (Map preserves insertion order, so first key is oldest).
+  if (normalizeModelCache.size >= NORMALIZE_MODEL_CACHE_MAX) {
+    const oldest = normalizeModelCache.keys().next().value
+    if (oldest !== undefined) normalizeModelCache.delete(oldest)
+  }
+  normalizeModelCache.set(modelID, result)
+  return result
+}
+
+export function _resetNormalizeModelCacheForTesting(): void {
+  normalizeModelCache.clear()
 }
 
 /**
@@ -179,6 +201,20 @@ const THINKING_CAPABLE_MODELS = {
   "zai-coding-plan": ["glm"],
 } as const satisfies Record<string, readonly string[]>
 
+/**
+ * Precomputed lowercase version of `THINKING_CAPABLE_MODELS`.
+ * Each pattern's `.toLowerCase()` is computed ONCE at module load
+ * (≈16 calls total) instead of on every `getThinkingConfig` call
+ * (was: N patterns × every invocation = 100×N for 100 invocations).
+ *
+ * Lookup is keyed by the same provider ID as `THINKING_CAPABLE_MODELS`.
+ * Patterns are already lowercase, so `baseLower.includes(pattern)` is
+ * safe without per-call `.toLowerCase()`.
+ */
+const THINKING_CAPABLE_MODELS_LOWER: Record<string, string[]> = Object.fromEntries(
+  Object.entries(THINKING_CAPABLE_MODELS).map(([k, v]) => [k, v.map((s) => s.toLowerCase())])
+)
+
 export function getHighVariant(modelID: string): string | null {
   const normalized = normalizeModelID(modelID)
   const { prefix, base } = extractModelPrefix(normalized)
@@ -199,8 +235,11 @@ export function getHighVariant(modelID: string): string | null {
 }
 
 export function isAlreadyHighVariant(modelID: string): boolean {
-  const normalized = normalizeModelID(modelID)
-  const { base } = extractModelPrefix(normalized)
+  return isAlreadyHighVariantNormalized(normalizeModelID(modelID))
+}
+
+function isAlreadyHighVariantNormalized(normalizedModelID: string): boolean {
+  const { base } = extractModelPrefix(normalizedModelID)
   return ALREADY_HIGH.has(base) || base.endsWith("-high")
 }
 
@@ -217,7 +256,7 @@ export function getThinkingConfig(
   const normalized = normalizeModelID(modelID)
   const { base } = extractModelPrefix(normalized)
 
-  if (isAlreadyHighVariant(normalized)) {
+  if (isAlreadyHighVariantNormalized(normalized)) {
     return null
   }
 
@@ -228,12 +267,14 @@ export function getThinkingConfig(
   }
 
   const config = THINKING_CONFIGS[resolvedProvider]
-  const capablePatterns = THINKING_CAPABLE_MODELS[resolvedProvider]
+  const capablePatterns = THINKING_CAPABLE_MODELS_LOWER[resolvedProvider]
 
-  // Check capability using base model name (without prefix)
+  // Check capability using base model name (without prefix).
+  // Patterns come pre-lowercased from `THINKING_CAPABLE_MODELS_LOWER` (module load),
+  // so no per-pattern `.toLowerCase()` is needed here.
   const baseLower = base.toLowerCase()
   const isCapable = capablePatterns.some((pattern) =>
-    baseLower.includes(pattern.toLowerCase())
+    baseLower.includes(pattern)
   )
 
   return isCapable ? config : null

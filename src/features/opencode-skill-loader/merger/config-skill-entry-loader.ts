@@ -1,13 +1,13 @@
-import type { LoadedSkill, SkillMetadata } from "../types"
-import type { SkillDefinition } from "../../../config/schema"
-import type { CommandDefinition } from "../../claude-code-command-loader/types"
 import { existsSync, readFileSync } from "fs"
-import { dirname, isAbsolute, resolve } from "path"
 import { homedir } from "os"
+import { dirname, isAbsolute, resolve } from "path"
+import type { SkillDefinition } from "../../../config/schema"
 import { parseFrontmatter } from "../../../shared/frontmatter"
 import { sanitizeModelField } from "../../../shared/model-sanitizer"
 import { resolveSkillPathReferences } from "../../../shared/skill-path-resolver"
+import type { CommandDefinition } from "../../claude-code-command-loader/types"
 import { parseAllowedTools } from "../allowed-tools-parser"
+import type { LoadedSkill, SkillMetadata } from "../types"
 
 function resolveFilePath(from: string, configDir?: string): string {
   let filePath = from

@@ -1,10 +1,9 @@
-export { buildDefaultMousePrompt } from "./default"
-export { buildGptMousePrompt } from "./gpt"
-
+export type { MousePromptSource } from "./agent"
 export {
-  MOUSE_DEFAULTS,
-  getMousePromptSource,
   buildMousePrompt,
   createMouseAgentWithOverrides,
+  getMousePromptSource,
+  MOUSE_DEFAULTS,
 } from "./agent"
-export type { MousePromptSource } from "./agent"
+export { buildDefaultMousePrompt } from "./default"
+export { buildGptMousePrompt } from "./gpt"

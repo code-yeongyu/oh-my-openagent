@@ -65,7 +65,7 @@ export const AgentOverridesSchema = z.object({
   architect: AgentOverrideConfigSchema.optional(),
   cipher: AgentOverrideConfigSchema.optional(),
   sentinel: AgentOverrideConfigSchema.optional(),
-  zion: AgentOverrideConfigSchema.optional(),
+  sati: AgentOverrideConfigSchema.optional(),
 })
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>

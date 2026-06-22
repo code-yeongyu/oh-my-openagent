@@ -1,29 +1,29 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
-import { CATEGORY_DESCRIPTIONS } from "./constants"
-import { SISYPHUS_JUNIOR_AGENT } from "./mouse-agent"
-import { mergeCategories } from "../../shared/merge-categories"
-import { log } from "../../shared/logger"
-import { buildSystemContent } from "./prompt-builder"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type {
   AvailableCategory,
   AvailableSkill,
 } from "../../agents/dynamic-agent-prompt-builder"
+import { log } from "../../shared/logger"
+import { mergeCategories } from "../../shared/merge-categories"
+import { CATEGORY_DESCRIPTIONS } from "./constants"
 import {
-  resolveSkillContent,
-  resolveParentContext,
   executeBackgroundContinuation,
-  executeSyncContinuation,
-  resolveCategoryExecution,
-  resolveSubagentExecution,
-  executeUnstableAgentTask,
   executeBackgroundTask,
+  executeSyncContinuation,
   executeSyncTask,
+  executeUnstableAgentTask,
+  resolveCategoryExecution,
+  resolveParentContext,
+  resolveSkillContent,
+  resolveSubagentExecution,
 } from "./executor"
+import { SISYPHUS_JUNIOR_AGENT } from "./mouse-agent"
+import { buildSystemContent } from "./prompt-builder"
+import type { DelegateTaskArgs, DelegateTaskToolOptions, ToolContextWithMetadata } from "./types"
 
 export { resolveCategoryConfig } from "./categories"
-export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent } from "./prompt-builder"
+export type { BuildSystemContentInput, DelegateTaskToolOptions, SyncSessionCreatedEvent } from "./types"
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { userCategories } = options
@@ -125,7 +125,6 @@ Prompts MUST be in English.`
       const runInBackground = args.run_in_background === true
 
       const { content: skillContent, error: skillError } = await resolveSkillContent(args.load_skills, {
-        gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
       })

@@ -23,7 +23,7 @@ src/
 ├── mcp/                              # Built-in MCPs (6 files) — see mcp/AGENTS.md
 ├── plugin/                           # Plugin interface composition (21 files)
 ├── plugin-handlers/                  # Config loading, plan inheritance (15 files) — see plugin-handlers/AGENTS.md
-├── shared/                           # Cross-cutting utilities (96 files) — see shared/AGENTS.md
+├── shared/                           # Cross-cutting utilities (~85 files) — see shared/AGENTS.md
 └── tools/                            # 26 tools (14 dirs) — see tools/AGENTS.md
 ```
 
@@ -49,7 +49,7 @@ src/
 **Core Hooks** (`create-core-hooks.ts`):
 - Session (20): context-window-monitor, session-recovery, think-mode, matrix-loop, anthropic-effort, ...
 - Tool Guard (8): comment-checker, tool-output-truncator, rules-injector, write-existing-file-guard, ...
-- Transform (4): claude-code-hooks, keyword-detector, context-injector, thinking-block-validator
+- Transform (3): keyword-detector, context-injector, thinking-block-validator
 
 **Continuation Hooks** (`create-continuation-hooks.ts`):
 - 7 hooks: stop-continuation-guard, compaction-context-injector, todo-continuation-enforcer, architect, ...

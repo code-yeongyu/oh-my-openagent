@@ -1,6 +1,6 @@
-import { describe, it, expect } from "bun:test"
-import { createEventState, serializeError, type EventState } from "./events"
-import type { RunContext, EventPayload } from "./types"
+import { describe, expect, it } from "bun:test"
+import { createEventState, type EventState, serializeError } from "./events"
+import type { EventPayload, RunContext } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   client: {} as RunContext["client"],

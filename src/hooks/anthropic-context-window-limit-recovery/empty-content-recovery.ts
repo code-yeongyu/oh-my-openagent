@@ -1,15 +1,15 @@
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
-  findEmptyMessages,
   findEmptyMessageByIndex,
+  findEmptyMessages,
   injectTextPart,
   replaceEmptyTextParts,
 } from "../session-recovery/storage"
-import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import type { AutoCompactState } from "./types"
 import type { Client } from "./client"
+import { fixEmptyMessagesWithSDK } from "./empty-content-recovery-sdk"
 import { PLACEHOLDER_TEXT } from "./message-builder"
 import { incrementEmptyContentAttempt } from "./state"
-import { fixEmptyMessagesWithSDK } from "./empty-content-recovery-sdk"
+import type { AutoCompactState } from "./types"
 
 export async function fixEmptyMessages(params: {
   sessionID: string

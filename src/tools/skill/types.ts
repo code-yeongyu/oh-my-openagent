@@ -1,7 +1,5 @@
-import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-loader/types"
+import type { LoadedSkill, SkillScope } from "../../features/opencode-skill-loader/types"
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { GitMasterConfig } from "../../config/schema"
-
 export interface SkillArgs {
   name: string
 }
@@ -26,7 +24,5 @@ export interface SkillLoadOptions {
   mcpManager?: SkillMcpManager
   /** Session ID getter for MCP client identification */
   getSessionID?: () => string
-  /** Git master configuration for watermark/co-author settings */
-  gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
 }

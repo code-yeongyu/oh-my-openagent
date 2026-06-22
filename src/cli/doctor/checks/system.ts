@@ -1,11 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
-
-import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
-import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
-import { getPluginInfo } from "./system-plugin"
-import { getLatestPluginVersion, getLoadedPluginVersion } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared"
+import { CHECK_IDS, CHECK_NAMES, MIN_OPENCODE_VERSION } from "../constants"
+import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
+import { compareVersions, findOpenCodeBinary, getOpenCodeVersion } from "./system-binary"
+import { getLatestPluginVersion, getLoadedPluginVersion } from "./system-loaded-version"
+import { getPluginInfo } from "./system-plugin"
 
 function isConfigValid(configPath: string | null): boolean {
   if (!configPath) return true

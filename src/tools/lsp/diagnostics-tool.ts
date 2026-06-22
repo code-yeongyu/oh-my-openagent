@@ -1,8 +1,8 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 
 import { DEFAULT_MAX_DIAGNOSTICS } from "./constants"
-import { filterDiagnosticsBySeverity, formatDiagnostic } from "./lsp-formatters"
 import { withLspClient } from "./lsp-client-wrapper"
+import { filterDiagnosticsBySeverity, formatDiagnostic } from "./lsp-formatters"
 import type { Diagnostic } from "./types"
 
 export const lsp_diagnostics: ToolDefinition = tool({

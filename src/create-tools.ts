@@ -1,13 +1,12 @@
 import type { AvailableCategory, AvailableSkill } from "./agents/dynamic-agent-prompt-builder"
 import type { MatrixxConfig } from "./config"
 import type { BrowserAutomationProvider } from "./config/schema/browser-automation"
-import type { LoadedSkill } from "./features/opencode-skill-loader/types"
-import type { PluginContext, ToolsRecord } from "./plugin/types"
 import type { Managers } from "./create-managers"
-
+import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import { createAvailableCategories } from "./plugin/available-categories"
 import { createSkillContext } from "./plugin/skill-context"
 import { createToolRegistry } from "./plugin/tool-registry"
+import type { PluginContext, ToolsRecord } from "./plugin/types"
 
 export type CreateToolsResult = {
   filteredTools: ToolsRecord

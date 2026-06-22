@@ -1,4 +1,4 @@
-import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import { executeOnCompleteHook } from "./on-complete-hook"
 
 describe("executeOnCompleteHook", () => {

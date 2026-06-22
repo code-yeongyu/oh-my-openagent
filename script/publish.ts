@@ -137,11 +137,11 @@ async function generateChangelog(previous: string, currentVersion?: string): Pro
 async function getContributors(previous: string): Promise<string[]> {
   const notes: string[] = []
 
-  const team = ["actions-user", "github-actions[bot]", "code-yeongyu"]
+  const team = ["actions-user", "github-actions[bot]"]
 
   try {
     const compare =
-      await $`gh api "/repos/code-yeongyu/matrixx/compare/v${previous}...HEAD" --jq '.commits[] | {login: .author.login, message: .commit.message}'`.text()
+      await $`gh api "/repos/klpanagi/matrixx/compare/v${previous}...HEAD" --jq '.commits[] | {login: .author.login, message: .commit.message}'`.text()
     const contributors = new Map<string, string[]>()
 
     for (const line of compare.split("\n").filter(Boolean)) {

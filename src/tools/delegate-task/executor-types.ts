@@ -1,5 +1,5 @@
+import type { AgentOverrides, BrowserAutomationProvider, CategoriesConfig } from "../../config/schema"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type { OpencodeClient } from "./types"
 
 export interface ExecutorContext {
@@ -7,7 +7,6 @@ export interface ExecutorContext {
   client: OpencodeClient
   directory: string
   userCategories?: CategoriesConfig
-  gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
   agentOverrides?: AgentOverrides

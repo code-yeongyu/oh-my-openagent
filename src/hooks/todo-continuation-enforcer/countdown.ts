@@ -8,9 +8,9 @@ import {
   HOOK_NAME,
   TOAST_DURATION_MS,
 } from "./constants"
-import type { ResolvedMessageInfo } from "./types"
-import type { SessionStateStore } from "./session-state"
 import { injectContinuation } from "./continuation-injection"
+import type { SessionStateStore } from "./session-state"
+import type { ResolvedMessageInfo } from "./types"
 
 async function showCountdownToast(
   ctx: PluginInput,

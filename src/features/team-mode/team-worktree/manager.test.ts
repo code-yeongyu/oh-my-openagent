@@ -5,9 +5,8 @@ import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-
-import { GitUnavailableError, createWorktree, setGitCommandRunnerForTests, validateWorktreeSpec } from "./manager"
 import { removeWorktree } from "./cleanup"
+import { createWorktree, GitUnavailableError, setGitCommandRunnerForTests, validateWorktreeSpec } from "./manager"
 
 const temporaryDirectories: string[] = []
 

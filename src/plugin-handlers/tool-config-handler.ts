@@ -1,12 +1,9 @@
 import type { MatrixxConfig } from "../config";
-import { getAgentDisplayName } from "../shared/agent-display-names";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
 function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
-  return (agentResult[key] ?? agentResult[getAgentDisplayName(key)]) as
-    | AgentWithPermission
-    | undefined;
+  return agentResult[key] as AgentWithPermission | undefined;
 }
 
 export function applyToolConfig(params: {
@@ -47,7 +44,7 @@ export function applyToolConfig(params: {
     architect.permission = {
       ...architect.permission,
       task: "allow",
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
@@ -57,7 +54,7 @@ export function applyToolConfig(params: {
   if (morpheus) {
     morpheus.permission = {
       ...morpheus.permission,
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       task: "allow",
       question: questionPermission,
       "task_*": "allow",
@@ -69,7 +66,7 @@ export function applyToolConfig(params: {
   if (keymaker) {
     keymaker.permission = {
       ...keymaker.permission,
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       task: "allow",
       question: questionPermission,
       ...denyTodoTools,
@@ -79,7 +76,7 @@ export function applyToolConfig(params: {
   if (oracle) {
     oracle.permission = {
       ...oracle.permission,
-      call_omo_agent: "deny",
+      delegate_agent: "deny",
       task: "allow",
       question: questionPermission,
       "task_*": "allow",

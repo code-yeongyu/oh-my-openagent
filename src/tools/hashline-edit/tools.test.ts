@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { createHashlineEditTool } from "./tools"
-import { computeLineHash } from "./hash-computation"
-import { canonicalizeFileText } from "./file-text-canonicalization"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { canonicalizeFileText } from "./file-text-canonicalization"
+import { computeLineHash } from "./hash-computation"
+import { createHashlineEditTool } from "./tools"
 
 function createMockContext(): ToolContext {
   return {

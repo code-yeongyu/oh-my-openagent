@@ -1,8 +1,8 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-import type { ExecutorContext, ParentContext } from "./executor-types"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { formatDetailedError } from "./error-formatting"
+import type { ExecutorContext, ParentContext } from "./executor-types"
+import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,

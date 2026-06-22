@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
-import { mkdirSync, rmSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { mkdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-const TEST_STORAGE = join(tmpdir(), `omo-msgdir-test-${randomUUID()}`)
+const TEST_STORAGE = join(tmpdir(), `matrixx-msgdir-test-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE, "message")
 
 mock.module("./opencode-storage-paths", () => ({

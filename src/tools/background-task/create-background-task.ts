@@ -1,13 +1,14 @@
-import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
+import { type PluginInput, type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { BackgroundTaskArgs } from "./types"
-import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
-import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { resolveMessageContext } from "../../features/hook-message-injector"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { formatDetailedError } from "../../shared/error-formatting"
 import { log } from "../../shared/logger"
+import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { getMessageDir } from "./message-dir"
+import type { BackgroundTaskArgs } from "./types"
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -87,14 +88,26 @@ export function createBackgroundTask(
           await delay(WAIT_FOR_SESSION_INTERVAL_MS)
           const updated = manager.getTask(task.id)
           if (!updated || updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
-            return `Task ${!updated ? "was deleted" : `entered error state`}\.\n\nTask ID: ${task.id}`
+            return `Task ${!updated ? "was deleted" : `entered error state`}.\n\nTask ID: ${task.id}`
           }
           sessionId = updated?.sessionID
         }
 
+        if (!sessionId) {
+          return formatDetailedError(
+            new Error(
+              `Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`
+            ),
+            {
+              operation: "Launch background task",
+              agent: task.agent,
+            }
+          )
+        }
+
         const bgMeta = {
           title: args.description,
-          metadata: { sessionId: sessionId ?? "pending" },
+          metadata: { sessionId },
         }
         await ctx.metadata?.(bgMeta)
 
@@ -105,7 +118,7 @@ export function createBackgroundTask(
         return `Background task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${sessionId ?? "pending"}
+Session ID: ${sessionId ?? "(timed out)"}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}

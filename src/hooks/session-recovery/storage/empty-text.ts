@@ -1,12 +1,11 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isSqliteBackend, log, normalizeSDKResponse, patchPart } from "../../../shared"
 import { PART_STORAGE } from "../constants"
-import type { StoredPart, StoredTextPart, MessageData } from "../types"
+import type { MessageData, StoredPart, StoredTextPart } from "../types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
-import { log, isSqliteBackend, patchPart } from "../../../shared"
-import { normalizeSDKResponse } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -37,7 +36,6 @@ export function replaceEmptyTextParts(messageID: string, replacementText: string
         }
       }
     } catch {
-      continue
     }
   }
 

@@ -1,13 +1,13 @@
 import pc from "picocolors"
-import type { RunOptions, RunContext } from "./types"
-import { createEventState, processEvents, serializeError } from "./events"
 import { loadPluginConfig } from "../../plugin-config"
-import { createServerConnection } from "./server-connection"
-import { resolveSession } from "./session-resolver"
+import { resolveRunAgent } from "./agent-resolver"
+import { createEventState, processEvents, serializeError } from "./events"
 import { createJsonOutputManager } from "./json-output"
 import { executeOnCompleteHook } from "./on-complete-hook"
-import { resolveRunAgent } from "./agent-resolver"
 import { pollForCompletion } from "./poll-for-completion"
+import { createServerConnection } from "./server-connection"
+import { resolveSession } from "./session-resolver"
+import type { RunContext, RunOptions } from "./types"
 
 export { resolveRunAgent }
 

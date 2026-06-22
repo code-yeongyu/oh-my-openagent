@@ -1,13 +1,12 @@
-import type { AutoCompactState } from "./types";
 import type { ExperimentalConfig } from "../../config";
-import { TRUNCATE_CONFIG } from "./types";
-
 import type { Client } from "./client";
-import { getOrCreateTruncateState } from "./state";
 import {
   runAggressiveTruncationStrategy,
   runSummarizeRetryStrategy,
 } from "./recovery-strategy";
+import { getOrCreateTruncateState } from "./state";
+import type { AutoCompactState } from "./types";
+import { TRUNCATE_CONFIG } from "./types";
 
 export { getLastAssistant } from "./message-builder";
 

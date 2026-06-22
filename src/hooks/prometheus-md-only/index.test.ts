@@ -1,11 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { clearSessionAgent, setSessionAgent } from "../../features/claude-code-session-state"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
@@ -380,11 +379,11 @@ describe("oracle-md-only", () => {
       expect(output.args.prompt).toContain("READ-ONLY")
     })
 
-    test("should inject read-only warning when Oracle calls call_omo_agent", async () => {
+    test("should inject read-only warning when Oracle calls delegate_agent", async () => {
       // given
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "call_omo_agent",
+        tool: "delegate_agent",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }

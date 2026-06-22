@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { setSessionTools, getSessionTools, clearSessionTools } from "./session-tools-store"
+import { beforeEach, describe, expect, test } from "bun:test"
+import { clearSessionTools, getSessionTools, setSessionTools } from "./session-tools-store"
 
 describe("session-tools-store", () => {
   beforeEach(() => {
@@ -20,14 +20,14 @@ describe("session-tools-store", () => {
   test("stores and retrieves tools for a session", () => {
     //#given
     const sessionID = "ses_abc123"
-    const tools = { question: false, task: true, call_omo_agent: true }
+    const tools = { question: false, task: true, delegate_agent: true }
 
     //#when
     setSessionTools(sessionID, tools)
     const result = getSessionTools(sessionID)
 
     //#then
-    expect(result).toEqual({ question: false, task: true, call_omo_agent: true })
+    expect(result).toEqual({ question: false, task: true, delegate_agent: true })
   })
 
   test("overwrites existing tools for same session", () => {

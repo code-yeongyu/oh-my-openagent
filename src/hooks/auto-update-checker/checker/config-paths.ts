@@ -1,10 +1,10 @@
 import * as os from "node:os"
 import * as path from "node:path"
 import {
+  getWindowsAppdataDir,
   USER_CONFIG_DIR,
   USER_OPENCODE_CONFIG,
   USER_OPENCODE_CONFIG_JSONC,
-  getWindowsAppdataDir,
 } from "../constants"
 
 export function getConfigPaths(directory: string): string[] {

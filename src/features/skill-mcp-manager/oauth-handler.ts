@@ -1,7 +1,7 @@
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { McpOAuthProvider } from "../mcp-oauth/provider"
-import type { OAuthTokenData } from "../mcp-oauth/storage"
 import { isStepUpRequired, mergeScopes } from "../mcp-oauth/step-up"
+import type { OAuthTokenData } from "../mcp-oauth/storage"
 
 export function getOrCreateAuthProvider(
   authProviders: Map<string, McpOAuthProvider>,

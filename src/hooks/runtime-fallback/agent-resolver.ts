@@ -14,7 +14,6 @@ export const AGENT_NAMES = [
   "cipher",
   "mouse",
   "sentinel",
-  "zion",
 ]
 
 export const agentPattern = new RegExp(

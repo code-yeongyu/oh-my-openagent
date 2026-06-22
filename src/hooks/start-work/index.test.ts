@@ -1,15 +1,15 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir, homedir } from "node:os"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { createStartWorkHook } from "./index"
-import {
-  writeMissionState,
-  clearMissionState,
-} from "../../features/mission-state"
-import type { MissionState } from "../../features/mission-state"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
+import { join } from "node:path"
 import * as sessionState from "../../features/claude-code-session-state"
+import type { MissionState } from "../../features/mission-state"
+import {
+  clearMissionState,
+  writeMissionState,
+} from "../../features/mission-state"
+import { createStartWorkHook } from "./index"
 
 describe("start-work hook", () => {
   let testDir: string

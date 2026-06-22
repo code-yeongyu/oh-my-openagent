@@ -1,17 +1,15 @@
 import type { MatrixxConfig } from "../config"
-import type { PluginContext } from "./types"
-
+import type { CreatedHooks } from "../create-hooks"
+import {
+  setSessionAgent,
+} from "../features/claude-code-session-state"
+import { hasConnectedProvidersCache } from "../shared"
 import {
   applyAgentVariant,
   resolveAgentVariant,
   resolveVariantForModel,
 } from "../shared/agent-variant"
-import { hasConnectedProvidersCache } from "../shared"
-import {
-  setSessionAgent,
-} from "../features/claude-code-session-state"
-
-import type { CreatedHooks } from "../create-hooks"
+import type { PluginContext } from "./types"
 
 type FirstMessageVariantGate = {
   shouldOverride: (sessionID: string) => boolean
@@ -79,7 +77,6 @@ export function createChatMessageHandler(args: {
 
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
-    await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)

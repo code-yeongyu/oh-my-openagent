@@ -5,9 +5,8 @@ import {
   getLocalDevVersion,
   isLocalDevMode,
 } from "../../hooks/auto-update-checker/checker"
-
-import type { GetLocalVersionOptions, VersionInfo } from "./types"
 import { formatJsonOutput, formatVersionOutput } from "./formatter"
+import type { GetLocalVersionOptions, VersionInfo } from "./types"
 
 export async function getLocalVersion(
   options: GetLocalVersionOptions = {}

@@ -1,9 +1,8 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
-
-import { formatApplyResult, formatPrepareRenameResult } from "./lsp-formatters"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { withLspClient } from "./lsp-client-wrapper"
-import { applyWorkspaceEdit } from "./workspace-edit"
+import { formatApplyResult, formatPrepareRenameResult } from "./lsp-formatters"
 import type { PrepareRenameDefaultBehavior, PrepareRenameResult, WorkspaceEdit } from "./types"
+import { applyWorkspaceEdit } from "./workspace-edit"
 
 export const lsp_prepare_rename: ToolDefinition = tool({
   description: "Check if rename is valid. Use BEFORE lsp_rename.",

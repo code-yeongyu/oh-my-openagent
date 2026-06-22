@@ -1,12 +1,12 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync, readdirSync } from "fs"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import type { MatrixxConfig } from "../../config/schema"
 import {
-  getSessionTaskDir,
-  listSessionTaskFiles,
-  listAllSessionDirs,
   findTaskAcrossSessions,
+  getSessionTaskDir,
+  listAllSessionDirs,
+  listSessionTaskFiles,
 } from "./session-storage"
 
 const TEST_DIR = ".test-session-storage"

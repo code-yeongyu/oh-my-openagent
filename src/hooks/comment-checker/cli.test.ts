@@ -1,7 +1,7 @@
-import { describe, test, expect, mock } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import type { PendingCall } from "./types"
 

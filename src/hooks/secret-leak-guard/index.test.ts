@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { isGitCommitOrPush, isGitPush } from "./git-command-detector"
-import { formatFindings, extractRemoteBranch } from "./result-formatter"
+import { extractRemoteBranch, formatFindings } from "./result-formatter"
 
 describe("git-command-detector", () => {
   describe("isGitCommitOrPush", () => {

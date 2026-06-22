@@ -1,18 +1,17 @@
 import type { MatrixxConfig } from "../config";
-import { getAgentDisplayName } from "../shared/agent-display-names";
-import {
-  loadUserCommands,
-  loadProjectCommands,
-  loadOpencodeGlobalCommands,
-  loadOpencodeProjectCommands,
-} from "../features/claude-code-command-loader";
 import { loadBuiltinCommands } from "../features/builtin-commands";
 import {
+  loadOpencodeGlobalCommands,
+  loadOpencodeProjectCommands,
+  loadProjectCommands,
+  loadUserCommands,
+} from "../features/claude-code-command-loader";
+import {
   discoverConfigSourceSkills,
-  loadUserSkills,
-  loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
+  loadProjectSkills,
+  loadUserSkills,
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
 import type { PluginComponents } from "./plugin-components-loader";
@@ -69,14 +68,4 @@ export async function applyCommandConfig(params: {
     ...params.pluginComponents.commands,
     ...params.pluginComponents.skills,
   };
-
-  remapCommandAgentFields(params.config.command as Record<string, Record<string, unknown>>);
-}
-
-function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
-  for (const cmd of Object.values(commands)) {
-    if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentDisplayName(cmd.agent);
-    }
-  }
 }

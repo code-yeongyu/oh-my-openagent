@@ -1,16 +1,16 @@
+import { subagentSessions } from "../../features/claude-code-session-state";
+import { buildSessionReminderMessage, MATRIXX_SESSION_PREFIX } from "./constants";
 import {
+  clearInteractiveBashSessionState,
   loadInteractiveBashSessionState,
   saveInteractiveBashSessionState,
-  clearInteractiveBashSessionState,
 } from "./storage";
-import { OMO_SESSION_PREFIX, buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
-import { subagentSessions } from "../../features/claude-code-session-state";
 
 type AbortSession = (args: { path: { id: string } }) => Promise<unknown>
 
 function isOmoSession(sessionName: string | null): sessionName is string {
-  return sessionName !== null && sessionName.startsWith(OMO_SESSION_PREFIX)
+  return sessionName !== null && sessionName.startsWith(MATRIXX_SESSION_PREFIX)
 }
 
 async function killAllTrackedSessions(

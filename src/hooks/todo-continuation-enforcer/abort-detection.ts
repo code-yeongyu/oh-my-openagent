@@ -5,13 +5,14 @@ export function isLastAssistantMessageAborted(
 ): boolean {
   if (!messages || messages.length === 0) return false
 
-  const assistantMessages = messages.filter((message) => message.info?.role === "assistant")
-  if (assistantMessages.length === 0) return false
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const info = messages[i].info
+    if (info?.role !== "assistant") continue
 
-  const lastAssistant = assistantMessages[assistantMessages.length - 1]
-  const errorName = lastAssistant.info?.error?.name
+    const errorName = info.error?.name
+    if (!errorName) return false
+    return errorName === "MessageAbortedError" || errorName === "AbortError"
+  }
 
-  if (!errorName) return false
-
-  return errorName === "MessageAbortedError" || errorName === "AbortError"
+  return false
 }

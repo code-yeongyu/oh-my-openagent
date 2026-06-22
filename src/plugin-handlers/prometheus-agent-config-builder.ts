@@ -1,12 +1,12 @@
-import type { CategoryConfig } from "../config/schema";
-import { ORACLE_PERMISSION, ORACLE_SYSTEM_PROMPT } from "../agents/oracle";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
-import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
+import { ORACLE_PERMISSION, ORACLE_SYSTEM_PROMPT } from "../agents/oracle";
+import type { CategoryConfig } from "../config/schema";
 import {
   fetchAvailableModels,
   readConnectedProvidersCache,
   resolveModelPipeline,
 } from "../shared";
+import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import { resolveCategoryConfig } from "./category-config-resolver";
 
 type OracleOverride = Record<string, unknown> & {

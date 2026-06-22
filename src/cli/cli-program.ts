@@ -1,14 +1,14 @@
 import { Command } from "commander"
-import { install } from "./install"
-import { run } from "./run"
-import { getLocalVersion } from "./get-local-version"
-import { doctor } from "./doctor"
-import { createMcpOAuthCommand } from "./mcp-oauth"
-import type { InstallArgs } from "./types"
-import type { RunOptions } from "./run"
-import type { GetLocalVersionOptions } from "./get-local-version/types"
-import type { DoctorOptions } from "./doctor"
 import packageJson from "../../package.json" with { type: "json" }
+import type { DoctorOptions } from "./doctor"
+import { doctor } from "./doctor"
+import { getLocalVersion } from "./get-local-version"
+import type { GetLocalVersionOptions } from "./get-local-version/types"
+import { install } from "./install"
+import { createMcpOAuthCommand } from "./mcp-oauth"
+import type { RunOptions } from "./run"
+import { run } from "./run"
+import type { InstallArgs } from "./types"
 
 const VERSION = packageJson.version
 

@@ -52,7 +52,7 @@ def metamodel():
 
 \`\`\`python
 def test_parse_simple_entity(metamodel):
-    \"\"\"Test that a basic entity definition parses correctly.\"\"\"
+    """Test that a basic entity definition parses correctly."""
     model = metamodel.model_from_str('''
         entity Person {
             name: string
@@ -64,13 +64,13 @@ def test_parse_simple_entity(metamodel):
     assert len(model.entities[0].attrs) == 2
 
 def test_parse_empty_entity(metamodel):
-    \"\"\"Test that an entity with no attributes parses.\"\"\"
+    """Test that an entity with no attributes parses."""
     model = metamodel.model_from_str('entity Empty {}')
     assert model.entities[0].name == 'Empty'
     assert len(model.entities[0].attrs) == 0
 
 def test_parse_from_file(metamodel):
-    \"\"\"Test parsing from fixture files.\"\"\"
+    """Test parsing from fixture files."""
     model = metamodel.model_from_file('tests/fixtures/valid/complex.mylang')
     assert model is not None
 \`\`\`
@@ -81,7 +81,7 @@ def test_parse_from_file(metamodel):
 from textx import TextXSyntaxError
 
 def test_reject_missing_name(metamodel):
-    \"\"\"Entity without a name should fail.\"\"\"
+    """Entity without a name should fail."""
     with pytest.raises(TextXSyntaxError, match="Expected 'ID'"):
         metamodel.model_from_str('entity { name: string }')
 
@@ -100,7 +100,7 @@ def test_reject_duplicate_keyword(metamodel):
 from textx import TextXSemanticError
 
 def test_reject_duplicate_attribute_names(metamodel):
-    \"\"\"Entities with duplicate attribute names should fail validation.\"\"\"
+    """Entities with duplicate attribute names should fail validation."""
     with pytest.raises(TextXSemanticError, match="Duplicate attribute"):
         metamodel.model_from_str('''
             entity Person {
@@ -110,7 +110,7 @@ def test_reject_duplicate_attribute_names(metamodel):
         ''')
 
 def test_reject_unresolved_reference(metamodel):
-    \"\"\"Reference to non-existent entity should fail.\"\"\"
+    """Reference to non-existent entity should fail."""
     with pytest.raises(TextXSemanticError, match="Unknown object.*NonExistent"):
         metamodel.model_from_str('''
             entity Person {
@@ -119,7 +119,7 @@ def test_reject_unresolved_reference(metamodel):
         ''')
 
 def test_accept_valid_cross_reference(metamodel):
-    \"\"\"Valid cross-reference should resolve.\"\"\"
+    """Valid cross-reference should resolve."""
     model = metamodel.model_from_str('''
         entity Address { city: string }
         entity Person { home: Address }
@@ -132,7 +132,7 @@ def test_accept_valid_cross_reference(metamodel):
 
 \`\`\`python
 def test_import_resolves_cross_file_reference(metamodel, tmp_path):
-    \"\"\"Test that imports resolve types across files.\"\"\"
+    """Test that imports resolve types across files."""
     types_file = tmp_path / 'types.mylang'
     types_file.write_text('entity Address { city: string }')
 
@@ -155,7 +155,7 @@ def test_import_resolves_cross_file_reference(metamodel, tmp_path):
 import os
 
 def test_codegen_entity_to_python(metamodel, generator):
-    \"\"\"Compare generated output against golden file.\"\"\"
+    """Compare generated output against golden file."""
     model = metamodel.model_from_file('tests/fixtures/valid/simple.mylang')
     generated = generator.generate(model)
 
@@ -170,7 +170,7 @@ def test_codegen_entity_to_python(metamodel, generator):
         assert generated == expected, f"Generated output differs from golden file"
 
 def test_codegen_compiles(metamodel, generator, tmp_path):
-    \"\"\"Test that generated code is syntactically valid.\"\"\"
+    """Test that generated code is syntactically valid."""
     model = metamodel.model_from_file('tests/fixtures/valid/simple.mylang')
     generated = generator.generate(model)
     out_file = tmp_path / 'output.py'
@@ -203,7 +203,7 @@ def test_generated_code_executes(metamodel, generator, tmp_path):
 
 \`\`\`python
 def test_model_roundtrip_xmi(metamodel, rset):
-    \"\"\"Parse → serialize to XMI → deserialize → compare.\"\"\"
+    """Parse → serialize to XMI → deserialize → compare."""
     original = metamodel.model_from_str('entity Foo { bar: string }')
 
     # Serialize
@@ -248,7 +248,7 @@ def entity_program(draw):
 
 @given(entity_program())
 def test_any_valid_entity_parses(metamodel, program):
-    \"\"\"Any well-formed entity program should parse without errors.\"\"\"
+    """Any well-formed entity program should parse without errors."""
     model = metamodel.model_from_str(program)
     assert model is not None
     assert len(model.entities) == 1

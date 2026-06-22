@@ -1,7 +1,7 @@
 import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { MatrixxConfig } from "../config"
-import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
+import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 
 export function createAvailableCategories(
   pluginConfig: MatrixxConfig,

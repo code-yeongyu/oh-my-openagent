@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer"
 
 type EventInput = { event: { type: string; properties?: Record<string, unknown> } }

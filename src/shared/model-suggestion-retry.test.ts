@@ -1,5 +1,5 @@
-import { describe, it, expect, mock } from "bun:test"
-import { parseModelSuggestion, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "./model-suggestion-retry"
+import { describe, expect, it, mock } from "bun:test"
+import { parseModelSuggestion, promptSyncWithModelSuggestionRetry, promptWithModelSuggestionRetry } from "./model-suggestion-retry"
 
 describe("parseModelSuggestion", () => {
   describe("structured NamedError format", () => {

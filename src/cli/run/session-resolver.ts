@@ -1,6 +1,6 @@
 import pc from "picocolors"
-import type { OpencodeClient } from "./types"
 import { serializeError } from "./events"
+import type { OpencodeClient } from "./types"
 
 const SESSION_CREATE_MAX_RETRIES = 3
 const SESSION_CREATE_RETRY_DELAY_MS = 1000
@@ -28,10 +28,11 @@ export async function resolveSession(options: {
       body: {
         title: "matrixx run",
         // In CLI run mode there's no TUI to answer questions.
+        // `permission` is not in the SDK's SessionCreateData type but is accepted by the server.
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
-      } as any,
+      } as { title: string; permission: Array<{ permission: string; action: string; pattern: string }> },
       query: { directory },
     })
 

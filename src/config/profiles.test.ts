@@ -321,15 +321,6 @@ describe("expandProfile", () => {
       expect(result.agents?.trinity?.model).toBe("opencode-go/deepseek-v4-flash")
     })
 
-    test("should set zion to opencode-go/deepseek-v4-flash (automation tier)", () => {
-      //#given
-      //#when
-      const result = expandProfile("go")
-
-      //#then
-      expect(result.agents?.zion?.model).toBe("opencode-go/deepseek-v4-flash")
-    })
-
     test("should set source category to opencode-go/kimi-k2.6", () => {
       //#given
       //#when

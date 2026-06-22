@@ -1,9 +1,9 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
-  createAgentToolRestrictions,
   createAgentToolAllowlist,
-  migrateToolsToPermission,
+  createAgentToolRestrictions,
   migrateAgentConfig,
+  migrateToolsToPermission,
 } from "./permission-compat"
 
 describe("permission-compat", () => {

@@ -4,35 +4,33 @@ import type {
   AvailableCategory,
 } from "../agents/dynamic-agent-prompt-builder"
 import type { MatrixxConfig } from "../config"
-import type { PluginContext, ToolsRecord } from "./types"
-
+import type { Managers } from "../create-managers"
+import { getMainSessionID } from "../features/claude-code-session-state"
+import { log } from "../shared"
+import { filterDisabledTools } from "../shared/disabled-tools"
 import {
   builtinTools,
-  createBackgroundTools,
-  createCallOmoAgent,
-  createLookAt,
-  createSkillTool,
-  createSkillMcpTool,
-  createSlashcommandTool,
-  createGrepTools,
-  createGlobTools,
   createAstGrepTools,
-  createSessionManagerTools,
+  createBackgroundTools,
+  createDelegateAgent,
   createDelegateTask,
-  discoverCommandsSync,
-  interactive_bash,
+  createGlobTools,
+  createGrepTools,
+  createHashlineEditTool,
+  createLookAt,
+  createSessionManagerTools,
+  createSkillMcpTool,
+  createSkillTool,
+  createSlashcommandTool,
   createTaskCreateTool,
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
-  createHashlineEditTool,
+  discoverCommandsSync,
+  interactive_bash,
 } from "../tools"
-import { getMainSessionID } from "../features/claude-code-session-state"
-import { filterDisabledTools } from "../shared/disabled-tools"
-import { log } from "../shared"
-
-import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
+import type { PluginContext, ToolsRecord } from "./types"
 
 export type ToolRegistryResult = {
   filteredTools: ToolsRecord
@@ -49,7 +47,7 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
+  const delegateAgent = createDelegateAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "construct",
@@ -61,7 +59,6 @@ export function createToolRegistry(args: {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
-    gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["mouse"]?.model,
     browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
@@ -92,7 +89,6 @@ export function createToolRegistry(args: {
     skills: skillContext.mergedSkills,
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
-    gitMasterConfig: pluginConfig.git_master,
     disabledSkills: skillContext.disabledSkills,
   })
 
@@ -130,7 +126,7 @@ export function createToolRegistry(args: {
     ...createAstGrepTools(ctx),
     ...createSessionManagerTools(ctx),
     ...backgroundTools,
-    call_omo_agent: callOmoAgent,
+    delegate_agent: delegateAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
     skill: skillTool,

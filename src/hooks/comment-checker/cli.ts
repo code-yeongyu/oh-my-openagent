@@ -1,10 +1,10 @@
 import { spawn } from "bun"
-import { createRequire } from "module"
-import { dirname, join } from "path"
-import { existsSync } from "fs"
 import * as fs from "fs"
+import { existsSync } from "fs"
+import { createRequire } from "module"
 import { tmpdir } from "os"
-import { getCachedBinaryPath, ensureCommentCheckerBinary } from "./downloader"
+import { dirname, join } from "path"
+import { ensureCommentCheckerBinary, getCachedBinaryPath } from "./downloader"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")

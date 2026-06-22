@@ -1,10 +1,10 @@
+import { expandEnvVarsInObject } from "./env-expander"
 import type {
   ClaudeCodeMcpServer,
   McpLocalConfig,
   McpRemoteConfig,
   McpServerConfig,
 } from "./types"
-import { expandEnvVarsInObject } from "./env-expander"
 
 export function transformMcpServer(
   name: string,

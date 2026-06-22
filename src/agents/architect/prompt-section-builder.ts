@@ -6,10 +6,10 @@
  */
 
 import type { CategoryConfig } from "../../config/schema"
-import { formatCustomSkillsBlock, type AvailableAgent, type AvailableSkill } from "../dynamic-agent-prompt-builder"
-import { CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
 import { mergeCategories } from "../../shared/merge-categories"
 import { truncateDescription } from "../../shared/truncate-description"
+import { CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
+import { type AvailableAgent, type AvailableSkill, formatCustomSkillsBlock } from "../dynamic-agent-prompt-builder"
 
 export const getCategoryDescription = (name: string, userCategories?: Record<string, CategoryConfig>) =>
   userCategories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks"

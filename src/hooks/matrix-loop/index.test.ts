@@ -1,10 +1,10 @@
 /// <reference types="bun-types" />
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createMatrixLoopHook } from "./index"
-import { readState, writeState, clearState } from "./storage"
+import { clearState, readState, writeState } from "./storage"
 import type { MatrixLoopState } from "./types"
 
 describe("matrix-loop", () => {
@@ -1026,20 +1026,17 @@ Original task: Build something`
       } as unknown as Parameters<typeof createMatrixLoopHook>[0]
     }
 
-    //#given ultrawork loop with verification enabled and completion detected
+    //#given ultrawork loop with verification enabled and completion detected (H4: tag in preFetchedMessages)
     //#when session goes idle
     //#then verifyCompletion is called before clearing state
     test("should call verification before clearing state on ultrawork completion", async () => {
       mockSessionMessages = [
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
-      ]
-      const mockInput = createVerificationMockPluginInput()
-      verificationMessages = [
         {
           info: { role: "assistant" },
-          parts: [{ type: "text", text: "<verification>PASS</verification>" }],
+          parts: [{ type: "text", text: "<promise>DONE</promise> <verification>PASS</verification>" }],
         },
       ]
+      const mockInput = createVerificationMockPluginInput()
       const hook = createMatrixLoopHook(mockInput, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         verification: { enabled: true, timeoutMs: 1000 },
@@ -1050,25 +1047,22 @@ Original task: Build something`
         event: { type: "session.idle", properties: { sessionID: "session-123" } },
       })
 
-      expect(sessionCreateCalls.length).toBe(1)
+      expect(sessionCreateCalls.length).toBe(0)
       expect(hook.getState()).toBeNull()
       expect(toastCalls.some((t) => t.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
     })
 
-    //#given verification returns verified=true
+    //#given verification returns verified=true (H4: tag present in preFetchedMessages)
     //#when completion flow runs
     //#then state is cleared and success toast shown
     test("should clear state and show toast when verification passes", async () => {
       mockSessionMessages = [
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
-      ]
-      const mockInput = createVerificationMockPluginInput()
-      verificationMessages = [
         {
           info: { role: "assistant" },
-          parts: [{ type: "text", text: "<verification>PASS</verification>" }],
+          parts: [{ type: "text", text: "<promise>DONE</promise> <verification>PASS</verification>" }],
         },
       ]
+      const mockInput = createVerificationMockPluginInput()
       const hook = createMatrixLoopHook(mockInput, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         verification: { enabled: true, timeoutMs: 1000 },
@@ -1083,20 +1077,22 @@ Original task: Build something`
       expect(toastCalls.some((t) => t.title === "Matrix Loop Complete!")).toBe(true)
     })
 
-    //#given verification returns verified=false
+    //#given verification returns verified=false (H4: FAIL tag in preFetchedMessages)
     //#when completion flow runs
     //#then state is NOT cleared, iteration increments, continuation injected with feedback
     test("should NOT clear state when verification fails, inject continuation with feedback", async () => {
       mockSessionMessages = [
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
-      ]
-      const mockInput = createVerificationMockPluginInput()
-      verificationMessages = [
         {
           info: { role: "assistant" },
-          parts: [{ type: "text", text: "<verification>FAIL: Tests are not passing</verification>" }],
+          parts: [
+            {
+              type: "text",
+              text: "<promise>DONE</promise> <verification>FAIL: Tests are not passing</verification>",
+            },
+          ],
         },
       ]
+      const mockInput = createVerificationMockPluginInput()
       const hook = createMatrixLoopHook(mockInput, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         verification: { enabled: true, timeoutMs: 1000 },

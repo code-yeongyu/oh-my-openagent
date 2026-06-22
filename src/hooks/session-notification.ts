@@ -1,16 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
-import {
-  startBackgroundCheck,
-} from "./session-notification-utils"
+import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
+import { createIdleNotificationScheduler } from "./session-notification-scheduler"
 import {
   detectPlatform,
   getDefaultSoundPath,
   playSessionNotificationSound,
   sendSessionNotification,
 } from "./session-notification-sender"
+import {
+  startBackgroundCheck,
+} from "./session-notification-utils"
 import { hasIncompleteTodos } from "./session-todo-status"
-import { createIdleNotificationScheduler } from "./session-notification-scheduler"
 
 interface SessionNotificationConfig {
   title?: string

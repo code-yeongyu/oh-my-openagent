@@ -1,14 +1,10 @@
 export const AGENT_NAME_MAP: Record<string, string> = {
   // Legacy Sisyphus variants → "morpheus"
-  omo: "morpheus",
-  OmO: "morpheus",
   Sisyphus: "morpheus",
   sisyphus: "morpheus",
   morpheus: "morpheus",
 
   // Legacy Prometheus variants → "oracle"
-  "OmO-Plan": "oracle",
-  "omo-plan": "oracle",
   "Planner-Sisyphus": "oracle",
   "planner-sisyphus": "oracle",
   "Prometheus (Planner)": "oracle",

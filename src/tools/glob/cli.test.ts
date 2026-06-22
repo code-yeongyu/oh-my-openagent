@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test"
-import { buildRgArgs, buildFindArgs, buildPowerShellCommand } from "./cli"
+import { describe, expect, it } from "bun:test"
+import { buildFindArgs, buildPowerShellCommand, buildRgArgs } from "./cli"
 
 describe("buildRgArgs", () => {
   // given default options (no hidden/follow specified)

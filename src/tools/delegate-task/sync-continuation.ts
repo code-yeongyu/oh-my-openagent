@@ -1,16 +1,14 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-import type { ExecutorContext, SessionMessage } from "./executor-types"
-import { isPlanFamily, getDeliverableTag } from "./constants"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { getTaskToastManager } from "../../features/task-toast-manager"
-import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
-import { getMessageDir } from "../../shared"
-import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
-import { formatDuration } from "./time-formatter"
-import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
+import { getTaskToastManager } from "../../features/task-toast-manager"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { formatDuration, getMessageDir, normalizeSDKResponse } from "../../shared"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { normalizeSDKResponse } from "../../shared"
+import { getDeliverableTag, isPlanFamily } from "./constants"
+import type { ExecutorContext, SessionMessage } from "./executor-types"
+import { type SyncContinuationDeps, syncContinuationDeps } from "./sync-continuation-deps"
+import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -86,7 +84,7 @@ export async function executeSyncContinuation(
     const tools = {
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,
-      call_omo_agent: true,
+      delegate_agent: true,
       question: false,
     }
     setSessionTools(continuationID!, tools)

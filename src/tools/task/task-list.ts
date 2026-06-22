@@ -1,10 +1,10 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
-import { join } from "path"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { existsSync, readdirSync } from "fs"
+import { join } from "path"
 import type { MatrixxConfig } from "../../config/schema"
+import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
 import type { TaskObject, TaskStatus } from "./types"
 import { TaskObjectSchema } from "./types"
-import { readJsonSafe, getTaskDir } from "../../features/claude-tasks/storage"
 
 interface TaskSummary {
   id: string

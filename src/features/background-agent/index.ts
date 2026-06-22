@@ -1,5 +1,5 @@
-export * from "./types"
-export { BackgroundManager, type SubagentSessionCreatedEvent, type OnSubagentSessionCreated } from "./manager"
-export { TaskHistory, type TaskHistoryEntry } from "./task-history"
 export { ConcurrencyManager } from "./concurrency"
+export { BackgroundManager, type OnSubagentSessionCreated, type SubagentSessionCreatedEvent } from "./manager"
 export { TaskStateManager } from "./state"
+export { TaskHistory, type TaskHistoryEntry } from "./task-history"
+export * from "./types"

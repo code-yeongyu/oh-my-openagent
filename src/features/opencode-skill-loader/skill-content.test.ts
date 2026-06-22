@@ -1,9 +1,9 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { tmpdir } from "node:os"
-import { resolveSkillContent, resolveMultipleSkills, resolveSkillContentAsync, resolveMultipleSkillsAsync } from "./skill-content"
+import { join } from "node:path"
+import { resolveMultipleSkills, resolveMultipleSkillsAsync, resolveSkillContent, resolveSkillContentAsync } from "./skill-content"
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
@@ -221,136 +221,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(result.notFound).toEqual(["frontend-ui-ux"])
 	})
 
-	it("should NOT inject watermark when both options are disabled", async () => {
-		// given: git-master skill with watermark disabled
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: false,
-				include_co_authored_by: false,
-			},
-		}
 
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: no watermark section injected
-		expect(result.resolved.size).toBe(1)
-		expect(result.notFound).toEqual([])
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).not.toContain("Ultraworked with")
-		expect(gitMasterContent).not.toContain("Co-authored-by: Morpheus")
-	})
-
-	it("should inject watermark when enabled (default)", async () => {
-		// given: git-master skill with default config (watermark enabled)
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: true,
-				include_co_authored_by: true,
-			},
-		}
-
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: watermark section is injected
-		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Matrixx]")
-		expect(gitMasterContent).toContain("Co-authored-by: Morpheus")
-	})
-
-	it("should inject only footer when co-author is disabled", async () => {
-		// given: git-master skill with only footer enabled
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: true,
-				include_co_authored_by: false,
-			},
-		}
-
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: only footer is injected
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Matrixx]")
-		expect(gitMasterContent).not.toContain("Co-authored-by: Morpheus")
-	})
-
-	it("should inject watermark by default when no config provided", async () => {
-		// given: git-master skill with NO config (default behavior)
-		const skillNames = ["git-master"]
-
-		// when: resolving without any gitMasterConfig
-		const result = await resolveMultipleSkillsAsync(skillNames)
-
-		// then: watermark is injected (default is ON)
-		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Matrixx]")
-		expect(gitMasterContent).toContain("Co-authored-by: Morpheus")
-	})
-
-	it("should inject only co-author when footer is disabled", async () => {
-		// given: git-master skill with only co-author enabled
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: false,
-				include_co_authored_by: true,
-			},
-		}
-
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: only co-author is injected
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).not.toContain("Ultraworked with [Matrixx]")
-		expect(gitMasterContent).toContain("Co-authored-by: Morpheus")
-	})
-
-	it("should inject custom string footer when commit_footer is a string", async () => {
-		// given: git-master skill with custom string footer
-		const skillNames = ["git-master"]
-		const customFooter = "Custom footer from my team"
-		const options = {
-			gitMasterConfig: {
-				commit_footer: customFooter,
-				include_co_authored_by: false,
-			},
-		}
-
-		// when: resolving with custom footer config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: custom footer is injected instead of default
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain(customFooter)
-		expect(gitMasterContent).not.toContain("Ultraworked with [Matrixx]")
-	})
-
-	it("should use default Morpheus footer when commit_footer is boolean true", async () => {
-		// given: git-master skill with boolean true footer
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: true,
-				include_co_authored_by: false,
-			},
-		}
-
-		// when: resolving with boolean true footer config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: default Morpheus footer is injected
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Matrixx]")
-	})
 
 	it("should handle empty array", async () => {
 		// given: empty skill names

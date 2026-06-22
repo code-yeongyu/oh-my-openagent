@@ -1,11 +1,10 @@
-import { describe, it, expect, mock, spyOn, beforeEach, afterEach, afterAll } from "bun:test"
-import type { RunResult } from "./types"
-import { createJsonOutputManager } from "./json-output"
-import { resolveSession } from "./session-resolver"
-import { executeOnCompleteHook } from "./on-complete-hook"
-import type { OpencodeClient } from "./types"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"
+import { createJsonOutputManager } from "./json-output"
+import { executeOnCompleteHook } from "./on-complete-hook"
+import { resolveSession } from "./session-resolver"
+import type { OpencodeClient, RunResult } from "./types"
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>

@@ -74,33 +74,6 @@ function startsWithThinkingBlock(parts: Part[]): boolean {
   return type === "thinking" || type === "reasoning"
 }
 
-/**
- * Find the most recent thinking content from previous assistant messages
- */
-function findPreviousThinkingContent(
-  messages: MessageWithParts[],
-  currentIndex: number
-): string {
-  // Search backwards from current message
-  for (let i = currentIndex - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (msg.info.role !== "assistant") continue
-
-    // Look for thinking parts
-    if (!msg.parts) continue
-    for (const part of msg.parts) {
-      const type = part.type as string
-      if (type === "thinking" || type === "reasoning") {
-        const thinking = (part as any).thinking || (part as any).text
-        if (thinking && typeof thinking === "string" && thinking.trim().length > 0) {
-          return thinking
-        }
-      }
-    }
-  }
-
-  return ""
-}
 
 /**
  * Prepend a thinking block to a message's parts array
@@ -114,7 +87,7 @@ function prependThinkingBlock(message: MessageWithParts, thinkingContent: string
   const thinkingPart = {
     type: "thinking" as const,
     id: `prt_0000000000_synthetic_thinking`,
-    sessionID: (message.info as any).sessionID || "",
+    sessionID: (message.info as { sessionID?: string }).sessionID || "",
     messageID: message.info.id,
     thinking: thinkingContent,
     synthetic: true,
@@ -136,30 +109,35 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         return
       }
 
-      // Get the model info from the last user message
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
-      const modelID = (lastUserMessage?.info as any)?.modelID || ""
+      const modelID = (lastUserMessage?.info as { modelID?: string })?.modelID || ""
 
-      // Only process if extended thinking might be enabled
       if (!isExtendedThinkingModel(modelID)) {
         return
       }
 
-      // Process all assistant messages
+      // Cache last thinking content to avoid O(n²) scan for each assistant message
+      let lastThinkingContent = ""
+
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i]
 
-        // Only check assistant messages
+        if (msg.info.role === "assistant" && msg.parts) {
+          for (const part of msg.parts) {
+            const type = part.type as string
+            if (type === "thinking" || type === "reasoning") {
+              const thinking = (part as { thinking?: string; text?: string }).thinking || (part as { thinking?: string; text?: string }).text
+              if (thinking && typeof thinking === "string" && thinking.trim().length > 0) {
+                lastThinkingContent = thinking
+              }
+            }
+          }
+        }
+
         if (msg.info.role !== "assistant") continue
 
-        // Check if message has content parts but doesn't start with thinking
         if (hasContentParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
-          // Find thinking content from previous turns
-          const previousThinking = findPreviousThinkingContent(messages, i)
-
-          // Prepend thinking block with content from previous turn or placeholder
-          const thinkingContent = previousThinking || "[Continuing from previous reasoning]"
-
+          const thinkingContent = lastThinkingContent || "[Continuing from previous reasoning]"
           prependThinkingBlock(msg, thinkingContent)
         }
       }

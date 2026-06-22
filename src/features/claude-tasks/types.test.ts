@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test"
-import { TaskSchema, TaskStatusSchema, type Task, type TaskStatus } from "./types"
+import { describe, expect, test } from "bun:test"
+import { type Task, TaskSchema, type TaskStatus, TaskStatusSchema } from "./types"
 
 describe("TaskStatusSchema", () => {
   test("accepts valid status values", () => {

@@ -1,8 +1,8 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
-import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxUtilDeps } from './manager'
+import type { PaneAction, WindowState } from './types'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -273,7 +273,7 @@ describe('TmuxSessionManager', () => {
               height: 44,
               left: 100,
               top: 0,
-              title: 'omo-subagent-Task 1',
+              title: 'matrixx-subagent-Task 1',
               isActive: false,
             },
           ],
@@ -400,7 +400,7 @@ describe('TmuxSessionManager', () => {
               height: 11,
               left: 80,
               top: 0,
-              title: 'omo-subagent-Task 1',
+              title: 'matrixx-subagent-Task 1',
               isActive: false,
             },
           ],
@@ -452,7 +452,7 @@ describe('TmuxSessionManager', () => {
               height: 44,
               left: 100,
               top: 0,
-              title: 'omo-subagent-Task',
+              title: 'matrixx-subagent-Task',
               isActive: false,
             },
           ],
@@ -650,7 +650,7 @@ describe('DecisionEngine', () => {
             height: 11,
             left: 80,
             top: 0,
-            title: 'omo-subagent-Old',
+            title: 'matrixx-subagent-Old',
             isActive: false,
           },
         ],

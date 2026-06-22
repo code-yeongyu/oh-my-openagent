@@ -1,6 +1,6 @@
 import color from "picocolors"
+import { formatHeader, formatIssue, formatStatusSymbol } from "./format-shared"
 import type { DoctorResult } from "./types"
-import { formatHeader, formatStatusSymbol, formatIssue } from "./format-shared"
 
 export function formatVerbose(result: DoctorResult): string {
   const lines: string[] = []

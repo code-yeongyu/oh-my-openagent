@@ -1,7 +1,14 @@
-import { describe, expect, it, beforeEach } from "bun:test"
+import { beforeEach, describe, expect, it } from "bun:test"
 import type { ThinkModeInput } from "./types"
 
-const { createThinkModeHook, clearThinkModeState } = await import("./index")
+const {
+  createThinkModeHook,
+  clearThinkModeState,
+  setThinkModeState,
+  getThinkModeState,
+  _getThinkModeStateSizeForTesting,
+  _resetThinkModeStateForTesting,
+} = await import("./index")
 
 /**
  * Helper to create a mock ThinkModeInput for testing
@@ -448,5 +455,48 @@ describe("createThinkModeHook integration", () => {
       const message = input.message as MessageWithInjectedProps
       expect(message.providerOptions).toBeDefined()
     })
+  })
+})
+
+function makeThinkModeState(): ThinkModeState {
+  return {
+    requested: false,
+    modelSwitched: false,
+    thinkingConfigInjected: false,
+  }
+}
+
+describe("thinkModeState LRU cap of 1000", () => {
+  beforeEach(() => {
+    _resetThinkModeStateForTesting()
+  })
+
+  it("thinkModeState LRU cap of 1000", () => {
+    //#given an empty thinkModeState
+    expect(_getThinkModeStateSizeForTesting()).toBe(0)
+
+    //#when inserting 1000 unique entries
+    for (let i = 0; i < 1000; i++) {
+      setThinkModeState(`sess-${i}`, makeThinkModeState())
+    }
+
+    //#then size is exactly 1000
+    expect(_getThinkModeStateSizeForTesting()).toBe(1000)
+
+    //#when inserting the 1001st entry
+    setThinkModeState("sess-1000", makeThinkModeState())
+
+    //#then size remains 1000 (oldest entry was evicted)
+    expect(_getThinkModeStateSizeForTesting()).toBe(1000)
+    expect(_getThinkModeStateSizeForTesting()).toBeLessThanOrEqual(1000)
+
+    //#and the first inserted entry is gone
+    expect(getThinkModeState("sess-0")).toBeUndefined()
+
+    //#and the newest entry is present
+    expect(getThinkModeState("sess-1000")).toBeDefined()
+
+    //#and (no double-eviction) the 2nd-inserted entry still survives
+    expect(getThinkModeState("sess-1")).toBeDefined()
   })
 })

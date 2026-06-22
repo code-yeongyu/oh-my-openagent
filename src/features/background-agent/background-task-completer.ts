@@ -1,7 +1,7 @@
-import type { BackgroundTask } from "./types"
-import type { ResultHandlerContext } from "./result-handler-context"
 import { log } from "../../shared"
 import { notifyParentSession } from "./parent-session-notifier"
+import type { ResultHandlerContext } from "./result-handler-context"
+import type { BackgroundTask } from "./types"
 
 export async function tryCompleteTask(
   task: BackgroundTask,

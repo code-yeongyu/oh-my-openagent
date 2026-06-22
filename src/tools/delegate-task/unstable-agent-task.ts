@@ -1,11 +1,10 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { formatDuration, normalizeSDKResponse } from "../../shared"
+import { getSessionTools } from "../../shared/session-tools-store"
+import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
 import { getTimingConfig } from "./timing"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { formatDuration } from "./time-formatter"
-import { formatDetailedError } from "./error-formatting"
-import { getSessionTools } from "../../shared/session-tools-store"
-import { normalizeSDKResponse } from "../../shared"
+import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,

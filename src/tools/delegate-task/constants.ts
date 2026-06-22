@@ -1,8 +1,8 @@
-import type { CategoryConfig } from "../../config/schema"
 import type {
    AvailableCategory,
    AvailableSkill,
  } from "../../agents/dynamic-agent-prompt-builder"
+import type { CategoryConfig } from "../../config/schema"
 import { truncateDescription } from "../../shared/truncate-description"
 
 export const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -230,7 +230,7 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
 }
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  "construct": "Frontend, UI/UX, design, styling, animation",
+  "construct": "Frontend, UI/UX, design, styling, animation. For dedicated frontend tasks, invoke 'sati' agent directly via `@sati/`, `task(subagent_type=\"sati\")`, or `delegate_agent(subagent_type=\"sati\")`.",
   "source": "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
   "deep-jack": "Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding.",
   "matrix-bend": "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
@@ -251,8 +251,8 @@ BEFORE you begin planning, you MUST first understand the user's request deeply.
 
 MANDATORY CONTEXT GATHERING PROTOCOL:
 1. Launch background agents to gather context:
-   - call_omo_agent(description="Explore codebase patterns", subagent_type="trinity", run_in_background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
-   - call_omo_agent(description="Research documentation", subagent_type="operator", run_in_background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
+   - delegate_agent(description="Explore codebase patterns", subagent_type="trinity", run_in_background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
+   - delegate_agent(description="Research documentation", subagent_type="operator", run_in_background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
 
 2. After gathering context, ALWAYS present:
    - **User Request Summary**: Concise restatement of what the user is asking for

@@ -1,12 +1,12 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import {
-  setSessionAgent,
-  getSessionAgent,
-  clearSessionAgent,
-  updateSessionAgent,
-  setMainSession,
-  getMainSessionID,
   _resetForTesting,
+  clearSessionAgent,
+  getMainSessionID,
+  getSessionAgent,
+  setMainSession,
+  setSessionAgent,
+  updateSessionAgent,
 } from "./state"
 
 describe("claude-code-session-state", () => {

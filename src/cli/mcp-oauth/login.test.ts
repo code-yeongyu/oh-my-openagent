@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 const mockLogin = mock(() => Promise.resolve({ accessToken: "test-token", expiresAt: 1710000000 }))
 

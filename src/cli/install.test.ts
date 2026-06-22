@@ -1,9 +1,9 @@
-import { describe, expect, test, mock, beforeEach, afterEach, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { install } from "./install"
 import * as configManager from "./config-manager"
+import { install } from "./install"
 import type { InstallArgs } from "./types"
 
 // Mock console methods to capture output
@@ -18,7 +18,7 @@ describe("install CLI - binary check behavior", () => {
 
   beforeEach(() => {
     // given temporary config directory
-    tempDir = join(tmpdir(), `omo-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tempDir = join(tmpdir(), `matrixx-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tempDir, { recursive: true })
 
     originalEnv = process.env.OPENCODE_CONFIG_DIR

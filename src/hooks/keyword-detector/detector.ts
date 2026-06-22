@@ -1,7 +1,7 @@
 import {
-  KEYWORD_DETECTORS,
   CODE_BLOCK_PATTERN,
   INLINE_CODE_PATTERN,
+  KEYWORD_DETECTORS,
 } from "./constants"
 
 export interface DetectedKeyword {
@@ -34,13 +34,17 @@ export function detectKeywords(text: string, agentName?: string, modelID?: strin
 export function detectKeywordsWithType(text: string, agentName?: string, modelID?: string): DetectedKeyword[] {
   const textWithoutCode = removeCodeBlocks(text)
   const types: Array<"ultrawork" | "search" | "analyze"> = ["ultrawork", "search", "analyze"]
-  return KEYWORD_DETECTORS.map(({ pattern, message }, index) => ({
-    matches: pattern.test(textWithoutCode),
-    type: types[index],
-    message: resolveMessage(message, agentName, modelID),
-  }))
-    .filter((result) => result.matches)
-    .map(({ type, message }) => ({ type, message }))
+  const result: DetectedKeyword[] = []
+  for (let i = 0; i < KEYWORD_DETECTORS.length; i++) {
+    const detector = KEYWORD_DETECTORS[i]
+    if (detector.pattern.test(textWithoutCode)) {
+      result.push({
+        type: types[i],
+        message: resolveMessage(detector.message, agentName, modelID),
+      })
+    }
+  }
+  return result
 }
 
 export function extractPromptText(

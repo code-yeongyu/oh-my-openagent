@@ -1,14 +1,14 @@
-import { describe, it, expect } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import { 
-  decideSpawnActions, 
   calculateCapacity, 
   canSplitPane, 
   canSplitPaneAnyDirection,
+  decideSpawnActions, 
   getBestSplitDirection,
   type SessionMapping 
 } from "./decision-engine"
-import type { WindowState, CapacityConfig, TmuxPaneInfo } from "./types"
-import { MIN_PANE_WIDTH, MIN_PANE_HEIGHT } from "./types"
+import type { CapacityConfig, TmuxPaneInfo, WindowState } from "./types"
+import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
 
 const MIN_SPLIT_WIDTH = 2 * MIN_PANE_WIDTH + 1
 const MIN_SPLIT_HEIGHT = 2 * MIN_PANE_HEIGHT + 1

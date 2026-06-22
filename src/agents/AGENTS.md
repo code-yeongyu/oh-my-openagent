@@ -58,19 +58,20 @@ agents/
 | Cipher | claude-opus-4-6 | 0.1 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
 | Niobe | claude-opus-4-6 | 0.15 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
 | Sentinel | claude-opus-4-6 | 0.1 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
+| Sati | claude-sonnet-4-6 | 0.1 | claude-sonnet-4-6 → claude-opus-4-6@max | EXPENSIVE |
 | Mouse | claude-sonnet-4-6 | 0.1 | (user-configurable) | EXPENSIVE |
 
 ## TOOL RESTRICTIONS
 
 | Agent | Denied | Allowed |
 |-------|--------|---------|
-| Merovingian | write, edit, task, call_omo_agent | Read-only consultation |
-| Operator | write, edit, task, call_omo_agent | Research tools only |
-| Trinity | write, edit, task, call_omo_agent | Search tools only |
+| Merovingian | write, edit, task, delegate_agent | Read-only consultation |
+| Operator | write, edit, task, delegate_agent | Research tools only |
+| Trinity | write, edit, task, delegate_agent | Search tools only |
 | Construct | ALL except `read` | Vision-only |
 | Mouse | task | No delegation |
-| Architect | task, call_omo_agent | Orchestration only |
-| Sentinel | write, edit, multiedit, task, call_omo_agent | Read-only security auditing |
+| Architect | task, delegate_agent | Orchestration only |
+| Sentinel | write, edit, multiedit, task, delegate_agent | Read-only security auditing |
 
 ## THINKING / REASONING
 

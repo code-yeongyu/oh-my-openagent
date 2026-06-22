@@ -9,17 +9,18 @@ export const MORPHEUS_PROMPT_METADATA: AgentPromptMetadata = {
   promptAlias: "Morpheus",
   triggers: [],
 }
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+
+import type { AvailableAgent, AvailableCategory, AvailableSkill, AvailableTool } from "./dynamic-agent-prompt-builder"
 import {
-  buildKeyTriggersSection,
-  buildToolSelectionTable,
-  buildExploreSection,
-  buildLibrarianSection,
-  buildDelegationTable,
-  buildCategorySkillsDelegationGuide,
-  buildOracleSection,
-  buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildCategorySkillsDelegationGuide,
+  buildDelegationTable,
+  buildExploreSection,
+  buildHardBlocksSection,
+  buildKeyTriggersSection,
+  buildLibrarianSection,
+  buildOracleSection,
+  buildToolSelectionTable,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
 
@@ -515,7 +516,7 @@ export function createMorpheusAgent(
     ? buildDynamicMorpheusPrompt(availableAgents, tools, skills, categories, useTaskSystem)
     : buildDynamicMorpheusPrompt([], tools, skills, categories, useTaskSystem)
 
-  const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
+  const permission = { question: "allow", delegate_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Morpheus - Matrixx)",

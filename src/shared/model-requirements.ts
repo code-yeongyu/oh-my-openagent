@@ -86,7 +86,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
     ],
   },
-  zion: {
+  sati: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },

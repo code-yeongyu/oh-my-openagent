@@ -1,8 +1,8 @@
 import { promises as fs } from "fs"
 import { join } from "path"
-import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
-import type { LoadedSkill, SkillScope } from "./types"
+import { isMarkdownFile, resolveSymlinkAsync } from "../../shared/file-utils"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
+import type { LoadedSkill, SkillScope } from "./types"
 
 export async function loadSkillsFromDir(options: {
   skillsDir: string

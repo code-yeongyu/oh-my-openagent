@@ -1,5 +1,5 @@
-import type { InstallConfig } from "./types"
 import type { ProviderAvailability } from "./model-fallback-types"
+import type { InstallConfig } from "./types"
 
 export function toProviderAvailability(config: InstallConfig): ProviderAvailability {
 	return {

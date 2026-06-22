@@ -1,5 +1,5 @@
 import type { ModelRequirement } from "../../../shared/model-requirements"
-import type { OmoConfig } from "./model-resolution-types"
+import type { MatrixxConfig } from "./model-resolution-types"
 
 export function formatModelWithVariant(model: string, variant?: string): string {
   return variant ? `${model} (${variant})` : model
@@ -7,7 +7,7 @@ export function formatModelWithVariant(model: string, variant?: string): string 
 
 function getAgentOverride(
   agentName: string,
-  config: OmoConfig
+  config: MatrixxConfig
 ): { variant?: string; category?: string } | undefined {
   const agentOverrides = config.agents
   if (!agentOverrides) return undefined
@@ -21,7 +21,7 @@ function getAgentOverride(
 export function getEffectiveVariant(
   agentName: string,
   requirement: ModelRequirement,
-  config: OmoConfig
+  config: MatrixxConfig
 ): string | undefined {
   const agentOverride = getAgentOverride(agentName, config)
 
@@ -44,7 +44,7 @@ export function getEffectiveVariant(
 export function getCategoryEffectiveVariant(
   categoryName: string,
   requirement: ModelRequirement,
-  config: OmoConfig
+  config: MatrixxConfig
 ): string | undefined {
   const categoryVariant = config.categories?.[categoryName]?.variant
   if (categoryVariant) {

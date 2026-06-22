@@ -13,7 +13,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "architect",
   "cipher",
   "sentinel",
-  "zion",
+  "sati",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
@@ -27,18 +27,6 @@ export const BuiltinSkillNameSchema = z.enum([
   "dsl-codegen",
   "dsl-metamodel",
   "dsl-tooling",
-  "eu-horizon",
-  "academic-paper-review",
-  "deliverable-writing",
-  "project-management",
-  "technical-lead",
-  "academic-writing",
-  "research-methodology",
-  "literature-review",
-  "grant-writing",
-  "scientific-presentation",
-  "data-management-plan",
-  "ip-exploitation",
   "dsl-textx-ecosystem",
   "dsl-pyecore-advanced",
   "dsl-model-transformation",
@@ -54,10 +42,11 @@ export const BuiltinSkillNameSchema = z.enum([
   "security-crypto",
   "security-infra",
   "security-review",
-  "crypto-market-analysis",
-  "crypto-trading",
-  "crypto-onchain",
   "tdd-enforcer",
+  "review-work",
+  "quality-gate",
+  "software-dev",
+  "matrixx-self-config",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -77,7 +66,7 @@ export const OverridableAgentNameSchema = z.enum([
   "architect",
   "cipher",
   "sentinel",
-  "zion",
+  "sati",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema

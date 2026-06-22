@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-96 cross-cutting utilities across 4 subdirectories. Import via barrel: `import { log, deepMerge } from "../../shared"`
+~85 cross-cutting utilities across 4 subdirectories. Import via barrel: `import { log, deepMerge } from "../../shared"`
 
 ## STRUCTURE
 ```
@@ -15,13 +15,10 @@ shared/
 ├── model-resolution-pipeline.ts # Pipeline orchestration (176 lines)
 ├── model-resolution-types.ts  # Resolution request/provenance types
 ├── model-sanitizer.ts         # Model name sanitization
-├── model-name-matcher.ts      # Model name matching (91 lines)
 ├── model-suggestion-retry.ts  # Suggest models on failure (144 lines)
 ├── model-cache-availability.ts # Cache availability checking
 ├── fallback-model-availability.ts # Fallback model logic (67 lines)
 ├── available-models-fetcher.ts # Fetch models from providers (114 lines)
-├── models-json-cache-reader.ts # Read models.json cache
-├── provider-models-cache-model-reader.ts # Provider cache reader
 ├── connected-providers-cache.ts # Provider caching (196 lines)
 ├── system-directive.ts        # Unified message prefix & types (61 lines) — 11 imports
 ├── session-utils.ts           # Session cursor, orchestrator detection
@@ -43,15 +40,12 @@ shared/
 ├── external-plugin-detector.ts # Plugin conflict detection (137 lines)
 ├── opencode-server-auth.ts    # Authentication utilities (190 lines)
 ├── safe-create-hook.ts        # Hook error wrapper (24 lines)
-├── pattern-matcher.ts         # Pattern matching (40 lines)
 ├── file-utils.ts              # File operations (34 lines) — 9 imports
 ├── file-reference-resolver.ts # File reference resolution (85 lines)
-├── snake-case.ts              # Case conversion (44 lines)
-├── tool-name.ts               # Tool naming conventions
 ├── port-utils.ts              # Port management (48 lines)
 ├── zip-extractor.ts           # ZIP extraction (83 lines)
 ├── binary-downloader.ts       # Binary download (60 lines)
-├── command-executor/          # Shell execution (6 files, 213 lines)
+├── command-executor/          # Shell execution (4 files, 181 lines)
 ├── git-worktree/              # Git status/diff parsing (8 files, 311 lines)
 ├── migration/                 # Legacy config migration (5 files, 341 lines)
 │   ├── config-migration.ts    # Migration orchestration (133 lines)

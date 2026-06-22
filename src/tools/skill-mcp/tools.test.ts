@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { createSkillMcpTool, applyGrepFilter } from "./tools"
-import { SkillMcpManager } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { SkillMcpManager } from "../../features/skill-mcp-manager"
+import { applyGrepFilter, createSkillMcpTool } from "./tools"
 
 function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown>): LoadedSkill {
   return {

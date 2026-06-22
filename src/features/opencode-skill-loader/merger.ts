@@ -1,11 +1,11 @@
-import type { LoadedSkill } from "./types"
 import type { SkillsConfig } from "../../config/schema"
 import type { BuiltinSkill } from "../builtin-skills/types"
 import { builtinToLoadedSkill } from "./merger/builtin-skill-converter"
 import { configEntryToLoadedSkill } from "./merger/config-skill-entry-loader"
+import { SCOPE_PRIORITY } from "./merger/scope-priority"
 import { mergeSkillDefinitions } from "./merger/skill-definition-merger"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
-import { SCOPE_PRIORITY } from "./merger/scope-priority"
+import type { LoadedSkill } from "./types"
 
 export interface MergeSkillsOptions {
   configDir?: string

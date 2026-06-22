@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { normalizeSDKResponse } from "./normalize-sdk-response"
+import { getCachedTokenUsage } from "./token-cache"
 
 const ANTHROPIC_ACTUAL_LIMIT =
   process.env.ANTHROPIC_1M_CONTEXT === "true" ||
@@ -115,10 +116,29 @@ export async function getContextWindowUsage(
 	remainingTokens: number;
 	usagePercentage: number;
 } | null> {
+	const cached = getCachedTokenUsage(sessionID)
+	if (cached) {
+		const usedTokens =
+			(cached.tokens.input ?? 0) +
+			(cached.tokens.cache?.read ?? 0) +
+			(cached.tokens.output ?? 0);
+		const remainingTokens = ANTHROPIC_ACTUAL_LIMIT - usedTokens;
+		return {
+			usedTokens,
+			remainingTokens,
+			usagePercentage: usedTokens / ANTHROPIC_ACTUAL_LIMIT,
+		};
+	}
+
 	try {
-		const response = await ctx.client.session.messages({
-			path: { id: sessionID },
-		});
+		const response = await Promise.race([
+			ctx.client.session.messages({
+				path: { id: sessionID },
+			}),
+			new Promise<never>((_, reject) =>
+				setTimeout(() => reject(new Error("SDK messages timeout after 5000ms")), 5000)
+			),
+		]);
 
 		const messages = normalizeSDKResponse(response, [] as MessageWrapper[], { preferResponseOnMissingData: true })
 

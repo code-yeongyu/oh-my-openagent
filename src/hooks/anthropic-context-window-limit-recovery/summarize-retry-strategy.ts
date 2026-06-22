@@ -1,9 +1,9 @@
+import type { Client } from "./client"
+import { fixEmptyMessages } from "./empty-content-recovery"
+import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
+import { clearSessionState, getEmptyContentAttempt, getOrCreateRetryState } from "./state"
 import type { AutoCompactState } from "./types"
 import { RETRY_CONFIG } from "./types"
-import type { Client } from "./client"
-import { clearSessionState, getEmptyContentAttempt, getOrCreateRetryState } from "./state"
-import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
-import { fixEmptyMessages } from "./empty-content-recovery"
 
 export async function runSummarizeRetryStrategy(params: {
   sessionID: string
@@ -84,7 +84,7 @@ export async function runSummarizeRetryStrategy(params: {
       } catch {
         const delay =
           RETRY_CONFIG.initialDelayMs *
-          Math.pow(RETRY_CONFIG.backoffFactor, retryState.attempt - 1)
+          RETRY_CONFIG.backoffFactor ** (retryState.attempt - 1)
         const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs)
 
         setTimeout(() => {

@@ -1,7 +1,6 @@
-import type { PendingCall } from "./types"
 import { existsSync } from "fs"
-
-import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type HookInput } from "./cli"
+import { getCommentCheckerPath, type HookInput, runCommentChecker, startBackgroundInit } from "./cli"
+import type { PendingCall } from "./types"
 
 let cliPathPromise: Promise<string | null> | null = null
 let isRunning = false

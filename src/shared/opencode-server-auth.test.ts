@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { getServerBasicAuthHeader, injectServerAuthIntoClient } from "./opencode-server-auth"
 
 describe("opencode-server-auth", () => {

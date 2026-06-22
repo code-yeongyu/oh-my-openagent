@@ -1,7 +1,7 @@
-import { describe, it, expect, spyOn } from "bun:test"
-import type { RunContext } from "./types"
+import { describe, expect, it, spyOn } from "bun:test"
+import { handleMessagePartUpdated, handleSessionStatus, handleTuiToast } from "./event-handlers"
 import { createEventState } from "./events"
-import { handleSessionStatus, handleMessagePartUpdated, handleTuiToast } from "./event-handlers"
+import type { RunContext } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   sessionID,

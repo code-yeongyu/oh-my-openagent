@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
-import { join } from "path"
-import { homedir } from "os"
 import { createRequire } from "module"
+import { homedir } from "os"
+import { join } from "path"
 import {
   cleanupArchive,
   downloadArchive,

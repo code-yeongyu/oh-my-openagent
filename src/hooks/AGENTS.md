@@ -15,7 +15,6 @@ hooks/
 ├── auto-update-checker/          # Plugin update check (1140 lines)
 ├── background-notification/      # OS notifications (33 lines)
 ├── category-skill-reminder/      # Category+skill delegation reminders (597 lines)
-├── claude-code-hooks/            # settings.json compat (2110 lines) - see AGENTS.md
 ├── comment-checker/              # Prevents AI slop comments (710 lines)
 ├── compaction-context-injector/  # Injects context on compaction (128 lines)
 ├── compaction-todo-preserver/    # Preserves todos during compaction (203 lines)
@@ -73,13 +72,12 @@ hooks/
 | subagent-question-blocker | tool.execute.before | Question tool in subagent |
 | tasks-todowrite-disabler | tool.execute.before | TodoWrite with task system |
 | write-existing-file-guard | tool.execute.before | Write to existing file |
-| claude-code-hooks | tool.execute.before | Exit code 2 from settings.json hook |
 
 ## EXECUTION ORDER
 
-**UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
-**PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → oracleMdOnly → morpheusJuniorNotepad → writeExistingFileGuard → architectHook
-**PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → architectHook → taskResumeInfo → taskReminder
+**UserPromptSubmit**: keywordDetector → autoSlashCommand → startWork
+**PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → oracleMdOnly → morpheusJuniorNotepad → writeExistingFileGuard → architectHook
+**PostToolUse**: toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → architectHook → taskResumeInfo → taskReminder
 
 ## HOW TO ADD
 

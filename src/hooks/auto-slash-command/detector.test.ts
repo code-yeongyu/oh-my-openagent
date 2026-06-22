@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test"
 import {
-  parseSlashCommand,
   detectSlashCommand,
-  isExcludedCommand,
-  removeCodeBlocks,
   extractPromptText,
+  isExcludedCommand,
+  parseSlashCommand,
+  removeCodeBlocks,
 } from "./detector"
 
 describe("auto-slash-command detector", () => {

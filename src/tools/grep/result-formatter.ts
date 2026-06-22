@@ -1,4 +1,4 @@
-import type { GrepResult, GrepMatch, CountResult } from "./types"
+import type { CountResult, GrepMatch, GrepResult } from "./types"
 
 export function formatGrepResult(result: GrepResult): string {
   if (result.error) {

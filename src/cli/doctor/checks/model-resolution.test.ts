@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 
 describe("model-resolution check", () => {
   describe("getModelResolutionInfo", () => {

@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import { HOOK_NAME, DEFAULT_VERIFICATION_AGENT, DEFAULT_VERIFICATION_TIMEOUT_MS } from "./constants"
+import type { OpenCodeSessionMessage } from "./completion-promise-detector"
+import { DEFAULT_VERIFICATION_AGENT, DEFAULT_VERIFICATION_TIMEOUT_MS, HOOK_NAME } from "./constants"
 
 export interface VerificationResult {
 	verified: boolean
@@ -46,11 +47,6 @@ function parseVerificationResponse(text: string): VerificationResult {
 	return { verified: true }
 }
 
-interface OpenCodeSessionMessage {
-	info?: { role?: string }
-	parts?: Array<{ type: string; text?: string }>
-}
-
 function extractAssistantText(messages: OpenCodeSessionMessage[]): string | undefined {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const msg = messages[i]
@@ -72,8 +68,13 @@ export async function verifyCompletion(
 		agent?: string
 		timeoutMs?: number
 		pollIntervalMs?: number
+		preFetchedMessages?: OpenCodeSessionMessage[]
 	},
 ): Promise<VerificationResult> {
+	if (options.preFetchedMessages) {
+		return verifyWithPrefetchedMessages(options.preFetchedMessages)
+	}
+
 	const agent = options.agent ?? DEFAULT_VERIFICATION_AGENT
 	const timeoutMs = options.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS
 	const pollIntervalMs = options.pollIntervalMs ?? 2000
@@ -146,4 +147,12 @@ export async function verifyCompletion(
 			ctx.client.session.delete({ path: { id: verifySessionID } }).catch(() => {})
 		}
 	}
+}
+
+function verifyWithPrefetchedMessages(messages: OpenCodeSessionMessage[]): VerificationResult {
+	const assistantText = extractAssistantText(messages)
+	if (assistantText && VERIFICATION_TAG_PATTERN.test(assistantText)) {
+		return parseVerificationResponse(assistantText)
+	}
+	return { verified: true }
 }

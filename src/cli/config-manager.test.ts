@@ -1,6 +1,6 @@
-import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
+import { ANTIGRAVITY_PROVIDER_CONFIG, fetchNpmDistTags, generateMatrixxConfig, getPluginNameWithVersion } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -239,7 +239,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
   })
 })
 
-describe("generateOmoConfig - model fallback system", () => {
+describe("generateMatrixxConfig - model fallback system", () => {
   test("generates native sonnet models when Claude standard subscription", () => {
     // #given user has Claude standard subscription (not max20)
     const config: InstallConfig = {
@@ -254,7 +254,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then Morpheus uses Claude (OR logic - at least one provider available)
     expect(result.$schema).toBe("https://raw.githubusercontent.com/klpanagi/matrixx/dev/assets/matrixx.schema.json")
@@ -276,7 +276,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then Morpheus uses Claude (OR logic - at least one provider available)
     expect((result.agents as Record<string, { model: string }>).morpheus.model).toBe("anthropic/claude-opus-4-6")
@@ -296,7 +296,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then Morpheus uses Copilot (OR logic - copilot is in claude-opus-4-6 providers)
     expect((result.agents as Record<string, { model: string }>).morpheus.model).toBe("github-copilot/claude-opus-4.6")
@@ -316,7 +316,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then Morpheus is omitted (requires all fallback providers)
     expect(result.$schema).toBe("https://raw.githubusercontent.com/klpanagi/matrixx/dev/assets/matrixx.schema.json")
@@ -337,7 +337,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then librarian should use zai-coding-plan/glm-4.7
     expect((result.agents as Record<string, { model: string }>).operator.model).toBe("zai-coding-plan/glm-4.7")
@@ -359,7 +359,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then Morpheus is omitted (requires all fallback providers)
     expect((result.agents as Record<string, { model: string }>).morpheus).toBeUndefined()
@@ -383,7 +383,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then explore should use haiku (max20 plan uses Claude quota)
     expect((result.agents as Record<string, { model: string }>).trinity.model).toBe("anthropic/claude-haiku-4-5")
@@ -403,7 +403,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateMatrixxConfig(config)
 
     // #then explore should use haiku (isMax20 doesn't affect explore anymore)
     expect((result.agents as Record<string, { model: string }>).trinity.model).toBe("anthropic/claude-haiku-4-5")

@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
 import { fileURLToPath } from "node:url"
-import type { OpencodeConfig } from "../types"
 import { PACKAGE_NAME } from "../constants"
+import type { OpencodeConfig } from "../types"
 import { getConfigPaths } from "./config-paths"
 import { stripJsonComments } from "./jsonc-strip"
 
@@ -27,7 +27,6 @@ export function getLocalDevPath(directory: string): string | null {
         }
       }
     } catch {
-      continue
     }
   }
 

@@ -23,7 +23,7 @@ export interface ModelResolutionInfo {
   categories: CategoryResolutionInfo[]
 }
 
-export interface OmoConfig {
+export interface MatrixxConfig {
   agents?: Record<string, { model?: string; variant?: string; category?: string }>
   categories?: Record<string, { model?: string; variant?: string }>
 }

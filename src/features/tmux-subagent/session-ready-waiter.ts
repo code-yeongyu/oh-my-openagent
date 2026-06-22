@@ -1,9 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { log } from "../../shared"
 import {
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
-import { log } from "../../shared"
 import { parseSessionStatusMap } from "./session-status-parser"
 
 type OpencodeClient = PluginInput["client"]

@@ -1,13 +1,9 @@
+import { getMessageDir, isObject } from "../../shared"
+import { findNearestMessageWithFields } from "../hook-message-injector"
 import type { OpencodeClient } from "./constants"
 import type { BackgroundTask } from "./types"
-import { findNearestMessageWithFields } from "../hook-message-injector"
-import { getMessageDir } from "../../shared"
 
 type AgentModel = { providerID: string; modelID: string }
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
 
 function extractAgentAndModelFromMessage(message: unknown): {
   agent?: string

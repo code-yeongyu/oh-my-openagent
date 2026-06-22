@@ -1,11 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import type { MatrixLoopOptions, MatrixLoopState } from "./types"
-import { HOOK_NAME, DEFAULT_VERIFICATION_AGENT, DEFAULT_VERIFICATION_TIMEOUT_MS, DEFAULT_VERIFICATION_MAX_RETRIES } from "./constants"
+import type { OpenCodeSessionMessage } from "./completion-promise-detector"
 import { detectCompletionInSessionMessages, detectCompletionInTranscript } from "./completion-promise-detector"
+import { verifyCompletion } from "./completion-verifier"
+import { DEFAULT_VERIFICATION_AGENT, DEFAULT_VERIFICATION_MAX_RETRIES, DEFAULT_VERIFICATION_TIMEOUT_MS, HOOK_NAME } from "./constants"
 import { buildContinuationPrompt } from "./continuation-prompt-builder"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
-import { verifyCompletion } from "./completion-verifier"
+import type { MatrixLoopOptions, MatrixLoopState } from "./types"
+import { withTimeout } from "./with-timeout"
 
 type SessionRecovery = { isRecovering: (sessionID: string) => boolean; markRecovering: (sessionID: string) => void; clear: (sessionID: string) => void }
 type LoopStateController = { getState: () => MatrixLoopState | null; clear: () => boolean; incrementIteration: () => MatrixLoopState | null }
@@ -79,9 +81,45 @@ export function createMatrixLoopEventHandler(ctx: PluginInput, options: MatrixLo
 
 				const transcriptPath = options.getTranscriptPath(sessionID)
 				const completionViaTranscript = detectCompletionInTranscript(transcriptPath, state.completion_promise)
+
+				// Cache session.messages response so detector AND verifier can share it (H4)
+				let messages: OpenCodeSessionMessage[] | undefined
+				if (!completionViaTranscript) {
+					try {
+						const response = await withTimeout(
+							ctx.client.session.messages({
+								path: { id: sessionID },
+								query: { directory: options.directory },
+							}),
+							options.apiTimeoutMs,
+						)
+						const messagesResponse: unknown = response
+						const responseData =
+							typeof messagesResponse === "object" && messagesResponse !== null && "data" in messagesResponse
+								? (messagesResponse as { data?: unknown }).data
+								: undefined
+						messages = Array.isArray(messagesResponse)
+							? (messagesResponse as OpenCodeSessionMessage[])
+							: Array.isArray(responseData)
+								? (responseData as OpenCodeSessionMessage[])
+								: []
+					} catch (err) {
+						setTimeout(() => {
+							log(`[${HOOK_NAME}] Session messages fetch failed`, { sessionID, error: String(err) })
+						}, 0)
+						messages = []
+					}
+				}
+
 				const completionViaApi = completionViaTranscript
 					? false
-					: await detectCompletionInSessionMessages(ctx, { sessionID, promise: state.completion_promise, apiTimeoutMs: options.apiTimeoutMs, directory: options.directory })
+					: await detectCompletionInSessionMessages(ctx, {
+							sessionID,
+							promise: state.completion_promise,
+							apiTimeoutMs: options.apiTimeoutMs,
+							directory: options.directory,
+							preFetchedMessages: messages,
+						})
 
 				if (completionViaTranscript || completionViaApi) {
 					log(`[${HOOK_NAME}] Completion detected!`, { sessionID, iteration: state.iteration, promise: state.completion_promise, detectedVia: completionViaTranscript ? "transcript_file" : "session_messages_api" })
@@ -101,6 +139,7 @@ export function createMatrixLoopEventHandler(ctx: PluginInput, options: MatrixLo
 							prompt: state.prompt, iteration: state.iteration,
 							agent: options.verification?.agent ?? DEFAULT_VERIFICATION_AGENT,
 							timeoutMs: options.verification?.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS,
+							preFetchedMessages: messages,
 						})
 
 						if (!result.verified) {

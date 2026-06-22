@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isObject, log } from "../../shared"
 import { CONSTRUCT_AGENT } from "./constants"
-import { log } from "../../shared"
 
 type AgentModel = { providerID: string; modelID: string }
 
@@ -13,10 +13,6 @@ type AgentInfo = {
   name?: string
   model?: AgentModel
   variant?: string
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
 }
 
 function toAgentInfo(value: unknown): AgentInfo | null {

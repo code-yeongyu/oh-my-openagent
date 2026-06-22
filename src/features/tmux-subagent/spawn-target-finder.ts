@@ -1,7 +1,7 @@
-import type { SplitDirection, TmuxPaneInfo, WindowState } from "./types"
-import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
 import { computeGridPlan, mapPaneToSlot } from "./grid-planning"
 import { canSplitPane, getBestSplitDirection } from "./pane-split-availability"
+import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
+import type { SplitDirection, TmuxPaneInfo, WindowState } from "./types"
 
 export interface SpawnTarget {
 	targetPaneId: string

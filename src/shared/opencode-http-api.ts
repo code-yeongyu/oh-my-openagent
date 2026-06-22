@@ -1,5 +1,5 @@
-import { getServerBasicAuthHeader } from "./opencode-server-auth"
 import { log } from "./logger"
+import { getServerBasicAuthHeader } from "./opencode-server-auth"
 import { isRecord } from "./record-type-guard"
 
 type UnknownRecord = Record<string, unknown>

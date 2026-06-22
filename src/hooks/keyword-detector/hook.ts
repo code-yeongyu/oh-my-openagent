@@ -1,17 +1,17 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { detectKeywordsWithType, extractPromptText } from "./detector"
-import { isPlannerAgent } from "./constants"
-import { log } from "../../shared"
-import {
-  isSystemDirective,
-  removeSystemReminders,
-} from "../../shared/system-directive"
 import {
   getMainSessionID,
   getSessionAgent,
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
+import { log } from "../../shared"
+import {
+  isSystemDirective,
+  removeSystemReminders,
+} from "../../shared/system-directive"
+import { isPlannerAgent } from "./constants"
+import { detectKeywordsWithType, extractPromptText } from "./detector"
 
 export function createKeywordDetectorHook(ctx: PluginInput, _collector?: ContextCollector) {
   return {

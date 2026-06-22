@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { AnyMcpNameSchema } from "../../mcp/types"
+import { AgentDefinitionsConfigSchema } from "./agent-definitions"
 import { BuiltinAgentNameSchema, BuiltinSkillNameSchema } from "./agent-names"
 import { AgentOverridesSchema } from "./agent-overrides"
 import { BabysittingConfigSchema } from "./babysitting"
@@ -7,23 +8,22 @@ import { BackgroundTaskConfigSchema } from "./background-task"
 import { BrowserAutomationConfigSchema } from "./browser-automation"
 import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
-import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
+import { CommentCheckerConfigSchema } from "./comment-checker"
 import { ExperimentalConfigSchema } from "./experimental"
-import { GitMasterConfigSchema } from "./git-master"
-import { TddEnforcerConfigSchema } from "./tdd-enforcer"
 import { HookNameSchema } from "./hooks"
-import { SecurityConfigSchema } from "./security"
-import { NotificationConfigSchema } from "./notification"
 import { MatrixLoopConfigSchema } from "./matrix-loop"
-import { SkillsConfigSchema } from "./skills"
+import { MatrixxSelfConfigSkillConfigSchema } from "./matrixx-self-config"
+import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 import { MorpheusConfigSchema } from "./morpheus"
 import { MorpheusAgentConfigSchema } from "./morpheus-agent"
+import { NotificationConfigSchema } from "./notification"
+import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
+import { SecurityConfigSchema } from "./security"
+import { SkillsConfigSchema } from "./skills"
+import { TddEnforcerConfigSchema } from "./tdd-enforcer"
 import { TmuxConfigSchema } from "./tmux"
 import { WebsearchConfigSchema } from "./websearch"
-import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
-import { AgentDefinitionsConfigSchema } from "./agent-definitions"
-import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 
 export const MatrixxConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -52,7 +52,7 @@ export const MatrixxConfigSchema = z.object({
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
-  git_master: GitMasterConfigSchema.optional(),
+
   tdd_enforcer: TddEnforcerConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
@@ -65,6 +65,8 @@ export const MatrixxConfigSchema = z.object({
   agent_definitions: AgentDefinitionsConfigSchema.optional(),
   /** Dynamic model capabilities refresh configuration */
   model_capabilities: ModelCapabilitiesConfigSchema.optional(),
+  /** Enable matrixx-self-config skill (default: false - opt-in feature) */
+  matrixx_self_config: MatrixxSelfConfigSkillConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

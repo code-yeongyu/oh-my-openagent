@@ -1,28 +1,28 @@
 import { existsSync, readFileSync } from "node:fs"
 import { parseJsonc } from "../../shared"
 import type { DetectedConfig } from "../types"
-import { getOmoConfigPath } from "./config-context"
+import { getMatrixxConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 
-function detectProvidersFromOmoConfig(): {
+function detectProvidersFromMatrixxConfig(): {
   hasOpenAI: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
 } {
-  const omoConfigPath = getOmoConfigPath()
-  if (!existsSync(omoConfigPath)) {
+  const matrixxConfigPath = getMatrixxConfigPath()
+  if (!existsSync(matrixxConfigPath)) {
     return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
   }
 
   try {
-    const content = readFileSync(omoConfigPath, "utf-8")
-    const omoConfig = parseJsonc<Record<string, unknown>>(content)
-    if (!omoConfig || typeof omoConfig !== "object") {
+    const content = readFileSync(matrixxConfigPath, "utf-8")
+    const matrixxConfig = parseJsonc<Record<string, unknown>>(content)
+    if (!matrixxConfig || typeof matrixxConfig !== "object") {
       return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
     }
 
-    const configStr = JSON.stringify(omoConfig)
+    const configStr = JSON.stringify(matrixxConfig)
     const hasOpenAI = configStr.includes('"openai/')
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
@@ -67,7 +67,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan } = detectProvidersFromMatrixxConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan

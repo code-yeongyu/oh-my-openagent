@@ -1,7 +1,7 @@
 import packageJson from "../../package.json" with { type: "json" }
-import type { InstallArgs } from "./types"
 import { runCliInstaller } from "./cli-installer"
 import { runTuiInstaller } from "./tui-installer"
+import type { InstallArgs } from "./types"
 
 const VERSION = packageJson.version
 

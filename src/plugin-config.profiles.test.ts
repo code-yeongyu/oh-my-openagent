@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { mergeConfigs } from "./plugin-config"
-import { expandProfile } from "./config/profiles"
 import type { MatrixxConfig } from "./config"
+import { expandProfile } from "./config/profiles"
+import { mergeConfigs } from "./plugin-config"
 
 describe("profile expansion in mergeConfigs", () => {
   test("profile-only config sets agent models from profile", () => {

@@ -1,7 +1,6 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
-
-import { formatLocation } from "./lsp-formatters"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { withLspClient } from "./lsp-client-wrapper"
+import { formatLocation } from "./lsp-formatters"
 import type { Location, LocationLink } from "./types"
 
 export const lsp_goto_definition: ToolDefinition = tool({

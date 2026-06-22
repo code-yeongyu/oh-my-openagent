@@ -1,4 +1,3 @@
-export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter-hook"
 export {
   buildReminder,
   extractMessages,
@@ -7,3 +6,4 @@ export {
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
+export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter-hook"

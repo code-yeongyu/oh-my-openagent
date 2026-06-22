@@ -1,15 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
-import { MatrixxConfigSchema, type MatrixxConfig } from "./config";
+import { type MatrixxConfig, MatrixxConfigSchema } from "./config";
 import { expandProfile, PROFILE_NAMES } from "./config/profiles";
 import {
-  log,
-  deepMerge,
-  getOpenCodeConfigDir,
   addConfigLoadError,
-  parseJsonc,
+  deepMerge,
   detectConfigFile,
+  getOpenCodeConfigDir,
+  log,
   migrateConfigFile,
+  parseJsonc,
 } from "./shared";
 
 export function parseConfigPartially(
@@ -91,47 +91,101 @@ export function loadConfigFromPath(
   return null;
 }
 
+/**
+ * Cached view of the 5 `disabled_*` arrays on a `MatrixxConfig` as Sets.
+ * Returned by {@link getDisabledSets} so callers can do O(1) membership
+ * checks without re-constructing a Set on every read.
+ */
+export interface DisabledSets {
+  disabledAgents: Set<string>
+  disabledMcps: Set<string>
+  disabledHooks: Set<string>
+  disabledCommands: Set<string>
+  disabledSkills: Set<string>
+}
+
+// Module-level WeakMap cache. WeakMap allows GC to collect cached configs
+// when no other references exist, preventing memory leaks. Re-assigned (not
+// `const`) so `_resetDisabledSetsCacheForTesting` can swap in a fresh map.
+let disabledSetsCache: WeakMap<MatrixxConfig, DisabledSets> = new WeakMap()
+
+/**
+ * Returns the cached `DisabledSets` view for `config`, constructing and
+ * caching it on first access. Callers MUST treat the returned Sets as
+ * read-only — they are shared across all readers of the same config.
+ */
+export function getDisabledSets(config: MatrixxConfig): DisabledSets {
+  const cached = disabledSetsCache.get(config)
+  if (cached) return cached
+
+  const fresh: DisabledSets = {
+    disabledAgents: new Set(config.disabled_agents ?? []),
+    disabledMcps: new Set(config.disabled_mcps ?? []),
+    disabledHooks: new Set(config.disabled_hooks ?? []),
+    disabledCommands: new Set(config.disabled_commands ?? []),
+    disabledSkills: new Set(config.disabled_skills ?? []),
+  }
+  disabledSetsCache.set(config, fresh)
+  return fresh
+}
+
+/**
+ * Test-only: drop all cached `DisabledSets`. WeakMap has no `clear()`,
+ * so we replace the map with a fresh one — the old map is GC'd.
+ */
+export function _resetDisabledSetsCacheForTesting(): void {
+  disabledSetsCache = new WeakMap()
+}
+
 export function mergeConfigs(
   base: MatrixxConfig,
   override: MatrixxConfig
 ): MatrixxConfig {
-  return {
+  // Build the 5 dedup Sets once; reuse them for the merged arrays AND the
+  // cache so the first `getDisabledSets(merged)` is a hit (zero extra Sets).
+  const disabledAgentsSet = new Set([
+    ...(base.disabled_agents ?? []),
+    ...(override.disabled_agents ?? []),
+  ])
+  const disabledMcpsSet = new Set([
+    ...(base.disabled_mcps ?? []),
+    ...(override.disabled_mcps ?? []),
+  ])
+  const disabledHooksSet = new Set([
+    ...(base.disabled_hooks ?? []),
+    ...(override.disabled_hooks ?? []),
+  ])
+  const disabledCommandsSet = new Set([
+    ...(base.disabled_commands ?? []),
+    ...(override.disabled_commands ?? []),
+  ])
+  const disabledSkillsSet = new Set([
+    ...(base.disabled_skills ?? []),
+    ...(override.disabled_skills ?? []),
+  ])
+
+  const merged: MatrixxConfig = {
     ...base,
     ...override,
     agents: deepMerge(base.agents, override.agents),
     categories: deepMerge(base.categories, override.categories),
-    disabled_agents: [
-      ...new Set([
-        ...(base.disabled_agents ?? []),
-        ...(override.disabled_agents ?? []),
-      ]),
-    ],
-    disabled_mcps: [
-      ...new Set([
-        ...(base.disabled_mcps ?? []),
-        ...(override.disabled_mcps ?? []),
-      ]),
-    ],
-    disabled_hooks: [
-      ...new Set([
-        ...(base.disabled_hooks ?? []),
-        ...(override.disabled_hooks ?? []),
-      ]),
-    ],
-    disabled_commands: [
-      ...new Set([
-        ...(base.disabled_commands ?? []),
-        ...(override.disabled_commands ?? []),
-      ]),
-    ],
-    disabled_skills: [
-      ...new Set([
-        ...(base.disabled_skills ?? []),
-        ...(override.disabled_skills ?? []),
-      ]),
-    ],
+    disabled_agents: [...disabledAgentsSet],
+    disabled_mcps: [...disabledMcpsSet],
+    disabled_hooks: [...disabledHooksSet],
+    disabled_commands: [...disabledCommandsSet],
+    disabled_skills: [...disabledSkillsSet],
     claude_code: deepMerge(base.claude_code, override.claude_code),
-  };
+  }
+
+  disabledSetsCache.set(merged, {
+    disabledAgents: disabledAgentsSet,
+    disabledMcps: disabledMcpsSet,
+    disabledHooks: disabledHooksSet,
+    disabledCommands: disabledCommandsSet,
+    disabledSkills: disabledSkillsSet,
+  })
+
+  return merged
 }
 
 function resolveConfigPath(baseDir: string, configName: string): string {

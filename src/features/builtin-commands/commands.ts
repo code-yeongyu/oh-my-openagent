@@ -1,14 +1,15 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
-import type { BuiltinCommandName, BuiltinCommands } from "./types"
-import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
-import { MATRIX_LOOP_TEMPLATE, CANCEL_LOOP_TEMPLATE } from "./templates/matrix-loop"
-import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
-import { REFACTOR_TEMPLATE } from "./templates/refactor"
-import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { END_ULTRAWORK_TEMPLATE } from "./templates/end-ultrawork"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
+import { CANCEL_LOOP_TEMPLATE, MATRIX_LOOP_TEMPLATE } from "./templates/matrix-loop"
 import { PICKUP_TEMPLATE } from "./templates/pickup"
-import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
 import { PROFILE_TEMPLATE } from "./templates/profile"
+import { REFACTOR_TEMPLATE } from "./templates/refactor"
+import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
+import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
+import type { BuiltinCommandName, BuiltinCommands } from "./types"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -125,6 +126,17 @@ ${PROFILE_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[list|show|set <name> [--global|--project]]",
+  },
+  "end-ultrawork": {
+    description: "(builtin) Deactivate ultrawork mode and return to default Matrixx behavior for the current session",
+    template: `<command-instruction>
+${END_ULTRAWORK_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[optional follow-up task]",
   },
 }
 

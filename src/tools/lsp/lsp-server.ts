@@ -1,7 +1,8 @@
-import type { ResolvedServer } from "./types"
+import { LSPClient } from "./lsp-client"
 import { registerLspManagerProcessCleanup } from "./lsp-manager-process-cleanup"
 import { cleanupTempDirectoryLspClients } from "./lsp-manager-temp-directory-cleanup"
-import { LSPClient } from "./lsp-client"
+import type { ResolvedServer } from "./types"
+
 interface ManagedClient {
   client: LSPClient
   lastUsedAt: number

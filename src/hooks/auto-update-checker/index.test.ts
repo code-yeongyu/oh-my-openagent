@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test"
-import { isPrereleaseVersion, isDistTag, isPrereleaseOrDistTag, extractChannel } from "./index"
+import { describe, expect, test } from "bun:test"
+import { extractChannel, isDistTag, isPrereleaseOrDistTag, isPrereleaseVersion } from "./index"
 
 describe("auto-update-checker", () => {
   describe("isPrereleaseVersion", () => {

@@ -1,7 +1,7 @@
 import color from "picocolors"
-import type { DoctorResult } from "./types"
 import { SYMBOLS } from "./constants"
 import { formatHeader, formatIssue } from "./format-shared"
+import type { DoctorResult } from "./types"
 
 export function formatDefault(result: DoctorResult): string {
   const lines: string[] = []

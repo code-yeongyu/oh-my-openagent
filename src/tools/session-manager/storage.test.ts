@@ -1,10 +1,10 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
+const TEST_DIR = join(tmpdir(), `matrixx-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
 const TEST_PART_STORAGE = join(TEST_DIR, "part")
 const TEST_SESSION_STORAGE = join(TEST_DIR, "session")

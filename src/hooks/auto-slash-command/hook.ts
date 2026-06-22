@@ -1,21 +1,21 @@
-import {
-  detectSlashCommand,
-  extractPromptText,
-  findSlashCommandPartIndex,
-} from "./detector"
-import { executeSlashCommand, type ExecutorOptions } from "./executor"
+import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { log } from "../../shared"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
+import {
+  detectSlashCommand,
+  extractPromptText,
+  findSlashCommandPartIndex,
+} from "./detector"
+import { type ExecutorOptions, executeSlashCommand } from "./executor"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
   CommandExecuteBeforeInput,
   CommandExecuteBeforeOutput,
 } from "./types"
-import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
 const sessionProcessedCommands = new Set<string>()
 const sessionProcessedCommandExecutions = new Set<string>()

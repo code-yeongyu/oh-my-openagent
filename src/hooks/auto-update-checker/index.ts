@@ -1,12 +1,10 @@
+export { invalidateCache, invalidatePackage } from "./cache"
+export { checkForUpdate } from "./checker"
 export { createAutoUpdateCheckerHook } from "./hook"
-
+export type { AutoUpdateCheckerOptions, UpdateCheckResult } from "./types"
 export {
-  isPrereleaseVersion,
+  extractChannel,
   isDistTag,
   isPrereleaseOrDistTag,
-  extractChannel,
+  isPrereleaseVersion,
 } from "./version-channel"
-
-export { checkForUpdate } from "./checker"
-export { invalidatePackage, invalidateCache } from "./cache"
-export type { UpdateCheckResult, AutoUpdateCheckerOptions } from "./types"

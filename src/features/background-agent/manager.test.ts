@@ -1,12 +1,22 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
+const { mock, spyOn } = require("bun:test")
+
+import { randomUUID } from "node:crypto"
+import * as fs from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { BackgroundTask, ResumeInput } from "./types"
+import { _resetTaskToastManagerForTesting, initTaskToastManager } from "../task-toast-manager/manager"
+import type { ConcurrencyManager } from "./concurrency"
 import { MIN_IDLE_TIME_MS } from "./constants"
-import { BackgroundManager } from "./manager"
-import { ConcurrencyManager } from "./concurrency"
-import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
+import {
+  _resetMessageDirCacheForTesting,
+  BackgroundManager,
+  getMessageDir,
+} from "./manager"
+import type { BackgroundTask, ResumeInput } from "./types"
 
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -3102,6 +3112,126 @@ describe("BackgroundManager queue processing - error tasks are skipped", () => {
   })
 })
 
+// ----- B7 regression: processKey must release its concurrency slot on every error path -----
+//
+// processKey acquires a slot via concurrencyManager.acquire(key) at the top of each
+// loop iteration. The new implementation tracks ownership via an `acquired` flag
+// and the outer finally releases if the flag is still set, so getCount(key) always
+// returns to its baseline after processKey resolves.
+
+describe("BackgroundManager processKey - concurrency slot release", () => {
+  test("processKey releases slot on startTask throw", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      { defaultConcurrency: 1 }
+    )
+
+    const key = "test-key"
+    const task: BackgroundTask = {
+      id: "task-throws",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "throwing task",
+      prompt: "test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt: new Date(),
+    }
+
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+    }
+
+    // Throwing BEFORE setting task.concurrencyKey exercises the "no handoff" path.
+    ;(manager as unknown as { startTask: (item: unknown) => Promise<void> }).startTask = async () => {
+      throw new Error("simulated startTask failure")
+    }
+
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(concurrencyManager.getCount(key)).toBe(0)
+
+    //#when
+    await processKeyForTest(manager, key)
+
+    //#then
+    expect(concurrencyManager.getCount(key)).toBe(0)
+    expect(concurrencyManager.getQueueLength(key)).toBe(0)
+    expect(getQueuesByKey(manager).get(key)?.length ?? 0).toBe(0)
+
+    manager.shutdown()
+  })
+
+  test("processKey releases slot on cancel after acquire", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      { defaultConcurrency: 1 }
+    )
+
+    const key = "test-key"
+    const task: BackgroundTask = {
+      id: "task-cancelled",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "cancelled task",
+      prompt: "test",
+      agent: "test-agent",
+      status: "cancelled",
+      queuedAt: new Date(),
+    }
+
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+    }
+
+    let startCalled = false
+    ;(manager as unknown as { startTask: (item: unknown) => Promise<void> }).startTask = async () => {
+      startCalled = true
+    }
+
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(concurrencyManager.getCount(key)).toBe(0)
+
+    //#when
+    await processKeyForTest(manager, key)
+
+    //#then
+    // The outer finally must NOT double-release (acquired flag is reset to false).
+    expect(startCalled).toBe(false)
+    expect(concurrencyManager.getCount(key)).toBe(0)
+    expect(concurrencyManager.getQueueLength(key)).toBe(0)
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey", () => {
   test("removes stale pending task from queue", () => {
     //#given
@@ -3775,6 +3905,179 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
 
     //#then
     expect(getCompletionTimers(manager).has(task.id)).toBe(true)
+
+    manager.shutdown()
+  })
+})
+
+// ----- B4 regression: getMessageDir must cache results across calls -----
+//
+// The pre-fix getMessageDir did 3 + N sync IO ops per call (existsSync + readdirSync
+// + N × existsSync for subdir scan). With many sessions, the readdirSync + N
+// existsSync scan is expensive. B4 wraps the original body in a module-level
+// LRU cache so the 2nd call for the same sessionID makes 0 sync IO ops.
+//
+// Uses spyOn (NOT mock.module) on `fs.existsSync` and `fs.readdirSync`. This
+// works in bun because destructured `import { existsSync, readdirSync }` from
+// "node:fs" goes through a live property lookup at call time, so spyOn on
+// the namespace intercepts the call. This is bun-specific CJS interop behavior
+// also exploited in src/shared/git-worktree/collect-git-diff-stats.test.ts.
+//
+// MUST run BEFORE the B2 describe block below: B2 uses mock.module("node:fs", ...)
+// which is a global, process-wide mock that persists for the rest of the run. The
+// spy-based assertions in this test would see 0 readdirSync calls (the mock wrapper
+// is replaced by the spy in a way that confuses the live-binding chain).
+
+describe("getMessageDir cached after first call", () => {
+  test("getMessageDir cached after first call", () => {
+    //#given
+    _resetMessageDirCacheForTesting()
+    const sessionID = `ses_b4_nonexistent_${randomUUID()}`
+    const existsSpy = spyOn(fs, "existsSync")
+    const readdirSpy = spyOn(fs, "readdirSync")
+
+    //#when
+    const result1 = getMessageDir(sessionID)
+
+    //#then
+    expect(result1).toBeNull()
+    const existsAfter1 = existsSpy.mock.calls.length
+    const readdirAfter1 = readdirSpy.mock.calls.length
+    expect(existsAfter1).toBeGreaterThan(0)
+    expect(readdirAfter1).toBeGreaterThan(0)
+
+    //#when
+    const result2 = getMessageDir(sessionID)
+
+    //#then
+    expect(result2).toBeNull()
+    expect(existsSpy.mock.calls.length).toBe(existsAfter1)
+    expect(readdirSpy.mock.calls.length).toBe(readdirAfter1)
+  })
+})
+
+// ----- B2 regression: findNearestMessageExcludingCompaction must read each file once -----
+//
+// The previous two-pass implementation called readFileSync on the same .json file
+// twice (once in the "full" pass, once in the "partial" pass). This test asserts
+// the single-pass contract: exactly one readFileSync call per unique file.
+//
+// Uses mock.module for 'node:fs' and '../../shared/opencode-storage-paths' so
+// this file MUST be added to the mock-heavy lists in .github/workflows/ci.yml
+// AND .github/workflows/publish.yml.
+
+const B2_TEST_STORAGE = join(tmpdir(), `b2-mgr-test-${randomUUID()}`)
+const B2_TEST_MESSAGE_STORAGE = join(B2_TEST_STORAGE, "message")
+const B2_SESSION_ID = `ses_b2_${randomUUID()}`
+const B2_SESSION_DIR = join(B2_TEST_MESSAGE_STORAGE, B2_SESSION_ID)
+const B2_N_FILES = 3
+
+describe("findNearestMessageExcludingCompaction reads each file once", () => {
+  beforeEach(() => {
+    mkdirSync(B2_SESSION_DIR, { recursive: true })
+    for (let i = 0; i < B2_N_FILES; i++) {
+      writeFileSync(
+        join(B2_SESSION_DIR, `msg_${String(i).padStart(3, "0")}.json`),
+        JSON.stringify({ info: { role: "user" } }),
+      )
+    }
+  })
+
+  afterEach(() => {
+    try {
+      rmSync(B2_TEST_STORAGE, { recursive: true, force: true })
+    } catch {
+      // best-effort cleanup
+    }
+  })
+
+  test("findNearestMessageExcludingCompaction reads each file once", async () => {
+    //#given
+    // Capture real fs functions BEFORE mock so wrappers don't recurse.
+    const realFsNs = require("node:fs") as typeof import("node:fs")
+    const realExistsSync = realFsNs.existsSync
+    const realReadFileSync = realFsNs.readFileSync
+    const realReaddirSync = realFsNs.readdirSync
+
+    mock.module("../../shared/opencode-storage-paths", () => ({
+      OPENCODE_STORAGE: B2_TEST_STORAGE,
+      MESSAGE_STORAGE: B2_TEST_MESSAGE_STORAGE,
+      PART_STORAGE: join(B2_TEST_STORAGE, "part"),
+      SESSION_STORAGE: join(B2_TEST_STORAGE, "session"),
+    }))
+
+    let readFileSyncCalls = 0
+    const readFileSyncCallsByPath = new Map<string, number>()
+    mock.module("node:fs", () => {
+      const wrapped = {
+        ...realFsNs,
+        existsSync: (path: string) => realExistsSync(path),
+        readFileSync: (...args: unknown[]) => {
+          readFileSyncCalls++
+          const first = args[0]
+          if (typeof first === "string") {
+            readFileSyncCallsByPath.set(first, (readFileSyncCallsByPath.get(first) ?? 0) + 1)
+          }
+          return realReadFileSync(...(args as Parameters<typeof realReadFileSync>))
+        },
+        readdirSync: (path: string) => realReaddirSync(path),
+      }
+      return wrapped as unknown as typeof realFsNs
+    })
+
+    // Re-import manager with cache buster so it picks up the mocked modules.
+    const { BackgroundManager: IsolatedManager } = await import(
+      `./manager?bust=${randomUUID()}`
+    )
+
+    // client.session.messages throws → triggers fallback in notifyParentSession
+    // which calls getMessageDir → findNearestMessageExcludingCompaction.
+    const client = {
+      session: {
+        status: async () => ({ data: {} as Record<string, { type: string }> }),
+        messages: async () => {
+          throw new Error("simulated failure to trigger file-fallback path")
+        },
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        todo: async () => ({ data: [] }),
+      },
+    }
+    const manager = new IsolatedManager({
+      client,
+      directory: tmpdir(),
+    } as unknown as PluginInput)
+
+    const task: BackgroundTask = {
+      id: "task_b2_regression",
+      sessionID: "ses_b2_child",
+      parentSessionID: B2_SESSION_ID,
+      parentMessageID: "msg_parent",
+      description: "b2 regression",
+      prompt: "b2",
+      agent: "b2",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+
+    //#when
+    await (
+      manager as unknown as { notifyParentSession: (t: BackgroundTask) => Promise<void> }
+    ).notifyParentSession(task)
+
+    //#then
+    // Single-pass contract: readFileSync must be called exactly once per file.
+    // Pre-fix bug: 2 calls per file (3 files × 2 = 6 total).
+    // Post-fix: 1 call per file (3 files × 1 = 3 total).
+    expect(readFileSyncCalls).toBe(B2_N_FILES)
+    expect(readFileSyncCallsByPath.size).toBe(B2_N_FILES)
+    for (const [path, count] of readFileSyncCallsByPath) {
+      expect(count).toBe(1)
+      // sanity: every read path lives inside B2_SESSION_DIR
+      expect(path.startsWith(B2_SESSION_DIR)).toBe(true)
+    }
 
     manager.shutdown()
   })

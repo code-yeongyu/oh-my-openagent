@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import type { MatrixxConfig } from "../config"
 
 import * as mcpLoader from "../features/claude-code-mcp-loader"

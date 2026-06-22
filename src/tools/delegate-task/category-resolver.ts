@@ -1,13 +1,13 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { DelegateTaskArgs } from "./types"
-import type { ExecutorContext } from "./executor-types"
 import { mergeCategories } from "../../shared/merge-categories"
-import { SISYPHUS_JUNIOR_AGENT } from "./mouse-agent"
-import { resolveCategoryConfig } from "./categories"
-import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAvailableModelsForDelegateTask } from "./available-models"
+import { resolveCategoryConfig } from "./categories"
+import type { ExecutorContext } from "./executor-types"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { parseModelString } from "./model-string-parser"
+import { SISYPHUS_JUNIOR_AGENT } from "./mouse-agent"
+import type { DelegateTaskArgs } from "./types"
 
 export interface CategoryResolutionResult {
   agentToUse: string

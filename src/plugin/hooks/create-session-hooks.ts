@@ -1,26 +1,24 @@
-import type { MatrixxConfig, HookName } from "../../config"
-import type { PluginContext } from "../types"
-
+import type { HookName, MatrixxConfig } from "../../config"
 import {
-  createContextWindowMonitorHook,
-  createSessionRecoveryHook,
-  createSessionNotification,
-  createThinkModeHook,
+  createAgentUsageReminderHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
-  createAgentUsageReminderHook,
-  createNonInteractiveEnvHook,
+  createContextWindowMonitorHook,
+  createDelegateTaskRetryHook,
+  createEditErrorRecoveryHook,
   createInteractiveBashSessionHook,
   createMatrixLoopHook,
-  createEditErrorRecoveryHook,
-  createDelegateTaskRetryHook,
-  createTaskResumeInfoHook,
-  createStartWorkHook,
-  createOracleMdOnlyHook,
   createMouseNotepadHook,
-  createQuestionLabelTruncatorHook,
+  createNonInteractiveEnvHook,
+  createOracleMdOnlyHook,
   createPreemptiveCompactionHook,
+  createQuestionLabelTruncatorHook,
   createRuntimeFallbackHook,
+  createSessionNotification,
+  createSessionRecoveryHook,
+  createStartWorkHook,
+  createTaskResumeInfoHook,
+  createThinkModeHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -30,6 +28,7 @@ import {
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
+import type { PluginContext } from "../types"
 
 export type SessionHooks = {
   contextWindowMonitor: ReturnType<typeof createContextWindowMonitorHook> | null

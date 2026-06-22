@@ -1,6 +1,6 @@
 import { promises as fs } from "fs"
-import { join } from "path"
 import yaml from "js-yaml"
+import { join } from "path"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
 
 export function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {

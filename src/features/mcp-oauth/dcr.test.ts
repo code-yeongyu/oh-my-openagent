@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
 import {
-  getOrRegisterClient,
   type ClientCredentials,
   type ClientRegistrationStorage,
   type DcrFetch,
+  getOrRegisterClient,
 } from "./dcr"
 
 function createStorage(initial: ClientCredentials | null):

@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
 

@@ -69,6 +69,7 @@ jobs:
           bun test src/hooks/auto-update-checker/hook/background-update-check.test.ts
           bun test src/hooks/auto-update-checker/hook.test.ts
           bun test src/features/skill-mcp-manager/manager.test.ts
+          bun test src/features/background-agent/manager.test.ts
           bun test src/hooks/comment-checker/cli.test.ts
           bun test src/hooks/comment-checker/hook.apply-patch.test.ts
           bun test src/hooks/directory-agents-injector/injector.test.ts
@@ -114,6 +115,7 @@ jobs:
               -e 'src/hooks/auto-update-checker/hook/background-update-check.test.ts' \
               -e 'src/hooks/auto-update-checker/hook.test.ts' \
               -e 'src/features/skill-mcp-manager/manager.test.ts' \
+              -e 'src/features/background-agent/manager.test.ts' \
               -e 'src/hooks/comment-checker/cli.test.ts' \
               -e 'src/hooks/comment-checker/hook.apply-patch.test.ts' \
               -e 'src/hooks/directory-agents-injector/injector.test.ts' \
@@ -152,9 +154,26 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Lint
+        run: bun run lint
+
   build:
     runs-on: ubuntu-latest
-    needs: [test, typecheck]
+    needs: [test, typecheck, lint]
     permissions:
       contents: write
     steps:
@@ -182,12 +201,12 @@ jobs:
       - name: Auto-commit schema changes
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
-          if git diff --quiet assets/oh-my-opencode.schema.json; then
+          if git diff --quiet assets/matrixx.schema.json; then
             echo "No schema changes to commit"
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add assets/oh-my-opencode.schema.json
+            git add assets/matrixx.schema.json
             git commit -m "chore: auto-update schema.json"
             git push
           fi

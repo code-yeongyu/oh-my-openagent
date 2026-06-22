@@ -1,8 +1,8 @@
-import { extname, resolve } from "path"
 import { fileURLToPath } from "node:url"
 import { existsSync } from "fs"
+import { extname, resolve } from "path"
 
-import { LSPClient, lspManager } from "./client"
+import { type LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
 import type { ServerLookupResult } from "./types"
 

@@ -1,14 +1,10 @@
+import { isObject, log } from "../../shared"
 import type { OpencodeClient } from "./constants"
-import { log } from "../../shared"
 
 type SessionMessagePart = {
   type?: string
   text?: string
   content?: unknown
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
 }
 
 function getMessageRole(message: unknown): string | undefined {

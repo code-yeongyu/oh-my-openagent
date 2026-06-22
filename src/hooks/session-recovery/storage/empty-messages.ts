@@ -1,5 +1,5 @@
-import { messageHasContent } from "./part-content"
 import { readMessages } from "./messages-reader"
+import { messageHasContent } from "./part-content"
 
 export function findEmptyMessages(sessionID: string): string[] {
   const messages = readMessages(sessionID)

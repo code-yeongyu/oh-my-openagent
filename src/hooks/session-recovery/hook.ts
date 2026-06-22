@@ -1,13 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
 import { log } from "../../shared/logger"
-import { detectErrorType } from "./detect-error-type"
 import type { RecoveryErrorType } from "./detect-error-type"
-import type { MessageData } from "./types"
-import { recoverToolResultMissing } from "./recover-tool-result-missing"
+import { detectErrorType } from "./detect-error-type"
 import { recoverThinkingBlockOrder } from "./recover-thinking-block-order"
 import { recoverThinkingDisabledViolation } from "./recover-thinking-disabled-violation"
+import { recoverToolResultMissing } from "./recover-tool-result-missing"
 import { extractResumeConfig, findLastUserMessage, resumeSession } from "./resume"
+import type { MessageData } from "./types"
 
 interface MessageInfo {
   id?: string

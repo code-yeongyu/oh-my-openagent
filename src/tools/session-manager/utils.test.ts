@@ -1,13 +1,13 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
+  filterSessionsByDate,
+  formatSearchResults,
+  formatSessionInfo,
   formatSessionList,
   formatSessionMessages,
-  formatSessionInfo,
-  formatSearchResults,
-  filterSessionsByDate,
   searchInSession,
 } from "./session-formatter"
-import type { SessionInfo, SessionMessage, SearchResult } from "./types"
+import type { SearchResult, SessionInfo, SessionMessage } from "./types"
 
 describe("session-manager utils", () => {
   test("formatSessionList handles empty array", async () => {

@@ -1,24 +1,24 @@
 import type { MatrixxConfig } from "../../config"
-import type { PluginContext } from "../types"
-
-import {
-  createClaudeCodeHooksHook,
-  createKeywordDetectorHook,
-  createThinkingBlockValidatorHook,
-  createToolPairValidatorHook,
-} from "../../hooks"
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
 } from "../../features/context-injector"
+
+import {
+  createDesignIntentPreserverHook,
+  createKeywordDetectorHook,
+  createThinkingBlockValidatorHook,
+  createToolPairValidatorHook,
+} from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import type { PluginContext } from "../types"
 
 export type TransformHooks = {
-  claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook>
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
+  designIntentPreserver: ReturnType<typeof createDesignIntentPreserverHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -29,15 +29,6 @@ export function createTransformHooks(args: {
 }): TransformHooks {
   const { ctx, pluginConfig, isHookEnabled } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
-
-  const claudeCodeHooks = createClaudeCodeHooksHook(
-    ctx,
-    {
-      disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
-      keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
-    },
-    contextCollector,
-  )
 
   const keywordDetector = isHookEnabled("keyword-detector")
     ? safeCreateHook(
@@ -66,11 +57,19 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const designIntentPreserver = isHookEnabled("design-intent-preserver")
+    ? safeCreateHook(
+        "design-intent-preserver",
+        () => createDesignIntentPreserverHook(ctx),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
-    claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
     toolPairValidator,
+    designIntentPreserver,
   }
 }

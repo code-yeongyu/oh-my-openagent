@@ -1,19 +1,19 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs"
-import { join, basename } from "path"
+import { basename, join } from "path"
 import { z } from "zod"
+import type { MatrixxConfig } from "../../config/schema"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import {
-  getTaskDir,
-  readJsonSafe,
-  writeJsonAtomic,
   acquireLock,
   generateTaskId,
+  getTaskDir,
   listTaskFiles,
+  readJsonSafe,
   resolveTaskListId,
   sanitizePathSegment,
+  writeJsonAtomic,
 } from "./storage"
-import type { MatrixxConfig } from "../../config/schema"
 
 const TEST_DIR = ".test-claude-tasks"
 const TEST_DIR_ABS = join(process.cwd(), TEST_DIR)

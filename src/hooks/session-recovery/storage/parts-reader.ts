@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { PART_STORAGE } from "../constants"
-import type { StoredPart } from "../types"
 import { isSqliteBackend } from "../../../shared"
 import { isRecord } from "../../../shared/record-type-guard"
+import { PART_STORAGE } from "../constants"
+import type { StoredPart } from "../types"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -21,7 +21,6 @@ export function readParts(messageID: string): StoredPart[] {
       const content = readFileSync(join(partDir, file), "utf-8")
       parts.push(JSON.parse(content))
     } catch {
-      continue
     }
   }
 

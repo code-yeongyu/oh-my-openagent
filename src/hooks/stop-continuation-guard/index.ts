@@ -1,2 +1,2 @@
-export { createStopContinuationGuardHook } from "./hook"
 export type { StopContinuationGuard } from "./hook"
+export { createStopContinuationGuardHook } from "./hook"

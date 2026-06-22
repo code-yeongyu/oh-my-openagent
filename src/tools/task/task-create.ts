@@ -1,16 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool";
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool";
 import { join } from "path";
 import type { MatrixxConfig } from "../../config/schema";
-import type { TaskObject } from "./types";
-import { TaskObjectSchema, TaskCreateInputSchema } from "./types";
 import {
-  getTaskDir,
-  writeJsonAtomic,
   acquireLock,
   generateTaskId,
+  getTaskDir,
+  writeJsonAtomic,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
+import type { TaskObject } from "./types";
+import { TaskCreateInputSchema, TaskObjectSchema } from "./types";
 
 export function createTaskCreateTool(
   config: Partial<MatrixxConfig>,

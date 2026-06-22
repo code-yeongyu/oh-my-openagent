@@ -1,5 +1,5 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -18,7 +18,7 @@ mock.module("./config-context", () => ({
   resetConfigContext: () => {},
   getConfigJson: () => join(tempConfigDir, "opencode.json"),
   getConfigJsonc: () => join(tempConfigDir, "opencode.jsonc"),
-  getOmoConfigPath: () => join(tempConfigDir, "matrixx", "config.jsonc"),
+  getMatrixxConfigPath: () => join(tempConfigDir, "matrixx", "config.jsonc"),
 }))
 
 // `opencode-config-format` calls `getConfigJson()` / `getConfigJsonc()` via

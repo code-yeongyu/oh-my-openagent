@@ -97,11 +97,11 @@ TodoWrite([
 
 ## 1.1: Launch Parallel Explore Agents (BACKGROUND)
 
-Fire ALL of these simultaneously using \`call_omo_agent\`:
+Fire ALL of these simultaneously using \`delegate_agent\`:
 
 \`\`\`
 // Agent 1: Find the refactoring target
-call_omo_agent(
+delegate_agent(
   subagent_type="trinity",
   run_in_background=true,
   prompt="Find all occurrences and definitions of [TARGET]. 
@@ -109,7 +109,7 @@ call_omo_agent(
 )
 
 // Agent 2: Find related code
-call_omo_agent(
+delegate_agent(
   subagent_type="trinity", 
   run_in_background=true,
   prompt="Find all code that imports, uses, or depends on [TARGET].
@@ -117,7 +117,7 @@ call_omo_agent(
 )
 
 // Agent 3: Find similar patterns
-call_omo_agent(
+delegate_agent(
   subagent_type="trinity",
   run_in_background=true,
   prompt="Find similar code patterns to [TARGET] in the codebase.
@@ -125,7 +125,7 @@ call_omo_agent(
 )
 
 // Agent 4: Find tests
-call_omo_agent(
+delegate_agent(
   subagent_type="trinity",
   run_in_background=true,
   prompt="Find all test files related to [TARGET].
@@ -133,7 +133,7 @@ call_omo_agent(
 )
 
 // Agent 5: Architecture context
-call_omo_agent(
+delegate_agent(
   subagent_type="trinity",
   run_in_background=true,
   prompt="Find architectural patterns and module organization around [TARGET].
@@ -274,7 +274,7 @@ ls -la *_test.go
 
 \`\`\`
 // Find all tests related to target
-call_omo_agent(
+delegate_agent(
   subagent_type="trinity",
   run_in_background=false,  // Need this synchronously
   prompt="Analyze test coverage for [TARGET]:

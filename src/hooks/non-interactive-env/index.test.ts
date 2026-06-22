@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { createNonInteractiveEnvHook, NON_INTERACTIVE_ENV } from "./index"
 
 describe("non-interactive-env hook", () => {

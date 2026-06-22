@@ -1,52 +1,46 @@
-import type { BuiltinSkill } from "./types"
 import type { BrowserAutomationProvider } from "../../config/schema"
-
 import {
-  playwrightSkill,
   agentBrowserSkill,
-  playwrightCliSkill,
-  frontendUiUxSkill,
-  gitMasterSkill,
   devBrowserSkill,
+  documentReaderSkill,
+  dslCodegenSkill,
+  dslCompositionSkill,
   dslCoreSkill,
   dslGrammarSkill,
-  dslCodegenSkill,
   dslMetamodelSkill,
-  dslToolingSkill,
-  euHorizonSkill,
-  academicPaperReviewSkill,
-  deliverableWritingSkill,
-  projectManagementSkill,
-  technicalLeadSkill,
-  academicWritingSkill,
-  researchMethodologySkill,
-  literatureReviewSkill,
-  grantWritingSkill,
-  scientificPresentationSkill,
-  dataManagementPlanSkill,
-  ipExploitationSkill,
-  dslTextxEcosystemSkill,
-  dslPyecoreAdvancedSkill,
   dslModelTransformationSkill,
+  dslPyecoreAdvancedSkill,
   dslTestingSkill,
+  dslTextxEcosystemSkill,
+  dslToolingSkill,
   dslValidationSkill,
-  dslCompositionSkill,
-  documentReaderSkill,
-  cryptoMarketAnalysisSkill,
-  cryptoTradingSkill,
-  cryptoOnchainSkill,
+  frontendA11ySkill,
+  frontendBuildToolingSkill,
+  frontendPerfSkill,
+  frontendStateDataSkill,
+  frontendTestingSkill,
+  frontendUiUxSkill,
+  gitMasterSkill,
+  matrixxSelfConfigSkill,
+  playwrightCliSkill,
+  playwrightSkill,
+  qualityGateSkill,
+  reactNextjsPatternsSkill,
+  reviewWorkSkill,
+  securityApiSkill,
   securityCoreSkill,
-  securitySecretsSkill,
-  securitySastSkill,
+  securityCryptoSkill,
   securityDastSkill,
   securityDependenciesSkill,
-  securityApiSkill,
-  securityCryptoSkill,
   securityInfraSkill,
   securityReviewSkill,
+  securitySastSkill,
+  securitySecretsSkill,
+  softwareDevSkill,
+  svelteSveltekitPatternsSkill,
   tddEnforcerSkill,
-  reviewWorkSkill,
 } from "./skills/index"
+import type { BuiltinSkill } from "./types"
 
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
@@ -65,7 +59,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     browserSkill = playwrightSkill
   }
 
-  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, dslCoreSkill, dslGrammarSkill, dslCodegenSkill, dslMetamodelSkill, dslToolingSkill, dslTextxEcosystemSkill, dslPyecoreAdvancedSkill, dslModelTransformationSkill, dslTestingSkill, dslValidationSkill, dslCompositionSkill, euHorizonSkill, academicPaperReviewSkill, deliverableWritingSkill, projectManagementSkill, technicalLeadSkill, academicWritingSkill, researchMethodologySkill, literatureReviewSkill, grantWritingSkill, scientificPresentationSkill, dataManagementPlanSkill, ipExploitationSkill, documentReaderSkill, cryptoMarketAnalysisSkill, cryptoTradingSkill, cryptoOnchainSkill, securityCoreSkill, securitySecretsSkill, securitySastSkill, securityDastSkill, securityDependenciesSkill, securityApiSkill, securityCryptoSkill, securityInfraSkill, securityReviewSkill, tddEnforcerSkill, reviewWorkSkill]
+  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, dslCoreSkill, dslGrammarSkill, dslCodegenSkill, dslMetamodelSkill, dslToolingSkill, dslTextxEcosystemSkill, dslPyecoreAdvancedSkill, dslModelTransformationSkill, dslTestingSkill, dslValidationSkill, dslCompositionSkill, frontendA11ySkill, frontendBuildToolingSkill, frontendPerfSkill, frontendStateDataSkill, frontendTestingSkill, reactNextjsPatternsSkill, svelteSveltekitPatternsSkill, documentReaderSkill, securityCoreSkill, securitySecretsSkill, securitySastSkill, securityDastSkill, securityDependenciesSkill, securityApiSkill, securityCryptoSkill, securityInfraSkill, securityReviewSkill, tddEnforcerSkill, reviewWorkSkill, qualityGateSkill, softwareDevSkill, matrixxSelfConfigSkill]
 
   if (!disabledSkills) {
     return skills

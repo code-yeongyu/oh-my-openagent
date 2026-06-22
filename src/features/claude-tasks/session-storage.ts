@@ -1,7 +1,7 @@
-import { join } from "path"
 import { existsSync, readdirSync, statSync } from "fs"
-import { getTaskDir } from "./storage"
+import { join } from "path"
 import type { MatrixxConfig } from "../../config/schema"
+import { getTaskDir } from "./storage"
 
 export function getSessionTaskDir(
   config: Partial<MatrixxConfig>,

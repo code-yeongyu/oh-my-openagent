@@ -1,5 +1,5 @@
-import type { SessionInfo, SessionMessage, SearchResult } from "./types"
 import { getSessionInfo, readSessionMessages } from "./storage"
+import type { SearchResult, SessionInfo, SessionMessage } from "./types"
 
 export async function formatSessionList(sessionIDs: string[]): Promise<string> {
   if (sessionIDs.length === 0) {

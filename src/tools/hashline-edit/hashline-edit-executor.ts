@@ -1,13 +1,13 @@
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { applyHashlineEditsWithReport } from "./edit-operations"
+import type { PluginContext } from "../../plugin/types"
 import { countLineDiffs, generateUnifiedDiff } from "./diff-utils"
+import { applyHashlineEditsWithReport } from "./edit-operations"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
+import { type FormatterClient, runFormattersForFile } from "./formatter-trigger"
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
 import type { HashlineEdit } from "./types"
 import { HashlineMismatchError } from "./validation"
-import { runFormattersForFile, type FormatterClient } from "./formatter-trigger"
-import type { PluginContext } from "../../plugin/types"
 
 interface HashlineEditArgs {
   filePath: string

@@ -1,14 +1,14 @@
-import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-import type { ExecutorContext, ParentContext } from "./executor-types"
-import { getTaskToastManager } from "../../features/task-toast-manager"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import { getTaskToastManager } from "../../features/task-toast-manager"
+import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { formatDuration } from "../../shared"
 import { log } from "../../shared/logger"
-import { formatDuration } from "./time-formatter"
 import { getDeliverableTag } from "./constants"
 import { formatDetailedError } from "./error-formatting"
-import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
+import type { ExecutorContext, ParentContext } from "./executor-types"
+import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
+import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,

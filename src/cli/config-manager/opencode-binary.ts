@@ -23,7 +23,6 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
         return { binary, version }
       }
     } catch {
-      continue
     }
   }
   return null

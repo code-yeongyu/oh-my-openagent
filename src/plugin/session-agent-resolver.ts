@@ -1,5 +1,4 @@
-import { log } from "../shared"
-import { normalizeSDKResponse } from "../shared"
+import { log, normalizeSDKResponse } from "../shared"
 
 interface SessionMessage {
   info?: {
@@ -17,9 +16,15 @@ type SessionClient = {
 export async function resolveSessionAgent(
   client: SessionClient,
   sessionId: string,
+  timeoutMs = 5000,
 ): Promise<string | undefined> {
   try {
-    const messagesResp = await client.session.messages({ path: { id: sessionId } })
+    const messagesResp = await Promise.race([
+      client.session.messages({ path: { id: sessionId } }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Session agent resolve timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ])
     const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
 
     for (const msg of messages) {

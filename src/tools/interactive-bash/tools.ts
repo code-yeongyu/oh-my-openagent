@@ -1,4 +1,4 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { BLOCKED_TMUX_SUBCOMMANDS, DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
 import { getCachedTmuxPath } from "./tmux-path-resolver"
 
@@ -65,7 +65,7 @@ export const interactive_bash: ToolDefinition = tool({
       const subcommand = parts[0].toLowerCase()
       if (BLOCKED_TMUX_SUBCOMMANDS.includes(subcommand)) {
         const sessionIdx = parts.findIndex(p => p === "-t" || p.startsWith("-t"))
-        let sessionName = "omo-session"
+        let sessionName = "matrixx-session"
         if (sessionIdx !== -1) {
           if (parts[sessionIdx] === "-t" && parts[sessionIdx + 1]) {
             sessionName = parts[sessionIdx + 1]

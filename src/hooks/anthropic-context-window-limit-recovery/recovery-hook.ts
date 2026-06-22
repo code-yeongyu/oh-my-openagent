@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { AutoCompactState, ParsedTokenLimitError } from "./types"
 import type { ExperimentalConfig } from "../../config"
-import { parseAnthropicTokenLimitError } from "./parser"
-import { executeCompact, getLastAssistant } from "./executor"
-import { attemptDeduplicationRecovery } from "./deduplication-recovery"
 import { log } from "../../shared/logger"
+import { attemptDeduplicationRecovery } from "./deduplication-recovery"
+import { executeCompact, getLastAssistant } from "./executor"
+import { parseAnthropicTokenLimitError } from "./parser"
+import type { AutoCompactState, ParsedTokenLimitError } from "./types"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig

@@ -1,8 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { createCategorySkillReminderHook } from "./index"
-import { updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
+import { _resetForTesting, clearSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
 import * as sharedModule from "../../shared"
+import { createCategorySkillReminderHook } from "./index"
 
 describe("category-skill-reminder hook", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -150,16 +150,16 @@ describe("category-skill-reminder hook", () => {
       clearSessionAgent(sessionID)
     })
 
-    test("should NOT inject reminder if call_omo_agent is used", async () => {
-      // given - morpheus agent that uses call_omo_agent
+    test("should NOT inject reminder if delegate_agent is used", async () => {
+      // given - morpheus agent that uses delegate_agent
       const hook = createHook()
       const sessionID = "omo-agent-session"
       updateSessionAgent(sessionID, "Morpheus")
 
       const output = { title: "", output: "result", metadata: {} }
 
-      // when - call_omo_agent is used first
-      await hook["tool.execute.after"]({ tool: "call_omo_agent", sessionID, callID: "1" }, output)
+      // when - delegate_agent is used first
+      await hook["tool.execute.after"]({ tool: "delegate_agent", sessionID, callID: "1" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)

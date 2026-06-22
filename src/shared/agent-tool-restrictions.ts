@@ -8,7 +8,7 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
   edit: false,
   task: false,
-  call_omo_agent: false,
+  delegate_agent: false,
 }
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
@@ -20,7 +20,7 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     write: false,
     edit: false,
     task: false,
-    call_omo_agent: false,
+    delegate_agent: false,
   },
 
   seraph: {

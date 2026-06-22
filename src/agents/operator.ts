@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 
 const MODE: AgentMode = "subagent"
 
@@ -27,7 +27,7 @@ export function createLibrarianAgent(model: string): AgentConfig {
     "edit",
     "task",
     "task",
-    "call_omo_agent",
+    "delegate_agent",
   ])
 
   return {

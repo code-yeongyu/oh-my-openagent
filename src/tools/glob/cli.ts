@@ -1,15 +1,15 @@
+import { stat } from "node:fs/promises"
 import { spawn } from "bun"
 import {
-  resolveGrepCli,
-  type GrepBackend,
-  DEFAULT_TIMEOUT_MS,
   DEFAULT_LIMIT,
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_OUTPUT_BYTES,
+  DEFAULT_TIMEOUT_MS,
+  type GrepBackend,
   RG_FILES_FLAGS,
+  resolveGrepCli,
 } from "./constants"
-import type { GlobOptions, GlobResult, FileMatch } from "./types"
-import { stat } from "node:fs/promises"
+import type { FileMatch, GlobOptions, GlobResult } from "./types"
 
 export interface ResolvedCli {
   path: string
@@ -86,7 +86,7 @@ async function getFileMtime(filePath: string): Promise<number> {
   }
 }
 
-export { buildRgArgs, buildFindArgs, buildPowerShellCommand }
+export { buildFindArgs, buildPowerShellCommand, buildRgArgs }
 
 export async function runRgFiles(
   options: GlobOptions,

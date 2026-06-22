@@ -1,13 +1,13 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import {
-  parseVersion,
   compareVersions,
   getOpenCodeVersion,
   isOpenCodeVersionAtLeast,
-  resetVersionCache,
-  setVersionCache,
   MINIMUM_OPENCODE_VERSION,
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
+  parseVersion,
+  resetVersionCache,
+  setVersionCache,
 } from "./opencode-version"
 
 describe("opencode-version", () => {

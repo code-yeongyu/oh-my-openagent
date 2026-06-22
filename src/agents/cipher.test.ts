@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test"
-import { createCipherAgent, CIPHER_PROMPT_METADATA } from "./cipher"
+import { describe, expect, test } from "bun:test"
+import { CIPHER_PROMPT_METADATA, createCipherAgent } from "./cipher"
 
 describe("createCipherAgent", () => {
   //#given a Claude model
@@ -39,13 +39,13 @@ describe("createCipherAgent", () => {
 
   //#given a model
   //#when creating the agent
-  //#then call_omo_agent denied but task allowed for code generation delegation
-  test("denies call_omo_agent but allows task for delegation", () => {
+  //#then delegate_agent denied but task allowed for code generation delegation
+  test("denies delegate_agent but allows task for delegation", () => {
     const config = createCipherAgent("anthropic/claude-opus-4-6")
 
     expect(config.permission).toBeDefined()
     expect(config.permission!["task"]).toBeUndefined()
-    expect(config.permission!["call_omo_agent"]).toBe("deny")
+    expect(config.permission!["delegate_agent"]).toBe("deny")
   })
 
   //#given a model

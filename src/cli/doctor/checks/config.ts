@@ -4,9 +4,9 @@ import { MatrixxConfigSchema } from "../../../config"
 import { detectConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
-import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
-import type { OmoConfig } from "./model-resolution-types"
+import { loadAvailableModelsFromCache } from "./model-resolution-cache"
+import type { MatrixxConfig } from "./model-resolution-types"
 
 const USER_CONFIG_BASE = join(getOpenCodeConfigDir({ binary: "opencode" }), PACKAGE_NAME)
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
@@ -15,7 +15,7 @@ interface ConfigValidationResult {
   exists: boolean
   path: string | null
   valid: boolean
-  config: OmoConfig | null
+  config: MatrixxConfig | null
   errors: string[]
 }
 
@@ -37,7 +37,7 @@ function validateConfig(): ConfigValidationResult {
 
   try {
     const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<OmoConfig>(content)
+    const rawConfig = parseJsonc<MatrixxConfig>(content)
     const schemaResult = MatrixxConfigSchema.safeParse(rawConfig)
 
     if (!schemaResult.success) {
@@ -62,7 +62,7 @@ function validateConfig(): ConfigValidationResult {
   }
 }
 
-function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
+function collectModelResolutionIssues(config: MatrixxConfig): DoctorIssue[] {
   const issues: DoctorIssue[] = []
   const availableModels = loadAvailableModelsFromCache()
   const resolution = getModelResolutionInfoWithOverrides(config)

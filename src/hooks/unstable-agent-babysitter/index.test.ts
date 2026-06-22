@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
+import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import { createUnstableAgentBabysitterHook } from "./index"
 
 const projectDir = process.cwd()

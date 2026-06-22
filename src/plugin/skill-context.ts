@@ -1,23 +1,22 @@
 import type { AvailableSkill } from "../agents/dynamic-agent-prompt-builder"
 import type { MatrixxConfig } from "../config"
 import type { BrowserAutomationProvider } from "../config/schema/browser-automation"
+import { createBuiltinSkills } from "../features/builtin-skills"
+import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
+import {
+  discoverConfigSourceSkills,
+  discoverGlobalAgentsSkills,
+  discoverOpencodeGlobalSkills,
+  discoverOpencodeProjectSkills,
+  discoverProjectAgentsSkills,
+  discoverProjectClaudeSkills,
+  discoverUserClaudeSkills,
+  mergeSkills,
+} from "../features/opencode-skill-loader"
 import type {
   LoadedSkill,
   SkillScope,
 } from "../features/opencode-skill-loader/types"
-
-import {
-  discoverConfigSourceSkills,
-  discoverUserClaudeSkills,
-  discoverProjectClaudeSkills,
-  discoverOpencodeGlobalSkills,
-  discoverOpencodeProjectSkills,
-  discoverProjectAgentsSkills,
-  discoverGlobalAgentsSkills,
-  mergeSkills,
-} from "../features/opencode-skill-loader"
-import { createBuiltinSkills } from "../features/builtin-skills"
-import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 
 export type SkillContext = {
   mergedSkills: LoadedSkill[]

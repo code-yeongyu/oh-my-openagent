@@ -1,37 +1,37 @@
 
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type {
-  BackgroundTask,
-  LaunchInput,
-  ResumeInput,
-} from "./types"
-import { TaskHistory } from "./task-history"
-import { log, getAgentToolRestrictions, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
-import { setSessionTools } from "../../shared/session-tools-store"
-import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import { getAgentToolRestrictions, log, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
+import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
+import { subagentSessions } from "../claude-code-session-state"
+import { MESSAGE_STORAGE, type StoredMessage } from "../hook-message-injector"
+import { getTaskToastManager } from "../task-toast-manager"
+import { ConcurrencyManager } from "./concurrency"
 import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_IDLE_TIME_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
   POLLING_INTERVAL_MS,
+  PRUNE_THROTTLE_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
 import {
-  resolveCircuitBreakerSettings,
-  recordToolCall,
-  detectRepetitiveToolUse,
   type CircuitBreakerSettings,
+  detectRepetitiveToolUse,
+  recordToolCall,
+  resolveCircuitBreakerSettings,
 } from "./loop-detector"
-
-import { subagentSessions } from "../claude-code-session-state"
-import { getTaskToastManager } from "../task-toast-manager"
-import { MESSAGE_STORAGE, type StoredMessage } from "../hook-message-injector"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { TaskHistory } from "./task-history"
+import type {
+  BackgroundTask,
+  LaunchInput,
+  ResumeInput,
+} from "./types"
 
 type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 
@@ -89,6 +89,7 @@ export class BackgroundManager {
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
   private pollingInFlight = false
+  private lastPruneAt = 0
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
@@ -202,6 +203,7 @@ export class BackgroundManager {
     }
 
     this.processingKeys.add(key)
+    let acquired = false
 
     try {
       const queue = this.queuesByKey.get(key)
@@ -209,27 +211,37 @@ export class BackgroundManager {
         const item = queue[0]
 
         await this.concurrencyManager.acquire(key)
+        acquired = true
 
         if (item.task.status === "cancelled" || item.task.status === "error") {
           this.concurrencyManager.release(key)
+          acquired = false
           queue.shift()
           continue
         }
 
         try {
           await this.startTask(item)
+          // startTask is responsible for releasing the slot (via task.concurrencyKey lifecycle)
+          acquired = false
         } catch (error) {
           log("[background-agent] Error starting task:", error)
           // Release concurrency slot if startTask failed and didn't release it itself
           // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
-          if (!item.task.concurrencyKey) {
+          if (!item.task.concurrencyKey && acquired) {
             this.concurrencyManager.release(key)
+            acquired = false
           }
         }
 
         queue.shift()
       }
     } finally {
+      // Defense-in-depth: if some unexpected path left the slot held, release it here
+      // to prevent slot leaks. Skipped when acquired=false (responsibility handed off).
+      if (acquired) {
+        this.concurrencyManager.release(key)
+      }
       this.processingKeys.delete(key)
     }
   }
@@ -258,7 +270,7 @@ export class BackgroundManager {
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
-      } as any,
+      },
       query: {
         directory: parentDirectory,
       },
@@ -346,7 +358,7 @@ export class BackgroundManager {
         tools: (() => {
           const tools = {
             task: false,
-            call_omo_agent: true,
+            delegate_agent: true,
             question: false,
             ...getAgentToolRestrictions(input.agent),
           }
@@ -619,7 +631,7 @@ export class BackgroundManager {
         tools: (() => {
           const tools = {
             task: false,
-            call_omo_agent: true,
+            delegate_agent: true,
             question: false,
             ...getAgentToolRestrictions(existingTask.agent),
           }
@@ -1639,12 +1651,19 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
-    this.pruneStaleTasksAndNotifications()
+    // Throttle prune to once per PRUNE_THROTTLE_MS. Stale tasks age out at
+    // TASK_TTL_MS (30 minutes), so a 30s cadence is 60× the minimum useful
+    // frequency and saves ~9 of every 10 prune invocations when polling
+    // runs every POLLING_INTERVAL_MS (3s). The check lives here (not inside
+    // pruneStaleTasksAndNotifications) so the function stays pure and
+    // testable in isolation.
+    if (Date.now() - this.lastPruneAt >= PRUNE_THROTTLE_MS) {
+      this.pruneStaleTasksAndNotifications()
+      this.lastPruneAt = Date.now()
+    }
 
     const statusResult = await this.client.session.status()
     const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
-
-    await this.checkAndInterruptStaleTasks(allStatuses)
 
     await this.checkAndInterruptStaleTasks(allStatuses)
 
@@ -1804,7 +1823,7 @@ function registerProcessSignal(
 }
 
 
-function getMessageDir(sessionID: string): string | null {
+function computeMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
 
   const directPath = join(MESSAGE_STORAGE, sessionID)
@@ -1815,6 +1834,43 @@ function getMessageDir(sessionID: string): string | null {
     if (existsSync(sessionPath)) return sessionPath
   }
   return null
+}
+
+const MESSAGE_DIR_CACHE_CAP = 1000
+const messageDirCache = new Map<string, string | null>()
+
+export function getMessageDir(sessionID: string): string | null {
+  const cached = messageDirCache.get(sessionID)
+  if (cached !== undefined) {
+    messageDirCache.delete(sessionID)
+    messageDirCache.set(sessionID, cached)
+    return cached
+  }
+  const result = computeMessageDir(sessionID)
+  if (messageDirCache.size >= MESSAGE_DIR_CACHE_CAP) {
+    const oldest = messageDirCache.keys().next().value
+    if (oldest !== undefined) messageDirCache.delete(oldest)
+  }
+  messageDirCache.set(sessionID, result)
+  return result
+}
+
+export function _resetMessageDirCacheForTesting(): void {
+  messageDirCache.clear()
+}
+
+export function _resetPruneThrottleForTesting(): void {
+  // Access the private static instance set via a typed cast — `private static`
+  // is a per-class visibility modifier, so a module-level function in the
+  // same file needs the cast to read it. Mirrors the _resetMessageDirCacheForTesting
+  // pattern: a thin module-level export that resets module/instance state for
+  // test isolation.
+  const instances = (BackgroundManager as unknown as {
+    cleanupManagers: Set<BackgroundManager>
+  }).cleanupManagers
+  for (const m of instances) {
+    ;(m as unknown as { lastPruneAt: number }).lastPruneAt = 0
+  }
 }
 
 function isCompactionAgent(agent: string | undefined): boolean {
@@ -1841,32 +1897,33 @@ function findNearestMessageExcludingCompaction(messageDir: string): StoredMessag
       .sort()
       .reverse()
 
+    // Single-pass: read+parse each file exactly once. The Map caches parsed
+    // data so the "full" and "partial" classification passes don't each
+    // re-read the same file (was 2× per file, see B2 in
+    // .matrixx/plans/matrixx-performance-optimization.md).
+    const parsedByFile = new Map<string, StoredMessage>()
+
     for (const file of files) {
       try {
         const content = readFileSync(join(messageDir, file), "utf-8")
         const parsed = JSON.parse(content) as StoredMessage
+        parsedByFile.set(file, parsed)
         if (hasFullAgentAndModel(parsed)) {
           return parsed
         }
       } catch {
-        continue
+        // unreadable / unparseable file: skip and let later files decide
       }
     }
 
-    for (const file of files) {
-      try {
-        const content = readFileSync(join(messageDir, file), "utf-8")
-        const parsed = JSON.parse(content) as StoredMessage
-        if (hasPartialAgentOrModel(parsed)) {
-          return parsed
-        }
-      } catch {
-        continue
+    for (const parsed of parsedByFile.values()) {
+      if (hasPartialAgentOrModel(parsed)) {
+        return parsed
       }
     }
+
+    return null
   } catch {
     return null
   }
-
-  return null
 }

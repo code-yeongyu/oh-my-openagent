@@ -1,6 +1,6 @@
 import color from "picocolors"
+import { STATUS_COLORS, SYMBOLS } from "./constants"
 import type { CheckStatus, DoctorIssue } from "./types"
-import { SYMBOLS, STATUS_COLORS } from "./constants"
 
 export function formatStatusSymbol(status: CheckStatus): string {
   const colorFn = STATUS_COLORS[status]

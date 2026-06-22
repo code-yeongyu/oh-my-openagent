@@ -11,6 +11,7 @@ export const DEFAULT_CIRCUIT_BREAKER_ENABLED = true
 export const MIN_RUNTIME_BEFORE_STALE_MS = 30_000
 export const MIN_IDLE_TIME_MS = 5000
 export const POLLING_INTERVAL_MS = 3000
+export const PRUNE_THROTTLE_MS = 30_000
 export const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000
 export const TMUX_CALLBACK_DELAY_MS = 200
 

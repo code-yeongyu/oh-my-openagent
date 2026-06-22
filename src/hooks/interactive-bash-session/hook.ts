@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { saveInteractiveBashSessionState, clearInteractiveBashSessionState } from "./storage";
-import { buildSessionReminderMessage } from "./constants";
-import type { InteractiveBashSessionState } from "./types";
-import { tokenizeCommand, findSubcommand, extractSessionNameFromTokens } from "./parser";
-import { getOrCreateState, isOmoSession, killAllTrackedSessions } from "./state-manager";
 import { subagentSessions } from "../../features/claude-code-session-state";
+import { buildSessionReminderMessage } from "./constants";
+import { extractSessionNameFromTokens, findSubcommand, tokenizeCommand } from "./parser";
+import { getOrCreateState, isOmoSession, killAllTrackedSessions } from "./state-manager";
+import { clearInteractiveBashSessionState, saveInteractiveBashSessionState } from "./storage";
+import type { InteractiveBashSessionState } from "./types";
 
 interface ToolExecuteInput {
   tool: string;

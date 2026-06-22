@@ -1,10 +1,10 @@
-import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
-import type { TmuxPaneInfo } from "./types"
 import {
 	DIVIDER_SIZE,
 	MAIN_PANE_RATIO,
 	MAX_GRID_SIZE,
 } from "./tmux-grid-constants"
+import type { TmuxPaneInfo } from "./types"
+import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
 
 export interface GridCapacity {
 	cols: number

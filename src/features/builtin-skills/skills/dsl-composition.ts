@@ -98,7 +98,7 @@ Add cross-cutting concerns without modifying the base grammar:
 
 \`\`\`python
 def add_logging_aspect(metamodel):
-    \"\"\"Add logging validation/transformation as an aspect.\"\"\"
+    """Add logging validation/transformation as an aspect."""
     original_processors = metamodel._obj_processors.copy()
 
     def logging_processor(obj):
@@ -144,11 +144,11 @@ Transition.eStructuralFeatures.append(EReference('target', State))
 State.eStructuralFeatures.append(EReference('transitions', Transition, upper=-1, containment=True))
 
 # Concrete Syntax 1: Textual (textX grammar)
-textual_grammar = \"\"\"
+textual_grammar = """
 StateMachine: states+=State;
 State: 'state' name=ID '{' transitions+=Transition '}';
 Transition: trigger=ID '->' target=[State];
-\"\"\"
+"""
 
 # Concrete Syntax 2: JSON
 json_syntax = {
@@ -163,7 +163,7 @@ json_syntax = {
 }
 
 # Concrete Syntax 3: YAML
-yaml_syntax = \"\"\"
+yaml_syntax = """
 states:
   - name: idle
     transitions:
@@ -173,7 +173,7 @@ states:
     transitions:
       - trigger: stop
         target: idle
-\"\"\"
+"""
 
 # All three parse into the SAME metamodel instances
 \`\`\`
@@ -225,7 +225,7 @@ def check_version_compatibility(model):
 
 \`\`\`python
 class ModelMigration:
-    \"\"\"Migrate models between grammar versions.\"\"\"
+    """Migrate models between grammar versions."""
 
     def __init__(self):
         self._migrations = {}
@@ -277,7 +277,7 @@ migrated = migrator.migrate(old_model_text, '1.0', '3.0')
 import warnings
 
 def deprecated_feature_processor(element):
-    \"\"\"Warn about deprecated grammar features.\"\"\"
+    """Warn about deprecated grammar features."""
     if hasattr(element, 'old_syntax_flag') and element.old_syntax_flag:
         warnings.warn(
             f"Deprecated syntax at line {get_location(element).get('line')}: "

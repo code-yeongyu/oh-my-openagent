@@ -1,24 +1,24 @@
 import type { HookName, MatrixxConfig } from "../../config"
-import type { PluginContext } from "../types"
-
 import {
+  createBashFileReadGuardHook,
   createCommentCheckerHooks,
-  createToolOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
   createDirectoryReadmeInjectorHook,
   createEmptyTaskResponseDetectorHook,
-  createRulesInjectorHook,
-  createTasksTodowriteDisablerHook,
-  createWriteExistingFileGuardHook,
-  createHashlineReadEnhancerHook,
-  createSecretLeakGuardHook,
   createEnvFileWriteGuardHook,
-  createJsonErrorRecoveryHook,
-  createBashFileReadGuardHook,
-  createTodoDescriptionOverrideHook,
-  createReadImageResizerHook,
-  createWebFetchRedirectGuardHook,
   createHashlineEditDiffEnhancerHook,
+  createHashlineReadEnhancerHook,
+  createJsonErrorRecoveryHook,
+  createQualityGateHook,
+  createReadImageResizerHook,
+  createRulesInjectorHook,
+  createSecretLeakGuardHook,
+  createTaskNotepadHook,
+  createTasksTodowriteDisablerHook,
+  createTodoDescriptionOverrideHook,
+  createToolOutputTruncatorHook,
+  createWebFetchRedirectGuardHook,
+  createWriteExistingFileGuardHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -27,6 +27,7 @@ import {
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import type { PluginContext } from "../types"
 
 export type ToolGuardHooks = {
   commentChecker: ReturnType<typeof createCommentCheckerHooks> | null
@@ -46,6 +47,8 @@ export type ToolGuardHooks = {
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
   webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
   hashlineEditDiffEnhancer: ReturnType<typeof createHashlineEditDiffEnhancerHook> | null
+  qualityGate: ReturnType<typeof createQualityGateHook> | null
+  taskNotepad: ReturnType<typeof createTaskNotepadHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -140,6 +143,14 @@ export function createToolGuardHooks(args: {
         createHashlineEditDiffEnhancerHook({ hashline_edit: { enabled: pluginConfig.experimental?.hashline_edit ?? false } }))
     : null
 
+  const qualityGate = isHookEnabled("quality-gate")
+    ? safeHook("quality-gate", () => createQualityGateHook())
+    : null
+
+  const taskNotepad = isHookEnabled("task-notepad")
+    ? safeHook("task-notepad", () => createTaskNotepadHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -158,5 +169,7 @@ export function createToolGuardHooks(args: {
     readImageResizer,
     webfetchRedirectGuard,
     hashlineEditDiffEnhancer,
+    qualityGate,
+    taskNotepad,
   }
 }

@@ -1,10 +1,10 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
-import type { CommandInfo, SlashcommandToolOptions } from "./types"
 import { discoverCommandsSync } from "./command-discovery"
-import { buildDescriptionFromItems, TOOL_DESCRIPTION_PREFIX } from "./slashcommand-description"
 import { formatCommandList, formatLoadedCommand } from "./command-output-formatter"
 import { skillToCommandInfo } from "./skill-command-converter"
+import { buildDescriptionFromItems, TOOL_DESCRIPTION_PREFIX } from "./slashcommand-description"
+import type { CommandInfo, SlashcommandToolOptions } from "./types"
 
 export function createSlashcommandTool(options: SlashcommandToolOptions = {}): ToolDefinition {
   let cachedCommands: CommandInfo[] | null = options.commands ?? null

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
 
@@ -20,7 +20,6 @@ function createMockHandlerArgs(overrides?: {
     hooks: {
       stopContinuationGuard: null,
       keywordDetector: null,
-      claudeCodeHooks: null,
       autoSlashCommand: null,
       startWork: null,
       ralphLoop: null,

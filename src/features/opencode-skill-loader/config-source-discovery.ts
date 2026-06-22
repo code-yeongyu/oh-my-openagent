@@ -2,10 +2,10 @@ import { promises as fs } from "fs"
 import { dirname, extname, isAbsolute, join, relative } from "path"
 import picomatch from "picomatch"
 import type { SkillsConfig } from "../../config/schema"
+import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { deduplicateSkillsByName } from "./skill-deduplication"
 import { loadSkillsFromDir } from "./skill-directory-loader"
-import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
 import type { LoadedSkill } from "./types"
 
 const MAX_RECURSIVE_DEPTH = 10

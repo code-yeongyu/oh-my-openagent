@@ -4,7 +4,7 @@
 
 ## Agents: Your AI Team
 
-Matrixx provides 11 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
+Matrixx provides 12 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
 
 ### Core Agents
 
@@ -16,6 +16,7 @@ Matrixx provides 11 specialized AI agents. Each has distinct expertise, optimize
 | **Operator** | `zai-coding-plan/glm-4.7` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: glm-4.7-free → minimax-m2.5-free → claude-sonnet-4-6. |
 | **Trinity** | `xai/grok-code-fast-1` | Fast codebase exploration and contextual grep. Fallback: minimax-m2.5-free → claude-haiku-4-5 → gpt-5-nano. |
 | **Construct** | `opencode/kimi-k2.5-free` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: gemini-3-flash → gpt-5.2 → glm-4.6v → gpt-5-nano. |
+| **Sati** | `anthropic/claude-sonnet-4-6` | **The frontend specialist.** UI/UX, components, accessibility (WCAG 2.2), performance (Core Web Vitals), testing (Vitest, Playwright, Storybook). Self-contained execution with 8 frontend skills. Fallback: claude-opus-4-6@max. |
 
 ### Planning Agents
 
@@ -378,7 +379,6 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **claude-code-hooks** | All | Executes hooks from Claude Code's settings.json. |
 | **architect** | All | Main orchestration logic (771 lines). |
 | **interactive-bash-session** | PreToolUse | Manages tmux sessions for interactive CLI. |
 | **non-interactive-env** | PreToolUse | Handles non-interactive environment constraints. |
@@ -451,7 +451,7 @@ Disable specific hooks in config:
 
 | Tool | Description |
 |------|-------------|
-| **call_omo_agent** | Spawn trinity/operator agents. Supports `run_in_background`. |
+| **delegate_agent** | Spawn trinity/operator agents. Supports `run_in_background`. |
 | **task** | Category-based task delegation. Supports categories (visual, business-logic) or direct agent targeting. |
 | **background_output** | Retrieve background task results |
 | **background_cancel** | Cancel running background tasks |

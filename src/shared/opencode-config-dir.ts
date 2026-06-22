@@ -102,7 +102,6 @@ export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenC
     configJson: join(configDir, "opencode.json"),
     configJsonc: join(configDir, "opencode.jsonc"),
     packageJson: join(configDir, "package.json"),
-    omoConfig: join(configDir, "matrixx.json"),
     matrixxConfig: join(configDir, "matrixx.json"),
   }
 }

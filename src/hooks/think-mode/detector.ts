@@ -1,3 +1,5 @@
+import { CODE_BLOCK_PATTERN, INLINE_CODE_PATTERN } from "../../shared"
+
 const ENGLISH_PATTERNS = [
   /\bultrathink\b/i,
   /\bthink\s+(deeply|hard|carefully|step.by.step|step-by-step|through\s+this|this\s+through)\b/i,
@@ -38,9 +40,6 @@ const MULTILINGUAL_KEYWORDS = [
 
 const MULTILINGUAL_PATTERNS = MULTILINGUAL_KEYWORDS.map((kw) => new RegExp(kw, "i"))
 const THINK_PATTERNS = [...ENGLISH_PATTERNS, ...MULTILINGUAL_PATTERNS]
-
-const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
-const INLINE_CODE_PATTERN = /`[^`]+`/g
 
 function removeCodeBlocks(text: string): string {
   return text.replace(CODE_BLOCK_PATTERN, "").replace(INLINE_CODE_PATTERN, "")

@@ -1,17 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool";
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool";
 import { join } from "path";
 import type { MatrixxConfig } from "../../config/schema";
-import { TaskObjectSchema, TaskUpdateInputSchema } from "./types";
 import {
+  acquireLock,
   getTaskDir,
   readJsonSafe,
   writeJsonAtomic,
-  acquireLock,
 } from "../../features/claude-tasks/storage";
+import { TASK_ID_PATTERN } from "./constants";
 import { syncTaskTodoUpdate } from "./todo-sync";
-
-const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/;
+import { TaskObjectSchema, TaskUpdateInputSchema } from "./types";
 
 function parseTaskId(id: string): string | null {
   if (!TASK_ID_PATTERN.test(id)) return null;

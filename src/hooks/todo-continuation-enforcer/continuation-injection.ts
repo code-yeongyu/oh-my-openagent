@@ -1,15 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { normalizeSDKResponse } from "../../shared"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
   type ToolPermission,
 } from "../../features/hook-message-injector"
+import { normalizeSDKResponse } from "../../shared"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 import {
   CONTINUATION_PROMPT,
@@ -17,9 +17,9 @@ import {
   HOOK_NAME,
 } from "./constants"
 import { getMessageDir } from "./message-directory"
+import type { SessionStateStore } from "./session-state"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
-import type { SessionStateStore } from "./session-state"
 
 function hasWritePermission(tools: Record<string, ToolPermission> | undefined): boolean {
   const editPermission = tools?.edit

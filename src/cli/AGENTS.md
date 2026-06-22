@@ -18,7 +18,7 @@ cli/
 │   ├── add-plugin-to-opencode-config.ts  # Plugin registration
 │   ├── add-provider-config.ts            # Provider setup
 │   ├── detect-current-config.ts          # Project vs user config
-│   ├── write-omo-config.ts               # JSONC writing
+│   ├── write-matrixx-config.ts               # JSONC writing
 │   └── ...
 ├── doctor/                  # 14 health checks
 │   ├── runner.ts            # Check orchestration

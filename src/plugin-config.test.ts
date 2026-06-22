@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { mergeConfigs, parseConfigPartially } from "./plugin-config";
 import type { MatrixxConfig } from "./config";
+import {
+  _resetDisabledSetsCacheForTesting,
+  getDisabledSets,
+  mergeConfigs,
+  parseConfigPartially,
+} from "./plugin-config";
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
@@ -114,6 +119,101 @@ describe("mergeConfigs", () => {
       expect(result.disabled_hooks).toContain("think-mode");
       expect(result.disabled_hooks).toContain("session-recovery");
       expect(result.disabled_hooks?.length).toBe(3);
+    });
+  });
+
+  describe("disabled Sets cache", () => {
+    //#given mergeConfigs has produced a merged MatrixxConfig
+    //#when getDisabledSets is called twice on the same config
+    //#then both calls must return the SAME Set reference for each
+    //#     disabled_xxx field, and the constructor was only invoked
+    //#     once per disabled_xxx list (no allocation on cache hit)
+
+    it("mergeConfigs allocates disabled_xxx Set once per config", () => {
+      _resetDisabledSetsCacheForTesting();
+
+      const base: MatrixxConfig = {
+        disabled_agents: ["morpheus", "oracle"],
+        disabled_mcps: ["websearch"],
+        disabled_hooks: ["quality-gate"],
+        disabled_commands: ["profile"],
+        disabled_skills: ["git-master"],
+      };
+      const override: MatrixxConfig = {
+        disabled_agents: ["trinity"],
+      };
+
+      // Spy on global Set to count how many Sets mergeConfigs allocates.
+      // deepMerge has zero runtime Set usage (only at module load), so
+      // every Set created here belongs to the 5 disabled_xxx fields.
+      const OriginalSet = globalThis.Set;
+      let setCallCount = 0;
+      const SetSpy = class extends OriginalSet {
+        constructor(...args: ConstructorParameters<typeof OriginalSet>) {
+          super(...args);
+          setCallCount++;
+        }
+      };
+      globalThis.Set = SetSpy as unknown as typeof Set;
+
+      try {
+        const merged = mergeConfigs(base, override);
+
+        // 1 Set per disabled_xxx field (5 total). No extra Sets from
+        // getDisabledSets yet — that path is cache-populated by mergeConfigs
+        // itself.
+        expect(setCallCount).toBe(5);
+
+        // First read: cache hit (pre-populated by mergeConfigs), 0 new Sets.
+        const s1 = getDisabledSets(merged);
+        expect(setCallCount).toBe(5);
+
+        // Second read: same config → same WeakMap entry → same Set refs.
+        const s2 = getDisabledSets(merged);
+        expect(setCallCount).toBe(5);
+
+        // Every disabled_xxx Set is the SAME reference across calls.
+        expect(Object.is(s1.disabledAgents, s2.disabledAgents)).toBe(true);
+        expect(Object.is(s1.disabledMcps, s2.disabledMcps)).toBe(true);
+        expect(Object.is(s1.disabledHooks, s2.disabledHooks)).toBe(true);
+        expect(Object.is(s1.disabledCommands, s2.disabledCommands)).toBe(true);
+        expect(Object.is(s1.disabledSkills, s2.disabledSkills)).toBe(true);
+
+        // Sanity: merged values are correct (dedup union of base + override).
+        expect(s1.disabledAgents.has("morpheus")).toBe(true);
+        expect(s1.disabledAgents.has("oracle")).toBe(true);
+        expect(s1.disabledAgents.has("trinity")).toBe(true);
+        expect(s1.disabledAgents.size).toBe(3);
+        expect(s1.disabledMcps.has("websearch")).toBe(true);
+        expect(s1.disabledHooks.has("quality-gate")).toBe(true);
+        expect(s1.disabledCommands.has("profile")).toBe(true);
+        expect(s1.disabledSkills.has("git-master")).toBe(true);
+      } finally {
+        globalThis.Set = OriginalSet;
+      }
+    });
+
+    it("getDisabledSets on a fresh (un-merged) config allocates its own Sets once", () => {
+      _resetDisabledSetsCacheForTesting();
+
+      const config: MatrixxConfig = {
+        disabled_agents: ["morpheus"],
+        disabled_mcps: ["websearch"],
+        disabled_hooks: ["quality-gate"],
+        disabled_commands: ["profile"],
+        disabled_skills: ["git-master"],
+      };
+
+      // Cold read: 5 fresh Sets (one per disabled_xxx field).
+      const s1 = getDisabledSets(config);
+      // Warm read: cache hit, identical Set references.
+      const s2 = getDisabledSets(config);
+
+      expect(Object.is(s1.disabledAgents, s2.disabledAgents)).toBe(true);
+      expect(Object.is(s1.disabledMcps, s2.disabledMcps)).toBe(true);
+      expect(Object.is(s1.disabledHooks, s2.disabledHooks)).toBe(true);
+      expect(Object.is(s1.disabledCommands, s2.disabledCommands)).toBe(true);
+      expect(Object.is(s1.disabledSkills, s2.disabledSkills)).toBe(true);
     });
   });
 });

@@ -1,13 +1,13 @@
 import { join } from "node:path"
 
 import { getOpenCodeCacheDir } from "../../../shared"
-import type { AvailableModelsInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
+import type { AvailableModelsInfo, MatrixxConfig, ModelResolutionInfo } from "./model-resolution-types"
 import { formatModelWithVariant, getCategoryEffectiveVariant, getEffectiveVariant } from "./model-resolution-variant"
 
 export function buildModelResolutionDetails(options: {
   info: ModelResolutionInfo
   available: AvailableModelsInfo
-  config: OmoConfig
+  config: MatrixxConfig
 }): string[] {
   const details: string[] = []
   const cacheFile = join(getOpenCodeCacheDir(), "models.json")

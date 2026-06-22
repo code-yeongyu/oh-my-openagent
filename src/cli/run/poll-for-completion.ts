@@ -1,8 +1,8 @@
 import pc from "picocolors"
-import type { RunContext } from "./types"
-import type { EventState } from "./events"
-import { checkCompletionConditions } from "./completion"
 import { normalizeSDKResponse } from "../../shared"
+import { checkCompletionConditions } from "./completion"
+import type { EventState } from "./events"
+import type { RunContext } from "./types"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 3

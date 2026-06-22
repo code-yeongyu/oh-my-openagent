@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { findAvailablePort, startCallbackServer, type CallbackServer } from "./callback-server"
+import { type CallbackServer, findAvailablePort, startCallbackServer } from "./callback-server"
 
 const nativeFetch = Bun.fetch.bind(Bun)
 

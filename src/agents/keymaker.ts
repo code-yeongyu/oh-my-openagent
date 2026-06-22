@@ -1,18 +1,18 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode } from "./types"
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+import type { AvailableAgent, AvailableCategory, AvailableSkill, AvailableTool } from "./dynamic-agent-prompt-builder"
 import {
-  buildKeyTriggersSection,
-  buildToolSelectionTable,
-  buildExploreSection,
-  buildLibrarianSection,
+  buildAntiPatternsSection,
   buildCategorySkillsDelegationGuide,
   buildDelegationTable,
-  buildOracleSection,
+  buildExploreSection,
   buildHardBlocksSection,
-  buildAntiPatternsSection,
+  buildKeyTriggersSection,
+  buildLibrarianSection,
+  buildOracleSection,
+  buildToolSelectionTable,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
+import type { AgentMode } from "./types"
 
 const MODE: AgentMode = "primary"
 
@@ -617,7 +617,7 @@ export function createKeymakerAgent(
     maxTokens: 32000,
     prompt,
     color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman
-    permission: { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"],
+    permission: { question: "allow", delegate_agent: "deny" } as AgentConfig["permission"],
     reasoningEffort: "medium",
   }
 }

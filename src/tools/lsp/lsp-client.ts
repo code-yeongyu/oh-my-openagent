@@ -1,6 +1,6 @@
+import { pathToFileURL } from "node:url"
 import { readFileSync } from "fs"
 import { extname, resolve } from "path"
-import { pathToFileURL } from "node:url"
 
 import { getLanguageId } from "./config"
 import { LSPClientConnection } from "./lsp-client-connection"

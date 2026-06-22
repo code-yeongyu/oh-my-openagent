@@ -1,35 +1,33 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
-import type { CategoriesConfig, GitMasterConfig } from "../config/schema"
+import type { BrowserAutomationProvider, CategoriesConfig } from "../config/schema"
 import type { LoadedSkill } from "../features/opencode-skill-loader/types"
-import type { BrowserAutomationProvider } from "../config/schema"
-import { createMorpheusAgent } from "./morpheus"
-import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./merovingian"
-import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./operator"
-import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./trinity"
-import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./construct"
-import { createSeraphAgent, seraphPromptMetadata } from "./seraph"
-import { createAtlasAgent, atlasPromptMetadata } from "./architect"
-import { createSmithAgent, smithPromptMetadata } from "./smith"
-import { createCipherAgent, CIPHER_PROMPT_METADATA } from "./cipher"
-
-import { createSentinelAgent, SENTINEL_PROMPT_METADATA } from "./sentinel"
-import { createZionAgent, ZION_PROMPT_METADATA } from "./zion"
-import { createKeymakerAgent } from "./keymaker"
-import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
   readConnectedProvidersCache,
   readProviderModelsCache,
 } from "../shared"
-import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
+import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
+import { atlasPromptMetadata, createAtlasAgent } from "./architect"
+import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
 import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
-import { maybeCreateMorpheusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateKeymakerConfig } from "./builtin-agents/hephaestus-agent"
-import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
+import { maybeCreateMorpheusConfig } from "./builtin-agents/sisyphus-agent"
+import { CIPHER_PROMPT_METADATA, createCipherAgent } from "./cipher"
+import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./construct"
 import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
+import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
+import { createKeymakerAgent } from "./keymaker"
+import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./merovingian"
+import { createMorpheusAgent } from "./morpheus"
+import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./operator"
+import { createSatiAgent, SATI_PROMPT_METADATA } from "./sati"
+import { createSentinelAgent, SENTINEL_PROMPT_METADATA } from "./sentinel"
+import { createSeraphAgent, seraphPromptMetadata } from "./seraph"
+import { createSmithAgent, smithPromptMetadata } from "./smith"
+import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./trinity"
+import type { AgentFactory, AgentOverrides, AgentPromptMetadata, BuiltinAgentName } from "./types"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -45,7 +43,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   architect: createAtlasAgent as AgentFactory,
   cipher: createCipherAgent,
   sentinel: createSentinelAgent,
-  zion: createZionAgent,
+  sati: createSatiAgent,
 }
 
 /**
@@ -62,7 +60,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   architect: atlasPromptMetadata,
   cipher: CIPHER_PROMPT_METADATA,
   sentinel: SENTINEL_PROMPT_METADATA,
-  zion: ZION_PROMPT_METADATA,
+  sati: SATI_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(
@@ -71,7 +69,6 @@ export async function createBuiltinAgents(
   directory?: string,
   systemDefaultModel?: string,
   categories?: CategoriesConfig,
-  gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
   customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
@@ -115,7 +112,6 @@ export async function createBuiltinAgents(
     directory,
     systemDefaultModel,
     mergedCategories,
-    gitMasterConfig,
     browserProvider,
     uiSelectedModel,
     availableModels,

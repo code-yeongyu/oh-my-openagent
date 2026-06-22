@@ -1,6 +1,7 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
-import { __setTimingConfig, __resetTimingConfig } from "./timing"
+
+import { __resetTimingConfig, __setTimingConfig } from "./timing"
 
 function createMockCtx(aborted = false) {
   const controller = new AbortController()
@@ -33,7 +34,7 @@ describe("pollSyncSession", () => {
       //         and the assistant id > user id (native opencode condition)
       const { pollSyncSession } = require("./sync-session-poller")
 
-      let pollCount = 0
+      const pollCount = 0
       const mockClient = {
         session: {
           messages: async () => ({

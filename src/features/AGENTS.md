@@ -2,30 +2,29 @@
 
 ## OVERVIEW
 
-18 feature modules extending plugin capabilities: agent orchestration, skill loading, Claude Code compatibility, MCP management, task storage, and tmux integration.
+17 feature modules extending plugin capabilities: agent orchestration, skill loading, Claude Code compatibility, MCP management, task storage, and tmux integration.
 
 ## STRUCTURE
 ```
 features/
-├── background-agent/           # Task lifecycle, concurrency (50 files, 8330 LOC)
+├── background-agent/           # Task lifecycle, concurrency (29 files, ~5000 LOC)
 │   ├── manager.ts              # Main task orchestration (1646 lines)
-│   ├── concurrency.ts          # Parallel execution limits per provider/model
-│   └── spawner/                # Task spawning utilities (8 files)
-├── tmux-subagent/              # Tmux integration (28 files, 3303 LOC)
+│   └── concurrency.ts          # Parallel execution limits per provider/model
+├── tmux-subagent/              # Tmux integration (25 files, ~3000 LOC)
 │   └── manager.ts              # Pane management, grid planning (350 lines)
-├── opencode-skill-loader/      # YAML frontmatter skill loading (28 files, 2967 LOC)
+├── opencode-skill-loader/      # YAML frontmatter skill loading (26 files, ~2850 LOC)
 │   ├── loader.ts               # Skill discovery (4 scopes)
 │   ├── skill-directory-loader.ts # Recursive directory scanning
 │   ├── skill-discovery.ts      # getAllSkills() with caching
 │   └── merger/                 # Skill merging with scope priority
-├── mcp-oauth/                  # OAuth 2.0 flow for MCP (18 files, 2164 LOC)
+├── mcp-oauth/                  # OAuth 2.0 flow for MCP (17 files, ~2050 LOC)
 │   ├── provider.ts             # McpOAuthProvider class
 │   ├── oauth-authorization-flow.ts # PKCE, callback handling
 │   └── dcr.ts                  # Dynamic Client Registration (RFC 7591)
 ├── skill-mcp-manager/          # MCP client lifecycle per session (12 files, 1769 LOC)
 │   └── manager.ts              # SkillMcpManager class (150 lines)
-├── builtin-skills/             # 5 built-in skills (10 files, 1921 LOC)
-│   └── skills/                 # git-master (1111), playwright, dev-browser, frontend-ui-ux
+├── builtin-skills/             # Built-in skills (8 files, ~1700 LOC)
+│   └── skills/                 # dev-browser, frontend-ui-ux, git-master (1111), matrixx-self-config, playwright
 ├── builtin-commands/           # 6 command templates (11 files, 1511 LOC)
 │   └── templates/              # refactor, matrix-loop, init-deep, handoff, start-work, stop-continuation
 ├── claude-tasks/               # Task schema + storage (7 files, 1165 LOC)

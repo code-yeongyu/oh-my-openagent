@@ -1,15 +1,15 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import type { MissionState } from "../../features/mission-state"
 import {
-  writeMissionState,
   clearMissionState,
   readMissionState,
+  writeMissionState,
 } from "../../features/mission-state"
-import type { MissionState } from "../../features/mission-state"
-import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `architect-test-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "messages")
@@ -49,7 +49,7 @@ mock.module("/home/klpanagi/matrixx/src/shared/session-utils.ts", () => ({
             const agent = msg.agent.toLowerCase()
             return agent === "architect" || agent === "atlas"
           }
-        } catch { continue }
+        } catch { }
       }
     } catch { return false }
     return false

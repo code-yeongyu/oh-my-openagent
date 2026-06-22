@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 import {
-  runFormattersForFile,
-  clearFormatterCache,
-  resolveFormatters,
   buildFormatterCommand,
+  clearFormatterCache,
   type FormatterClient,
+  resolveFormatters,
+  runFormattersForFile,
 } from "./formatter-trigger"
 
 function createMockClient(config: Record<string, unknown> = {}): FormatterClient {

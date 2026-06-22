@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-const TEST_DATA_DIR = join(tmpdir(), `omo-sqlite-detect-${randomUUID()}`)
+const TEST_DATA_DIR = join(tmpdir(), `matrixx-sqlite-detect-${randomUUID()}`)
 const DB_PATH = join(TEST_DATA_DIR, "opencode", "opencode.db")
 
 let versionCheckCalls: string[] = []

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { executeCompact } from "./executor"
-import type { AutoCompactState } from "./types"
-import * as storage from "./storage"
 import * as messagesReader from "../session-recovery/storage/messages-reader"
+import { executeCompact } from "./executor"
+import * as storage from "./storage"
+import type { AutoCompactState } from "./types"
 
 type TimerCallback = (...args: any[]) => void
 

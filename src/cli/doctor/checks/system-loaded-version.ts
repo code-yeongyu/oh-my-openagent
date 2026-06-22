@@ -1,11 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-
-import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
-import { NPM_PACKAGE_NAME } from "../constants"
+import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { getOpenCodeCacheDir, parseJsonc } from "../../../shared"
+import { NPM_PACKAGE_NAME } from "../constants"
 
 interface PackageJsonShape {
   version?: string

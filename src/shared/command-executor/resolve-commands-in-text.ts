@@ -1,5 +1,5 @@
-import { executeCommand } from "./execute-command"
 import { findEmbeddedCommands } from "./embedded-commands"
+import { executeCommand } from "./execute-command"
 
 export async function resolveCommandsInText(
 	text: string,

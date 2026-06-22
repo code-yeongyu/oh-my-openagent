@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 import type { TmuxConfig } from "../../config/schema"
-import { executeActionWithDeps } from "./action-executor-core"
 import type { ActionExecutorDeps, ExecuteContext } from "./action-executor-core"
+import { executeActionWithDeps } from "./action-executor-core"
 import type { WindowState } from "./types"
 
 const mockSpawnTmuxPane = mock(async () => ({ success: true, paneId: "%7" }))

@@ -1,5 +1,5 @@
 import type { BackgroundTask } from "../../features/background-agent"
-import { formatDuration } from "./time-format"
+import { formatDuration } from "../../shared"
 import { truncateText } from "./truncate-text"
 
 export function formatTaskStatus(task: BackgroundTask): string {

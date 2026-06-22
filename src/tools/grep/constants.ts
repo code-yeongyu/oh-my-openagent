@@ -1,8 +1,8 @@
-import { existsSync } from "node:fs"
-import { join, dirname } from "node:path"
 import { spawnSync } from "node:child_process"
-import { getInstalledRipgrepPath, downloadAndInstallRipgrep } from "./downloader"
+import { existsSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { getDataDir } from "../../shared/data-path"
+import { downloadAndInstallRipgrep, getInstalledRipgrepPath } from "./downloader"
 
 export type GrepBackend = "rg" | "grep"
 

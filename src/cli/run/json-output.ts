@@ -20,11 +20,11 @@ export function createJsonOutputManager(
   const originalWrite = stdout.write.bind(stdout)
 
   function redirectToStderr(): void {
-    stdout.write = function (
+    stdout.write = ((
       chunk: Uint8Array | string,
       encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
       callback?: (error?: Error | null) => void
-    ): boolean {
+    ): boolean => {
       if (typeof encodingOrCallback === "function") {
         return stderr.write(chunk, encodingOrCallback)
       }
@@ -32,7 +32,7 @@ export function createJsonOutputManager(
         return stderr.write(chunk, encodingOrCallback, callback)
       }
       return stderr.write(chunk)
-    } as NodeJS.WriteStream["write"]
+    }) as NodeJS.WriteStream["write"]
   }
 
   function restore(): void {

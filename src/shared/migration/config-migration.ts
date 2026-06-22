@@ -61,13 +61,6 @@ export function migrateConfigFile(
     needsWrite = true
   }
 
-  // Migrate omo_agent → morpheus_agent (skip intermediate sisyphus_agent)
-  if (copy.omo_agent) {
-    copy.morpheus_agent = copy.omo_agent
-    delete copy.omo_agent
-    needsWrite = true
-  }
-
   // Migrate sisyphus_agent → morpheus_agent
   if (copy.sisyphus_agent) {
     copy.morpheus_agent = copy.sisyphus_agent

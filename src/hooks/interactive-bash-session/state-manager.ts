@@ -1,6 +1,6 @@
-import type { InteractiveBashSessionState } from "./types";
+import { MATRIXX_SESSION_PREFIX } from "./constants";
 import { loadInteractiveBashSessionState } from "./storage";
-import { OMO_SESSION_PREFIX } from "./constants";
+import type { InteractiveBashSessionState } from "./types";
 
 export function getOrCreateState(sessionID: string, sessionStates: Map<string, InteractiveBashSessionState>): InteractiveBashSessionState {
   if (!sessionStates.has(sessionID)) {
@@ -16,7 +16,7 @@ export function getOrCreateState(sessionID: string, sessionStates: Map<string, I
 }
 
 export function isOmoSession(sessionName: string | null): boolean {
-  return sessionName !== null && sessionName.startsWith(OMO_SESSION_PREFIX);
+  return sessionName !== null && sessionName.startsWith(MATRIXX_SESSION_PREFIX);
 }
 
 export async function killAllTrackedSessions(

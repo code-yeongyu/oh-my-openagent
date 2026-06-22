@@ -1,9 +1,9 @@
+import { CHECK_IDS, CHECK_NAMES } from "../constants"
+import type { CheckResult, DoctorIssue, ToolsSummary } from "../types"
 import { checkAstGrepCli, checkAstGrepNapi, checkCommentChecker } from "./dependencies"
 import { getGhCliInfo } from "./tools-gh"
 import { getLspServerStats, getLspServersInfo } from "./tools-lsp"
 import { getBuiltinMcpInfo, getUserMcpInfo } from "./tools-mcp"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue, ToolsSummary } from "../types"
 
 export async function gatherToolsSummary(): Promise<ToolsSummary> {
   const [astGrepCliInfo, astGrepNapiInfo, commentCheckerInfo, ghInfo] = await Promise.all([

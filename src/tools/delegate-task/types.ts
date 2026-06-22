@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type {
   AvailableCategory,
   AvailableSkill,
 } from "../../agents/dynamic-agent-prompt-builder"
+import type { AgentOverrides, BrowserAutomationProvider, CategoriesConfig } from "../../config/schema"
+import type { BackgroundManager } from "../../features/background-agent"
 
 export type OpencodeClient = PluginInput["client"]
 
@@ -60,7 +60,6 @@ export interface DelegateTaskToolOptions {
    */
   availableModelsOverride?: Set<string>
   userCategories?: CategoriesConfig
-  gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
   disabledSkills?: Set<string>

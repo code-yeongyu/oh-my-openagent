@@ -70,7 +70,7 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+	const title = `matrixx-subagent-${description.slice(0, 20)}`
 	const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
 		stdout: "ignore",
 		stderr: "pipe",

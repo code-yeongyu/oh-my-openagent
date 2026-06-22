@@ -10,13 +10,13 @@
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode } from "../types"
-import { isGptModel, isAnthropicModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
 } from "../../shared/permission-compat"
+import type { AgentMode } from "../types"
+import { isAnthropicModel, isGptModel } from "../types"
 
 import { buildDefaultMousePrompt } from "./default"
 import { buildGptMousePrompt } from "./gpt"
@@ -24,7 +24,7 @@ import { buildGptMousePrompt } from "./gpt"
 const MODE: AgentMode = "subagent"
 
 // Core tools that Mouse must NEVER have access to
-// Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
+// Note: delegate_agent is ALLOWED so subagents can spawn explore/librarian
 const BLOCKED_TOOLS = ["task"]
 
 export const MOUSE_DEFAULTS = {
@@ -87,7 +87,7 @@ export function createMouseAgentWithOverrides(
   for (const tool of BLOCKED_TOOLS) {
     merged[tool] = "deny"
   }
-  merged.call_omo_agent = "allow"
+  merged.delegate_agent = "allow"
   const toolsConfig = { permission: { ...merged, ...basePermission } }
 
   const base: AgentConfig = {

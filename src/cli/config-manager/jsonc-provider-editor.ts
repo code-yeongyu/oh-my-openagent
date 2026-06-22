@@ -1,4 +1,4 @@
-import { modify, applyEdits } from "jsonc-parser"
+import { applyEdits, modify } from "jsonc-parser"
 
 export function modifyProviderInJsonc(
   content: string,

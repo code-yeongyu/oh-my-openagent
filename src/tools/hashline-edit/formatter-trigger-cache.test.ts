@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
-import { clearFormatterCache, resolveFormatters, type FormatterClient } from "./formatter-trigger"
+import { clearFormatterCache, type FormatterClient, resolveFormatters } from "./formatter-trigger"
 
 function createDirectoryAwareClient(
   resolveConfig: (directory: string) => Promise<Record<string, unknown> | undefined>,

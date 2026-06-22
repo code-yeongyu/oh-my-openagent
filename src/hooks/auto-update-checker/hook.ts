@@ -1,12 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { getCachedVersion, getLocalDevVersion } from "./checker"
-import type { AutoUpdateCheckerOptions } from "./types"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
 import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-providers-status"
 import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
 import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
+import type { AutoUpdateCheckerOptions } from "./types"
 
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
   const { showStartupToast = true, isMorpheusEnabled = false, autoUpdate = true } = options

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getConfigLoadErrors, clearConfigLoadErrors } from "../../../shared/config-errors"
+import { clearConfigLoadErrors, getConfigLoadErrors } from "../../../shared/config-errors"
 import { log } from "../../../shared/logger"
 
 export async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {

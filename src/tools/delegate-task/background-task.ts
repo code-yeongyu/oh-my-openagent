@@ -1,9 +1,9 @@
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { formatDetailedError } from "../../shared/error-formatting"
+import { getSessionTools } from "../../shared/session-tools-store"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTimingConfig } from "./timing"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { formatDetailedError } from "./error-formatting"
-import { getSessionTools } from "../../shared/session-tools-store"
+import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -48,6 +48,20 @@ export async function executeBackgroundTask(
       sessionId = updated?.sessionID
     }
 
+    if (!sessionId) {
+      return formatDetailedError(
+        new Error(
+          `Task failed to start within timeout (${timing.WAIT_FOR_SESSION_TIMEOUT_MS}ms). Task ID: ${task.id}, Status: ${task.status}`
+        ),
+        {
+          operation: "Launch background task",
+          args,
+          agent: agentToUse,
+          category: args.category,
+        }
+      )
+    }
+
     const unstableMeta = {
       title: args.description,
       metadata: {
@@ -57,7 +71,7 @@ export async function executeBackgroundTask(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
-        sessionId: sessionId ?? "pending",
+        sessionId,
         command: args.command,
       },
     }

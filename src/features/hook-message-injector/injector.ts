@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
-import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
+import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
+import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
+import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 
 export interface StoredMessage {
   agent?: string
@@ -61,10 +61,16 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
  */
 export async function findNearestMessageWithFieldsFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
+  timeoutMs = 5000
 ): Promise<StoredMessage | null> {
   try {
-    const response = await client.session.messages({ path: { id: sessionID } })
+    const response = await Promise.race([
+      client.session.messages({ path: { id: sessionID } }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`SDK messages timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ])
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -94,10 +100,16 @@ export async function findNearestMessageWithFieldsFromSDK(
  */
 export async function findFirstMessageWithAgentFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
+  timeoutMs = 5000
 ): Promise<string | null> {
   try {
-    const response = await client.session.messages({ path: { id: sessionID } })
+    const response = await Promise.race([
+      client.session.messages({ path: { id: sessionID } }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`SDK messages timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ])
     const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 
     for (const msg of messages) {
@@ -145,7 +157,6 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
           return msg
         }
       } catch {
-        continue
       }
     }
 
@@ -157,7 +168,6 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
           return msg
         }
       } catch {
-        continue
       }
     }
   } catch {
@@ -195,7 +205,6 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
           return msg.agent
         }
       } catch {
-        continue
       }
     }
   } catch {

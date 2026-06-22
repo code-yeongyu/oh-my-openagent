@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, afterAll } from "bun:test"
+import { afterAll, describe, expect, it, mock } from "bun:test"
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})

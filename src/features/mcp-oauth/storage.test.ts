@@ -1,7 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { existsSync, mkdirSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
+import type { OAuthTokenData } from "./storage"
 import {
   deleteToken,
   getMcpOauthStoragePath,
@@ -10,7 +11,6 @@ import {
   loadToken,
   saveToken,
 } from "./storage"
-import type { OAuthTokenData } from "./storage"
 
 describe("mcp-oauth storage", () => {
   const TEST_CONFIG_DIR = join(tmpdir(), "mcp-oauth-test-" + Date.now())

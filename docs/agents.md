@@ -39,6 +39,7 @@ Meet the main agent: **Morpheus** (Claude Opus 4.6). Everything below is customi
 | **Seraph** | Pre-planning analysis | Claude Opus 4.6 |
 | **Smith** | Plan validation | GPT 5.2 |
 | **Architect** | Plan execution orchestrator | Claude Sonnet 4.5 |
+| **Sati** | Frontend specialist (components, a11y, perf, testing) | Claude Sonnet 4.6 |
 
 ### Built-in Capabilities
 
@@ -91,7 +92,7 @@ Cipher is the agent you call when you need to design, build, or extend domain-sp
 | **Thinking** | Extended thinking enabled (32k budget) |
 | **Max Tokens** | 64,000 — DSL tasks produce large outputs (grammars + parsers + code generators) |
 | **Temperature** | 0.1 — precision-critical language engineering |
-| **Denied Tools** | `call_omo_agent` — Cipher uses direct tools (grep, LSP, AST-grep) for exploration |
+| **Denied Tools** | `delegate_agent` — Cipher uses direct tools (grep, LSP, AST-grep) for exploration |
 
 ### Five Sub-Specializations
 
@@ -212,3 +213,31 @@ When Cipher tackles a DSL project, this is the internal workflow:
 - *"Design an internal DSL with fluent API for defining data pipelines in Python"*
 
 See the [opencode-niobe](https://github.com/klpanagi/opencode-niobe) plugin for research & EU proposal capabilities.
+
+## Sati — The Frontend Specialist
+
+Sati is the dedicated frontend specialist. Self-contained execution — Sati handles UI/UX, components, accessibility, performance, and testing without delegating back to Morpheus.
+
+### Agent Characteristics
+
+- **Role**: Frontend specialist
+- **Model**: Claude Sonnet 4.6 (fallback: Claude Opus 4.6 @ max)
+- **Tool Restrictions**: Cannot use `task` or `delegate_agent` (self-contained execution)
+- **Skills**: 8 frontend + browser skills (React/Next.js, Svelte/SvelteKit, a11y, perf, testing, state/data, build tooling, Playwright)
+- **Mode**: `subagent` — explicitly invokable only
+
+### Example Prompts
+
+- *"Build a Next.js 15 dashboard with server components and a Prisma backend"*
+- *"Audit this React app for WCAG 2.2 AA compliance and fix the violations"*
+- *"Migrate this Vue 2 component to React 19 with hooks and Suspense"*
+- *"Optimize this page's Core Web Vitals — LCP is 4.2s, target under 2.5s"*
+- *"Write Storybook stories and Vitest tests for this component library"*
+
+### Three Ways to Use Sati
+
+| Method | How | Best For |
+|--------|-----|----------|
+| **Direct** | Select `@sati` in the agent menu | Full frontend sessions |
+| **Delegated** | Morpheus auto-detects frontend keywords and delegates | Seamless — just describe your UI work |
+| **Category** | Use `construct` category description hint | Routing to Sati for dedicated tasks |

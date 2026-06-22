@@ -1,5 +1,4 @@
 import color from "picocolors"
-import type { InstallArgs } from "./types"
 import {
   addAuthPlugins,
   addPluginToOpenCodeConfig,
@@ -7,10 +6,9 @@ import {
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
-  writeOmoConfig,
+  writeMatrixxConfig,
 } from "./config-manager"
 import {
-  SYMBOLS,
   argsToConfig,
   detectedToInitialValues,
   formatConfigSummary,
@@ -21,8 +19,10 @@ import {
   printStep,
   printSuccess,
   printWarning,
+  SYMBOLS,
   validateNonTuiArgs,
 } from "./install-validators"
+import type { InstallArgs } from "./types"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -100,7 +100,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   printStep(step++, totalSteps, "Writing matrixx configuration...")
-  const omoResult = writeOmoConfig(config)
+  const omoResult = writeMatrixxConfig(config)
   if (!omoResult.success) {
     printError(`Failed: ${omoResult.error}`)
     return 1

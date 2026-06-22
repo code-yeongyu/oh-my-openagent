@@ -1,7 +1,7 @@
 import { createBuiltinSkills } from "../builtin-skills/skills"
 import { discoverSkills } from "./loader"
-import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
+import type { LoadedSkill } from "./types"
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "fs"
-import { join } from "path"
 import { tmpdir } from "os"
+import { join } from "path"
 import { SkillsConfigSchema } from "../../config/schema/skills"
 import { discoverConfigSourceSkills, normalizePathForGlob } from "./config-source-discovery"
 

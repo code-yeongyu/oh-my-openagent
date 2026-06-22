@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import type { PackageJson } from "../types"
 import { PACKAGE_NAME } from "../constants"
+import type { PackageJson } from "../types"
 
 export function findPackageJsonUp(startPath: string): string | null {
   try {

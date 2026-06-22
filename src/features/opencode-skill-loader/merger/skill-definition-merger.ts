@@ -1,6 +1,6 @@
-import type { LoadedSkill } from "../types"
 import type { SkillDefinition } from "../../../config/schema"
 import { deepMerge } from "../../../shared/deep-merge"
+import type { LoadedSkill } from "../types"
 
 export function mergeSkillDefinitions(base: LoadedSkill, patch: SkillDefinition): LoadedSkill {
   const mergedMetadata = base.metadata || patch.metadata

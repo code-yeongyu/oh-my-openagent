@@ -1,18 +1,18 @@
 import pc from "picocolors"
+import { serializeError } from "./event-formatting"
+import type { EventState } from "./event-state"
 import type {
-  RunContext,
   EventPayload,
+  MessagePartUpdatedProps,
+  MessageUpdatedProps,
+  RunContext,
+  SessionErrorProps,
   SessionIdleProps,
   SessionStatusProps,
-  SessionErrorProps,
-  MessageUpdatedProps,
-  MessagePartUpdatedProps,
   ToolExecuteProps,
   ToolResultProps,
   TuiToastShowProps,
 } from "./types"
-import type { EventState } from "./event-state"
-import { serializeError } from "./event-formatting"
 
 function getSessionId(props?: { sessionID?: string; sessionId?: string }): string | undefined {
   return props?.sessionID ?? props?.sessionId

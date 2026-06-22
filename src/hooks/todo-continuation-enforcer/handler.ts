@@ -4,9 +4,9 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
-import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
+import type { SessionStateStore } from "./session-state"
 
 export function createTodoContinuationHandler(args: {
   ctx: PluginInput

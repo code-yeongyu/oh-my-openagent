@@ -14,25 +14,15 @@ const GLM_CHEAP = "zai-coding-plan/glm-4.7"
 const MINIMAX_FREE = "minimax-m2.5-free"
 
 const KIMI_K26 = "opencode-go/kimi-k2.6"
-const KIMI_K25 = "opencode-go/kimi-k2.5"
 const DEEPSEEK_PRO = "opencode-go/deepseek-v4-pro"
 const DEEPSEEK_FLASH = "opencode-go/deepseek-v4-flash"
 const GLM_51 = "opencode-go/glm-5.1"
 const MIMO_V25 = "opencode-go/mimo-v2.5"
-const MIMO_PRO = "opencode-go/mimo-v2.5-pro"
 const MINIMAX_M3 = "opencode-go/minimax-m3"
-const MINIMAX_27 = "opencode-go/minimax-m2.7"
-const QWEN_36 = "opencode-go/qwen3.6-plus"
 
 // Xiaomi Token Plan AMS provider models
-const XIAOMI_MIMO_V2_OMNI = "xiaomi-token-plan-ams/mimo-v2-omni"
-const XIAOMI_MIMO_V2_PRO = "xiaomi-token-plan-ams/mimo-v2-pro"
-const XIAOMI_MIMO_V2_TTS = "xiaomi-token-plan-ams/mimo-v2-tts"
 const XIAOMI_MIMO_V25 = "xiaomi-token-plan-ams/mimo-v2.5"
 const XIAOMI_MIMO_V25_PRO = "xiaomi-token-plan-ams/mimo-v2.5-pro"
-const XIAOMI_MIMO_V25_TTS = "xiaomi-token-plan-ams/mimo-v2.5-tts"
-const XIAOMI_MIMO_V25_TTS_VOICECLONE = "xiaomi-token-plan-ams/mimo-v2.5-tts-voiceclone"
-const XIAOMI_MIMO_V25_TTS_VOICEDESIGN = "xiaomi-token-plan-ams/mimo-v2.5-tts-voicedesign"
 
 const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
   /* Use only free/zero-cost models. Best for experimentation, quick prototyping,
@@ -53,7 +43,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       trinity: { model: GROK_FREE },
       construct: { model: KIMI_FREE },
       mouse: { model: MINIMAX_FREE },
-      zion: { model: MINIMAX_FREE },
     },
     categories: {
       source: { model: KIMI_FREE },
@@ -90,7 +79,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       trinity: { model: DEEPSEEK_FLASH },
       construct: { model: DEEPSEEK_FLASH },
       mouse: { model: DEEPSEEK_FLASH },
-      zion: { model: DEEPSEEK_FLASH },
     },
     categories: {
       source: { model: KIMI_K26 },
@@ -229,7 +217,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       trinity: { model: XIAOMI_MIMO_V25 },
       construct: { model: XIAOMI_MIMO_V25 },
       mouse: { model: XIAOMI_MIMO_V25 },
-      zion: { model: XIAOMI_MIMO_V25 },
     },
     categories: {
       source: { model: XIAOMI_MIMO_V25_PRO },
@@ -262,7 +249,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       trinity: { model: DEEPSEEK_PRO },
       construct: { model: DEEPSEEK_PRO },
       mouse: { model: DEEPSEEK_PRO },
-      zion: { model: DEEPSEEK_PRO },
     },
     categories: {
       source: { model: KIMI_K26 },
@@ -298,7 +284,6 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       trinity: { model: DEEPSEEK_FLASH },
       construct: { model: DEEPSEEK_FLASH },
       mouse: { model: DEEPSEEK_FLASH },
-      zion: { model: DEEPSEEK_FLASH },
     },
     categories: {
       source: { model: MINIMAX_M3 },

@@ -1,9 +1,38 @@
+import { log } from "../../shared"
 import { detectThinkKeyword, extractPromptText } from "./detector"
 import { getHighVariant, getThinkingConfig, isAlreadyHighVariant } from "./switcher"
 import type { ThinkModeInput, ThinkModeState } from "./types"
-import { log } from "../../shared"
 
+const MAX_THINK_MODE_ENTRIES = 1000
 const thinkModeState = new Map<string, ThinkModeState>()
+
+export function setThinkModeState(key: string, value: ThinkModeState): void {
+  if (thinkModeState.size >= MAX_THINK_MODE_ENTRIES && !thinkModeState.has(key)) {
+    const oldest = thinkModeState.keys().next().value
+    if (oldest !== undefined) thinkModeState.delete(oldest)
+  }
+  // Bump insertion order: delete + set re-inserts at the most recent position.
+  thinkModeState.delete(key)
+  thinkModeState.set(key, value)
+}
+
+export function getThinkModeState(key: string): ThinkModeState | undefined {
+  const value = thinkModeState.get(key)
+  if (value !== undefined) {
+    // Bump to most recent position so active sessions are not evicted.
+    thinkModeState.delete(key)
+    thinkModeState.set(key, value)
+  }
+  return value
+}
+
+export function _getThinkModeStateSizeForTesting(): number {
+  return thinkModeState.size
+}
+
+export function _resetThinkModeStateForTesting(): void {
+  thinkModeState.clear()
+}
 
 export function clearThinkModeState(sessionID: string): void {
   thinkModeState.delete(sessionID)
@@ -60,7 +89,7 @@ export function createThinkModeHook() {
       }
 
       if (!detectThinkKeyword(promptText)) {
-        thinkModeState.set(sessionID, state)
+        setThinkModeState(sessionID, state)
         return
       }
 
@@ -68,7 +97,7 @@ export function createThinkModeHook() {
 
       const currentModel = output.message.model
       if (!currentModel) {
-        thinkModeState.set(sessionID, state)
+        setThinkModeState(sessionID, state)
         return
       }
 
@@ -76,7 +105,7 @@ export function createThinkModeHook() {
       state.modelID = currentModel.modelID
 
       if (isAlreadyHighVariant(currentModel.modelID)) {
-        thinkModeState.set(sessionID, state)
+        setThinkModeState(sessionID, state)
         return
       }
 
@@ -132,7 +161,7 @@ export function createThinkModeHook() {
         }
       }
 
-      thinkModeState.set(sessionID, state)
+      setThinkModeState(sessionID, state)
     },
 
     event: async ({ event }: { event: { type: string; properties?: unknown } }) => {

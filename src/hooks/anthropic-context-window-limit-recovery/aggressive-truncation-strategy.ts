@@ -1,10 +1,10 @@
+import { log } from "../../shared/logger"
+import type { Client } from "./client"
+import { formatBytes } from "./message-builder"
+import { clearSessionState } from "./state"
+import { truncateUntilTargetTokens } from "./storage"
 import type { AutoCompactState } from "./types"
 import { TRUNCATE_CONFIG } from "./types"
-import { truncateUntilTargetTokens } from "./storage"
-import type { Client } from "./client"
-import { clearSessionState } from "./state"
-import { formatBytes } from "./message-builder"
-import { log } from "../../shared/logger"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string

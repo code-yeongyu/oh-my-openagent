@@ -1,5 +1,5 @@
-import { computeLegacyLineHash, computeLineHash } from "./hash-computation"
 import { HASHLINE_REF_PATTERN } from "./constants"
+import { computeLegacyLineHash, computeLineHash } from "./hash-computation"
 
 export interface LineRef {
   line: number
@@ -83,8 +83,8 @@ export class HashlineMismatchError extends Error {
   readonly remaps: ReadonlyMap<string, string>
 
   constructor(
-    private readonly mismatches: HashMismatch[],
-    private readonly fileLines: string[]
+    mismatches: HashMismatch[],
+    fileLines: string[]
   ) {
     super(HashlineMismatchError.formatMessage(mismatches, fileLines))
     this.name = "HashlineMismatchError"

@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import type { ContinuationMarker, ContinuationMarkerSource, ContinuationMarkerState } from "./types"
 import { CONTINUATION_MARKER_DIR } from "./constants"
+import type { ContinuationMarker, ContinuationMarkerSource, ContinuationMarkerState } from "./types"
 
 function getMarkerFilePath(directory: string, sessionID: string): string {
   return join(directory, CONTINUATION_MARKER_DIR, `${sessionID}.json`)

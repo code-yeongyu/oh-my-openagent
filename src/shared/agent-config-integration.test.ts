@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test"
-import { migrateAgentNames } from "./migration"
+import { describe, expect, test } from "bun:test"
 import { getAgentDisplayName } from "./agent-display-names"
+import { migrateAgentNames } from "./migration"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("Agent Config Integration", () => {

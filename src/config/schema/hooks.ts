@@ -30,7 +30,6 @@ export const HookNameSchema = z.enum([
 
   "compaction-context-injector",
   "compaction-todo-preserver",
-  "claude-code-hooks",
   "auto-slash-command",
   "edit-error-recovery",
   "delegate-task-retry",
@@ -56,6 +55,9 @@ export const HookNameSchema = z.enum([
   "webfetch-redirect-guard",
   "hashline-edit-diff-enhancer",
   "tool-pair-validator",
+  "quality-gate",
+  "task-notepad",
+  "design-intent-preserver",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

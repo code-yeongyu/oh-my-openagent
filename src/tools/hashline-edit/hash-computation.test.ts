@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import { computeLineHash, formatHashLine, formatHashLines } from "./hash-computation"
 
 const NIBBLE_CHARS = "ZPMQVRWSNKTXJBYH"

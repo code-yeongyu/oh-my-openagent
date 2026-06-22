@@ -1,7 +1,7 @@
-import type { BackgroundTask, LaunchInput } from "./types"
-import type { QueueItem } from "./constants"
 import { log } from "../../shared"
 import { subagentSessions } from "../claude-code-session-state"
+import type { QueueItem } from "./constants"
+import type { BackgroundTask, LaunchInput } from "./types"
 export class TaskStateManager {
   readonly tasks: Map<string, BackgroundTask> = new Map()
   readonly notifications: Map<string, BackgroundTask[]> = new Map()

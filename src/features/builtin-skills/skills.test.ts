@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { createBuiltinSkills } from "./skills"
 
 describe("createBuiltinSkills", () => {
@@ -80,7 +80,7 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
-	test("returns exactly 42 skills regardless of provider", () => {
+	test("returns exactly 37 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -88,8 +88,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(42)
-		expect(agentBrowserSkills).toHaveLength(42)
+		expect(defaultSkills).toHaveLength(37)
+		expect(agentBrowserSkills).toHaveLength(37)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -105,7 +105,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("dsl-core")
-		expect(skills.length).toBe(41)
+		expect(skills.length).toBe(36)
 	})
 
 	test("should return all skills when disabledSkills set is empty", () => {
@@ -116,7 +116,29 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(42)
+		expect(skills.length).toBe(37)
+	})
+
+	test("should include all 7 upcoming frontend skills in the result", () => {
+		// #given
+
+		// #when
+		const skills = createBuiltinSkills()
+		const skillNames = skills.map((s) => s.name)
+
+		// #then
+		const newSkillNames = [
+			"react-nextjs-patterns",
+			"svelte-sveltekit-patterns",
+			"frontend-a11y",
+			"frontend-perf",
+			"frontend-testing",
+			"frontend-state-data",
+			"frontend-build-tooling",
+		]
+		for (const name of newSkillNames) {
+			expect(skillNames).toContain(name)
+		}
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {

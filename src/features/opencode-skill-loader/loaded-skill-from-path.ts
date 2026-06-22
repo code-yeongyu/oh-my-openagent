@@ -6,7 +6,7 @@ import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import { parseAllowedTools } from "./allowed-tools-parser"
 import { loadMcpJsonFromDir, parseSkillMcpConfigFromFrontmatter } from "./skill-mcp-config"
-import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
+import type { LazyContentLoader, LoadedSkill, SkillMetadata, SkillScope } from "./types"
 
 export async function loadSkillFromPath(options: {
   skillPath: string
