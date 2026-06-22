@@ -29,6 +29,7 @@ export type ParentWakeNotifierDeps = {
     parentSessionID: string | undefined,
     operation: () => Promise<void>,
   ) => Promise<void>
+  readonly onScheduledFlushSettled?: (sessionID: string) => void
 }
 
 export type ParentWakeNotifierOptions = {

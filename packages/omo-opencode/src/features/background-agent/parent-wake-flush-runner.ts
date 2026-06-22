@@ -144,7 +144,13 @@ export class ParentWakeFlushRunner {
   }
 
   schedulePendingParentWakeFlush(sessionID: string, delayMs?: number): void {
-    this.deps.pendingQueue.scheduleFlush(sessionID, () => this.flushPendingParentWake(sessionID), delayMs)
+    this.deps.pendingQueue.scheduleFlush(sessionID, async () => {
+      try {
+        await this.flushPendingParentWake(sessionID)
+      } finally {
+        this.deps.notifierDeps.onScheduledFlushSettled?.(sessionID)
+      }
+    }, delayMs)
   }
 
   // Reply-required wakes must never be consumed by an admit-only noReply
