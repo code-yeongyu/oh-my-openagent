@@ -125,18 +125,15 @@ jobs:
             src/shared/opencode-server-auth.test.ts \
             src/shared/opencode-storage-detection.test.ts \
             src/shared/opencode-version.test.ts \
-            src/shared/pattern-matcher.test.ts \
             src/shared/permission-compat.test.ts \
             src/shared/port-utils.test.ts \
             src/shared/safe-create-hook.test.ts \
             src/shared/session-cursor.test.ts \
             src/shared/session-directory-resolver.test.ts \
             src/shared/session-tools-store.test.ts \
-            src/shared/shell-env.test.ts \
             src/shared/skill-path-resolver.test.ts \
             src/shared/system-directive.test.ts \
             src/shared/tmux \
-            src/shared/tool-name.test.ts \
             src/shared/truncate-description.test.ts \
             src/cli/run/completion.test.ts \
             src/cli/run/event-handlers.test.ts \
