@@ -4,10 +4,12 @@ This component optionally installs @colbymchenry/codegraph@1.0.1. That package
 selects platform bundles for darwin, linux, and win32 on arm64 and x64. The
 CodeGraph packages declare MIT license metadata.
 
-The selected CodeGraph platform bundles may include a Node.js runtime plus
-vendored JavaScript dependencies and tree-sitter WASM payloads. Their aggregate
-notices remain attributed to CodeGraph, Node.js contributors, and bundled
-dependency contributors.
+The selected CodeGraph platform bundles may include a Node.js v24.16.0 runtime
+plus vendored JavaScript dependencies and tree-sitter WASM payloads. Node.js
+runtime license and bundled third-party license text is included in this
+component at NODE-RUNTIME-LICENSES.md. Vendored JavaScript dependencies and WASM
+payloads retain the license files included inside the selected CodeGraph
+platform package under lib/node_modules/.
 
 This NOTICE is self-contained for the marketplace plugin payload. The wider
 Codex distribution also records these details in its aggregate third-party

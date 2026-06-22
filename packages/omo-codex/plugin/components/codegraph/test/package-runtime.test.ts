@@ -45,8 +45,10 @@ describe("CodeGraph component runtime package metadata", () => {
 		// then
 		expect(optionalDependencies["@colbymchenry/codegraph"]).toBe("1.0.1");
 		expect(files).toContain("LICENSE");
+		expect(files).toContain("NODE-RUNTIME-LICENSES.md");
 		expect(files).toContain("NOTICE");
 		expect(existsSync(resolve(componentRoot, "LICENSE"))).toBe(true);
+		expect(existsSync(resolve(componentRoot, "NODE-RUNTIME-LICENSES.md"))).toBe(true);
 		expect(existsSync(resolve(componentRoot, "NOTICE"))).toBe(true);
 		expect(existsSync(resolve(componentRoot, "dist", "cli.d.ts"))).toBe(false);
 		expect(existsSync(resolve(componentRoot, "dist", "serve.d.ts"))).toBe(false);
@@ -58,8 +60,19 @@ describe("CodeGraph component runtime package metadata", () => {
 
 		expect(notice).toContain("@colbymchenry/codegraph@1.0.1");
 		expect(notice).toContain("MIT license");
-		expect(notice).toContain("Node.js runtime");
+		expect(notice).toContain("Node.js v24.16.0 runtime");
+		expect(notice).toContain("NODE-RUNTIME-LICENSES.md");
 		expect(notice).not.toContain("packages/omo-codex/THIRD-PARTY-NOTICES.md");
+	});
+
+	it("#given CodeGraph platform bundles include Node #when reading runtime licenses #then Node license text ships with the component", () => {
+		// given
+		const licenseText = readFileSync(resolve(componentRoot, "NODE-RUNTIME-LICENSES.md"), "utf8");
+
+		// then
+		expect(licenseText).toContain("Node.js v24.16.0 LICENSE text");
+		expect(licenseText).toContain("Copyright Node.js contributors");
+		expect(licenseText).toContain("The externally maintained libraries used by Node.js are:");
 	});
 
 	it("#given third-party notices #when validating CodeGraph component notices #then aggregate Codex notices list CodeGraph as shipped", () => {

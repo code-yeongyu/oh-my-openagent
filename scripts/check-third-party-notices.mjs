@@ -118,13 +118,14 @@ function checkCodexComponentNotices() {
 
   for (const requirement of CODEX_COMPONENT_NOTICE_REQUIREMENTS) {
     const noticePath = join(repoRoot, requirement.path, "NOTICE")
-    const licensePath = join(repoRoot, requirement.path, "LICENSE")
     if (!existsSync(noticePath)) {
       failures.push(`${requirement.path}/NOTICE is missing`)
       continue
     }
-    if (!existsSync(licensePath)) {
-      failures.push(`${requirement.path}/LICENSE is missing`)
+    for (const filename of requirement.requiredFiles ?? ["LICENSE", "NOTICE"]) {
+      if (!existsSync(join(repoRoot, requirement.path, filename))) {
+        failures.push(`${requirement.path}/${filename} is missing`)
+      }
     }
 
     const noticeText = readFileSync(noticePath, "utf8")
@@ -191,7 +192,7 @@ function runShipCheck() {
     const packagePath = `${requirement.path}/package.json`
     const packageJson = readJson(packagePath)
     const packageFiles = packageJson.files ?? []
-    for (const filename of ["LICENSE", "NOTICE"]) {
+    for (const filename of requirement.requiredFiles ?? ["LICENSE", "NOTICE"]) {
       if (existsSync(join(repoRoot, requirement.path, filename)) && !packageFiles.includes(filename)) {
         failures.push(`${packagePath} files[] is missing ${filename}`)
       }
@@ -202,7 +203,7 @@ function runShipCheck() {
   const requiredPackPaths = [
     ...ROOT_SHIP_REQUIRED_PATHS,
     ...CODEX_COMPONENT_NOTICE_REQUIREMENTS.flatMap((requirement) =>
-      ["LICENSE", "NOTICE"]
+      (requirement.requiredFiles ?? ["LICENSE", "NOTICE"])
         .map((filename) => `${requirement.path}/${filename}`)
         .filter((path) => existsSync(join(repoRoot, path))),
     ),

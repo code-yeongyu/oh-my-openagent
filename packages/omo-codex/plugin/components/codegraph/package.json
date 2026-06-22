@@ -10,6 +10,7 @@
 	"files": [
 		"dist",
 		"LICENSE",
+		"NODE-RUNTIME-LICENSES.md",
 		"NOTICE"
 	],
 	"scripts": {
