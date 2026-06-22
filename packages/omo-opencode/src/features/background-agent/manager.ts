@@ -1970,6 +1970,7 @@ The fallback retry session is now created and can be inspected directly.
     const releaseNotificationPreparation = (): void => {
       if (notificationParentSessionID) {
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
     }
 
@@ -2597,6 +2598,7 @@ The task was re-queued on a fallback model after a retryable failure.
     } finally {
       if (notificationParentSessionID) {
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
     }
   }

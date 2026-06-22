@@ -8,6 +8,7 @@ import { readContinuationMarker } from "../run-continuation-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { BACKGROUND_COMPLETION_WAKE_PENDING_REASON } from "./background-task-marker"
 import { BackgroundManager } from "./manager"
+import type { BackgroundTask } from "./types"
 
 type ParentWakeNotifierForMarkerTest = {
   readonly reserveNotificationPreparation: (sessionID: string) => void
@@ -18,6 +19,8 @@ type ParentWakeNotifierForMarkerTest = {
 
 type BackgroundManagerMarkerInternals = BackgroundManager & {
   readonly parentWakeNotifier: ParentWakeNotifierForMarkerTest
+  readonly tasks: Map<string, BackgroundTask>
+  readonly pendingByParent: Map<string, Set<string>>
   readonly updateBackgroundTaskMarker: (parentSessionID: string) => void
   readonly queuePendingParentWake: (
     sessionID: string,
@@ -27,6 +30,7 @@ type BackgroundManagerMarkerInternals = BackgroundManager & {
     delayMs?: number,
   ) => void
   readonly flushPendingParentWake: (sessionID: string) => Promise<void>
+  readonly tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
 }
 
 const testDirectories: string[] = []
@@ -47,7 +51,7 @@ function createTestDirectory(): string {
   return directory
 }
 
-function createManager(directory: string): BackgroundManager {
+function createManager(directory: string, enableParentSessionNotifications = true): BackgroundManager {
   const promptAsyncCalls: unknown[] = []
   const pluginContext = unsafeTestValue<PluginInput>({
     client: {
@@ -63,7 +67,19 @@ function createManager(directory: string): BackgroundManager {
     },
     directory,
   })
-  return new BackgroundManager({ pluginContext })
+  return new BackgroundManager({ pluginContext, enableParentSessionNotifications })
+}
+
+function createRunningTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionId: string }): BackgroundTask {
+  return {
+    parentMessageId: "parent-message-id",
+    description: "test background task",
+    prompt: "test prompt",
+    agent: "test-agent",
+    status: "running",
+    startedAt: new Date("2026-06-22T00:00:00.000Z"),
+    ...overrides,
+  }
 }
 
 async function waitForBackgroundTaskMarkerState(
@@ -130,6 +146,33 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       // then
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
       expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("#given parent notifications are disabled #when final child completion releases preparation #then the marker returns idle", async () => {
+    // given
+    const directory = createTestDirectory()
+    const parentSessionID = "parent-disabled-notifications"
+    const manager = createManager(directory, false)
+    const internals = unsafeTestValue<BackgroundManagerMarkerInternals>(manager)
+    const task = createRunningTask({
+      id: "task-disabled-notifications",
+      parentSessionId: parentSessionID,
+      sessionId: "child-disabled-notifications",
+    })
+    internals.tasks.set(task.id, task)
+    internals.pendingByParent.set(parentSessionID, new Set([task.id]))
+
+    try {
+      // when
+      const completed = await internals.tryCompleteTask(task, "marker regression")
+
+      // then
+      expect(completed).toBe(true)
+      const marker = readContinuationMarker(directory, parentSessionID)
+      expect(marker?.sources["background-task"]?.state).toBe("idle")
     } finally {
       manager.shutdown()
     }
