@@ -19,6 +19,29 @@ function parseAdditionalContext(output: string): string {
 	return parsed.hookSpecificOutput?.additionalContext ?? "";
 }
 
+function normalizeGuidance(value: string): string {
+	return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function expectSparkshellFirstContract(value: string): void {
+	const guidance = normalizeGuidance(value);
+
+	expect(guidance).toMatch(/`omo sparkshell <command>`[^.]*\bfirst\b/);
+	expect(guidance).toMatch(/\brepo inspection\b/);
+	expect(guidance).toMatch(/\bcli smoke tests\b/);
+	expect(guidance).toMatch(/\bgit\/history checks\b/);
+	expect(guidance).toMatch(/\bbounded command output\b/);
+	expect(guidance).toMatch(/\braw\b[^.]*`rg`\/`grep`\/`cat`\/`git`[^.]*\bfallbacks?\b/);
+	expect(guidance).toMatch(/\bsparkshell is unavailable\b/);
+	expect(guidance).toMatch(/\btoo narrow\b/);
+	expect(guidance).toMatch(/`omo sparkshell --shell '<command>'`[^.]*\bmetacharacters\b[^.]*\bpipelines\b/);
+	expect(guidance).toMatch(
+		/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bonly\b[^.]*\binspect\b[^.]*\bexisting pane\b/,
+	);
+	expect(guidance).toMatch(/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bnever\b[^.]*\blaunch ordinary commands\b/);
+	expect(guidance).not.toMatch(/\bprefer\b[^.]*\bbefore raw shell commands\b/);
+}
+
 function parseHookOutput(value: unknown): HookOutput {
 	if (typeof value !== "object" || value === null) {
 		return {};
@@ -86,14 +109,7 @@ describe("Codex Sparkshell awareness", () => {
 
 		// then
 		const context = parseAdditionalContext(output);
-		expect(context).toContain("Use `omo sparkshell <command>` first for repo inspection");
-		expect(context).toContain("CLI smoke tests");
-		expect(context).toContain("git/history checks");
-		expect(context).toContain("bounded command output");
-		expect(context).toContain("Raw `rg`/`grep`/`cat`/`git` are fallbacks");
-		expect(context).toContain("Sparkshell is unavailable or too narrow");
-		expect(context).toContain("`omo sparkshell --shell '<command>'` only for shell metacharacters or pipelines");
-		expect(context).toContain("`omo sparkshell --tmux-pane <pane-id> --tail-lines 400` only to inspect an existing pane, never to launch ordinary commands");
+		expectSparkshellFirstContract(context);
 		expect(context).toContain("OMO_SPARKSHELL_SESSION_CONTEXT");
 		expect(context).toContain("OMO_SPARKSHELL_CONDENSE");
 		expect(context).toContain("OMO_SPARKSHELL_SPARK");

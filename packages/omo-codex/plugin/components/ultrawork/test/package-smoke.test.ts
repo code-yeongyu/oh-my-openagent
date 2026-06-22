@@ -8,6 +8,27 @@ import {
 	requireScripts,
 } from "../../test-support/package-smoke-fixture.js";
 
+function normalizeGuidance(value: string): string {
+	return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function expectSparkshellToolStrategyContract(value: string): void {
+	const guidance = normalizeGuidance(value);
+
+	expect(guidance).toMatch(/`omo sparkshell <command>`[^.]*\bfirst\b/);
+	expect(guidance).toMatch(/\brepo-wide inspection\b/);
+	expect(guidance).toMatch(/\bcli smoke tests\b/);
+	expect(guidance).toMatch(/\bgit\/history\b/);
+	expect(guidance).toMatch(/\bbounded command output\b/);
+	expect(guidance).toMatch(/\braw\b[^.]*`rg`\/`grep`\/`cat`\/`git`[^.]*\bfallbacks?\b/);
+	expect(guidance).toMatch(/\bsparkshell is unavailable\b/);
+	expect(guidance).toMatch(/\btoo narrow\b/);
+	expect(guidance).toMatch(/--shell[^.]*\bmetacharacters\b[^.]*\bpipelines\b/);
+	expect(guidance).toMatch(/--tmux-pane[^.]*\bonly\b[^.]*\binspect(?:ing)?\b[^.]*\bexisting (?:tmux )?pane\b/);
+	expect(guidance).toMatch(/--tmux-pane[^.]*\bnever\b[^.]*\blaunch(?:ing)? ordinary commands\b/);
+	expect(guidance).not.toMatch(/\bprefer\b[^.]*\bbefore raw shell commands\b/);
+}
+
 describe("codex ultrawork package metadata", () => {
 	it("#given package metadata #when inspected #then hook ships as bundled CLI", () => {
 		// given
@@ -56,7 +77,6 @@ describe("codex ultrawork package metadata", () => {
 
 		// when
 		const guidance = explorer.toLowerCase();
-		const directiveGuidance = directive.toLowerCase().replace(/\s+/g, " ");
 		const sparkshellIndex = guidance.indexOf("omo sparkshell <command>");
 		const lspIndex = guidance.indexOf("lsp_goto_definition");
 		const structuralIndex = guidance.indexOf("ast-grep");
@@ -65,15 +85,8 @@ describe("codex ultrawork package metadata", () => {
 		expect(sparkshellIndex).toBeGreaterThanOrEqual(0);
 		expect(lspIndex).toBeGreaterThan(sparkshellIndex);
 		expect(structuralIndex).toBeGreaterThan(sparkshellIndex);
-		expect(guidance).toContain("use `omo sparkshell <command>` first for repo-wide inspection");
-		expect(guidance).toContain("raw `rg`/`grep`/`cat`/`git` are fallbacks");
-		expect(guidance).toContain("sparkshell is unavailable or too narrow");
-		expect(guidance).toContain("sparkshell --shell '<command>'` only for shell metacharacters or pipelines");
-		expect(guidance).toContain("sparkshell --tmux-pane <pane-id> --tail-lines 400` only to inspect an existing tmux pane, never to launch ordinary commands");
-		expect(directiveGuidance).toContain("use `omo sparkshell <command>` first");
-		expect(directiveGuidance).toContain("raw `rg`/`grep`/`cat`/`git` are fallbacks when sparkshell is unavailable or too narrow");
-		expect(directiveGuidance).toContain("`--shell` is only for shell metacharacters or pipelines");
-		expect(directiveGuidance).toContain("`--tmux-pane` is only for inspecting an existing pane, never for launching ordinary commands");
+		expectSparkshellToolStrategyContract(explorer);
+		expectSparkshellToolStrategyContract(directive);
 	});
 
 	it("#given librarian guidance #when inspected #then names the packaged research MCP surfaces", () => {
