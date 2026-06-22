@@ -102,7 +102,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-screen flex-col bg-[#0a0a0a] text-[#ededed] antialiased">
+      <body className="flex min-h-screen flex-col bg-background text-foreground antialiased">
         <Script id="google-analytics-loader" strategy="lazyOnload">
           {`if (typeof window !== 'undefined' && window.location.hostname === '${gaTrackedDomain}') {
   var s = document.createElement('script');

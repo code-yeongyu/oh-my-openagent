@@ -311,12 +311,35 @@ function idleNodes(roster: RosterState, theme: ThemeLike): ViewNode[] {
   ]
 }
 
+function getStringWidth(str: string): number {
+  let width = 0
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i)
+    if (
+      (code >= 0x3000 && code <= 0x9fff) || // CJK symbols and ideographs
+      (code >= 0xac00 && code <= 0xd7af) || // Hangul
+      (code >= 0xff01 && code <= 0xff60)    // Fullwidth ASCII
+    ) {
+      width += 2
+    } else {
+      width += 1
+    }
+  }
+  return width
+}
+
+function padEndWidth(str: string, targetWidth: number, padChar = " "): string {
+  const width = getStringWidth(str)
+  if (width >= targetWidth) return str
+  return str + padChar.repeat(targetWidth - width)
+}
+
 function rosterLines(roster: RosterState): string[] {
   switch (roster.kind) {
     case "empty":
       return ["No configured models"]
     case "rows":
-      return roster.rows.map((row) => `  ${row.label.padEnd(ROSTER_LABEL_WIDTH)} ${row.model}`)
+      return roster.rows.map((row) => `  ${padEndWidth(row.label, ROSTER_LABEL_WIDTH)} ${row.model}`)
     default:
       return assertNever(roster)
   }

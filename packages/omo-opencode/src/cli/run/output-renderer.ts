@@ -31,16 +31,17 @@ export function renderAgentHeader(
 }
 
 export function openThinkBlock(): void {
-  process.stdout.write(`\n  ${pc.dim("┃  Thinking:")} `)
+  process.stdout.write(`\n  ${pc.dim("│")} ${pc.dim("thinking:")} `)
 }
 
 export function closeThinkBlock(): void {
-  process.stdout.write("  \n\n")
+  process.stdout.write("\n\n")
 }
 
 export function writePaddedText(
   text: string,
   atLineStart: boolean,
+  prefix: string = "  ",
 ): { output: string; atLineStart: boolean } {
   const isGitHubActions = process.env.GITHUB_ACTIONS === "true"
   if (isGitHubActions) {
@@ -53,12 +54,12 @@ export function writePaddedText(
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (lineStart) {
-      parts.push("  ")
+      parts.push(prefix)
       lineStart = false
     }
 
     if (ch === "\n") {
-      parts.push("  \n")
+      parts.push(`${prefix}\n`)
       lineStart = true
       continue
     }

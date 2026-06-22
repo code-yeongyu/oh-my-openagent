@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=LXGW+Wen+Kai:wght@300;400;700&family=LXGW+Wen+Kai+Mono&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap');
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
@@ -5,8 +6,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "LXGW Wen Kai", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Source Code Pro", var(--font-geist-mono), "LXGW Wen Kai Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* shadcn / legacy tokens, preserved for component compatibility */
   --color-background: var(--background);
@@ -124,7 +125,7 @@
     /* Dark Theme Only - Terminal/Hacker Aesthetic */
 
     /* shadcn / legacy tokens, preserved */
-    --background: #0a0a0a;
+    --background: #080809;
     --foreground: #ededed;
 
     --card: #111111;
@@ -168,7 +169,7 @@
      * Surfaces stack by luminance, not by shadow. Borders are punctuation.
      * Cyan is the only chromatic brand color.
      */
-    --surface-0: #0a0a0a;
+    --surface-0: #080809;
     --surface-1: rgba(255, 255, 255, 0.018);
     --surface-2: rgba(255, 255, 255, 0.035);
     --surface-3: rgba(255, 255, 255, 0.055);
@@ -195,9 +196,9 @@
     --font-geist-sans: var(--font-geist-sans);
     --font-geist-mono: var(--font-geist-mono);
 
-    --font-heading: var(--font-geist-sans);
-    --font-body: var(--font-geist-sans);
-    --font-code: var(--font-geist-mono);
+    --font-heading: "LXGW Wen Kai", var(--font-geist-sans);
+    --font-body: "LXGW Wen Kai", var(--font-geist-sans);
+    --font-code: "Source Code Pro", var(--font-geist-mono);
   }
 }
 
@@ -207,6 +208,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    line-height: 1.68;
+    letter-spacing: 0.015em;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
