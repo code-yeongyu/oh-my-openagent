@@ -59,6 +59,11 @@ function addRetryTaskToast(input: {
   })
 }
 
+function shouldRetryPollErrorWithFallback(pollError: string, deps: SyncTaskDeps): boolean {
+  const errorInfo = { message: pollError }
+  return shouldRetryError(errorInfo) || (deps.isProviderExhaustionFallbackEligible?.(errorInfo) ?? false)
+}
+
 export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<string> {
   const {
     args,
@@ -165,7 +170,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
         }
       }
 
-      const nextFallbackModel = shouldRetryError({ message: pollError })
+      const nextFallbackModel = shouldRetryPollErrorWithFallback(pollError, deps)
         ? getNextSyncFallbackModel(activeSessionID, fallbackState)
         : null
       if (!nextFallbackModel) {
