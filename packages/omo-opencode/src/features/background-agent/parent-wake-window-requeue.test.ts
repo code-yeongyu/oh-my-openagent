@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../hooks/shared/prompt-async-gate"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 
 type ParentWakeNotifierClientForTest = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
@@ -65,6 +68,13 @@ async function waitForTimer(): Promise<void> {
   })
 }
 
+function releaseParentWakeHold(sessionID: string): void {
+  const released = releasePromptAsyncReservation(sessionID, "test:simulate-expired-parent-wake-hold", {
+    reservedBy: "background-agent-parent-wake",
+  })
+  expect(released).toBe(true)
+}
+
 describe("ParentWakeNotifier dispatched wake recovery", () => {
   test("#given a parent wake is accepted but produces no assistant output #when the recovery window elapses #then the wake is requeued for another dispatch", async () => {
     // given
@@ -85,6 +95,36 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
       expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
       expect(notifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([FINAL_WAKE])
       expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a requeued parent wake still produces no assistant output #when the retry window elapses #then the wake is not retried forever", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-window-no-continuation-retry-budget"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      await waitForTimer()
+      expect(notifier.getPendingParentWakes().get(sessionID)?.noAssistantOutputRetryCount).toBe(1)
+
+      releaseParentWakeHold(sessionID)
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(2)
+
+      // when
+      await waitForTimer()
+
+      // then
+      expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(false)
+      expect(promptAsyncCalls).toHaveLength(2)
     } finally {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
