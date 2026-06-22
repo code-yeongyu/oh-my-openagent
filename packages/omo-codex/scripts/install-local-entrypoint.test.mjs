@@ -87,17 +87,54 @@ test("#given dry-run install opt-out #when running the Node installer entrypoint
 	assert.equal(output, "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --no-codex-autonomous");
 });
 
-test("#given dry-run doctor #when running the Node installer entrypoint #then prints delegated doctor command", () => {
+test("#given dry-run doctor #when running the Node installer entrypoint #then prints Codex LazyCodex doctor workflow command", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
 
 	// when
-	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor"], {
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor", "--json"], {
 		encoding: "utf8",
 	}).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo doctor");
+	assert.match(output, /^codex exec /);
+	assert.match(output, /Use \$omo:lcx-doctor/);
+	assert.match(output, /Requested doctor arguments: --json/);
+	assert.match(output, /Return exactly one JSON object/);
+	assert.doesNotMatch(output, /oh-my-openagent omo doctor/);
+});
+
+test("#given recursive doctor env #when running the Node installer entrypoint #then refuses to re-enter doctor", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when/then
+	assert.throws(
+		() =>
+			execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor"], {
+				encoding: "utf8",
+				env: {
+					...process.env,
+					LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
+				},
+			}),
+		/Refusing recursive lazycodex doctor invocation/,
+	);
+});
+
+test("#given dry-run cleanup path needs quoting #when running the Node installer entrypoint #then prints shell-safe command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(
+		process.execPath,
+		[scriptPath, "--dry-run", "cleanup", "--project", "/tmp/lazy codex's qa"],
+		{ encoding: "utf8" },
+	).trim();
+
+	// then
+	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
 });
 
 test("#given dry-run cleanup #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {

@@ -180,6 +180,7 @@ export function formatLazyCodexInstallHelp(): string {
     "`uninstall` removes managed Codex Light state; `cleanup` is a backward-compatible alias.",
     "`update` refreshes the installed Codex Light edition in place.",
     "",
-    `Pass-through commands delegated to the omo CLI: ${passthrough}.`,
+    `Commands supported by lazycodex-ai: ${passthrough}.`,
+    "`doctor` runs the Codex LazyCodex doctor workflow; other pass-through commands delegate to the omo CLI.",
   ].join("\n")
 }
