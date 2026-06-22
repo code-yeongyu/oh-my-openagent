@@ -107,5 +107,31 @@ describe("executeBackground", () => {
       expect(result).toContain("test-task-id")
       expect(result).not.toContain("Background agent task launched successfully")
     })
+
+    test("returns formatDetailedError without 'pending' placeholder when session times out", async () => {
+      //#given - getTask always returns null sessionID; metadata is mocked for assertion
+      getTaskMock.mockReturnValue({
+        id: "test-task-id",
+        sessionID: null,
+        description: "Test task",
+        agent: "test-agent",
+        status: "running",
+      })
+      const metadataMock = mock(() => {})
+      const ctxWithMetadata = {
+        ...testContext,
+        metadata: metadataMock,
+      }
+
+      //#when
+      const result = await executeBackground(testArgs, ctxWithMetadata, mockManager, mockClient)
+
+      //#then - formatDetailedError markers present, no "pending" placeholder anywhere, metadata untouched
+      expect(result).toContain("failed")
+      expect(result).toContain("Task ID:")
+      expect(result).toContain("test-task-id")
+      expect(result).not.toContain("pending")
+      expect(metadataMock).not.toHaveBeenCalled()
+    })
   })
 })
