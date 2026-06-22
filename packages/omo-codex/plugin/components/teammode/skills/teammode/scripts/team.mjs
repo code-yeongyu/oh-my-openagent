@@ -27,16 +27,18 @@ import {
 	assertSafeTeamDir,
 	bindThread,
 	buildTeam,
+	clearMemberWorktree,
 	ensureTeamDir,
 	isUnderstaffed,
 	MIN_MEMBERS,
 	readTeam,
-	resolveTeamDir,
 	setMemberStatus,
+	setMemberWorktree,
 	teamExists,
 	writeGuideAtomic,
 	writeTeamAtomic,
 } from "./team-state.mjs";
+import { addMemberWorktree, integrateMemberBranch, removeMemberWorktree } from "./team-worktree.mjs";
 
 function parseFlags(args) {
 	const flags = { _: [] };
@@ -67,6 +69,12 @@ function requireFlag(flags, name) {
 async function loadTeam(cwd, sessionId) {
 	const dir = await assertSafeTeamDir(cwd, sessionId);
 	return { dir, team: await readTeam(dir) };
+}
+
+function memberOrThrow(team, id) {
+	const member = team.members.find((m) => m.id === id);
+	if (!member) throw new Error(`no member with id "${id}"`);
+	return member;
 }
 
 async function persist(team, dir) {
@@ -144,6 +152,49 @@ const handlers = {
 		});
 		await persist(team, dir);
 		process.stdout.write(`member ${flags.id} -> ${flags.status}\n`);
+	},
+
+	async "worktree-add"(cwd, flags) {
+		const sessionId = requireFlag(flags, "team");
+		const { dir, team } = await loadTeam(cwd, sessionId);
+		const member = memberOrThrow(team, requireFlag(flags, "id"));
+		const result = addMemberWorktree(cwd, team, member, {
+			baseBranch: typeof flags["base-branch"] === "string" ? flags["base-branch"] : null,
+		});
+		setMemberWorktree(team, { id: member.id, path: result.path, branch: result.branch });
+		await persist(team, dir);
+		const note = result.created ? "" : " (already exists)";
+		process.stdout.write(
+			`worktree for member ${member.id}${note}: ${result.path} on branch ${result.branch} (off ${result.base}).\nTell that member to: cd "${result.path}"\n`,
+		);
+	},
+
+	async "worktree-remove"(cwd, flags) {
+		const sessionId = requireFlag(flags, "team");
+		const { dir, team } = await loadTeam(cwd, sessionId);
+		const member = memberOrThrow(team, requireFlag(flags, "id"));
+		removeMemberWorktree(cwd, team, member, { force: flags.force === true });
+		clearMemberWorktree(team, { id: member.id });
+		await persist(team, dir);
+		process.stdout.write(`removed worktree for member ${member.id}\n`);
+	},
+
+	async integrate(cwd, flags) {
+		const sessionId = requireFlag(flags, "team");
+		const { team } = await loadTeam(cwd, sessionId);
+		const targets = typeof flags.id === "string" ? [memberOrThrow(team, flags.id)] : team.members.filter((m) => m.worktree?.branch);
+		if (targets.length === 0) throw new Error("no member has a worktree branch to integrate; run worktree-add first");
+		for (const member of targets) {
+			const result = integrateMemberBranch(cwd, member.worktree.branch);
+			if (!result.merged) {
+				process.stdout.write(`member ${member.id} (${member.worktree.branch}): CONFLICT into ${result.into}\n`);
+				throw new Error(
+					`merge conflict integrating member ${member.id} (branch ${member.worktree.branch}). Resolve it, commit the merge, then re-run integrate. Conflicting files: ${result.conflicts.join(", ") || "(see git status)"}`,
+				);
+			}
+			process.stdout.write(`member ${member.id} (${member.worktree.branch}): merged into ${result.into}\n`);
+		}
+		process.stdout.write(`integrated ${targets.length} member branch(es) with merge commits\n`);
 	},
 
 	async archive(cwd, flags) {
