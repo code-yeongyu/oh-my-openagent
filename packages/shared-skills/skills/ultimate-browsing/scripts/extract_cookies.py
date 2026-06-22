@@ -30,6 +30,7 @@ from cookie_crypto import (
     macos_keyring_secret,
     windows_oscrypt_key,
 )
+from cookie_domains import domain_where_clause
 from cookie_paths import BROWSERS, BrowserSpec, UnsupportedPlatform, platform_base, resolve_cookie_db
 
 _SAMESITE = {-1: "None", 0: "None", 1: "Lax", 2: "Strict"}
@@ -148,8 +149,7 @@ def write_cookie_file(path: Path, cookies: list[CookieRecord]) -> None:
 def extract_firefox(db_path: Path, domains: list[str]) -> list[CookieRecord]:
     tmp = _secure_cookie_db_copy(db_path)
     try:
-        where = " OR ".join("host LIKE ?" for _ in domains)
-        params = [f"%{d}%" for d in domains]
+        where, params = domain_where_clause("host", domains)
         conn = sqlite3.connect(str(tmp))
         rows = conn.execute(
             f"SELECT name, value, host, path, expiry, isSecure, isHttpOnly, sameSite "
@@ -171,8 +171,7 @@ def extract_firefox(db_path: Path, domains: list[str]) -> list[CookieRecord]:
 def extract_chromium(db_path: Path, domains: list[str], platform: str, key: bytes) -> list[CookieRecord]:
     tmp = _secure_cookie_db_copy(db_path)
     try:
-        where = " OR ".join("host_key LIKE ?" for _ in domains)
-        params = [f"%{d}%" for d in domains]
+        where, params = domain_where_clause("host_key", domains)
         conn = sqlite3.connect(str(tmp))
         rows = conn.execute(
             f"SELECT name, encrypted_value, host_key, path, expires_utc, is_secure, is_httponly, samesite "
