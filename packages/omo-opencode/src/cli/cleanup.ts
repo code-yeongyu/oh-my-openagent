@@ -43,6 +43,9 @@ export async function cleanup(options: CleanupOptions): Promise<number> {
   for (const path of result.removedPaths) {
     console.log(`- Removed ${path}`)
   }
+  for (const skippedPath of result.skippedPaths) {
+    console.log(`- Skipped cleanup target ${skippedPath.path}: ${skippedPath.reason}`)
+  }
   for (const path of result.removedAgentLinks) {
     console.log(`- Removed managed agent link ${path}`)
   }
