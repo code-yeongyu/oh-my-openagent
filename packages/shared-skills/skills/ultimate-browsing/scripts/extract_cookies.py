@@ -21,7 +21,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Callable, NotRequired, TypedDict
 
 from cookie_crypto import (
     decrypt_chromium_value,
@@ -41,6 +41,38 @@ IMPORTANT_COOKIES = {
 }
 
 
+class CookieRecord(TypedDict):
+    name: str
+    value: str
+    domain: str
+    path: str
+    expires: int
+    secure: bool
+    httpOnly: bool
+    sameSite: str
+
+
+class CdpCookie(TypedDict):
+    name: str
+    value: str
+    domain: str
+    path: str
+    secure: bool
+    httpOnly: bool
+    sameSite: str
+    expires: NotRequired[int]
+
+
+class BrowserDirs(TypedDict, total=False):
+    win32: str
+
+
+class BrowserSpec(TypedDict):
+    kind: str
+    safe_storage: str
+    dirs: BrowserDirs
+
+
 _CDP_SET_COOKIES_SCRIPT = r"""
 const port = Number(process.argv[1] || 0);
 if (!Number.isInteger(port) || port <= 0) {
@@ -51,7 +83,8 @@ if (!Number.isInteger(port) || port <= 0) {
 let input = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", async () => {
+process.stdin.on("end", () => {
+  (async () => {
   const cookies = JSON.parse(input || "[]");
   const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json());
   const ws = new WebSocket(version.webSocketDebuggerUrl);
@@ -85,9 +118,10 @@ process.stdin.on("end", async () => {
   }
   ws.close();
   process.stdout.write(String(ok));
-}).catch((error) => {
+  })().catch((error) => {
   process.stderr.write(`${error.name || "Error"}: ${error.message || error}\n`);
   process.exit(1);
+  });
 });
 """
 
@@ -100,25 +134,28 @@ def _secure_cookie_db_copy(db_path: Path) -> Path:
         shutil.copyfile(db_path, tmp)
         tmp.chmod(0o600)
         return tmp
-    except Exception:
+    except (OSError, shutil.Error):
         tmp.unlink(missing_ok=True)
         raise
 
 
-def write_cookie_file(path: Path, cookies: list[dict[str, Any]]) -> None:
-    if path.exists() and path.is_symlink():
+def write_cookie_file(path: Path, cookies: list[CookieRecord]) -> None:
+    if path.is_symlink():
         raise ValueError(f"refusing to write cookies through symlink: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
+            os.fchmod(f.fileno(), 0o600)
             json.dump(cookies, f, indent=2)
             f.write("\n")
+        os.replace(tmp_path, path)
     finally:
-        path.chmod(0o600)
+        tmp_path.unlink(missing_ok=True)
 
 
-def extract_firefox(db_path: Path, domains: list[str]) -> list[dict[str, Any]]:
+def extract_firefox(db_path: Path, domains: list[str]) -> list[CookieRecord]:
     tmp = _secure_cookie_db_copy(db_path)
     try:
         where = " OR ".join("host LIKE ?" for _ in domains)
@@ -141,7 +178,7 @@ def extract_firefox(db_path: Path, domains: list[str]) -> list[dict[str, Any]]:
     ]
 
 
-def extract_chromium(db_path: Path, domains: list[str], platform: str, key: bytes) -> list[dict[str, Any]]:
+def extract_chromium(db_path: Path, domains: list[str], platform: str, key: bytes) -> list[CookieRecord]:
     tmp = _secure_cookie_db_copy(db_path)
     try:
         where = " OR ".join("host_key LIKE ?" for _ in domains)
@@ -165,7 +202,18 @@ def extract_chromium(db_path: Path, domains: list[str], platform: str, key: byte
     return out
 
 
-def default_keyring_reader(platform: str, spec: dict[str, Any]) -> Callable[[str], bytes]:
+def _browser_spec(browser: str) -> BrowserSpec:
+    spec = BROWSERS.get(browser)
+    if spec is None:
+        raise UnsupportedPlatform(f"unsupported browser: {browser!r}")
+    return {
+        "kind": spec["kind"],
+        "safe_storage": spec.get("safe_storage", ""),
+        "dirs": spec.get("dirs", {}),
+    }
+
+
+def default_keyring_reader(platform: str, spec: BrowserSpec) -> Callable[[str], bytes]:
     if platform == "darwin":
         return macos_keyring_secret
     if platform == "linux":
@@ -182,12 +230,10 @@ def extract_cookies(
     browser: str,
     domains: list[str],
     platform: str = sys.platform,
-    keyring_reader: Optional[Callable[[str], bytes]] = None,
-    base_override: Optional[Path] = None,
-) -> list[dict[str, Any]]:
-    spec = BROWSERS.get(browser)
-    if spec is None:
-        raise UnsupportedPlatform(f"unsupported browser: {browser!r}")
+    keyring_reader: Callable[[str], bytes] | None = None,
+    base_override: Path | None = None,
+) -> list[CookieRecord]:
+    spec = _browser_spec(browser)
     db = resolve_cookie_db(browser, platform, base_override=base_override)
     if spec["kind"] == "firefox":
         return extract_firefox(db, domains)
@@ -196,9 +242,9 @@ def extract_cookies(
     return extract_chromium(db, domains, platform, key)
 
 
-def inject_cookies(cookies: list[dict[str, Any]], cdp_port: int) -> None:
+def inject_cookies(cookies: list[CookieRecord], cdp_port: int) -> None:
     filtered = [c for c in cookies if c["name"] in IMPORTANT_COOKIES] or cookies
-    payload = [
+    payload: list[CdpCookie] = [
         {
             "name": c["name"],
             "value": c["value"],

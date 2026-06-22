@@ -21,13 +21,12 @@ import json
 import os
 import random
 import time
-from typing import Optional
 
 from .curl_probe import run_attempt
 from .result_schema import Attempt, FetchResult
 from .summary import format_summary
 from .validators import Verdict
-from .waf_detector import detect, load_profile, _load_profiles, last_load_error
+from .waf_detector import DetectionHit, detect, load_profile, _load_profiles, last_load_error
 from .url_transforms import iter_transformed
 
 
@@ -35,9 +34,9 @@ from .url_transforms import iter_transformed
 def fetch(
     url: str,
     *,
-    success_selectors: Optional[list[str]] = None,
+    success_selectors: list[str] | None = None,
     device_class: str = "auto",      # "auto" | "desktop" | "mobile"
-    user_hint: Optional[dict] = None,
+    user_hint: dict | None = None,
     timeout: int = 25,
     max_attempts: int = 12,
     enable_playwright: bool = True,   # hook left for executor module
@@ -70,8 +69,8 @@ def fetch(
     profiles = _load_profiles()
     trace: list[Attempt] = []
     last_resp = None
-    last_attempt: Optional[Attempt] = None
-    profile_used: Optional[str] = None
+    last_attempt: Attempt | None = None
+    profile_used: str | None = None
 
     # Surface profile-loader failures as a trace entry so callers can see
     # that we're running on the in-code default (YAML missing / invalid /
@@ -115,7 +114,7 @@ def fetch(
     if last_resp is not None:
         hits = detect(last_resp, profiles=profiles)
     else:
-        hits = [type("H", (), {"profile_id": "unknown_challenge", "confidence": 0.1, "signals": ["no_probe_response"]})()]  # type: ignore
+        hits = [DetectionHit(profile_id="unknown_challenge", confidence=0.1, signals=["no_probe_response"])]
 
     # Try top profiles by confidence.
     attempts_used = len(trace)
@@ -232,7 +231,7 @@ def fetch(
                 verdict=Verdict.UNKNOWN.value,
                 error="executor module not available",
             ))
-        except Exception as e:
+        except (RuntimeError, OSError) as e:
             trace.append(Attempt(
                 phase="fallback",
                 executor="playwright",
@@ -257,7 +256,7 @@ def fetch(
     )
 
 
-def _build_result(resp, attempt: Attempt, trace: list[Attempt], profile_used: Optional[str]) -> FetchResult:
+def _build_result(resp, attempt: Attempt, trace: list[Attempt], profile_used: str | None) -> FetchResult:
     return FetchResult(
         ok=True,
         content=getattr(resp, "text", "") or "",

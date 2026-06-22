@@ -176,6 +176,27 @@ class SecretHandling(unittest.TestCase):
         self.assertEqual(output.stat().st_mode & 0o777, 0o600)
         self.assertIn("secret", output.read_text())
 
+    def test_cookie_output_replaces_existing_file_only_after_private_temp_write(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        output = base / "cookies.json"
+        output.write_text("old\n")
+        output.chmod(0o644)
+
+        def _dump(_cookies, f, indent: int) -> None:
+            self.assertEqual(output.read_text(), "old\n")
+            self.assertEqual(output.stat().st_mode & 0o777, 0o644)
+            temp_files = list(base.glob(".cookies.json.*.tmp"))
+            self.assertEqual(len(temp_files), 1)
+            self.assertEqual(temp_files[0].stat().st_mode & 0o777, 0o600)
+            f.write('[{"name": "SID", "value": "secret"}]')
+
+        with patch("extract_cookies.json.dump", side_effect=_dump):
+            write_cookie_file(output, [{"name": "SID", "value": "secret"}])
+
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        self.assertIn("secret", output.read_text())
+
     def test_cookie_output_refuses_symlinks(self) -> None:
         base = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
@@ -183,6 +204,15 @@ class SecretHandling(unittest.TestCase):
         target.write_text("{}")
         link = base / "cookies.json"
         link.symlink_to(target)
+
+        with self.assertRaises(ValueError):
+            write_cookie_file(link, [{"name": "SID", "value": "secret"}])
+
+    def test_cookie_output_refuses_dangling_symlinks(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        link = base / "cookies.json"
+        link.symlink_to(base / "missing.json")
 
         with self.assertRaises(ValueError):
             write_cookie_file(link, [{"name": "SID", "value": "secret"}])

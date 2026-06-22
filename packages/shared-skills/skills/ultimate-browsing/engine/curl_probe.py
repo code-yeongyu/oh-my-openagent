@@ -1,16 +1,32 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Optional
+from typing import Iterable, Mapping, Protocol
 
 from .referers import REFERER_STRATEGIES
 from .result_schema import Attempt
 from .validators import Verdict, validate
 
 
+class _CookieItem(Protocol):
+    name: str
+    value: str
+
+
+class _CookieJar(Protocol):
+    jar: Iterable[_CookieItem]
+
+
+class ProbeResponse(Protocol):
+    status_code: int
+    text: str
+    url: str
+    cookies: _CookieJar | Mapping[str, str]
+
+
 def _curl_probe(
     url: str, *, impersonate: str, referer: str, timeout: int = 20
-) -> tuple[Any, Optional[str]]:
+) -> tuple[ProbeResponse | None, str | None]:
     try:
         from curl_cffi import requests as cffi_requests
     except ImportError:
@@ -32,7 +48,7 @@ def _curl_probe(
             allow_redirects=True,
         )
         return resp, None
-    except Exception as e:
+    except cffi_requests.exceptions.RequestException as e:
         return None, f"{type(e).__name__}:{str(e)[:200]}"
 
 
@@ -42,11 +58,11 @@ def run_attempt(
     transform_name: str,
     impersonate: str,
     referer_name: str,
-    success_selectors: Optional[list[str]],
-    known_bad_sizes: Optional[list[int]],
+    success_selectors: list[str] | None,
+    known_bad_sizes: list[int] | None,
     timeout: int,
     phase: str,
-) -> tuple[Attempt, Any]:
+) -> tuple[Attempt, ProbeResponse | None]:
     referer_url = REFERER_STRATEGIES.get(referer_name, REFERER_STRATEGIES["none"])(url)
     started_at = time.time()
     resp, err = _curl_probe(url, impersonate=impersonate, referer=referer_url, timeout=timeout)
