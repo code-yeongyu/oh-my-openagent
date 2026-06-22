@@ -1,15 +1,23 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
 import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw, teamDir, teamJsonPath } from "./teammode-safety-fixture.mjs";
 
-// team.mjs derives paths from process.cwd(), which is the realpath; on macOS the temp dir is a
-// symlink (/var -> /private/var), so compare against the resolved root, not the symlink form.
 function memberWorktreePath(tempRoot, sessionId, memberId) {
-	return join(realpathSync(tempRoot), ".omo", "teams", sessionId, "worktrees", memberId);
+	return join(tempRoot, ".omo", "teams", sessionId, "worktrees", memberId);
+}
+
+// Compare two on-disk paths regardless of OS: realpathSync canonicalizes separators, drive-letter
+// case (Windows), and symlinks (macOS /var -> /private/var). Returns false if either side is gone.
+function samePath(a, b) {
+	try {
+		return realpathSync(a) === realpathSync(b);
+	} catch {
+		return false;
+	}
 }
 
 function git(cwd, ...args) {
@@ -37,11 +45,13 @@ function bootstrapTeam(cwd, sessionId, { worktree = false, baseBranch = "main" }
 	runTeam(cwd, "add-member", "--team", sessionId, "--id", "B", "--focus", "beta slice", "--lens", "ownership", "--deliverable", "b");
 }
 
-function worktreePaths(cwd) {
+// The branch each worktree is checked out on. Branch refs are "/"-delimited on every OS, so this
+// is a separator-proof way to assert which worktrees git knows about (porcelain paths are not).
+function worktreeBranches(cwd) {
 	return git(cwd, "worktree", "list", "--porcelain")
 		.split("\n")
-		.filter((line) => line.startsWith("worktree "))
-		.map((line) => line.slice("worktree ".length));
+		.filter((line) => line.startsWith("branch "))
+		.map((line) => line.slice("branch ".length).replace("refs/heads/", ""));
 }
 
 function branchExists(cwd, branch) {
@@ -59,14 +69,14 @@ test("#given a worktree team #when worktree-add A #then a real git worktree on a
 		// then - git itself knows about the worktree on the member branch
 		const expectedBranch = "team/wt-add/A";
 		assert.equal(branchExists(tempRoot, expectedBranch), true, "member branch must exist");
-		const expectedPath = memberWorktreePath(tempRoot, "wt-add", "A");
-		assert.ok(worktreePaths(tempRoot).some((p) => p === expectedPath), `git worktree list must include ${expectedPath}`);
+		assert.ok(worktreeBranches(tempRoot).includes(expectedBranch), "git worktree list must include the member branch");
 
-		// then - team.json records the worktree for the member
+		// then - team.json records the worktree for the member (compare by realpath: OS-agnostic)
+		const expectedPath = memberWorktreePath(tempRoot, "wt-add", "A");
 		const member = readTeamJson(tempRoot, "wt-add").members.find((m) => m.id === "A");
-		assert.equal(member.worktree.path, expectedPath);
+		assert.ok(existsSync(member.worktree.path) && samePath(member.worktree.path, expectedPath), "worktree.path must point at the member worktree dir");
 		assert.equal(member.worktree.branch, expectedBranch);
-		assert.equal(member.cwd, expectedPath);
+		assert.ok(samePath(member.cwd, expectedPath), "cwd must be the member worktree dir");
 
 		// then - the leader is told the exact cd target
 		assert.match(result.stdout, /cd /);
@@ -105,7 +115,7 @@ test("#given a team initialized WITHOUT --worktree #when worktree-add is called 
 
 		const team = readTeamJson(tempRoot, "wt-auto");
 		assert.equal(team.worktree.enabled, true, "worktree-add must flip the team into isolation mode");
-		assert.ok(worktreePaths(tempRoot).some((p) => p === memberWorktreePath(tempRoot, "wt-auto", "A")));
+		assert.ok(worktreeBranches(tempRoot).includes("team/wt-auto/A"), "git must have created the member worktree");
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}
@@ -121,7 +131,7 @@ test("#given an existing member worktree #when worktree-add runs again #then it 
 		const second = runTeam(tempRoot, "worktree-add", "--team", "wt-idem", "--id", "A");
 
 		assert.match(second.stdout, /exist/i, "re-running must report the worktree already exists, not crash");
-		assert.equal(worktreePaths(tempRoot).filter((p) => p.endsWith(join("worktrees", "A"))).length, 1);
+		assert.equal(worktreeBranches(tempRoot).filter((b) => b === "team/wt-idem/A").length, 1, "no duplicate worktree");
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}
@@ -132,13 +142,12 @@ test("#given a member worktree #when worktree-remove A #then git drops it and te
 	try {
 		initGitRepo(tempRoot);
 		bootstrapTeam(tempRoot, "wt-rm", { worktree: true });
-		const path = memberWorktreePath(tempRoot, "wt-rm", "A");
 		runTeam(tempRoot, "worktree-add", "--team", "wt-rm", "--id", "A");
-		assert.ok(worktreePaths(tempRoot).includes(path));
+		assert.ok(worktreeBranches(tempRoot).includes("team/wt-rm/A"));
 
 		runTeam(tempRoot, "worktree-remove", "--team", "wt-rm", "--id", "A");
 
-		assert.ok(!worktreePaths(tempRoot).includes(path), "git worktree list must no longer include the removed worktree");
+		assert.ok(!worktreeBranches(tempRoot).includes("team/wt-rm/A"), "git worktree list must no longer include the removed worktree");
 		const member = readTeamJson(tempRoot, "wt-rm").members.find((m) => m.id === "A");
 		assert.equal(member.worktree.path, null);
 	} finally {
