@@ -15,8 +15,8 @@ def derive_key(platform: str, secret: bytes) -> bytes:
             raise ValueError(f"win32 os_crypt key must be 32 bytes, got {len(secret)}")
         return secret
     if platform in ("darwin", "linux"):
-        from cryptography.hazmat.primitives import hashes  # type: ignore[import-untyped]
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # type: ignore[import-untyped]
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
         iterations = 1003 if platform == "darwin" else 1
         return PBKDF2HMAC(algorithm=hashes.SHA1(), length=16, salt=b"saltysalt", iterations=iterations).derive(secret)
@@ -26,14 +26,16 @@ def derive_key(platform: str, secret: bytes) -> bytes:
 def decrypt_chromium_value(platform: str, key: bytes, encrypted: bytes) -> str:
     if not encrypted:
         return ""
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes  # type: ignore[import-untyped]
-
     prefix = encrypted[:3]
     if prefix in (b"v10", b"v11") and platform == "win32":
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
         nonce, ciphertext, tag = encrypted[3:15], encrypted[15:-16], encrypted[-16:]
         decryptor = Cipher(algorithms.AES(key), modes.GCM(nonce, tag)).decryptor()
         return (decryptor.update(ciphertext) + decryptor.finalize()).decode("utf-8", errors="replace")
     if prefix in (b"v10", b"v11"):
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
         decryptor = Cipher(algorithms.AES128(key), modes.CBC(b" " * 16)).decryptor()
         decrypted = decryptor.update(encrypted[3:]) + decryptor.finalize()
         pad = decrypted[-1]
@@ -55,7 +57,7 @@ def macos_keyring_secret(safe_storage: str) -> bytes:
 
 def linux_keyring_secret(safe_storage: str) -> bytes:
     try:
-        import secretstorage  # type: ignore[import-not-found,import-untyped]
+        import secretstorage
     except ImportError:
         return b"peanuts"
     conn = secretstorage.dbus_init()
@@ -68,6 +70,6 @@ def linux_keyring_secret(safe_storage: str) -> bytes:
 def windows_oscrypt_key(local_state_path: Path) -> bytes:
     state = json.loads(local_state_path.read_text())
     blob = base64.b64decode(state["os_crypt"]["encrypted_key"])[5:]
-    import win32crypt  # type: ignore[import-not-found,import-untyped]
+    import win32crypt
 
     return win32crypt.CryptUnprotectData(blob, None, None, None, 0)[1]
