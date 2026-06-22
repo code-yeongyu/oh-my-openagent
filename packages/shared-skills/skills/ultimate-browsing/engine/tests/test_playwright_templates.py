@@ -94,6 +94,17 @@ def _install_playwright_extra_with_internal_missing_dependency(node_modules: Pat
     )
 
 
+def _install_self_missing_optional_module(node_modules: Path, module_name: str) -> None:
+    _write_file(
+        node_modules / module_name / "index.js",
+        f"""
+        const error = new Error("Cannot find module '{module_name}'");
+        error.code = 'MODULE_NOT_FOUND';
+        throw error;
+        """,
+    )
+
+
 def _run_template(
     template_name: str,
     payload: dict[str, JsonValue],
@@ -101,6 +112,7 @@ def _run_template(
     include_broken_extra: bool = False,
     include_working_extra: bool = False,
     include_internal_missing_extra: bool = False,
+    include_self_missing_module: str | None = None,
     env_overrides: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     with tempfile.TemporaryDirectory(prefix="ultimate-browsing-template-test-") as tmp:
@@ -113,6 +125,8 @@ def _run_template(
             _install_broken_playwright_extra(node_modules)
         if include_internal_missing_extra:
             _install_playwright_extra_with_internal_missing_dependency(node_modules)
+        if include_self_missing_module:
+            _install_self_missing_optional_module(node_modules, include_self_missing_module)
 
         script_path = tmp_path / template_name
         script_path.write_text((TEMPLATES_DIR / template_name).read_text(encoding="utf-8"), encoding="utf-8")
@@ -205,6 +219,27 @@ class PlaywrightTemplateErrorHandling(unittest.TestCase):
                 self.assertIn("Cannot find module 'transitive-stealth-runtime'", result.stderr)
                 self.assertNotIn("best-effort optional module", result.stderr)
                 self.assertEqual(result.stdout, "")
+
+    def test_present_optional_module_self_missing_error_is_not_swallowed(self) -> None:
+        cases = (("playwright-extra", False), ("puppeteer-extra-plugin-stealth", True))
+        for template_name in TEMPLATE_NAMES:
+            for module_name, include_working_extra in cases:
+                with self.subTest(template_name=template_name, module_name=module_name):
+                    result = _run_template(
+                        template_name,
+                        {
+                            "url": "https://example.com/article",
+                            "profileDir": "/tmp/ultimate-browsing-test-profile",
+                            "headless": True,
+                        },
+                        include_working_extra=include_working_extra,
+                        include_self_missing_module=module_name,
+                    )
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f"Cannot find module '{module_name}'", result.stderr)
+                    self.assertNotIn("best-effort optional module", result.stderr)
+                    self.assertEqual(result.stdout, "")
 
     def test_selector_failures_are_reported_as_best_effort_warnings(self) -> None:
         for template_name in TEMPLATE_NAMES:
