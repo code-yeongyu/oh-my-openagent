@@ -2,6 +2,7 @@ import type { BackgroundTask, LaunchInput } from "./types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
+import { isProviderExhaustionFallbackEligible } from "@oh-my-opencode/model-core"
 import { log, readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
 import {
   shouldRetryError,
@@ -33,6 +34,7 @@ export type FallbackRetryHandlerDeps = {
   hasMoreFallbacks: typeof hasMoreFallbacks
   selectFallbackProvider: typeof selectFallbackProvider
   transformModelForProvider: typeof transformModelForProvider
+  isProviderExhaustionFallbackEligible: (error: unknown) => boolean
 }
 
 const defaultFallbackRetryHandlerDeps: FallbackRetryHandlerDeps = {
@@ -44,6 +46,7 @@ const defaultFallbackRetryHandlerDeps: FallbackRetryHandlerDeps = {
   hasMoreFallbacks,
   selectFallbackProvider,
   transformModelForProvider,
+  isProviderExhaustionFallbackEligible,
 }
 
 export async function tryFallbackRetry(args: {
@@ -68,8 +71,9 @@ export async function tryFallbackRetry(args: {
   const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
   const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
   const fallbackChain = task.fallbackChain
+  const canUseProviderExhaustionFallback = deps.isProviderExhaustionFallbackEligible(errorInfo)
   const canRetry =
-    deps.shouldRetryError(errorInfo) &&
+    (deps.shouldRetryError(errorInfo) || canUseProviderExhaustionFallback) &&
     fallbackChain &&
     fallbackChain.length > 0 &&
     deps.hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)
