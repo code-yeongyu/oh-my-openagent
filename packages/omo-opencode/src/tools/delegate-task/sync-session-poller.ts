@@ -4,6 +4,8 @@ import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { consumeSyncSessionError } from "../../shared/sync-session-error-store"
+import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 
 export { isSessionComplete } from "./sync-session-turns"
 
@@ -162,6 +164,13 @@ export async function pollSyncSession(
         inactiveElapsed: Math.floor(inactiveElapsedMs / 1000) + "s",
         sessionStatus: sessionStatus?.type ?? "not_in_status",
       })
+    }
+
+    const asyncSessionError = consumeSyncSessionError(input.sessionID)
+    if (asyncSessionError !== undefined) {
+      const errorMessage = extractErrorMessage(asyncSessionError) ?? "Session error"
+      log("[task] Poll detected async session error", { sessionID: input.sessionID, sessionError: errorMessage })
+      return errorMessage
     }
 
     if (isActiveSessionStatus(sessionStatus)) {

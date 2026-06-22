@@ -25,6 +25,8 @@ describe("pollSyncSession", () => {
 
   afterEach(() => {
     __resetTimingConfig()
+    const { clearAllSyncSessionErrorsForTesting } = require("../../shared/sync-session-error-store")
+    clearAllSyncSessionErrorsForTesting()
   })
 
   describe("native finish-based completion", () => {
@@ -62,6 +64,48 @@ describe("pollSyncSession", () => {
 
       // then: returns error message
       expect(result).toBe("Forbidden: Selected provider is forbidden")
+    })
+
+    test("returns recorded async session error when no assistant message exists", async () => {
+      // given: promptAsync succeeded but provider failed through session.error before any assistant turn
+      const { pollSyncSession } = require("./sync-session-poller")
+      const { recordSyncSessionError } = require("../../shared/sync-session-error-store")
+      const providerError = {
+        name: "ProviderModelNotFoundError",
+        data: {
+          providerID: "openai",
+          modelID: "gpt-5.3-codex",
+          message: "Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?",
+        },
+      }
+      recordSyncSessionError("ses_async_error", providerError)
+
+      let abortCount = 0
+      const mockClient = {
+        session: {
+          abort: async () => {
+            abortCount++
+          },
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            ],
+          }),
+          status: async () => ({ data: { "ses_async_error": { type: "running" } } }),
+        },
+      }
+
+      // when: polling the sync child session
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_async_error",
+        agentToUse: "sisyphus-junior",
+        toastManager: null,
+        taskId: undefined,
+      }, 50)
+
+      // then: the async provider error wins over running status and missing assistant messages
+      expect(result).toBe("Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?")
+      expect(abortCount).toBe(0)
     })
 
     test("ignores stale prior-turn assistant errors after a new user turn starts", async () => {

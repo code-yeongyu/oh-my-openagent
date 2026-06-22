@@ -57,6 +57,8 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#given - reset timing after each test
     const { __resetTimingConfig } = require("./timing")
     __resetTimingConfig()
+    const { clearAllSyncSessionErrorsForTesting } = require("../../shared/sync-session-error-store")
+    clearAllSyncSessionErrorsForTesting()
 
 		mock.restore()
 
@@ -480,6 +482,116 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("Result")
   })
 
+  test("routes late session.error from resumed sync task_id session into the poller", async () => {
+    //#given - a sync continuation using an existing task_id and the real poller/event bridge
+    const continuationID = "ses_resume_sync_late_error"
+    let promptDispatched = false
+    let emitSessionError: (() => Promise<void>) | undefined
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: {
+                id: "msg_002",
+                role: "assistant",
+                time: { created: 2000 },
+                finish: "end_turn",
+                agent: "sisyphus",
+              },
+              parts: [{ type: "text", text: "Previous response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => {
+          promptDispatched = true
+          setTimeout(() => {
+            void emitSessionError?.()
+          }, 0)
+          return {}
+        },
+        status: async () => ({
+          data: promptDispatched ? { [continuationID]: { type: "running" } } : {},
+        }),
+        abort: async () => ({}),
+      },
+    }
+    const { createEventHandler } = require("../../plugin/event")
+    const { pollSyncSession } = require("./sync-session-poller")
+    const { executeSyncContinuation } = require("./sync-continuation")
+    const { unsafeTestValue } = require("../../../../../test-support/unsafe-test-value")
+    const eventHandler = createEventHandler({
+      ctx: unsafeTestValue({
+        directory: "/tmp",
+        client: mockClient,
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: unsafeTestValue({
+        tmuxSessionManager: {
+          onSessionCreated: async () => {},
+          onSessionDeleted: async () => {},
+        },
+        skillMcpManager: {
+          disconnectSession: async () => {},
+        },
+      }),
+      hooks: unsafeTestValue({}),
+    })
+    emitSessionError = async () => {
+      await eventHandler(unsafeTestValue({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: continuationID,
+            error: {
+              name: "ProviderModelNotFoundError",
+              message: "Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?",
+            },
+          },
+        },
+      }))
+    }
+
+    const deps = {
+      pollSyncSession,
+      fetchSyncResult: async () => {
+        throw new Error("fetchSyncResult should not run after poller sees async session.error")
+      },
+    }
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+    const mockExecutorCtx = {
+      client: mockClient,
+      syncPollTimeoutMs: 100,
+    }
+    const args = {
+      task_id: continuationID,
+      prompt: "continue working",
+      description: "resume sync task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then
+    expect(result).toContain("Model not found: openai/gpt-5.3-codex")
+    expect(result).not.toContain("Poll inactivity timeout")
+  })
+
   test("marks and aborts resumed sync session after successful handback", async () => {
     //#given - a resumed sync continuation completes successfully
     const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
@@ -612,6 +724,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     handedBackSyncSessions.clear()
   })
+
 
   test("removes toast when abort happens", async () => {
     //#given - create a context with abort signal

@@ -16,6 +16,7 @@ import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { log } from "../../shared/logger"
+import { clearDelegateTaskSyncSession, clearSyncSessionError, registerDelegateTaskSyncSession } from "../../shared/sync-session-error-store"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -101,6 +102,7 @@ export async function executeSyncContinuation(
 ): Promise<string> {
   const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
+  const hasActiveChildBackgroundTasks = executorCtx.manager?.hasActiveChildTasks?.bind(executorCtx.manager)
   const continuationID = getTaskID(args)
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
@@ -163,6 +165,8 @@ export async function executeSyncContinuation(
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
     }
     setSessionTools(continuationID, tools)
+    clearSyncSessionError(continuationID)
+    registerDelegateTaskSyncSession(continuationID)
 
     await promptWithModelSuggestionRetry(client, {
       path: { id: continuationID },
@@ -178,68 +182,45 @@ export async function executeSyncContinuation(
       queueBehavior: "defer",
       checkToolState: false,
     })
-   } catch (promptError) {
-     if (toastManager) {
-       toastManager.removeTask(taskId)
-     }
-     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-     return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
-   }
+  } catch (promptError) {
+    clearSyncSessionError(continuationID)
+    clearDelegateTaskSyncSession(continuationID)
+    if (toastManager) {
+      toastManager.removeTask(taskId)
+    }
+    const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+    return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
+  }
 
-    try {
-      const pollError = await deps.pollSyncSession(ctx, client, {
-        sessionID: continuationID,
-        agentToUse: resumeAgent ?? "continue",
-        toastManager,
-        taskId,
-        anchorMessageCount,
-      }, syncPollTimeoutMs)
-      if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
-        if (anchorMessageCount === undefined) {
-          return pollError
-        }
-        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-          strictAbortRecovery: true,
-          deliverableTag: getDeliverableTag(resumeAgent),
-        })
-        if (!recoveredResult.ok) {
-          return pollError
-        }
+  try {
+    const pollError = await deps.pollSyncSession(ctx, client, {
+      sessionID: continuationID,
+      agentToUse: resumeAgent ?? "continue",
+      toastManager,
+      taskId,
+      anchorMessageCount,
+      hasActiveChildBackgroundTasks,
+    }, syncPollTimeoutMs)
+    if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
+      if (anchorMessageCount === undefined) {
+        return pollError
+      }
+      const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+        strictAbortRecovery: true,
+        deliverableTag: getDeliverableTag(resumeAgent),
+      })
+      if (!recoveredResult.ok) {
+        return pollError
+      }
 
-        const duration = formatDuration(startTime)
-        handedBackToParent = true
+      const duration = formatDuration(startTime)
+      handedBackToParent = true
 
-        return `Task continued and completed in ${duration}.
+      return `Task continued and completed in ${duration}.
 
 ---
 
 ${recoveredResult.textContent || "(No text output)"}
-
-${buildTaskMetadataBlock({
-          sessionId: continuationID,
-          taskId: continuationID,
-          agent: resumeAgent,
-          category: args.category,
-        })}`
-      } else if (pollError) {
-        return pollError
-      }
-
-      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-        deliverableTag: getDeliverableTag(resumeAgent),
-      })
-      if (!result.ok) {
-        return result.error
-      }
-
-     const duration = formatDuration(startTime)
-     handedBackToParent = true
-
-     return `Task continued and completed in ${duration}.
-
----
-
-${result.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
         sessionId: continuationID,
@@ -247,17 +228,45 @@ ${buildTaskMetadataBlock({
         agent: resumeAgent,
         category: args.category,
       })}`
-   } finally {
-     if (toastManager) {
-       toastManager.removeTask(taskId)
-     }
-     if (handedBackToParent) {
-       handedBackSyncSessions.add(continuationID)
-       if (typeof client.session.abort === "function") {
-         void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
-           log(`[task] Failed to abort completed sync continuation session:`, error)
-         })
-       }
-     }
-   }
+    } else if (pollError) {
+      return pollError
+    }
+
+    const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+      deliverableTag: getDeliverableTag(resumeAgent),
+    })
+    if (!result.ok) {
+      return result.error
+    }
+
+    const duration = formatDuration(startTime)
+    handedBackToParent = true
+
+    return `Task continued and completed in ${duration}.
+
+---
+
+${result.textContent || "(No text output)"}
+
+${buildTaskMetadataBlock({
+      sessionId: continuationID,
+      taskId: continuationID,
+      agent: resumeAgent,
+      category: args.category,
+    })}`
+  } finally {
+    if (toastManager) {
+      toastManager.removeTask(taskId)
+    }
+    clearSyncSessionError(continuationID)
+    clearDelegateTaskSyncSession(continuationID)
+    if (handedBackToParent) {
+      handedBackSyncSessions.add(continuationID)
+      if (typeof client.session.abort === "function") {
+        void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
+          log("[task] Failed to abort completed sync continuation session", { sessionID: continuationID, error: String(error) })
+        })
+      }
+    }
+  }
 }

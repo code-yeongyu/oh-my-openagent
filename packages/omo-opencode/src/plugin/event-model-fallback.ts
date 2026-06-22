@@ -34,7 +34,7 @@ export function createModelFallbackEventHandler(args: {
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
-  const continuationsInFlight = new Set<string>();
+  const continuationsInFlight = new Map<string, Promise<boolean>>();
   const lastDispatchedContinuationKeys = new Map<
     string,
     {
@@ -80,17 +80,22 @@ export function createModelFallbackEventHandler(args: {
     currentModel: string,
     shouldAutoContinue: boolean,
     fallbackContext: FallbackContinuationContext,
-  ): Promise<void> => {
-    if (shouldAutoContinue && continuation.shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return;
+  ): Promise<boolean> => {
+    if (shouldAutoContinue) {
+      const existingResult = continuation.getExistingFallbackContinuationResult(sessionID, source, fallbackContext);
+      if (existingResult !== undefined) return existingResult;
+    }
 
     applyUserConfiguredFallbackChain(args.modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
     const setFallback = args.modelFallback
       ? setPendingModelFallback(args.modelFallback, sessionID, agentName, currentProvider, currentModel)
       : false;
+    if (!setFallback) return false;
 
-    if (setFallback && shouldAutoContinue) {
-      await continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
+    if (shouldAutoContinue) {
+      return continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
     }
+    return true;
   };
 
   const shouldHandleModelFallback = (): boolean => {
@@ -191,8 +196,8 @@ export function createModelFallbackEventHandler(args: {
     errorMessage: string;
     errorName?: string;
     props?: Record<string, unknown>;
-  }): Promise<void> => {
-    if (!shouldHandleModelFallback() || !shouldRetryError({ name: params.errorName, message: params.errorMessage })) return;
+  }): Promise<boolean> => {
+    if (!shouldHandleModelFallback() || !shouldRetryError({ name: params.errorName, message: params.errorMessage })) return false;
 
     const agentName = resolveFallbackAgentName({
       currentAgent: getSessionAgent(params.sessionID),
@@ -200,7 +205,7 @@ export function createModelFallbackEventHandler(args: {
       mainSessionID: getMainSessionID(),
       message: params.errorMessage,
     });
-    if (!agentName) return;
+    if (!agentName) return false;
 
     const parsed = extractProviderModelFromErrorMessage(params.errorMessage);
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
@@ -211,7 +216,7 @@ export function createModelFallbackEventHandler(args: {
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
-    await applyFallback(
+    return applyFallback(
       params.sessionID,
       "session.error",
       agentName,

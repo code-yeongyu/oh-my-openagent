@@ -5,9 +5,14 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
-import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { _resetForTesting, setMainSession, subagentSessions, syncSubagentSessions } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
+import {
+	clearAllSyncSessionErrorsForTesting,
+	consumeSyncSessionError,
+	registerDelegateTaskSyncSession,
+} from "../shared/sync-session-error-store"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
@@ -146,6 +151,7 @@ async function flushMicrotasks(turns: number = 5): Promise<void> {
 afterEach(() => {
 	mock.restore()
 	_resetForTesting()
+	clearAllSyncSessionErrorsForTesting()
 })
 
 describe("event error extraction", () => {
@@ -1510,6 +1516,120 @@ describe("createEventHandler - retry dedupe lifecycle", () => {
 		expect(abortCalls).toEqual([sessionID, sessionID])
 		expect(promptCalls).toEqual([sessionID, sessionID])
 	})
+})
+
+describe("createEventHandler - sync poller session.error", () => {
+	it("records sync child session.error for the sync poller when runtime fallback is disabled", async () => {
+		const sessionID = "ses_sync_child_provider_error"
+		const providerError = {
+			name: "ProviderModelNotFoundError",
+			data: {
+				providerID: "openai",
+				modelID: "gpt-5.3-codex",
+				message: "Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?",
+			},
+		}
+		syncSubagentSessions.add(sessionID)
+		registerDelegateTaskSyncSession(sessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({ runtime_fallback: false }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID,
+					error: providerError,
+				},
+			},
+		}))
+
+		expect(consumeSyncSessionError(sessionID)).toBe("Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?")
+	})
+
+	it("stores a sanitized sync child session.error message for the sync poller", async () => {
+		const sessionID = "ses_sync_child_sensitive_error"
+		const providerError = {
+			name: "ProviderModelNotFoundError",
+			data: {
+				token: "secret-token-value",
+				headers: { authorization: "Bearer secret-token-value" },
+			},
+		}
+		syncSubagentSessions.add(sessionID)
+		registerDelegateTaskSyncSession(sessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({ runtime_fallback: false }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID,
+					error: providerError,
+				},
+			},
+		}))
+
+		const storedError = consumeSyncSessionError(sessionID)
+		expect(storedError).toBe("ProviderModelNotFoundError")
+		expect(storedError).not.toContain("secret-token-value")
+	})
+
+	it("does not record generic sync subagent session.error for the sync poller", async () => {
+		const sessionID = "ses_generic_sync_child_provider_error"
+		const providerError = {
+			name: "ProviderModelNotFoundError",
+			data: {
+				providerID: "openai",
+				modelID: "gpt-5.3-codex",
+				message: "Model not found: openai/gpt-5.3-codex. Did you mean: gpt-5.3-codex-spark?",
+			},
+		}
+		syncSubagentSessions.add(sessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({ runtime_fallback: false }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID,
+					error: providerError,
+				},
+			},
+		}))
+
+		expect(consumeSyncSessionError(sessionID)).toBeUndefined()
+	})
+
 })
 
 describe("createEventHandler - event hook isolation", () => {
