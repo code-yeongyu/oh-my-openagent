@@ -232,13 +232,16 @@ test("#given user-customized Codex model config #when migrating #then user value
 	});
 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
-	assert.deepEqual(result.changed, []);
+	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
 	assert.deepEqual(result.modeChanged, []);
 	assert.match(content, /model = "gpt-5\.4"/);
 	assert.match(content, /model_context_window = 123456/);
 	assert.match(content, /model_reasoning_effort = "medium"/);
 	assert.match(content, /plan_mode_reasoning_effort = "medium"/);
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
+	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
 });
 
 test("#given managed config state is malformed #when migrating #then migration ignores stale state safely", async () => {
@@ -399,6 +402,8 @@ test("#given config already matches current catalog #when catalog version advanc
 	assert.equal(state.files[configPath].catalogVersion, "test.role-only");
 	const content = await readFile(configPath, "utf8");
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
 });
 
 test("#given multi_agent_v2 enabled #when forcing disable #then flips the flag to false", () => {
@@ -555,7 +560,9 @@ test("#given global config without multi_agent_v2 section #when full migration r
 	assert.deepEqual(result.changed, [configPath]);
 	assert.deepEqual(result.modeChanged, []);
 	const content = await readFile(configPath, "utf8");
-	assert.match(content, /\[features\.multi_agent_v2\]\nenabled = false\n/);
+	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
 });
 
@@ -661,6 +668,8 @@ test("#given global config with forced multi_agent_v2 #when full migration runs 
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /enabled = false/);
 	assert.doesNotMatch(content, /enabled = true/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 });
 
 test("#given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment", () => {

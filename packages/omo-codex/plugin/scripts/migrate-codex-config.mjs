@@ -10,6 +10,7 @@ import { removeUnsupportedRootMultiAgentMode } from "./migrate-codex-config/mult
 import { forceDisableMultiAgentV2 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
 import { readState, resolveStatePath, writeState } from "./migrate-codex-config/state.mjs";
+import { ensureSubagentConcurrencyLimit } from "./migrate-codex-config/subagent-limit-guard.mjs";
 
 export { readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 
@@ -62,7 +63,11 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 	const multiAgentModeChanged = afterMultiAgentModeGuard !== config;
 	if (multiAgentModeChanged) config = afterMultiAgentModeGuard;
 
-	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged;
+	const afterSubagentLimit = ensureSubagentConcurrencyLimit(config);
+	const subagentLimitChanged = afterSubagentLimit !== config;
+	if (subagentLimitChanged) config = afterSubagentLimit;
+
+	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged || subagentLimitChanged;
 	if (changed) {
 		await mkdir(dirname(configPath), { recursive: true });
 		await writeFile(configPath, `${config.trimEnd()}\n`);
