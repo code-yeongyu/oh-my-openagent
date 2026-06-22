@@ -291,6 +291,7 @@ describe("morpheus-task", () => {
           promptAsync: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -354,6 +355,7 @@ describe("morpheus-task", () => {
           promptAsync: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -418,6 +420,7 @@ describe("morpheus-task", () => {
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -482,6 +485,7 @@ describe("morpheus-task", () => {
           promptAsync: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -539,6 +543,7 @@ describe("morpheus-task", () => {
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -586,6 +591,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -653,6 +659,7 @@ describe("morpheus-task", () => {
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -985,6 +992,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -1052,6 +1060,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -1115,6 +1124,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
            }),
            status: async () => ({ data: { "ses_sync_default_variant": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -1166,6 +1176,7 @@ describe("morpheus-task", () => {
           prompt: async () => ({ data: {} }),
           promptAsync: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -1207,6 +1218,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -1260,6 +1272,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
            }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
        }
       
@@ -1357,6 +1370,7 @@ describe("morpheus-task", () => {
              }
            },
            status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          app: {
@@ -1425,6 +1439,7 @@ describe("morpheus-task", () => {
           ],
         }),
         status: async () => ({ data: { "ses_var_test": { type: "idle" } } }),
+        abort: mock(() => Promise.resolve()),
       },
       config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
       app: {
@@ -1487,6 +1502,7 @@ describe("morpheus-task", () => {
          messages: async () => ({
            data: [],
          }),
+         abort: mock(() => Promise.resolve()),
        },
        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
      }
@@ -1542,6 +1558,7 @@ describe("morpheus-task", () => {
            promptAsync: promptMock,
            messages: async () => ({ data: [] }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          app: {
@@ -1586,38 +1603,41 @@ describe("morpheus-task", () => {
       
       const mockManager = {
         launch: async () => ({}),
+        getTasksByParentSession: () => [],
+        hasInFlightNotificationForParent: () => false,
       }
       
        const mockClient = {
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_sync_success" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [
-               {
-                 info: { id: "msg_001", role: "user", time: { created: Date.now() } },
-                 parts: [{ type: "text", text: "Do something" }],
-               },
-               {
-                 info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
-                 parts: [{ type: "text", text: "Sync task completed successfully" }],
-               },
-             ],
-           }),
-           status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
-         },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         app: {
-           agents: async () => ({ data: [{ name: "source", mode: "subagent" }] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_sync_success" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { id: "msg_001", role: "user", time: { created: Date.now() } },
+                  parts: [{ type: "text", text: "Do something" }],
+                },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "Sync task completed successfully" }],
+                },
+              ],
+            }),
+            status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
+            abort: mock(() => Promise.resolve()),
+          },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          app: {
+            agents: async () => ({ data: [{ name: "source", mode: "subagent" }] }),
+          },
+        }
+        
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
       
       const toolContext = {
         sessionID: "parent-session",
@@ -1663,6 +1683,7 @@ describe("morpheus-task", () => {
            promptAsync: promptMock,
            messages: async () => ({ data: [] }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          app: {
@@ -1721,6 +1742,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
            }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          app: { agents: async () => ({ data: [] }) },
@@ -1794,6 +1816,7 @@ describe("morpheus-task", () => {
              ]
            }),
            status: async () => ({ data: { "ses_unstable_custom": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -1856,6 +1879,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -1923,6 +1947,7 @@ describe("morpheus-task", () => {
              ]
            }),
            status: async () => ({ data: { "ses_unstable_minimax": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -1991,6 +2016,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done sync" }] }]
            }),
            status: async () => ({ data: { "ses_sync_non_gemini": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -2060,6 +2086,7 @@ describe("morpheus-task", () => {
              ]
            }),
            status: async () => ({ data: { "ses_artistry_custom": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -2131,6 +2158,7 @@ describe("morpheus-task", () => {
              ]
            }),
            status: async () => ({ data: { "ses_writing_custom": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -2201,6 +2229,7 @@ describe("morpheus-task", () => {
             ]
           }),
           status: async () => ({ data: { "ses_custom_unstable": { type: "idle" } } }),
+          abort: mock(() => Promise.resolve()),
         },
       }
       
@@ -2271,6 +2300,7 @@ describe("morpheus-task", () => {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -2336,6 +2366,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -2399,6 +2430,7 @@ describe("morpheus-task", () => {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -2461,6 +2493,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -2525,6 +2558,7 @@ describe("morpheus-task", () => {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -2586,6 +2620,7 @@ describe("morpheus-task", () => {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          abort: mock(() => Promise.resolve()),
         },
       }
 
@@ -2648,6 +2683,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
            }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -2700,6 +2736,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
            }),
            status: async () => ({ data: {} }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3103,7 +3140,7 @@ describe("morpheus-task", () => {
       const mockClient = {
          app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
+         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) , abort: mock(() => Promise.resolve())},
        }
        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
       
@@ -3124,7 +3161,7 @@ describe("morpheus-task", () => {
       const mockClient = {
          app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
+         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) , abort: mock(() => Promise.resolve())},
        }
        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
       
@@ -3144,7 +3181,7 @@ describe("morpheus-task", () => {
       const mockClient = {
          app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) },
+         session: { get: async () => ({ data: { directory: "/project" } }), create: async () => ({ data: { id: "s" } }), prompt: async () => ({ data: {} }), promptAsync: async () => ({ data: {} }), messages: async () => ({ data: [] }), status: async () => ({ data: {} }) , abort: mock(() => Promise.resolve())},
        }
        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
       
@@ -3171,14 +3208,15 @@ describe("morpheus-task", () => {
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }] }),
            status: async () => ({ data: { "ses_ok": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
-       const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
-      
-      //#when
-      const result = await tool.execute(
-        { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
-        { sessionID: "p", messageID: "m", agent: "morpheus", abort: new AbortController().signal }
+        const tool = createDelegateTask({ manager: { launch: async () => ({}), getTasksByParentSession: () => [], hasInFlightNotificationForParent: () => false }, client: mockClient })
+       
+       //#when
+       const result = await tool.execute(
+         { description: "test", prompt: "Create a plan", subagent_type: "plan", run_in_background: false, load_skills: [] },
+         { sessionID: "p", messageID: "m", agent: "morpheus", abort: new AbortController().signal }
       )
       
       //#then
@@ -3220,6 +3258,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3284,6 +3323,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }],
            }),
            status: async () => ({ data: { "ses_oracle_model": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3348,6 +3388,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
            }),
            status: async () => ({ data: { "ses_no_model_agent": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3409,6 +3450,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
            }),
            status: async () => ({ data: { "ses_override_model": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3476,6 +3518,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
            }),
            status: async () => ({ data: { "ses_variant_test": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3540,6 +3583,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
            }),
            status: async () => ({ data: { "ses_fallback_test": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3604,6 +3648,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }]
            }),
            status: async () => ({ data: { "ses_plan_delegate": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        
@@ -3650,6 +3695,7 @@ describe("morpheus-task", () => {
            promptAsync: promptMock,
            messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }] }),
            status: async () => ({ data: { "ses_oracle_task": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
@@ -3688,6 +3734,7 @@ describe("morpheus-task", () => {
             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }]
           }),
           status: async () => ({ data: { "ses_oracle_no_delegate": { type: "idle" } } }),
+          abort: mock(() => Promise.resolve()),
         },
       }
       
@@ -3743,6 +3790,7 @@ describe("morpheus-task", () => {
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
            }),
            status: async () => ({ data: { "ses_title_test": { type: "idle" } } }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 
@@ -3778,27 +3826,28 @@ describe("morpheus-task", () => {
       // given
       const { createDelegateTask } = require("./tools")
 
-       const mockManager = { launch: async () => ({}) }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_metadata_test" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Task completed" }] }]
-           }),
-           status: async () => ({ data: { "ses_metadata_test": { type: "idle" } } }),
-         },
-       }
+        const mockManager = { launch: async () => ({}), getTasksByParentSession: () => [], hasInFlightNotificationForParent: () => false }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+          model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_metadata_test" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({
+              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Task completed" }] }]
+            }),
+            status: async () => ({ data: { "ses_metadata_test": { type: "idle" } } }),
+            abort: mock(() => Promise.resolve()),
+          },
+        }
 
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
+        const tool = createDelegateTask({
+          manager: mockManager,
+          client: mockClient,
+        })
 
       const toolContext = {
         sessionID: "parent-session",
@@ -3847,6 +3896,7 @@ describe("morpheus-task", () => {
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({ data: [] }),
+           abort: mock(() => Promise.resolve()),
          },
        }
 

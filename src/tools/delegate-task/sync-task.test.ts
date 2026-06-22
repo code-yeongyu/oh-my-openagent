@@ -64,6 +64,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
+        abort: mock(() => Promise.resolve()),
       },
     }
 
@@ -114,6 +115,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
+        abort: mock(() => Promise.resolve()),
       },
     }
 
@@ -164,6 +166,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
+        abort: mock(() => Promise.resolve()),
       },
     }
 
