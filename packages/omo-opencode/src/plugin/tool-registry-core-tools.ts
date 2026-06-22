@@ -11,6 +11,8 @@ import { getMainSessionID } from "../features/claude-code-session-state"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { log } from "../shared"
 import { getSisyphusJuniorModelOverride } from "./tool-registry-team-tools"
+import { createSkillContext } from "./skill-context"
+import { createRuntimeSkillsResolver, readRuntimeHostSkills } from "./runtime-skill-resolver"
 
 export function createCoreTools(args: {
   readonly ctx: PluginContext
@@ -82,9 +84,15 @@ export function createCoreTools(args: {
   })
 
   const getSessionIDForMcp = (): string | undefined => getMainSessionID()
+  const getLoadedSkillsForMcp = createRuntimeSkillsResolver({
+    baseSkills: skillContext.mergedSkills,
+    readRuntimeHostSkills: () => readRuntimeHostSkills(ctx.client),
+    buildMergedSkills: async (hostSkills) =>
+      (await createSkillContext({ directory: ctx.directory, pluginConfig, hostSkills })).mergedSkills,
+  })
   const skillMcpTool = factories.createSkillMcpTool({
     manager: managers.skillMcpManager,
-    getLoadedSkills: () => skillContext.mergedSkills,
+    getLoadedSkills: getLoadedSkillsForMcp,
     getSessionID: getSessionIDForMcp,
   })
   const commands = factories.discoverCommandsSync(ctx.directory, {
