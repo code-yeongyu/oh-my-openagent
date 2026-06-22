@@ -13360,12 +13360,15 @@ function formatLazyCodexInstallHelp() {
 
 // packages/omo-codex/src/install/lazycodex-delegated-command.ts
 async function runDelegatedOmoCommand(parsed, options) {
+  if (parsed.command === "doctor" && process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE === "1") {
+    throw new Error("Refusing recursive lazycodex doctor invocation from inside $omo:lcx-doctor");
+  }
   const invocation = buildDelegatedOmoInvocation(parsed);
   if (parsed.dryRun) {
-    options.log(`${invocation.command} ${invocation.args.join(" ")}`);
+    options.log(formatShellCommand(invocation.command, invocation.args));
     return;
   }
-  const env3 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo" } : process.env;
+  const env3 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env } : { ...process.env, ...invocation.env };
   await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env3 });
 }
 function buildDelegatedOmoInvocation(parsed) {
@@ -13404,17 +13407,35 @@ function buildLazyCodexDoctorInvocation(doctorArgs) {
       ".",
       buildLazyCodexDoctorPrompt(doctorArgs)
     ],
-    delegatesToOmo: false
+    delegatesToOmo: false,
+    env: {
+      LAZYCODEX_DOCTOR_LCX_ACTIVE: "1"
+    }
   };
 }
 function buildLazyCodexDoctorPrompt(doctorArgs) {
   return [
     "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
-    "This command is already the lazycodex doctor surface, so do not invoke lazycodex doctor recursively.",
+    "This command is already the lazycodex doctor surface; never invoke lazycodex doctor from inside the doctor workflow.",
     "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
     "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
+    buildDoctorOutputInstruction(doctorArgs),
     doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none"
   ].join(" ");
+}
+function buildDoctorOutputInstruction(doctorArgs) {
+  if (doctorArgs.includes("--json")) {
+    return "Return exactly one JSON object with summary, environment, checks, remediations, and knownIssues fields; do not wrap it in Markdown.";
+  }
+  return "Return the standard Markdown LazyCodex Doctor Report.";
+}
+function formatShellCommand(command, args) {
+  return [command, ...args].map(shellQuote).join(" ");
+}
+function shellQuote(value) {
+  if (/^[A-Za-z0-9_/:=.,@%+-]+$/.test(value))
+    return value;
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts

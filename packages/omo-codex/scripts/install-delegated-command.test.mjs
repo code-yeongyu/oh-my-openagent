@@ -79,3 +79,72 @@ test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCod
 	assert.match(logged, /Requested doctor arguments: --json/);
 	assert.doesNotMatch(logged, /oh-my-openagent omo doctor/);
 });
+
+test("#given doctor recursion guard is active #when lazycodex doctor delegates #then rejects before launching Codex", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: [] };
+	const previous = process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE;
+	process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE = "1";
+	let ran = false;
+
+	try {
+		// when/then
+		await assert.rejects(
+			runDelegatedOmoCommand(parsed, {
+				cwd: "/tmp/project",
+				log: () => {},
+				runCommand: async () => {
+					ran = true;
+				},
+			}),
+			/Refusing recursive lazycodex doctor invocation/,
+		);
+	} finally {
+		if (previous === undefined) delete process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE;
+		else process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE = previous;
+	}
+
+	// then
+	assert.equal(ran, false);
+});
+
+test("#given a dry-run doctor with JSON output #when delegating #then asks the Codex workflow to return JSON", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", dryRun: true, args: ["--json"] };
+	let logged;
+
+	// when
+	await runDelegatedOmoCommand(parsed, {
+		cwd: "/tmp/project",
+		log: (line) => {
+			logged = line;
+		},
+		runCommand: async () => {},
+	});
+
+	// then
+	assert.match(logged, /Return exactly one JSON object/);
+});
+
+test("#given dry-run args with shell metacharacters #when delegating #then logs a shell-safe command", async () => {
+	// given
+	const parsed = {
+		kind: "command",
+		command: "cleanup",
+		dryRun: true,
+		args: ["--project", "/tmp/lazy codex's qa"],
+	};
+	let logged;
+
+	// when
+	await runDelegatedOmoCommand(parsed, {
+		cwd: "/tmp/project",
+		log: (line) => {
+			logged = line;
+		},
+		runCommand: async () => {},
+	});
+
+	// then
+	assert.equal(logged, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project '/tmp/lazy codex'\\''s qa'");
+});
