@@ -1,5 +1,5 @@
-import { type Dirent, promises as fs } from "fs"
-import { basename, join } from "path"
+import { type Dirent, promises as fs } from "node:fs"
+import { basename, join } from "node:path"
 import { getClaudeConfigDir, getOpenCodeConfigDir } from "../../shared"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { parseFrontmatter } from "../../shared/frontmatter"

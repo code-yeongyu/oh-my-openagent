@@ -108,7 +108,7 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
         }
       }
     } else {
-      const nextContent = JSON.stringify(newConfig, null, 2) + "\n"
+      const nextContent = `${JSON.stringify(newConfig, null, 2)}\n`
       try {
         writeFileSync(path, nextContent)
       } catch (error) {

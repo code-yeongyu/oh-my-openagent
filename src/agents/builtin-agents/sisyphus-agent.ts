@@ -38,8 +38,8 @@ export function maybeCreateMorpheusConfig(input: {
     useTaskSystem,
   } = input
 
-  const morpheusOverride = agentOverrides["morpheus"]
-  const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["morpheus"]
+  const morpheusOverride = agentOverrides.morpheus
+  const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS.morpheus
   const hasMorpheusExplicitConfig = morpheusOverride !== undefined
   const meetsMorpheusAnyModelRequirement =
     !sisyphusRequirement?.requiresAnyModel ||

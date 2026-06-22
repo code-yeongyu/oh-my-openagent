@@ -9,7 +9,7 @@ function getSessionStatusType(statusResult: unknown, sessionID: string): string 
 	const record = data as Record<string, unknown>
 	const entry = record[sessionID]
 	if (typeof entry !== "object" || entry === null) return null
-	const typeValue = (entry as Record<string, unknown>)["type"]
+	const typeValue = (entry as Record<string, unknown>).type
 	return typeof typeValue === "string" ? typeValue : null
 }
 

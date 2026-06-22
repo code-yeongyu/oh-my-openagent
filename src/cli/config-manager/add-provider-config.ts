@@ -69,7 +69,7 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 
       writeFileSync(path, newContent)
     } else {
-      writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
+      writeFileSync(path, `${JSON.stringify(newConfig, null, 2)}\n`)
     }
     return { success: true, configPath: path }
   } catch (err) {

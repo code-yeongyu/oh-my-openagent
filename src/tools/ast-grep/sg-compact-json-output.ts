@@ -19,7 +19,7 @@ export function createSgResultFromStdout(stdout: string): SgResult {
 				if (lastValidIndex > 0) {
 					const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
 					if (bracketIndex > 0) {
-						const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
+						const truncatedJson = `${outputToProcess.substring(0, bracketIndex + 1)}]`
 						matches = JSON.parse(truncatedJson) as CliMatch[]
 					}
 				}

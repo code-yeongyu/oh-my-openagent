@@ -11,7 +11,7 @@ import {
 } from "./storage"
 
 describe("handoff-injector/storage", () => {
-  const TEST_DIR = join(tmpdir(), "handoff-storage-test-" + Date.now())
+  const TEST_DIR = join(tmpdir(), `handoff-storage-test-${Date.now()}`)
   const MATRIX_DIR = join(TEST_DIR, ".matrixx")
 
   beforeEach(() => {
@@ -80,7 +80,7 @@ describe("handoff-injector/storage", () => {
 
     test("returns false when .matrixx/ dir does not exist", () => {
       //#given - a directory with no .matrixx subdirectory
-      const emptyDir = join(tmpdir(), "handoff-empty-" + Date.now())
+      const emptyDir = join(tmpdir(), `handoff-empty-${Date.now()}`)
       mkdirSync(emptyDir, { recursive: true })
 
       //#when
@@ -129,7 +129,7 @@ describe("handoff-injector/storage", () => {
 
     test("returns null when .matrixx/ dir does not exist", () => {
       //#given - a directory with no .matrixx subdirectory
-      const emptyDir = join(tmpdir(), "handoff-nodir-" + Date.now())
+      const emptyDir = join(tmpdir(), `handoff-nodir-${Date.now()}`)
       mkdirSync(emptyDir, { recursive: true })
 
       //#when

@@ -9,23 +9,23 @@ type SessionMessagePart = {
 
 function getMessageRole(message: unknown): string | undefined {
   if (!isObject(message)) return undefined
-  const info = message["info"]
+  const info = message.info
   if (!isObject(info)) return undefined
-  const role = info["role"]
+  const role = info.role
   return typeof role === "string" ? role : undefined
 }
 
 function getMessageParts(message: unknown): SessionMessagePart[] {
   if (!isObject(message)) return []
-  const parts = message["parts"]
+  const parts = message.parts
   if (!Array.isArray(parts)) return []
 
   return parts
     .filter((part): part is SessionMessagePart => isObject(part))
     .map((part) => ({
-      type: typeof part["type"] === "string" ? part["type"] : undefined,
-      text: typeof part["text"] === "string" ? part["text"] : undefined,
-      content: part["content"],
+      type: typeof part.type === "string" ? part.type : undefined,
+      text: typeof part.text === "string" ? part.text : undefined,
+      content: part.content,
     }))
 }
 

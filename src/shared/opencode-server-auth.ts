@@ -43,12 +43,12 @@ function getInternalClient(client: unknown): UnknownRecord | null {
     return null
   }
 
-  const internal = client["_client"]
+  const internal = client._client
   return isRecord(internal) ? internal : null
 }
 
 function tryInjectViaSetConfigHeaders(internal: UnknownRecord, auth: string): boolean {
-  const setConfig = internal["setConfig"]
+  const setConfig = internal.setConfig
   if (typeof setConfig !== "function") {
     return false
   }
@@ -63,17 +63,17 @@ function tryInjectViaSetConfigHeaders(internal: UnknownRecord, auth: string): bo
 }
 
 function tryInjectViaInterceptors(internal: UnknownRecord, auth: string): boolean {
-  const interceptors = internal["interceptors"]
+  const interceptors = internal.interceptors
   if (!isRecord(interceptors)) {
     return false
   }
 
-  const requestInterceptors = interceptors["request"]
+  const requestInterceptors = interceptors.request
   if (!isRecord(requestInterceptors)) {
     return false
   }
 
-  const use = requestInterceptors["use"]
+  const use = requestInterceptors.use
   if (typeof use !== "function") {
     return false
   }
@@ -89,8 +89,8 @@ function tryInjectViaInterceptors(internal: UnknownRecord, auth: string): boolea
 }
 
 function tryInjectViaFetchWrapper(internal: UnknownRecord, auth: string): boolean {
-  const getConfig = internal["getConfig"]
-  const setConfig = internal["setConfig"]
+  const getConfig = internal.getConfig
+  const setConfig = internal.setConfig
   if (typeof getConfig !== "function" || typeof setConfig !== "function") {
     return false
   }
@@ -100,7 +100,7 @@ function tryInjectViaFetchWrapper(internal: UnknownRecord, auth: string): boolea
     return false
   }
 
-  const fetchValue = config["fetch"]
+  const fetchValue = config.fetch
   if (!isRequestFetch(fetchValue)) {
     return false
   }
@@ -113,17 +113,17 @@ function tryInjectViaFetchWrapper(internal: UnknownRecord, auth: string): boolea
 }
 
 function tryInjectViaMutableInternalConfig(internal: UnknownRecord, auth: string): boolean {
-  const configValue = internal["_config"]
+  const configValue = internal._config
   if (!isRecord(configValue)) {
     return false
   }
 
-  const fetchValue = configValue["fetch"]
+  const fetchValue = configValue.fetch
   if (!isRequestFetch(fetchValue)) {
     return false
   }
 
-  configValue["fetch"] = wrapRequestFetch(fetchValue, auth)
+  configValue.fetch = wrapRequestFetch(fetchValue, auth)
 
   return true
 }
@@ -133,12 +133,12 @@ function tryInjectViaTopLevelFetch(client: unknown, auth: string): boolean {
     return false
   }
 
-  const fetchValue = client["fetch"]
+  const fetchValue = client.fetch
   if (!isRequestFetch(fetchValue)) {
     return false
   }
 
-  client["fetch"] = wrapRequestFetch(fetchValue, auth)
+  client.fetch = wrapRequestFetch(fetchValue, auth)
 
   return true
 }

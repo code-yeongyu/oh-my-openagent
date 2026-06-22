@@ -11,8 +11,8 @@ describe("createBuiltinSkills", () => {
 		// then
 		const browserSkill = skills.find((s) => s.name === "playwright")
 		expect(browserSkill).toBeDefined()
-		expect(browserSkill!.description).toContain("browser")
-		expect(browserSkill!.mcpConfig).toHaveProperty("playwright")
+		expect(browserSkill?.description).toContain("browser")
+		expect(browserSkill?.mcpConfig).toHaveProperty("playwright")
 	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
@@ -40,9 +40,9 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		expect(agentBrowserSkill).toBeDefined()
-		expect(agentBrowserSkill!.description).toContain("browser")
-		expect(agentBrowserSkill!.allowedTools).toContain("Bash(agent-browser:*)")
-		expect(agentBrowserSkill!.template).toContain("agent-browser")
+		expect(agentBrowserSkill?.description).toContain("browser")
+		expect(agentBrowserSkill?.allowedTools).toContain("Bash(agent-browser:*)")
+		expect(agentBrowserSkill?.template).toContain("agent-browser")
 		expect(playwrightSkill).toBeUndefined()
 	})
 
@@ -55,10 +55,10 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 
 		// then - template should contain substantial content (inlined, not fallback)
-		expect(agentBrowserSkill!.template).toContain("## Quick start")
-		expect(agentBrowserSkill!.template).toContain("## Commands")
-		expect(agentBrowserSkill!.template).toContain("agent-browser open")
-		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
+		expect(agentBrowserSkill?.template).toContain("## Quick start")
+		expect(agentBrowserSkill?.template).toContain("## Commands")
+		expect(agentBrowserSkill?.template).toContain("agent-browser open")
+		expect(agentBrowserSkill?.template).toContain("agent-browser snapshot")
 	})
 
 	test("always includes frontend-ui-ux, git-master, and dsl skills", () => {
@@ -152,9 +152,9 @@ describe("createBuiltinSkills", () => {
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		expect(playwrightSkill).toBeDefined()
-		expect(playwrightSkill!.description).toContain("browser")
-		expect(playwrightSkill!.allowedTools).toContain("Bash(playwright-cli:*)")
-		expect(playwrightSkill!.mcpConfig).toBeUndefined()
+		expect(playwrightSkill?.description).toContain("browser")
+		expect(playwrightSkill?.allowedTools).toContain("Bash(playwright-cli:*)")
+		expect(playwrightSkill?.mcpConfig).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()
 	})
 
@@ -167,8 +167,8 @@ describe("createBuiltinSkills", () => {
 		const skill = skills.find((s) => s.name === "playwright")
 
 		// then
-		expect(skill!.template).toContain("playwright-cli open")
-		expect(skill!.template).toContain("playwright-cli snapshot")
-		expect(skill!.template).toContain("playwright-cli click")
+		expect(skill?.template).toContain("playwright-cli open")
+		expect(skill?.template).toContain("playwright-cli snapshot")
+		expect(skill?.template).toContain("playwright-cli click")
 	})
 })

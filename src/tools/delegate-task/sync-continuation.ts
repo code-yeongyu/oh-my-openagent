@@ -19,7 +19,7 @@ export async function executeSyncContinuation(
   const { client } = executorCtx
   const toastManager = getTaskToastManager()
   const continuationID = args.execute?.task_id ?? args.session_id
-  const taskId = `resume_sync_${continuationID!.slice(0, 8)}`
+  const taskId = `resume_sync_${continuationID?.slice(0, 8)}`
   const startTime = new Date()
 
   if (toastManager) {

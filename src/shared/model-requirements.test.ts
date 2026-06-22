@@ -9,7 +9,7 @@ import {
 describe("AGENT_MODEL_REQUIREMENTS", () => {
   test("merovingian has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - merovingian agent requirement
-    const merovingian = AGENT_MODEL_REQUIREMENTS["merovingian"]
+    const merovingian = AGENT_MODEL_REQUIREMENTS.merovingian
 
     // when - accessing merovingian requirement
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
@@ -25,7 +25,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("morpheus has claude-opus-4-6 as primary and requiresAnyModel", () => {
     // #given - morpheus agent requirement
-    const morpheus = AGENT_MODEL_REQUIREMENTS["morpheus"]
+    const morpheus = AGENT_MODEL_REQUIREMENTS.morpheus
 
     // #when - accessing Morpheus requirement
     // #then - fallbackChain has claude-opus-4-6 first, claude-sonnet-4-6 second
@@ -46,7 +46,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("operator has valid fallbackChain with claude-haiku-4-5 as primary", () => {
     // given - operator agent requirement
-    const operator = AGENT_MODEL_REQUIREMENTS["operator"]
+    const operator = AGENT_MODEL_REQUIREMENTS.operator
 
     // when - accessing operator requirement
     // then - fallbackChain exists with claude-haiku-4-5 as first entry
@@ -61,7 +61,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("explore has valid fallbackChain with claude-haiku-4-5 as primary", () => {
     // given - explore agent requirement
-    const explore = AGENT_MODEL_REQUIREMENTS["trinity"]
+    const explore = AGENT_MODEL_REQUIREMENTS.trinity
 
     // when - accessing explore requirement
     // then - fallbackChain exists with claude-haiku-4-5 as first entry
@@ -80,7 +80,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("construct has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - construct agent requirement
-    const construct = AGENT_MODEL_REQUIREMENTS["construct"]
+    const construct = AGENT_MODEL_REQUIREMENTS.construct
 
     // when - accessing construct requirement
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
@@ -95,7 +95,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("oracle (planner) has claude-opus-4-6 as primary", () => {
     // #given - oracle agent requirement
-    const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
+    const oracle = AGENT_MODEL_REQUIREMENTS.oracle
 
     // #when - accessing Oracle requirement
     // #then - claude-opus-4-6 is first
@@ -111,7 +111,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("metis has claude-opus-4-6 as primary", () => {
     // #given - metis agent requirement
-    const metis = AGENT_MODEL_REQUIREMENTS["seraph"]
+    const metis = AGENT_MODEL_REQUIREMENTS.seraph
 
     // #when - accessing Seraph requirement
     // #then - claude-opus-4-6 is first
@@ -127,7 +127,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("momus has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - momus agent requirement
-    const momus = AGENT_MODEL_REQUIREMENTS["smith"]
+    const momus = AGENT_MODEL_REQUIREMENTS.smith
 
     // when - accessing Smith requirement
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
@@ -143,7 +143,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("architect has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - architect agent requirement
-    const architect = AGENT_MODEL_REQUIREMENTS["architect"]
+    const architect = AGENT_MODEL_REQUIREMENTS.architect
 
     // when - accessing Architect requirement
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
@@ -158,7 +158,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
   test("keymaker has no requiresProvider (Claude-only chain)", () => {
     // #given - keymaker agent requirement
-    const keymaker = AGENT_MODEL_REQUIREMENTS["keymaker"]
+    const keymaker = AGENT_MODEL_REQUIREMENTS.keymaker
 
     // #when - accessing keymaker requirement
     // #then - requiresProvider is not set (Claude-only chain, no provider restriction)
@@ -209,7 +209,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
   test("source has valid fallbackChain with claude-opus-4-6 as primary", () => {
     // given - source category requirement
-    const source = CATEGORY_MODEL_REQUIREMENTS["source"]
+    const source = CATEGORY_MODEL_REQUIREMENTS.source
 
     // when - accessing source requirement
     // then - fallbackChain exists with claude-opus-4-6 as first entry
@@ -241,7 +241,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
   test("construct has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - construct category requirement
-    const construct = CATEGORY_MODEL_REQUIREMENTS["construct"]
+    const construct = CATEGORY_MODEL_REQUIREMENTS.construct
 
     // when - accessing construct requirement
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
@@ -318,7 +318,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
   test("broadcast has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - broadcast category requirement
-    const broadcast = CATEGORY_MODEL_REQUIREMENTS["broadcast"]
+    const broadcast = CATEGORY_MODEL_REQUIREMENTS.broadcast
 
     // when - accessing broadcast requirement
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry

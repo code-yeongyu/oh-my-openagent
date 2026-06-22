@@ -181,7 +181,7 @@ export class TaskStateManager {
 
   cancelPendingTask(taskId: string): boolean {
     const task = this.tasks.get(taskId)
-    if (!task || task.status !== "pending") {
+    if (task?.status !== "pending") {
       return false
     }
 

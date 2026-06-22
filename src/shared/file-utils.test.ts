@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "fs"
-import { tmpdir } from "os"
-import { join } from "path"
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { isSymbolicLink, resolveSymlink, resolveSymlinkAsync } from "./file-utils"
 
-const testDir = join(tmpdir(), "file-utils-test-" + Date.now())
+const testDir = join(tmpdir(), `file-utils-test-${Date.now()}`)
 
 // Create a directory structure that mimics the real-world scenario:
 //

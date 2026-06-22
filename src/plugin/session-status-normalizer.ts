@@ -8,7 +8,7 @@ export function normalizeSessionStatusToIdle(input: EventInput): EventInput | nu
 	if (!props) return null
 
 	const status = props.status as SessionStatus | undefined
-	if (!status || status.type !== "idle") return null
+	if (status?.type !== "idle") return null
 
 	const sessionID = props.sessionID as string | undefined
 	if (!sessionID) return null

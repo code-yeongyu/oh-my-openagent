@@ -8,7 +8,7 @@ type ShellType = "unix" | "powershell" | "cmd"
  * 2. SHELL env var → Unix shell
  * 3. Platform fallback → win32: cmd, others: unix
  */
-function detectShellType(): ShellType {
+function _detectShellType(): ShellType {
   if (process.env.PSModulePath) {
     return "powershell"
   }

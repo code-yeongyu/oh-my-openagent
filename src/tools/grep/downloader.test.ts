@@ -86,7 +86,7 @@ describe("findFileRecursive", () => {
 
     // then
     expect(result).not.toBeNull()
-    expect(result!.endsWith("rg")).toBe(true)
+    expect(result?.endsWith("rg")).toBe(true)
   })
 
   test("should match exact filename, not partial", () => {

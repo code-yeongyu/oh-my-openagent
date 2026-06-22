@@ -58,7 +58,6 @@ export function getAtlasPrompt(model?: string): string {
   switch (source) {
     case "gpt":
       return getGptAtlasPrompt()
-    case "default":
     default:
       return getDefaultAtlasPrompt()
   }

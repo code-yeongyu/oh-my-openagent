@@ -289,8 +289,8 @@ describe("deepMerge", () => {
       const result = deepMerge(base, override)
 
       // then
-      expect(result!.b).toBe(2)
-      expect(result!["constructor"]).not.toEqual({ polluted: true })
+      expect(result?.b).toBe(2)
+      expect(result?.constructor).not.toEqual({ polluted: true })
     })
 
     test("ignores prototype key", () => {
@@ -302,8 +302,8 @@ describe("deepMerge", () => {
       const result = deepMerge(base, override)
 
       // then
-      expect(result!.b).toBe(2)
-      expect(result!.prototype).toBeUndefined()
+      expect(result?.b).toBe(2)
+      expect(result?.prototype).toBeUndefined()
     })
   })
 

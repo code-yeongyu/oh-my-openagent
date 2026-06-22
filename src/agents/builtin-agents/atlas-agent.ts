@@ -35,8 +35,8 @@ export function maybeCreateAtlasConfig(input: {
 
   if (disabledAgents.includes("architect")) return undefined
 
-  const orchestratorOverride = agentOverrides["architect"]
-  const atlasRequirement = AGENT_MODEL_REQUIREMENTS["architect"]
+  const orchestratorOverride = agentOverrides.architect
+  const atlasRequirement = AGENT_MODEL_REQUIREMENTS.architect
 
   const atlasResolution = applyModelResolution({
     uiSelectedModel: orchestratorOverride?.model ? undefined : uiSelectedModel,

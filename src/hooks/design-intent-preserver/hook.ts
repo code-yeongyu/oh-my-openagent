@@ -1,5 +1,5 @@
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { join } from "path"
 import { log } from "../../shared"
 import {
   HOOK_NAME,

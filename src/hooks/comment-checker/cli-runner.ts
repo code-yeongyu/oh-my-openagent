@@ -1,4 +1,4 @@
-import { existsSync } from "fs"
+import { existsSync } from "node:fs"
 import { getCommentCheckerPath, type HookInput, runCommentChecker, startBackgroundInit } from "./cli"
 import type { PendingCall } from "./types"
 

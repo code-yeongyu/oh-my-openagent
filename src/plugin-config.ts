@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { type MatrixxConfig, MatrixxConfigSchema } from "./config";
 import { expandProfile, PROFILE_NAMES } from "./config/profiles";
 import {
@@ -205,7 +205,7 @@ function resolveConfigPath(baseDir: string, configName: string): string {
     return legacyDetected.path;
   }
 
-  return newBase + ".json";
+  return `${newBase}.json`;
 }
 
 export function loadPluginConfig(

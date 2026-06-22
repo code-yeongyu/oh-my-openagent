@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "fs"
-import { tmpdir } from "os"
-import { join } from "path"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-const TEST_DIR = join(tmpdir(), "skill-loader-test-" + Date.now())
+const TEST_DIR = join(tmpdir(), `skill-loader-test-${Date.now()}`)
 const SKILLS_DIR = join(TEST_DIR, ".opencode", "skills")
 
 function createTestSkill(name: string, content: string, mcpJson?: object): string {

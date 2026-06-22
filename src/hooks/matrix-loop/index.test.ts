@@ -8,7 +8,7 @@ import { clearState, readState, writeState } from "./storage"
 import type { MatrixLoopState } from "./types"
 
 describe("matrix-loop", () => {
-  const TEST_DIR = join(tmpdir(), "matrix-loop-test-" + Date.now())
+  const TEST_DIR = join(tmpdir(), `matrix-loop-test-${Date.now()}`)
   let promptCalls: Array<{ sessionID: string; text: string }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
@@ -469,7 +469,7 @@ describe("matrix-loop", () => {
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
 
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "Task done <promise>COMPLETE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, `${JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "Task done <promise>COMPLETE</promise>" } })}\n`)
 
       // when - session goes idle (transcriptPath now derived from sessionID via getTranscriptPath)
       await hook.event({
@@ -794,7 +794,7 @@ Output <promise>DONE</promise> when fully complete`
         timestamp: new Date().toISOString(),
         content: templateText,
       })
-      writeFileSync(transcriptPath, userEntry + "\n")
+      writeFileSync(transcriptPath, `${userEntry}\n`)
 
       const hook = createMatrixLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
@@ -825,7 +825,7 @@ Original task: Build something`
         timestamp: new Date().toISOString(),
         content: continuationText,
       })
-      writeFileSync(transcriptPath, userEntry + "\n")
+      writeFileSync(transcriptPath, `${userEntry}\n`)
 
       const hook = createMatrixLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
@@ -855,7 +855,7 @@ Original task: Build something`
         tool_input: {},
         tool_output: { output: "Task complete! <promise>DONE</promise>" },
       })
-      writeFileSync(transcriptPath, toolResultEntry + "\n")
+      writeFileSync(transcriptPath, `${toolResultEntry}\n`)
 
       const hook = createMatrixLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
@@ -879,7 +879,7 @@ Original task: Build something`
     test("should check transcript BEFORE API to optimize performance", async () => {
       // given - transcript has completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, `${JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } })}\n`)
       mockSessionMessages = [
         { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
       ]
@@ -909,7 +909,7 @@ Original task: Build something`
       const hook = createMatrixLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, `${JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } })}\n`)
       hook.startLoop("test-id", "Build API", { ultrawork: true })
 
       // when - idle event triggered
@@ -918,7 +918,7 @@ Original task: Build something`
       // then - ultrawork toast shown
       const completionToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP COMPLETE!")
       expect(completionToast).toBeDefined()
-      expect(completionToast!.message).toMatch(/JUST ULW ULW!/)
+      expect(completionToast?.message).toMatch(/JUST ULW ULW!/)
     })
 
     test("should show regular completion toast when ultrawork disabled", async () => {
@@ -927,7 +927,7 @@ Original task: Build something`
       const hook = createMatrixLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, `${JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } })}\n`)
       hook.startLoop("test-id", "Build API")
 
       // when - idle event triggered
@@ -1108,7 +1108,7 @@ Original task: Build something`
       expect(hook.getState()?.verification_failed_count).toBe(1)
       const continuationPrompt = promptCalls.find((p) => p.sessionID === "session-123")
       expect(continuationPrompt).toBeDefined()
-      expect(continuationPrompt!.text).toContain("Tests are not passing")
+      expect(continuationPrompt?.text).toContain("Tests are not passing")
     })
 
     //#given verification fails maxRetries times

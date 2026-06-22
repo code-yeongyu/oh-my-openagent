@@ -53,7 +53,7 @@ describe("profile expansion in mergeConfigs", () => {
     const result = mergeConfigs(profileDefaults, userConfig)
 
     //#then
-    expect(result.categories?.["source"]?.model).toBe(
+    expect(result.categories?.source?.model).toBe(
       "anthropic/claude-opus-4-6"
     )
     expect(result.categories?.["bullet-time"]?.model).toBe("anthropic/claude-haiku-4-5")

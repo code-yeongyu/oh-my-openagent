@@ -119,8 +119,8 @@ export async function applyAgentConfig(params: {
       morpheus: builtinAgents.morpheus,
     };
 
-    agentConfig["mouse"] = createMouseAgentWithOverrides(
-      params.pluginConfig.agents?.["mouse"],
+    agentConfig.mouse = createMouseAgentWithOverrides(
+      params.pluginConfig.agents?.mouse,
       undefined,
       useTaskSystem,
     );
@@ -140,11 +140,11 @@ export async function applyAgentConfig(params: {
     }
 
     if (plannerEnabled) {
-      const oracleOverride = params.pluginConfig.agents?.["oracle"] as
+      const oracleOverride = params.pluginConfig.agents?.oracle as
         | (Record<string, unknown> & { prompt_append?: string })
         | undefined;
 
-      agentConfig["oracle"] = await buildOracleAgentConfig({
+      agentConfig.oracle = await buildOracleAgentConfig({
         configAgentPlan: configAgent?.plan,
         pluginOracleOverride: oracleOverride,
         userCategories: params.pluginConfig.categories,
@@ -174,7 +174,7 @@ export async function applyAgentConfig(params: {
 
     const planDemoteConfig = shouldDemotePlan
       ? buildPlanDemoteConfig(
-          agentConfig["oracle"] as Record<string, unknown> | undefined,
+          agentConfig.oracle as Record<string, unknown> | undefined,
           params.pluginConfig.agents?.plan as Record<string, unknown> | undefined,
         )
       : undefined;

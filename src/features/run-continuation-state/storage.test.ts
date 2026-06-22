@@ -11,7 +11,7 @@ import {
 } from "./storage"
 
 describe("run-continuation-state", () => {
-  const TEST_DIR = join(tmpdir(), "run-continuation-state-test-" + Date.now())
+  const TEST_DIR = join(tmpdir(), `run-continuation-state-test-${Date.now()}`)
 
   afterEach(() => {
     if (existsSync(TEST_DIR)) {

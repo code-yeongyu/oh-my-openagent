@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, statSync } from "fs"
-import { join } from "path"
+import { existsSync, readdirSync, statSync } from "node:fs"
+import { join } from "node:path"
 import type { MatrixxConfig } from "../../config/schema"
 import { getTaskDir } from "./storage"
 

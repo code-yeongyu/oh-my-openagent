@@ -33,8 +33,6 @@ function getTauriConfigDir(identifier: string): string {
       const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming")
       return join(appData, identifier)
     }
-
-    case "linux":
     default: {
       const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
       return join(xdgConfig, identifier)

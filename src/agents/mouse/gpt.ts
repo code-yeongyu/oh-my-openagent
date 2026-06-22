@@ -85,7 +85,7 @@ Task NOT complete without evidence:
 </style_spec>`
 
   if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  return `${prompt}\n\n${promptAppend}`
 }
 
 function buildGptBlockedActionsSection(useTaskSystem: boolean): string {

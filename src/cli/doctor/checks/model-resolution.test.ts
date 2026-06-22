@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { describe, expect, it, } from "bun:test"
 
 describe("model-resolution check", () => {
   describe("getModelResolutionInfo", () => {
@@ -14,8 +14,8 @@ describe("model-resolution check", () => {
       // then: Should have agent entries
       const morpheus = info.agents.find((a) => a.name === "morpheus")
       expect(morpheus).toBeDefined()
-      expect(morpheus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-6")
-      expect(morpheus!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
+      expect(morpheus?.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-6")
+      expect(morpheus?.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
     it("returns category requirements with provider chains", async () => {
@@ -26,8 +26,8 @@ describe("model-resolution check", () => {
       // then: Should have category entries
       const visual = info.categories.find((c) => c.name === "construct")
       expect(visual).toBeDefined()
-      expect(visual!.requirement.fallbackChain[0]?.model).toBe("claude-sonnet-4-6")
-      expect(visual!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
+      expect(visual?.requirement.fallbackChain[0]?.model).toBe("claude-sonnet-4-6")
+      expect(visual?.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
   })
 
@@ -51,8 +51,8 @@ describe("model-resolution check", () => {
       // then: Oracle should show the override
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-6")
-      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
+      expect(oracle?.userOverride).toBe("anthropic/claude-opus-4-6")
+      expect(oracle?.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
     })
 
     it("shows user override for category when configured", async () => {
@@ -70,8 +70,8 @@ describe("model-resolution check", () => {
       // then: construct should show the override
       const visual = info.categories.find((c) => c.name === "construct")
       expect(visual).toBeDefined()
-      expect(visual!.userOverride).toBe("openai/gpt-5.2")
-      expect(visual!.effectiveResolution).toBe("User override: openai/gpt-5.2")
+      expect(visual?.userOverride).toBe("openai/gpt-5.2")
+      expect(visual?.effectiveResolution).toBe("User override: openai/gpt-5.2")
     })
 
     it("shows provider fallback when no override exists", async () => {
@@ -85,9 +85,9 @@ describe("model-resolution check", () => {
       // then: Should show provider fallback chain
       const morpheus = info.agents.find((a) => a.name === "morpheus")
       expect(morpheus).toBeDefined()
-      expect(morpheus!.userOverride).toBeUndefined()
-      expect(morpheus!.effectiveResolution).toContain("Provider fallback:")
-      expect(morpheus!.effectiveResolution).toContain("anthropic")
+      expect(morpheus?.userOverride).toBeUndefined()
+      expect(morpheus?.effectiveResolution).toContain("Provider fallback:")
+      expect(morpheus?.effectiveResolution).toContain("anthropic")
     })
 
     it("captures user variant for agent when configured", async () => {
@@ -106,8 +106,8 @@ describe("model-resolution check", () => {
       //#then Oracle should have userVariant set
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("openai/gpt-5.2")
-      expect(oracle!.userVariant).toBe("xhigh")
+      expect(oracle?.userOverride).toBe("openai/gpt-5.2")
+      expect(oracle?.userVariant).toBe("xhigh")
     })
 
     it("captures user variant for category when configured", async () => {
@@ -126,8 +126,8 @@ describe("model-resolution check", () => {
       //#then construct should have userVariant set
       const visual = info.categories.find((c) => c.name === "construct")
       expect(visual).toBeDefined()
-      expect(visual!.userOverride).toBe("google/gemini-3-flash-preview")
-      expect(visual!.userVariant).toBe("high")
+      expect(visual?.userOverride).toBe("google/gemini-3-flash-preview")
+      expect(visual?.userVariant).toBe("high")
     })
   })
 
@@ -154,14 +154,14 @@ describe("model-resolution check", () => {
 
       // then: Details should contain agent/category resolution info
       expect(result.details).toBeDefined()
-      expect(result.details!.length).toBeGreaterThan(0)
+      expect(result.details?.length).toBeGreaterThan(0)
       // Should have Available Models and Configured Models headers
-      expect(result.details!.some((d) => d.includes("Available Models"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("Configured Models"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("Agents:"))).toBe(true)
-      expect(result.details!.some((d) => d.includes("Categories:"))).toBe(true)
+      expect(result.details?.some((d) => d.includes("Available Models"))).toBe(true)
+      expect(result.details?.some((d) => d.includes("Configured Models"))).toBe(true)
+      expect(result.details?.some((d) => d.includes("Agents:"))).toBe(true)
+      expect(result.details?.some((d) => d.includes("Categories:"))).toBe(true)
       // Should have legend
-      expect(result.details!.some((d) => d.includes("user override"))).toBe(true)
+      expect(result.details?.some((d) => d.includes("user override"))).toBe(true)
     })
   })
 

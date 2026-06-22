@@ -12,8 +12,8 @@ describe("parseAnthropicTokenLimitError", () => {
 
     //#then
     expect(result).not.toBeNull()
-    expect(result!.currentTokens).toBe(250000)
-    expect(result!.maxTokens).toBe(200000)
+    expect(result?.currentTokens).toBe(250000)
+    expect(result?.maxTokens).toBe(200000)
   })
 
   it("#given a non-token-limit error #when parsing #then returns null", () => {
@@ -77,8 +77,8 @@ describe("parseAnthropicTokenLimitError", () => {
 
     //#then
     expect(result).not.toBeNull()
-    expect(result!.currentTokens).toBe(300000)
-    expect(result!.maxTokens).toBe(200000)
+    expect(result?.currentTokens).toBe(300000)
+    expect(result?.maxTokens).toBe(200000)
   })
 
   it("#given an error with data as a string (not object) #when parsing #then does not crash", () => {

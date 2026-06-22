@@ -29,7 +29,7 @@ export function applyCategoryOverride(
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
 
   if (categoryConfig.prompt_append && typeof result.prompt === "string") {
-    result.prompt = result.prompt + "\n" + resolvePromptAppend(categoryConfig.prompt_append)
+    result.prompt = `${result.prompt}\n${resolvePromptAppend(categoryConfig.prompt_append)}`
   }
 
   return result as AgentConfig
@@ -45,7 +45,7 @@ export function mergeAgentConfig(
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
   if (prompt_append && merged.prompt) {
-    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
+    merged.prompt = `${merged.prompt}\n${resolvePromptAppend(prompt_append, directory)}`
   }
 
   return merged

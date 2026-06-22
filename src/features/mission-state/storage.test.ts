@@ -6,7 +6,6 @@ import {
   appendSessionId,
   clearMissionState,
   createMissionState,
-  findOraclePlans,
   getPlanName,
   getPlanProgress,
   readMissionState,
@@ -15,7 +14,7 @@ import {
 import type { MissionState } from "./types"
 
 describe("mission-state", () => {
-  const TEST_DIR = join(tmpdir(), "mission-state-test-" + Date.now())
+  const TEST_DIR = join(tmpdir(), `mission-state-test-${Date.now()}`)
   const MATRIX_DIR = join(TEST_DIR, ".matrixx")
 
   beforeEach(() => {
@@ -81,7 +80,7 @@ describe("mission-state", () => {
 
       //#then
       expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
+      expect(result?.session_ids).toEqual([])
     })
 
     test("should default session_ids to [] when not an array", () => {
@@ -99,7 +98,7 @@ describe("mission-state", () => {
 
       //#then
       expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
+      expect(result?.session_ids).toEqual([])
     })
 
     test("should default session_ids to [] for empty object", () => {
@@ -112,7 +111,7 @@ describe("mission-state", () => {
 
       //#then
       expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
+      expect(result?.session_ids).toEqual([])
     })
 
     test("should read valid mission state", () => {
@@ -216,7 +215,7 @@ describe("mission-state", () => {
 
       //#then - should not crash and should contain the new session
       expect(result).not.toBeNull()
-      expect(result!.session_ids).toContain("ses-new")
+      expect(result?.session_ids).toContain("ses-new")
     })
   })
 

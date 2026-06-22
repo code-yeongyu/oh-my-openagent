@@ -41,7 +41,7 @@ export function createJsonOutputManager(
 
   function emitResult(result: RunResult): void {
     restore()
-    originalWrite(JSON.stringify(result) + "\n")
+    originalWrite(`${JSON.stringify(result)}\n`)
   }
 
   return {

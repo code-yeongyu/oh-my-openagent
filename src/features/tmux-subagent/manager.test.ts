@@ -244,7 +244,7 @@ describe('TmuxSessionManager', () => {
 
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
-      const actionsArg = call![0]
+      const actionsArg = call?.[0]
       expect(actionsArg).toHaveLength(1)
       expect(actionsArg[0].type).toBe('spawn')
       if (actionsArg[0].type === 'spawn') {
@@ -306,7 +306,7 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
-      const actionsArg = call![0]
+      const actionsArg = call?.[0]
       expect(actionsArg).toHaveLength(1)
       expect(actionsArg[0].type).toBe('spawn')
     })
@@ -427,7 +427,7 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
-      const actionsArg = call![0]
+      const actionsArg = call?.[0]
       expect(actionsArg).toHaveLength(1)
       expect(actionsArg[0].type).toBe('replace')
     })
@@ -486,7 +486,7 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteAction).toHaveBeenCalledTimes(1)
       const call = mockExecuteAction.mock.calls[0]
       expect(call).toBeDefined()
-      expect(call![0]).toEqual({
+      expect(call?.[0]).toEqual({
         type: 'close',
         paneId: '%mock',
         sessionId: 'ses_child',

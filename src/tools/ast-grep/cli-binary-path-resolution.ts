@@ -1,4 +1,4 @@
-import { existsSync } from "fs"
+import { existsSync } from "node:fs"
 
 import { findSgCliPathSync, getSgCliPath, setSgCliPath } from "./constants"
 import { ensureAstGrepBinary } from "./downloader"

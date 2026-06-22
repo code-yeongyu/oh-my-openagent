@@ -23,7 +23,7 @@ describe("truncateDescription", () => {
     // then
     expect(result.length).toBe(120) // 117 chars + "..."
     expect(result).toEndWith("...")
-    expect(result).toBe(description.slice(0, 117) + "...")
+    expect(result).toBe(`${description.slice(0, 117)}...`)
   })
 
   it("respects custom max length parameter", () => {
@@ -37,7 +37,7 @@ describe("truncateDescription", () => {
     // then
     expect(result.length).toBe(50) // 47 chars + "..."
     expect(result).toEndWith("...")
-    expect(result).toBe(description.slice(0, 47) + "...")
+    expect(result).toBe(`${description.slice(0, 47)}...`)
   })
 
   it("handles empty string", () => {

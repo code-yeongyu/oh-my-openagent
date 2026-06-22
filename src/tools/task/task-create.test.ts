@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "fs"
-import { join } from "path"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { join } from "node:path"
 import { createTaskCreateTool } from "./task-create"
-import type { TaskObject } from "./types"
 
 const TEST_STORAGE = ".test-task-create-tool"
 const TEST_DIR = join(process.cwd(), TEST_STORAGE)

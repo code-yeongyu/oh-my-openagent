@@ -49,8 +49,8 @@ function extractTextFromParts(parts: SessionMessagePart[] | undefined): string[]
 		for (const block of content) {
 			if (typeof block !== "object" || block === null) continue
 			const record = block as Record<string, unknown>
-			const typeValue = record["type"]
-			const textValue = record["text"]
+			const typeValue = record.type
+			const textValue = record.text
 			if (
 				(typeValue === "text" || typeValue === "reasoning") &&
 				typeof textValue === "string" &&

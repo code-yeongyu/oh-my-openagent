@@ -22,7 +22,7 @@ export function formatStatusMark(available: boolean): string {
 
 export function stripAnsi(str: string): string {
   const ESC = String.fromCharCode(27)
-  const pattern = ESC + "\\[[0-9;]*m"
+  const pattern = `${ESC}\\[[0-9;]*m`
   return str.replace(new RegExp(pattern, "g"), "")
 }
 

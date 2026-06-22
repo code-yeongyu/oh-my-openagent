@@ -50,9 +50,9 @@ describe("keyword-detector message transform", () => {
     // then - message should be prepended to text part with separator and original text
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("do something")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart?.text).toContain("---")
+    expect(textPart?.text).toContain("do something")
+    expect(textPart?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
   test("should prepend search message to text part", async () => {
@@ -72,9 +72,9 @@ describe("keyword-detector message transform", () => {
     // then - search message should be prepended to text part
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("for the bug")
-    expect(textPart!.text).toContain("[search-mode]")
+    expect(textPart?.text).toContain("---")
+    expect(textPart?.text).toContain("for the bug")
+    expect(textPart?.text).toContain("[search-mode]")
   })
 
   test("should NOT transform when no keywords detected", async () => {
@@ -93,7 +93,7 @@ describe("keyword-detector message transform", () => {
     // then - text should remain unchanged
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("just a normal message")
+    expect(textPart?.text).toBe("just a normal message")
   })
 })
 
@@ -388,8 +388,8 @@ Please locate and scan the directory.
     // then - should NOT trigger search mode (text should remain unchanged)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).toContain("<system-reminder>")
+    expect(textPart?.text).not.toContain("[search-mode]")
+    expect(textPart?.text).toContain("<system-reminder>")
   })
 
   test("should NOT trigger analyze mode from keywords inside <system-reminder> tags", async () => {
@@ -414,8 +414,8 @@ Research the implementation details.
     // then - should NOT trigger analyze mode
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[analyze-mode]")
-    expect(textPart!.text).toContain("<system-reminder>")
+    expect(textPart?.text).not.toContain("[analyze-mode]")
+    expect(textPart?.text).toContain("<system-reminder>")
   })
 
   test("should detect keywords in user text even when system-reminder is present", async () => {
@@ -441,8 +441,8 @@ Please search for the bug in the code.`
     // then - should trigger search mode from user text only
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[search-mode]")
-    expect(textPart!.text).toContain("Please search for the bug in the code.")
+    expect(textPart?.text).toContain("[search-mode]")
+    expect(textPart?.text).toContain("Please search for the bug in the code.")
   })
 
   test("should handle multiple system-reminder tags in message", async () => {
@@ -472,8 +472,8 @@ Second reminder with investigate and examine keywords.
     // then - should NOT trigger any mode (only user text exists, no keywords)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).not.toContain("[analyze-mode]")
+    expect(textPart?.text).not.toContain("[search-mode]")
+    expect(textPart?.text).not.toContain("[analyze-mode]")
   })
 
   test("should handle case-insensitive system-reminder tags", async () => {
@@ -497,7 +497,7 @@ System will search and find files.
     // then - should NOT trigger search mode
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
+    expect(textPart?.text).not.toContain("[search-mode]")
   })
 
   test("should handle multiline system-reminder content with search keywords", async () => {
@@ -526,7 +526,7 @@ Please explore the codebase and discover patterns.
     // then - should NOT trigger search mode
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[search-mode]")
+    expect(textPart?.text).not.toContain("[search-mode]")
   })
 })
 
@@ -573,9 +573,9 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - ultrawork should be skipped for planner agents, text unchanged
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork plan this feature")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart?.text).toBe("ultrawork plan this feature")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
   test("should skip ultrawork injection when agent name contains 'planner'", async () => {
@@ -594,8 +594,8 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - ultrawork should be skipped, text unchanged
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ulw create a work plan")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).toBe("ulw create a work plan")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 
   test("should skip ultrawork injection when agent name contains 'plan' token", async () => {
@@ -614,8 +614,8 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     //#then - ultrawork should be skipped, text unchanged
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork draft a plan")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).toBe("ultrawork draft a plan")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 
   test("should use normal ultrawork message when agent is Morpheus", async () => {
@@ -634,10 +634,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should use normal ultrawork message with agent utilization instructions
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("implement this feature")
+    expect(textPart?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).toContain("---")
+    expect(textPart?.text).toContain("implement this feature")
   })
 
   test("should use normal ultrawork message when agent is undefined", async () => {
@@ -656,10 +656,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should use normal ultrawork message (default behavior)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("do something")
+    expect(textPart?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).toContain("---")
+    expect(textPart?.text).toContain("do something")
   })
 
   test("should skip ultrawork for oracle but inject for morpheus", async () => {
@@ -685,12 +685,12 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
 
     // then - oracle should have no injection, morpheus should have normal ultrawork
     const oracleTextPart = oracleOutput.parts.find(p => p.type === "text")
-    expect(oracleTextPart!.text).toBe("ultrawork plan")
+    expect(oracleTextPart?.text).toBe("ultrawork plan")
 
     const morpheusTextPart = morpheusOutput.parts.find(p => p.type === "text")
-    expect(morpheusTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(morpheusTextPart!.text).toContain("---")
-    expect(morpheusTextPart!.text).toContain("implement")
+    expect(morpheusTextPart?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(morpheusTextPart?.text).toContain("---")
+    expect(morpheusTextPart?.text).toContain("implement")
   })
 
   //#given ultrawork mode activated for default model
@@ -712,10 +712,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should contain mandatory acceptance criteria section
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("MANDATORY: ACCEPTANCE CRITERIA DEFINITION")
-    expect(textPart!.text).toContain("BEFORE writing ANY code, you MUST output an Acceptance Criteria block")
-    expect(textPart!.text).toContain("FAILURE TO OUTPUT ACCEPTANCE CRITERIA")
-    expect(textPart!.text).toContain("Verification Commands")
+    expect(textPart?.text).toContain("MANDATORY: ACCEPTANCE CRITERIA DEFINITION")
+    expect(textPart?.text).toContain("BEFORE writing ANY code, you MUST output an Acceptance Criteria block")
+    expect(textPart?.text).toContain("FAILURE TO OUTPUT ACCEPTANCE CRITERIA")
+    expect(textPart?.text).toContain("Verification Commands")
   })
 
   //#given ultrawork mode activated for default model
@@ -737,10 +737,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should contain mandatory QA execution section
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("MANDATORY: QA EXECUTION")
-    expect(textPart!.text).toContain("AFTER implementation, you MUST execute ALL verification commands")
-    expect(textPart!.text).toContain("QA Report")
-    expect(textPart!.text).toContain("NO EVIDENCE = NOT VERIFIED = NOT DONE")
+    expect(textPart?.text).toContain("MANDATORY: QA EXECUTION")
+    expect(textPart?.text).toContain("AFTER implementation, you MUST execute ALL verification commands")
+    expect(textPart?.text).toContain("QA Report")
+    expect(textPart?.text).toContain("NO EVIDENCE = NOT VERIFIED = NOT DONE")
   })
 
   //#given ultrawork mode activated for GPT model
@@ -765,10 +765,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should contain both acceptance criteria and QA sections
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("MANDATORY: ACCEPTANCE CRITERIA DEFINITION")
-    expect(textPart!.text).toContain("MANDATORY: QA EXECUTION")
-    expect(textPart!.text).toContain("QA Report")
-    expect(textPart!.text).toContain("NO EVIDENCE = NOT VERIFIED = NOT DONE")
+    expect(textPart?.text).toContain("MANDATORY: ACCEPTANCE CRITERIA DEFINITION")
+    expect(textPart?.text).toContain("MANDATORY: QA EXECUTION")
+    expect(textPart?.text).toContain("QA Report")
+    expect(textPart?.text).toContain("NO EVIDENCE = NOT VERIFIED = NOT DONE")
   })
 
   test("should use session state agent over stale input.agent (bug fix)", async () => {
@@ -791,10 +791,10 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - should use Morpheus from session state, NOT oracle from stale input
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("implement this")
+    expect(textPart?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).toContain("---")
+    expect(textPart?.text).toContain("implement this")
 
     // cleanup
     clearSessionAgent(sessionID)
@@ -820,7 +820,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // then - oracle fallback from input.agent, ultrawork skipped
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork plan this")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(textPart?.text).toBe("ultrawork plan this")
+    expect(textPart?.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 })

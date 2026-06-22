@@ -11,7 +11,7 @@ export function toHashlineContent(content: string): string {
     const hash = computeLineHash(lineNum, line)
     return `${lineNum}#${hash}|${line}`
   })
-  return hasTrailingNewline ? hashlined.join("\n") + "\n" : hashlined.join("\n")
+  return hasTrailingNewline ? `${hashlined.join("\n")}\n` : hashlined.join("\n")
 }
 
 export function generateUnifiedDiff(oldContent: string, newContent: string, filePath: string): string {

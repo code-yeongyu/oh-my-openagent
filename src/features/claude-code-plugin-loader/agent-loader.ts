@@ -1,6 +1,6 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { basename, join } from "node:path"
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { existsSync, readdirSync, readFileSync } from "fs"
-import { basename, join } from "path"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { log } from "../../shared/logger"

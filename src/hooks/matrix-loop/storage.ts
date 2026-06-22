@@ -31,7 +31,7 @@ export function readState(directory: string, customPath?: string): MatrixLoopSta
     const isActive = active === true || active === "true"
     const iterationNum = typeof iteration === "number" ? iteration : Number(iteration)
     
-    if (isNaN(iterationNum)) {
+    if (Number.isNaN(iterationNum)) {
       return null
     }
 
@@ -53,7 +53,7 @@ export function readState(directory: string, customPath?: string): MatrixLoopSta
       prompt: body.trim(),
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
       ultrawork: data.ultrawork === true || data.ultrawork === "true" ? true : undefined,
-      verification_failed_count: verificationFailedCount && !isNaN(verificationFailedCount) ? verificationFailedCount : undefined,
+      verification_failed_count: verificationFailedCount && !Number.isNaN(verificationFailedCount) ? verificationFailedCount : undefined,
     }
   } catch {
     return null

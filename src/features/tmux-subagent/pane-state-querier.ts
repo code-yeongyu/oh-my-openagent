@@ -44,7 +44,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
     windowWidth = parseInt(windowWidthStr, 10)
     windowHeight = parseInt(windowHeightStr, 10)
 
-    if (!isNaN(width) && !isNaN(left) && !isNaN(height) && !isNaN(top)) {
+    if (!Number.isNaN(width) && !Number.isNaN(left) && !Number.isNaN(height) && !Number.isNaN(top)) {
       panes.push({ paneId, width, height, left, top, title, isActive })
     }
   }

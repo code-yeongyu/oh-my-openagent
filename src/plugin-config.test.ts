@@ -236,9 +236,9 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
-      expect(result!.agents?.smith?.model).toBe("openai/gpt-5.2");
-      expect(result!.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.agents?.oracle?.model).toBe("openai/gpt-5.2");
+      expect(result?.agents?.smith?.model).toBe("openai/gpt-5.2");
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
     });
   });
 
@@ -264,8 +264,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.disabled_hooks).toEqual(["comment-checker"]);
-      expect(result!.agents).toBeUndefined();
+      expect(result?.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result?.agents).toBeUndefined();
     });
 
     it("should preserve valid agents when a non-agent section is invalid", () => {
@@ -279,8 +279,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
-      expect(result!.disabled_hooks).toBeUndefined();
+      expect(result?.agents?.oracle?.model).toBe("openai/gpt-5.2");
+      expect(result?.disabled_hooks).toBeUndefined();
     });
   });
 
@@ -298,8 +298,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents).toBeUndefined();
-      expect(result!.disabled_hooks).toBeUndefined();
+      expect(result?.agents).toBeUndefined();
+      expect(result?.disabled_hooks).toBeUndefined();
     });
   });
 
@@ -332,8 +332,8 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially(rawConfig);
 
       expect(result).not.toBeNull();
-      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
-      expect((result as Record<string, unknown>)["some_future_key"]).toBeUndefined();
+      expect(result?.agents?.oracle?.model).toBe("openai/gpt-5.2");
+      expect((result as Record<string, unknown>).some_future_key).toBeUndefined();
     });
   });
 });

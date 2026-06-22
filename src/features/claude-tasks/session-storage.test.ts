@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "fs"
-import { join } from "path"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import type { MatrixxConfig } from "../../config/schema"
 import {
   findTaskAcrossSessions,
@@ -187,8 +187,8 @@ describe("findTaskAcrossSessions", () => {
 
     //#then
     expect(result).not.toBeNull()
-    expect(result!.sessionID).toBe("ses_002")
-    expect(result!.path).toBe(join(session2Dir, "T-target.json"))
+    expect(result?.sessionID).toBe("ses_002")
+    expect(result?.path).toBe(join(session2Dir, "T-target.json"))
   })
 
   test("returns null when base directory does not exist", () => {

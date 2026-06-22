@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -42,7 +42,7 @@ describe("addPluginToOpenCodeConfig — legacy plugin name upgrade", () => {
     const cfgPath = join(tempConfigDir, "opencode.json")
     writeFileSync(
       cfgPath,
-      JSON.stringify({ plugin: ["matrixx@1.1.0", "some-other-plugin"] }, null, 2) + "\n"
+      `${JSON.stringify({ plugin: ["matrixx@1.1.0", "some-other-plugin"] }, null, 2)}\n`
     )
 
     // #when re-running the installer with version 1.2.0
@@ -57,7 +57,7 @@ describe("addPluginToOpenCodeConfig — legacy plugin name upgrade", () => {
   test("replaces bare legacy `matrixx` entry (no version pin) with versioned `opencode-matrixx@<version>`", async () => {
     // #given a user with the bare legacy plugin name (unpinned)
     const cfgPath = join(tempConfigDir, "opencode.json")
-    writeFileSync(cfgPath, JSON.stringify({ plugin: ["matrixx"] }, null, 2) + "\n")
+    writeFileSync(cfgPath, `${JSON.stringify({ plugin: ["matrixx"] }, null, 2)}\n`)
 
     // #when re-running the installer
     const result = await addPluginToOpenCodeConfig("1.2.0")
@@ -73,7 +73,7 @@ describe("addPluginToOpenCodeConfig — legacy plugin name upgrade", () => {
     const cfgPath = join(tempConfigDir, "opencode.json")
     writeFileSync(
       cfgPath,
-      JSON.stringify({ plugin: ["opencode-matrixx@1.0.0", "other"] }, null, 2) + "\n"
+      `${JSON.stringify({ plugin: ["opencode-matrixx@1.0.0", "other"] }, null, 2)}\n`
     )
 
     // #when re-running the installer with a newer version
@@ -88,7 +88,7 @@ describe("addPluginToOpenCodeConfig — legacy plugin name upgrade", () => {
   test("appends `opencode-matrixx@<version>` when no matrixx entry is present", async () => {
     // #given a fresh config with no matrixx-related plugin
     const cfgPath = join(tempConfigDir, "opencode.json")
-    writeFileSync(cfgPath, JSON.stringify({ plugin: ["unrelated"] }, null, 2) + "\n")
+    writeFileSync(cfgPath, `${JSON.stringify({ plugin: ["unrelated"] }, null, 2)}\n`)
 
     // #when running the installer for the first time
     const result = await addPluginToOpenCodeConfig("1.2.0")
@@ -104,7 +104,7 @@ describe("addPluginToOpenCodeConfig — legacy plugin name upgrade", () => {
     const cfgPath = join(tempConfigDir, "opencode.json")
     writeFileSync(
       cfgPath,
-      JSON.stringify({ plugin: ["matrixx-unrelated-plugin"] }, null, 2) + "\n"
+      `${JSON.stringify({ plugin: ["matrixx-unrelated-plugin"] }, null, 2)}\n`
     )
 
     // #when running the installer

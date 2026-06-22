@@ -7,7 +7,7 @@ import { createMatrixLoopHook } from "./matrix-loop-hook"
 import { clearState } from "./storage"
 
 describe("matrix-loop event handler", () => {
-	const TEST_DIR = join(tmpdir(), "matrix-loop-event-handler-test-" + Date.now())
+	const TEST_DIR = join(tmpdir(), `matrix-loop-event-handler-test-${Date.now()}`)
 	let messagesCalls: Array<{ sessionID: string }>
 	let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
 

@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from "fs"
-import { join } from "path"
+import { readdirSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
 import { log } from "../../shared"
 import {
   CONSTRUCT_INDICATORS,

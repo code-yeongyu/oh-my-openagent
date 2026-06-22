@@ -1,4 +1,4 @@
-import * as fs from "fs"
+import * as fs from "node:fs"
 import { log } from "../logger"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
 import { migrateHookNames } from "./hook-names"
@@ -117,7 +117,7 @@ export function migrateConfigFile(
 
     let writeSucceeded = false
     try {
-      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
+      fs.writeFileSync(configPath, `${JSON.stringify(copy, null, 2)}\n`, "utf-8")
       writeSucceeded = true
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)

@@ -136,7 +136,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      expect(mockStdout.writes[0]!).toBe(JSON.stringify(result) + "\n")
+      expect(mockStdout.writes[0]!).toBe(`${JSON.stringify(result)}\n`)
 
       mockStdout.write("after emit")
       expect(mockStdout.writes).toHaveLength(2)

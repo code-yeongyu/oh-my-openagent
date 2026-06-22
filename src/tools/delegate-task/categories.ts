@@ -67,7 +67,7 @@ export function resolveCategoryConfig(
   let promptAppend = defaultPromptAppend
   if (userConfig?.prompt_append) {
     promptAppend = defaultPromptAppend
-      ? defaultPromptAppend + "\n\n" + userConfig.prompt_append
+      ? `${defaultPromptAppend}\n\n${userConfig.prompt_append}`
       : userConfig.prompt_append
   }
 

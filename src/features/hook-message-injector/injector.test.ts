@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test"
-import { isSqliteBackend, resetSqliteBackendCache } from "../../shared/opencode-storage-detection"
 import {
-  findFirstMessageWithAgent,
   findFirstMessageWithAgentFromSDK,
-  findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
   injectHookMessage,
 } from "./injector"

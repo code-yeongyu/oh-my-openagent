@@ -1,5 +1,5 @@
+import { platform } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { platform } from "os"
 import { buildWindowsToastScript, escapeAppleScriptText, escapePowerShellSingleQuotedText } from "./session-notification-formatting"
 import {
   getAfplayPath,
@@ -44,7 +44,7 @@ export async function sendSessionNotification(
 
       const escapedTitle = escapeAppleScriptText(title)
       const escapedMessage = escapeAppleScriptText(message)
-      await ctx.$`${osascriptPath} -e ${"display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""}`.catch(
+      await ctx.$`${osascriptPath} -e ${`display notification "${escapedMessage}" with title "${escapedTitle}"`}`.catch(
         () => {}
       )
       break
@@ -95,7 +95,7 @@ export async function playSessionNotificationSound(
       const powershellPath = await getPowershellPath()
       if (!powershellPath) return
       const escaped = escapePowerShellSingleQuotedText(soundPath)
-      ctx.$`${powershellPath} -Command ${("(New-Object Media.SoundPlayer '" + escaped + "').PlaySync()")}`.catch(() => {})
+      ctx.$`${powershellPath} -Command ${(`(New-Object Media.SoundPlayer '${escaped}').PlaySync()`)}`.catch(() => {})
       break
     }
   }

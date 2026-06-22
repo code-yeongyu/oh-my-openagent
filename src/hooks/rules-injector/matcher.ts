@@ -1,5 +1,5 @@
+import { createHash } from "node:crypto"
 import { relative } from "node:path"
-import { createHash } from "crypto"
 import picomatch from "picomatch"
 import type { RuleMetadata } from "./types"
 

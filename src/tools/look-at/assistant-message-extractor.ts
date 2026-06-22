@@ -19,13 +19,13 @@ type SessionMessage = {
 
 function asSessionMessage(value: unknown): SessionMessage | null {
   if (!isObject(value)) return null
-  const info = value["info"]
-  const parts = value["parts"]
+  const info = value.info
+  const parts = value.parts
   return {
     info: isObject(info)
       ? {
-          role: typeof info["role"] === "string" ? info["role"] : undefined,
-          time: isObject(info["time"]) ? { created: typeof info["time"]["created"] === "number" ? info["time"]["created"] : undefined } : undefined,
+          role: typeof info.role === "string" ? info.role : undefined,
+          time: isObject(info.time) ? { created: typeof info.time.created === "number" ? info.time.created : undefined } : undefined,
         }
       : undefined,
     parts,
@@ -41,8 +41,8 @@ function getTextParts(message: SessionMessage): MessagePart[] {
   return message.parts
     .filter((part): part is Record<string, unknown> => isObject(part))
     .map((part) => ({
-      type: typeof part["type"] === "string" ? part["type"] : undefined,
-      text: typeof part["text"] === "string" ? part["text"] : undefined,
+      type: typeof part.type === "string" ? part.type : undefined,
+      text: typeof part.text === "string" ? part.text : undefined,
     }))
     .filter((part) => part.type === "text" && Boolean(part.text))
 }

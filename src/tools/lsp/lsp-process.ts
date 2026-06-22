@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process"
+import { existsSync, statSync } from "node:fs"
 import { spawn as bunSpawn } from "bun"
-import { existsSync, statSync } from "fs"
 import { log } from "../../shared/logger"
 
 // Bun spawn segfaults on Windows (oven-sh/bun#25798) — unfixed as of v1.3.8+

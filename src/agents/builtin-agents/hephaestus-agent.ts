@@ -37,8 +37,8 @@ export function maybeCreateKeymakerConfig(input: {
 
   if (disabledAgents.includes("keymaker")) return undefined
 
-  const keymakerOverride = agentOverrides["keymaker"]
-  const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["keymaker"]
+  const keymakerOverride = agentOverrides.keymaker
+  const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS.keymaker
   const hasKeymakerExplicitConfig = keymakerOverride !== undefined
 
   const hasRequiredProvider =

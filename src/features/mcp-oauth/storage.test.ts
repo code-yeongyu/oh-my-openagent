@@ -6,14 +6,13 @@ import type { OAuthTokenData } from "./storage"
 import {
   deleteToken,
   getMcpOauthStoragePath,
-  listAllTokens,
   listTokensByHost,
   loadToken,
   saveToken,
 } from "./storage"
 
 describe("mcp-oauth storage", () => {
-  const TEST_CONFIG_DIR = join(tmpdir(), "mcp-oauth-test-" + Date.now())
+  const TEST_CONFIG_DIR = join(tmpdir(), `mcp-oauth-test-${Date.now()}`)
   let originalConfigDir: string | undefined
 
   beforeEach(() => {

@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
-import { basename, dirname, join } from "path"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { discoverAllSkills, type LazyContentLoader, type LoadedSkill } from "../../features/opencode-skill-loader"

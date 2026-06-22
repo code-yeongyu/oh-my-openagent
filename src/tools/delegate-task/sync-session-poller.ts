@@ -104,7 +104,7 @@ export async function pollSyncSession(
       log("[task] Poll status", {
         sessionID: input.sessionID,
         pollCount,
-        elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
+        elapsed: `${Math.floor((Date.now() - pollStart) / 1000)}s`,
         sessionStatus: sessionStatus?.type ?? "not_in_status",
         idleStallCount,
         stableIdlePolls,

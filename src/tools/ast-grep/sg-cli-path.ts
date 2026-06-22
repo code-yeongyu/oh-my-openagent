@@ -1,6 +1,6 @@
-import { existsSync, statSync } from "fs"
-import { createRequire } from "module"
-import { dirname, join } from "path"
+import { existsSync, statSync } from "node:fs"
+import { createRequire } from "node:module"
+import { dirname, join } from "node:path"
 
 import { getCachedBinaryPath } from "./downloader"
 

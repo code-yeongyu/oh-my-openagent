@@ -1,4 +1,4 @@
-import { dirname } from "path"
+import { dirname } from "node:path"
 import { resolveCommandsInText, resolveFileReferencesInText } from "../../shared"
 import type { CommandInfo } from "./types"
 

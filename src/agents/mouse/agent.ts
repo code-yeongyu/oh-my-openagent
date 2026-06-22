@@ -57,7 +57,6 @@ export function buildMousePrompt(
   switch (source) {
     case "gpt":
       return buildGptMousePrompt(useTaskSystem, promptAppend)
-    case "default":
     default:
       return buildDefaultMousePrompt(useTaskSystem, promptAppend)
   }

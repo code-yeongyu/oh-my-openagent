@@ -71,7 +71,7 @@ describe("morpheus-task", () => {
   describe("DEFAULT_CATEGORIES", () => {
     test("construct category has model and variant config", () => {
       // given
-      const category = DEFAULT_CATEGORIES["construct"]
+      const category = DEFAULT_CATEGORIES.construct
 
       // when / #then
       expect(category).toBeDefined()
@@ -81,7 +81,7 @@ describe("morpheus-task", () => {
 
     test("source category has model and variant config", () => {
       // given
-      const category = DEFAULT_CATEGORIES["source"]
+      const category = DEFAULT_CATEGORIES.source
 
       // when / #then
       expect(category).toBeDefined()
@@ -103,7 +103,7 @@ describe("morpheus-task", () => {
   describe("CATEGORY_PROMPT_APPENDS", () => {
     test("construct category has design-focused prompt", () => {
       // given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["construct"]
+      const promptAppend = CATEGORY_PROMPT_APPENDS.construct
 
       // when / #then
       expect(promptAppend).toContain("VISUAL/UI")
@@ -112,7 +112,7 @@ describe("morpheus-task", () => {
 
     test("source category has deep logical reasoning prompt", () => {
       // given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["source"]
+      const promptAppend = CATEGORY_PROMPT_APPENDS.source
 
       // when / #then
       expect(promptAppend).toContain("DEEP LOGICAL REASONING")
@@ -717,7 +717,7 @@ describe("morpheus-task", () => {
 
       // then - resolves successfully since anthropic is available
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("resolves deep-jack with built-in model when availability is empty", () => {
@@ -733,7 +733,7 @@ describe("morpheus-task", () => {
 
       // then - resolves via deep-jack's built-in model (anthropic/claude-opus-4-6)
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("bypasses requiresModel when explicit user config provided", () => {
@@ -753,7 +753,7 @@ describe("morpheus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("bypasses requiresModel when explicit user config provided even with empty availability", () => {
@@ -773,7 +773,7 @@ describe("morpheus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
@@ -785,8 +785,8 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-sonnet-4-6")
-      expect(result!.promptAppend).toContain("VISUAL/UI")
+      expect(result?.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(result?.promptAppend).toContain("VISUAL/UI")
     })
 
     test("user config overrides systemDefaultModel", () => {
@@ -801,7 +801,7 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("user prompt_append is appended to default", () => {
@@ -819,8 +819,8 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.promptAppend).toContain("VISUAL/UI")
-      expect(result!.promptAppend).toContain("Custom instructions here")
+      expect(result?.promptAppend).toContain("VISUAL/UI")
+      expect(result?.promptAppend).toContain("Custom instructions here")
     })
 
     test("user can define custom category", () => {
@@ -839,9 +839,9 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("openai/gpt-5.2")
-      expect(result!.config.temperature).toBe(0.5)
-      expect(result!.promptAppend).toBe("You are a custom agent")
+      expect(result?.config.model).toBe("openai/gpt-5.2")
+      expect(result?.config.temperature).toBe(0.5)
+      expect(result?.promptAppend).toBe("You are a custom agent")
     })
 
     test("user category overrides temperature", () => {
@@ -859,7 +859,7 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.temperature).toBe(0.3)
+      expect(result?.config.temperature).toBe(0.3)
     })
 
     test("category built-in model takes precedence over inheritedModel", () => {
@@ -872,7 +872,7 @@ describe("morpheus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -886,7 +886,7 @@ describe("morpheus-task", () => {
 
       // then - systemDefaultModel is used since custom category has no built-in model
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(result?.config.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
     test("user model takes precedence over inheritedModel", () => {
@@ -902,7 +902,7 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("my-provider/my-model")
+      expect(result?.config.model).toBe("my-provider/my-model")
     })
 
     test("default model from category config is used when no user model and no inheritedModel", () => {
@@ -914,7 +914,7 @@ describe("morpheus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(result?.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
   })
 
@@ -929,7 +929,7 @@ describe("morpheus-task", () => {
 
       //#then - variant should NOT be inherited from the default "source" config
       expect(result).not.toBeNull()
-      expect(result!.config.variant).toBeUndefined()
+      expect(result?.config.variant).toBeUndefined()
     })
 
     test("uses user explicit variant even when user also overrides model", () => {
@@ -942,7 +942,7 @@ describe("morpheus-task", () => {
 
       //#then
       expect(result).not.toBeNull()
-      expect(result!.config.variant).toBe("high")
+      expect(result?.config.variant).toBe("high")
     })
 
     test("inherits default variant when user does not override model", () => {
@@ -954,7 +954,7 @@ describe("morpheus-task", () => {
 
       //#then - variant should be inherited from default
       expect(result).not.toBeNull()
-      expect(result!.config.variant).toBe("max")
+      expect(result?.config.variant).toBe("max")
     })
   })
 
@@ -1397,7 +1397,7 @@ describe("morpheus-task", () => {
     //#given a session with a previous message that has variant "max"
     const { createDelegateTask } = require("./tools")
 
-    const promptMock = mock(async (input: any) => {
+    const promptMock = mock(async (_input: any) => {
       return { data: {} }
     })
 
@@ -2886,7 +2886,7 @@ describe("morpheus-task", () => {
       // then
       expect(result).toContain(planPrepend)
       expect(result).toContain(skillContent)
-      expect(result!.indexOf(planPrepend)).toBeLessThan(result!.indexOf(skillContent))
+      expect(result?.indexOf(planPrepend)).toBeLessThan(result?.indexOf(skillContent))
     })
 
     test("does not prepend plan agent prompt for non-plan agents", () => {
@@ -2926,8 +2926,8 @@ describe("morpheus-task", () => {
       
       // then - catalog model is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("anthropic/claude-opus-4-6")
-      expect(resolved!.config.variant).toBe("max")
+      expect(resolved?.config.model).toBe("anthropic/claude-opus-4-6")
+      expect(resolved?.config.variant).toBe("max")
     })
 
     test("default model is used for category with default entry", () => {
@@ -2939,7 +2939,7 @@ describe("morpheus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(resolved?.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -2952,7 +2952,7 @@ describe("morpheus-task", () => {
       
       // then - category's built-in model wins (source uses anthropic/claude-opus-4-6)
       expect(resolved).not.toBeNull()
-      const actualModel = resolved!.config.model
+      const actualModel = resolved?.config.model
       expect(actualModel).toBe("anthropic/claude-opus-4-6")
     })
 
@@ -2967,7 +2967,7 @@ describe("morpheus-task", () => {
       
       // then - actualModel should be userModel, type should be "user-defined"
       expect(resolved).not.toBeNull()
-      const actualModel = resolved!.config.model
+      const actualModel = resolved?.config.model
       const userDefinedModel = userCategories[categoryName]?.model
       expect(actualModel).toBe(userDefinedModel)
       expect(actualModel).toBe("my-provider/custom-model")
@@ -2982,7 +2982,7 @@ describe("morpheus-task", () => {
       
       // when - user model wins
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
-      const actualModel = resolved!.config.model
+      const actualModel = resolved?.config.model
       const userDefinedModel = userCategories[categoryName]?.model
       
       // then - detection should compare against actual resolved model
@@ -3012,7 +3012,7 @@ describe("morpheus-task", () => {
       
       // then category's built-in model should be used, NOT inheritedModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-6")
+      expect(resolved?.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
@@ -3029,7 +3029,7 @@ describe("morpheus-task", () => {
       
       // then systemDefaultModel should be returned
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(resolved?.model).toBe("anthropic/claude-sonnet-4-5")
     })
 
     test("FIXED: userConfig.model always takes priority over everything", () => {
@@ -3048,7 +3048,7 @@ describe("morpheus-task", () => {
       
       // then userConfig.model should win
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("custom/user-model")
+      expect(resolved?.model).toBe("custom/user-model")
     })
 
     test("FIXED: empty string in userConfig.model is treated as unset and falls back to systemDefault", () => {
@@ -3062,7 +3062,7 @@ describe("morpheus-task", () => {
       
       // then should fall back to systemDefaultModel since custom category has no built-in model
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(resolved?.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
     test("FIXED: undefined userConfig.model falls back to category built-in model", () => {
@@ -3077,7 +3077,7 @@ describe("morpheus-task", () => {
       
       // then should use category's built-in model (anthropic/claude-sonnet-4-6 for construct)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(resolved?.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {
@@ -3092,7 +3092,7 @@ describe("morpheus-task", () => {
       
       // then - actualModel should be systemDefaultModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe(systemDefaultModel)
+      expect(resolved?.model).toBe(systemDefaultModel)
     })
   })
 

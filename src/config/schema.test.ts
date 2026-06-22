@@ -354,10 +354,10 @@ describe("AgentOverrideConfigSchema", () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.fallbackChain).toHaveLength(2)
-        expect(result.data.fallbackChain![0].providers).toEqual(["anthropic", "opencode"])
-        expect(result.data.fallbackChain![0].model).toBe("claude-opus-4-6")
-        expect(result.data.fallbackChain![0].variant).toBe("max")
-        expect(result.data.fallbackChain![1].variant).toBeUndefined()
+        expect(result.data.fallbackChain?.[0].providers).toEqual(["anthropic", "opencode"])
+        expect(result.data.fallbackChain?.[0].model).toBe("claude-opus-4-6")
+        expect(result.data.fallbackChain?.[0].variant).toBe("max")
+        expect(result.data.fallbackChain?.[1].variant).toBeUndefined()
       }
     })
 
@@ -489,9 +489,9 @@ describe("Mouse agent override", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["mouse"]).toBeDefined()
-      expect(result.data.agents?.["mouse"]?.model).toBe("openai/gpt-5.2")
-      expect(result.data.agents?.["mouse"]?.temperature).toBe(0.2)
+      expect(result.data.agents?.mouse).toBeDefined()
+      expect(result.data.agents?.mouse?.model).toBe("openai/gpt-5.2")
+      expect(result.data.agents?.mouse?.temperature).toBe(0.2)
     }
   })
 
@@ -511,7 +511,7 @@ describe("Mouse agent override", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["mouse"]?.prompt_append).toBe(
+      expect(result.data.agents?.mouse?.prompt_append).toBe(
         "Additional instructions for morpheus-junior"
       )
     }
@@ -536,7 +536,7 @@ describe("Mouse agent override", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["mouse"]?.tools).toEqual({
+      expect(result.data.agents?.mouse?.tools).toEqual({
         read: true,
         write: false,
       })

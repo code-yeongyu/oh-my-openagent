@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { createCleanMcpEnvironment, EXCLUDED_ENV_PATTERNS } from "./env-cleaner"
 
 describe("createCleanMcpEnvironment", () => {

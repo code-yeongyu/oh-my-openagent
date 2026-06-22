@@ -30,7 +30,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   if (!sessionID) return
 
   const task = findBySession(sessionID)
-  if (!task || task.status !== "running") return
+  if (task?.status !== "running") return
 
   const startedAt = task.startedAt
   if (!startedAt) return
