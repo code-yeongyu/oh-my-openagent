@@ -3,6 +3,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { log } from "../../shared"
+import { formatDetailedError } from "../../shared/error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { getMessageDir } from "./message-dir"
 import type { DelegateAgentArgs } from "./types"
@@ -66,15 +67,25 @@ export async function executeBackground(
       sessionId = manager.getTask(task.id)?.sessionID
     }
 
+    if (!sessionId) {
+      return formatDetailedError(
+        new Error(`Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`),
+        {
+          operation: "Launch background agent task",
+          agent: task.agent,
+        }
+      )
+    }
+
     await toolContext.metadata?.({
       title: args.description,
-      metadata: { sessionId: sessionId ?? "pending" },
+      metadata: { sessionId },
     })
 
     return `Background agent task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${sessionId ?? "pending"}
+Session ID: ${sessionId ?? "(timed out)"}
 Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
