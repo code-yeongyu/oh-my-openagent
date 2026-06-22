@@ -81,6 +81,25 @@ export function createCoreTools(args: {
     },
   })
 
+  const delegateTaskDag = factories.createDelegateTaskDag({
+    manager: managers.backgroundManager,
+    client: ctx.client,
+    directory: ctx.directory,
+    userCategories: pluginConfig.categories,
+    agentOverrides: pluginConfig.agents,
+    gitMasterConfig: pluginConfig.git_master,
+    sisyphusJuniorModel: getSisyphusJuniorModelOverride(pluginConfig.agents?.["sisyphus-junior"]),
+    browserProvider: skillContext.browserProvider,
+    disabledSkills: skillContext.disabledSkills,
+    teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    availableCategories,
+    availableSkills: skillContext.availableSkills,
+    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    sisyphusAgentConfig: pluginConfig.sisyphus_agent,
+    syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
+    modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
+  })
+
   const getSessionIDForMcp = (): string | undefined => getMainSessionID()
   const skillMcpTool = factories.createSkillMcpTool({
     manager: managers.skillMcpManager,
@@ -118,6 +137,7 @@ export function createCoreTools(args: {
     tools.look_at = factories.createLookAt(ctx)
   }
   tools.task = delegateTask
+  tools.delegate_task_dag = delegateTaskDag
   tools.skill_mcp = skillMcpTool
   tools.skill = skillTool
 

@@ -30,6 +30,7 @@ import {
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
   createCostGatingHook,
+  createSandboxGateHook,
 } from "../../hooks"
 import {
   detectExternalNotificationPlugin,
@@ -67,6 +68,7 @@ export type SessionHooks = {
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
   costGating: ReturnType<typeof createCostGatingHook> | null
+  sandboxGate: ReturnType<typeof createSandboxGateHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -240,6 +242,10 @@ export function createSessionHooks(args: {
     ? safeHook("cost-gating", () => createCostGatingHook(ctx, pluginConfig))
     : null
 
+  const sandboxGate = isHookEnabled("sandbox-gate")
+    ? safeHook("sandbox-gate", () => createSandboxGateHook(ctx, pluginConfig))
+    : null
+
   return {
     preemptiveCompaction,
     sessionNotification,
@@ -266,5 +272,6 @@ export function createSessionHooks(args: {
     runtimeFallback,
     legacyPluginToast,
     costGating,
+    sandboxGate,
   }
 }

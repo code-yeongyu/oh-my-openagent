@@ -105,6 +105,10 @@ export const OhMyOpenCodeConfigSchema = z.object({
   enforce_subagent_threshold_tokens: z.number().optional(),
   /** Enable model fallback degradation for simple tasks (default: false) */
   enable_cost_degradation: z.boolean().optional(),
+  /** Max budget per session in USD (default: 0.20) */
+  max_session_budget_usd: z.number().optional(),
+  /** Sandbox verification command (default: 'npm run compile || bun test') */
+  sandbox_verify_command: z.string().optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

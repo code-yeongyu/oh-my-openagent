@@ -27,6 +27,7 @@ import {
   smartRouteToCategory,
 } from "@oh-my-opencode/delegate-core"
 import { mergeCategories } from "../../shared/merge-categories"
+import { sessionAnnealingMap } from "../../hooks/cost-gating/hook"
 
 async function loadNativeSkillEntries(
   nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
@@ -225,6 +226,18 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
         fallbackChain = resolution.fallbackChain
+      }
+
+      const isAnnealing = sessionAnnealingMap.get(ctx.sessionID) === true
+      if (isAnnealing) {
+        log("[budget-control] Annealing active for session. Downgrading to cheap model.")
+        categoryModel = {
+          providerID: "google",
+          modelID: "gemini-1.5-flash",
+        }
+        if (delegateTaskArgs.prompt && !hasExplicitExecutionSteps(delegateTaskArgs.prompt)) {
+          delegateTaskArgs.prompt = `${delegateTaskArgs.prompt}\n\n[Instruction-Driven Enforced: Please follow these step-by-step instructions:\\n1. Execute the task.\\n2. Verify the results.\\n3. Make sure all tests pass.]`
+        }
       }
 
       // For simple/cheaper models, validate that we have explicit execution steps (bypass in unit tests)

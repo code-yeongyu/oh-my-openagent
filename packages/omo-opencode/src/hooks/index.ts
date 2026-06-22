@@ -71,4 +71,5 @@ export { createPlanFormatValidatorHook } from "./plan-format-validator"
 export { createMonitorStatusInjectorHook } from "./monitor-status-injector"
 export { createCostGatingHook } from "./cost-gating";
 export { createEnforcedDelegationHook } from "./enforced-delegation";
-
+export { createFileCacheHook } from "./file-cache";
+export { createSandboxGateHook } from "./sandbox-gate";
