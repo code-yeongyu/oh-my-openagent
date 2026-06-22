@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   OMO_INTERNAL_INITIATOR_MARKER,
+  OMO_INTERNAL_INITIATOR_METADATA_KEY,
   OMO_INTERNAL_NOREPLY_MARKER,
 } from "../internal-initiator-marker"
 import { latestAssistantTurnBlocksInternalPrompt } from "./pending-tool-turn"
@@ -66,7 +67,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
           role: "user",
           time: { created: 4000 },
         },
-        parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+        parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->", synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -99,7 +100,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
           role: "user",
           time: { created: 4000 },
         },
-        parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+        parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->", synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -132,7 +133,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
           role: "user",
           time: { created: 4000 },
         },
-        parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+        parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->", synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -221,7 +222,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
           role: "user",
           time: { created: 3000 },
         },
-        parts: [{ type: "text", text: "continue\n<!-- OMO_INTERNAL_INITIATOR -->", synthetic: true }],
+        parts: [{ type: "text", text: "continue\n<!-- OMO_INTERNAL_INITIATOR -->", synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -309,7 +310,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
           role: "user",
           time: { created: 3000 },
         },
-        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -333,11 +334,11 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
       },
       {
         info: { role: "user", time: { created: 3000 } },
-        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
       {
         info: { role: "user", time: { created: 4000 } },
-        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -361,11 +362,11 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
       },
       {
         info: { role: "user", time: { created: 3000 } },
-        parts: [{ type: "text", text: REPLY_EXPECTING_TAIL_TEXT, synthetic: true }],
+        parts: [{ type: "text", text: REPLY_EXPECTING_TAIL_TEXT, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
       {
         info: { role: "user", time: { created: 4000 } },
-        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
@@ -389,7 +390,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
       },
       {
         info: { role: "user", time: { created: 3000 } },
-        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true, metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true } }],
       },
     ]
 
