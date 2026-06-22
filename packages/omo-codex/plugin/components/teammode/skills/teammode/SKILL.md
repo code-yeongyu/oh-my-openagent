@@ -1,163 +1,166 @@
 ---
 name: teammode
-description: Codex-only team orchestration with durable team state and coordinated thread cleanup
+description: "Codex-only team orchestration: run a named team of cooperating Codex threads with durable, script-managed state. MUST USE when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of threads/sessions, or to work on something as a team in parallel. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps, or when a task still needs exploration under a clear goal; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team, delete the team."
 ---
 
 # Teammode
 
-Use this skill when the user asks Codex to create, coordinate, inspect, archive,
-or delete a team of Codex threads. This is a Codex-only workflow. It is inspired
-by the lifecycle concerns in Yeachan-Heo/oh-my-codex team skill, but it does not
-copy that runtime model or depend on an external terminal runner.
+Run a named team of cooperating Codex threads under one leader, with durable state on disk.
+This is a Codex-only workflow. It is inspired by the lifecycle concerns in the
+Yeachan-Heo/oh-my-codex team skill, but it does not copy that runtime model and never depends
+on an external terminal runner - it coordinates through Codex's own thread tools plus a bundled
+state script.
 
-## Core Model
+## When to use a team (and when to use plain subagents instead)
 
-A team is the parent object. Threads and subagents are members of that team, not
-the other way around. Store the team record under:
+Use a TEAM when EITHER holds:
+- the work does NOT split into perfectly isolated pieces, but doing it in parallel is clearly
+  more convenient - members will need to see and react to each other's findings; or
+- one task still needs exploration, yet its GOAL is already clear - parallel investigation under
+  a fixed objective.
 
-```text
-.omo/teams/{session_id}/team.json
-.omo/teams/{session_id}/notepad.md
-.omo/teams/{session_id}/events.jsonl
+Use plain subagents (`$ulw` / `multi_agent_v1.spawn_agent`) - NOT a team - when EITHER holds:
+- the work IS perfectly isolated, so there is no coordination cost worth paying; or
+- the GOAL is still ambiguous, where one mind should resolve direction before any fan-out.
+
+A team buys cross-member coordination at a real overhead cost; only spend it when coordination
+is the thing you actually need.
+
+## You are the leader - orchestrate, do not implement
+
+The main session is ALWAYS the team leader; you orchestrate directly and never spin up a separate
+leader thread. Your job is orchestration, NOT writing product code: split the work and assign each
+slice, hold live situational awareness of every member, verify and QA what they deliver, relay
+findings between members, instruct and unblock, and synthesize the result. DELEGATE every code edit
+to a member - if you catch yourself editing product files while the team runs, that work was a
+member's slice you should have handed off. You own direction, verification, and integration (the
+merge), not the keystrokes.
+
+## Compose by part, ownership, or perspective - not by job title
+
+A team is ALWAYS two or more members - never a single-member team. One worker on an isolated
+job is a subagent (`multi_agent_v1.spawn_agent`), not a team; if you end up with a single member,
+either split off a second distinct slice or drop the team and use a subagent.
+
+Compose the team from what you actually KNOW about the work. Ground the split in real knowledge
+of the problem, then divide it into clear, non-overlapping responsibilities - one per aspect of
+the work - and give each member exactly one. No two members may own the same thing. Define each
+member by a concrete slice: a specific part of the codebase, an ownership area, or a distinct
+perspective/lens. Assigning a vague role ("backend dev", "release analyst", "the tester") is an
+anti-pattern - it gives the member no real boundary and invites overlap. Each member's `focus`
+names what they own concretely; the `lens` is one of `area`, `ownership`, or `perspective`.
+Give each member a short, distinct `--name` too - its role or what it watches (e.g.
+`app-server-lifecycle`, `mailbox-delivery`) - because that name titles its thread; never reuse
+one name for two members.
+
+## Run the script - never hand-write team state
+
+A bundled, dependency-free Node script owns all team state so you never author `team.json` or
+the member manual by hand. Run it with `node` (or `bun`); it works on macOS, Linux, and Windows.
+Replace `<skill-root>` with this skill's own directory.
+
+```
+node "<skill-root>/scripts/team.mjs" init        --name "<team>" --session-name "<session>" [--session <leader_session_id>] [--worktree] [--base-branch dev]
+node "<skill-root>/scripts/team.mjs" add-member  --team <session_id> --id A --name "<short role>" --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>" [--branch <branch>]
+node "<skill-root>/scripts/team.mjs" bind-thread  --team <session_id> --id A --thread <thread_id> [--cwd <path>]
+node "<skill-root>/scripts/team.mjs" member-prompt --team <session_id> --id A
+node "<skill-root>/scripts/team.mjs" set-status   --team <session_id> --id A --status reported|blocked|active|archived [--note "<...>"]
+node "<skill-root>/scripts/team.mjs" worktree-add    --team <session_id> --id A [--base-branch <branch>]
+node "<skill-root>/scripts/team.mjs" worktree-remove --team <session_id> --id A [--force]
+node "<skill-root>/scripts/team.mjs" integrate       --team <session_id> [--id A]
+node "<skill-root>/scripts/team.mjs" archive      --team <session_id> [--id A]
+node "<skill-root>/scripts/team.mjs" delete       --team <session_id> [--force]
+node "<skill-root>/scripts/team.mjs" status       --team <session_id>
 ```
 
-`{session_id}` is the leader Codex session id when available. If the current
-session id is not exposed, use a stable timestamp slug and record the fallback
-in `events.jsonl`.
+`init` creates `.omo/teams/{session_id}/` containing `team.json` (the single durable state file:
+team id, the main-session leader, the member roster, status, worktree config, and a lifecycle
+log), `guide.md` (the auto-generated member field manual), and `artifacts/` (a shared exchange
+space). `{session_id}` is the leader's Codex session id when you can pass it via `--session`;
+otherwise the script generates a stable handle. Re-running `init` is a safe no-op. Every mutating
+subcommand rewrites `guide.md`, so the manual always matches the current team.
 
-The `team.json` shape is:
+## Create the team and its threads
 
-```json
-{
-  "schemaVersion": 1,
-  "sessionId": "{session_id}",
-  "teamName": "Team Name",
-  "activeTeam": true,
-  "archived": false,
-  "leader": {
-    "threadId": "leader-thread-id",
-    "role": "leader",
-    "title": "[team name] {session name}"
-  },
-  "members": [
-    {
-      "id": "A",
-      "threadId": "member-thread-id",
-      "role": "release analyst",
-      "status": "active",
-      "title": "[team name] {session name}"
-    }
-  ]
-}
-```
+1. `init` the team, then `add-member` once per member.
+2. Create a durable thread per member with `codex_app.create_thread` - ALWAYS this tool for every
+   member, never a spawned agent - titled `[team name] <member name>`, using THAT member's own
+   name (its role / what it watches), so no two threads share a title. `add-member` prints the
+   exact title to use. If `codex_app.create_thread` accepts a working directory / cwd argument,
+   set it to that member's worktree; otherwise the member's manual tells it to `cd` there first.
+   Use `codex_app.set_thread_title` if the title did not land at creation.
+3. `bind-thread` to record each thread id (and `--cwd`), then send that member's bootstrap
+   trigger (printed by `add-member` / `member-prompt`) as the thread's first message. The trigger
+   is short on purpose: it tells the new thread to READ its `guide.md` and `team.json` rather than
+   carrying the whole protocol inline.
 
-Keep `notepad.md` for leader memory, peer digests, decisions, and cleanup notes.
-Append every create, broadcast, status, archive, and delete action to
-`events.jsonl`.
-
-## Team Creation
-
-1. Choose a short team name and a session name before creating members.
-2. Every team-created thread title must use this exact shape:
-   `[team name] {session name}`.
-3. Write `team.json` before sending work to members.
-4. Create durable member threads with `codex_app.create_thread` when available.
-   Use `codex_app.set_thread_title` immediately after creation if the title did
-   not land during creation.
-5. For short in-turn helper lanes, `multi_agent_v1.spawn_agent` is acceptable,
-   but durable teams should prefer Codex thread tools so the team remains visible
-   as a set of archived or active threads.
-
-Member prompts must be self-contained and English-only. Include:
-
-- team name and leader thread id
-- the member's explicit role and owned scope
-- the exact deliverable and verification expectation
-- the team state directory path
-- instructions to send `WORKING: <role> - <phase>` during long work
-- instructions to send a concise final report to the leader
-- instructions that all member-to-member and member-to-leader communication is
-  English-only
+Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
+not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
+for a team member: a spawned agent is an ephemeral helper that does not show up as a team thread,
+cannot carry the `[team name] <member name>` title, and cannot be inspected, titled, archived, or
+re-opened with the `codex_app.*` thread tools - which defeats the entire point of a durable team.
+A member only counts once you have `bind-thread`-ed it to a real `codex_app.create_thread` thread
+id. If the thread-creation tool is unavailable, STOP and say so (see Stop rules); do not quietly
+fall back to a spawned agent.
 
 ## Communication
 
-The leader owns coordination. Members own their assigned lane and report risks
-that affect other lanes.
+Members push to you and to one another with `codex_app.send_message_to_thread`; you inspect their
+state with `codex_app.read_thread`. So members can actually reach you, run `init` with
+`--session <your own thread id>` - that makes `leader.sessionId` in team.json a real, messageable
+thread; without it members cannot report to you and you are stuck polling. The generated manual binds
+members to the hard rules, so you mainly keep the channel open: expect frequent small inbound updates
+from each member - findings, `WORKING:`/`BLOCKED:` markers, peer digests - rather than one final
+dump, and act on them as they arrive. All member-to-member and member-to-leader traffic is in English;
+when the END user addresses a member, that member replies in the user's own language. Members hand off
+files and memos through the team `artifacts/` directory and reference them by path. Wait for every
+required member's final report before you declare the team done.
 
-Use `codex_app.send_message_to_thread` for leader-to-member messages and
-broadcasts. Use `codex_app.read_thread` to inspect recent member status before
-reassigning or summarizing. Broadcast peer digests when one member finds context
-that changes another member's assumptions.
+## Worktrees - isolate members who would touch the same files
 
-Cadence:
+The moment two members' slices would edit the same files, give each its own git worktree so they
+cannot clobber each other. Decide this whenever you see the collision - at team creation OR mid-run,
+not only up front. For each colliding member run `worktree-add --team <id> --id <member>`: it creates
+the worktree off the base branch on a derived branch, flips the team into worktree mode, records it in
+`team.json`, and prints the `cd` path to hand that member. The member works and commits only inside
+its own worktree. To land the work, `integrate --team <id>` merges every member branch into your
+current branch with a merge commit (never a squash or rebase); resolve any conflict it reports, then
+`worktree-remove` each worktree at cleanup.
 
-- Require frequent status updates for long tasks, usually every 30-60 seconds of
-  active work or at each phase boundary.
-- Members acknowledge handoffs with understood scope, affected files or topics,
-  owner, and next action.
-- The leader records status snapshots in `notepad.md` and `events.jsonl`.
-- The leader waits for every required member final report before claiming the
-  team is complete.
+## Run a ulw-plan in parallel
 
-For bounded in-turn helper work, use:
+When a decision-complete plan already exists at `.omo/plans/<slug>.md` (from ulw-plan), execute its
+parallel waves as a team instead of one todo at a time. Map it directly:
+- one wave's independent todos -> one member each; the todo's scope/files become that member's `focus`,
+  and its acceptance criteria + QA become the member's `deliverable`.
+- the plan's dependency matrix sets the shape: todos with no unmet dependency inside a wave run as
+  concurrent members; a todo that depends on another waits, so launch the next wave only after the
+  blocking members report.
+- todos in the same wave that touch overlapping files -> give those members worktrees (see above).
 
-```json
-{
-  "tool": "multi_agent_v1.spawn_agent",
-  "arguments": {
-    "fork_context": false,
-    "message": "TASK: act as a focused teammate. DELIVERABLE: ... SCOPE: ... VERIFY: ... Communicate in English only."
-  }
-}
-```
+Keep the plan file as the shared spec: point each member at its todo by path, and verify the member's
+result against that todo's acceptance criteria before you integrate.
 
-Wait with `multi_agent_v1.wait_agent` and close finished helper agents with
-`multi_agent_v1.close_agent`. Record helper ids in `team.json` only when they
-materially contributed to the team result.
+## Archive, delete, and cleanup
 
-For helper agents that may take longer than one wait cycle, require both
-progress markers: `WORKING: <task> - <current phase>` before long work and
-`BLOCKED: <reason>` only when the helper cannot progress. A
-`multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived.
-Treat a running helper as alive. Fallback only when the helper is completed
-without the deliverable, ack-only after follow-up, explicitly `BLOCKED:`, or no
-longer running.
+DISBAND the team the moment it is no longer needed. A team exists only to do its work; once that
+work is done, or the user no longer wants it, do not leave it lying around - archive every member,
+then delete the team state. A finished team that is never disbanded is a leak.
 
-## Archive
+- `archive` closes the team: notify each active member, copy anything useful into `artifacts/`,
+  archive each member thread with `codex_app.set_thread_archived`, then `archive` flips the team
+  and all members to archived. If a thread-archive tool is unavailable, record that in the team log
+  and tell the user - never pretend a member was archived.
+- `delete` removes `.omo/teams/{session_id}` and refuses while the team is unarchived or any member
+  is still active unless `--force`.
+- When the work wraps up, land it the way the user asked: `integrate --team <id>` for a direct merge
+  commit, or push each member branch and open a PR. Then `worktree-remove` each worktree, archive, and
+  delete. Cleanup is real work; respect the user's instruction on how to land it.
 
-Archiving a team closes or archives every member before the team is marked
-archived.
+## Stop rules
 
-1. Send a final archive notice to every active member thread with
-   `codex_app.send_message_to_thread`.
-2. Inspect each member with `codex_app.read_thread` and copy useful final notes
-   into `notepad.md`.
-3. Archive every member thread with `codex_app.set_thread_archived`.
-4. Close any helper subagents with `multi_agent_v1.close_agent`.
-5. Set `activeTeam` to `false`, set `archived` to `true`, and append the archive
-   receipt to `events.jsonl`.
-
-If a thread archive tool is unavailable, record the failed archive attempt and
-the member thread ids in `events.jsonl` and surface that limitation to the user.
-Do not pretend the member was archived.
-
-## Delete
-
-Delete is stronger than archive.
-
-1. Archive first when `archived` is not already `true`.
-2. Confirm there are no active member threads left unhandled.
-3. Remove `.omo/teams/{session_id}` only after the archive receipts and useful
-   notes have been preserved or explicitly deemed disposable by the user.
-4. Report which team directory was removed and which threads were archived.
-
-Never delete team state while member threads are still active unless the user
-explicitly requested an abort and you recorded the abort in `events.jsonl`.
-
-## Stop Rules
-
-- Stop and ask before deleting a non-archived team if any member is still active.
-- Stop if the user asks for private or non-English member communication; team
-  member communication remains English-only.
-- Stop if thread tooling is unavailable and the requested operation depends on
-  creating, reading, sending to, or archiving actual Codex threads.
+- Stop and ask before deleting an unarchived team while any member is still active.
+- Member communication stays English unless the user explicitly requests otherwise; user-facing
+  replies follow the user's language.
+- Stop if the requested operation needs Codex thread tools (create/read/send/title/archive) and
+  they are unavailable; say so instead of faking it.

@@ -30,9 +30,11 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	const componentMarkers = [
 		"components/comment-checker/dist/cli.js",
 		"components/lsp/dist/cli.js",
+		"components/codegraph/dist/cli.js",
 		"components/rules/dist/cli.js",
 		"components/start-work-continuation/dist/cli.js",
 		"components/telemetry/dist/cli.js",
+		"components/teammode/dist/cli.js",
 		"components/ulw-loop/dist/cli.js",
 		"components/ultrawork/dist/cli.js",
 		"scripts/auto-update.mjs",
@@ -177,6 +179,40 @@ test("#given aggregate SessionStart hooks #when inspected #then LazyCodex auto-u
 	assert.match(text, /scripts\/auto-update\.mjs/);
 	assert.match(text, /Checking Auto Update/);
 	assert(sessionStartCommands.some((command) => command.includes("scripts/auto-update.mjs")));
+});
+
+test("#given aggregate PostToolUse hooks #when inspected #then CodeGraph init guidance is registered for CodeGraph tools", async () => {
+	// given
+	const commandHooks = await readAggregateCommandHooks();
+
+	// when
+	const codegraphPostToolUseHooks = commandHooks.filter(
+		(hook) =>
+			hook.eventName === "PostToolUse" &&
+			hook.handler.command === 'node "${PLUGIN_ROOT}/components/codegraph/dist/cli.js" hook post-tool-use',
+	);
+
+	// then
+	assert.equal(codegraphPostToolUseHooks.length, 1);
+	assert.equal(codegraphPostToolUseHooks[0]?.matcher, "^(codegraph[._].*|mcp__codegraph__.*)$");
+	assert.equal(codegraphPostToolUseHooks[0]?.handler.statusMessage, "(OmO) Checking CodeGraph Init Guidance");
+});
+
+test("#given aggregate PostToolUse hooks #when inspected #then thread title hygiene is registered for created Codex threads", async () => {
+	// given
+	const commandHooks = await readAggregateCommandHooks();
+
+	// when
+	const threadTitleHooks = commandHooks.filter(
+		(hook) =>
+			hook.eventName === "PostToolUse" &&
+			hook.handler.command === 'node "${PLUGIN_ROOT}/components/teammode/dist/cli.js" hook post-tool-use',
+	);
+
+	// then
+	assert.equal(threadTitleHooks.length, 1);
+	assert.equal(threadTitleHooks[0]?.matcher, "^(create_thread|codex_app\\.create_thread)$");
+	assert.equal(threadTitleHooks[0]?.handler.statusMessage, "(OmO) Checking Thread Title Hygiene");
 });
 
 test("#given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free", async () => {

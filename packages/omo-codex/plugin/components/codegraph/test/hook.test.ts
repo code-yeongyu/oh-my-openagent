@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Readable } from "node:stream";
@@ -8,8 +8,7 @@ import { fileURLToPath } from "node:url";
 import { runCodegraphCli } from "../src/cli.ts";
 import {
 	executeCodegraphSessionStartHook,
-	resolveCodegraphCommandInvocation,
-	runCodegraphSessionStartWorker,
+	runCodegraphPostToolUseHook,
 	type WorkerSpawnInvocation,
 } from "../src/hook.ts";
 
@@ -46,6 +45,54 @@ describe("CodeGraph SessionStart hook", () => {
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 		}
+	});
+
+	it("#given CodeGraph MCP reports an uninitialized project #when PostToolUse fires #then it emits OMO global-store init guidance", async () => {
+		// given
+		const output = runCodegraphPostToolUseHook(
+			{
+				cwd: "/Users/me/project",
+				tool_name: "codegraph.codegraph_status",
+				tool_response: {
+					error: [
+						"Tool execution failed: CodeGraph not initialized in /Users/me/project.",
+						"Run 'codegraph init' in that project first.",
+					].join(" "),
+				},
+			},
+			{ homeDir: "/Users/me" },
+		);
+
+		// when
+		const parsed = JSON.parse(output);
+
+		// then
+		expect(parsed).toEqual({
+			hookSpecificOutput: {
+				hookEventName: "PostToolUse",
+				additionalContext: expect.stringContaining('"/Users/me/.omo/codegraph/projects/project-'),
+			},
+		});
+		expect(parsed.hookSpecificOutput.additionalContext).toContain('run `codegraph init` from "/Users/me/project"');
+	});
+
+	it("#given real CodeGraph status output has no MCP path phrase #when PostToolUse fires #then it emits OMO global-store init guidance", async () => {
+		// given
+		const output = runCodegraphPostToolUseHook(
+			{
+				cwd: "/Users/me/project",
+				tool_name: "mcp__codegraph__codegraph_status",
+				tool_response: ['Project: /Users/me/project', "Not initialized", 'Run "codegraph init" to initialize'].join("\n"),
+			},
+			{ homeDir: "/Users/me" },
+		);
+
+		// when
+		const parsed = JSON.parse(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.additionalContext).toContain('CodeGraph is not initialized for "/Users/me/project"');
+		expect(parsed.hookSpecificOutput.additionalContext).toContain('"/Users/me/.omo/codegraph/projects/project-');
 	});
 
 	it("#given CodeGraph is disabled by Codex SOT config #when SessionStart fires #then it skips without spawning", async () => {
@@ -198,323 +245,6 @@ describe("CodeGraph SessionStart hook", () => {
 		}
 	});
 
-	it("#given an unsupported local Node and a PATH CodeGraph command #when worker runs #then it skips without touching the workspace", async () => {
-		// given
-		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-"));
-		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-node-home-"));
-		const outcomes: unknown[] = [];
-
-		try {
-			// when
-			const result = await runCodegraphSessionStartWorker({
-				cwd: workspace,
-				env: { HOME: homeDir },
-				nodeVersion: "26.3.0",
-				logOutcome: (outcome) => outcomes.push(outcome),
-				deps: {
-					resolveCommand: () => {
-						return { argsPrefix: [], command: "/usr/local/bin/codegraph", exists: true, source: "path" };
-					},
-					ensureProvisioned: () => {
-						throw new Error("ensureProvisioned should not run on unsupported Node");
-					},
-					prepareWorkspace: () => {
-						throw new Error("prepareWorkspace should not run on unsupported Node");
-					},
-					runCommand: () => {
-						throw new Error("runCommand should not run on unsupported Node");
-					},
-				},
-			});
-
-			// then
-			expect(result).toEqual({ action: "skipped-unsupported-node" });
-			expect(existsSync(join(workspace, ".codegraph"))).toBe(false);
-			expect(outcomes).toEqual([{ action: "skipped-unsupported-node", projectRoot: workspace }]);
-		} finally {
-			rmSync(workspace, { recursive: true, force: true });
-			rmSync(homeDir, { recursive: true, force: true });
-		}
-	});
-
-	it("#given an unsupported local Node but bundled CodeGraph resolves through CODEGRAPH_NODE_BIN #when worker runs #then it bootstraps with the compatible runtime", async () => {
-		// given
-		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-compatible-node-"));
-		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-compatible-node-home-"));
-		const nodeBin = "/opt/node22/bin/node";
-		const calls: Array<{ readonly args: readonly string[]; readonly command: string }> = [];
-		const outcomes: unknown[] = [];
-
-		try {
-			// when
-			const result = await runCodegraphSessionStartWorker({
-				cwd: workspace,
-				env: { CODEGRAPH_NODE_BIN: nodeBin, HOME: homeDir },
-				nodeVersion: "26.3.0",
-				logOutcome: (outcome) => outcomes.push(outcome),
-				deps: {
-					ensureGitignored: () => true,
-					ensureProvisioned: () => {
-						throw new Error("provisioning should not run when bundled CodeGraph resolved");
-					},
-					prepareWorkspace: () => ({
-						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-						dataRoot: join(homeDir, ".omo/codegraph"),
-						linked: true,
-						mode: "global-linked",
-						projectLink: join(workspace, ".codegraph"),
-					}),
-					resolveCommand: () => ({ argsPrefix: ["codegraph.js"], command: nodeBin, exists: true, source: "bundled" }),
-					runCommand: (_projectRoot, command, args) => {
-						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
-					},
-				},
-			});
-
-			// then
-			expect(result).toEqual({ action: "initialized" });
-			expect(calls).toEqual([
-				{ args: ["codegraph.js", "status", "--json"], command: nodeBin },
-				{ args: ["codegraph.js", "init"], command: nodeBin },
-			]);
-			expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "bundled", timedOut: false }]);
-		} finally {
-			rmSync(workspace, { recursive: true, force: true });
-			rmSync(homeDir, { recursive: true, force: true });
-		}
-	});
-
-	it("#given CodeGraph cannot be resolved or provisioned #when worker runs #then it logs a graceful skip", async () => {
-		// given
-		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-"));
-		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-home-"));
-		const outcomes: unknown[] = [];
-		const calls: string[] = [];
-
-		try {
-			// when
-			const result = await runCodegraphSessionStartWorker({
-				cwd: workspace,
-				env: { HOME: homeDir },
-				nodeVersion: "22.14.0",
-				logOutcome: (outcome) => outcomes.push(outcome),
-				deps: {
-					ensureGitignored: () => {
-						calls.push("ensureGitignored");
-						return true;
-					},
-					ensureProvisioned: () => Promise.resolve({ error: "offline", provisioned: false }),
-					prepareWorkspace: () => {
-						calls.push("prepareWorkspace");
-						return {
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						};
-					},
-					resolveCommand: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
-					runCommand: () => {
-						calls.push("runCommand");
-						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
-					},
-				},
-			});
-
-			// then
-			expect(result).toEqual({ action: "skipped-unavailable" });
-			expect(calls).toEqual([]);
-			expect(outcomes).toEqual([
-				{
-					action: "skipped-unavailable",
-					error: "offline",
-					projectRoot: workspace,
-					source: "path",
-				},
-			]);
-		} finally {
-			rmSync(workspace, { recursive: true, force: true });
-			rmSync(homeDir, { recursive: true, force: true });
-		}
-	});
-
-	it("#given CodeGraph is unavailable and auto provisioning is disabled #when worker runs #then it leaves the project untouched", async () => {
-		// given
-		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-unavailable-"));
-		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-unavailable-home-"));
-		const outcomes: unknown[] = [];
-
-		try {
-			// when
-			const result = await runCodegraphSessionStartWorker({
-				config: { codegraph: { auto_provision: false, enabled: true }, sources: [], warnings: [] },
-				nodeVersion: "22.14.0",
-				cwd: workspace,
-				env: { HOME: homeDir },
-				logOutcome: (outcome) => outcomes.push(outcome),
-				deps: {
-					ensureProvisioned: () => {
-						throw new Error("auto provision should not run");
-					},
-					resolveCommand: () => ({ argsPrefix: [], command: "missing-codegraph", exists: false, source: "path" }),
-					runCommand: () => {
-						throw new Error("codegraph command should not run");
-					},
-				},
-			});
-
-			// then
-			expect(result).toEqual({ action: "skipped-unavailable" });
-			expect(existsSync(join(workspace, ".codegraph"))).toBe(false);
-			expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false);
-			expect(outcomes).toEqual([
-				{
-					action: "skipped-unavailable",
-					error: "codegraph binary unavailable and auto_provision is disabled",
-					projectRoot: workspace,
-					source: "path",
-				},
-			]);
-		} finally {
-			rmSync(workspace, { recursive: true, force: true });
-			rmSync(homeDir, { recursive: true, force: true });
-		}
-	});
-
-	it("#given Windows install_dir has codegraph.cmd #when worker resolves provisioned CodeGraph #then it uses the cmd shim", async () => {
-		await withProcessPlatform("win32", async () => {
-			// given
-			const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-win32-"));
-			const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-win32-home-"));
-			const installDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-win32-install-"));
-			const binPath = join(installDir, "bin", "codegraph.cmd");
-			const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string> }[] = [];
-			const outcomes: unknown[] = [];
-			try {
-				mkdirSync(join(installDir, "bin"), { recursive: true });
-				writeFileSync(binPath, "");
-
-				// when
-				const result = await runCodegraphSessionStartWorker({
-					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
-					nodeVersion: "22.14.0",
-					cwd: workspace,
-					env: { HOME: homeDir },
-					logOutcome: (outcome) => outcomes.push(outcome),
-					deps: {
-						ensureGitignored: () => true,
-						ensureProvisioned: () => {
-							throw new Error("provisioning should not run when install_dir binary exists");
-						},
-						prepareWorkspace: () => ({
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						}),
-						resolveCommand: (options) => {
-							const provisioned = options?.provisioned?.() ?? null;
-							return { argsPrefix: [], command: provisioned ?? "missing-codegraph", exists: provisioned !== null, source: provisioned === null ? "path" : "provisioned" };
-						},
-						runCommand: (_projectRoot, command, args, options) => {
-							calls.push({ args, command, env: options.env });
-							return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
-						},
-					},
-				});
-
-				// then
-				expect(result).toEqual({ action: "initialized" });
-				expect(calls.map((call) => ({ args: [...call.args], command: call.command }))).toEqual([
-					{ args: ["status", "--json"], command: binPath },
-					{ args: ["init"], command: binPath },
-				]);
-				expect(calls[0]?.env["CODEGRAPH_INSTALL_DIR"]).toBe(installDir);
-				expect(outcomes).toEqual([{ action: "initialized", exitCode: 0, projectRoot: workspace, source: "provisioned", timedOut: false }]);
-			} finally {
-				rmSync(workspace, { recursive: true, force: true });
-				rmSync(homeDir, { recursive: true, force: true });
-				rmSync(installDir, { recursive: true, force: true });
-			}
-		});
-	});
-
-	it("#given Windows codegraph.cmd #when default worker runner builds invocation #then it runs through cmd.exe", () => {
-		// given
-		const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd";
-
-		// when
-		const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32");
-
-		// then
-		expect(invocation).toEqual({
-			args: ["/d", "/s", "/c", command, "status", "--json"],
-			command: "cmd.exe",
-		});
-	});
-
-	it("#given non-Windows codegraph command #when default worker runner builds invocation #then it executes directly", () => {
-		// given
-		const command = "/home/test/.omo/codegraph/bin/codegraph";
-
-		// when
-		const invocation = resolveCodegraphCommandInvocation(command, ["sync"], "linux");
-
-		// then
-		expect(invocation).toEqual({ args: ["sync"], command });
-	});
-
-	it("#given resolved CodeGraph status #when worker runs #then it runs status before init or sync", async () => {
-		for (const scenario of [
-			{ action: "initialized", args: [["status", "--json"], ["init"]], stdout: '{"initialized":false}' },
-			{ action: "synced", args: [["status", "--json"], ["sync"]], stdout: '{"initialized":true}' },
-		] as const) {
-			// given
-			const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-status-"));
-			const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-status-home-"));
-			const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string> }[] = [];
-			const outcomes: unknown[] = [];
-			try {
-				// when
-				const result = await runCodegraphSessionStartWorker({
-					config: { codegraph: { enabled: true, install_dir: "/tmp/codegraph-install" }, sources: [], warnings: [] },
-					nodeVersion: "22.14.0",
-					cwd: workspace,
-					env: { HOME: homeDir },
-					logOutcome: (outcome) => outcomes.push(outcome),
-					deps: {
-						ensureGitignored: () => true,
-						ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
-						prepareWorkspace: () => ({
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						}),
-						resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
-						runCommand: (_projectRoot, command, args, options) => {
-							calls.push({ args, command, env: options.env });
-							return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? scenario.stdout : "", timedOut: false });
-						},
-					},
-				});
-
-				// then
-				expect(result).toEqual({ action: scenario.action });
-				expect(calls.map((call) => [...call.args])).toEqual(scenario.args.map((args) => [...args]));
-				expect(calls[0]?.env["CODEGRAPH_INSTALL_DIR"]).toBe("/tmp/codegraph-install");
-				expect(outcomes).toEqual([{ action: scenario.action, exitCode: 0, projectRoot: workspace, source: "path", timedOut: false }]);
-			} finally {
-				rmSync(workspace, { recursive: true, force: true });
-				rmSync(homeDir, { recursive: true, force: true });
-			}
-		}
-	});
-
 	it("#given malformed hook input with CodeGraph disabled #when SessionStart fires #then it stays silent and exits zero", async () => {
 		// given
 		const stdout: string[] = [];
@@ -552,13 +282,3 @@ describe("CodeGraph SessionStart hook", () => {
 		);
 	});
 });
-
-async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
-	const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
-	Object.defineProperty(process, "platform", { configurable: true, enumerable: true, value: platform });
-	try {
-		await run();
-	} finally {
-		if (descriptor !== undefined) Object.defineProperty(process, "platform", descriptor);
-	}
-}

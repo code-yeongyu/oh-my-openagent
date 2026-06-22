@@ -124,3 +124,81 @@ test("#given ultraresearch worker sizing #when spawn guidance is inspected #then
 		);
 	}
 });
+
+test("#given ultraresearch execution substrate #when team usage is inspected #then it prefers a cooperating team with harness-native team tools", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/cooperating team/i,
+			`${copy.label}: body must encourage running the swarm as a cooperating team`,
+		);
+		assert.match(copy.content, /\bteammode\b/i, `${copy.label}: body must name the Codex teammode skill`);
+		assert.match(copy.content, /team_mode/i, `${copy.label}: body must name the OpenCode team_mode path`);
+	}
+});
+
+test("#given ultraresearch team composition #when member slicing is inspected #then members map to part/ownership/perspective, never job titles", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/by part, ownership, or perspective/i,
+			`${copy.label}: body must compose members by part, ownership, or perspective`,
+		);
+		assert.match(
+			copy.content,
+			/never a job title|not (?:a |by )?job title/i,
+			`${copy.label}: body must forbid vague job-title members`,
+		);
+	}
+});
+
+test("#given ultraresearch team communication #when the raise law is inspected #then members broadcast every lead immediately rather than hoarding", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/raise law|broadcast every lead/i,
+			`${copy.label}: body must state the raise/broadcast law`,
+		);
+		assert.match(copy.content, /over-communicate/i, `${copy.label}: body must demand over-communication`);
+		assert.match(
+			copy.content,
+			/the (?:moment|instant) it (?:surfaces|appears|lands)/i,
+			`${copy.label}: body must require raising leads the moment they surface`,
+		);
+		assert.match(
+			copy.content,
+			/hoard/i,
+			`${copy.label}: body must reject hoarding leads for a final dump`,
+		);
+	}
+});
+
+test("#given ultraresearch non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/claim ledger|verified-claims/i,
+			`${copy.label}: body must define the non-code claim-ledger verification gate`,
+		);
+	}
+});
+
+test("#given ultraresearch claim ledger #when ownership is inspected #then workers never write the ledger / verified-claims artifact", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.doesNotMatch(
+			copy.content,
+			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:ledger|verified-claims)/i,
+			`${copy.label}: workers must not be instructed to write/append/create the ledger or verified-claims`,
+		);
+	}
+});
+
+test("#given ultraresearch blocked sources #when escalation is inspected #then it routes through the ultimate-browsing skill", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(
+			copy.content,
+			/ultimate-browsing/,
+			`${copy.label}: body must escalate blocked sources via the ultimate-browsing skill`,
+		);
+	}
+});

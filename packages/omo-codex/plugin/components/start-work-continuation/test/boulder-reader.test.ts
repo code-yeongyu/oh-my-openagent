@@ -164,6 +164,38 @@ describe("start-work boulder state reader", () => {
 		// then
 		expect(state).toBeNull();
 	});
+
+	it("#given works omit the codex session but stale mirror matches #when state is read #then continuation is absent", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: JSON.stringify({
+				schema_version: 2,
+				active_work_id: "work_1",
+				works: {
+					work_1: {
+						work_id: "work_1",
+						active_plan: ".omo/plans/plan.md",
+						plan_name: "current-work",
+						status: "active",
+						started_at: "2026-06-13T00:00:00.000Z",
+						session_ids: ["opencode:sess_other"],
+					},
+				},
+				active_plan: ".omo/plans/plan.md",
+				plan_name: "stale-mirror",
+				status: "active",
+				started_at: "2026-06-12T00:00:00.000Z",
+				session_ids: ["codex:sess_abc"],
+			}),
+			planMarkdown: "# Plan\n\n## TODOs\n- [ ] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state).toBeNull();
+	});
 });
 
 type WorkspaceInput = {

@@ -31,7 +31,16 @@ const workflowExpectations = [
   { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish"] },
   {
     path: ".github/workflows/publish.yml",
-    jobs: ["test", "typecheck", "codex-compatibility", "preflight-trust", "release-metadata", "publish-main", "release"],
+    jobs: [
+      "test",
+      "typecheck",
+      "codex-compatibility",
+      "preflight-trust",
+      "release-metadata",
+      "prepare-release-state",
+      "publish-main",
+      "release",
+    ],
   },
   { path: ".github/workflows/refresh-model-capabilities.yml", jobs: ["refresh"] },
   { path: ".github/workflows/sisyphus-agent.yml", jobs: ["agent"] },

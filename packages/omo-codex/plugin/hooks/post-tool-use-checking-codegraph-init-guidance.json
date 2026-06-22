@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PostToolUse": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/codegraph/dist/cli.js\" hook post-tool-use",
+						"timeout": 5,
+						"statusMessage": "(OmO) Checking CodeGraph Init Guidance"
+					}
+				],
+				"matcher": "^(codegraph[._].*|mcp__codegraph__.*)$"
+			}
+		]
+	}
+}

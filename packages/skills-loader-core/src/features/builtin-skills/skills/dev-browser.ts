@@ -1,4 +1,8 @@
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import type { BuiltinSkill } from "../types"
+
+const CURRENT_DIR = dirname(fileURLToPath(import.meta.url))
 
 export const devBrowserSkill: BuiltinSkill = {
   name: "dev-browser",
@@ -218,4 +222,5 @@ console.log({
 await client.disconnect();
 EOF
 \`\`\``,
+  resolvedPath: join(CURRENT_DIR, "..", "dev-browser"),
 }

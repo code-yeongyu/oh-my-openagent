@@ -1,6 +1,7 @@
 import {
   messageCompleted,
   messageFinish,
+  messageHasSubstantiveAssistantOutput,
   messageHasUnresolvedTool,
   messageHasWaitingTool,
   messageIsSyntheticOrInternalUser,
@@ -8,7 +9,7 @@ import {
 } from "../../shared/prompt-async-gate/prompt-message-state"
 import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { isRecord } from "./error-classifier"
-import { getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
+import { getParentWakeMessageActivityAt, getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 
 export function latestAssistantTurnIsCompletedEmptyNoProgress(messages: readonly unknown[]): boolean {
@@ -67,6 +68,28 @@ export function latestAssistantTurnHasFreshToolActivity(
   return false
 }
 
+export function latestAssistantTurnHasStaleUnknownSubstantiveOutput(
+  messages: readonly unknown[],
+  now: number,
+  maxAgeMs: number,
+): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    const role = messageRole(message)
+    if (role === "assistant") {
+      const finish = messageFinish(message)
+      return (finish === undefined || finish === "unknown")
+        && !messageCompleted(message)
+        && messageHasSubstantiveAssistantOutput(message)
+        && !messageHasFreshActivity(message, now, maxAgeMs)
+    }
+    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
+      return false
+    }
+  }
+  return false
+}
+
 export function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake): string {
   return [
     "background-agent-parent-wake-empty-retry",
@@ -85,6 +108,14 @@ function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number):
     now,
     maxAgeMs,
   )
+}
+
+function messageHasFreshActivity(message: unknown, now: number, maxAgeMs: number): boolean {
+  if (!isRecord(message)) {
+    return false
+  }
+  const activityAt = getParentWakeMessageActivityAt(message)
+  return activityAt !== undefined && now - activityAt <= maxAgeMs
 }
 
 function timeHasFreshActivity(time: unknown, now: number, maxAgeMs: number): boolean {

@@ -17,7 +17,7 @@ test("#given aggregate plugin manifest #when inspected #then it owns the omo nam
 	// then
 	assert.equal(manifest.name, "omo");
 	assert(Array.isArray(hookPaths));
-	assert.equal(hookPaths.length, 19);
+	assert.equal(hookPaths.length, 21);
 	assert(hookPaths.every((hookPath) => typeof hookPath === "string" && hookPath.startsWith("./hooks/")));
 	assert(!hookPaths.includes("./hooks/hooks.json"));
 	assert.equal(skillsPath, "./skills/");
@@ -60,6 +60,7 @@ test("#given component directories #when scanned #then only intentional resource
 		"lsp",
 		"rules",
 		"start-work-continuation",
+		"teammode",
 		"telemetry",
 		"ultrawork",
 		"ulw-loop",

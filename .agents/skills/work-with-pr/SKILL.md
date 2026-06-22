@@ -21,7 +21,7 @@ Phase 3: Verify Loop   → Unbounded iteration; a failing gate routes back to Ph
   ├─ Gate B: review-work → 5-agent parallel review (the reviewer subagents)
   └─ Gate C: Cubic      → cubic-dev-ai[bot] "No issues found"
                          (SKIPPED, not failed, when Cubic's quota is exhausted)
-Phase 4: Merge         → Merge by default, then worktree cleanup
+Phase 4: Merge         → Auto-merge by default; wait until actually merged, then worktree cleanup
 ```
 
 </architecture>
@@ -293,14 +293,28 @@ Once all active gates pass (Cubic may be SKIPPED on quota):
 
 <merge_cleanup>
 
-### Merge the PR
+### Merge the PR (auto-merge by default)
 
-Merging is the default — do it unless the user explicitly told you not to. If they opted out, skip this step and report the green, ready-to-merge PR, but STILL run the cleanup below: the worktree is removed either way.
+Enabling auto-merge is the default - do it unless the user explicitly told you not to merge. Auto-merge hands the merge to GitHub, which lands the PR the moment every required gate is green, so you never sit and babysit checks. It does NOT bypass the gates: if a gate fails, GitHub will not merge, which routes you back to Phase 1 to fix and re-QA like any other failing gate.
 
 ```bash
-# This repository requires merge commits. Never use --squash or --rebase here.
-gh pr merge "$PR_NUMBER" --merge --delete-branch
+# This repository requires merge commits. Never use --squash or --rebase.
+# --auto arms auto-merge: GitHub merges as soon as all required checks pass.
+gh pr merge "$PR_NUMBER" --merge --auto --delete-branch
+# If the repo has not enabled the auto-merge feature, --auto errors; once the gates
+# are green, fall back to a direct merge: gh pr merge "$PR_NUMBER" --merge --delete-branch
 ```
+
+Then WAIT until the merge has actually completed before you report done or clean up - never walk away while the PR is still merging:
+
+```bash
+# Block until the PR is actually MERGED (auto-merge lands once all required checks pass)
+until [ "$(gh pr view "$PR_NUMBER" --json state -q .state)" = "MERGED" ]; do
+  gh pr checks "$PR_NUMBER" --watch --fail-fast >/dev/null 2>&1 || true   # spend the interval on the checks
+done
+```
+
+If the user opted out of merging, skip the merge but STILL run the cleanup below: the worktree is removed either way.
 
 ### Sync .omo state back to main repo
 

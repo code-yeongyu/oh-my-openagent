@@ -52,7 +52,7 @@ describe("ulw-loop skill contract", () => {
 
 		// then
 		expect(workflow.match(/malformed input, prompt injection/g)?.length ?? 0).toBe(1);
-		expect(wordCount(workflow)).toBeLessThanOrEqual(3544);
+		expect(wordCount(workflow)).toBeLessThanOrEqual(3697);
 		expect(wordCount(skill)).toBeLessThanOrEqual(611);
 	});
 });
