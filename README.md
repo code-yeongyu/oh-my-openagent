@@ -168,6 +168,10 @@ Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, depe
 
 ---
 
+### 05. Sati — *The Frontend Specialist*
+
+**Sati** is the dedicated frontend specialist. She ships production-grade UI work: React/Next.js, Svelte/SvelteKit, accessibility, performance, browser verification via Playwright. Invoke Sati directly with `@sati/` or `task(subagent_type="sati")` for any non-trivial frontend task.
+
 ### The Rest of the Team
 
 | Agent | Role | Model |
@@ -190,10 +194,10 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 | | |
 |---|---|
-| **Agent Orchestration** | 14 agents, parallel background execution, category-based routing, session continuity |
+| **Agent Orchestration** | 14 agents (incl. **Sati** frontend specialist, **Sentinel** security auditor, **Cipher** DSL expert), parallel background execution, category-based routing, session continuity |
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **40 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery, quality gate |
-| **37 Built-in Skills** | DSL engineering (11), security (9), browser, git, frontend (7), software dev pipeline |
+| **37 Built-in Skills** | DSL engineering (11), security (9), browser, git, frontend (7 via **Sati**), software dev pipeline |
 | **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search), Document Reader |
 | **Claude Code Compat** | Full compatibility — commands, agents, skills, MCPs, hooks from `settings.json` |
 | **Software Dev Pipeline** | 6-phase TDD workflow (PLAN→BUILD→VERIFY→REVIEW→SECURE→SHIP), 5 team roles, adaptive phases |
