@@ -8,7 +8,9 @@
 		"omo-codegraph": "./dist/cli.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"LICENSE",
+		"NOTICE"
 	],
 	"scripts": {
 		"build": "bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
@@ -20,6 +22,9 @@
 		"@types/node": "^25.9.3",
 		"bun-types": "^1.3.1",
 		"typescript": "^6.0.3"
+	},
+	"optionalDependencies": {
+		"@colbymchenry/codegraph": "1.0.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"
