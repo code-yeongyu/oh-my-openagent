@@ -1,0 +1,1 @@
+$ node --check packages/omo-codex/plugin/test/auto-update-restart-notice.test.mjs
