@@ -1,7 +1,7 @@
 import { join } from "node:path"
 
 import { getOpenCodeCacheDir } from "../../../shared"
-import type { AvailableModelsInfo, ModelResolutionInfo, MatrixxConfig } from "./model-resolution-types"
+import type { AvailableModelsInfo, MatrixxConfig, ModelResolutionInfo } from "./model-resolution-types"
 import { formatModelWithVariant, getCategoryEffectiveVariant, getEffectiveVariant } from "./model-resolution-variant"
 
 export function buildModelResolutionDetails(options: {

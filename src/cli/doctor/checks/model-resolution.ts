@@ -5,7 +5,7 @@ import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { loadMatrixxConfig } from "./model-resolution-config"
 import { buildModelResolutionDetails } from "./model-resolution-details"
 import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
-import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, MatrixxConfig } from "./model-resolution-types"
+import type { AgentResolutionInfo, CategoryResolutionInfo, MatrixxConfig, ModelResolutionInfo } from "./model-resolution-types"
 
 export function getModelResolutionInfo(): ModelResolutionInfo {
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => ({
