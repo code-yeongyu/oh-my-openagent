@@ -3,6 +3,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { formatDetailedError } from "../../shared/error-formatting"
 import { log } from "../../shared/logger"
 import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
@@ -92,9 +93,21 @@ export function createBackgroundTask(
           sessionId = updated?.sessionID
         }
 
+        if (!sessionId) {
+          return formatDetailedError(
+            new Error(
+              `Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`
+            ),
+            {
+              operation: "Launch background task",
+              agent: task.agent,
+            }
+          )
+        }
+
         const bgMeta = {
           title: args.description,
-          metadata: { sessionId: sessionId ?? "pending" },
+          metadata: { sessionId },
         }
         await ctx.metadata?.(bgMeta)
 
@@ -105,7 +118,7 @@ export function createBackgroundTask(
         return `Background task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${sessionId ?? "pending"}
+Session ID: ${sessionId ?? "(timed out)"}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
