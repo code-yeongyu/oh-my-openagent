@@ -19,6 +19,29 @@ function parseAdditionalContext(output: string): string {
 	return parsed.hookSpecificOutput?.additionalContext ?? "";
 }
 
+function normalizeGuidance(value: string): string {
+	return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function expectSparkshellFirstContract(value: string): void {
+	const guidance = normalizeGuidance(value);
+
+	expect(guidance).toMatch(/`omo sparkshell <command>`[^.]*\bfirst\b/);
+	expect(guidance).toMatch(/\brepo inspection\b/);
+	expect(guidance).toMatch(/\bcli smoke tests\b/);
+	expect(guidance).toMatch(/\bgit\/history checks\b/);
+	expect(guidance).toMatch(/\bbounded command output\b/);
+	expect(guidance).toMatch(/\braw\b[^.]*`rg`\/`grep`\/`cat`\/`git`[^.]*\bfallbacks?\b/);
+	expect(guidance).toMatch(/\bsparkshell is unavailable\b/);
+	expect(guidance).toMatch(/\btoo narrow\b/);
+	expect(guidance).toMatch(/`omo sparkshell --shell '<command>'`[^.]*\bmetacharacters\b[^.]*\bpipelines\b/);
+	expect(guidance).toMatch(
+		/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bonly\b[^.]*\binspect\b[^.]*\bexisting pane\b/,
+	);
+	expect(guidance).toMatch(/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bnever\b[^.]*\blaunch ordinary commands\b/);
+	expect(guidance).not.toMatch(/\bprefer\b[^.]*\bbefore raw shell commands\b/);
+}
+
 function parseHookOutput(value: unknown): HookOutput {
 	if (typeof value !== "object" || value === null) {
 		return {};
@@ -85,15 +108,16 @@ describe("Codex Sparkshell awareness", () => {
 		);
 
 		// then
-		expect(parseAdditionalContext(output)).toContain("omo sparkshell <command>");
-		expect(parseAdditionalContext(output)).toContain("OMO_SPARKSHELL_SESSION_CONTEXT");
-		expect(parseAdditionalContext(output)).toContain("OMO_SPARKSHELL_CONDENSE");
-		expect(parseAdditionalContext(output)).toContain("OMO_SPARKSHELL_SPARK");
-		expect(parseAdditionalContext(output)).toContain("[sparkshell caption]");
-		expect(parseAdditionalContext(output)).toContain("never appends that context to command output");
-		expect(parseAdditionalContext(output)).toContain("what the full output contained");
-		expect(parseAdditionalContext(output)).not.toContain("[REDACTED]");
-		expect(parseAdditionalContext(output)).not.toContain("appends recent session context");
+		const context = parseAdditionalContext(output);
+		expectSparkshellFirstContract(context);
+		expect(context).toContain("OMO_SPARKSHELL_SESSION_CONTEXT");
+		expect(context).toContain("OMO_SPARKSHELL_CONDENSE");
+		expect(context).toContain("OMO_SPARKSHELL_SPARK");
+		expect(context).toContain("[sparkshell caption]");
+		expect(context).toContain("never appends that context to command output");
+		expect(context).toContain("what the full output contained");
+		expect(context).not.toContain("[REDACTED]");
+		expect(context).not.toContain("appends recent session context");
 	});
 
 	it("#given inactive env #when SessionStart runs #then emits no Sparkshell guidance", async () => {
