@@ -104,6 +104,42 @@ test("#given plugin-local MCP runtime #when installing cached plugin #then manif
 	assert.deepEqual(cachedMcp.mcpServers.omo.args, [join(result.path, "dist", "cli.js")]);
 });
 
+test("#given CodeGraph MCP runtime in plugin cache #when installing cached plugin #then manifest points at cached plugin before bootstrap", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const sourceRoot = join(repoRoot, "packages", "omo-codex", "plugin");
+
+	await writeJson(join(sourceRoot, "package.json"), {
+		name: "@example/omo",
+		version: "0.1.0",
+	});
+	await writeJson(join(sourceRoot, ".mcp.json"), {
+		mcpServers: {
+			codegraph: {
+				command: "node",
+				args: ["components/codegraph/dist/serve.js"],
+				cwd: ".",
+				required: false,
+			},
+		},
+	});
+	await writeJson(join(sourceRoot, "components", "codegraph", "dist", "serve.js"), { executable: true });
+
+	const result = await installCachedPlugin({
+		codexHome,
+		marketplaceName: "sisyphuslabs",
+		name: "omo",
+		runCommand: async () => {},
+		sourcePath: sourceRoot,
+		version: "0.1.0",
+	});
+
+	const cachedMcp = JSON.parse(await readFile(join(result.path, ".mcp.json"), "utf8"));
+
+	assert.deepEqual(cachedMcp.mcpServers.codegraph.args, [join(result.path, "components", "codegraph", "dist", "serve.js")]);
+	assert.equal(Object.hasOwn(cachedMcp.mcpServers.codegraph, "cwd"), false);
+});
+
 test("#given external MCP package not in the generated bundled runtime set #when installing cached plugin #then manifest args point at source", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();

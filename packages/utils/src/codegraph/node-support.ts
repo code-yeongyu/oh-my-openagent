@@ -1,6 +1,7 @@
 export const CODEGRAPH_MIN_NODE_MAJOR = 20
 export const CODEGRAPH_BLOCKED_NODE_MAJOR = 25
 export const CODEGRAPH_UNSAFE_NODE_ENV = "CODEGRAPH_ALLOW_UNSAFE_NODE"
+export const CODEGRAPH_NODE_BIN_ENV = "CODEGRAPH_NODE_BIN"
 
 export type CodegraphNodeUnsupportedReason = "too-new" | "too-old"
 

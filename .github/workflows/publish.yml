@@ -63,6 +63,18 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release test gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages before release tests.
+            - Runs the full root `bun test` suite before publishing.
+          JOB_SUMMARY_NEXT: Fix the first failing test or vendored package build before rerunning release.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -85,6 +97,18 @@ jobs:
 
       - name: Type check
         run: bun run typecheck
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release typecheck gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP tooling.
+            - Runs `bun run typecheck` before any publish job can start.
+          JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; release jobs stay blocked until this is green.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   codex-compatibility:
     runs-on: ${{ matrix.os }}
@@ -116,6 +140,18 @@ jobs:
 
       - name: Run Codex compatibility tests
         run: bun run test:codex
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release Codex compatibility (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds MCP runtime prerequisites.
+            - Runs `bun run test:codex` across the supported OS matrix.
+          JOB_SUMMARY_NEXT: Inspect the first failing Codex component or installer test for `${{ matrix.os }}`.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   preflight-trust:
     runs-on: ubuntu-latest
@@ -199,6 +235,28 @@ jobs:
           echo
           echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
 
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Trusted publishing preflight"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| LazyCodex publish | \`${{ inputs.publish_lazycodex }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Requires the LazyCodex sync token for stable releases."
+            echo "- Verifies npm trusted-publisher mappings before release writes begin."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Configure the missing npm trusted publisher or required sync secret before rerunning."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release-metadata:
     runs-on: ubuntu-latest
     outputs:
@@ -247,6 +305,29 @@ jobs:
           PREVIOUS_LAZYCODEX_VERSION=$(npm view "lazycodex-ai@${LAZYCODEX_COMPARE_TAG}" version 2>/dev/null || true)
           echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Release metadata"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Version | \`${{ steps.version.outputs.version || 'not calculated' }}\` |"
+            echo "| Dist tag | \`${{ steps.version.outputs.dist_tag || 'latest' }}\` |"
+            echo "| Previous LazyCodex | \`${{ steps.version.outputs.previous_lazycodex_version || 'none' }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Resolves the release version from manual inputs."
+            echo "- Computes the npm dist tag and previous LazyCodex comparison version."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Check the requested version format, bump input, or npm metadata lookup."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   publish-main:
     runs-on: ubuntu-latest
@@ -527,6 +608,19 @@ jobs:
         run: |
           git checkout -- package.json
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Wrapper package publish
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Verifies platform packages exist before wrapper publish.
+            - Publishes `oh-my-opencode`, `oh-my-openagent`, and optionally `lazycodex-ai`.
+            - Smoke-tests the published LazyCodex package when it was published.
+          JOB_SUMMARY_NEXT: Check package existence probes first, then npm publish logs and the LazyCodex smoke section.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   publish-platform:
     needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
     if: >-
@@ -776,3 +870,17 @@ jobs:
           git checkout master
           git reset --hard "v${VERSION}"
           git push -f origin master || echo "::warning::Failed to push to master"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release finalization
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Applies and commits release state when needed.
+            - Creates or reuses the release tag.
+            - Syncs LazyCodex marketplace payload and creates GitHub releases.
+            - Attempts the protected `master` mirror update after release.
+          JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

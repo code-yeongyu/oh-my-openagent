@@ -8,7 +8,6 @@ import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { SESSION_START_CWD_ENV } from "./session-start-worker.js";
 import type {
 	HookStdout,
-	SessionStartAction,
 	SessionStartHookOptions,
 	SessionStartHookResult,
 	WorkerSpawnInvocation,
@@ -47,7 +46,6 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
 
 	if (config.codegraph?.enabled === false) {
-		writeHookJson(options.stdout ?? processStdout, "skipped-disabled");
 		return { action: "skipped-disabled", exitCode: 0 };
 	}
 
@@ -56,14 +54,17 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 		command: process.execPath,
 		env: { ...env, [SESSION_START_CWD_ENV]: projectRoot },
 	});
-	writeHookJson(options.stdout ?? processStdout, "spawned");
+	writeHookJson(options.stdout ?? processStdout);
 	return { action: "spawned", exitCode: 0 };
 }
 
-function writeHookJson(stdout: HookStdout, action: SessionStartAction): void {
-	const output = action === "spawned"
-		? { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: CODEGRAPH_SESSION_START_NOTICE }, codegraph: { action } }
-		: { hookSpecificOutput: { hookEventName: "SessionStart" }, codegraph: { action } };
+function writeHookJson(stdout: HookStdout): void {
+	const output = {
+		hookSpecificOutput: {
+			hookEventName: "SessionStart",
+			additionalContext: CODEGRAPH_SESSION_START_NOTICE,
+		},
+	};
 	stdout.write(`${JSON.stringify(output)}\n`);
 }
 

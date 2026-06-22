@@ -10,13 +10,16 @@ test("#given aggregate plugin manifest #when inspected #then it owns the omo nam
 	const manifest = await readJson(".codex-plugin/plugin.json");
 
 	// when
-	const hookPath = manifest.hooks;
+	const hookPaths = manifest.hooks;
 	const skillsPath = manifest.skills;
 	const mcpPath = manifest.mcpServers;
 
 	// then
 	assert.equal(manifest.name, "omo");
-	assert.equal(hookPath, "./hooks/hooks.json");
+	assert(Array.isArray(hookPaths));
+	assert.equal(hookPaths.length, 19);
+	assert(hookPaths.every((hookPath) => typeof hookPath === "string" && hookPath.startsWith("./hooks/")));
+	assert(!hookPaths.includes("./hooks/hooks.json"));
 	assert.equal(skillsPath, "./skills/");
 	assert.equal(mcpPath, "./.mcp.json");
 });
