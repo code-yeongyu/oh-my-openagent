@@ -137,6 +137,24 @@ export function setMemberStatus(team, { id, status, note = "" }) {
 	return touch(team, "set-status", `member ${id} -> ${status}${note ? `: ${note}` : ""}`);
 }
 
+// Record a provisioned worktree. Isolation is conflict-triggered: the first worktree-add flips
+// the whole team into worktree mode, so the leader can decide it mid-run, not only at init.
+export function setMemberWorktree(team, { id, path, branch }) {
+	const m = memberById(team, id);
+	team.worktree.enabled = true;
+	m.worktree.path = path;
+	m.worktree.branch = branch;
+	m.cwd = path;
+	return touch(team, "worktree-add", `member ${id} -> ${path} (${branch})`);
+}
+
+export function clearMemberWorktree(team, { id }) {
+	const m = memberById(team, id);
+	if (m.cwd === m.worktree?.path) m.cwd = null;
+	m.worktree.path = null;
+	return touch(team, "worktree-remove", `member ${id}`);
+}
+
 export function archive(team, { id = null, note = "" } = {}) {
 	if (id) {
 		memberById(team, id).status = "archived";
