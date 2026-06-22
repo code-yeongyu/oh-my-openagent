@@ -103,12 +103,13 @@ agent-browser --cdp 9242 close
 
 ```bash
 # Extract cookies to a file:
-python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --output /tmp/cookies.json
+mkdir -p ~/.local/state/omo-cookies
+python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --output ~/.local/state/omo-cookies/youtube.cookies.json
 # Extract and inject into the running CDP session:
 python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
 ```
 
-Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Full detail in [references/chrome-stealth.md](references/chrome-stealth.md).
+Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Full detail in [references/chrome-stealth.md](references/chrome-stealth.md).
 
 ## Reference docs
 

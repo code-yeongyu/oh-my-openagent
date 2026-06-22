@@ -34,7 +34,18 @@ The Tier-2 stealth browser is **CloakBrowser**, installed at runtime via `pip`
 - Source: https://github.com/CloakHQ/CloakBrowser
 - Pinned runtime version: **0.3.28** (documented in `references/chrome-stealth.md`;
   this is a documented version string, not an automated drift check).
-- Licensed under the MIT License:
+- Wrapper source license: MIT License.
+- Binary license: the compiled CloakBrowser Chromium binary downloaded by
+  `cloakbrowser.ensure_binary()` is governed by the separate CloakBrowser
+  Binary License:
+  https://github.com/CloakHQ/CloakBrowser/blob/main/BINARY-LICENSE.md
+- Redistribution note: this npm package does not redistribute the CloakBrowser
+  binary, does not repackage it, and does not include it in `skills/` or
+  `dist/skills`. Users who run the Tier-2 setup download the binary directly
+  from CloakHQ's official distribution channels and must comply with that
+  binary license.
+
+MIT wrapper source license:
 
 ```
 MIT License

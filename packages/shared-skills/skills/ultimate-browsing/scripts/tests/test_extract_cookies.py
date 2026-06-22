@@ -9,12 +9,13 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Callable
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cookie_crypto import decrypt_chromium_value, derive_key  # noqa: E402
 from cookie_paths import UnsupportedPlatform, resolve_cookie_db  # noqa: E402
-from extract_cookies import extract_cookies  # noqa: E402
+from extract_cookies import extract_cookies, inject_cookies, write_cookie_file  # noqa: E402
 
 
 def _make_chromium_db(path: Path, name: str, encrypted_value: bytes, host: str) -> None:
@@ -162,6 +163,82 @@ class EndToEnd(unittest.TestCase):
         cookies = extract_cookies("firefox", ["example.com"], platform="darwin", base_override=base)
         self.assertEqual(len(cookies), 1)
         self.assertEqual(cookies[0]["value"], "plain-value")
+
+
+class SecretHandling(unittest.TestCase):
+    def test_cookie_output_file_is_owner_only(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        output = base / "cookies.json"
+
+        write_cookie_file(output, [{"name": "SID", "value": "secret"}])
+
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        self.assertIn("secret", output.read_text())
+
+    def test_cookie_output_replaces_existing_file_only_after_private_temp_write(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        output = base / "cookies.json"
+        output.write_text("old\n")
+        output.chmod(0o644)
+
+        def _dump(_cookies, f, indent: int) -> None:
+            self.assertEqual(output.read_text(), "old\n")
+            self.assertEqual(output.stat().st_mode & 0o777, 0o644)
+            temp_files = list(base.glob(".cookies.json.*.tmp"))
+            self.assertEqual(len(temp_files), 1)
+            self.assertEqual(temp_files[0].stat().st_mode & 0o777, 0o600)
+            f.write('[{"name": "SID", "value": "secret"}]')
+
+        with patch("extract_cookies.json.dump", side_effect=_dump):
+            write_cookie_file(output, [{"name": "SID", "value": "secret"}])
+
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        self.assertIn("secret", output.read_text())
+
+    def test_cookie_output_refuses_symlinks(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        target = base / "target.json"
+        target.write_text("{}")
+        link = base / "cookies.json"
+        link.symlink_to(target)
+
+        with self.assertRaises(ValueError):
+            write_cookie_file(link, [{"name": "SID", "value": "secret"}])
+
+    def test_cookie_output_refuses_dangling_symlinks(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        link = base / "cookies.json"
+        link.symlink_to(base / "missing.json")
+
+        with self.assertRaises(ValueError):
+            write_cookie_file(link, [{"name": "SID", "value": "secret"}])
+
+    def test_inject_cookies_sends_values_over_stdin_not_argv(self) -> None:
+        cookie = {
+            "name": "SID",
+            "value": "secret-token",
+            "domain": ".youtube.com",
+            "path": "/",
+            "expires": 9999999999,
+            "secure": True,
+            "httpOnly": True,
+            "sameSite": "Lax",
+        }
+
+        with patch("extract_cookies.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "1"
+            run.return_value.stderr = ""
+
+            inject_cookies([cookie], 9242)
+
+        command = run.call_args.args[0]
+        self.assertNotIn("secret-token", command)
+        self.assertIn("secret-token", run.call_args.kwargs["input"])
 
 
 if __name__ == "__main__":
