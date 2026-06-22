@@ -81,9 +81,9 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env, dep
 	return [
 		SPARKSHELL_AWARENESS_MARKER,
 		"",
-		`- Prefer \`${command} sparkshell <command>\` for repo inspection, CLI smoke tests, git/history checks, and bounded verification before falling back to raw shell commands.`,
-		`- Use \`${command} sparkshell --shell '<command>'\` only when shell metacharacters are required.`,
-		`- Use \`${command} sparkshell --tmux-pane <pane-id> --tail-lines 400\` to inspect an existing tmux pane. Tail lines must stay between 100 and 1000.`,
+		`- Use \`${command} sparkshell <command>\` first for repo inspection, CLI smoke tests, git/history checks, and bounded command output. Raw \`rg\`/\`grep\`/\`cat\`/\`git\` are fallbacks when Sparkshell is unavailable or too narrow for the task.`,
+		`- Use \`${command} sparkshell --shell '<command>'\` only for shell metacharacters or pipelines.`,
+		`- Use \`${command} sparkshell --tmux-pane <pane-id> --tail-lines 400\` only to inspect an existing pane, never to launch ordinary commands. Tail lines must stay between 100 and 1000.`,
 		"- When no native sidecar or appserver is available, Sparkshell silently falls back to raw command execution. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
 		"- When `CODEX_THREAD_ID` identifies a Codex session, Sparkshell feeds recent session context (first/latest user request + last 5 conversation messages) into oversized-output condensation for relevance ranking, but never appends that context to command output. `OMO_SPARKSHELL_SESSION_CONTEXT=0` disables the lookup.",
 		`- Route potentially huge output (full log files, big diffs, \`cat\`/\`grep\` over large artifacts) through \`${command} sparkshell\` instead of reading it raw: oversized output is condensed to a budget while preserving error signatures, repeated patterns, session-goal-relevant lines, and head/tail. Tune with \`--budget <chars>\`; disable with \`OMO_SPARKSHELL_CONDENSE=0\`.`,
