@@ -8,6 +8,8 @@ type ParentWakeWindowRecoveryInput = {
   readonly wake: PendingParentWake
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
+  readonly requeueWake: (wake: PendingParentWake) => void
+  readonly scheduleFlush: () => void
 }
 
 export async function handleDispatchedParentWakeWindowElapsed(
@@ -26,8 +28,10 @@ export async function handleDispatchedParentWakeWindowElapsed(
     return
   }
 
-  input.dispatchedTracker.refreshWakeTimer(input.sessionID)
-  log("[background-agent] Kept dispatched parent wake awaiting late failure or assistant output:", {
+  input.dispatchedTracker.clearWake(input.sessionID)
+  input.requeueWake(input.wake)
+  input.scheduleFlush()
+  log("[background-agent] Requeued dispatched parent wake after no assistant output:", {
     sessionID: input.sessionID,
   })
 }
