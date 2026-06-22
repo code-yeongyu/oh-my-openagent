@@ -35,8 +35,10 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/validators.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/waf_detector.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/cookie_crypto.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/cookie_domains.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/cookie_paths.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/extract_cookies.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/tests/test_cookie_domain_filter.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/scripts/tests/test_extract_cookies.py",
 ] as const
 const retainedPythonFiles = [
