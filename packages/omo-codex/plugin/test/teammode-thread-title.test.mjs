@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
 import test from "node:test";
 
-import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw } from "./teammode-safety-fixture.mjs";
+import { cleanupTeamRoot, createTeamRoot, readTeamJson, runTeam, runTeamRaw, teamJsonPath } from "./teammode-safety-fixture.mjs";
 
 function addMember(tempRoot, sessionId, { id, name, focus, lens, deliverable }) {
 	const args = ["add-member", "--team", sessionId, "--id", id, "--focus", focus, "--lens", lens, "--deliverable", deliverable];
@@ -88,6 +89,38 @@ test("#given a member name already exists #when add-member receives the same nam
 			team.members.map((member) => ({ id: member.id, name: member.name, threadTitle: member.threadTitle })),
 			[{ id: "A", name: "App Server", threadTitle: "[Recovery] App Server" }],
 		);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given persisted team.json has duplicate member names #when a command loads the team #then stale state is rejected", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-title-stale-duplicate-name-");
+	try {
+		runTeam(tempRoot, "init", "--name", "Recovery", "--session-name", "shared-session", "--session", "title-stale-duplicate-name");
+		addMember(tempRoot, "title-stale-duplicate-name", {
+			id: "A",
+			name: "App Server",
+			focus: "app-server lifecycle",
+			lens: "area",
+			deliverable: "lifecycle map",
+		});
+		addMember(tempRoot, "title-stale-duplicate-name", {
+			id: "B",
+			name: "Mailbox Delivery",
+			focus: "mailbox delivery",
+			lens: "ownership",
+			deliverable: "delivery audit",
+		});
+		const path = teamJsonPath(tempRoot, "title-stale-duplicate-name");
+		const team = JSON.parse(readFileSync(path, "utf8"));
+		team.members[1].name = " app   server ";
+		writeFileSync(path, `${JSON.stringify(team, null, 2)}\n`);
+
+		const result = runTeamRaw(tempRoot, "status", "--team", "title-stale-duplicate-name");
+
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /member name " app   server " duplicates "App Server"/);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}
