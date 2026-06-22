@@ -44,8 +44,9 @@ function isMissingTopLevelModule(error, moduleName) {
 }
 
 function requireOptionalModule(moduleName) {
+  let resolvedModule;
   try {
-    return require(moduleName);
+    resolvedModule = require.resolve(moduleName);
   } catch (e) {
     if (isMissingTopLevelModule(e, moduleName)) {
       warnBestEffort(`optional module ${moduleName}`, e);
@@ -53,6 +54,7 @@ function requireOptionalModule(moduleName) {
     }
     throw e;
   }
+  return require(resolvedModule);
 }
 
 async function main() {
