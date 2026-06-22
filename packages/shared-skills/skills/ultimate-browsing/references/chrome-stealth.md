@@ -2,7 +2,7 @@
 
 Real interaction (clicks, forms, screenshots, video, persistent login) for pages that defeat Tier 1/1.5. Two runtime tools, both installed on demand — neither is vendored in this skill:
 
-- **CloakBrowser** (`pip`, MIT) — stealth Chromium with source-level C++ fingerprint patches. Passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors. Pin **0.3.28**.
+- **CloakBrowser** (`pip`) — stealth Chromium with source-level C++ fingerprint patches. The Python wrapper source is MIT; the downloaded Chromium binary is covered by CloakBrowser's separate binary license and is not redistributed by this package. Passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors. Pin **0.3.28**.
 - **agent-browser** (`npm`, Apache-2.0) — native CDP automation CLI that drives CloakBrowser. AX-tree snapshots, `@eN` refs, click/fill/type/scroll, screenshots, video, cookie/state/session management. Pin **0.27.1**.
 
 ```
@@ -18,7 +18,7 @@ CloakBrowser (stealth Chromium) <- CDP port 9242 -> agent-browser CLI
 CloakBrowser runs in a dedicated Python venv. Cross-platform: macOS, Linux, and Windows all supported by both tools (use the venv path convention for your OS).
 
 ```bash
-# CloakBrowser (MIT, pin 0.3.28):
+# CloakBrowser (MIT wrapper source; separate binary license, pin 0.3.28):
 uv venv .cloak-venv --python 3.13
 # macOS/Linux: source .cloak-venv/bin/activate    Windows: .cloak-venv\Scripts\activate
 uv pip install "cloakbrowser==0.3.28"
@@ -90,12 +90,13 @@ Tested May 2026: bot.sannysoft.com all-green, browserscan.net "Normal" (15/15), 
 
 ```bash
 # Extract to a file:
-python3 ../scripts/extract_cookies.py --browser chrome --domain youtube.com --output /tmp/cookies.json
+mkdir -p ~/.local/state/omo-cookies
+python3 ../scripts/extract_cookies.py --browser chrome --domain youtube.com --output ~/.local/state/omo-cookies/youtube.cookies.json
 # Extract and inject into the running CDP session:
 python3 ../scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
 ```
 
-Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens (SIDTS) that may not transfer across browser profiles. Firefox-family profiles store cookies unencrypted; Chromium-family profiles trigger a one-time OS-keyring prompt on macOS/Linux.
+Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv, so live cookie values do not appear in process listings. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens (SIDTS) that may not transfer across browser profiles. Firefox-family profiles store cookies unencrypted; Chromium-family profiles trigger a one-time OS-keyring prompt on macOS/Linux.
 
 ## Anti-patterns
 
