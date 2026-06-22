@@ -1,5 +1,7 @@
 import { VERIFICATION_REMINDER } from "./system-reminder-templates"
 
+export type VerificationReminderDetail = "full" | "compact"
+
 function buildReuseHint(sessionId: string): string {
   return `
 **PREFERRED REUSE SESSION FOR THE CURRENT TOP-LEVEL PLAN TASK**
@@ -38,7 +40,29 @@ task(task_id="${sessionId}", load_skills=[], prompt="fix: checkbox not recorded 
 ${buildReuseHint(sessionId)}`
 }
 
-function buildVerificationReminder(sessionId: string): string {
+function buildCompactVerificationReminder(sessionId: string): string {
+  return `**VERIFICATION_REMINDER**
+
+Full verification protocol was already shown earlier in this orchestrator session. Keep the same gate:
+
+1. Read every changed file before running checks.
+2. Run targeted diagnostics/tests first, then the broader build or test gate.
+3. Drive the real surface for user-facing behavior.
+4. Reject or resume the subagent if any claim is unproven.
+
+**If ANY verification fails, use this immediately:**
+\`\`\`
+task(task_id="${sessionId}", load_skills=[], prompt="fix: [describe the specific failure]")
+\`\`\`
+
+${buildReuseHint(sessionId)}`
+}
+
+function buildVerificationReminder(sessionId: string, detail: VerificationReminderDetail = "full"): string {
+  if (detail === "compact") {
+    return buildCompactVerificationReminder(sessionId)
+  }
+
   return `**VERIFICATION_REMINDER**
 
 ${VERIFICATION_REMINDER}
@@ -58,7 +82,8 @@ export function buildOrchestratorReminder(
   progress: { total: number; completed: number },
   sessionId: string,
   autoCommit: boolean = true,
-  includeCompletionGate: boolean = true
+  includeCompletionGate: boolean = true,
+  verificationDetail: VerificationReminderDetail = "full"
 ): string {
   const remaining = progress.total - progress.completed
 
@@ -82,7 +107,7 @@ export function buildOrchestratorReminder(
 
 ${includeCompletionGate ? `${buildCompletionGate(planName, sessionId)}
 
-` : ""}${buildVerificationReminder(sessionId)}
+` : ""}${buildVerificationReminder(sessionId, verificationDetail)}
 
 **STEP 5: READ SUBAGENT NOTEPAD (LEARNINGS, ISSUES, PROBLEMS)**
 
@@ -160,11 +185,14 @@ If the user rejects or requests changes:
 **DO NOT mark the final-wave checkbox complete until the user explicitly says okay.**`
 }
 
-export function buildStandaloneVerificationReminder(sessionId: string): string {
+export function buildStandaloneVerificationReminder(
+  sessionId: string,
+  detail: VerificationReminderDetail = "full",
+): string {
   return `
 ---
 
-${buildVerificationReminder(sessionId)}
+${buildVerificationReminder(sessionId, detail)}
 
 **STEP 5: CHECK YOUR PROGRESS DIRECTLY (EVERY TIME - NO EXCEPTIONS)**
 

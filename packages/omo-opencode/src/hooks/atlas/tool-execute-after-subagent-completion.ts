@@ -19,6 +19,7 @@ import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagen
 import { resolvePreferredSessionId, resolveTaskContext } from "./task-context"
 import { isTrackedTaskChecked } from "./tool-execute-after-plan-tasks"
 import type { PendingTaskRef, SessionState, ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
+import type { VerificationReminderDetail } from "./verification-reminders"
 import {
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
@@ -30,6 +31,13 @@ function isBackgroundLaunchOutput(output: string): boolean {
   return output.includes("Background task launched") || output.includes("Background task continued")
     || output.includes("Background delegate launched")
     || output.includes("Background agent task launched")
+}
+
+function consumeVerificationReminderDetail(sessionState: SessionState | undefined): VerificationReminderDetail {
+  if (!sessionState) return "full"
+  if (sessionState.fullVerificationReminderShown) return "compact"
+  sessionState.fullVerificationReminderShown = true
+  return "full"
 }
 
 export async function handleSubagentCompletionAfter(input: {
@@ -82,6 +90,7 @@ export async function handleSubagentCompletionAfter(input: {
   const gitStats = collectGitDiffStatsImpl(verificationDirectory)
   const fileChanges = formatFileChangesImpl(gitStats)
   const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(outputStr)
+  const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
   if (!boulderState) {
     const lineageSessionIDs = toolInput.sessionID ? [toolInput.sessionID] : []
@@ -95,6 +104,7 @@ export async function handleSubagentCompletionAfter(input: {
       : subagentSessionId
     toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(
       resolvePreferredSessionId(preferredSessionId),
+      consumeVerificationReminderDetail(sessionState),
     )}\n</system-reminder>`
 
     log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
@@ -136,7 +146,6 @@ export async function handleSubagentCompletionAfter(input: {
   const trackedTaskSession = currentTask
     ? getTaskSessionState(ctx.directory, currentTask.key)
     : null
-  const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
   const lineageSessionIDs = sessionWork?.session_ids ?? boulderState.session_ids
   const subagentSessionId = await validateSubagentSessionId({
@@ -198,7 +207,14 @@ export async function handleSubagentCompletionAfter(input: {
     : buildCompletionGate(workScopedBoulderState.plan_name, preferredSessionId)
   const followupReminder = shouldPauseForApproval
     ? null
-    : buildOrchestratorReminder(workScopedBoulderState.plan_name, progress, preferredSessionId, autoCommit, false)
+    : buildOrchestratorReminder(
+        workScopedBoulderState.plan_name,
+        progress,
+        preferredSessionId,
+        autoCommit,
+        false,
+        consumeVerificationReminderDetail(sessionState),
+      )
 
   toolOutput.output = `
 <system-reminder>

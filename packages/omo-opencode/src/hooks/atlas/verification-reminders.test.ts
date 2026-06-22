@@ -90,5 +90,16 @@ describe("buildOrchestratorReminder", () => {
         expect(gateIndex).toBeLessThan(verificationIndex)
       })
     })
+
+    when("buildOrchestratorReminder is called with compact verification detail", () => {
+      const reminder = buildOrchestratorReminder(planName, progress, sessionId, true, true, "compact")
+
+      then("full phase text is omitted while verification remains mandatory", () => {
+        expect(reminder).not.toContain("PHASE 1")
+        expect(reminder).toContain("Full verification protocol was already shown earlier")
+        expect(reminder).toContain("Drive the real surface")
+        expect(reminder).toContain(`task(task_id="${sessionId}"`)
+      })
+    })
   })
 })

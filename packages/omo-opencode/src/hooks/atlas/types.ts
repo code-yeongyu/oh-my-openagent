@@ -56,4 +56,5 @@ export interface SessionState {
   stalledContinuationPlanPath?: string
   /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
   activeContinuationPlanPath?: string
+  fullVerificationReminderShown?: boolean
 }
