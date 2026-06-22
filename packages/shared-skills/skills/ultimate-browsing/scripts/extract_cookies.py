@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -40,19 +41,97 @@ IMPORTANT_COOKIES = {
 }
 
 
+_CDP_SET_COOKIES_SCRIPT = r"""
+const port = Number(process.argv[1] || 0);
+if (!Number.isInteger(port) || port <= 0) {
+  process.stderr.write("invalid CDP port\n");
+  process.exit(2);
+}
+
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { input += chunk; });
+process.stdin.on("end", async () => {
+  const cookies = JSON.parse(input || "[]");
+  const version = await fetch(`http://127.0.0.1:${port}/json/version`).then((r) => r.json());
+  const ws = new WebSocket(version.webSocketDebuggerUrl);
+  let nextId = 1;
+  const pending = new Map();
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const waiter = pending.get(msg.id);
+    if (!waiter) return;
+    pending.delete(msg.id);
+    if (msg.error) waiter.reject(new Error(msg.error.message || "CDP error"));
+    else waiter.resolve(msg.result);
+  };
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = resolve;
+    ws.onerror = reject;
+  });
+
+  const send = (method, params) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    pending.set(id, { resolve, reject });
+    ws.send(JSON.stringify({ id, method, params }));
+  });
+
+  let ok = 0;
+  for (const cookie of cookies) {
+    const result = await send("Network.setCookie", cookie);
+    if (result && result.success) ok += 1;
+  }
+  ws.close();
+  process.stdout.write(String(ok));
+}).catch((error) => {
+  process.stderr.write(`${error.name || "Error"}: ${error.message || error}\n`);
+  process.exit(1);
+});
+"""
+
+
+def _secure_cookie_db_copy(db_path: Path) -> Path:
+    handle = tempfile.NamedTemporaryFile(prefix="omo-cookies-", suffix=".sqlite", delete=False)
+    tmp = Path(handle.name)
+    handle.close()
+    try:
+        shutil.copyfile(db_path, tmp)
+        tmp.chmod(0o600)
+        return tmp
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def write_cookie_file(path: Path, cookies: list[dict[str, Any]]) -> None:
+    if path.exists() and path.is_symlink():
+        raise ValueError(f"refusing to write cookies through symlink: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(cookies, f, indent=2)
+            f.write("\n")
+    finally:
+        path.chmod(0o600)
+
+
 def extract_firefox(db_path: Path, domains: list[str]) -> list[dict[str, Any]]:
-    tmp = Path(tempfile.mktemp(suffix=".sqlite"))
-    shutil.copy2(db_path, tmp)
-    where = " OR ".join("host LIKE ?" for _ in domains)
-    params = [f"%{d}%" for d in domains]
-    conn = sqlite3.connect(str(tmp))
-    rows = conn.execute(
-        f"SELECT name, value, host, path, expiry, isSecure, isHttpOnly, sameSite "
-        f"FROM moz_cookies WHERE ({where}) ORDER BY host, name",
-        params,
-    ).fetchall()
-    conn.close()
-    tmp.unlink(missing_ok=True)
+    tmp = _secure_cookie_db_copy(db_path)
+    try:
+        where = " OR ".join("host LIKE ?" for _ in domains)
+        params = [f"%{d}%" for d in domains]
+        conn = sqlite3.connect(str(tmp))
+        rows = conn.execute(
+            f"SELECT name, value, host, path, expiry, isSecure, isHttpOnly, sameSite "
+            f"FROM moz_cookies WHERE ({where}) ORDER BY host, name",
+            params,
+        ).fetchall()
+        conn.close()
+    finally:
+        tmp.unlink(missing_ok=True)
     return [
         {
             "name": n, "value": v, "domain": h, "path": p, "expires": e,
@@ -63,18 +142,19 @@ def extract_firefox(db_path: Path, domains: list[str]) -> list[dict[str, Any]]:
 
 
 def extract_chromium(db_path: Path, domains: list[str], platform: str, key: bytes) -> list[dict[str, Any]]:
-    tmp = Path(tempfile.mktemp(suffix=".sqlite"))
-    shutil.copy2(db_path, tmp)
-    where = " OR ".join("host_key LIKE ?" for _ in domains)
-    params = [f"%{d}%" for d in domains]
-    conn = sqlite3.connect(str(tmp))
-    rows = conn.execute(
-        f"SELECT name, encrypted_value, host_key, path, expires_utc, is_secure, is_httponly, samesite "
-        f"FROM cookies WHERE ({where}) ORDER BY host_key, name",
-        params,
-    ).fetchall()
-    conn.close()
-    tmp.unlink(missing_ok=True)
+    tmp = _secure_cookie_db_copy(db_path)
+    try:
+        where = " OR ".join("host_key LIKE ?" for _ in domains)
+        params = [f"%{d}%" for d in domains]
+        conn = sqlite3.connect(str(tmp))
+        rows = conn.execute(
+            f"SELECT name, encrypted_value, host_key, path, expires_utc, is_secure, is_httponly, samesite "
+            f"FROM cookies WHERE ({where}) ORDER BY host_key, name",
+            params,
+        ).fetchall()
+        conn.close()
+    finally:
+        tmp.unlink(missing_ok=True)
     out = []
     for n, enc, h, p, exp, sec, ho, ss in rows:
         unix_expires = int((exp / 1_000_000) - 11644473600) if exp and exp > 0 else 0
@@ -118,21 +198,29 @@ def extract_cookies(
 
 def inject_cookies(cookies: list[dict[str, Any]], cdp_port: int) -> None:
     filtered = [c for c in cookies if c["name"] in IMPORTANT_COOKIES] or cookies
-    ok = 0
-    for c in filtered:
-        cmd = ["agent-browser", "--cdp", str(cdp_port), "cookies", "set", c["name"], c["value"]]
-        for flag, value in (("--domain", c["domain"]), ("--path", c["path"])):
-            if value:
-                cmd += [flag, value]
-        if c["secure"]:
-            cmd.append("--secure")
-        if c["httpOnly"]:
-            cmd.append("--httpOnly")
-        cmd += ["--sameSite", c.get("sameSite", "Lax")]
-        if c["expires"] and int(c["expires"]) > 0:
-            cmd += ["--expires", str(c["expires"])]
-        if subprocess.run(cmd, capture_output=True, text=True, timeout=5).returncode == 0:
-            ok += 1
+    payload = [
+        {
+            "name": c["name"],
+            "value": c["value"],
+            "domain": c["domain"],
+            "path": c.get("path") or "/",
+            "secure": bool(c.get("secure")),
+            "httpOnly": bool(c.get("httpOnly")),
+            "sameSite": c.get("sameSite", "Lax"),
+            **({"expires": int(c["expires"])} if c.get("expires") and int(c["expires"]) > 0 else {}),
+        }
+        for c in filtered
+    ]
+    proc = subprocess.run(
+        ["node", "-e", _CDP_SET_COOKIES_SCRIPT, str(cdp_port)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError((proc.stderr or "CDP cookie injection failed").strip())
+    ok = int((proc.stdout or "0").strip() or "0")
     print(f"Injected {ok}/{len(filtered)} cookies into agent-browser (CDP {cdp_port})")
 
 
@@ -148,7 +236,7 @@ def main() -> None:
     cookies = extract_cookies(args.browser, args.domains)
     print(f"Extracted {len(cookies)} cookies from {args.browser}")
     if args.output:
-        Path(args.output).write_text(json.dumps(cookies, indent=2))
+        write_cookie_file(Path(args.output), cookies)
         print(f"Saved to {args.output}")
     if args.inject:
         inject_cookies(cookies, args.cdp)
