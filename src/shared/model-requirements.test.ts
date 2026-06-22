@@ -182,13 +182,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "architect",
       "cipher",
       "sentinel",
+      "sati",
     ]
 
     // when - checking AGENT_MODEL_REQUIREMENTS
     const definedAgents = Object.keys(AGENT_MODEL_REQUIREMENTS)
 
     // #then - all agents present with valid fallbackChain
-    expect(definedAgents).toHaveLength(12)
+    expect(definedAgents).toHaveLength(13)
     for (const agent of expectedAgents) {
       const requirement = AGENT_MODEL_REQUIREMENTS[agent]
       expect(requirement).toBeDefined()

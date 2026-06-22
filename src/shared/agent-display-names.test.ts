@@ -159,6 +159,8 @@ describe("AGENT_DISPLAY_NAMES", () => {
       smith: "Smith (Plan Reviewer)",
       merovingian: "Merovingian (Consultation Expert)",
       operator: "operator",
+      sentinel: "Sentinel (Security Auditor)",
+      sati: "Sati (Frontend Specialist)",
       trinity: "trinity",
       construct: "construct",
       cipher: "Cipher (DSL Expert)",

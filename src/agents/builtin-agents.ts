@@ -22,6 +22,7 @@ import { createKeymakerAgent } from "./keymaker"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./merovingian"
 import { createMorpheusAgent } from "./morpheus"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./operator"
+import { createSatiAgent, SATI_PROMPT_METADATA } from "./sati"
 import { createSentinelAgent, SENTINEL_PROMPT_METADATA } from "./sentinel"
 import { createSeraphAgent, seraphPromptMetadata } from "./seraph"
 import { createSmithAgent, smithPromptMetadata } from "./smith"
@@ -42,6 +43,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   architect: createAtlasAgent as AgentFactory,
   cipher: createCipherAgent,
   sentinel: createSentinelAgent,
+  sati: createSatiAgent,
 }
 
 /**
@@ -58,6 +60,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   architect: atlasPromptMetadata,
   cipher: CIPHER_PROMPT_METADATA,
   sentinel: SENTINEL_PROMPT_METADATA,
+  sati: SATI_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(

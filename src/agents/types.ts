@@ -110,6 +110,7 @@ export type BuiltinAgentName =
   | "architect"
   | "cipher"
   | "sentinel"
+  | "sati"
 
 export type OverridableAgentName =
   | "build"
