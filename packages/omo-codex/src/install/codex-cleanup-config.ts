@@ -1,5 +1,6 @@
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
+import { parseAgentHeaderName, parseHookStateHeaderKey, parsePluginHeaderKey } from "./codex-config-toml-sections"
 
 const MANAGED_MARKETPLACES = ["sisyphuslabs", "lazycodex", "code-yeongyu-codex-plugins"] as const
 
@@ -65,9 +66,7 @@ function isManagedPluginHeader(header: string, marketplace: string): boolean {
 }
 
 function isManagedHookStateHeader(header: string, marketplace: string): boolean {
-  const prefix = "hooks.state."
-  if (!header.startsWith(prefix)) return false
-  const hookKey = parseJsonString(header.slice(prefix.length))
+  const hookKey = parseHookStateHeaderKey(header)
   if (hookKey === null) return false
   const separator = hookKey.indexOf(":")
   if (separator === -1) return false
@@ -103,47 +102,6 @@ function parseTomlHeader(line: string): string | null {
   const trimmed = line.trim()
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]") || trimmed.startsWith("[[")) return null
   return trimmed.slice(1, -1)
-}
-
-function parsePluginHeaderKey(header: string): string | null {
-  const prefix = "plugins."
-  if (!header.startsWith(prefix)) return null
-  return parseLeadingJsonString(header.slice(prefix.length))
-}
-
-function parseAgentHeaderName(header: string): string | null {
-  const prefix = "agents."
-  if (!header.startsWith(prefix)) return null
-  const key = header.slice(prefix.length)
-  return key.startsWith('"') ? parseLeadingJsonString(key) : key
-}
-
-function parseLeadingJsonString(value: string): string | null {
-  if (!value.startsWith('"')) return parseJsonString(value)
-  let escaped = false
-  for (let index = 1; index < value.length; index += 1) {
-    const char = value[index]
-    if (escaped) {
-      escaped = false
-      continue
-    }
-    if (char === "\\") {
-      escaped = true
-      continue
-    }
-    if (char === '"') return parseJsonString(value.slice(0, index + 1))
-  }
-  return null
-}
-
-function parseJsonString(value: string): string | null {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return typeof parsed === "string" ? parsed : null
-  } catch (error) {
-    if (error instanceof Error) return null
-    return null
-  }
 }
 
 function formatBackupTimestamp(date: Date): string {

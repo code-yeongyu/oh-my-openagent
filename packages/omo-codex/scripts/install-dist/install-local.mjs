@@ -7395,6 +7395,7 @@ import { dirname as dirname5 } from "node:path";
 // packages/omo-codex/src/install/toml-section-editor.ts
 function findTomlSection(config, header) {
   const headerLine = `[${header}]`;
+  const targetHeaderPath = parseTomlDottedKey(header);
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
   let start = -1;
@@ -7403,7 +7404,7 @@ function findTomlSection(config, header) {
       break;
     const trimmed = line.trim();
     if (start === -1) {
-      if (trimmed === headerLine)
+      if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath))
         start = offset;
     } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       return { start, end: offset, text: config.slice(start, offset) };
@@ -7459,6 +7460,127 @@ function insertSetting(sectionText, key, value) {
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function tomlTableHeaderMatches(line, headerLine, targetHeaderPath) {
+  if (line === headerLine)
+    return true;
+  if (!targetHeaderPath)
+    return false;
+  const candidateHeaderPath = parseTomlTableHeader(line);
+  if (!candidateHeaderPath || candidateHeaderPath.length !== targetHeaderPath.length)
+    return false;
+  return candidateHeaderPath.every((part, index) => part === targetHeaderPath[index]);
+}
+function parseTomlTableHeader(line) {
+  if (!line.startsWith("[") || !line.endsWith("]") || line.startsWith("[["))
+    return null;
+  return parseTomlDottedKey(line.slice(1, -1).trim());
+}
+function parseTomlDottedKey(input) {
+  const parts = [];
+  let index = 0;
+  while (index < input.length) {
+    index = skipWhitespace(input, index);
+    const parsedKey = parseTomlKeyPart(input, index);
+    if (!parsedKey)
+      return null;
+    parts.push(parsedKey.value);
+    index = skipWhitespace(input, parsedKey.nextIndex);
+    if (index === input.length)
+      return parts;
+    if (input[index] !== ".")
+      return null;
+    index += 1;
+  }
+  return parts.length > 0 ? parts : null;
+}
+function parseTomlKeyPart(input, startIndex) {
+  const quote = input[startIndex];
+  if (quote === "'")
+    return parseLiteralTomlString(input, startIndex);
+  if (quote === '"')
+    return parseBasicTomlString(input, startIndex);
+  return parseBareTomlKey(input, startIndex);
+}
+function parseLiteralTomlString(input, startIndex) {
+  let index = startIndex + 1;
+  let value = "";
+  while (index < input.length) {
+    const char = input[index];
+    if (char === "'")
+      return { value, nextIndex: index + 1 };
+    value += char;
+    index += 1;
+  }
+  return null;
+}
+function parseBasicTomlString(input, startIndex) {
+  let index = startIndex + 1;
+  let value = "";
+  while (index < input.length) {
+    const char = input[index];
+    if (char === '"')
+      return { value, nextIndex: index + 1 };
+    if (char !== "\\") {
+      value += char;
+      index += 1;
+      continue;
+    }
+    const escaped = parseBasicTomlEscape(input, index);
+    if (!escaped)
+      return null;
+    value += escaped.value;
+    index = escaped.nextIndex;
+  }
+  return null;
+}
+function parseBasicTomlEscape(input, backslashIndex) {
+  const escape = input[backslashIndex + 1];
+  if (escape === undefined)
+    return null;
+  if (escape === "b")
+    return { value: "\b", nextIndex: backslashIndex + 2 };
+  if (escape === "t")
+    return { value: "\t", nextIndex: backslashIndex + 2 };
+  if (escape === "n")
+    return { value: `
+`, nextIndex: backslashIndex + 2 };
+  if (escape === "f")
+    return { value: "\f", nextIndex: backslashIndex + 2 };
+  if (escape === "r")
+    return { value: "\r", nextIndex: backslashIndex + 2 };
+  if (escape === '"')
+    return { value: '"', nextIndex: backslashIndex + 2 };
+  if (escape === "\\")
+    return { value: "\\", nextIndex: backslashIndex + 2 };
+  if (escape === "u")
+    return parseUnicodeEscape(input, backslashIndex + 2, 4);
+  if (escape === "U")
+    return parseUnicodeEscape(input, backslashIndex + 2, 8);
+  return null;
+}
+function parseUnicodeEscape(input, digitsStart, digitCount) {
+  const digits = input.slice(digitsStart, digitsStart + digitCount);
+  if (digits.length !== digitCount || !/^[0-9A-Fa-f]+$/.test(digits))
+    return null;
+  const codePoint = Number.parseInt(digits, 16);
+  if (codePoint > 1114111)
+    return null;
+  return { value: String.fromCodePoint(codePoint), nextIndex: digitsStart + digitCount };
+}
+function parseBareTomlKey(input, startIndex) {
+  let index = startIndex;
+  while (index < input.length && /[A-Za-z0-9_-]/.test(input[index]))
+    index += 1;
+  if (index === startIndex)
+    return null;
+  return { value: input.slice(startIndex, index), nextIndex: index };
+}
+function skipWhitespace(input, startIndex) {
+  let index = startIndex;
+  while (index < input.length && /\s/.test(input[index]))
+    index += 1;
+  return index;
+}
 
 // packages/omo-codex/src/install/codex-config-toml-sections.ts
 function removeTomlSections(config, shouldRemove) {
@@ -7487,52 +7609,24 @@ function splitTomlSections(config) {
   return sections;
 }
 function parsePluginHeaderKey(header) {
-  const prefix = "plugins.";
-  if (!header.startsWith(prefix))
-    return null;
-  return parseLeadingJsonString(header.slice(prefix.length));
+  const path = parseTomlDottedKey(header);
+  return path?.[0] === "plugins" ? path[1] ?? null : null;
 }
 function parseAgentHeaderName(header) {
-  const prefix = "agents.";
-  if (!header.startsWith(prefix))
-    return null;
-  const key = header.slice(prefix.length);
-  return key.startsWith('"') ? parseLeadingJsonString(key) : key;
+  const path = parseTomlDottedKey(header);
+  return path?.[0] === "agents" ? path[1] ?? null : null;
 }
-function parseJsonString(value) {
-  try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === "string" ? parsed : null;
-  } catch (error) {
-    if (error instanceof Error)
-      return null;
+function parseHookStateHeaderKey(header) {
+  const path = parseTomlDottedKey(header);
+  if (path?.[0] !== "hooks" || path[1] !== "state")
     return null;
-  }
+  return path[2] ?? null;
 }
 function parseTomlHeader(line) {
   const trimmed = line.trim();
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]") || trimmed.startsWith("[["))
     return null;
   return trimmed.slice(1, -1);
-}
-function parseLeadingJsonString(value) {
-  if (!value.startsWith('"'))
-    return parseJsonString(value);
-  let escaped = false;
-  for (let index = 1;index < value.length; index += 1) {
-    const char = value[index];
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (char === '"')
-      return parseJsonString(value.slice(0, index + 1));
-  }
-  return null;
 }
 
 // packages/omo-codex/src/install/codex-config-agents.ts
@@ -7670,10 +7764,7 @@ function removeStaleMarketplacePluginBlocks(config, marketplaceName, keepPluginN
 }
 function removeStaleMarketplaceHookStateBlocks(config, marketplaceName, keepPluginNames) {
   return removeTomlSections(config, (header) => {
-    const prefix = "hooks.state.";
-    if (!header.startsWith(prefix))
-      return false;
-    const hookKey = parseJsonString(header.slice(prefix.length));
+    const hookKey = parseHookStateHeaderKey(header);
     if (hookKey === null)
       return false;
     const separator = hookKey.indexOf(":");
@@ -8368,7 +8459,7 @@ function extractTopLevelStringSetting(content, key) {
     const rawValue = topLevelStringSettingRawValue(line, key);
     if (rawValue === undefined)
       continue;
-    const parsed = parseJsonString2(rawValue);
+    const parsed = parseJsonString(rawValue);
     if (parsed !== null)
       return parsed;
   }
@@ -8429,7 +8520,7 @@ function isSectionHeader2(line) {
 function agentNameFromToml(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
 }
-function parseJsonString2(value) {
+function parseJsonString(value) {
   try {
     const parsed = JSON.parse(value);
     return typeof parsed === "string" ? parsed : null;
