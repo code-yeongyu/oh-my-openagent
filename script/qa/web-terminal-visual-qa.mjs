@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { ansiColorCss, escapeHtml, renderAnsiToHtml, stripAnsi } from "./web-terminal-renderer.mjs";
 
 const HELP = `web-terminal-visual-qa
 
@@ -20,6 +21,8 @@ Inputs:
   --cols <n>             Terminal columns for tmux connector. Default: 140.
   --rows <n>             Terminal rows for tmux connector. Default: 40.
   --dwell-ms <n>         Milliseconds to let --command render before capture. Default: 3000.
+  --wrap                 Wrap long terminal lines in HTML/PNG evidence. Default.
+  --no-wrap              Preserve long lines with horizontal scrolling.
   --evidence-dir <path>  Directory for terminal.txt, terminal-ansi.txt, terminal.html, terminal.png, metadata.json.
   --chrome-bin <path>    Chrome/Chromium executable for PNG capture.
   --no-browser           Skip PNG capture, but still write HTML/text/metadata.
@@ -30,12 +33,20 @@ Connector notes:
 `;
 
 function parseArgs(argv) {
-  const args = { cols: 140, rows: 40, dwellMs: 3000, cwd: process.cwd(), browser: true };
+  const args = { cols: 140, rows: 40, dwellMs: 3000, cwd: process.cwd(), browser: true, wrap: true };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") return { ...args, help: true };
     if (arg === "--no-browser") {
       args.browser = false;
+      continue;
+    }
+    if (arg === "--wrap") {
+      args.wrap = true;
+      continue;
+    }
+    if (arg === "--no-wrap") {
+      args.wrap = false;
       continue;
     }
     const next = argv[i + 1];
@@ -68,15 +79,21 @@ function requireArgs(args) {
   if (!args.fromFile && !args.command) throw new Error("choose --from-file or --command");
 }
 
-function escapeHtml(value) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+function terminalWidthCh(cols) {
+  return Math.max(80, Math.min(cols, 160));
 }
 
-function stripAnsi(value) {
-  return value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+function screenshotSize({ cols, rows }) {
+  return {
+    width: Math.max(900, Math.min(1440, Math.round(cols * 8.2 + 120))),
+    height: Math.max(520, Math.min(1200, Math.round(rows * 18 + 120))),
+  };
 }
 
-function writeHtml({ title, text, outPath, cols }) {
+function writeHtml({ title, ansi, outPath, cols, wrap }) {
+  const whiteSpace = wrap ? "pre-wrap" : "pre";
+  const overflowWrap = wrap ? "anywhere" : "normal";
+  const terminalWidth = terminalWidthCh(cols);
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -85,15 +102,22 @@ function writeHtml({ title, text, outPath, cols }) {
 <title>${escapeHtml(title)}</title>
 <style>
 :root { color-scheme: dark; }
-body { margin: 0; background: #111318; color: #e7edf3; font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+body { margin: 0; background: #101217; color: #d8dee9; font: 13px/1.35 "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", "Menlo", "Consolas", "Liberation Mono", ui-monospace, monospace; }
 main { min-height: 100vh; box-sizing: border-box; padding: 20px; }
-.terminal { width: max-content; max-width: 100%; min-width: min(100%, ${cols}ch); border: 1px solid #3b4452; background: #090b10; box-shadow: 0 20px 80px rgb(0 0 0 / 40%); }
-.bar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #303846; color: #aab7c4; background: #171b22; }
+.terminal { width: min(100%, ${terminalWidth}ch); max-width: calc(100vw - 40px); border: 1px solid #3b4452; background: #090b10; box-shadow: 0 20px 80px rgb(0 0 0 / 40%); }
+.bar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #303846; color: #aab7c4; background: #171b22; font-size: 12px; }
 .dot { width: 10px; height: 10px; border-radius: 999px; background: #6b7280; }
-pre { margin: 0; padding: 14px 16px; white-space: pre; tab-size: 8; overflow: auto; }
+pre { margin: 0; padding: 14px 16px; white-space: ${whiteSpace}; overflow-wrap: ${overflowWrap}; tab-size: 8; overflow: auto; }
+.ansi-bold { font-weight: 700; }
+.ansi-dim { opacity: 0.72; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
+.ansi-strike { text-decoration: line-through; }
+.ansi-inverse { filter: invert(1); }
+${ansiColorCss()}
 </style>
 </head>
-<body><main><section class="terminal"><div class="bar"><span class="dot"></span><strong>${escapeHtml(title)}</strong></div><pre>${escapeHtml(text)}</pre></section></main></body>
+<body><main><section class="terminal"><div class="bar"><span class="dot"></span><strong>${escapeHtml(title)}</strong></div><pre>${renderAnsiToHtml(ansi)}</pre></section></main></body>
 </html>
 `;
   writeFileSync(outPath, html, "utf8");
@@ -163,13 +187,16 @@ function main() {
   const text = stripAnsi(capture.ansi);
   writeFileSync(textPath, text, "utf8");
   writeFileSync(ansiPath, capture.ansi, "utf8");
-  writeHtml({ title: args.title, text, outPath: htmlPath, cols: args.cols });
-  const browser = args.browser ? capturePng({ chromeBin: args.chromeBin, htmlPath, pngPath, width: 1280, height: 900 }) : { status: "skipped" };
+  writeHtml({ title: args.title, ansi: capture.ansi, outPath: htmlPath, cols: args.cols, wrap: args.wrap });
+  const size = screenshotSize({ cols: args.cols, rows: args.rows });
+  const browser = args.browser ? capturePng({ chromeBin: args.chromeBin, htmlPath, pngPath, ...size }) : { status: "skipped" };
   const metadata = {
     title: args.title,
     connector: capture.connector,
     browserCapture: browser.status,
     source: args.fromFile ? resolve(args.fromFile) : args.command,
+    wrap: args.wrap ? "on" : "off",
+    dimensions: { cols: args.cols, rows: args.rows, screenshotWidth: size.width, screenshotHeight: size.height },
     cleanup: capture.cleanup,
     files: { html: htmlPath, text: textPath, ansi: ansiPath, png: browser.status === "captured" ? pngPath : null, metadata: metadataPath },
   };

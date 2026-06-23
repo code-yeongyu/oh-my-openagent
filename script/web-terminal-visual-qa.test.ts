@@ -61,10 +61,86 @@ describe("web terminal visual QA helper", () => {
     expect(metadata).toMatchObject({
       connector: "file-replay",
       browserCapture: "skipped",
+      wrap: "on",
       files: {
         html: join(dir, "terminal.html"),
         text: join(dir, "terminal.txt"),
       },
+    })
+  })
+
+  test("#given ANSI color and style escapes #when rendering #then HTML preserves terminal styling while text stays plain", async () => {
+    // given
+    const dir = makeTempDir()
+    const transcript = join(dir, "ansi-capture.txt")
+    writeFileSync(transcript, "\u001b[31mred\u001b[0m \u001b[1;32mbold green\u001b[0m\n", "utf8")
+
+    // when
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "ANSI QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+
+    // then
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+    expect(readFileSync(join(dir, "terminal-ansi.txt"), "utf8")).toContain("\u001b[31mred")
+    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toBe("red bold green\n")
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain('class="ansi-fg-red"')
+    expect(html).toContain('class="ansi-bold ansi-fg-green"')
+    expect(html).toContain("bold green")
+  })
+
+  test("#given a very long line #when rendering with defaults #then wrapping is enabled and recorded", async () => {
+    // given
+    const dir = makeTempDir()
+    const transcript = join(dir, "long-line.txt")
+    writeFileSync(transcript, `${"x".repeat(260)}\n`, "utf8")
+
+    // when
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "Long Line QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+
+    // then
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain("white-space: pre-wrap")
+    expect(html).toContain("overflow-wrap: anywhere")
+
+    const metadata: unknown = JSON.parse(readFileSync(join(dir, "metadata.json"), "utf8"))
+    expect(metadata).toMatchObject({
+      wrap: "on",
+      dimensions: { cols: 140, rows: 40 },
     })
   })
 
@@ -86,6 +162,7 @@ describe("web terminal visual QA helper", () => {
     expect(exitCode).toBe(0)
     expect(stdoutText).toContain("--command")
     expect(stdoutText).toContain("--from-file")
+    expect(stdoutText).toContain("--no-wrap")
     expect(stdoutText).toContain("tmux-backed PTY connector")
     expect(stdoutText).toContain("PNG")
   })
