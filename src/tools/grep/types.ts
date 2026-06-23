@@ -33,7 +33,7 @@ export interface GrepOptions {
   timeout?: number
 }
 
-export interface CountResult {
+interface CountResult {
   file: string
   count: number
 }

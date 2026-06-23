@@ -31,7 +31,7 @@ interface MetaVariable {
   kind: string
 }
 
-export interface AnalyzeResult {
+interface AnalyzeResult {
   text: string
   range: Range
   kind: string
