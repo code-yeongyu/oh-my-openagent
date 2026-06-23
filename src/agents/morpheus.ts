@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
+import type { AgentMode } from "./types"
 import { isGptModel } from "./types"
 
 const MODE: AgentMode = "primary"
