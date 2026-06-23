@@ -23,6 +23,13 @@ Run each criterion's real-surface proof yourself through the channel that faithf
 3. **Browser use** — use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture action log + screenshot path. Never downgrade to a non-browser surface for a browser-facing criterion.
 4. **Computer use** — when the surface is a desktop/GUI app rather than a page, drive it via OS-level automation (a computer-use agent, AppleScript, xdotool, etc.) against the running app; capture action log + screenshot. Use this for any non-browser GUI criterion.
 
+For TUI visual QA, pair the tmux transcript with a browser-rendered terminal
+screenshot. In this repo run `node script/qa/web-terminal-visual-qa.mjs
+--from-file <capture.txt> --evidence-dir <dir>` and record `terminal.png`,
+`terminal.html`, `terminal.txt`, and `metadata.json` as the visual evidence
+bundle. This is mandatory when a PR or review needs to inspect the terminal
+screen, not just the text.
+
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump) are first-class evidence for CLI- or data-shaped criteria; use a channel scenario when the behavior is user-facing. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
 
 ## Delegation model (ATLAS-STYLE — YOU CONDUCT, WORKERS PLAY)
