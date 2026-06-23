@@ -73,16 +73,31 @@ function formatIdentifier(value: string): string {
 }
 
 function extractThreadCreationReference(toolResponse: unknown): ThreadCreationReference | null {
-	if (!isRecord(toolResponse)) return null;
-	const threadId = toolResponse["threadId"];
+	const response = parseToolResponseRecord(toolResponse);
+	if (response === null) return null;
+	const threadId = response["threadId"];
 	if (typeof threadId === "string" && threadId.trim().length > 0) {
 		return { kind: "thread", id: threadId };
 	}
-	const pendingWorktreeId = toolResponse["pendingWorktreeId"];
+	const pendingWorktreeId = response["pendingWorktreeId"];
 	if (typeof pendingWorktreeId === "string" && pendingWorktreeId.trim().length > 0) {
 		return { kind: "pendingWorktree", id: pendingWorktreeId };
 	}
 	return null;
+}
+
+function parseToolResponseRecord(toolResponse: unknown): Record<string, unknown> | null {
+	if (isRecord(toolResponse)) return toolResponse;
+	if (typeof toolResponse !== "string") return null;
+	const trimmed = toolResponse.trim();
+	if (trimmed.length === 0) return null;
+	try {
+		const parsed: unknown = JSON.parse(trimmed);
+		return isRecord(parsed) ? parsed : null;
+	} catch (error) {
+		if (error instanceof SyntaxError) return null;
+		return null;
+	}
 }
 
 function isPostToolUsePayload(value: unknown): value is PostToolUsePayload {
