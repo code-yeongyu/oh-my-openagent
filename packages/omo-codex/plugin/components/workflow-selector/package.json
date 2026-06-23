@@ -28,9 +28,9 @@
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
-		"lint": "biome check .",
-		"lint:fix": "biome check --write .",
-		"check": "tsc --noEmit && biome check . && npm run build"
+		"lint": "biome check src test",
+		"lint:fix": "biome check --write src test",
+		"check": "tsc --noEmit && biome check src test && npm run build"
 	},
 	"files": [
 		"dist",
