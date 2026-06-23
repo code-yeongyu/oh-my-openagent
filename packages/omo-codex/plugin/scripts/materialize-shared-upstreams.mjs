@@ -11,6 +11,7 @@ const upstreamPaths = [
 	"packages/shared-skills/upstreams/open-design",
 	"packages/shared-skills/upstreams/taste-skill",
 	"packages/shared-skills/upstreams/ui-ux-pro-max",
+	"packages/shared-skills/upstreams/designpowers",
 ];
 
 function initSubmodules({ strict }) {

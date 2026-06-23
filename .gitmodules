@@ -7,3 +7,6 @@
 [submodule "packages/shared-skills/upstreams/ui-ux-pro-max"]
 	path = packages/shared-skills/upstreams/ui-ux-pro-max
 	url = https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+[submodule "packages/shared-skills/upstreams/designpowers"]
+	path = packages/shared-skills/upstreams/designpowers
+	url = https://github.com/Owl-Listener/designpowers

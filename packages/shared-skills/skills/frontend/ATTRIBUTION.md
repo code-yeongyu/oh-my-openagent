@@ -140,7 +140,47 @@ SOFTWARE.
 
 ---
 
-## 4. Project-original files
+## 4. designpowers (Owl-Listener) — design operating-layer references
+
+The designpowers reference corpus under `frontend/references/designpowers/vendor/` is
+path-mapped verbatim from the designpowers project. It is not committed here; the build
+materializes the selected files from the pinned submodule under
+`packages/shared-skills/upstreams/designpowers`. The materialized set includes the
+upstream `LICENSE`, ten `agents/*.md` role-reference files, and selected
+`skills/*/SKILL.md` files. Bridge/state/router integration skills are intentionally
+excluded; see `frontend/references/designpowers/UPSTREAM.md` for the allowlist and
+exclusion list.
+
+- Source: https://github.com/Owl-Listener/designpowers
+- Pinned upstream commit: cb00757da9d554591fa78d27aa1854d60a05c4f7
+
+```
+MIT License
+
+Copyright (c) 2026 MC Dean
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+## 5. Project-original files
 
 `frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`,
 `design-system-architecture.md`, `react-dev-tooling-skill.md`,

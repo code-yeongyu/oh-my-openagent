@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
-import { brandStems, frontendSkillRoot, thirdPartyRelativePaths, uiUxDbScripts } from "./scripts/frontend-refs-manifest.mjs";
+import { brandStems, designpowersThirdPartyRelativePaths, frontendSkillRoot, thirdPartyRelativePaths, uiUxDbScripts } from "./scripts/frontend-refs-manifest.mjs";
 
 describe("materialize-frontend-refs", () => {
 	const result = materializeFrontendRefs({ strict: false });
@@ -24,6 +24,13 @@ describe("materialize-frontend-refs", () => {
 		}
 		for (const script of uiUxDbScripts as string[]) {
 			expect(existsSync(join(frontendSkillRoot, "references", "ui-ux-db", "scripts", script))).toBe(true);
+		}
+	});
+
+	test("materializes the designpowers reference corpus", () => {
+		if (result.skipped) return;
+		for (const relPath of designpowersThirdPartyRelativePaths()) {
+			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
 		}
 	});
 

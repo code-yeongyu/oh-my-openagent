@@ -42,12 +42,20 @@ describe("frontend third-party manifest partition", () => {
 		expect(trackedUiUxDb).toEqual([]);
 	});
 
-	test("third-party manifest covers design brand, taste-skill, and ui-ux-db", () => {
+	test("no designpowers vendor file is committed", () => {
+		// then the materialized designpowers corpus is submodule-sourced, never committed
+		const trackedDesignpowersVendor = [...tracked].filter((relPath) => relPath.startsWith("references/designpowers/vendor/"));
+		expect(trackedDesignpowersVendor).toEqual([]);
+	});
+
+	test("third-party manifest covers design brand, taste-skill, ui-ux-db, and designpowers", () => {
 		// given the manifest partition
 		const designCount = thirdParty.filter((relPath) => relPath.startsWith("references/design/")).length;
 		const uiUxDbCount = thirdParty.filter((relPath) => relPath.startsWith("references/ui-ux-db/")).length;
-		// then both reference families are represented
+		const designpowersCount = thirdParty.filter((relPath) => relPath.startsWith("references/designpowers/vendor/")).length;
+		// then each reference family is represented
 		expect(designCount).toBeGreaterThanOrEqual(81);
 		expect(uiUxDbCount).toBeGreaterThanOrEqual(28);
+		expect(designpowersCount).toBeGreaterThanOrEqual(38);
 	});
 });

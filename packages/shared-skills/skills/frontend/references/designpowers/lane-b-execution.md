@@ -1,10 +1,10 @@
 # Lane B: Design Execution Guidance
 
-Lane B feeds OmO `start-work` workers and always loads `frontend` for UI implementation. It does not install a separate builder. Its job is to carry designpowers composition, interaction, motion, content, responsive, adaptive, token, and cognitive-accessibility guidance into worker prompts while OmO keeps ownership of decomposition, implementation, QA, evidence, and ledger updates.
+Lane B feeds `start-work` workers and always loads `frontend` for UI implementation. It does not install a separate builder. Its job is to carry designpowers composition, interaction, motion, content, responsive, adaptive, token, and cognitive-accessibility guidance into worker prompts while keeps ownership of decomposition, implementation, QA, evidence, and ledger updates.
 
-## OmO Phase Owner
+## Phase Owner
 
-| Capability | Vendored designpowers source | OmO owner | Mapping |
+| Capability | Materialized designpowers source | owner | Mapping |
 |---|---|---|---|
 | Visual hierarchy, layout, color, typography, touch targets, and WCAG contrast | `ui-composition` | `start-work` worker plus `frontend` | Add visual constraints and acceptance checks to worker assignments. `frontend` remains the required UI implementation skill. |
 | States, feedback, loading, error, keyboard, touch, and recovery behavior | `interaction-design` | `start-work` worker plus `frontend` | Require every interactive component to define default, hover, focus, active, disabled, loading, success, and error states where applicable. |
@@ -15,7 +15,7 @@ Lane B feeds OmO `start-work` workers and always loads `frontend` for UI impleme
 | Plain-language labels, headings, alt text, link text, errors, and instructions | `accessible-content` and `voice-and-tone` | `start-work` worker plus `frontend` | Require final copy, no placeholders, useful errors, readable labels, and consistent tone. |
 | Tokens and design-system consistency | `token-architecture` and `design-system-alignment` | `frontend` | Require real design tokens and existing component patterns before new one-off styling. |
 
-Vendored agent references for this lane: `design-lead`, `motion-designer`, and `content-writer`. They are prompt-role references for spawned OpenAgent work, not alternate executors.
+Materialized agent references for this lane: `design-lead`, `motion-designer`, and `content-writer`. They are prompt-role references for spawned OpenAgent work, not alternate executors.
 
 ## Prompt Injection
 
@@ -24,7 +24,7 @@ Add this block to each `start-work` implementation worker that touches UI:
 ```text
 Load `frontend` for UI implementation. Also apply Lane B Design Execution Guidance.
 
-Use the OmO plan and `.omo/web-ui-design/state.md` as source of truth. Carry forward:
+Use the OpenAgent plan and `.omo/frontend-design/state.md` as source of truth. Carry forward:
 - design principles, personas, taste direction, and accepted trade-offs
 - ui-composition requirements for hierarchy, spacing, type, color, contrast, and touch targets
 - interaction-design requirements for all states, feedback, keyboard, touch, loading, empty, and error paths
@@ -53,13 +53,13 @@ Lane B worker DoneClaims must include:
 
 - UI implementation always goes through `frontend`; Lane B only enriches the worker prompt.
 - `start-work` owns decomposition, worker dispatch, evidence ledger entries, adversarial checks, and completion state.
-- The vendored `design-builder` concept is not used as an available executor. OpenAgent workers build.
+- The materialized `design-builder` concept is not used as an available executor. OpenAgent workers build.
 - No placeholders, generic copy, unverified contrast claims, decorative-only motion, or one-off hardcoded design systems pass this lane.
 - Accessibility and cognitive-accessibility are implementation constraints, not review-only cleanup.
 - Direct or auto mode language is prompt-only and cannot create new automation.
 
 ## Pass / Fail Behavior
 
-PASS when every UI worker loads `frontend`, implements against the OmO plan plus Lane B constraints, and returns evidence showing the design works through the actual surface.
+PASS when every UI worker loads `frontend`, implements against the OpenAgent plan plus Lane B constraints, and returns evidence showing the design works through the actual surface.
 
 FAIL when a worker skips `frontend`, invents unplanned design direction, omits cognitive-accessibility checks for complex flows, ships placeholder content, leaves required states undesigned, or claims success without captured real-surface evidence.
