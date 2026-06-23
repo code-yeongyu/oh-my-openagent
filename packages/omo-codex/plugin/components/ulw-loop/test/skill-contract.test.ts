@@ -40,7 +40,9 @@ describe("ulw-loop skill contract", () => {
 		// then
 		expect(workflow).toMatch(/(?:optimization|performance) work[^.]+baseline speed[^.]+before/i);
 		expect(workflow).toMatch(/baseline speed[^.]+behavior[^.]+regression/i);
-		expect(workflow).toMatch(/(?:each|every) (?:try|attempt)[^.]+speed[^.]+(?:behavior|regression)[^.]+(?:keep|revert|iterate)/i);
+		expect(workflow).toMatch(
+			/(?:each|every) (?:try|attempt)[^.]+speed[^.]+(?:behavior|regression)[^.]+(?:keep|revert|iterate)/i,
+		);
 	});
 
 	it("#given full workflow #when checkpoint guidance is inspected #then non-final and final criteria gates differ", async () => {
