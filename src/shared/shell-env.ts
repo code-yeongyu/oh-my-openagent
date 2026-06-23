@@ -1,26 +1,6 @@
 type ShellType = "unix" | "powershell" | "cmd"
 
 /**
- * Detect the current shell type based on environment variables.
- * 
- * Detection priority:
- * 1. PSModulePath → PowerShell
- * 2. SHELL env var → Unix shell
- * 3. Platform fallback → win32: cmd, others: unix
- */
-function _detectShellType(): ShellType {
-  if (process.env.PSModulePath) {
-    return "powershell"
-  }
-
-  if (process.env.SHELL) {
-    return "unix"
-  }
-
-  return process.platform === "win32" ? "cmd" : "unix"
-}
-
-/**
  * Shell-escape a value for use in environment variable assignment.
  * 
  * @param value - The value to escape
