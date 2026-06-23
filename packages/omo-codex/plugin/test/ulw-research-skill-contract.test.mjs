@@ -28,6 +28,21 @@ test("#given renamed research skill #when frontmatter is inspected #then ulw-res
 	}
 });
 
+test("#given renamed research skill #when activation marker is inspected #then ulw-research is the canonical marker", async () => {
+	for (const copy of await readUlwResearchCopies()) {
+		assert.match(
+			copy.content,
+			/`ULW-RESEARCH MODE ENABLED!`/,
+			`${copy.label}: body must expose the ulw-research activation marker`,
+		);
+		assert.doesNotMatch(
+			copy.content,
+			/`ULTRARESEARCH MODE ENABLED!`/,
+			`${copy.label}: body must not expose the old ultraresearch activation marker`,
+		);
+	}
+});
+
 test("#given ulw-research skill #when scanned for non-English content #then it contains no Hangul", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.doesNotMatch(
