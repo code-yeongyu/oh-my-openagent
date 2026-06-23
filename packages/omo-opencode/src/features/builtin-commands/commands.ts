@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { BTW_TEMPLATE } from "./templates/btw"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
 
@@ -26,7 +27,7 @@ function withTeamModeAddendum(baseTemplate: string, addendum: string, teamModeEn
   return teamModeEnabled ? `${baseTemplate}\n${addendum}` : baseTemplate
 }
 
-function createBuiltinCommandDefinitions(
+export function createBuiltinCommandDefinitions(
   options?: LoadBuiltinCommandsOptions,
 ): Record<BuiltinCommandName, Omit<CommandDefinition, "name">> {
   const teamModeEnabled = options?.teamModeEnabled ?? false
@@ -122,6 +123,17 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
       argumentHint: "[goal]",
+    },
+    btw: {
+      description: "(builtin) Ask a side question that is excluded from future context",
+      template: `<command-instruction>
+${BTW_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "<question>",
     },
     hyperplan: {
       description: "(builtin) Adversarial multi-agent planning via team-mode (5 hostile category members cross-critique, lead synthesizes)",

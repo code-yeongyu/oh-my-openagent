@@ -1,7 +1,8 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { afterEach, beforeEach, describe, test, expect } from "bun:test"
-import { loadBuiltinCommands } from "./commands"
+import { createBuiltinCommandDefinitions, loadBuiltinCommands } from "./commands"
+import { BTW_TEMPLATE } from "./templates/btw"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
@@ -17,6 +18,71 @@ afterEach(() => {
 })
 
 describe("loadBuiltinCommands", () => {
+  test("should include btw command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.btw).toBeDefined()
+    expect(commands.btw.name).toBe("btw")
+  })
+
+  test("should exclude btw when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["btw"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.btw).toBeUndefined()
+  })
+
+  test("should include btw template content in command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.btw.template).toContain(BTW_TEMPLATE)
+    expect(commands.btw.template).toContain("<user-request>\n$ARGUMENTS\n</user-request>")
+  })
+
+  test("should keep btw argument hint on the built-in definition", () => {
+    //#given - argumentHint is stripped from loaded OpenCode command config
+
+    //#when
+    const definitions = createBuiltinCommandDefinitions()
+
+    //#then
+    expect(definitions.btw.argumentHint).toBe("<question>")
+  })
+
+  test("should not assign btw to a fixed agent or model", () => {
+    //#given - btw must use the current session model
+
+    //#when
+    const definitions = createBuiltinCommandDefinitions()
+
+    //#then
+    expect(definitions.btw.agent).toBeUndefined()
+    expect(definitions.btw.model).toBeUndefined()
+  })
+
+  test("should use the planned btw command description", () => {
+    //#given - the command description is part of slash-command discovery
+
+    //#when
+    const definitions = createBuiltinCommandDefinitions()
+
+    //#then
+    expect(definitions.btw.description).toBe("(builtin) Ask a side question that is excluded from future context")
+  })
+
   test("should include handoff command in loaded commands", () => {
     //#given
     const disabledCommands: BuiltinCommandName[] = []

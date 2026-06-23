@@ -1,9 +1,11 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { BTW_AUTO_SLASH_COMMAND_MARKER } from "../btw-context-strip/predicates"
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
 import type {
@@ -131,6 +133,38 @@ describe("createAutoSlashCommandHook", () => {
 
       // then should not modify (feature inactive for unknown commands)
       expect(output.parts[0].text).toBe(originalText)
+    })
+    it("should mark empty /btw via chat.message so it is stripped from future context", async () => {
+      // given a user types a bare /btw with no question on the chat.message route
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-chat-empty-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("/btw")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then the expanded /btw turn carries the strip marker on message and part
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("# BTW Command")
+    })
+
+    it("should mark whitespace-only /btw via chat.message so it is stripped from future context", async () => {
+      // given a user types /btw followed only by whitespace on the chat.message route
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-chat-ws-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("/btw    ")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then the expanded /btw turn still carries the strip marker
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
     })
   })
 
@@ -355,6 +389,65 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("/ralph-loop Command")
     })
 
+
+    it("should mark /btw native command output with structural metadata", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("btw", "What is PURPLE-PANDA-47?")
+      const output: CommandExecuteBeforeOutput = {
+        parts: [{ type: "text", text: "original" }],
+        message: {},
+      }
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.text).toContain("<auto-slash-command>")
+      expect(output.parts[0]?.text).toContain("# BTW Command")
+    })
+
+    it("should mark empty /btw native command output so it is still stripped from future context", async () => {
+      //#given an empty /btw (no question): Option B drops the usage special-case,
+      //#given so an empty /btw must expand and mark exactly like a real question
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("btw", "")
+      const output: CommandExecuteBeforeOutput = {
+        parts: [{ type: "text", text: "original" }],
+        message: {},
+      }
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then the empty /btw turn carries the strip marker, so btw-context-strip removes it
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.text).toContain("<auto-slash-command>")
+      expect(output.parts[0]?.text).toContain("# BTW Command")
+    })
+
+    it("should mark inserted /btw command parts when native output starts empty", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("btw", "What is PURPLE-PANDA-47?")
+      const output: CommandExecuteBeforeOutput = {
+        parts: [],
+        message: {},
+      }
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
+      expect(output.parts[0]?.text).toContain("<auto-slash-command>")
+      expect(output.parts[0]?.text).toContain("# BTW Command")
+    })
+
     it("should not duplicate injection when command output is already tagged", async () => {
       //#given
       const hook = createAutoSlashCommandHook()
@@ -397,13 +490,16 @@ describe("createAutoSlashCommandHook", () => {
       await hook["command.execute.before"](input, output)
 
       //#then
-      expect(logCalls).toContainEqual([
-        "[auto-slash-command] command.execute.before received",
-        expect.objectContaining({
-          command: "some-command",
-          arguments: "arg1 arg2 arg3",
-        }),
-      ])
+      expect(logCalls.some(([message, data]) => {
+        if (message !== "[auto-slash-command] command.execute.before received") {
+          return false
+        }
+        if (typeof data !== "object" || data === null) {
+          return false
+        }
+        const record = data as Record<string, unknown>
+        return record.command === "some-command" && record.arguments === "arg1 arg2 arg3"
+      })).toBe(true)
     })
 
     it("should not duplicate injection when parts already contain auto-slash-command tags (#3724)", async () => {

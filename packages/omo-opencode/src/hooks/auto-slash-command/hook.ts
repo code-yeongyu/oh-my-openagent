@@ -12,6 +12,7 @@ import {
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
 import { createProcessedCommandStore } from "./processed-command-store"
+import { BTW_AUTO_SLASH_COMMAND_MARKER } from "../btw-context-strip/predicates"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -55,6 +56,26 @@ function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | 
   return null
 }
 
+function markBtwCommandMessage(
+  command: string,
+  output: { message?: Record<string, unknown> },
+): void {
+  if (command.toLowerCase() !== "btw") {
+    return
+  }
+
+  output.message ??= {}
+  output.message[BTW_AUTO_SLASH_COMMAND_MARKER] = true
+}
+
+function markBtwCommandPart(command: string, part: Record<string, unknown>): void {
+  if (command.toLowerCase() !== "btw") {
+    return
+  }
+
+  part[BTW_AUTO_SLASH_COMMAND_MARKER] = true
+}
+
 function partsContainAutoSlashCommandTags(parts: Array<{ text?: string }>): boolean {
   return parts.some((part) =>
     typeof part.text === "string"
@@ -96,9 +117,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       // Debug logging to diagnose slash command issues
       if (promptText.startsWith("/")) {
+        const isBtwCommand = promptText.toLowerCase().startsWith("/btw")
         log(`[auto-slash-command] chat.message hook received slash command`, {
           sessionID: input.sessionID,
-          promptText: promptText.slice(0, 100),
+          promptText: isBtwCommand ? "[redacted /btw side-question]" : promptText.slice(0, 100),
         })
       }
 
@@ -125,7 +147,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       log(`[auto-slash-command] Detected: /${parsed.command}`, {
         sessionID: input.sessionID,
-        args: parsed.args,
+        args: parsed.command.toLowerCase() === "btw" ? "[redacted /btw side-question]" : parsed.args,
       })
 
       const executionOptions: ExecutorOptions = {
@@ -151,6 +173,8 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
       output.parts[idx].text = taggedContent
+      markBtwCommandPart(parsed.command, output.parts[idx])
+      markBtwCommandMessage(parsed.command, output)
 
       log(`[auto-slash-command] Replaced message with command template`, {
         sessionID: input.sessionID,
@@ -177,7 +201,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       log(`[auto-slash-command] command.execute.before received`, {
         sessionID: input.sessionID,
         command: input.command,
-        arguments: input.arguments,
+        arguments: input.command.toLowerCase() === "btw" ? "[redacted /btw side-question]" : input.arguments,
       })
 
       const parsed = {
@@ -212,9 +236,13 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       const idx = findSlashCommandPartIndex(output.parts)
       if (idx >= 0) {
         output.parts[idx].text = taggedContent
+        markBtwCommandPart(parsed.command, output.parts[idx])
       } else {
-        output.parts.unshift({ type: "text", text: taggedContent })
+        const injectedPart = { type: "text", text: taggedContent }
+        markBtwCommandPart(parsed.command, injectedPart)
+        output.parts.unshift(injectedPart)
       }
+      markBtwCommandMessage(parsed.command, output)
 
       log(`[auto-slash-command] command.execute.before - injected template`, {
         sessionID: input.sessionID,

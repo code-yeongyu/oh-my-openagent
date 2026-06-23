@@ -25,6 +25,7 @@ export const HookNameSchema = z.enum([
   "interactive-bash-session",
 
   "tool-pair-validator",
+  "btw-context-strip",
   "monitor-status-injector",
   "ralph-loop",
   "category-skill-reminder",
@@ -48,6 +49,7 @@ export const HookNameSchema = z.enum([
   "task-resume-info",
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
+  "btw-tool-guard",
   "runtime-fallback",
   "write-existing-file-guard",
   "notepad-write-guard",

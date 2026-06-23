@@ -66,6 +66,7 @@
           "start-work",
           "stop-continuation",
           "remove-ai-slops",
+          "btw",
           "hyperplan"
         ]
       }

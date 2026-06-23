@@ -4,6 +4,7 @@ import type { PluginContext } from "../types"
 
 import {
   createCommentCheckerHooks,
+  createBtwToolGuardHook,
   createToolOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
   createDirectoryReadmeInjectorHook,
@@ -38,6 +39,7 @@ export type ToolGuardHooks = {
   emptyTaskResponseDetector: ReturnType<typeof createEmptyTaskResponseDetectorHook> | null
   rulesInjector: ReturnType<typeof createRulesInjectorHook> | null
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
+  btwToolGuard: ReturnType<typeof createBtwToolGuardHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
   bashFileReadGuard: ReturnType<typeof createBashFileReadGuardHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
@@ -113,6 +115,10 @@ export function createToolGuardHooks(args: {
         createTasksTodowriteDisablerHook({ experimental: pluginConfig.experimental }))
     : null
 
+  const btwToolGuard = isHookEnabled("btw-tool-guard")
+    ? safeHook("btw-tool-guard", () => createBtwToolGuardHook({ client: ctx.client }))
+    : null
+
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
     ? safeHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx))
     : null
@@ -165,6 +171,7 @@ export function createToolGuardHooks(args: {
     emptyTaskResponseDetector,
     rulesInjector,
     tasksTodowriteDisabler,
+    btwToolGuard,
     writeExistingFileGuard,
     bashFileReadGuard,
     hashlineReadEnhancer,

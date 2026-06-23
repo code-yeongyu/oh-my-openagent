@@ -5,11 +5,13 @@ import type { RalphLoopHook } from "../../hooks/ralph-loop"
 
 import {
   createClaudeCodeHooksHook,
+  createBtwContextStripHook,
   createKeywordDetectorHook,
   createMonitorStatusInjectorHook,
   createTeamMailboxInjector,
   createTeamModeStatusInjector,
   createToolPairValidatorHook,
+  isBtwMarked,
 } from "../../hooks"
 import {
   contextCollector,
@@ -17,12 +19,17 @@ import {
 } from "../../features/context-injector"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
+type BtwContextStripHook = {
+  "experimental.chat.messages.transform": ReturnType<typeof createBtwContextStripHook>
+}
+
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   teamModeStatusInjector: ReturnType<typeof createTeamModeStatusInjector> | null
   teamMailboxInjector: ReturnType<typeof createTeamMailboxInjector> | null
+  btwContextStrip: BtwContextStripHook | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
   monitorStatusInjector: ReturnType<typeof createMonitorStatusInjectorHook> | null
 }
@@ -90,6 +97,16 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const btwContextStrip = isHookEnabled("btw-context-strip")
+    ? safeCreateHook(
+        "btw-context-strip",
+        () => ({
+          "experimental.chat.messages.transform": createBtwContextStripHook(isBtwMarked),
+        }),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   const toolPairValidator = isHookEnabled("tool-pair-validator")
     ? safeCreateHook(
         "tool-pair-validator",
@@ -113,6 +130,7 @@ export function createTransformHooks(args: {
     contextInjectorMessagesTransform,
     teamModeStatusInjector,
     teamMailboxInjector,
+    btwContextStrip,
     toolPairValidator,
     monitorStatusInjector,
   }

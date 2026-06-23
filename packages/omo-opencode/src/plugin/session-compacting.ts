@@ -97,6 +97,9 @@ function unrefTimer(timer: TimerHandleWithOptionalUnref, sessionID: string): voi
 export function createSessionCompactingHandler(
   hooks: CompactionHookDependencies,
 ): SessionCompactingHook {
+  // NOTE: The /btw context-strip hook (btw-context-strip) does not apply here.
+  // Compaction does not route through experimental.chat.messages.transform.
+  // A compaction summary may retain /btw question/answer content.
   return async (
     input: SessionCompactingInput,
     output: SessionCompactingOutput,
