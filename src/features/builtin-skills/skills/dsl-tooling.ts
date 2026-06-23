@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_TOOLING_SKILL_NAME = "dsl-tooling"
 
-export const DSL_TOOLING_SKILL_DESCRIPTION =
+const DSL_TOOLING_SKILL_DESCRIPTION =
   "IDE tooling and internal DSL engineering. Tree-sitter grammars, LSP implementation, syntax highlighting, formatters, fluent APIs, builder patterns, decorators. Triggers: 'tree-sitter', 'LSP', 'syntax highlighting', 'IDE support', 'formatter', 'fluent API', 'builder pattern', 'internal DSL', 'embedded DSL'."
 
 export const dslToolingSkill: BuiltinSkill = {

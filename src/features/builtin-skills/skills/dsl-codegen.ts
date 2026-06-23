@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_CODEGEN_SKILL_NAME = "dsl-codegen"
 
-export const DSL_CODEGEN_SKILL_DESCRIPTION =
+const DSL_CODEGEN_SKILL_DESCRIPTION =
   "Code generation and transpiler engineering for DSLs. Source analysis, generator architecture (template/AST-walk/IR), multi-target generation, source maps. Triggers: 'code generation', 'transpile', 'compile to', 'emit', 'codegen', 'M2T'."
 
 export const dslCodegenSkill: BuiltinSkill = {

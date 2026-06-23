@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const FRONTEND_SVELTE_SVELTEKIT_SKILL_NAME = "svelte-sveltekit-patterns"
 
-export const FRONTEND_SVELTE_SVELTEKIT_SKILL_DESCRIPTION =
+const FRONTEND_SVELTE_SVELTEKIT_SKILL_DESCRIPTION =
   "Svelte 5 runes ($state, $derived, $effect, snippets) and SvelteKit (file-based routing, load functions, form actions, SSR/CSR) patterns"
 
 export const svelteSveltekitPatternsSkill: BuiltinSkill = {

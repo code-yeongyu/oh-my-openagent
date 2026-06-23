@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_REVIEW_SKILL_NAME = "security-review"
 
-export const SECURITY_REVIEW_SKILL_DESCRIPTION =
+const SECURITY_REVIEW_SKILL_DESCRIPTION =
   "Security review and threat modeling methodology: LLM-powered review phases, STRIDE threat model, attack surface mapping, architecture checklist, risk assessment, and report structure. Triggers: 'security review', 'threat model', 'STRIDE', 'attack surface', 'risk assessment', 'security architecture'."
 
 export const securityReviewSkill: BuiltinSkill = {

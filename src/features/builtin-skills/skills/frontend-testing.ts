@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const FRONTEND_TESTING_SKILL_NAME = "frontend-testing"
 
-export const FRONTEND_TESTING_SKILL_DESCRIPTION =
+const FRONTEND_TESTING_SKILL_DESCRIPTION =
   "Frontend testing specialist: Vitest, React Testing Library, Playwright, Storybook, MSW, visual regression (Chromatic, toHaveScreenshot), and TDD workflow"
 
 export const frontendTestingSkill: BuiltinSkill = {

@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_TEXTX_ECOSYSTEM_SKILL_NAME = "dsl-textx-ecosystem"
 
-export const DSL_TEXTX_ECOSYSTEM_SKILL_DESCRIPTION =
+const DSL_TEXTX_ECOSYSTEM_SKILL_DESCRIPTION =
   "textX ecosystem: registration system (entry points, textx_languages/textx_generators), generator framework (textx generate CLI, Jinja2, GeneratorParam), multi-file models (ModelRepository, FQNImportURI), language composition (grammar extension, multi-metamodel), visualization (dot/PlantUML), textX-LS. Triggers: 'textx generate', 'textx_languages', 'entry points', 'multi-file model', 'language composition', 'textX-LS'."
 
 export const dslTextxEcosystemSkill: BuiltinSkill = {

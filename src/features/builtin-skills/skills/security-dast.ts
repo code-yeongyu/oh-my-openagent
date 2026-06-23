@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_DAST_SKILL_NAME = "security-dast"
 
-export const SECURITY_DAST_SKILL_DESCRIPTION =
+const SECURITY_DAST_SKILL_DESCRIPTION =
   "DAST overview: testing running applications for vulnerabilities at runtime, differs from SAST by finding issues only visible during execution. Triggers: 'DAST', 'dynamic analysis', 'ZAP', 'Nuclei', 'runtime security', 'penetration test', 'fuzzing'."
 
 export const securityDastSkill: BuiltinSkill = {

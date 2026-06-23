@@ -1,8 +1,8 @@
 import type { BuiltinSkill } from "../types"
 
-export const QUALITY_GATE_SKILL_NAME = "quality-gate"
+const QUALITY_GATE_SKILL_NAME = "quality-gate"
 
-export const QUALITY_GATE_SKILL_DESCRIPTION =
+const QUALITY_GATE_SKILL_DESCRIPTION =
   "Automated quality verification after code changes: lint (Biome), typecheck, test execution, build verification. Triggers: 'verify', 'quality', 'lint', 'check', 'validate', 'quality gate', 'run checks'."
 
 export const qualityGateSkill: BuiltinSkill = {

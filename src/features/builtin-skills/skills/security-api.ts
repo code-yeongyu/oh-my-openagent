@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_API_SKILL_NAME = "security-api"
 
-export const SECURITY_API_SKILL_DESCRIPTION =
+const SECURITY_API_SKILL_DESCRIPTION =
   "API security patterns: authentication, authorization, input validation, rate limiting, CORS, CSRF, security headers, and error handling. Triggers: 'API security', 'authentication', 'authorization', 'JWT', 'OAuth', 'CORS', 'CSRF', 'rate limiting', 'input validation'."
 
 export const securityApiSkill: BuiltinSkill = {

@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_PYECORE_ADVANCED_SKILL_NAME = "dsl-pyecore-advanced"
 
-export const DSL_PYECORE_ADVANCED_SKILL_DESCRIPTION =
+const DSL_PYECORE_ADVANCED_SKILL_DESCRIPTION =
   "Advanced PyEcore: serialization (XMI/JSON, ResourceSet, URI), dynamic vs static metamodels (DynamicEPackage, pyecoregen), notifications (EObserver), @EMetaclass decorator, loading .ecore files, EMF interchange, executable models. Triggers: 'XMI', 'ResourceSet', 'pyecoregen', 'DynamicEPackage', 'EObserver', '.ecore', 'EMF interchange'."
 
 export const dslPyecoreAdvancedSkill: BuiltinSkill = {

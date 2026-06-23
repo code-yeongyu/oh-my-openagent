@@ -1,14 +1,10 @@
 import type { BuiltinSkill } from "../types"
 
-import {
-  MATRIXX_SELF_CONFIG_SKILL_DESCRIPTION,
-  MATRIXX_SELF_CONFIG_SKILL_NAME,
-} from "./matrixx-self-config-skill-metadata"
-
 /** Built-in skill for safe matrixx configuration editing by the orchestrator agent. */
 export const matrixxSelfConfigSkill: BuiltinSkill = {
-  name: MATRIXX_SELF_CONFIG_SKILL_NAME,
-  description: MATRIXX_SELF_CONFIG_SKILL_DESCRIPTION,
+  name: "matrixx-self-config",
+  description:
+    "Configure and improve matrixx for the current user. Use when users want to tune agents, models, prompts, custom agents, skills, MCPs, profiles, or plugin behavior. Reactive by default — only acts when user explicitly requests help. Proactive mode requires `matrixx_self_config.proactive: true` in matrixx.jsonc.",
   agent: "morpheus",
   allowedTools: ["read", "write", "edit", "bash"],
   template: `# Matrixx Self-Config Skill

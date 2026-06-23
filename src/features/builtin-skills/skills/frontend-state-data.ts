@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const FRONTEND_STATE_DATA_SKILL_NAME = "frontend-state-data"
 
-export const FRONTEND_STATE_DATA_SKILL_DESCRIPTION =
+const FRONTEND_STATE_DATA_SKILL_DESCRIPTION =
   "State & data management: client state (Zustand/Jotai/Valtio), server state (TanStack Query/SWR), form state (React Hook Form + Zod), validation (Zod v4), URL state, persistence, real-time (WebSocket/SSE)"
 
 export const frontendStateDataSkill: BuiltinSkill = {

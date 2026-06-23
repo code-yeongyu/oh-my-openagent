@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_GRAMMAR_SKILL_NAME = "dsl-grammar"
 
-export const DSL_GRAMMAR_SKILL_DESCRIPTION =
+const DSL_GRAMMAR_SKILL_DESCRIPTION =
   "Grammar design and parser implementation for DSLs. Domain analysis, formal grammar (BNF/EBNF/PEG), expression precedence, declaration patterns, error recovery, framework adaptation. Triggers: 'grammar', 'BNF', 'EBNF', 'PEG', 'parser', 'lexer', 'ANTLR', 'textX grammar', 'precedence', 'operator'."
 
 export const dslGrammarSkill: BuiltinSkill = {

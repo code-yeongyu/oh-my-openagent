@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const FRONTEND_A11Y_SKILL_NAME = "frontend-a11y"
 
-export const FRONTEND_A11Y_SKILL_DESCRIPTION =
+const FRONTEND_A11Y_SKILL_DESCRIPTION =
   "Web accessibility expert: WCAG 2.2 conformance (Perceivable/Operable/Understandable/Robust), ARIA patterns, semantic HTML, keyboard navigation, and automated testing with axe-core, jest-axe, @axe-core/playwright"
 
 export const frontendA11ySkill: BuiltinSkill = {

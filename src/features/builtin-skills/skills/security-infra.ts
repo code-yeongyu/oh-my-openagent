@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_INFRA_SKILL_NAME = "security-infra"
 
-export const SECURITY_INFRA_SKILL_DESCRIPTION =
+const SECURITY_INFRA_SKILL_DESCRIPTION =
   "Infrastructure and container security guidelines: container scanning, Dockerfile hardening, Kubernetes security, IaC scanning, and cloud security fundamentals. Triggers: 'container security', 'Docker', 'Kubernetes', 'IaC', 'infrastructure', 'Checkov', 'tfsec', 'cloud security', 'Dockerfile'."
 
 export const securityInfraSkill: BuiltinSkill = {

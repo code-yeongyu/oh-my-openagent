@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_MODEL_TRANSFORMATION_SKILL_NAME = "dsl-model-transformation"
 
-export const DSL_MODEL_TRANSFORMATION_SKILL_DESCRIPTION =
+const DSL_MODEL_TRANSFORMATION_SKILL_DESCRIPTION =
   "Model-to-model (M2M) transformations: in-place vs out-place, rule-based mapping, transformation chaining, trace models, ATL-style patterns in Python, motra framework, M2T with Jinja2 best practices. Triggers: 'M2M', 'model transformation', 'ATL', 'motra', 'in-place transformation', 'transformation chain'."
 
 export const dslModelTransformationSkill: BuiltinSkill = {

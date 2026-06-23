@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_COMPOSITION_SKILL_NAME = "dsl-composition"
 
-export const DSL_COMPOSITION_SKILL_DESCRIPTION =
+const DSL_COMPOSITION_SKILL_DESCRIPTION =
   "Language composition and DSL evolution: textX multi-metamodel, grammar extension/inheritance, grammar referencing, DSL evolution (grammar versioning, backward compatibility), model migration, multiple concrete syntaxes for one abstract syntax, language embedding. Triggers: 'language composition', 'grammar extension', 'multi-metamodel', 'DSL evolution', 'model migration', 'grammar versioning', 'language embedding'."
 
 export const dslCompositionSkill: BuiltinSkill = {

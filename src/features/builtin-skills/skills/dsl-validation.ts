@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const DSL_VALIDATION_SKILL_NAME = "dsl-validation"
 
-export const DSL_VALIDATION_SKILL_DESCRIPTION =
+const DSL_VALIDATION_SKILL_DESCRIPTION =
   "Advanced DSL model validation: OCL-style constraint patterns, well-formedness rules, multiplicity/cardinality checks, referential integrity, invariant specifications, constraint categories (structural/semantic/domain), error reporting strategy. Triggers: 'OCL', 'constraint', 'well-formedness', 'invariant', 'model validation', 'cardinality', 'referential integrity'."
 
 export const dslValidationSkill: BuiltinSkill = {

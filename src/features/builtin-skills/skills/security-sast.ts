@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_SAST_SKILL_NAME = "security-sast"
 
-export const SECURITY_SAST_SKILL_DESCRIPTION =
+const SECURITY_SAST_SKILL_DESCRIPTION =
   "Static Application Security Testing (SAST), Semgrep usage, CWE-specific code patterns, and ESLint security plugins. Triggers: 'SAST', 'static analysis', 'semgrep', 'code scanning', 'vulnerability pattern'."
 
 export const securitySastSkill: BuiltinSkill = {

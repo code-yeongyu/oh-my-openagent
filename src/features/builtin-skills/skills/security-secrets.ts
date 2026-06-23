@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_SECRETS_SKILL_NAME = "security-secrets"
 
-export const SECURITY_SECRETS_SKILL_DESCRIPTION =
+const SECURITY_SECRETS_SKILL_DESCRIPTION =
   "Secret scanning, entropy analysis, gitleaks usage, and remediation playbooks for exposed credentials. Triggers: 'secret', 'API key', 'credential', 'gitleaks', 'secret scanning', 'key exposure'."
 
 export const securitySecretsSkill: BuiltinSkill = {

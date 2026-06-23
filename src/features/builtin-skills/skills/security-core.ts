@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "../types"
 
 export const SECURITY_CORE_SKILL_NAME = "security-core"
 
-export const SECURITY_CORE_SKILL_DESCRIPTION =
+const SECURITY_CORE_SKILL_DESCRIPTION =
   "Core security auditing principles, OWASP Top 10, CWE classification, severity scoring, and structured reporting. Triggers: 'security', 'audit', 'vulnerability', 'OWASP', 'CWE', 'security review'."
 
 export const securityCoreSkill: BuiltinSkill = {
