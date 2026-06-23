@@ -167,6 +167,10 @@ describe("applyUserPromptUlwLoopSteering - non-matching prompts", () => {
 		expect(await applyUserPromptUlwLoopSteering(payload("just a normal user message", "/tmp"))).toBe("");
 	});
 
+	it("#given standalone ultrawork injection is disabled #when prompt is ulw #then aggregate ulw-loop steering stays silent", async () => {
+		expect(await applyUserPromptUlwLoopSteering(payload("ulw this change", "/tmp"))).toBe("");
+	});
+
 	it("returns empty when hook_event_name is not UserPromptSubmit", async () => {
 		expect(await applyUserPromptUlwLoopSteering(payloadWithRuntimeEvent("PostToolUse"))).toBe("");
 	});
