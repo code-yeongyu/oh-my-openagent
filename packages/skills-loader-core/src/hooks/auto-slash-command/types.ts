@@ -39,4 +39,5 @@ export interface CommandExecuteBeforeInput {
 
 export interface CommandExecuteBeforeOutput {
   parts: Array<{ type: string; text?: string; [key: string]: unknown }>
+  message?: Record<string, unknown>
 }
