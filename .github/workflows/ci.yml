@@ -163,9 +163,6 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
-      - name: Type check script tooling
-        run: bun run typecheck:script
-
       - name: Write job summary
         if: always()
         shell: bash
@@ -174,8 +171,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages required by the workspace.
-            - Runs root `bun run typecheck`.
-            - Runs `bun run typecheck:script` for release/build tooling.
+            - Runs root `bun run typecheck`, including script and package checks.
           JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; shared package failures can cascade into adapters.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
