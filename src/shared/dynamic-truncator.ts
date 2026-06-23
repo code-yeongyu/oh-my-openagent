@@ -78,7 +78,7 @@ export function truncateToTokenLimit(
 	if (availableTokens <= 0) {
 		return {
 			result:
-				headerText + "\n\n[Content truncated due to context window limit]",
+				`${headerText}\n\n[Content truncated due to context window limit]`,
 			truncated: true,
 			removedCount: contentLines.length,
 		};
@@ -88,7 +88,7 @@ export function truncateToTokenLimit(
 	let currentTokenCount = 0;
 
 	for (const line of contentLines) {
-		const lineTokens = estimateTokens(line + "\n");
+		const lineTokens = estimateTokens(`${line}\n`);
 		if (currentTokenCount + lineTokens > availableTokens) {
 			break;
 		}

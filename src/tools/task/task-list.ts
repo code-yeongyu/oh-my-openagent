@@ -1,6 +1,6 @@
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
-import { existsSync, readdirSync } from "fs"
-import { join } from "path"
 import type { MatrixxConfig } from "../../config/schema"
 import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
 import type { TaskObject, TaskStatus } from "./types"
@@ -56,7 +56,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
         const unresolvedBlockers = task.blockedBy.filter((blockerId) => {
           const blockerTask = allTasks.find((t) => t.id === blockerId)
           // Include if blocker doesn't exist (missing) or if it's not completed
-          return !blockerTask || blockerTask.status !== "completed"
+          return blockerTask?.status !== "completed"
         })
 
         return {

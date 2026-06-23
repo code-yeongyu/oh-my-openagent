@@ -95,9 +95,9 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#when - executeSyncContinuation with fetchSyncResult throwing
     let error: any = null
-    let result: string | null = null
+    let _result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+      _result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
     } catch (e) {
       error = e
     }
@@ -157,9 +157,9 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#when - executeSyncContinuation with pollSyncSession throwing
     let error: any = null
-    let result: string | null = null
+    let _result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+      _result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
     } catch (e) {
       error = e
     }
@@ -344,9 +344,9 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     //#when - executeSyncContinuation with null toastManager
     let error: any = null
-    let result: string | null = null
+    let _result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+      _result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
     } catch (e) {
       error = e
     }

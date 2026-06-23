@@ -32,7 +32,7 @@ export async function buildOracleAgentConfig(params: {
     ? resolveCategoryConfig(params.pluginOracleOverride.category, params.userCategories)
     : undefined;
 
-  const requirement = AGENT_MODEL_REQUIREMENTS["oracle"];
+  const requirement = AGENT_MODEL_REQUIREMENTS.oracle;
   const connectedProviders = readConnectedProvidersCache();
   const availableModels = await fetchAvailableModels(undefined, {
     connectedProviders: connectedProviders ?? undefined,
@@ -93,7 +93,7 @@ export async function buildOracleAgentConfig(params: {
   const { prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
   if (prompt_append && typeof merged.prompt === "string") {
-    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
+    merged.prompt = `${merged.prompt}\n${resolvePromptAppend(prompt_append)}`;
   }
   return merged;
 }

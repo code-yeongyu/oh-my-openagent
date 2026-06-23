@@ -61,7 +61,7 @@ export async function resolveNoTextTailFromSession(args: {
     if (!Array.isArray(messages) || messages.length === 0) return false
 
     const target = findMessageByID(messages, messageID) ?? messages[messages.length - 1]
-    if (!target || target.info?.role !== "assistant") return false
+    if (target?.info?.role !== "assistant") return false
 
     return isStepOnlyNoTextParts(target.parts)
   } catch {

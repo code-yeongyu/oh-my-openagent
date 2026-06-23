@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "fs"
+import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { resolvePluginPaths } from "./plugin-path-resolver"
 import type { HooksConfig, LoadedPlugin } from "./types"

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "fs"
-import { tmpdir } from "os"
-import { join } from "path"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { isServerInstalled } from "./config"
 
 describe("isServerInstalled", () => {
@@ -75,7 +75,7 @@ describe("isServerInstalled", () => {
   if (process.platform === "win32") {
     test("Windows: detects executable with Path env var", () => {
        const binName = "test-lsp-server-case"
-       const binPath = join(tempDir, binName + ".cmd")
+       const binPath = join(tempDir, `${binName}.cmd`)
        writeFileSync(binPath, "echo hello")
 
        delete process.env.PATH
@@ -86,7 +86,7 @@ describe("isServerInstalled", () => {
 
     test("Windows: respects PATHEXT", () => {
        const binName = "test-lsp-server-custom"
-       const binPath = join(tempDir, binName + ".COM")
+       const binPath = join(tempDir, `${binName}.COM`)
        writeFileSync(binPath, "echo hello")
 
        process.env.PATH = tempDir
@@ -97,7 +97,7 @@ describe("isServerInstalled", () => {
     
     test("Windows: ensures default extensions are checked even if PATHEXT is missing", () => {
        const binName = "test-lsp-server-default"
-       const binPath = join(tempDir, binName + ".bat")
+       const binPath = join(tempDir, `${binName}.bat`)
        writeFileSync(binPath, "echo hello")
 
        process.env.PATH = tempDir
@@ -108,7 +108,7 @@ describe("isServerInstalled", () => {
 
     test("Windows: ensures default extensions are checked even if PATHEXT does not include them", () => {
         const binName = "test-lsp-server-ps1"
-        const binPath = join(tempDir, binName + ".ps1")
+        const binPath = join(tempDir, `${binName}.ps1`)
         writeFileSync(binPath, "echo hello")
  
         process.env.PATH = tempDir
@@ -119,7 +119,7 @@ describe("isServerInstalled", () => {
   } else {
       test("Non-Windows: does not use windows extensions", () => {
           const binName = "test-lsp-server-win"
-          const binPath = join(tempDir, binName + ".cmd")
+          const binPath = join(tempDir, `${binName}.cmd`)
           writeFileSync(binPath, "echo hello")
           
           process.env.PATH = tempDir

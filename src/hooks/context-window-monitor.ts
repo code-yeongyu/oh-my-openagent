@@ -89,7 +89,7 @@ export function createContextWindowMonitorHook(_ctx: PluginInput) {
         tokens?: TokenInfo
       } | undefined
 
-      if (!info || info.role !== "assistant" || !info.finish) return
+      if (info?.role !== "assistant" || !info.finish) return
       if (!info.sessionID || !info.providerID || !info.tokens) return
 
       tokenCache.set(info.sessionID, {

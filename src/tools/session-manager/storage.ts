@@ -155,13 +155,13 @@ export async function readSessionMessages(sessionID: string): Promise<SessionMes
       const messages: SessionMessage[] = rawMessages
         .filter((m) => m.info?.id)
         .map((m) => ({
-          id: m.info!.id!,
-          role: (m.info!.role as "user" | "assistant") || "user",
-          agent: m.info!.agent,
-          time: m.info!.time?.created
+          id: m.info?.id as string,
+          role: (m.info?.role as "user" | "assistant") || "user",
+          agent: m.info?.agent,
+          time: m.info?.time?.created
             ? {
-                created: m.info!.time.created,
-                updated: m.info!.time.updated,
+                created: m.info?.time.created,
+                updated: m.info?.time.updated,
               }
             : undefined,
           parts:

@@ -33,27 +33,27 @@ export function writeMatrixxConfig(installConfig: InstallConfig): ConfigMergeRes
         const content = readFileSync(matrixxConfigPath, "utf-8")
 
         if (stat.size === 0 || isEmptyOrWhitespace(content)) {
-          writeFileSync(matrixxConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          writeFileSync(matrixxConfigPath, `${JSON.stringify(newConfig, null, 2)}\n`)
           return { success: true, configPath: matrixxConfigPath }
         }
 
         const existing = parseJsonc<Record<string, unknown>>(content)
         if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
-          writeFileSync(matrixxConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          writeFileSync(matrixxConfigPath, `${JSON.stringify(newConfig, null, 2)}\n`)
           return { success: true, configPath: matrixxConfigPath }
         }
 
         const merged = deepMergeRecord(newConfig, existing)
-        writeFileSync(matrixxConfigPath, JSON.stringify(merged, null, 2) + "\n")
+        writeFileSync(matrixxConfigPath, `${JSON.stringify(merged, null, 2)}\n`)
       } catch (parseErr) {
         if (parseErr instanceof SyntaxError) {
-          writeFileSync(matrixxConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          writeFileSync(matrixxConfigPath, `${JSON.stringify(newConfig, null, 2)}\n`)
           return { success: true, configPath: matrixxConfigPath }
         }
         throw parseErr
       }
     } else {
-      writeFileSync(matrixxConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+      writeFileSync(matrixxConfigPath, `${JSON.stringify(newConfig, null, 2)}\n`)
     }
 
     return { success: true, configPath: matrixxConfigPath }

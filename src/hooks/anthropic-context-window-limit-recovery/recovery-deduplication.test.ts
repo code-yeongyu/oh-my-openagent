@@ -88,7 +88,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
 
       //#then - deduplication recovery was called for the second error
       expect(attemptDeduplicationRecoveryMock).toHaveBeenCalledTimes(1)
-      expect(attemptDeduplicationRecoveryMock.mock.calls[0]![0]).toBe("session-96")
+      expect(attemptDeduplicationRecoveryMock.mock.calls[0]?.[0]).toBe("session-96")
     } finally {
       if (resolveSummarize) resolveSummarize()
       restoreTimeouts()

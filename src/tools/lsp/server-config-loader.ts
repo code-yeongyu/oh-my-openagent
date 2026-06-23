@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "fs"
-import { join } from "path"
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { getOpenCodeConfigDir } from "../../shared"
 import { detectConfigFile, parseJsonc } from "../../shared/jsonc-parser"
 import { BUILTIN_SERVERS } from "./constants"

@@ -16,7 +16,7 @@ export function getOrCreateState(sessionID: string, sessionStates: Map<string, I
 }
 
 export function isOmoSession(sessionName: string | null): boolean {
-  return sessionName !== null && sessionName.startsWith(MATRIXX_SESSION_PREFIX);
+  return Boolean(sessionName?.startsWith(MATRIXX_SESSION_PREFIX));
 }
 
 export async function killAllTrackedSessions(

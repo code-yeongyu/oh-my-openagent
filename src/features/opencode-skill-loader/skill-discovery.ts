@@ -67,7 +67,7 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 
 	// Filter discovered skills by disabledSkills (builtin skills are already filtered by createBuiltinSkills)
 	if (hasDisabledSkills) {
-		allSkills = allSkills.filter((skill) => !options!.disabledSkills!.has(skill.name))
+		allSkills = allSkills.filter((skill) => !options?.disabledSkills?.has(skill.name))
 	} else {
 		cachedSkillsByProvider.set(cacheKey, allSkills)
 	}

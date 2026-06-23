@@ -61,7 +61,7 @@ export function createMatrixLoopEventHandler(ctx: PluginInput, options: MatrixLo
 					return
 				}
 				const state = options.loopState.getState()
-				if (!state || !state.active) return
+				if (!state?.active) return
 
 				if (state.session_id && state.session_id !== sessionID) {
 					if (options.checkSessionExists) {

@@ -44,8 +44,8 @@ describe("createCipherAgent", () => {
     const config = createCipherAgent("anthropic/claude-opus-4-6")
 
     expect(config.permission).toBeDefined()
-    expect(config.permission!["task"]).toBeUndefined()
-    expect(config.permission!["delegate_agent"]).toBe("deny")
+    expect(config.permission?.task).toBeUndefined()
+    expect(config.permission?.delegate_agent).toBe("deny")
   })
 
   //#given a model
@@ -126,7 +126,7 @@ describe("CIPHER_PROMPT_METADATA", () => {
   //#given the metadata
   //#then it should have useWhen and avoidWhen lists
   test("has useWhen and avoidWhen lists", () => {
-    expect(CIPHER_PROMPT_METADATA.useWhen!.length).toBeGreaterThan(0)
-    expect(CIPHER_PROMPT_METADATA.avoidWhen!.length).toBeGreaterThan(0)
+    expect(CIPHER_PROMPT_METADATA.useWhen?.length).toBeGreaterThan(0)
+    expect(CIPHER_PROMPT_METADATA.avoidWhen?.length).toBeGreaterThan(0)
   })
 })

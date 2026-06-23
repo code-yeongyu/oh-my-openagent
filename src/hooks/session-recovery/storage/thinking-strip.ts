@@ -44,8 +44,8 @@ export async function stripThinkingPartsAsync(
     const messages = normalizeSDKResponse(response, [] as Array<{ parts?: Array<{ type: string; id: string }> }>, { preferResponseOnMissingData: true })
 
     const targetMsg = messages.find((m) => {
-      const info = (m as Record<string, unknown>)["info"] as Record<string, unknown> | undefined
-      return info?.["id"] === messageID
+      const info = (m as Record<string, unknown>).info as Record<string, unknown> | undefined
+      return info?.id === messageID
     })
     if (!targetMsg?.parts) return false
 

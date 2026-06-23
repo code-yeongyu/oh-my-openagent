@@ -111,7 +111,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       const parsed = {
         command: input.command,
         args: input.arguments || "",
-        raw: `/${input.command}${input.arguments ? " " + input.arguments : ""}`,
+        raw: `/${input.command}${input.arguments ? ` ${input.arguments}` : ""}`,
       }
 
       const result = await executeSlashCommand(parsed, executorOptions)

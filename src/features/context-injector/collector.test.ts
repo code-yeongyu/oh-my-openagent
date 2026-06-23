@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 import { ContextCollector } from "./collector"
-import type { ContextPriority, ContextSourceType } from "./types"
+import type { ContextSourceType } from "./types"
 
 describe("ContextCollector", () => {
   let collector: ContextCollector

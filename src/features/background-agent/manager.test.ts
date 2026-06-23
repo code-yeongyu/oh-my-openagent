@@ -1788,7 +1788,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      const task1 = await manager.launch(input)
+      const _task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
 
       // Wait for first task to start
@@ -1846,7 +1846,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      const task1 = await manager.launch(input)
+      const _task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
       const task3 = await manager.launch(input)
 
@@ -2071,7 +2071,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // Verify TTL would use queuedAt (implementation detail check)
       const now = Date.now()
-      const age = now - pendingTask!.queuedAt!.getTime()
+      const age = now - pendingTask?.queuedAt?.getTime()
       expect(age).toBeGreaterThanOrEqual(0)
     })
 
@@ -2102,7 +2102,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // Verify TTL would use startedAt (implementation detail check)
       const now = Date.now()
-      const age = now - runningTask!.startedAt!.getTime()
+      const age = now - runningTask?.startedAt?.getTime()
       expect(age).toBeGreaterThanOrEqual(0)
     })
 
@@ -2222,7 +2222,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     expect(task.status).toBe("running")
   })
@@ -2255,7 +2255,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     expect(task.status).toBe("running")
   })
@@ -2289,7 +2289,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
@@ -2326,7 +2326,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
@@ -2362,7 +2362,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     expect(task.concurrencyKey).toBeUndefined()
     expect(task.status).toBe("cancelled")
@@ -2414,7 +2414,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task1.id, task1)
     getTaskMap(manager).set(task2.id, task2)
 
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     expect(task1.status).toBe("cancelled")
     expect(task2.status).toBe("cancelled")
@@ -2449,7 +2449,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-     await manager["checkAndInterruptStaleTasks"]()
+     await manager.checkAndInterruptStaleTasks()
 
     expect(task.status).toBe("cancelled")
   })
@@ -2484,7 +2484,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task.id, task)
 
     //#when — session is actively running
-    await manager["checkAndInterruptStaleTasks"]({ "session-running": { type: "running" } })
+    await manager.checkAndInterruptStaleTasks({ "session-running": { type: "running" } })
 
     //#then — task survives because session is running
     expect(task.status).toBe("running")
@@ -2521,7 +2521,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task.id, task)
 
     //#when — session is idle
-    await manager["checkAndInterruptStaleTasks"]({ "session-idle": { type: "idle" } })
+    await manager.checkAndInterruptStaleTasks({ "session-idle": { type: "idle" } })
 
     //#then — killed because session is idle with stale lastUpdate
     expect(task.status).toBe("cancelled")
@@ -2558,7 +2558,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task.id, task)
 
     //#when — session is running, lastUpdate 15min old
-    await manager["checkAndInterruptStaleTasks"]({ "session-long": { type: "running" } })
+    await manager.checkAndInterruptStaleTasks({ "session-long": { type: "running" } })
 
     //#then — running sessions are NEVER stale-killed
     expect(task.status).toBe("running")
@@ -2591,7 +2591,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task.id, task)
 
     //#when — session is running despite no progress
-    await manager["checkAndInterruptStaleTasks"]({ "session-rnp": { type: "running" } })
+    await manager.checkAndInterruptStaleTasks({ "session-rnp": { type: "running" } })
 
     //#then — running sessions are NEVER killed
     expect(task.status).toBe("running")
@@ -2625,7 +2625,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task.id, task)
 
     //#when — no progress update for 15 minutes
-    await manager["checkAndInterruptStaleTasks"]({})
+    await manager.checkAndInterruptStaleTasks({})
 
     //#then — killed after messageStalenessTimeout
     expect(task.status).toBe("cancelled")
@@ -2659,7 +2659,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     getTaskMap(manager).set(task.id, task)
 
     //#when — only 5 min since start, within 10min timeout
-    await manager["checkAndInterruptStaleTasks"]({})
+    await manager.checkAndInterruptStaleTasks({})
 
     //#then — task survives
     expect(task.status).toBe("running")
@@ -3474,7 +3474,7 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
     stubNotifyParentSession(manager)
 
-    const remainingMs = 1200
+    const _remainingMs = 1200
     const task: BackgroundTask = {
       id: "task-early-idle",
       sessionID,
@@ -3659,8 +3659,8 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
     })
 
     //#then - lastUpdate should be refreshed, toolCalls should NOT change
-    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
-    expect(task.progress!.toolCalls).toBe(2)
+    expect(task.progress?.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(task.progress?.toolCalls).toBe(2)
   })
 
   test("should update lastUpdate on thinking-type message.part.updated event", () => {
@@ -3699,8 +3699,8 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
     })
 
     //#then - lastUpdate should be refreshed, toolCalls should remain 0
-    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
-    expect(task.progress!.toolCalls).toBe(0)
+    expect(task.progress?.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(task.progress?.toolCalls).toBe(0)
   })
 
   test("should initialize progress on first non-tool event", () => {
@@ -3735,8 +3735,8 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
 
     //#then - progress should be initialized with toolCalls: 0 and fresh lastUpdate
     expect(task.progress).toBeDefined()
-    expect(task.progress!.toolCalls).toBe(0)
-    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(Date.now() - 5000)
+    expect(task.progress?.toolCalls).toBe(0)
+    expect(task.progress?.lastUpdate.getTime()).toBeGreaterThan(Date.now() - 5000)
   })
 
   test("should NOT mark thinking model as stale when text events refresh lastUpdate", async () => {
@@ -3773,7 +3773,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
       type: "message.part.updated",
       properties: { sessionID: "session-alive-1", type: "text" },
     })
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     //#then - task should still be running (text event refreshed lastUpdate)
     expect(task.status).toBe("running")
@@ -3813,7 +3813,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
       type: "message.part.delta",
       properties: { sessionID: "session-delta-1", field: "text", delta: "thinking..." },
     })
-    await manager["checkAndInterruptStaleTasks"]()
+    await manager.checkAndInterruptStaleTasks()
 
     //#then - task should still be running (delta event refreshed lastUpdate)
     expect(task.status).toBe("running")

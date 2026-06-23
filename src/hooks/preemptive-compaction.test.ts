@@ -226,7 +226,7 @@ describe("preemptive-compaction", () => {
       },
     })
 
-    const output = { title: "", output: "test", metadata: null }
+    const _output = { title: "", output: "test", metadata: null }
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_log" },
       { title: "", output: "test", metadata: null }

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "fs"
+import { readFileSync, writeFileSync } from "node:fs"
 
 import { uriToPath } from "./lsp-client-wrapper"
 import type { TextEdit, WorkspaceEdit } from "./types"
@@ -86,7 +86,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
             const newPath = uriToPath(change.newUri)
             const content = readFileSync(oldPath, "utf-8")
             writeFileSync(newPath, content, "utf-8")
-            require("fs").unlinkSync(oldPath)
+            require("node:fs").unlinkSync(oldPath)
             result.filesModified.push(newPath)
           } catch (err) {
             result.success = false
@@ -95,7 +95,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
         } else if (change.kind === "delete") {
           try {
             const filePath = uriToPath(change.uri)
-            require("fs").unlinkSync(filePath)
+            require("node:fs").unlinkSync(filePath)
             result.filesModified.push(filePath)
           } catch (err) {
             result.success = false

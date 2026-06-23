@@ -40,7 +40,7 @@ export function buildAgent(
     const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { browserProvider, disabledSkills })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
-      base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
+      base.prompt = skillContent + (base.prompt ? `\n\n${base.prompt}` : "")
     }
   }
 

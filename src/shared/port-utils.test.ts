@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
+import { describe, expect, it } from "bun:test"
 import {
   DEFAULT_SERVER_PORT,
   findAvailablePort,
@@ -66,7 +66,7 @@ describe("port-utils", () => {
         const result = await findAvailablePort(startPort)
         expect(result).toBe(startPort + 3)
       } finally {
-        blockers.forEach((b) => b.stop(true))
+        blockers.forEach((b) => { b.stop(true) })
       }
     })
   })

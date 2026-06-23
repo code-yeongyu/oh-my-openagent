@@ -1,4 +1,4 @@
-import { join } from "path"
+import { join } from "node:path"
 
 /**
  * Resolves @path references in skill content to absolute paths.

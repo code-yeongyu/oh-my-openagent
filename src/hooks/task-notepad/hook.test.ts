@@ -179,10 +179,9 @@ describe(`${HOOK_NAME}`, () => {
     const oldPlan = join(plansDir, "old.md")
     const newPlan = join(plansDir, "new.md")
     writeFileSync(oldPlan, "# Old\n")
+    // Use a brief delay to guarantee different mtime on all filesystems (incl. CI overlay2)
+    await Bun.sleep(1)
     writeFileSync(newPlan, "# New\n")
-    // bump new plan mtime
-    const future = new Date()
-    utimesSync(newPlan, future, future)
     const ctx = makeContext(
       [{ id: "t1", content: "x", status: "in_progress" }],
       tempDir,

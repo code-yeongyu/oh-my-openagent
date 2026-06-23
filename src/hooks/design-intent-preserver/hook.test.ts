@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
-import { tmpdir } from "os"
-import { join } from "path"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createDesignIntentPreserverHook } from "./index"
 
 describe("design-intent-preserver", () => {
@@ -47,9 +47,9 @@ describe("design-intent-preserver", () => {
     //#then - guardrail is prepended
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("design-intent-preservation")
-    expect(textPart!.text).toContain("FROZEN")
-    expect(textPart!.text).toContain("Phase 2: implement backend now")
+    expect(textPart?.text).toContain("design-intent-preservation")
+    expect(textPart?.text).toContain("FROZEN")
+    expect(textPart?.text).toContain("Phase 2: implement backend now")
   })
 
   test("skips guardrail when no phase transition in message", async () => {
@@ -66,7 +66,7 @@ describe("design-intent-preserver", () => {
 
     //#then - text remains unchanged
     const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart!.text).toBe("just a regular user message")
+    expect(textPart?.text).toBe("just a regular user message")
   })
 
   test("skips guardrail when plan has no construct reference", async () => {
@@ -83,7 +83,7 @@ describe("design-intent-preserver", () => {
 
     //#then - no guardrail injected
     const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart!.text).toBe("Phase 2: build feature")
+    expect(textPart?.text).toBe("Phase 2: build feature")
   })
 
   test("no-ops when no plans directory exists", async () => {
@@ -97,7 +97,7 @@ describe("design-intent-preserver", () => {
 
     //#then - no guardrail injected
     const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart!.text).toBe("Phase 2: anything")
+    expect(textPart?.text).toBe("Phase 2: anything")
   })
 
   test("is idempotent - does not double-inject if guardrail already present", async () => {
@@ -115,9 +115,9 @@ describe("design-intent-preserver", () => {
 
     //#then - guardrail appears only once
     const textPart = output.parts.find(p => p.type === "text")
-    const matches = textPart!.text.match(/<design-intent-preservation>/g)
+    const matches = textPart?.text.match(/<design-intent-preservation>/g)
     expect(matches).not.toBeNull()
-    expect(matches!.length).toBe(1)
+    expect(matches?.length).toBe(1)
   })
 
   test("uses most recent plan when multiple plans exist", async () => {
@@ -130,7 +130,7 @@ describe("design-intent-preserver", () => {
     const newPath = join(plansDir, "2026-12-31-new.md")
     writeFileSync(newPath, "category: source\n")
     const future = new Date(Date.now() + 10000)
-    const { utimesSync } = require("fs")
+    const { utimesSync } = require("node:fs")
     utimesSync(newPath, future, future)
 
     const hook = createDesignIntentPreserverHook(createMockPluginInput())
@@ -141,7 +141,7 @@ describe("design-intent-preserver", () => {
 
     //#then - no guardrail (newest plan has no construct)
     const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart!.text).toBe("Phase 2: do thing")
+    expect(textPart?.text).toBe("Phase 2: do thing")
   })
 
   test("detects construct via web-designer agent reference in plan", async () => {
@@ -158,6 +158,6 @@ describe("design-intent-preserver", () => {
 
     //#then - guardrail injected
     const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart!.text).toContain("design-intent-preservation")
+    expect(textPart?.text).toContain("design-intent-preservation")
   })
 })

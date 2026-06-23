@@ -17,14 +17,14 @@ type AgentInfo = {
 
 function toAgentInfo(value: unknown): AgentInfo | null {
   if (!isObject(value)) return null
-  const name = typeof value["name"] === "string" ? value["name"] : undefined
-  const variant = typeof value["variant"] === "string" ? value["variant"] : undefined
-  const modelValue = value["model"]
+  const name = typeof value.name === "string" ? value.name : undefined
+  const variant = typeof value.variant === "string" ? value.variant : undefined
+  const modelValue = value.model
   const model =
     isObject(modelValue) &&
-    typeof modelValue["providerID"] === "string" &&
-    typeof modelValue["modelID"] === "string"
-      ? { providerID: modelValue["providerID"], modelID: modelValue["modelID"] }
+    typeof modelValue.providerID === "string" &&
+    typeof modelValue.modelID === "string"
+      ? { providerID: modelValue.providerID, modelID: modelValue.modelID }
       : undefined
   return { name, model, variant }
 }
@@ -34,7 +34,7 @@ export async function resolveMultimodalLookerAgentMetadata(
 ): Promise<ResolvedAgentMetadata> {
   try {
     const agentsResult = await ctx.client.app?.agents?.()
-    const agentsRaw = isObject(agentsResult) ? agentsResult["data"] : undefined
+    const agentsRaw = isObject(agentsResult) ? agentsResult.data : undefined
     const agents = Array.isArray(agentsRaw) ? agentsRaw.map(toAgentInfo).filter(Boolean) : []
 
     const matched = agents.find(

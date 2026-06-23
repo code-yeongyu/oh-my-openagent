@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
-import os from "os"
-import { join } from "path"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import os from "node:os"
+import { join } from "node:path"
 
 import { findWorkspaceRoot } from "./lsp-client-wrapper"
 

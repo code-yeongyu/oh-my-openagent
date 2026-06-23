@@ -10,21 +10,21 @@ function extractAgentAndModelFromMessage(message: unknown): {
   model?: AgentModel
 } {
   if (!isObject(message)) return {}
-  const info = message["info"]
+  const info = message.info
   if (!isObject(info)) return {}
 
-  const agent = typeof info["agent"] === "string" ? info["agent"] : undefined
-  const modelObj = info["model"]
+  const agent = typeof info.agent === "string" ? info.agent : undefined
+  const modelObj = info.model
   if (isObject(modelObj)) {
-    const providerID = modelObj["providerID"]
-    const modelID = modelObj["modelID"]
+    const providerID = modelObj.providerID
+    const modelID = modelObj.modelID
     if (typeof providerID === "string" && typeof modelID === "string") {
       return { agent, model: { providerID, modelID } }
     }
   }
 
-  const providerID = info["providerID"]
-  const modelID = info["modelID"]
+  const providerID = info.providerID
+  const modelID = info.modelID
   if (typeof providerID === "string" && typeof modelID === "string") {
     return { agent, model: { providerID, modelID } }
   }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "fs"
-import { join } from "path"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { join } from "node:path"
 import { readProviderModelsCache, updateConnectedProvidersCache } from "./connected-providers-cache"
 import * as dataPath from "./data-path"
 
@@ -62,8 +62,8 @@ describe("updateConnectedProvidersCache", () => {
 		//#then
 		const cache = readProviderModelsCache()
 		expect(cache).not.toBeNull()
-		expect(cache!.connected).toEqual(["openai", "anthropic"])
-		expect(cache!.models).toEqual({
+		expect(cache?.connected).toEqual(["openai", "anthropic"])
+		expect(cache?.models).toEqual({
 			openai: ["gpt-5.3-codex", "gpt-5.2"],
 			anthropic: ["claude-opus-4-6", "claude-sonnet-4-5"],
 		})
@@ -95,7 +95,7 @@ describe("updateConnectedProvidersCache", () => {
 		//#then
 		const cache = readProviderModelsCache()
 		expect(cache).not.toBeNull()
-		expect(cache!.models).toEqual({})
+		expect(cache?.models).toEqual({})
 	})
 
 	test("writes empty models when all field is missing", async () => {
@@ -116,7 +116,7 @@ describe("updateConnectedProvidersCache", () => {
 		//#then
 		const cache = readProviderModelsCache()
 		expect(cache).not.toBeNull()
-		expect(cache!.models).toEqual({})
+		expect(cache?.models).toEqual({})
 	})
 
 	test("does nothing when client.provider.list is not available", async () => {

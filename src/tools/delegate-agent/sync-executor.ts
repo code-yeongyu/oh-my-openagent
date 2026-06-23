@@ -66,7 +66,7 @@ export async function executeSync(
   const responseText = await deps.processMessages(sessionID, ctx)
 
   const output =
-    responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
+    `${responseText}\n\n${["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")}`
 
   return output
 }

@@ -23,12 +23,12 @@ type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
   if (typeof value !== "object" || value === null) return false
   const record = value as Record<string, unknown>
-  const partsValue = record["parts"]
+  const partsValue = record.parts
   if (!Array.isArray(partsValue)) return false
   return partsValue.every((part) => {
     if (typeof part !== "object" || part === null) return false
     const partRecord = part as Record<string, unknown>
-    return typeof partRecord["type"] === "string"
+    return typeof partRecord.type === "string"
   })
 }
 
@@ -54,21 +54,21 @@ export function createChatMessageHandler(args: {
     const message = output.message
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      if (message["variant"] === undefined) {
+      if (message.variant === undefined) {
         const variant =
           input.model && input.agent
             ? resolveVariantForModel(pluginConfig, input.agent, input.model)
             : resolveAgentVariant(pluginConfig, input.agent)
         if (variant !== undefined) {
-          message["variant"] = variant
+          message.variant = variant
         }
       }
       firstMessageVariantGate.markApplied(input.sessionID)
     } else {
-      if (input.model && input.agent && message["variant"] === undefined) {
+      if (input.model && input.agent && message.variant === undefined) {
         const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
         if (variant !== undefined) {
-          message["variant"] = variant
+          message.variant = variant
         }
       } else {
         applyAgentVariant(pluginConfig, input.agent, message)

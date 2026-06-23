@@ -120,7 +120,7 @@ export async function executeDeduplication(
         signatures.set(signature, [])
       }
       
-      signatures.get(signature)!.push({
+      signatures.get(signature)?.push({
         toolName: part.tool,
         signature,
         callID: part.callID,
@@ -130,7 +130,7 @@ export async function executeDeduplication(
       if (!state.toolSignatures.has(signature)) {
         state.toolSignatures.set(signature, [])
       }
-      state.toolSignatures.get(signature)!.push({
+      state.toolSignatures.get(signature)?.push({
         toolName: part.tool,
         signature,
         callID: part.callID,

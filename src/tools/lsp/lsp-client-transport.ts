@@ -33,7 +33,7 @@ export class LSPClientTransport {
 
     if (this.proc.exitCode !== null) {
       const stderr = this.stderrBuffer.join("\n")
-      throw new Error(`LSP server exited immediately with code ${this.proc.exitCode}` + (stderr ? `\nstderr: ${stderr}` : ""))
+      throw new Error(`LSP server exited immediately with code ${this.proc.exitCode}${stderr ? `\nstderr: ${stderr}` : ""}`)
     }
 
     const stdoutReader = this.proc.stdout.getReader()
@@ -119,14 +119,14 @@ export class LSPClientTransport {
 
     if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
       const stderr = this.stderrBuffer.slice(-10).join("\n")
-      throw new Error(`LSP server already exited (code: ${this.proc?.exitCode})` + (stderr ? `\nstderr: ${stderr}` : ""))
+      throw new Error(`LSP server already exited (code: ${this.proc?.exitCode})${stderr ? `\nstderr: ${stderr}` : ""}`)
     }
 
     let timeoutId: ReturnType<typeof setTimeout>
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         const stderr = this.stderrBuffer.slice(-5).join("\n")
-        reject(new Error(`LSP request timeout (method: ${method})` + (stderr ? `\nrecent stderr: ${stderr}` : "")))
+        reject(new Error(`LSP request timeout (method: ${method})${stderr ? `\nrecent stderr: ${stderr}` : ""}`))
       }, this.REQUEST_TIMEOUT)
     })
 

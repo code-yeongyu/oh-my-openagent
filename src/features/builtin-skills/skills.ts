@@ -48,7 +48,8 @@ export interface CreateBuiltinSkillsOptions {
 }
 
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
-  const { browserProvider = "playwright", disabledSkills } = options
+  const { browserProvider = "playwright", disabledSkills: rawDisabledSkills } = options
+  const disabledSkills = rawDisabledSkills instanceof Set ? rawDisabledSkills : new Set(rawDisabledSkills ?? [])
 
   let browserSkill: BuiltinSkill
   if (browserProvider === "agent-browser") {

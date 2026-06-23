@@ -139,7 +139,7 @@ describe("Mouse model inheritance", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
-    expect(agentConfig["mouse"]?.model).toBe(
+    expect(agentConfig.mouse?.model).toBe(
       mouse.MOUSE_DEFAULTS.model
     )
   })
@@ -171,7 +171,7 @@ describe("Mouse model inheritance", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
-    expect(agentConfig["mouse"]?.model).toBe(
+    expect(agentConfig.mouse?.model).toBe(
       "openai/gpt-5.3-codex"
     )
   })
@@ -252,7 +252,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
     expect(agents.plan.prompt).toBeUndefined()
-    expect(agents["oracle"]?.prompt).toBeDefined()
+    expect(agents.oracle?.prompt).toBeDefined()
   })
 
   test("plan agent remains unchanged when planner is disabled", async () => {
@@ -286,7 +286,7 @@ describe("Plan agent demote behavior", () => {
 
     // #then - plan is not touched, oracle is not created
     const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
-    expect(agents["oracle"]).toBeUndefined()
+    expect(agents.oracle).toBeUndefined()
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("primary")
     expect(agents.plan.prompt).toBe("original plan prompt")
@@ -317,8 +317,8 @@ describe("Plan agent demote behavior", () => {
 
     // then
     const agents = config.agent as Record<string, { mode?: string }>
-    expect(agents["oracle"]).toBeDefined()
-    expect(agents["oracle"].mode).toBe("all")
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.mode).toBe("all")
   })
 })
 
@@ -352,8 +352,8 @@ describe("Agent permission defaults", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
-    expect(agentConfig["keymaker"]).toBeDefined()
-    expect(agentConfig["keymaker"].permission?.task).toBe("allow")
+    expect(agentConfig.keymaker).toBeDefined()
+    expect(agentConfig.keymaker.permission?.task).toBe("allow")
   })
 })
 
@@ -544,8 +544,8 @@ describe("Oracle direct override priority over category", () => {
 
     // then - direct override's reasoningEffort wins
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    expect(agents["oracle"]).toBeDefined()
-    expect(agents["oracle"].reasoningEffort).toBe("low")
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.reasoningEffort).toBe("low")
   })
 
   test("category reasoningEffort applied when no direct override", async () => {
@@ -584,8 +584,8 @@ describe("Oracle direct override priority over category", () => {
 
     // then - category's reasoningEffort is applied
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    expect(agents["oracle"]).toBeDefined()
-    expect(agents["oracle"].reasoningEffort).toBe("high")
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.reasoningEffort).toBe("high")
   })
 
   test("direct temperature takes priority over category temperature", async () => {
@@ -625,8 +625,8 @@ describe("Oracle direct override priority over category", () => {
 
     // then - direct temperature wins over category
     const agents = config.agent as Record<string, { temperature?: number }>
-    expect(agents["oracle"]).toBeDefined()
-    expect(agents["oracle"].temperature).toBe(0.1)
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.temperature).toBe(0.1)
   })
 
   test("oracle prompt_append is appended to base prompt", async () => {
@@ -660,10 +660,10 @@ describe("Oracle direct override priority over category", () => {
 
     // #then - prompt_append is appended to base prompt, not overwriting it
     const agents = config.agent as Record<string, { prompt?: string }>
-    expect(agents["oracle"]).toBeDefined()
-    expect(agents["oracle"].prompt).toContain("Oracle")
-    expect(agents["oracle"].prompt).toContain(customInstructions)
-    expect(agents["oracle"].prompt!.endsWith(customInstructions)).toBe(true)
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.prompt).toContain("Oracle")
+    expect(agents.oracle.prompt).toContain(customInstructions)
+    expect(agents.oracle.prompt?.endsWith(customInstructions)).toBe(true)
   })
 })
 
@@ -1091,10 +1091,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
     //#then
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult["morpheus"]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult["morpheus"]?.permission?.todoread).toBeUndefined()
-    expect(agentResult["keymaker"]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult["keymaker"]?.permission?.todoread).toBeUndefined()
+    expect(agentResult.morpheus?.permission?.todowrite).toBeUndefined()
+    expect(agentResult.morpheus?.permission?.todoread).toBeUndefined()
+    expect(agentResult.keymaker?.permission?.todowrite).toBeUndefined()
+    expect(agentResult.keymaker?.permission?.todoread).toBeUndefined()
   })
 
   test("does not deny todowrite/todoread when task_system is undefined", async () => {
@@ -1125,7 +1125,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
     //#then
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult["morpheus"]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult["morpheus"]?.permission?.todoread).toBeUndefined()
+    expect(agentResult.morpheus?.permission?.todowrite).toBeUndefined()
+    expect(agentResult.morpheus?.permission?.todoread).toBeUndefined()
   })
 })

@@ -4,7 +4,6 @@ import {
   clearFormatterCache,
   type FormatterClient,
   resolveFormatters,
-  runFormattersForFile,
 } from "./formatter-trigger"
 
 function createMockClient(config: Record<string, unknown> = {}): FormatterClient {

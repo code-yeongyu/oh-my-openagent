@@ -1,4 +1,4 @@
-import { existsSync } from "fs"
+import { existsSync } from "node:fs"
 
 import { CLI_LANGUAGES, NAPI_LANGUAGES } from "./language-support"
 import { getSgCliPath } from "./sg-cli-path"

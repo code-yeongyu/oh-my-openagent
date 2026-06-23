@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { beforeEach, describe, expect, it, spyOn } from "bun:test"
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
 import type {

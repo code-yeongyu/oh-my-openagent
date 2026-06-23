@@ -1,5 +1,5 @@
-import { homedir } from "os"
-import { join } from "path"
+import { homedir } from "node:os"
+import { join } from "node:path"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { CommandDefinition } from "../claude-code-command-loader/types"

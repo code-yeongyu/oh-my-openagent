@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"

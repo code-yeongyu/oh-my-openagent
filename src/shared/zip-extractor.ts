@@ -1,5 +1,5 @@
-import { spawn, spawnSync } from "bun"
-import { release } from "os"
+import { release } from "node:os"
+import { type Subprocess, spawn, spawnSync } from "bun"
 
 const WINDOWS_BUILD_WITH_TAR = 17134
 
@@ -9,7 +9,7 @@ function getWindowsBuildNumber(): number | null {
   const parts = release().split(".")
   if (parts.length >= 3) {
     const build = parseInt(parts[2], 10)
-    if (!isNaN(build)) return build
+    if (!Number.isNaN(build)) return build
   }
   return null
 }
@@ -41,7 +41,7 @@ function getWindowsZipExtractor(): WindowsZipExtractor {
 }
 
 export async function extractZip(archivePath: string, destDir: string): Promise<void> {
-  let proc
+  let proc: Subprocess
   
   if (process.platform === "win32") {
     const extractor = getWindowsZipExtractor()
@@ -59,7 +59,6 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
           stderr: "pipe",
         })
         break
-      case "powershell":
       default:
         proc = spawn(["powershell", "-Command", `Expand-Archive -Path '${escapePowerShellPath(archivePath)}' -DestinationPath '${escapePowerShellPath(destDir)}' -Force`], {
           stdout: "ignore",
@@ -77,7 +76,7 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
   const exitCode = await proc.exited
   
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text()
+    const stderr = await new Response(proc.stderr as ReadableStream<Uint8Array<ArrayBuffer>>).text()
     throw new Error(`zip extraction failed (exit ${exitCode}): ${stderr}`)
   }
 }

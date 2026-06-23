@@ -29,7 +29,7 @@ describe("expandProfile", () => {
       const result = expandProfile("budget")
 
       //#then
-      expect(result.categories?.["source"]?.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(result.categories?.source?.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("should set bullet-time category to haiku", () => {
@@ -71,7 +71,7 @@ describe("expandProfile", () => {
       const result = expandProfile("balanced")
 
       //#then
-      expect(result.categories?.["source"]?.model).toBe(
+      expect(result.categories?.source?.model).toBe(
         "anthropic/claude-opus-4-6"
       )
     })
@@ -124,7 +124,7 @@ describe("expandProfile", () => {
       const result = expandProfile("performance")
 
       //#then
-      expect(result.categories?.["source"]?.model).toBe(
+      expect(result.categories?.source?.model).toBe(
         "anthropic/claude-opus-4-6"
       )
     })
@@ -186,7 +186,7 @@ describe("expandProfile", () => {
       const result = expandProfile("economy")
 
       //#then
-      expect(result.categories?.["source"]?.model).toBe(
+      expect(result.categories?.source?.model).toBe(
         "anthropic/claude-sonnet-4-6"
       )
     })
@@ -253,7 +253,7 @@ describe("expandProfile", () => {
       const result = expandProfile("free")
 
       //#then
-      expect(result.categories?.["source"]?.model).toBe("opencode/kimi-k2.5-free")
+      expect(result.categories?.source?.model).toBe("opencode/kimi-k2.5-free")
     })
 
     test("should set bullet-time category to minimax-m2.5-free", () => {
@@ -327,7 +327,7 @@ describe("expandProfile", () => {
       const result = expandProfile("go")
 
       //#then
-      expect(result.categories?.["source"]?.model).toBe("opencode-go/kimi-k2.6")
+      expect(result.categories?.source?.model).toBe("opencode-go/kimi-k2.6")
     })
 
     test("should set bullet-time category to opencode-go/deepseek-v4-flash", () => {

@@ -34,7 +34,7 @@ describe("pollSyncSession", () => {
       //         and the assistant id > user id (native opencode condition)
       const { pollSyncSession } = require("./sync-session-poller")
 
-      const pollCount = 0
+      const _pollCount = 0
       const mockClient = {
         session: {
           messages: async () => ({
@@ -287,11 +287,11 @@ describe("pollSyncSession", () => {
        const { pollSyncSession } = require("./sync-session-poller")
 
        let statusCallCount = 0
-       let messageCallCount = 0
+       let _messageCallCount = 0
        const mockClient = {
          session: {
            messages: async () => {
-             messageCallCount++
+             _messageCallCount++
              return {
                data: [
                  { info: { id: "msg_001", role: "user", time: { created: 1000 } } },

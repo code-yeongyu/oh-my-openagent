@@ -62,7 +62,7 @@ describe("createToolOutputTruncatorHook", () => {
 
       describe("#when using WebFetch variant", () => {
         it("#then should also use aggressive truncation limit", async () => {
-          const truncateMock = mock(async (_sessionID: string, _output: string, options?: { targetMaxTokens?: number }) => ({
+          const truncateMock = mock(async (_sessionID: string, _output: string, _options?: { targetMaxTokens?: number }) => ({
             result: "truncated",
             truncated: true,
           }))
@@ -90,7 +90,7 @@ describe("createToolOutputTruncatorHook", () => {
     describe("#given grep tool", () => {
       describe("#when output is processed", () => {
         it("#then should use default truncation limit (50k tokens)", async () => {
-          const truncateMock = mock(async (_sessionID: string, _output: string, options?: { targetMaxTokens?: number }) => ({
+          const truncateMock = mock(async (_sessionID: string, _output: string, _options?: { targetMaxTokens?: number }) => ({
             result: "truncated",
             truncated: true,
           }))
@@ -142,7 +142,7 @@ describe("createToolOutputTruncatorHook", () => {
     describe("#given truncate_all_tool_outputs enabled", () => {
       describe("#when any tool output is processed", () => {
         it("#then should truncate non-listed tools too", async () => {
-          const truncateMock = mock(async (_sessionID: string, _output: string, options?: { targetMaxTokens?: number }) => ({
+          const truncateMock = mock(async (_sessionID: string, _output: string, _options?: { targetMaxTokens?: number }) => ({
             result: "truncated",
             truncated: true,
           }))

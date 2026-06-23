@@ -189,7 +189,7 @@ describe("LSPClient", () => {
 
     it("returns invalid for non-existent directory", () => {
       // #given
-      const nonExistentDir = join(tmpdir(), "lsp-cwd-nonexistent-" + Date.now())
+      const nonExistentDir = join(tmpdir(), `lsp-cwd-nonexistent-${Date.now()}`)
 
       // #when
       const result = validateCwd(nonExistentDir)
@@ -221,7 +221,7 @@ describe("LSPClient", () => {
   describe("start", () => {
     it("throws error when working directory does not exist", async () => {
       // #given
-      const nonExistentDir = join(tmpdir(), "lsp-test-nonexistent-" + Date.now())
+      const nonExistentDir = join(tmpdir(), `lsp-test-nonexistent-${Date.now()}`)
       const server: ResolvedServer = {
         id: "typescript",
         command: ["typescript-language-server", "--stdio"],

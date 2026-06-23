@@ -29,7 +29,6 @@ export function getUltraworkMessage(agentName?: string, modelID?: string): strin
       return getPlannerUltraworkMessage()
     case "gpt":
       return getGptUltraworkMessage()
-    case "default":
     default:
       return getDefaultUltraworkMessage()
   }

@@ -1,6 +1,6 @@
+import { existsSync } from "node:fs"
+import { extname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { existsSync } from "fs"
-import { extname, resolve } from "path"
 
 import { type LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
@@ -9,8 +9,8 @@ import type { ServerLookupResult } from "./types"
 export function findWorkspaceRoot(filePath: string): string {
   let dir = resolve(filePath)
 
-  if (!existsSync(dir) || !require("fs").statSync(dir).isDirectory()) {
-    dir = require("path").dirname(dir)
+  if (!existsSync(dir) || !require("node:fs").statSync(dir).isDirectory()) {
+    dir = require("node:path").dirname(dir)
   }
 
   const markers = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"]
@@ -18,15 +18,15 @@ export function findWorkspaceRoot(filePath: string): string {
   let prevDir = ""
   while (dir !== prevDir) {
     for (const marker of markers) {
-      if (existsSync(require("path").join(dir, marker))) {
+      if (existsSync(require("node:path").join(dir, marker))) {
         return dir
       }
     }
     prevDir = dir
-    dir = require("path").dirname(dir)
+    dir = require("node:path").dirname(dir)
   }
 
-  return require("path").dirname(resolve(filePath))
+  return require("node:path").dirname(resolve(filePath))
 }
 
 export function uriToPath(uri: string): string {

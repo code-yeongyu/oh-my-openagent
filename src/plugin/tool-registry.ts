@@ -59,7 +59,7 @@ export function createToolRegistry(args: {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
-    sisyphusJuniorModel: pluginConfig.agents?.["mouse"]?.model,
+    sisyphusJuniorModel: pluginConfig.agents?.mouse?.model,
     browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
     availableCategories,

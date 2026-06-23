@@ -10,7 +10,7 @@ import type { InteractiveBashSessionState } from "./types";
 type AbortSession = (args: { path: { id: string } }) => Promise<unknown>
 
 function isOmoSession(sessionName: string | null): sessionName is string {
-  return sessionName !== null && sessionName.startsWith(MATRIXX_SESSION_PREFIX)
+  return Boolean(sessionName?.startsWith(MATRIXX_SESSION_PREFIX))
 }
 
 async function killAllTrackedSessions(

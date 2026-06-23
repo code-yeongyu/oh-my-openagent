@@ -1,4 +1,4 @@
-import { join } from "path"
+import { join } from "node:path"
 import { getClaudeConfigDir } from "./claude-config-dir"
 
 const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")

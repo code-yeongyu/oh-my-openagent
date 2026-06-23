@@ -1632,7 +1632,7 @@ describe("todo-continuation-enforcer", () => {
   test("should cancel all countdowns via cancelAllCountdowns", async () => {
     // given - multiple sessions with running countdowns
     const session1 = "main-cancel-all-1"
-    const session2 = "main-cancel-all-2"
+    const _session2 = "main-cancel-all-2"
     setMainSession(session1)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})

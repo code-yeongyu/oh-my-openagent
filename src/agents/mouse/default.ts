@@ -40,7 +40,7 @@ Task NOT complete without:
 </Style>`
 
   if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  return `${prompt}\n\n${promptAppend}`
 }
 
 function buildConstraintsSection(useTaskSystem: boolean): string {

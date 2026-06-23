@@ -1,5 +1,5 @@
-import { promises as fs } from "fs"
-import { dirname, extname, isAbsolute, join, relative } from "path"
+import { promises as fs } from "node:fs"
+import { dirname, extname, isAbsolute, join, relative } from "node:path"
 import picomatch from "picomatch"
 import type { SkillsConfig } from "../../config/schema"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"

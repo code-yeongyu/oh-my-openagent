@@ -1,6 +1,6 @@
+import { join } from "node:path";
 import type { PluginInput } from "@opencode-ai/plugin";
 import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool";
-import { join } from "path";
 import type { MatrixxConfig } from "../../config/schema";
 import {
   acquireLock,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs"
-import { basename, join } from "path"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { basename, join } from "node:path"
 import { z } from "zod"
 import type { MatrixxConfig } from "../../config/schema"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"

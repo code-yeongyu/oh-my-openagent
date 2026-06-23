@@ -151,7 +151,7 @@ export async function createBuiltinAgents(
     useTaskSystem,
   })
   if (morpheusConfig) {
-    result["morpheus"] = morpheusConfig
+    result.morpheus = morpheusConfig
   }
 
   const keymakerConfig = maybeCreateKeymakerConfig({
@@ -168,7 +168,7 @@ export async function createBuiltinAgents(
     useTaskSystem,
   })
   if (keymakerConfig) {
-    result["keymaker"] = keymakerConfig
+    result.keymaker = keymakerConfig
   }
 
   // Add pending agents after morpheus and keymaker to maintain order
@@ -189,7 +189,7 @@ export async function createBuiltinAgents(
     userCategories: categories,
   })
   if (atlasConfig) {
-    result["architect"] = atlasConfig
+    result.architect = atlasConfig
   }
 
   return result

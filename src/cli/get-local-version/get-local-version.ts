@@ -94,7 +94,7 @@ export async function getLocalVersion(
 
     console.log(options.json ? formatJsonOutput(info) : formatVersionOutput(info))
     return 0
-  } catch (error) {
+  } catch (_error) {
     const info: VersionInfo = {
       currentVersion: null,
       latestVersion: null,

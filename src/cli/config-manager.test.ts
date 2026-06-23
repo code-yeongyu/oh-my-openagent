@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, test } from "bun:test"
 
 import { ANTIGRAVITY_PROVIDER_CONFIG, fetchNpmDistTags, generateMatrixxConfig, getPluginNameWithVersion } from "./config-manager"
 import type { InstallConfig } from "./types"
@@ -366,7 +366,7 @@ describe("generateMatrixxConfig - model fallback system", () => {
     // #then Oracle falls back to ultimate fallback (all oracle chain entries require anthropic/copilot/opencode)
     expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("opencode/glm-4.7-free")
     // #then construct falls back to ultimate fallback (all construct chain entries require anthropic/copilot/opencode)
-    expect((result.agents as Record<string, { model: string }>)["construct"].model).toBe("opencode/glm-4.7-free")
+    expect((result.agents as Record<string, { model: string }>).construct.model).toBe("opencode/glm-4.7-free")
   })
 
   test("uses haiku for explore when Claude max20", () => {

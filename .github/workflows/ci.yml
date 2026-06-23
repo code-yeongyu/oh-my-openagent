@@ -57,8 +57,8 @@ jobs:
           # Individual files that use mock.module and cause cross-file pollution
           bun test src/cli/doctor/formatter.test.ts
           bun test src/cli/doctor/format-default.test.ts
-          bun test src/tools/call-omo-agent/sync-executor.test.ts
-          bun test src/tools/call-omo-agent/session-creator.test.ts
+          bun test src/tools/delegate-agent/sync-executor.test.ts
+          bun test src/tools/delegate-agent/session-creator.test.ts
           bun test src/features/opencode-skill-loader/loader.test.ts
           bun test src/features/opencode-skill-loader/agents-skills-global.test.ts
           bun test src/tools/session-manager/storage.test.ts
@@ -77,7 +77,6 @@ jobs:
           bun test src/hooks/rules-injector/injector.test.ts
           bun test src/hooks/compaction-todo-preserver/index.test.ts
           bun test src/hooks/preemptive-compaction.test.ts
-          bun test src/hooks/claude-code-hooks/stop.test.ts
           bun test src/tools/lsp/client.test.ts
           bun test src/tools/skill/tools.test.ts
           bun test src/features/claude-code-mcp-loader/loader.test.ts
@@ -91,6 +90,11 @@ jobs:
           # OPENCODE_CONFIG_DIR env var pollution — must run isolated to prevent
           # parallel test interference from other files that modify this global var
           bun test src/cli/config-manager/auth-plugins.test.ts
+          # spyOn() leaks from earlier tests pollute these (pass in isolation, fail
+          # in batch). Same pattern as publish.yml (line 96 documents utils.test.ts
+          # as a pre-existing CI-only failure).
+          bun test src/agents/utils.test.ts
+          bun test src/hooks/task-notepad/hook.test.ts
 
       - name: Run remaining tests
         run: |
@@ -103,8 +107,8 @@ jobs:
               -e 'src/features/tmux-subagent/' \
               -e 'src/cli/doctor/formatter.test.ts' \
               -e 'src/cli/doctor/format-default.test.ts' \
-              -e 'src/tools/call-omo-agent/sync-executor.test.ts' \
-              -e 'src/tools/call-omo-agent/session-creator.test.ts' \
+              -e 'src/tools/delegate-agent/sync-executor.test.ts' \
+              -e 'src/tools/delegate-agent/session-creator.test.ts' \
               -e 'src/features/opencode-skill-loader/loader.test.ts' \
               -e 'src/features/opencode-skill-loader/agents-skills-global.test.ts' \
               -e 'src/tools/session-manager/storage.test.ts' \
@@ -123,7 +127,6 @@ jobs:
               -e 'src/hooks/rules-injector/injector.test.ts' \
               -e 'src/hooks/compaction-todo-preserver/index.test.ts' \
               -e 'src/hooks/preemptive-compaction.test.ts' \
-              -e 'src/hooks/claude-code-hooks/stop.test.ts' \
               -e 'src/tools/lsp/client.test.ts' \
               -e 'src/tools/skill/tools.test.ts' \
               -e 'src/features/claude-code-mcp-loader/loader.test.ts' \
@@ -135,6 +138,8 @@ jobs:
               -e 'src/cli/run/server-connection.test.ts' \
               -e 'src/cli/mcp-oauth/login.test.ts' \
               -e 'src/cli/config-manager/auth-plugins.test.ts' \
+              -e 'src/agents/utils.test.ts' \
+              -e 'src/hooks/task-notepad/hook.test.ts' \
             | xargs bun test
 
   typecheck:

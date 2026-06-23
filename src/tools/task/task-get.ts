@@ -1,5 +1,5 @@
+import { join } from "node:path"
 import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
-import { join } from "path"
 import type { MatrixxConfig } from "../../config/schema"
 import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
 import { TASK_ID_PATTERN } from "./constants"

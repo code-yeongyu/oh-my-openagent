@@ -7,7 +7,7 @@ import { clearPendingStore, consumeToolMetadata } from "../../features/tool-meta
 import type { BackgroundCancelClient, BackgroundOutputClient, BackgroundOutputManager } from "./tools"
 import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 
-const projectDir = "/Users/yeongyu/local-workspaces/matrixx"
+const _projectDir = "/Users/yeongyu/local-workspaces/matrixx"
 
 const mockContext: ToolContext = {
   sessionID: "test-session",
@@ -285,7 +285,7 @@ describe("background_output full_session", () => {
     }, mockContext)
 
     // #then
-    expect(output).toContain("[thinking] " + "x".repeat(100) + "...")
+    expect(output).toContain(`[thinking] ${"x".repeat(100)}...`)
     expect(output).not.toContain("x".repeat(200))
   })
 
@@ -316,7 +316,7 @@ describe("background_output full_session", () => {
     }, mockContext)
 
     // #then
-    expect(output).toContain("[thinking] " + "y".repeat(2000) + "...")
+    expect(output).toContain(`[thinking] ${"y".repeat(2000)}...`)
     expect(output).not.toContain("y".repeat(2100))
   })
 })

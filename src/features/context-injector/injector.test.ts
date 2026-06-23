@@ -54,7 +54,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     const output = { messages } as any
 
     // when
-    await hook["experimental.chat.messages.transform"]!({}, output)
+    await hook["experimental.chat.messages.transform"]?.({}, output)
 
     // then - synthetic part inserted before original text part
     expect(output.messages.length).toBe(3)
@@ -73,7 +73,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     const output = { messages } as any
 
     // when
-    await hook["experimental.chat.messages.transform"]!({}, output)
+    await hook["experimental.chat.messages.transform"]?.({}, output)
 
     // then
     expect(output.messages.length).toBe(1)
@@ -93,7 +93,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     const output = { messages } as any
 
     // when
-    await hook["experimental.chat.messages.transform"]!({}, output)
+    await hook["experimental.chat.messages.transform"]?.({}, output)
 
     // then
     expect(output.messages.length).toBe(1)
@@ -114,7 +114,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     const output = { messages } as any
 
     // when
-    await hook["experimental.chat.messages.transform"]!({}, output)
+    await hook["experimental.chat.messages.transform"]?.({}, output)
 
     // then
     expect(collector.hasPending(sessionID)).toBe(false)

@@ -725,8 +725,10 @@ export class BackgroundManager {
           task.progress.toolCalls += 1
           task.progress.lastTool = partInfo.tool
 
+          if (this.cachedCircuitBreakerSettings == null) {
+            this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config)
+          }
           const circuitBreaker = this.cachedCircuitBreakerSettings
-            ?? (this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config))
 
           if (partInfo.tool) {
             task.progress.toolCallWindow = recordToolCall(
@@ -778,7 +780,7 @@ export class BackgroundManager {
       if (!sessionID) return
 
       const task = this.findBySession(sessionID)
-      if (!task || task.status !== "running") return
+      if (task?.status !== "running") return
       
       const startedAt = task.startedAt
       if (!startedAt) return
@@ -837,7 +839,7 @@ export class BackgroundManager {
       if (!sessionID) return
 
       const task = this.findBySession(sessionID)
-      if (!task || task.status !== "running") return
+      if (task?.status !== "running") return
 
       const errorMessage = props ? this.getSessionErrorMessage(props) : undefined
 
@@ -1127,7 +1129,7 @@ export class BackgroundManager {
    */
   cancelPendingTask(taskId: string): boolean {
     const task = this.tasks.get(taskId)
-    if (!task || task.status !== "pending") {
+    if (task?.status !== "pending") {
       return false
     }
 
@@ -1481,16 +1483,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   }
 
   private getSessionErrorMessage(properties: EventProperties): string | undefined {
-    const errorRaw = properties["error"]
+    const errorRaw = properties.error
     if (!this.isRecord(errorRaw)) return undefined
 
-    const dataRaw = errorRaw["data"]
+    const dataRaw = errorRaw.data
     if (this.isRecord(dataRaw)) {
-      const message = dataRaw["message"]
+      const message = dataRaw.message
       if (typeof message === "string") return message
     }
 
-    const message = errorRaw["message"]
+    const message = errorRaw.message
     return typeof message === "string" ? message : undefined
   }
 
@@ -1520,7 +1522,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           ? "Task timed out while queued (30 minutes)"
           : "Task timed out after 30 minutes"
         
-        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(age / 1000) + "s" })
+        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: `${Math.round(age / 1000)}s` })
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()

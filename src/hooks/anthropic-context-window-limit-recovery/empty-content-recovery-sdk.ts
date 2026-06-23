@@ -46,7 +46,7 @@ function getSdkMessages(response: unknown): SDKMessage[] {
   if (typeof response !== "object" || response === null) return []
   if (Array.isArray(response)) return response as SDKMessage[]
   const record = response as Record<string, unknown>
-  const data = record["data"]
+  const data = record.data
   if (Array.isArray(data)) return data as SDKMessage[]
   return Array.isArray(record) ? (record as SDKMessage[]) : []
 }

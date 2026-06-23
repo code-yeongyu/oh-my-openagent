@@ -40,7 +40,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   try {
     if (format === "none") {
       const config: OpenCodeConfig = { plugin: [pluginEntry] }
-      writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
+      writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`)
       return { success: true, configPath: path }
     }
 
@@ -82,7 +82,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
         writeFileSync(path, newContent)
       }
     } else {
-      writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
+      writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`)
     }
 
     return { success: true, configPath: path }

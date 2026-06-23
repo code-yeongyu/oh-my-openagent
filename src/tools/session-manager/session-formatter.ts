@@ -36,7 +36,7 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
     )
   }
 
-  const separator = "|" + colWidths.map((w) => "-".repeat(w + 2)).join("|") + "|"
+  const separator = `|${colWidths.map((w) => "-".repeat(w + 2)).join("|")}|`
 
   return [formatRow(headers), separator, ...rows.map(formatRow)].join("\n")
 }
@@ -135,7 +135,7 @@ export async function filterSessionsByDate(
   const results: string[] = []
   for (const id of sessionIDs) {
     const info = await getSessionInfo(id)
-    if (!info || !info.last_message) continue
+    if (!info?.last_message) continue
 
     if (from && info.last_message < from) continue
     if (to && info.last_message > to) continue
@@ -175,8 +175,8 @@ export async function searchInSession(
             const start = Math.max(0, index - 50)
             const end = Math.min(text.length, index + searchQuery.length + 50)
             let excerpt = part.text.substring(start, end)
-            if (start > 0) excerpt = "..." + excerpt
-            if (end < text.length) excerpt = excerpt + "..."
+            if (start > 0) excerpt = `...${excerpt}`
+            if (end < text.length) excerpt = `${excerpt}...`
             excerpts.push(excerpt)
           }
         }

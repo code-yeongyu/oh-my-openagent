@@ -121,7 +121,7 @@ function handleToolPart(
   if (status === "completed" || status === "error") {
     const output = part.state?.output || ""
     const maxLen = 200
-    const preview = output.length > maxLen ? output.slice(0, maxLen) + "..." : output
+    const preview = output.length > maxLen ? `${output.slice(0, maxLen)}...` : output
     if (preview.trim()) {
       const lines = preview.split("\n").slice(0, 3)
       process.stdout.write(pc.dim(`   └─ ${lines.join("\n      ")}\n`))
@@ -178,7 +178,7 @@ export function handleToolResult(ctx: RunContext, payload: EventPayload, state: 
 
   const output = props?.output || ""
   const maxLen = 200
-  const preview = output.length > maxLen ? output.slice(0, maxLen) + "..." : output
+  const preview = output.length > maxLen ? `${output.slice(0, maxLen)}...` : output
 
   if (preview.trim()) {
     const lines = preview.split("\n").slice(0, 3)

@@ -162,7 +162,7 @@ describe("McpOAuthProvider", () => {
       const { mkdirSync } = require("node:fs")
       const { tmpdir } = require("node:os")
       const { join } = require("node:path")
-      const testDir = join(tmpdir(), "mcp-oauth-provider-test-" + Date.now())
+      const testDir = join(tmpdir(), `mcp-oauth-provider-test-${Date.now()}`)
       mkdirSync(testDir, { recursive: true })
       process.env.OPENCODE_CONFIG_DIR = testDir
     })

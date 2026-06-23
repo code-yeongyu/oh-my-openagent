@@ -1,5 +1,5 @@
-import { promises as fs } from "fs"
-import { basename } from "path"
+import { promises as fs } from "node:fs"
+import { basename } from "node:path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"

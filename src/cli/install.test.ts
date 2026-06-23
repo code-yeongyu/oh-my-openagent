@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as configManager from "./config-manager"
@@ -8,7 +8,7 @@ import type { InstallArgs } from "./types"
 
 // Mock console methods to capture output
 const mockConsoleLog = mock(() => {})
-const mockConsoleError = mock(() => {})
+const _mockConsoleError = mock(() => {})
 
 describe("install CLI - binary check behavior", () => {
   let tempDir: string

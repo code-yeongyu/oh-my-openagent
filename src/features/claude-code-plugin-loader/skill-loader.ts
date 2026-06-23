@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
-import { join } from "path"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { resolveSymlink } from "../../shared/file-utils"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { log } from "../../shared/logger"

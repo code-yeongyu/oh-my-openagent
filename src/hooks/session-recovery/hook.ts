@@ -47,7 +47,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
   }
 
   const handleSessionRecovery = async (info: MessageInfo): Promise<boolean> => {
-    if (!info || info.role !== "assistant" || !info.error) return false
+    if (info?.role !== "assistant" || !info.error) return false
 
     const errorType = detectErrorType(info.error)
     if (!errorType) return false

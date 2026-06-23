@@ -103,7 +103,7 @@ async function getThinkingSummary(ctx: BabysitterContext, sessionID: string): Pr
     const combined = chunks.join("\n").trim()
     if (!combined) return null
     if (combined.length <= THINKING_SUMMARY_MAX_CHARS) return combined
-    return combined.slice(0, THINKING_SUMMARY_MAX_CHARS) + "..."
+    return `${combined.slice(0, THINKING_SUMMARY_MAX_CHARS)}...`
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch thinking summary`, { sessionID, error: String(error) })
     return null

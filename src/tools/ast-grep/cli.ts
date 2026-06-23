@@ -1,5 +1,5 @@
+import { existsSync } from "node:fs"
 import { spawn } from "bun"
-import { existsSync } from "fs"
 import { getAstGrepPath } from "./cli-binary-path-resolution"
 import {
 	DEFAULT_TIMEOUT_MS,

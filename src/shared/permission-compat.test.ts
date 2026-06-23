@@ -143,9 +143,9 @@ describe("permission-compat", () => {
 
       //#then delegate_task is renamed to task
       const perm = result.permission as Record<string, string>
-      expect(perm["task"]).toBe("allow")
-      expect(perm["delegate_task"]).toBeUndefined()
-      expect(perm["write"]).toBe("deny")
+      expect(perm.task).toBe("allow")
+      expect(perm.delegate_task).toBeUndefined()
+      expect(perm.write).toBe("deny")
     })
 
     test("does not overwrite existing task permission with delegate_task", () => {
@@ -159,8 +159,8 @@ describe("permission-compat", () => {
 
       //#then existing task permission is preserved
       const perm = result.permission as Record<string, string>
-      expect(perm["task"]).toBe("deny")
-      expect(perm["delegate_task"]).toBe("allow")
+      expect(perm.task).toBe("deny")
+      expect(perm.delegate_task).toBe("allow")
     })
 
     test("does not mutate the original config permission object", () => {

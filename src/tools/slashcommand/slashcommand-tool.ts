@@ -65,7 +65,7 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       const allItems = await getAllItems()
 
       if (!args.command) {
-        return formatCommandList(allItems) + "\n\nProvide a command or skill name to execute."
+        return `${formatCommandList(allItems)}\n\nProvide a command or skill name to execute.`
       }
 
       const commandName = args.command.replace(/^\//, "")

@@ -117,8 +117,8 @@ export class TaskToastManager {
         inherited: " (inherited from parent)",
         "system-default": " (system default fallback)",
       }
-      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
-      lines.push(`[FALLBACK] Model: ${newTask.modelInfo!.model}${suffix}`)
+      const suffix = suffixMap[newTask.modelInfo?.type as "inherited" | "system-default"]
+      lines.push(`[FALLBACK] Model: ${newTask.modelInfo?.model}${suffix}`)
       lines.push("")
     }
 

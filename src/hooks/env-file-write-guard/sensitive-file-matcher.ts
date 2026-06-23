@@ -1,4 +1,4 @@
-import { basename } from "path"
+import { basename } from "node:path"
 import picomatch from "picomatch"
 
 const DEFAULT_BLOCKED_PATTERNS = [

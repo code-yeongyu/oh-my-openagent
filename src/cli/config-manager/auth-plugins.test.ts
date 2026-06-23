@@ -9,7 +9,7 @@ import { resetConfigContext } from "./config-context"
 let testConfigPath: string
 let testConfigDir: string
 let testCounter = 0
-let fetchVersionSpy: unknown
+let _fetchVersionSpy: unknown
 
 beforeEach(async () => {
   testCounter++
@@ -21,7 +21,7 @@ beforeEach(async () => {
   resetConfigContext()
 
   const module = await import("./auth-plugins")
-  fetchVersionSpy = spyOn(module, "fetchLatestVersion").mockResolvedValue("1.2.3")
+  _fetchVersionSpy = spyOn(module, "fetchLatestVersion").mockResolvedValue("1.2.3")
 })
 
 afterEach(() => {

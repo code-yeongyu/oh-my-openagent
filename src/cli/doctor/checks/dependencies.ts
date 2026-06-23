@@ -35,7 +35,7 @@ export async function checkAstGrepCli(): Promise<DependencyInfo> {
   const altBinaryCheck = !binaryCheck.exists ? await checkBinaryExists("ast-grep") : null
 
   const binary = binaryCheck.exists ? binaryCheck : altBinaryCheck
-  if (!binary || !binary.exists) {
+  if (!binary?.exists) {
     return {
       name: "AST-Grep CLI",
       required: false,
@@ -70,9 +70,9 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
     }
   } catch {
     // Fallback: check common installation paths
-    const { existsSync } = await import("fs")
-    const { join } = await import("path")
-    const { homedir } = await import("os")
+    const { existsSync } = await import("node:fs")
+    const { join } = await import("node:path")
+    const { homedir } = await import("node:os")
 
     const pathsToCheck = [
       join(homedir(), ".config", "opencode", "node_modules", "@ast-grep", "napi"),

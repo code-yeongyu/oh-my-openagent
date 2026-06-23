@@ -20,7 +20,7 @@ function truncateLabel(label: string, maxLength: number = MAX_LABEL_LENGTH): str
   if (label.length <= maxLength) {
     return label;
   }
-  return label.substring(0, maxLength - 3) + "...";
+  return `${label.substring(0, maxLength - 3)}...`;
 }
 
 function truncateQuestionLabels(args: AskUserQuestionArgs): AskUserQuestionArgs {

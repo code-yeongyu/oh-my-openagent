@@ -39,7 +39,7 @@ function createMockInput(agent?: string, model?: { providerID: string; modelID: 
 function createMockOutput(variant?: string): ChatMessageHandlerOutput {
   const message: Record<string, unknown> = {}
   if (variant !== undefined) {
-    message["variant"] = variant
+    message.variant = variant
   }
   return { message, parts: [] }
 }
@@ -56,7 +56,7 @@ describe("createChatMessageHandler - first message variant", () => {
     await handler(input, output)
 
     //#then - should set variant from fallback chain
-    expect(output.message["variant"]).toBeDefined()
+    expect(output.message.variant).toBeDefined()
   })
 
   test("first message: preserves user-selected variant when already set", async () => {
@@ -70,7 +70,7 @@ describe("createChatMessageHandler - first message variant", () => {
     await handler(input, output)
 
     //#then - user's xhigh must be preserved, not overwritten to "medium"
-    expect(output.message["variant"]).toBe("xhigh")
+    expect(output.message.variant).toBe("xhigh")
   })
 
   test("first message: preserves user-selected 'high' variant", async () => {
@@ -84,7 +84,7 @@ describe("createChatMessageHandler - first message variant", () => {
     await handler(input, output)
 
     //#then
-    expect(output.message["variant"]).toBe("high")
+    expect(output.message.variant).toBe("high")
   })
 
   test("subsequent message: does not override existing variant", async () => {
@@ -98,7 +98,7 @@ describe("createChatMessageHandler - first message variant", () => {
     await handler(input, output)
 
     //#then
-    expect(output.message["variant"]).toBe("xhigh")
+    expect(output.message.variant).toBe("xhigh")
   })
 
   test("first message: marks gate as applied regardless of variant presence", async () => {

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "fs"
-import { tmpdir } from "os"
-import { join } from "path"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-const TEST_DIR = join(tmpdir(), "agents-global-skills-test-" + Date.now())
+const TEST_DIR = join(tmpdir(), `agents-global-skills-test-${Date.now()}`)
 const TEMP_HOME = join(TEST_DIR, "home")
 
 describe("discoverGlobalAgentsSkills", () => {
