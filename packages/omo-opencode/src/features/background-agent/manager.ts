@@ -1842,11 +1842,12 @@ The fallback retry session is now created and can be inspected directly.
       const { task } = resolved
       if (task.status !== "running") return
 
-      const errorObj = props?.error as { name?: string; message?: string } | undefined
+      const errorObj = props?.error as { name?: string; message?: string; statusCode?: number } | undefined
       const errorName = errorObj?.name
       const errorMessage = props ? getSessionErrorMessage(props) : undefined
+      const errorStatusCode = extractErrorStatusCode(props?.error)
 
-      const errorInfo = { name: errorName, message: errorMessage }
+      const errorInfo = { name: errorName, message: errorMessage, statusCode: errorStatusCode }
       void this.handleSessionErrorEvent({
         errorInfo,
         errorMessage,

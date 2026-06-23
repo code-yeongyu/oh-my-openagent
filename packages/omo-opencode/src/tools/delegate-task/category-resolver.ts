@@ -254,8 +254,10 @@ Available categories: ${categoryNames.join(", ")}`)
     maxPromptTokens: resolved.config.max_prompt_tokens,
     modelInfo,
     actualModel,
-    isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel || overrideModel) ? undefined : requirement?.fallbackChain),
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || overrideModel) ? undefined : requirement?.fallbackChain),
+    // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
+    // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || overrideModel) ? undefined : requirement?.fallbackChain),
   }
 }
