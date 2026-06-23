@@ -269,7 +269,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent | Role | Fallback Chain |
 |---|---|---|
-| **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|venice\|opencode\|vercel/gpt-5.5` (medium) — single-entry chain, requires one of those providers. The craftsman. |
+| **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — single-entry chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.1` |
 | **Momus** | Ruthless reviewer | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.1` |
 
