@@ -30,7 +30,7 @@ type DynamicClientRegistrationOptions = {
   fetch?: DcrFetch
 }
 
-export type DcrFetch = (
+type DcrFetch = (
   input: string,
   init?: { method?: string; headers?: Record<string, string>; body?: string }
 ) => Promise<{ ok: boolean; json: () => Promise<unknown> }>

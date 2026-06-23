@@ -20,7 +20,7 @@ interface SessionCreatedEvent {
   properties?: { info?: { id?: string; parentID?: string; title?: string } }
 }
 
-export interface TmuxUtilDeps {
+interface TmuxUtilDeps {
   isInsideTmux: () => boolean
   getCurrentPaneId: () => string | undefined
 }

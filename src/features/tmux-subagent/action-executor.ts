@@ -10,7 +10,7 @@ import type { PaneAction } from "./types"
 
 export type { ActionExecutorDeps, ActionResult, ExecuteContext } from "./action-executor-core"
 
-export interface ExecuteActionsResult {
+interface ExecuteActionsResult {
   success: boolean
   spawnedPaneId?: string
   results: Array<{ action: PaneAction; result: ActionResult }>
