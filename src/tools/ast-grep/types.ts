@@ -25,19 +25,6 @@ export interface CliMatch {
   language: string
 }
 
-interface MetaVariable {
-  name: string
-  text: string
-  kind: string
-}
-
-interface AnalyzeResult {
-  text: string
-  range: Range
-  kind: string
-  metaVariables: MetaVariable[]
-}
-
 export interface SgResult {
   matches: CliMatch[]
   totalMatches: number

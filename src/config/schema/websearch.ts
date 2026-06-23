@@ -11,5 +11,4 @@ export const WebsearchConfigSchema = z.object({
   provider: WebsearchProviderSchema.optional(),
 })
 
-type WebsearchProvider = z.infer<typeof WebsearchProviderSchema>
 export type WebsearchConfig = z.infer<typeof WebsearchConfigSchema>

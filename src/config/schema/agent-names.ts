@@ -49,26 +49,6 @@ export const BuiltinSkillNameSchema = z.enum([
   "matrixx-self-config",
 ])
 
-const OverridableAgentNameSchema = z.enum([
-  "build",
-  "plan",
-  "morpheus",
-  "keymaker",
-  "mouse",
-  "OpenCode-Builder",
-  "oracle",
-  "seraph",
-  "smith",
-  "merovingian",
-  "operator",
-  "trinity",
-  "construct",
-  "architect",
-  "cipher",
-  "sentinel",
-  "sati",
-])
-
 export const AgentNameSchema = BuiltinAgentNameSchema
 export type AgentName = z.infer<typeof AgentNameSchema>
 
