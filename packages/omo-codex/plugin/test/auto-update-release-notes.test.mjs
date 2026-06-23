@@ -14,6 +14,7 @@ function autoUpdateEnv(root, extra = {}) {
 		LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 		LAZYCODEX_AUTO_UPDATE_STATE_PATH: join(root, "state.json"),
 		LAZYCODEX_AUTO_UPDATE_LOG_PATH: join(root, "auto-update.log"),
+		LAZYCODEX_CONFIG_MIGRATION_DISABLED: "1",
 		...extra,
 	};
 }
