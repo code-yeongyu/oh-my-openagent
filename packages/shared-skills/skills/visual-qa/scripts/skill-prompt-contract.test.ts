@@ -68,6 +68,8 @@ describe("visual-qa skill prompt contract", () => {
 			expect(lowerPassB, fixture.label).toContain("view_image")
 			expect(lowerPassB, fixture.label).toContain("source code")
 			expect(passB, fixture.label).toContain("[Image #1]")
+			expect(passB, fixture.label).toContain("semantic phrases")
+			expect(passB, fixture.label).toContain("놀라운 변 / 화")
 			expect(passB, fixture.label).toContain("에이전트 오케스트")
 			expect(passB, fixture.label).toContain("레이션 현황 및 미")
 			expect(passB, fixture.label).toContain("래")
