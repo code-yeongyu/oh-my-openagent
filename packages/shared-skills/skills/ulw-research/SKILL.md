@@ -49,13 +49,15 @@ The research is done when all of these hold:
 - Every EXPAND lead was investigated or explicitly closed as a duplicate or dead end, and convergence was reached under the Phase 2 rules.
 - Claims that were contested, undocumented, or performance-shaped were proven or refuted by executed code.
 - Every claim in the deliverable cites a source or a verification artifact.
+- Final materials follow the Phase 5 format default or the user's explicit format.
 - The session journal reconstructs what was searched, found, and expanded, wave by wave.
 
 ## Run the swarm as a cooperating team
 
-Saturation research is the textbook case for a cooperating team, not isolated fire-and-forget workers: a lead one worker surfaces almost always reshapes what another should search next. So when your harness gives you real cooperating members — Codex: the `teammode` skill (`codex_app` threads); OpenCode: `team_mode` — run this swarm as a team. Fall back to the background-worker swarm below only when team mode is unavailable, or the axes are genuinely independent with no cross-pollination expected.
+Saturation research defaults to teammode, not isolated fire-and-forget workers: a lead one worker surfaces almost always reshapes what another should search next. When your harness gives you real cooperating members — Codex: the `teammode` skill (`codex_app` threads); OpenCode: `team_mode` — run this swarm as a team. Fall back to the background-worker swarm below only when team mode is unavailable, or the axes are genuinely independent with no cross-pollination expected.
 
 - **One member per axis — by part, ownership, or perspective, never a job title.** Each Phase 0 axis is one member owning one concrete slice: a codebase part, a source territory, or a question lens. No two members share an angle. "Backend researcher" or "the web person" gives no real boundary and invites overlap — name what the member owns.
+- **Many teammates by default.** Prefer a larger roster, usually 5-8 teammates, whenever the axes can be made distinct. Add at least one skeptic or red-team perspective for hyperdebate/ultradebate: cross-critique claims, evidence quality, synthesis structure, and visual-report choices before they reach the final deliverable.
 - **The raise law — broadcast every lead the instant it surfaces.** Members over-communicate relentlessly: every new lead, finding, contradiction, and dead end is raised to you the moment it surfaces, never hoarded for a final dump. Through long passes they send `WORKING: <axis> - <phase>`, and `BLOCKED: <reason>` the moment progress stops, so you always know a member is alive. Too many small updates is correct here; going quiet is the only failure.
 - **You lead; expand on each raised lead.** Members raise via message text, never write session files. Journal each lead and spawn its expansion the instant it lands (Phase 2), not only when a member's final reply arrives.
 
@@ -94,7 +96,7 @@ Before spawning anything, decompose the query:
 <analysis>
 Core question: <the actual information need>
 Axes (3+ orthogonal): <axis — what to search, where, why> ...
-Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verification likely: <yes/no> · Report requested: <no | format>
+Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verification likely: <yes/no> · Final material format: <HTML/PDF default | explicit format | markdown only>
 </analysis>
 ```
 
@@ -216,15 +218,15 @@ Workers: <total> · Waves: <count> · Sources: <count> · Verifications: <count>
 ## Expansion trace          — per wave: workers → markers; convergence reason
 ```
 
-Deliver the synthesis with inline `[Source N]` citations on every claim. Every high-risk non-code claim you assert must be a verified-claims row from Phase 3b — assert nothing the gate left in the unresolved/refuted annex. When no report was requested, this is the deliverable.
+`SYNTHESIS.md` is the citation source of truth for final materials: every claim carries inline `[Source N]` citations, and every high-risk non-code claim you assert must be a verified-claims row from Phase 3b. Assert nothing the gate left in the unresolved/refuted annex.
 
-## Phase 5 — Report (only when requested)
+## Phase 5 — Final materials
 
-Format by the user's words: "report" / "document" → Markdown (default) · "pdf" → HTML first, then weasyprint (`uv run --with weasyprint python`) · "slides" / "presentation" / "deck" → python-pptx · "html" / "webpage" → standalone HTML.
+Default final materials to HTML/PDF unless the user explicitly asks for a different format: "report" / "document" → HTML first, with a PDF default available through weasyprint (`uv run --with weasyprint python`) · "pdf" → HTML first, then weasyprint · "slides" / "presentation" / "deck" → python-pptx · "html" / "webpage" → standalone HTML · "markdown only" → Markdown.
 
-Asset workers (background, parallel): charts for quantitative findings (`uv run --with matplotlib --with plotly python`) saved by you to `$SESSION_DIR/assets/`; full-page screenshots of the top 5-10 sources (browsing skill); generated diagrams (imagegen skill) when architecture or flows need them.
+Asset workers (background, parallel): actively use charts for quantitative findings (`uv run --with matplotlib --with plotly python`) saved by you to `$SESSION_DIR/assets/`; Mermaid graphs for process, architecture, argument, and evidence-flow structure; full-page screenshots of the top 5-10 sources (browsing skill); generated diagrams or editorial visuals with the imagegen skill when architecture, flows, or narrative framing benefit from bitmap assets.
 
-Assembly worker — `task(category="deep", load_skills=["frontend-design", "open-design", "data-scientist", "imagegen"], run_in_background=true, ...)`: before writing, read every available design and visualization skill and apply it — the report is a designed artifact, not a text dump. Structure: executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (workers, waves, searches, verifications). Every claim cites `[Source N]`.
+Assembly worker — `task(category="deep", load_skills=["frontend", "visual-qa", "open-design", "data-scientist", "imagegen", "ulw-loop"], run_in_background=true, ...)`: before writing, read every available design and visualization skill and apply it — the report is a designed artifact, not a text dump. Run HTML/PDF output through the ULW loop with frontend and visual-qa, then repair until the reviewer says no broken parts and gives approval. Structure: executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (workers, waves, searches, verifications). Every claim cites `[Source N]`.
 
 ## Search craft
 
