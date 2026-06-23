@@ -98,6 +98,9 @@ test("#given dry-run doctor #when running the Node installer entrypoint #then pr
 
 	// then
 	assert.match(output, /^codex exec /);
+	assert.match(output, /--sandbox workspace-write/);
+	assert.match(output, /--add-dir \/tmp/);
+	assert.doesNotMatch(output, /--sandbox read-only/);
 	assert.match(output, /Use \$omo:lcx-doctor/);
 	assert.match(output, /Requested doctor arguments: --json/);
 	assert.match(output, /Return exactly one JSON object/);

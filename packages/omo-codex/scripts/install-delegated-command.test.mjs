@@ -75,6 +75,9 @@ test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCod
 	// then
 	assert.equal(ran, false);
 	assert.match(logged, /^codex exec /);
+	assert.match(logged, /--sandbox workspace-write/);
+	assert.match(logged, /--add-dir \/tmp/);
+	assert.doesNotMatch(logged, /--sandbox read-only/);
 	assert.match(logged, /Use \$omo:lcx-doctor/);
 	assert.match(logged, /Requested doctor arguments: --json/);
 	assert.doesNotMatch(logged, /oh-my-openagent omo doctor/);
