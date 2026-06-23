@@ -1,10 +1,12 @@
 import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
+import { createIdmBrowserConfig } from "./idm-browser"
 import { createCodegraphMcpConfig, type CodegraphMcpConfigOptions } from "./codegraph"
 import { createLspMcpConfig, type LocalMcpConfig } from "./lsp"
 import type { RuntimeExecutableResolver } from "./runtime-executable"
 import type { CodegraphConfig } from "../config/schema/codegraph"
+import type { BrowserAutomationConfig } from "../config/schema/browser-automation"
 
 export { McpNameSchema, type McpName } from "./types"
 
@@ -31,9 +33,10 @@ type BuiltinMcpSourceConfig = {
   readonly codegraph?: Partial<CodegraphConfig>
   readonly disabled_tools?: readonly string[]
   readonly websearch?: Parameters<typeof createWebsearchConfig>[0]
+  readonly browser_automation_engine?: BrowserAutomationConfig
 }
 
-export function createBuiltinMcps(disabledMcps: string[] = [], config?: BuiltinMcpSourceConfig, options: BuiltinMcpOptions = {}) {
+export async function createBuiltinMcps(disabledMcps: string[] = [], config?: BuiltinMcpSourceConfig, options: BuiltinMcpOptions = {}) {
   const mcps: Record<string, BuiltinMcpConfig> = {}
 
   if (!disabledMcps.includes("websearch")) {
@@ -62,6 +65,13 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: BuiltinM
       ...options.codegraph,
       resolveExecutable: options.resolveExecutable,
     })
+  }
+
+  if (!disabledMcps.includes("idm_browser")) {
+    const browserConfig = await createIdmBrowserConfig(config?.browser_automation_engine)
+    if (browserConfig) {
+      mcps.idm_browser = browserConfig
+    }
   }
 
   return mcps

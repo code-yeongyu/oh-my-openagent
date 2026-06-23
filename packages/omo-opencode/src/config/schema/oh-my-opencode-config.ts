@@ -29,6 +29,10 @@ import { TmuxConfigSchema } from "./tmux"
 import { TuiConfigSchema } from "./tui"
 import { StartWorkConfigSchema } from "./start-work"
 import { WebsearchConfigSchema } from "./websearch"
+import { ReasoningCoreConfigSchema } from "./reasoning-core"
+import { MemoryAgentConfigSchema } from "./memory-agent"
+import { McpPersistenceConfigSchema } from "./mcp-persistence"
+import { ProbeLabConfigSchema } from "./probe-lab"
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -43,6 +47,11 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(z.string()).optional(),
   disabled_skills: z.array(z.string()).optional(),
+  /**
+   * Per-agent skill denylist. Map of agent name to skill names that the agent must not load.
+   * Enforced at the `skill` tool's execute(). IDM extension.
+   */
+  disabled_skills_per_agent: z.record(z.string(), z.array(z.string())).optional(),
   disabled_hooks: z.array(z.string()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
@@ -99,6 +108,14 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: StartWorkConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, ralph loop) */
   default_mode: DefaultModeConfigSchema.optional(),
+  /** ASPIC+ reasoning-core integration (Rust binary at localhost:8080). IDM extension. */
+  reasoning_core: ReasoningCoreConfigSchema.optional(),
+  /** Multi-tier memory agent (Mem0, claude-mem, Vespa, Voyage, Cohere). IDM extension. */
+  memory_agent: MemoryAgentConfigSchema.optional(),
+  /** Auto-persist TUI runtime MCP enable/disable toggles to project-local opencode.json. IDM extension. */
+  mcp_persistence: McpPersistenceConfigSchema.optional(),
+  /** Probe-lab anti-bot research tuning (driver registration, fingerprinting). IDM extension. */
+  probe_lab: ProbeLabConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

@@ -47,8 +47,10 @@ export async function applyMcpConfig(params: {
     }
   }
 
+  const builtinMcps = await createBuiltinMcps(disabledMcps, params.pluginConfig, { cwd: params.ctx.directory });
+
   const merged = {
-    ...createBuiltinMcps(disabledMcps, params.pluginConfig, { cwd: params.ctx.directory }),
+    ...builtinMcps,
     ...mcpResult.servers,
     ...(userMcp ?? {}),
     ...params.pluginComponents.mcpServers,

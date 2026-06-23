@@ -1,0 +1,6 @@
+export type { EmailInbox, EmailMatch, WaitForCodeOptions } from "./types"
+export { MailwaveInbox } from "./mailwave"
+export { EmailnatorInbox } from "./emailnator"
+export { MailTmInbox, type MailTmFreshOptions } from "./mailtm"
+export { SmailProInbox, type SmailProInboxType, type SmailProFreshOptions } from "./smailpro"
+export { resolveSmailProKey } from "./smailpro-api-key"

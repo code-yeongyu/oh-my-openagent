@@ -13,6 +13,8 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
+import { createThemisAgent, themisPromptMetadata } from "./themis"
+import { createFormalizerAgent, FORMALIZER_PROMPT_METADATA } from "./formalizer"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -26,6 +28,7 @@ import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
+import { maybeCreateThemisConfig } from "./builtin-agents/themis-agent"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -42,6 +45,8 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
   "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as AgentFactory,
+  themis: createThemisAgent,
+  formalizer: createFormalizerAgent,
 }
 
 /**
@@ -56,6 +61,8 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
+  themis: themisPromptMetadata,
+  formalizer: FORMALIZER_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(
@@ -176,6 +183,24 @@ export async function createBuiltinAgents(
   })
   if (atlasConfig) {
     result["atlas"] = atlasConfig
+  }
+
+  const themisConfig = maybeCreateThemisConfig({
+    disabledAgents,
+    agentOverrides,
+    availableModels,
+    systemDefaultModel,
+    isFirstRunNoCache,
+    availableAgents,
+    availableSkills: buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills, teamModeEnabled, "themis"),
+    availableCategories,
+    mergedCategories,
+    directory,
+    useTaskSystem,
+    disableOmoEnv,
+  })
+  if (themisConfig) {
+    result["themis"] = themisConfig
   }
 
   return result

@@ -8,6 +8,8 @@ export { sessionExists } from "./session-manager/storage"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { createSkillMcpTool } from "./skill-mcp"
+export { createReasonArgueTool, createReasonSolveTool } from "./reasoning-core"
+export { createSubmitDeliberationTool } from "./submit-deliberation"
 
 import {
   createBackgroundOutput,
@@ -33,6 +35,44 @@ export {
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
 export { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
+export {
+  createProbeHypothesisAddTool,
+  createProbeRunTool,
+  createProbeHypothesisEvidenceTool,
+  createProbeHypothesisStatusTool,
+  createProbeQuestionAddTool,
+  createProbeQuestionStatusTool,
+  createProbeExperimentCreateTool,
+  createProbeProviderRegisterTool,
+  createProbeProviderHealthTool,
+  createProbeCaptureGetTool,
+  createProbeQuestionListTool,
+  createProbeQuestionParkTool,
+  createProbeFingerprintRegisterTool,
+  createProbeProviderRefreshTool,
+  createProbeProviderBootstrapTool,
+  createProbeExportTool,
+  createProbeAuditLogTool,
+  createProbeReplayTool,
+  createProbeProviderRotateTool,
+  createProbePoolBurnBudgetTool,
+  createProbeCanaryLockTool,
+  createProbeExperimentRunTool,
+  createProbeExperimentStatusTool,
+  createProbeExperimentAbortTool,
+  createProbeCaptureDiffTool,
+  createProbeMetricsGetTool,
+  createProbeFingerprintVerifyTool,
+  createProbeFingerprintMatrixTool,
+  createProbeReplayChainTool,
+  createProbeHypothesisSupersedeTool,
+  createProbeHypothesisResurrectTool,
+  createProbeAlertsEvaluateTool,
+  createProbeRetentionRunTool,
+  createProbeCredentialsAutoRotateTool,
+  createProbeCifThresholdScanTool,
+  createProbeRateLimitScanTool,
+} from "./probe-lab"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager

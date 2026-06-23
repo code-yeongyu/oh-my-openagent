@@ -1,0 +1,5 @@
+export { createActionCache, type ActionCache, type CachedAction } from "./action-cache"
+export { observeAXTree, type ObservableElement } from "./observe"
+export { resolveSelector, type SelectorResolveResult } from "./selector-resolver"
+export { act, type ActResult } from "./act"
+export { extract, type ExtractOptions, type ExtractResult } from "./extract"

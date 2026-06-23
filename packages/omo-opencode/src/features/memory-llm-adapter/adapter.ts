@@ -1,0 +1,147 @@
+import { resolveClaudeMemLlmAdapterConfig } from "./config"
+import type {
+  ClaudeMemLlmAdapterConfig,
+  ClaudeMemLlmAdapterDeps,
+  OpenAiChatCompletionRequest,
+} from "./types"
+import { fetchProviderResponse } from "./provider-request"
+
+type ProviderAttempt = {
+  name: string
+  url: string
+  model: string
+  authHeader: string
+}
+
+export function createChatCompletionsHandler(deps: ClaudeMemLlmAdapterDeps) {
+  return async function handleChatCompletions(request: Request): Promise<Response> {
+    const url = new URL(request.url)
+
+    if (url.pathname !== "/v1/chat/completions") {
+      return new Response("Not Found", { status: 404 })
+    }
+
+    if (request.method !== "POST") {
+      return new Response("Method Not Allowed", { status: 405 })
+    }
+
+    if (deps.config.authToken) {
+      const authHeader = request.headers.get("authorization")
+      if (authHeader !== `Bearer ${deps.config.authToken}`) {
+        return Response.json({ error: { message: "Unauthorized" } }, { status: 401 })
+      }
+    }
+
+    let body: OpenAiChatCompletionRequest
+    try {
+      body = (await request.json()) as OpenAiChatCompletionRequest
+    } catch {
+      return Response.json({ error: { message: "Invalid JSON request body" } }, { status: 400 })
+    }
+
+    // Reasoning-capable models (deepseek-v4-flash et al.) consume the output
+    // budget on internal reasoning when max_tokens is low, leaving an empty
+    // `content` field. Force a floor so XML-demanding callers (claude-mem
+    // observation parser) get the full structured response.
+    const MIN_OUTPUT_TOKENS = 4096
+    body.max_tokens = Math.max(body.max_tokens ?? 0, MIN_OUTPUT_TOKENS)
+
+    const attempts = buildProviderAttempts(deps.config)
+    const errors: string[] = []
+
+    for (const attempt of attempts) {
+      let response: Awaited<ReturnType<typeof fetchProviderResponse>>
+      try {
+        response = await fetchProviderResponse(
+          deps.fetchImpl,
+          attempt.url,
+          {
+            method: "POST",
+            headers: {
+              authorization: attempt.authHeader,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              ...body,
+              model: attempt.model,
+              stream: false,
+              ...(deps.config.providerOverride !== undefined
+                ? { provider: deps.config.providerOverride }
+                : {}),
+            }),
+          },
+          deps.config.requestTimeoutMs,
+        )
+      } catch (err) {
+        errors.push(`${attempt.name}: ${err instanceof Error ? err.message : String(err)}`)
+        continue
+      }
+
+      if (response.ok) {
+        return new Response(response.text, {
+          status: response.status,
+          headers: {
+            "content-type": response.contentType ?? "application/json",
+          },
+        })
+      }
+
+      errors.push(`${attempt.name}: ${response.status} ${response.text}`)
+    }
+
+    return Response.json(
+      {
+        error: {
+          message: `All claude-mem adapter providers failed: ${errors.join(" | ")}`,
+        },
+      },
+      { status: 502 },
+    )
+  }
+}
+
+export function startClaudeMemLlmAdapterServer(
+  config: ClaudeMemLlmAdapterConfig = resolveClaudeMemLlmAdapterConfig(),
+  deps?: Partial<Omit<ClaudeMemLlmAdapterDeps, "config">>,
+) {
+  const fetchImpl = deps?.fetchImpl ?? globalThis.fetch
+  const handleChatCompletions = createChatCompletionsHandler({ config, fetchImpl })
+
+  return Bun.serve({
+    hostname: config.host,
+    port: config.port,
+    fetch(request) {
+      const url = new URL(request.url)
+      if (url.pathname === "/health") {
+        return Response.json({ status: "ok", provider: "claude-mem-llm-adapter" })
+      }
+      return handleChatCompletions(request)
+    },
+  })
+}
+
+function buildProviderAttempts(config: ClaudeMemLlmAdapterConfig): ProviderAttempt[] {
+  const attempts: ProviderAttempt[] = [
+    {
+      name: "opencode-go-primary",
+      url: config.endpoint,
+      model: config.primaryModel,
+      authHeader: `Bearer ${config.apiKey}`,
+    },
+  ]
+  if (config.fallbackModel && config.fallbackModel !== config.primaryModel) {
+    attempts.push({
+      name: "opencode-go-fallback",
+      url: config.endpoint,
+      model: config.fallbackModel,
+      authHeader: `Bearer ${config.apiKey}`,
+    })
+  }
+  return attempts
+}
+
+if (import.meta.main) {
+  const config = resolveClaudeMemLlmAdapterConfig()
+  const server = startClaudeMemLlmAdapterServer(config)
+  console.log(`claude-mem adapter listening on http://${config.host}:${server.port}`)
+}

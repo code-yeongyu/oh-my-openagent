@@ -111,6 +111,45 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
     ],
   },
+  formalizer: {
+    fallbackChain: [
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+    ],
+    variant: "xhigh",
+  },
+  themis: {
+    fallbackChain: [
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "xhigh",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-4-7",
+        variant: "max",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.1" },
+    ],
+  },
   metis: {
     fallbackChain: [
       {
@@ -178,6 +217,24 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "big-pickle" },
+    ],
+  },
+  "themis-unrestricted": {
+    fallbackChain: [
+      { providers: ["ds2api"], model: "deepseek-v4-pro", variant: "T+S" },
+      { providers: ["opencode-go"], model: "deepseek-v4-pro", variant: "max" },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
+    ],
+  },
+  "formalizer-unrestricted": {
+    fallbackChain: [
+      { providers: ["ds2api"], model: "deepseek-v4-pro", variant: "T+S" },
+      {
+        providers: ["opencode-go"],
+        model: "deepseek-v4-pro",
+        variant: "xhigh",
+      },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
     ],
   },
 };

@@ -1,0 +1,5 @@
+export { getAudiencesForDomain, type AudienceDefinition, type AudienceDomain } from "./audience-categories"
+export { analyzeAudienceConsensus } from "./consensus-analyzer"
+export { detectDomain } from "./domain-detector"
+export { solveValueBasedArgumentation } from "./vaf-solver"
+export { extractValueDimensions, theoryContainsValueTags, VALUE_DIMENSIONS, type ValueDimension } from "./values-schema"

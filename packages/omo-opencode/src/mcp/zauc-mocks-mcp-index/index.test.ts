@@ -14,14 +14,14 @@ function mockLocalMcps(): void {
 }
 
 describe("createBuiltinMcps", () => {
-  test("should return all MCPs when disabled_mcps is empty", () => {
+  test("should return all MCPs when disabled_mcps is empty", async () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
     const disabledMcps: string[] = []
 
     // when
-    const result = createBuiltinMcps(disabledMcps)
+    const result = await createBuiltinMcps(disabledMcps)
 
     // then
     expect(Object.keys(result).length).toBeGreaterThan(0)
@@ -32,14 +32,14 @@ describe("createBuiltinMcps", () => {
     expect(result.codegraph).toBeDefined()
   })
 
-  test("should filter out disabled MCPs", () => {
+  test("should filter out disabled MCPs", async () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
     const disabledMcps = ["websearch"]
 
     // when
-    const result = createBuiltinMcps(disabledMcps)
+    const result = await createBuiltinMcps(disabledMcps)
 
     // then
     expect(result.websearch).toBeUndefined()
@@ -49,7 +49,7 @@ describe("createBuiltinMcps", () => {
     expect(result.codegraph).toBeDefined()
   })
 
-  test("should keep lsp when it uses a bootstrap command", () => {
+  test("should keep lsp when it uses a bootstrap command", async () => {
     // given
     mock.module("../lsp", () => ({
       createLspMcpConfig: () => ({ type: "local", command: ["node", "-e", "bootstrap", "/repo"], enabled: true }),
@@ -57,20 +57,20 @@ describe("createBuiltinMcps", () => {
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
 
     // when
-    const result = createBuiltinMcps([])
+    const result = await createBuiltinMcps([])
 
     // then
     expect(result.lsp).toBeDefined()
   })
 
-  test("should return empty array when all MCPs are disabled", () => {
+  test("should return empty array when all MCPs are disabled", async () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
     const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "codegraph"]
 
     // when
-    const result = createBuiltinMcps(disabledMcps)
+    const result = await createBuiltinMcps(disabledMcps)
 
     // then
     const remainingMcpNames = Object.keys(result)
@@ -82,25 +82,25 @@ describe("createBuiltinMcps", () => {
     expect(remainingMcpNames).toEqual([])
   })
 
-  test("should omit codegraph when its config section is disabled", () => {
+  test("should omit codegraph when its config section is disabled", async () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
 
     // when
-    const result = createBuiltinMcps([], { codegraph: { enabled: false } })
+    const result = await createBuiltinMcps([], { codegraph: { enabled: false } })
 
     // then
     expect(result.codegraph).toBeUndefined()
   })
 
-  test("should omit codegraph when it is listed in disabled_mcps", () => {
+  test("should omit codegraph when it is listed in disabled_mcps", async () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
 
     // when
-    const result = createBuiltinMcps(["codegraph"], { codegraph: { enabled: true } })
+    const result = await createBuiltinMcps(["codegraph"], { codegraph: { enabled: true } })
 
     // then
     expect(result.codegraph).toBeUndefined()
@@ -112,7 +112,7 @@ describe("createBuiltinMcps", () => {
     const { createBuiltinMcps } = await import(`../index?codegraph-missing=${Date.now()}-${Math.random()}`)
 
     // when
-    const result = createBuiltinMcps([], { codegraph: { enabled: true } }, {
+    const result = await createBuiltinMcps([], { codegraph: { enabled: true } }, {
       codegraph: {
         fileExists: () => false,
         homeDir: "/tmp/omo-codegraph-missing-home",
@@ -134,7 +134,7 @@ describe("createBuiltinMcps", () => {
     const { createBuiltinMcps } = await import(`../index?runtime=${Date.now()}-${Math.random()}`)
 
     // when
-    const result = createBuiltinMcps([], undefined, {
+    const result = await createBuiltinMcps([], undefined, {
       cwd: process.cwd(),
       resolveExecutable: (commandName: string) => {
         if (commandName === "node") return { command: nodePath, available: true }

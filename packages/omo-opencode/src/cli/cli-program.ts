@@ -5,6 +5,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { createOpenAICompatCommand } from "./openai-compat"
 import { configureRuntimeCommands } from "./runtime-commands"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -240,6 +241,8 @@ Examples:
 configureRuntimeCommands(program)
 
 program.addCommand(createMcpOAuthCommand())
+
+program.addCommand(createOpenAICompatCommand())
 
 export function runCli(): void {
   program.parse()
