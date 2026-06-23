@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const MorpheusTasksConfigSchema = z.object({
+const MorpheusTasksConfigSchema = z.object({
   /** Absolute or relative storage path override. When set, bypasses global config dir. */
   storage_path: z.string().optional(),
   /** Force task list ID (alternative to env ULTRAWORK_TASK_LIST_ID) */

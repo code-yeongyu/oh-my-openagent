@@ -17,7 +17,7 @@ const DEFAULT_SENSITIVE_FILE_PATTERNS = [
   ".pypirc",
 ]
 
-export const SecretScanningConfigSchema = z.object({
+const SecretScanningConfigSchema = z.object({
   /** Enable secret scanning before git commit/push (default: true) */
   enabled: z.boolean().default(true),
   /** Secret detection tool to use (default: gitleaks) */
@@ -28,7 +28,7 @@ export const SecretScanningConfigSchema = z.object({
   allowlist_paths: z.array(z.string()).optional(),
 })
 
-export const EnvFileGuardConfigSchema = z.object({
+const EnvFileGuardConfigSchema = z.object({
   /** Enable guard preventing writes to sensitive files (default: true) */
   enabled: z.boolean().default(true),
   /** Glob patterns for files that should be blocked from write/edit */
@@ -37,7 +37,7 @@ export const EnvFileGuardConfigSchema = z.object({
   allowed_paths: z.array(z.string()).optional(),
 })
 
-export const DependencyAuditConfigSchema = z.object({
+const DependencyAuditConfigSchema = z.object({
   /** Enable dependency vulnerability auditing (default: false) */
   enabled: z.boolean().default(false),
   /** Automatically audit when package.json/bun.lockb changes (default: true) */

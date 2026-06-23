@@ -49,7 +49,7 @@ export const BuiltinSkillNameSchema = z.enum([
   "matrixx-self-config",
 ])
 
-export const OverridableAgentNameSchema = z.enum([
+const OverridableAgentNameSchema = z.enum([
   "build",
   "plan",
   "morpheus",

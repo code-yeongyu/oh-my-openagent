@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const SkillSourceSchema = z.union([
+const SkillSourceSchema = z.union([
   z.string(),
   z.object({
     path: z.string(),
@@ -9,7 +9,7 @@ export const SkillSourceSchema = z.union([
   }),
 ])
 
-export const SkillDefinitionSchema = z.object({
+const SkillDefinitionSchema = z.object({
   description: z.string().optional(),
   template: z.string().optional(),
   from: z.string().optional(),
@@ -24,7 +24,7 @@ export const SkillDefinitionSchema = z.object({
   disable: z.boolean().optional(),
 })
 
-export const SkillEntrySchema = z.union([z.boolean(), SkillDefinitionSchema])
+const SkillEntrySchema = z.union([z.boolean(), SkillDefinitionSchema])
 
 export const SkillsConfigSchema = z.union([
   z.array(z.string()),
