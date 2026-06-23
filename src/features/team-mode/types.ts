@@ -49,17 +49,6 @@ const TeamReferenceSchema = z.object({
   description: z.string().optional(),
 }).strict()
 
-const TeamSpecSchema = z.object({
-  version: z.literal(1),
-  name: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  description: z.string().optional(),
-  createdAt: z.number().int().positive(),
-  leadAgentId: z.string(),
-  teamAllowedPaths: z.array(z.string()).optional(),
-  sessionPermission: z.string().optional(),
-  members: z.array(MemberSchema).min(1).max(8),
-})
-
 const MessageSchema = z.object({
   version: z.literal(1),
   messageId: z.string().uuid(),
@@ -116,19 +105,6 @@ const ShutdownRequestSchema = z.object({
   approvedAt: z.number().int().positive().optional(),
   rejectedReason: z.string().optional(),
 }).strict()
-
-const RuntimeStateSchema = z.object({
-  version: z.literal(1),
-  teamRunId: z.string().uuid(),
-  teamName: z.string(),
-  specSource: z.enum(["project", "user"]),
-  createdAt: z.number().int().positive(),
-  status: z.enum(RUNTIME_STATUSES),
-  leadSessionId: z.string().optional(),
-  members: z.array(RuntimeStateMemberSchema),
-  shutdownRequests: z.array(ShutdownRequestSchema).default([]),
-  bounds: RuntimeBoundsSchema,
-})
 
 export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
   verdict: "eligible" | "conditional" | "hard-reject"
