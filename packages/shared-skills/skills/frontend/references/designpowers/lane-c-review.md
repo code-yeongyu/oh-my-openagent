@@ -1,27 +1,27 @@
 # Lane C: Review & Repair
 
-Lane C runs after implementation and before final sign-off. It requires objective `visual-qa` evidence first, then applies designpowers judgment to the same artifact, then hands the reconciled context to `review-work`. The order matters: measurements and screenshots anchor the review; designpowers adds the human-centered judgment OmO does not fully encode.
+Lane C runs after implementation and before final sign-off. It requires objective `visual-qa` evidence first, then applies designpowers judgment to the same artifact, then hands the reconciled context to `review-work`. The order matters: measurements and screenshots anchor the review; designpowers adds the human-centered judgment does not fully encode.
 
-## OmO Phase Owner
+## Phase Owner
 
-| Capability | Vendored designpowers source | OmO owner | Mapping |
+| Capability | Materialized designpowers source | owner | Mapping |
 |---|---|---|---|
-| Review an existing surface without rerunning discovery | `design-review` | `visual-qa` plus `review-work` | Use only for critique context; OmO still captures objective artifacts and final review. |
+| Review an existing surface without rerunning discovery | `design-review` | `visual-qa` plus `review-work` | Use only for critique context; still captures objective artifacts and final review. |
 | Critique against brief, plan, personas, design principles, taste, and craft | `designpowers-critique` | `visual-qa` evidence, then `review-work` | Run after screenshots and objective checks exist, so findings cite the built surface. |
-| WCAG, COGA, keyboard, screen reader, motion, content, and adaptive needs | agent `accessibility-reviewer` | `visual-qa` evidence, then `review-work` | Treat the vendored agent file as reviewer-role guidance. Name who is affected and exact fixes. |
+| WCAG, COGA, keyboard, screen reader, motion, content, and adaptive needs | agent `accessibility-reviewer` | `visual-qa` evidence, then `review-work` | Treat the materialized agent file as reviewer-role guidance. Name who is affected and exact fixes. |
 | Nielsen heuristics and cognitive walkthroughs | `heuristic-evaluation` plus agent `heuristic-evaluator` | `visual-qa` evidence, then `review-work` | Walk every key task and classify H1-H10 findings with severity. |
 | Persona and task walkthroughs | `synthetic-user-testing` | `visual-qa` evidence, then `review-work` | Validate that inclusive-personas can complete real tasks under their assistive or situational contexts. |
 | Human testing plan when needed | `usability-testing` | `review-work` context | Produce a test plan or follow-up recommendation when synthetic testing is insufficient. |
 | Completion evidence discipline | `verification-before-shipping` | `review-work` | Summarize plan completion, accessibility results, persona walkthrough, content status, and debt status. |
 
-Vendored agent references for this lane: `design-critic`, `accessibility-reviewer`, and `heuristic-evaluator`.
+Materialized agent references for this lane: `design-critic`, `accessibility-reviewer`, and `heuristic-evaluator`.
 
 ## Prompt Injection
 
 Use this sequence for UI review and repair:
 
 ```text
-Run OmO `visual-qa` first against the actual built surface. Capture objective screenshots, diffs, browser or terminal artifacts, and any required visual QA report.
+Run `visual-qa` first against the actual built surface. Capture objective screenshots, diffs, browser or terminal artifacts, and any required visual QA report.
 
 Then apply Lane C Review & Repair to the same artifact:
 - designpowers-critique checks brief, plan, principles, personas, taste, craft, and design-system alignment
@@ -33,7 +33,7 @@ Then apply Lane C Review & Repair to the same artifact:
 
 Reconcile conflicts by this priority: accessibility over aesthetics, usability over style, brief over opinion, personas to break ties, user escalation for unresolved trade-offs.
 
-Pass the reconciled Lane C report, objective visual-qa artifacts, open findings, and accepted design debt to OmO `review-work` for final implementation review.
+Pass the reconciled Lane C report, objective visual-qa artifacts, open findings, and accepted design debt to `review-work` for final implementation review.
 ```
 
 ## Evidence Requirements

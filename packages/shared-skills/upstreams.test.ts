@@ -43,12 +43,13 @@ describe("frontend upstream provenance submodules", () => {
 		"packages/shared-skills/upstreams/open-design",
 		"packages/shared-skills/upstreams/taste-skill",
 		"packages/shared-skills/upstreams/ui-ux-pro-max",
+		"packages/shared-skills/upstreams/designpowers",
 	];
 
-	test("declares all 3 frontend content upstreams", () => {
+	test("declares all 4 frontend content upstreams", () => {
 		// given the committed .gitmodules
 		const paths = submodules.map((entry) => entry.path);
-		// then the 3 frontend content upstreams are declared
+		// then the 4 frontend content upstreams are declared
 		for (const expected of expectedUpstreams) {
 			expect(paths).toContain(expected);
 		}

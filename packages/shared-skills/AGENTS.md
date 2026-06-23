@@ -25,10 +25,10 @@ skills/ (source)
 
 ## FRONTEND THIRD-PARTY REFS — SUBMODULE-ONLY + BUILD-MATERIALIZE (DMCA-safe)
 
-The `frontend` skill's brand / taste-skill / ui-ux-db references are third-party content. Under the DMCA-safe model the repo holds ZERO committed copies; each upstream is a pinned git submodule under `upstreams/<name>` (NOT under `skills/`, so it never lands in the tarball), and the build materializes the referenced files VERBATIM, path-mapped, into `skills/frontend/references/{design,ui-ux-db}`.
+The `frontend` skill's brand / taste-skill / ui-ux-db / designpowers references are third-party content. Under the DMCA-safe model the repo holds ZERO committed copies; each upstream is a pinned git submodule under `upstreams/<name>` (NOT under `skills/`, so it never lands in the tarball), and the build materializes the referenced files VERBATIM, path-mapped, into `skills/frontend/references/{design,ui-ux-db,designpowers/vendor}`.
 
 ```
-upstreams/{open-design,taste-skill,ui-ux-pro-max}   # pinned submodules (provenance, build input)
+upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submodules (provenance, build input)
   └─ packages/shared-skills/scripts/frontend-refs-manifest.mjs   # single source of truth: partition + upstream path map
        └─ packages/shared-skills/scripts/materialize-frontend-refs.mjs   # verbatim path-mapped copy → references/{design,ui-ux-db}
             └─ chokepoint: packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs  (submodule init + materialize)

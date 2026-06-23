@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { designpowersMaterializeMap, designpowersRelativePaths } from "./designpowers-refs-manifest.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const sharedSkillsRoot = join(here, "..");
@@ -118,11 +119,15 @@ export function uiUxDbMaterializeMap() {
 }
 
 export function thirdPartyMaterializeMap() {
-	return { ...designMaterializeMap(), ...uiUxDbMaterializeMap() };
+	return { ...designMaterializeMap(), ...uiUxDbMaterializeMap(), ...designpowersMaterializeMap() };
 }
 
 export function thirdPartyRelativePaths() {
 	return Object.keys(thirdPartyMaterializeMap()).sort();
+}
+
+export function designpowersThirdPartyRelativePaths() {
+	return designpowersRelativePaths();
 }
 
 export function keptDesignRelativePaths() {

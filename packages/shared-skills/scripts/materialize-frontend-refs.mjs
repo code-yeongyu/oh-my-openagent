@@ -23,6 +23,7 @@ export function materializeFrontendRefs({ strict = false } = {}) {
 	}
 
 	rmSync(join(frontendSkillRoot, "references", "ui-ux-db"), { recursive: true, force: true });
+	rmSync(join(frontendSkillRoot, "references", "designpowers", "vendor"), { recursive: true, force: true });
 
 	let materialized = 0;
 	for (const [relTarget, { upstream, source }] of Object.entries(map)) {
