@@ -5907,7 +5907,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.12.1",
+    version: "4.13.0",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6042,7 +6042,7 @@ function createPostHogClient(source, options = {}) {
     osProvider: options.osProvider ?? resolveOsProvider(),
     product: createCodexTelemetryProductConfig(),
     source,
-    transportFactory: options.transportFactory
+    transportFactory: options.transportFactory ?? transportFactoryOverride ?? undefined
   });
   if (!client.enabled) {
     return NO_OP_POSTHOG;
@@ -6093,7 +6093,7 @@ function __setActivityStateProviderForTesting(provider) {
 function __resetActivityStateProviderForTesting() {
   activityStateProviderOverride = null;
 }
-var osProviderOverride2 = null, activityStateProviderOverride = null, NO_OP_POSTHOG;
+var osProviderOverride2 = null, activityStateProviderOverride = null, transportFactoryOverride = null, NO_OP_POSTHOG;
 var init_posthog = __esm(() => {
   init_src();
   init_diagnostics2();
@@ -8015,6 +8015,30 @@ function parseProfileMatch(match) {
   return profile;
 }
 
+// packages/omo-codex/src/install/codex-multi-agent-mode-config.ts
+var CODEX_MULTI_AGENT_MODE_KEY = "multi_agent_mode";
+var CODEX_MULTI_AGENT_MODE_STEERING = "steering";
+function ensureCodexMultiAgentModeConfig(config) {
+  if (readRootStringSetting(config, CODEX_MULTI_AGENT_MODE_KEY) === CODEX_MULTI_AGENT_MODE_STEERING) {
+    return config;
+  }
+  return replaceOrInsertRootSetting(config, CODEX_MULTI_AGENT_MODE_KEY, JSON.stringify(CODEX_MULTI_AGENT_MODE_STEERING));
+}
+function readRootStringSetting(config, key) {
+  for (const line of config.split(/\n/)) {
+    if (isSectionHeader2(line))
+      return null;
+    const match = line.trimStart().match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*)"/);
+    if (match?.[1] === key)
+      return match[2] ?? null;
+  }
+  return null;
+}
+function isSectionHeader2(line) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("[") && trimmed.endsWith("]");
+}
+
 // packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
 var CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION = 1e4;
@@ -8061,6 +8085,7 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
   config = ensureFeatureEnabled(config, "child_agents_md");
+  config = ensureCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
   config = ensureCodexMultiAgentV2Config(config);
   if (input.autonomousPermissions === true)
@@ -8454,7 +8479,7 @@ function extractServiceTier(content) {
 }
 function extractTopLevelStringSetting(content, key) {
   for (const line of content.split(/\n/)) {
-    if (isSectionHeader2(line))
+    if (isSectionHeader3(line))
       return null;
     const rawValue = topLevelStringSettingRawValue(line, key);
     if (rawValue === undefined)
@@ -8475,7 +8500,7 @@ function replaceTopLevelStringSetting(content, key, value, options) {
   const lines = content.split(/\n/);
   for (let index = 0;index < lines.length; index += 1) {
     const line = lines[index];
-    if (line === undefined || isSectionHeader2(line))
+    if (line === undefined || isSectionHeader3(line))
       break;
     if (topLevelStringSettingRawValue(line, key) === undefined)
       continue;
@@ -8505,7 +8530,7 @@ function topLevelStringSettingRawValue(line, key) {
   return rawValue;
 }
 function topLevelInsertionIndex(lines) {
-  const sectionIndex = lines.findIndex((line) => isSectionHeader2(line));
+  const sectionIndex = lines.findIndex((line) => isSectionHeader3(line));
   const topLevelEnd = sectionIndex === -1 ? lines.length : sectionIndex;
   let insertionIndex = topLevelEnd;
   while (insertionIndex > 0 && lines[insertionIndex - 1] === "") {
@@ -8513,7 +8538,7 @@ function topLevelInsertionIndex(lines) {
   }
   return insertionIndex;
 }
-function isSectionHeader2(line) {
+function isSectionHeader3(line) {
   const trimmed = line.trim();
   return trimmed.startsWith("[") && trimmed.endsWith("]");
 }

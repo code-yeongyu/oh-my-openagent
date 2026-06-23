@@ -73,11 +73,42 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
+    expect(content).toContain('multi_agent_mode = "steering"')
     expect(content).toContain("[features.multi_agent_v2]")
     const v2Section = content.slice(content.indexOf("[features.multi_agent_v2]"))
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2Section).not.toContain("enabled")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
+  })
+
+  test("#given queue multi-agent mode #when updating config #then switches to steering mode for team support", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-mode-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        'multi_agent_mode = "queue"',
+        "",
+        "[features]",
+        "multi_agent = true",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('multi_agent_mode = "steering"')
+    expect(content).not.toContain('multi_agent_mode = "queue"')
   })
 
   test("#given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning while setting thread limit", async () => {
