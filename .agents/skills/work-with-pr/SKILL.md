@@ -139,6 +139,8 @@ git push -u origin "$BRANCH_NAME"
 
 Write the PR body in English, detailed enough that a reviewer understands the change without reading the diff. The Verification section is where the manual-QA evidence from Phase 1 earns its place — cite what you actually drove and where the artifact lives, not just that tests passed.
 
+If the PR body needs screenshots or terminal PNGs, follow `docs/reference/github-attachment-upload.md`: upload via GitHub user attachments from an authenticated web session, include only the final `https://github.com/user-attachments/assets/<uuid>` URLs, and never commit temporary images, use release assets, use external hosts, or log cookies/tokens.
+
 ```bash
 gh pr create \
   --base "$BASE_BRANCH" \
