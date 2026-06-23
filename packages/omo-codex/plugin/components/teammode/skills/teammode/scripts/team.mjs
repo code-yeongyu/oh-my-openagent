@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { buildGuide, buildMemberPrompt } from "./team-guide.mjs";
+import { buildGuide, buildMemberPrompt, codexThreadLink } from "./team-guide.mjs";
 import {
 	addMember,
 	archive,
@@ -164,8 +164,9 @@ const handlers = {
 		setMemberWorktree(team, { id: member.id, path: result.path, branch: result.branch });
 		await persist(team, dir);
 		const note = result.created ? "" : " (already exists)";
+		const thread = member.threadId ? `\nMember thread: ${codexThreadLink(member.threadId)}` : "";
 		process.stdout.write(
-			`worktree for member ${member.id}${note}: ${result.path} on branch ${result.branch} (off ${result.base}).\nTell that member to: cd "${result.path}"\n`,
+			`worktree for member ${member.id}${note}: ${result.path} on branch ${result.branch} (off ${result.base}).${thread}\nTell that member to: cd "${result.path}"\n`,
 		);
 	},
 
@@ -232,7 +233,8 @@ const handlers = {
 		const { team } = await loadTeam(cwd, sessionId);
 		process.stdout.write(`Team ${team.teamName} [${team.status}] - leader: main session - ${team.members.length} member(s)\n`);
 		for (const m of team.members) {
-			process.stdout.write(`  ${m.id} (${m.lens}) ${m.focus} -> ${m.deliverable || "(no deliverable)"} [${m.status}]${m.threadId ? ` thread=${m.threadId}` : ""}${m.cwd ? ` cwd=${m.cwd}` : ""}\n`);
+			const thread = m.threadId ? ` thread=${m.threadId} link=${codexThreadLink(m.threadId)}` : "";
+			process.stdout.write(`  ${m.id} (${m.lens}) ${m.focus} -> ${m.deliverable || "(no deliverable)"} [${m.status}]${thread}${m.cwd ? ` cwd=${m.cwd}` : ""}\n`);
 		}
 		if (isUnderstaffed(team)) {
 			process.stdout.write(

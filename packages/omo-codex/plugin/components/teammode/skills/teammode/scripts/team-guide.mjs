@@ -5,8 +5,12 @@
 // writes it once at team creation, and every member thread is told to READ it instead of
 // receiving the rules inline each turn.
 
+export function codexThreadLink(threadId) {
+	return `codex://threads/${threadId}`;
+}
+
 function memberLine(member) {
-	const thread = member.threadId ? ` | thread ${member.threadId}` : " | thread not created yet";
+	const thread = member.threadId ? ` | thread ${member.threadId} (${codexThreadLink(member.threadId)})` : " | thread not created yet";
 	const wt = member.worktree?.path ? ` | worktree ${member.worktree.path}` : "";
 	const name = member.name ? ` "${member.name}"` : "";
 	const title = member.threadTitle ? ` | thread title \`${member.threadTitle}\`` : "";
@@ -23,7 +27,10 @@ that is a coordination signal: mark yourself \`blocked\` and tell the leader at 
 	}
 	const lines = team.members
 		.filter((m) => m.worktree?.path || m.worktree?.branch)
-		.map((m) => `- **${m.id}**: worktree \`${m.worktree.path ?? "(assign with bind-thread --cwd)"}\` on branch \`${m.worktree.branch ?? team.worktree.baseBranch}\``);
+		.map((m) => {
+			const thread = m.threadId ? `; thread ${codexThreadLink(m.threadId)}` : "";
+			return `- **${m.id}**: worktree \`${m.worktree.path ?? "(assign with bind-thread --cwd)"}\` on branch \`${m.worktree.branch ?? team.worktree.baseBranch}\`${thread}`;
+		});
 	return `## Worktrees (ISOLATION IS ON - this is not optional for you)
 
 This team runs each member in its own git worktree branched off \`${team.worktree.baseBranch}\`.
@@ -71,6 +78,8 @@ coordinate with each other, but the leader owns the final decision and integrati
 - **Reach the leader and your peers with \`codex_app.send_message_to_thread\` - not by narrating in
   your own thread, where no one reads it.** The address book is in team.json: the leader thread id
   is \`leader.sessionId\`, and each peer thread id is its \`members[].threadId\`.
+- **When you mention a Codex thread, include its app link too:** \`codex://threads/<threadId>\`.
+  These links are the fastest way for the leader to reopen worktree-backed member threads.
 - **Push a short message at each of these moments - never batch them into one report at the end:**
   - to the **leader**: every finding or decision, every file or sub-task you finish, a
     \`WORKING: <focus> - <phase>\` heartbeat every few tool calls so you never look stale, a
@@ -104,9 +113,10 @@ export function buildMemberPrompt(team, id) {
 	const guide = team.paths?.guide ?? ".omo/teams/<session_id>/guide.md";
 	const teamJson = team.paths?.team ?? ".omo/teams/<session_id>/team.json";
 	const where = member.cwd ? `Work inside \`${member.cwd}\`.` : "Work from the repository root unless your manual assigns a worktree.";
+	const threadLink = member.threadId ? `\nYour Codex thread link is ${codexThreadLink(member.threadId)}. Include it when reporting handoffs or worktree status.` : "";
 	return `You are member ${member.id}${member.name ? ` (${member.name})` : ""} of team ${team.teamName} - owner of: ${member.focus}. Your thread title is \`${member.threadTitle}\`.
 FIRST read your field manual at \`${guide}\`, then the team state at \`${teamJson}\`; they define your scope, deliverable, the leader, the artifacts directory, and the communication rules.
-${where}
+${where}${threadLink}
 Communicate with the team and leader in English; reply to the end user in the user's own language.
 Start now. Push updates to the leader and relevant peers with \`codex_app.send_message_to_thread\` as you work - findings, \`WORKING:\` heartbeats, and \`BLOCKED:\` the instant you stall - never just one report at the end.`;
 }
