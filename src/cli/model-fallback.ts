@@ -128,6 +128,3 @@ export function generateModelConfig(config: InstallConfig): GeneratedMatrixxConf
   }
 }
 
-export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {
-  return !config.hasClaude && !config.hasGemini && config.hasOpenAI
-}

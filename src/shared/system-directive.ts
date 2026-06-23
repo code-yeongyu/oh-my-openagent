@@ -27,16 +27,6 @@ export function isSystemDirective(text: string): boolean {
 }
 
 /**
- * Checks if a message contains system-generated content that should be excluded
- * from keyword detection and mode triggering.
- * @param text - The message text to check
- * @returns true if the message contains system-reminder tags
- */
-export function hasSystemReminder(text: string): boolean {
-  return /<system-reminder>[\s\S]*?<\/system-reminder>/i.test(text)
-}
-
-/**
  * Removes system-reminder tag content from text.
  * This prevents automated system messages from triggering mode keywords.
  * @param text - The message text to clean

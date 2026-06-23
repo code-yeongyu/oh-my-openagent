@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { type ParseError, parse, printParseErrorCode } from "jsonc-parser"
 
 interface JsoncParseResult<T> {
@@ -37,15 +37,6 @@ export function parseJsoncSafe<T = unknown>(content: string): JsoncParseResult<T
       offset: e.offset,
       length: e.length,
     })),
-  }
-}
-
-export function readJsoncFile<T = unknown>(filePath: string): T | null {
-  try {
-    const content = readFileSync(filePath, "utf-8")
-    return parseJsonc<T>(content)
-  } catch {
-    return null
   }
 }
 
