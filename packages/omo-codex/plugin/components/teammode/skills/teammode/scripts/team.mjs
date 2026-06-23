@@ -164,9 +164,11 @@ const handlers = {
 		setMemberWorktree(team, { id: member.id, path: result.path, branch: result.branch });
 		await persist(team, dir);
 		const note = result.created ? "" : " (already exists)";
-		const thread = member.threadId ? `\nMember thread: ${codexThreadLink(member.threadId)}` : "";
+		const thread = member.threadId
+			? `\nMember thread: ${codexThreadLink(member.threadId)}\nTell that member to: cd "${result.path}"`
+			: "\nMember thread is not bound yet; wait for the real Codex thread id, then bind-thread before sending bootstrap. After binding, send the member this worktree path.";
 		process.stdout.write(
-			`worktree for member ${member.id}${note}: ${result.path} on branch ${result.branch} (off ${result.base}).${thread}\nTell that member to: cd "${result.path}"\n`,
+			`worktree for member ${member.id}${note}: ${result.path} on branch ${result.branch} (off ${result.base}).${thread}\n`,
 		);
 	},
 

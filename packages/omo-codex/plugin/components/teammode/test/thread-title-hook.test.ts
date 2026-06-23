@@ -87,7 +87,7 @@ describe("thread title PostToolUse guidance", () => {
 		expect(actual).toBe("");
 	});
 
-	it("#given worktree-backed thread creation is pending #when the hook runs #then it tells Codex to title the thread once the thread id exists", () => {
+	it("#given worktree-backed thread creation is pending #when the hook runs #then it tells Codex to wait for the real thread before bootstrapping", () => {
 		// given
 		const output = runPostToolUseHook({
 			hook_event_name: "PostToolUse",
@@ -119,7 +119,7 @@ describe("thread title PostToolUse guidance", () => {
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
 		expect(parsed.hookSpecificOutput.additionalContext).toBe(
-			"PENDING WORKTREE ID remote-control:env:test-worktree: CALL codex_app.set_thread_title AS SOON AS THREAD ID EXISTS. USE THE REAL TASK/ROLE.",
+			"PENDING WORKTREE ID remote-control:env:test-worktree: WORKTREE THREAD IS NOT READY YET. DO NOT bind-thread OR SEND THE MEMBER BOOTSTRAP UNTIL A REAL THREAD ID EXISTS. THEN CALL codex_app.set_thread_title USING THE REAL TASK/ROLE.",
 		);
 	});
 });
