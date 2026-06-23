@@ -312,21 +312,141 @@ The system automatically recovers from common session failures without user inte
 - **JSON parse errors**: Recovers from malformed tool outputs
 
 Recovery happens transparently during agent execution. You see the result, not the failure.
-## Skills
+## Commands
 
-Skills provide specialized workflows with embedded MCP servers and detailed instructions. A Skill is a mechanism that injects **specialized knowledge (Context)** and **tools (MCP)** for specific domains into agents.
+Commands are slash-triggered workflows that execute predefined templates.
 
-### Built-in Skills
+### Built-in Commands
 
-| Skill              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **git-master**     | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering, style detection), Rebase Surgeon (history rewriting, conflict resolution, branch cleanup), History Archaeologist (finding when/where specific changes were introduced). |
-| **playwright**     | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
-| **agent-browser**  | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
-| **dev-browser**    | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
-| **frontend** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
-| **review-work**    | "review work", "review my work", "QA my work"         | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                      |
-| **$omo:remove-ai-slops**| "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                             |
+| Command              | Description                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
+| `/ralph-loop`        | Start self-referential development loop until completion                                   |
+| `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
+| `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
+| `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
+| `/start-work`        | Start Sisyphus work session from Prometheus plan                                           |
+| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
+| `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
+
+### /init-deep
+
+**Purpose**: Generate hierarchical AGENTS.md files throughout your project
+
+**Usage**:
+
+```
+/init-deep [--create-new] [--max-depth=N]
+```
+
+Creates directory-specific context files that agents automatically read:
+
+```
+project/
+├── AGENTS.md                        # Project-wide context
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # src-specific context
+│   └── components/
+│       └── AGENTS.md                # Component-specific context
+```
+
+### /ralph-loop
+
+**Purpose**: Self-referential development loop that runs until task completion
+
+**Named after**: Anthropic's Ralph Wiggum plugin
+
+**Usage**:
+
+```
+/ralph-loop "Build a REST API with authentication"
+/ralph-loop "Refactor the payment module" --max-iterations=50
+```
+
+**Behavior**:
+
+- Agent works continuously toward the goal
+- Detects `<promise>DONE</promise>` to know when complete
+- Auto-continues if agent stops without completion
+- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
+
+**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+
+### /ulw-loop
+
+**Purpose**: Same as ralph-loop but with ultrawork mode active
+
+Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+
+### /refactor
+
+**Purpose**: Intelligent refactoring with full toolchain
+
+**Usage**:
+
+```
+/refactor <target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
+```
+
+**Features**:
+
+- LSP-powered rename and navigation
+- AST-grep for pattern matching
+- Architecture analysis before changes
+- TDD verification after changes
+- Codemap generation
+
+### /start-work
+
+**Purpose**: Start execution from a Prometheus-generated plan
+
+**Usage**:
+
+```
+/start-work [plan-name]
+```
+
+Uses atlas agent to execute planned tasks systematically.
+
+### /stop-continuation
+
+**Purpose**: Stop all continuation mechanisms for this session
+
+Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
+
+### /handoff
+
+**Purpose**: Create a detailed context summary for continuing work in a new session
+
+Generates a structured handoff document capturing the current state, what was done, what remains, and relevant file paths — enabling seamless continuation in a fresh session.
+
+### Custom Commands
+
+Load custom commands from:
+
+- `.opencode/command/*.md` (project, OpenCode native)
+- `~/.config/opencode/command/*.md` (user, OpenCode native)
+- `.claude/commands/*.md` (project, Claude Code compat)
+- `~/.config/opencode/commands/*.md` (user, Claude Code compat)
+
+## Skill Sets
+
+Skill sets provide specialized workflows with embedded MCP servers and detailed instructions. They are automatically activated by matching task intent, so you do not need to study or preload everything before working. When you want to force one deliberately, call it by name in the prompt, slash command, or `load_skills` list.
+
+### Built-in Skill Sets
+
+| Skill set              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **git-master**         | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced).                              |
+| **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
+| **agent-browser**      | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
+| **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
+| **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
+| **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                     |
+| **ulw-research**       | `ulw-research`, `ultraresearch`, deep research requests | Maximum-saturation research. Runs parallel explore/librarian swarms across code, docs, web, and OSS repos; recursively follows `EXPAND` leads until convergence; proves contested claims by running code; and returns cited synthesis. `ultraresearch` is the legacy alias.                                                                   |
+| **$omo:remove-ai-slops** | "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                           |
+
+`ulw-research` is intentionally explicit. Ordinary questions and normal implementation context-gathering will not trigger a saturation swarm. Use `ulw-research` or `ultraresearch` when the research itself is the deliverable and every claim needs a citation, a proof artifact, or an execution-backed verdict.
 
 #### git-master Core Principles
 
@@ -490,123 +610,6 @@ When delegating, **clear and specific** prompts are essential. Include these 7 e
 > **MUST DO**: Change flex-direction at `md:` breakpoint
 > **MUST NOT DO**: Modify existing desktop layout
 > **EXPECTED**: Buttons align vertically on mobile
-
-## Commands
-
-Commands are slash-triggered workflows that execute predefined templates.
-
-### Built-in Commands
-
-| Command              | Description                                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
-| `/ralph-loop`        | Start self-referential development loop until completion                                   |
-| `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
-| `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
-| `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
-| `/start-work`        | Start Sisyphus work session from Prometheus plan                                           |
-| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
-| `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
-
-### /init-deep
-
-**Purpose**: Generate hierarchical AGENTS.md files throughout your project
-
-**Usage**:
-
-```
-/init-deep [--create-new] [--max-depth=N]
-```
-
-Creates directory-specific context files that agents automatically read:
-
-```
-project/
-├── AGENTS.md                        # Project-wide context
-├── packages/omo-opencode/src/
-│   ├── AGENTS.md                    # src-specific context
-│   └── components/
-│       └── AGENTS.md                # Component-specific context
-```
-
-### /ralph-loop
-
-**Purpose**: Self-referential development loop that runs until task completion
-
-**Named after**: Anthropic's Ralph Wiggum plugin
-
-**Usage**:
-
-```
-/ralph-loop "Build a REST API with authentication"
-/ralph-loop "Refactor the payment module" --max-iterations=50
-```
-
-**Behavior**:
-
-- Agent works continuously toward the goal
-- Detects `<promise>DONE</promise>` to know when complete
-- Auto-continues if agent stops without completion
-- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
-
-**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
-
-### /ulw-loop
-
-**Purpose**: Same as ralph-loop but with ultrawork mode active
-
-Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
-
-### /refactor
-
-**Purpose**: Intelligent refactoring with full toolchain
-
-**Usage**:
-
-```
-/refactor <target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
-```
-
-**Features**:
-
-- LSP-powered rename and navigation
-- AST-grep for pattern matching
-- Architecture analysis before changes
-- TDD verification after changes
-- Codemap generation
-
-### /start-work
-
-**Purpose**: Start execution from a Prometheus-generated plan
-
-**Usage**:
-
-```
-/start-work [plan-name]
-```
-
-Uses atlas agent to execute planned tasks systematically.
-
-### /stop-continuation
-
-**Purpose**: Stop all continuation mechanisms for this session
-
-Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
-
-### /handoff
-
-**Purpose**: Create a detailed context summary for continuing work in a new session
-
-Generates a structured handoff document capturing the current state, what was done, what remains, and relevant file paths — enabling seamless continuation in a fresh session.
-
-### Custom Commands
-
-Load custom commands from:
-
-- `.opencode/command/*.md` (project, OpenCode native)
-- `~/.config/opencode/command/*.md` (user, OpenCode native)
-- `.claude/commands/*.md` (project, Claude Code compat)
-- `~/.config/opencode/commands/*.md` (user, Claude Code compat)
 
 ## Tools
 
