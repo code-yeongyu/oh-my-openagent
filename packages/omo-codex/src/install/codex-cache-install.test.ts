@@ -113,15 +113,15 @@ describe("codex-cache install", () => {
         runCommand: async (command, args, options) => {
           commands.push(`${command} ${args.join(" ")}`)
           if (command === "npm" && args.join(" ") === "run sync:skills") {
-            await mkdir(join(options.cwd, "skills", "ultraresearch"), { recursive: true })
-            await writeFile(join(options.cwd, "skills", "ultraresearch", "SKILL.md"), "---\nname: ultraresearch\n---\n")
+            await mkdir(join(options.cwd, "skills", "ulw-research"), { recursive: true })
+            await writeFile(join(options.cwd, "skills", "ulw-research", "SKILL.md"), "---\nname: ulw-research\n---\n")
           }
         },
       })
 
       // then
       expect(commands).toEqual(["npm ci --omit=dev", "npm run sync:skills"])
-      expect(await readFile(join(installed.path, "skills", "ultraresearch", "SKILL.md"), "utf8")).toContain("name: ultraresearch")
+      expect(await readFile(join(installed.path, "skills", "ulw-research", "SKILL.md"), "utf8")).toContain("name: ulw-research")
     },
     15000,
   )
