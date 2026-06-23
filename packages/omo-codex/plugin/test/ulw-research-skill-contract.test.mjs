@@ -7,7 +7,7 @@ import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-async function readUltraresearchCopies() {
+async function readUlwResearchCopies() {
 	const sharedPath = join(sharedSkillsRootPath(), "ulw-research", "SKILL.md");
 	const packagedPath = join(root, "skills", "ulw-research", "SKILL.md");
 	return [
@@ -23,13 +23,13 @@ function frontmatterDescription(content) {
 }
 
 test("#given renamed research skill #when frontmatter is inspected #then ulw-research is the canonical name", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(copy.content, /^name: ulw-research$/m, `${copy.label}: frontmatter must expose ulw-research`);
 	}
 });
 
-test("#given ultraresearch skill #when scanned for non-English content #then it contains no Hangul", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research skill #when scanned for non-English content #then it contains no Hangul", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.doesNotMatch(
 			copy.content,
 			/[ᄀ-ᇿ㄰-㆏가-힣]/,
@@ -38,8 +38,8 @@ test("#given ultraresearch skill #when scanned for non-English content #then it 
 	}
 });
 
-test("#given ultraresearch description #when activation policy is inspected #then it gates on explicit research demands only", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research description #when activation policy is inspected #then it gates on explicit research demands only", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		const description = frontmatterDescription(copy.content);
 		assert.match(description, /ulw-research/i, `${copy.label}: description must name the ulw-research trigger`);
 		assert.match(description, /ultraresearch/i, `${copy.label}: description must preserve ultraresearch discoverability`);
@@ -54,8 +54,8 @@ test("#given ultraresearch description #when activation policy is inspected #the
 	}
 });
 
-test("#given ultraresearch body #when authority is inspected #then it takes precedence over exploration-bounding instructions", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research body #when authority is inspected #then it takes precedence over exploration-bounding instructions", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/exploration-bounding|exploration (?:caps|budgets|limits)/i,
@@ -69,8 +69,8 @@ test("#given ultraresearch body #when authority is inspected #then it takes prec
 	}
 });
 
-test("#given ultraresearch worker protocol #when EXPAND flow is inspected #then markers travel as message text and workers never write files", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research worker protocol #when EXPAND flow is inspected #then markers travel as message text and workers never write files", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(copy.content, /EXPAND/, `${copy.label}: body must keep the EXPAND marker protocol`);
 		assert.match(
 			copy.content,
@@ -90,8 +90,8 @@ test("#given ultraresearch worker protocol #when EXPAND flow is inspected #then 
 	}
 });
 
-test("#given ultraresearch journaling #when ownership is inspected #then the orchestrator owns the session journal", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research journaling #when ownership is inspected #then the orchestrator owns the session journal", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/orchestrator[\s\S]{0,200}journal|journal[\s\S]{0,200}orchestrator/i,
@@ -101,8 +101,8 @@ test("#given ultraresearch journaling #when ownership is inspected #then the orc
 	}
 });
 
-test("#given ultraresearch expansion loop #when stop rules are inspected #then convergence rules and a depth cap are stated", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research expansion loop #when stop rules are inspected #then convergence rules and a depth cap are stated", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(copy.content, /converg/i, `${copy.label}: body must define convergence`);
 		assert.match(copy.content, /depth/i, `${copy.label}: body must define an expansion depth cap`);
 		assert.match(
@@ -113,8 +113,8 @@ test("#given ultraresearch expansion loop #when stop rules are inspected #then c
 	}
 });
 
-test("#given ultraresearch under ultrawork #when coexistence is inspected #then marker and done-definition conflicts are resolved", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research under ultrawork #when coexistence is inspected #then marker and done-definition conflicts are resolved", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(copy.content, /ultrawork|\bulw\b/i, `${copy.label}: body must address ultrawork coexistence`);
 		assert.match(
 			copy.content,
@@ -124,8 +124,8 @@ test("#given ultraresearch under ultrawork #when coexistence is inspected #then 
 	}
 });
 
-test("#given ultraresearch worker sizing #when spawn guidance is inspected #then capable-model and high-effort routing is stated", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research worker sizing #when spawn guidance is inspected #then capable-model and high-effort routing is stated", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/capable model|high(?:est)? (?:reasoning )?effort/i,
@@ -134,8 +134,8 @@ test("#given ultraresearch worker sizing #when spawn guidance is inspected #then
 	}
 });
 
-test("#given ultraresearch execution substrate #when team usage is inspected #then it prefers a cooperating team with harness-native team tools", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research execution substrate #when team usage is inspected #then it prefers a cooperating team with harness-native team tools", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/cooperating team/i,
@@ -146,8 +146,8 @@ test("#given ultraresearch execution substrate #when team usage is inspected #th
 	}
 });
 
-test("#given ultraresearch team composition #when member slicing is inspected #then members map to part/ownership/perspective, never job titles", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research team composition #when member slicing is inspected #then members map to part/ownership/perspective, never job titles", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/by part, ownership, or perspective/i,
@@ -161,8 +161,8 @@ test("#given ultraresearch team composition #when member slicing is inspected #t
 	}
 });
 
-test("#given ultraresearch team communication #when the raise law is inspected #then members broadcast every lead immediately rather than hoarding", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research team communication #when the raise law is inspected #then members broadcast every lead immediately rather than hoarding", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/raise law|broadcast every lead/i,
@@ -182,8 +182,8 @@ test("#given ultraresearch team communication #when the raise law is inspected #
 	}
 });
 
-test("#given ultraresearch non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/claim ledger|verified-claims/i,
@@ -192,8 +192,8 @@ test("#given ultraresearch non-code verification #when the gate is inspected #th
 	}
 });
 
-test("#given ultraresearch claim ledger #when ownership is inspected #then workers never write the ledger / verified-claims artifact", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research claim ledger #when ownership is inspected #then workers never write the ledger / verified-claims artifact", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.doesNotMatch(
 			copy.content,
 			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:ledger|verified-claims)/i,
@@ -202,8 +202,8 @@ test("#given ultraresearch claim ledger #when ownership is inspected #then worke
 	}
 });
 
-test("#given ultraresearch blocked sources #when escalation is inspected #then it routes through the ultimate-browsing skill", async () => {
-	for (const copy of await readUltraresearchCopies()) {
+test("#given ulw-research blocked sources #when escalation is inspected #then it routes through the ultimate-browsing skill", async () => {
+	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
 			/ultimate-browsing/,
