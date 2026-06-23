@@ -81,6 +81,8 @@ test("#given a worktree team #when worktree-add A #then a real git worktree on a
 		// then - the leader is told the exact cd target
 		assert.match(result.stdout, /cd /);
 		assert.match(result.stdout, /A/);
+		assert.match(result.stdout, /wait for the real Codex thread id/);
+		assert.match(result.stdout, /bind-thread before sending bootstrap/);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

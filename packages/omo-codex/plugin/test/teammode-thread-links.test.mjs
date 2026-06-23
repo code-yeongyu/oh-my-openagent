@@ -77,6 +77,40 @@ test("#given a worktree-backed team has bound member threads #when guide and sta
 		assert.match(status, /link=codex:\/\/threads\/019ef350-ee78-72a3-bd5e-e40cebc3d814/);
 		assert.match(prompt, /Your Codex thread link is codex:\/\/threads\/019ef350-ee78-72a3-bd5e-e40cebc3d814/);
 		assert.match(prompt, /Work inside `\/tmp\/review-worktree`/);
+		assert.match(prompt, /Before editing, verify that your assigned worktree exists and contains repo files/);
+		assert.match(prompt, /BLOCKED: worktree not ready/);
+	} finally {
+		cleanupTeamRoot(tempRoot);
+	}
+});
+
+test("#given a worktree member has no cwd bound yet #when guide and prompt render #then they tell Codex to wait for readiness", () => {
+	const tempRoot = createTeamRoot("omo-codex-teammode-worktree-wait-");
+	try {
+		const sessionId = "worktree-wait";
+		runTeam(tempRoot, "init", "--name", "Wait", "--session-name", "worktrees", "--session", sessionId, "--worktree", "--base-branch", "main");
+		addMember(tempRoot, sessionId, {
+			id: "A",
+			name: "worktree-driver",
+			focus: "drive a pending Codex worktree thread",
+			lens: "ownership",
+			deliverable: "ready worktree report",
+		});
+		addMember(tempRoot, sessionId, {
+			id: "B",
+			name: "integration-watch",
+			focus: "watch integration boundaries",
+			lens: "perspective",
+			deliverable: "integration notes",
+		});
+		runTeam(tempRoot, "bind-thread", "--team", sessionId, "--id", "A", "--thread", "019ef350-ee78-72a3-bd5e-e40cebc3d814");
+
+		const guide = readFileSync(`${teamDir(tempRoot, sessionId)}/guide.md`, "utf8");
+		const prompt = runTeam(tempRoot, "member-prompt", "--team", sessionId, "--id", "A").stdout;
+
+		assert.match(guide, /If Codex returns only `pendingWorktreeId`/);
+		assert.match(guide, /wait until Codex surfaces a real thread id/);
+		assert.match(prompt, /If this prompt arrived before your Codex worktree checkout is ready/);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}
