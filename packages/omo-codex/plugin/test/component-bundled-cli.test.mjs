@@ -20,6 +20,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	teammode: "post-tool-use",
 	ultrawork: "user-prompt-submit",
 	"ulw-loop": "pre-tool-use",
+	"workflow-selector": "user-prompt-submit",
 };
 const MCP_ONLY_COMPONENTS = new Set(["codegraph"]);
 const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildAutoWorkflowContext, isUltraworkPrompt, runUserPromptSubmitHook } from "../src/codex-hook.js";
+import { isUltraworkPrompt, runUserPromptSubmitHook } from "../src/codex-hook.js";
 import { cleanupTempDirectories, parseHookOutput, writeTranscript } from "./codex-hook-test-helpers.js";
 
 afterEach(() => {
@@ -8,16 +8,6 @@ afterEach(() => {
 });
 
 describe("codex ultrawork trigger policy", () => {
-	const originalAutoWorkflowFlag = process.env["OMO_CODEX_AUTO_WORKFLOW"];
-
-	afterEach(() => {
-		if (originalAutoWorkflowFlag === undefined) {
-			delete process.env["OMO_CODEX_AUTO_WORKFLOW"];
-		} else {
-			process.env["OMO_CODEX_AUTO_WORKFLOW"] = originalAutoWorkflowFlag;
-		}
-	});
-
 	it("#given ultrawork variants in current prompt #when hook runs #then emits directive", () => {
 		// given
 		const prompts = ["ultrawork this change", "Ultrawork this change", "ULTRAWORK this change"] as const;
@@ -119,121 +109,27 @@ describe("codex ultrawork trigger policy", () => {
 		expect(isUltraworkPrompt(payload.prompt)).toBe(false);
 	});
 
-	it("#given auto workflow is disabled #when prompt asks for debugging #then hook stays quiet", () => {
-		// given
-		delete process.env["OMO_CODEX_AUTO_WORKFLOW"];
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "Fix this flaky test and diagnose why CI is failing",
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-
-		// then
-		expect(output).toBe("");
-		expect(buildAutoWorkflowContext(payload.prompt, {})).toBeNull();
-	});
-
-	it("#given auto workflow is enabled #when prompt asks for debugging #then hook selects ulw-loop guidance", () => {
+	it("#given prior transcript contains auto workflow guidance #when current prompt explicitly says ulw #then emits ultrawork directive", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
-			prompt: "Fix this flaky test and diagnose why CI is failing",
+			prompt: "ulw fix this failing test",
+			transcript_path: writeTranscript(
+				JSON.stringify({
+					hookSpecificOutput: {
+						hookEventName: "UserPromptSubmit",
+						additionalContext: "<lazycodex-auto-workflow>\nexisting selector guidance",
+					},
+				}),
+			),
 		};
-		process.env["OMO_CODEX_AUTO_WORKFLOW"] = "1";
 
 		// when
 		const output = runUserPromptSubmitHook(payload);
 		const parsed = parseHookOutput(output);
 
 		// then
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("<lazycodex-auto-workflow>");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("$ulw-loop");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("manual QA evidence");
-	});
-
-	it("#given auto workflow is enabled #when prompt asks for broad feature work #then hook selects plan and start-work guidance", () => {
-		// given
-		const prompt = "Add a settings page and implement the account preferences flow";
-
-		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "true" });
-
-		// then
-		expect(context).not.toBeNull();
-		expect(context).toContain("$ulw-plan");
-		expect(context).toContain("$start-work");
-		expect(context).toContain("ask one concise confirmation");
-	});
-
-	it("#given auto workflow is enabled #when prompt asks for repository onboarding #then hook selects init-deep guidance", () => {
-		// given
-		const prompt = "Map this unfamiliar repository before we change the architecture";
-
-		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "on" });
-
-		// then
-		expect(context).not.toBeNull();
-		expect(context).toContain("$init-deep");
-		expect(context).toContain("weak-context repository onboarding");
-	});
-
-	it("#given auto workflow is enabled #when prompt is a small edit #then hook stays quiet", () => {
-		// given
-		const prompt = "Rename this variable";
-
-		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "yes" });
-
-		// then
-		expect(context).toBeNull();
-	});
-
-	it("#given auto workflow is enabled and transcript already contains ultrawork directive #when prompt asks for debugging #then hook does not repeat guidance", () => {
-		// given
-		process.env["OMO_CODEX_AUTO_WORKFLOW"] = "1";
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "Why did the build fail? Please diagnose the error",
-			transcript_path: writeTranscript(
-				JSON.stringify({
-					hookSpecificOutput: {
-						hookEventName: "UserPromptSubmit",
-						additionalContext: "<ultrawork-mode>\nexisting directive",
-					},
-				}),
-			),
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-
-		// then
-		expect(output).toBe("");
-	});
-
-	it("#given auto workflow is enabled and transcript already contains auto workflow context #when prompt asks for debugging #then hook does not repeat guidance", () => {
-		// given
-		process.env["OMO_CODEX_AUTO_WORKFLOW"] = "1";
-		const payload = {
-			hook_event_name: "UserPromptSubmit",
-			prompt: "Why did the build fail? Please diagnose the error",
-			transcript_path: writeTranscript(
-				JSON.stringify({
-					hookSpecificOutput: {
-						hookEventName: "UserPromptSubmit",
-						additionalContext: "<lazycodex-auto-workflow>\nexisting directive",
-					},
-				}),
-			),
-		};
-
-		// when
-		const output = runUserPromptSubmitHook(payload);
-
-		// then
-		expect(output).toBe("");
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+		expect(isUltraworkPrompt(payload.prompt)).toBe(true);
 	});
 });
