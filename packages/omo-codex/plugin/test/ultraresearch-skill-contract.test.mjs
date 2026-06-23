@@ -8,8 +8,8 @@ import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function readUltraresearchCopies() {
-	const sharedPath = join(sharedSkillsRootPath(), "ultraresearch", "SKILL.md");
-	const packagedPath = join(root, "skills", "ultraresearch", "SKILL.md");
+	const sharedPath = join(sharedSkillsRootPath(), "ulw-research", "SKILL.md");
+	const packagedPath = join(root, "skills", "ulw-research", "SKILL.md");
 	return [
 		{ label: "shared", path: sharedPath, content: await readFile(sharedPath, "utf8") },
 		{ label: "packaged", path: packagedPath, content: await readFile(packagedPath, "utf8") },
@@ -21,6 +21,12 @@ function frontmatterDescription(content) {
 	assert.notEqual(match, null, "SKILL.md frontmatter description not found");
 	return match[1];
 }
+
+test("#given renamed research skill #when frontmatter is inspected #then ulw-research is the canonical name", async () => {
+	for (const copy of await readUltraresearchCopies()) {
+		assert.match(copy.content, /^name: ulw-research$/m, `${copy.label}: frontmatter must expose ulw-research`);
+	}
+});
 
 test("#given ultraresearch skill #when scanned for non-English content #then it contains no Hangul", async () => {
 	for (const copy of await readUltraresearchCopies()) {
@@ -35,6 +41,9 @@ test("#given ultraresearch skill #when scanned for non-English content #then it 
 test("#given ultraresearch description #when activation policy is inspected #then it gates on explicit research demands only", async () => {
 	for (const copy of await readUltraresearchCopies()) {
 		const description = frontmatterDescription(copy.content);
+		assert.match(description, /ulw-research/i, `${copy.label}: description must name the ulw-research trigger`);
+		assert.match(description, /ultraresearch/i, `${copy.label}: description must preserve ultraresearch discoverability`);
+		assert.match(description, /\bulw\b/i, `${copy.label}: description must preserve ulw discoverability`);
 		assert.match(description, /explicit/i, `${copy.label}: description must gate activation on explicit demand`);
 		assert.match(
 			description,

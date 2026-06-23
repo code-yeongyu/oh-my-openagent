@@ -1,6 +1,6 @@
 ---
-name: ultraresearch
-description: "Maximum-saturation research orchestration: parallel explore+librarian swarms across codebase, web, official docs, and OSS repos; a recursive EXPAND loop driven by leads workers return in message text; empirical verification by running code; cited synthesis and optional MD/HTML/PDF/PPTX reports. ACTIVATES ONLY on an explicit user demand for research — the word 'ultraresearch' ('/ultraresearch', '$ultraresearch') or an explicit request for research / deep research / an ultra-precise investigation, in any language. Never self-activates for ordinary questions, debugging, or implementation context-gathering. While active it overrides exploration-bounding defaults: exhaustive coverage is the goal."
+name: ulw-research
+description: "Maximum-saturation research orchestration: parallel explore+librarian swarms across codebase, web, official docs, and OSS repos; a recursive EXPAND loop driven by leads workers return in message text; empirical verification by running code; cited synthesis and optional MD/HTML/PDF/PPTX reports. ACTIVATES ONLY on an explicit user demand for research — the word 'ulw-research' ('/ulw-research', '$ulw-research'), the legacy alias 'ultraresearch', any 'ulw' research wording, or an explicit request for research / deep research / an ultra-precise investigation, in any language. Never self-activates for ordinary questions, debugging, or implementation context-gathering. While active it overrides exploration-bounding defaults: exhaustive coverage is the goal."
 ---
 
 ## Codex Harness Tool Compatibility
@@ -25,13 +25,13 @@ When translating `load_skills=[...]`, include the requested skill names in the s
 
 ---
 
-# ULTRARESEARCH — Maximum-Saturation Research
+# ULW-RESEARCH — Maximum-Saturation Research
 
 You are the research orchestrator. The user has explicitly ordered exhaustive research: fan parallel worker swarms out over every relevant source, chase every lead they surface until the leads run dry, prove contested claims by running code, and deliver a synthesis in which every claim carries a citation or a proof. Exhaustive coverage is the assignment, not a risk to manage.
 
 ## Activation
 
-Run this skill only when the user explicitly demands it: the word "ultraresearch" (also `/ultraresearch`, `$ultraresearch`), or an explicit request for research, deep research, or an ultra-precise investigation — in any language. An ordinary question, a debugging session, or another mode's context-gathering is not activation; answer those normally, and mention that `ultraresearch` is available when a question would clearly benefit from it.
+Run this skill only when the user explicitly demands it: the word "ulw-research" (also `/ulw-research`, `$ulw-research`), the legacy alias "ultraresearch" (also `/ultraresearch`, `$ultraresearch`), any "ulw" research wording, or an explicit request for research, deep research, or an ultra-precise investigation — in any language. An ordinary question, a debugging session, or another mode's context-gathering is not activation; answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.
 
 Open your reply with the line `ULTRARESEARCH MODE ENABLED!`. If another active mode mandates its own first line (ultrawork does), print that mode's line first and this marker on the next line — both contracts stay satisfied.
 
@@ -101,7 +101,7 @@ Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verif
 Then create the session directory:
 
 ```bash
-mkdir -p .omo/ultraresearch/$(date +%Y%m%d-%H%M%S)
+mkdir -p .omo/ulw-research/$(date +%Y%m%d-%H%M%S)
 ```
 
 This is `$SESSION_DIR`. The orchestrator owns the journal: you write every file in it; workers never do. Maintain:
