@@ -3,17 +3,6 @@ import { log } from "../../shared"
 import { getMainSessionID } from "../claude-code-session-state"
 import type { ContextCollector } from "./collector"
 
-interface OutputPart {
-  type: string
-  text?: string
-  [key: string]: unknown
-}
-
-interface InjectionResult {
-  injected: boolean
-  contextLength: number
-}
-
 interface MessageWithParts {
   info: Message
   parts: Part[]
