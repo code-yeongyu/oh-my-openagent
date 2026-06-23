@@ -102,6 +102,26 @@ describe("linkCachedPluginAgents", () => {
     expect(await readFile(join(agentsDir, "explorer.toml"), "utf8")).toBe('name = "explorer"\n')
   })
 
+  test("replaces matching legacy symlinks with regular files on unix", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await symlink(
+      join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
+      join(agentsDir, "explorer.toml"),
+    )
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+
+    // then
+    const linkStat = await lstat(join(agentsDir, "explorer.toml"))
+    expect(linkStat.isSymbolicLink()).toBe(false)
+    expect(linkStat.isFile()).toBe(true)
+    expect(await readFile(join(agentsDir, "explorer.toml"), "utf8")).toBe('name = "explorer"\n')
+  })
+
   test("overwrites stale copies on Windows", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()

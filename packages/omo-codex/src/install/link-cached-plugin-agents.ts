@@ -144,13 +144,14 @@ async function writeManagedAgentToml(input: ManagedAgentTomlWrite): Promise<void
   const bundledContent = await readFile(input.target, "utf8")
   const bundledHash = hashContent(bundledContent)
   const existingContent = await readTextIfExists(input.linkPath)
+  const isRegularFileCopy = existingContent !== null && (await isRegularFile(input.linkPath))
 
-  if (existingContent === bundledContent) {
+  if (existingContent === bundledContent && isRegularFileCopy) {
     input.manifest.files[input.fileName] = { sha256: bundledHash }
     return
   }
 
-  if (existingContent !== null) {
+  if (existingContent !== null && isRegularFileCopy) {
     const previousHash = input.manifest.files[input.fileName]?.sha256
     const existingAgentName = extractAgentName(existingContent)
     if (previousHash !== hashContent(existingContent) && existingAgentName === agentNameFromToml(input.fileName)) {
@@ -215,6 +216,11 @@ async function readTextIfExists(path: string): Promise<string | null> {
     if (nodeErrorCode(error) === "ENOENT") return null
     throw error
   }
+}
+
+async function isRegularFile(path: string): Promise<boolean> {
+  const entryStat = await lstat(path)
+  return entryStat.isFile() && !entryStat.isSymbolicLink()
 }
 
 function extractReasoningEffort(content: string): string | null {

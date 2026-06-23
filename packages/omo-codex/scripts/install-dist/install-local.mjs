@@ -8415,11 +8415,12 @@ async function writeManagedAgentToml(input) {
   const bundledContent = await readFile13(input.target, "utf8");
   const bundledHash = hashContent(bundledContent);
   const existingContent = await readTextIfExists2(input.linkPath);
-  if (existingContent === bundledContent) {
+  const isRegularFileCopy = existingContent !== null && await isRegularFile(input.linkPath);
+  if (existingContent === bundledContent && isRegularFileCopy) {
     input.manifest.files[input.fileName] = { sha256: bundledHash };
     return;
   }
-  if (existingContent !== null) {
+  if (existingContent !== null && isRegularFileCopy) {
     const previousHash = input.manifest.files[input.fileName]?.sha256;
     const existingAgentName = extractAgentName(existingContent);
     if (previousHash !== hashContent(existingContent) && existingAgentName === agentNameFromToml(input.fileName)) {
@@ -8480,6 +8481,10 @@ async function readTextIfExists2(path) {
       return null;
     throw error;
   }
+}
+async function isRegularFile(path) {
+  const entryStat = await lstat7(path);
+  return entryStat.isFile() && !entryStat.isSymbolicLink();
 }
 function extractReasoningEffort(content) {
   return extractTopLevelStringSetting(content, "model_reasoning_effort");
