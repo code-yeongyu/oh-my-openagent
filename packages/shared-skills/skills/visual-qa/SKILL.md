@@ -55,7 +55,22 @@ tmux capture-pane -p > capture.txt
 tmux capture-pane -e -p > capture-ansi.txt
 ```
 
-2. Run the check with the REAL terminal width and keep the JSON:
+2. When the TUI evidence will be attached to a PR or reviewed visually, render
+   the capture through the browser helper from the repository root:
+
+```
+node script/qa/web-terminal-visual-qa.mjs --title "TUI Visual QA" \
+  --from-file capture.txt \
+  --evidence-dir .omo/evidence/<slug>/tui-web-terminal
+```
+
+This produces `terminal.png`, `terminal.html`, `terminal.txt`,
+`terminal-ansi.txt`, and `metadata.json`. Treat this as the standard TUI visual
+artifact pattern for terminal screenshots. If the project is outside this repo,
+copy the same pattern: terminal capture -> browser-rendered page -> PNG +
+metadata with cleanup receipt.
+
+3. Run the check with the REAL terminal width and keep the JSON:
 
 ```
 bun "$SKILL_DIR/scripts/cli.ts" tui-check capture.txt --cols <N>

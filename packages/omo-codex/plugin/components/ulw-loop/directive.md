@@ -76,6 +76,13 @@ channel scenario when the behavior is user-facing. `--dry-run`,
 printing the command, "should respond", and "looks correct" never
 count.
 
+For TUI visual QA, terminal transcripts alone are not enough when a
+visual surface is being evaluated. Capture the pane and render it with
+`node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --from-file <capture.txt> --evidence-dir <dir>`
+or use the helper's `--command` tmux-backed PTY connector when tmux is
+available. The evidence must include `terminal.png`, `terminal.txt`,
+`terminal.html`, and `metadata.json` with the cleanup receipt.
+
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
 ## 0. Survey the skills, then size the work
