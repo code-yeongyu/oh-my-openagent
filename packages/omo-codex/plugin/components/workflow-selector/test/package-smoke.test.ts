@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { collectHookCommandsFromValue, readJsonFile, readPackageJson, requireFiles, requireScripts } from "../../test-support/package-smoke-fixture.js";
+import {
+	collectHookCommandsFromValue,
+	readJsonFile,
+	readPackageJson,
+	requireFiles,
+	requireScripts,
+} from "../../test-support/package-smoke-fixture.js";
 
 describe("codex workflow selector package metadata", () => {
 	it("#given package metadata #when inspected #then hook ships as bundled CLI", () => {
@@ -23,6 +29,8 @@ describe("codex workflow selector package metadata", () => {
 		expect(scripts["test"]).toBe("vitest --run");
 		expect(packageFiles).toContain("dist");
 		expect(packageFiles).toContain("hooks");
-		expect(hookCommands).toContain(`node "${pluginRoot}/dist/cli.js" hook user-prompt-submit`);
+		expect(hookCommands).toContain(
+			`node "${pluginRoot}/dist/cli.js" hook user-prompt-submit`,
+		);
 	});
 });

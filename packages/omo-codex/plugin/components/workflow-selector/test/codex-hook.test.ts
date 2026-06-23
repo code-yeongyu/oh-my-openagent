@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildAutoWorkflowContext, runUserPromptSubmitHook } from "../src/codex-hook.js";
+import {
+	buildAutoWorkflowContext,
+	runUserPromptSubmitHook,
+} from "../src/codex-hook.js";
 import {
 	cleanupTempDirectories,
 	parseHookOutput,
@@ -52,17 +55,24 @@ describe("codex workflow selector hook", () => {
 		const parsed = parseHookOutput(output);
 
 		// then
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("<lazycodex-auto-workflow>");
+		expect(parsed.hookSpecificOutput.additionalContext).toContain(
+			"<lazycodex-auto-workflow>",
+		);
 		expect(parsed.hookSpecificOutput.additionalContext).toContain("$ulw-loop");
-		expect(parsed.hookSpecificOutput.additionalContext).toContain("manual QA evidence");
+		expect(parsed.hookSpecificOutput.additionalContext).toContain(
+			"manual QA evidence",
+		);
 	});
 
 	it("#given auto workflow is enabled #when prompt asks for broad feature work #then hook selects plan and start-work guidance", () => {
 		// given
-		const prompt = "Add a settings page and implement the account preferences flow";
+		const prompt =
+			"Add a settings page and implement the account preferences flow";
 
 		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "true" });
+		const context = buildAutoWorkflowContext(prompt, {
+			OMO_CODEX_AUTO_WORKFLOW: "true",
+		});
 
 		// then
 		expect(context).not.toBeNull();
@@ -76,7 +86,9 @@ describe("codex workflow selector hook", () => {
 		const prompt = "Continue the approved plan";
 
 		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "1" });
+		const context = buildAutoWorkflowContext(prompt, {
+			OMO_CODEX_AUTO_WORKFLOW: "1",
+		});
 
 		// then
 		expect(context).not.toBeNull();
@@ -87,10 +99,13 @@ describe("codex workflow selector hook", () => {
 
 	it("#given auto workflow is enabled #when prompt asks for repository onboarding #then hook selects init-deep guidance", () => {
 		// given
-		const prompt = "Map this unfamiliar repository before we change the architecture";
+		const prompt =
+			"Map this unfamiliar repository before we change the architecture";
 
 		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "on" });
+		const context = buildAutoWorkflowContext(prompt, {
+			OMO_CODEX_AUTO_WORKFLOW: "on",
+		});
 
 		// then
 		expect(context).not.toBeNull();
@@ -103,7 +118,9 @@ describe("codex workflow selector hook", () => {
 		const prompt = "Rename this variable";
 
 		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "yes" });
+		const context = buildAutoWorkflowContext(prompt, {
+			OMO_CODEX_AUTO_WORKFLOW: "yes",
+		});
 
 		// then
 		expect(context).toBeNull();
@@ -114,7 +131,9 @@ describe("codex workflow selector hook", () => {
 		const prompt = "Debug this failing test in a new unfamiliar repository";
 
 		// when
-		const context = buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "1" });
+		const context = buildAutoWorkflowContext(prompt, {
+			OMO_CODEX_AUTO_WORKFLOW: "1",
+		});
 
 		// then
 		expect(context).not.toBeNull();
@@ -126,10 +145,18 @@ describe("codex workflow selector hook", () => {
 
 	it("#given explicit workflow command #when auto workflow is enabled #then selector stays quiet", () => {
 		// given
-		const prompts = ["ulw fix this", "$ulw-plan refactor auth", "$start-work continue", "$init-deep", "omo ulw-loop status"] as const;
+		const prompts = [
+			"ulw fix this",
+			"$ulw-plan refactor auth",
+			"$start-work continue",
+			"$init-deep",
+			"omo ulw-loop status",
+		] as const;
 
 		// when
-		const contexts = prompts.map((prompt) => buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "1" }));
+		const contexts = prompts.map((prompt) =>
+			buildAutoWorkflowContext(prompt, { OMO_CODEX_AUTO_WORKFLOW: "1" }),
+		);
 
 		// then
 		expect(contexts).toEqual([null, null, null, null, null]);
@@ -177,7 +204,11 @@ describe("codex workflow selector hook", () => {
 	it("#given malformed or empty input #when hook runs #then exits with empty output", () => {
 		// given
 		process.env["OMO_CODEX_AUTO_WORKFLOW"] = "1";
-		const inputs = [undefined, {}, { hook_event_name: "UserPromptSubmit", prompt: "" }] as const;
+		const inputs = [
+			undefined,
+			{},
+			{ hook_event_name: "UserPromptSubmit", prompt: "" },
+		] as const;
 
 		// when
 		const outputs = inputs.map((input) => runUserPromptSubmitHook(input));

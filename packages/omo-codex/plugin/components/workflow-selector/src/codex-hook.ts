@@ -97,18 +97,28 @@ interface UserPromptSubmitHookOutput {
 export function runUserPromptSubmitHook(input: unknown): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
-	if (hasAutoWorkflowContextAlreadyInTranscript(input.transcript_path)) return "";
+	if (hasAutoWorkflowContextAlreadyInTranscript(input.transcript_path))
+		return "";
 	if (isContextPressureTranscript(input.transcript_path)) return "";
 	const autoWorkflowContext = buildAutoWorkflowContext(input.prompt);
-	return autoWorkflowContext === null ? "" : formatAdditionalContextOutput(autoWorkflowContext);
+	return autoWorkflowContext === null
+		? ""
+		: formatAdditionalContextOutput(autoWorkflowContext);
 }
 
-export function buildAutoWorkflowContext(prompt: string, hookEnv: NodeJS.ProcessEnv = env): string | null {
+export function buildAutoWorkflowContext(
+	prompt: string,
+	hookEnv: NodeJS.ProcessEnv = env,
+): string | null {
 	if (!isAutoWorkflowEnabled(hookEnv)) return null;
 	if (matchesAny(prompt, EXPLICIT_WORKFLOW_PATTERNS)) return null;
 	const selection = selectAutoWorkflow(prompt);
 	if (selection === null) return null;
-	return [...AUTO_WORKFLOW_CONTEXT, selection, "</lazycodex-auto-workflow>"].join("\n");
+	return [
+		...AUTO_WORKFLOW_CONTEXT,
+		selection,
+		"</lazycodex-auto-workflow>",
+	].join("\n");
 }
 
 function isAutoWorkflowEnabled(hookEnv: NodeJS.ProcessEnv): boolean {
@@ -118,7 +128,9 @@ function isAutoWorkflowEnabled(hookEnv: NodeJS.ProcessEnv): boolean {
 }
 
 function selectAutoWorkflow(prompt: string): string | null {
-	const matches = WORKFLOW_MATCHERS.filter((workflow) => matchesAny(prompt, workflow.patterns));
+	const matches = WORKFLOW_MATCHERS.filter((workflow) =>
+		matchesAny(prompt, workflow.patterns),
+	);
 	if (matches.length === 0) return null;
 	if (matches.length > 1) {
 		return [
@@ -130,7 +142,9 @@ function selectAutoWorkflow(prompt: string): string | null {
 	return matches[0]?.guidance ?? null;
 }
 
-function hasAutoWorkflowContextAlreadyInTranscript(transcriptPath: string | null | undefined): boolean {
+function hasAutoWorkflowContextAlreadyInTranscript(
+	transcriptPath: string | null | undefined,
+): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
 		const rawTranscript = readTranscriptTail(transcriptPath);
@@ -142,7 +156,9 @@ function hasAutoWorkflowContextAlreadyInTranscript(transcriptPath: string | null
 			if (hookSpecificOutput["hookEventName"] !== "UserPromptSubmit") continue;
 			if (
 				typeof hookSpecificOutput["additionalContext"] === "string" &&
-				hookSpecificOutput["additionalContext"].includes(AUTO_WORKFLOW_DIRECTIVE_MARKER)
+				hookSpecificOutput["additionalContext"].includes(
+					AUTO_WORKFLOW_DIRECTIVE_MARKER,
+				)
 			) {
 				return true;
 			}
@@ -156,18 +172,26 @@ function hasAutoWorkflowContextAlreadyInTranscript(transcriptPath: string | null
 
 function readTranscriptTail(transcriptPath: string): string {
 	const rawTranscript = readFileSync(transcriptPath);
-	return rawTranscript.subarray(Math.max(0, rawTranscript.byteLength - TRANSCRIPT_SEARCH_BYTES)).toString("utf8");
+	return rawTranscript
+		.subarray(Math.max(0, rawTranscript.byteLength - TRANSCRIPT_SEARCH_BYTES))
+		.toString("utf8");
 }
 
 function isContextPressureRecoveryPrompt(prompt: string): boolean {
 	const normalizedPrompt = prompt.toLowerCase();
-	return CONTEXT_PRESSURE_MARKERS.some((marker) => normalizedPrompt.includes(marker));
+	return CONTEXT_PRESSURE_MARKERS.some((marker) =>
+		normalizedPrompt.includes(marker),
+	);
 }
 
-function isContextPressureTranscript(transcriptPath: string | null | undefined): boolean {
+function isContextPressureTranscript(
+	transcriptPath: string | null | undefined,
+): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		return isContextPressureRecoveryPrompt(readFileSync(transcriptPath, "utf8"));
+		return isContextPressureRecoveryPrompt(
+			readFileSync(transcriptPath, "utf8"),
+		);
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;
@@ -205,7 +229,9 @@ function matchesAny(prompt: string, patterns: readonly RegExp[]): boolean {
 	return patterns.some((pattern) => pattern.test(prompt));
 }
 
-function isCodexUserPromptSubmitInput(value: unknown): value is CodexUserPromptSubmitInput {
+function isCodexUserPromptSubmitInput(
+	value: unknown,
+): value is CodexUserPromptSubmitInput {
 	return (
 		isRecord(value) &&
 		value["hook_event_name"] === "UserPromptSubmit" &&

@@ -19,12 +19,15 @@ export function cleanupTempDirectories(): void {
 
 export function parseHookOutput(output: string): UserPromptSubmitHookOutput {
 	const parsed: unknown = JSON.parse(output);
-	if (!isUserPromptSubmitHookOutput(parsed)) throw new TypeError("Expected UserPromptSubmit hook output");
+	if (!isUserPromptSubmitHookOutput(parsed))
+		throw new TypeError("Expected UserPromptSubmit hook output");
 	return parsed;
 }
 
 export function writeTranscript(...lines: string[]): string {
-	const root = mkdtempSync(path.join(tmpdir(), "codex-workflow-selector-transcript-"));
+	const root = mkdtempSync(
+		path.join(tmpdir(), "codex-workflow-selector-transcript-"),
+	);
 	tempDirectories.push(root);
 	const transcriptPath = path.join(root, "transcript.jsonl");
 	writeFileSync(transcriptPath, `${lines.join("\n")}\n`);
@@ -42,7 +45,9 @@ export function writeContextPressureTranscript(): string {
 	);
 }
 
-function isUserPromptSubmitHookOutput(value: unknown): value is UserPromptSubmitHookOutput {
+function isUserPromptSubmitHookOutput(
+	value: unknown,
+): value is UserPromptSubmitHookOutput {
 	if (!isRecord(value)) return false;
 	const hookSpecificOutput = value["hookSpecificOutput"];
 	return (
