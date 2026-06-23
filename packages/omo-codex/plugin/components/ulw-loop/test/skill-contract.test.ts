@@ -33,6 +33,18 @@ describe("ulw-loop skill contract", () => {
 		expect(workflow).toMatch(/none-applicable/);
 	});
 
+	it("#given full workflow #when optimization work is planned #then speed and behavior evidence are required per attempt", async () => {
+		// given
+		const workflow = await readFile(FULL_WORKFLOW_URL, "utf8");
+
+		// then
+		expect(workflow).toMatch(/(?:optimization|performance) work[^.]+baseline speed[^.]+before/i);
+		expect(workflow).toMatch(/baseline speed[^.]+behavior[^.]+regression/i);
+		expect(workflow).toMatch(
+			/(?:each|every) (?:try|attempt)[^.]+speed[^.]+(?:behavior|regression)[^.]+(?:keep|revert|iterate)/i,
+		);
+	});
+
 	it("#given full workflow #when checkpoint guidance is inspected #then non-final and final criteria gates differ", async () => {
 		// given
 		const workflow = await readFile(FULL_WORKFLOW_URL, "utf8");
