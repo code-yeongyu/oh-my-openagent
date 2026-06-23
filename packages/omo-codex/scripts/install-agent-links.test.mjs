@@ -208,6 +208,52 @@ test(
 );
 
 test(
+	"#given unmodified installed ultrawork plan #when bundled default changes #then reinstall refreshes the managed TOML",
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.6"\nmodel_reasoning_effort = "high"\n',
+		);
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		assert.equal(
+			await readFile(join(codexHome, "agents", "plan.toml"), "utf8"),
+			'name = "plan"\nmodel = "gpt-5.6"\nmodel_reasoning_effort = "high"\n',
+		);
+	},
+);
+
+test(
 	"#given user edited installed ultrawork plan #when reinstalling after snapshot refresh #then high survives",
 	async () => {
 		const repoRoot = await makeTempDir();
@@ -249,6 +295,47 @@ test(
 		const installedStat = await lstat(join(codexHome, "agents", "plan.toml"));
 		assert.equal(installedStat.isFile(), true);
 		assert.equal(installedStat.isSymbolicLink(), false);
+	},
+);
+
+test(
+	"#given user edited installed ultrawork plan model #when reinstalling after snapshot refresh #then custom model survives",
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+		const customized = 'name = "plan"\nmodel = "custom-provider/plan-model"\nmodel_reasoning_effort = "xhigh"\n';
+		await writeFile(join(codexHome, "agents", "plan.toml"), customized);
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		assert.equal(await readFile(join(codexHome, "agents", "plan.toml"), "utf8"), customized);
 	},
 );
 

@@ -37,7 +37,7 @@ Codex passes the prompt payload on stdin. When the pattern `\b(?:ultrawork|ulw)\
 
 If a prior `UserPromptSubmit` hook output in transcript JSONL already contains `<ultrawork-mode>`, the hook suppresses itself so the same directive is not injected repeatedly. Plain transcript text containing `<ultrawork-mode>` is ignored unless it comes from hook output.
 
-Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install time, not via a runtime hook. The installer writes regular file copies on Linux, macOS, and Windows. For the public marketplace, the source is the installed-marketplace snapshot, not the versioned plugin cache, so agent role configs remain valid when Codex replaces `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/` during auto-update or removes temporary marketplace state. Both code paths overwrite stale files and write a `.installed-agents.json` manifest next to the source root for clean uninstall tracking.
+Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install time, not via a runtime hook. The installer writes regular file copies on Linux, macOS, and Windows. For the public marketplace, the source is the installed-marketplace snapshot, not the versioned plugin cache, so agent role configs remain valid when Codex replaces `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/` during auto-update or removes temporary marketplace state. Both code paths write a `.installed-agents.json` manifest next to the source root for clean uninstall tracking and a `CODEX_HOME/.omo/native-agents.json` hash manifest so unmodified managed TOMLs can refresh while user-modified TOMLs are preserved.
 
 ## Smoke test
 

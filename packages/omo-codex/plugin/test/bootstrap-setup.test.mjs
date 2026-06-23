@@ -13,8 +13,8 @@ const MARKETPLACE_SOURCE_LINE = 'source = "https://github.com/code-yeongyu/lazyc
 const PERMISSIONS_KEY_PATTERN = /approval_policy|sandbox_mode|network_access/;
 const PLUGIN_VERSION = "9.9.9";
 
-const BUNDLED_EXPLORER_TOML = 'description = "Explorer agent"\nmodel_reasoning_effort = "medium"\n';
-const BUNDLED_METIS_TOML = 'description = "Metis agent"\nmodel_reasoning_effort = "high"\n';
+const BUNDLED_EXPLORER_TOML = 'name = "explorer"\ndescription = "Explorer agent"\nmodel_reasoning_effort = "medium"\n';
+const BUNDLED_METIS_TOML = 'name = "metis"\ndescription = "Metis agent"\nmodel_reasoning_effort = "high"\n';
 
 async function withSetupFixture(run) {
 	const root = await mkdtemp(join(tmpdir(), "omo-bootstrap-setup-"));
@@ -175,7 +175,7 @@ test("#given user-tuned reasoning and service tier on an installed agent #when a
 		await mkdir(join(fixture.codexHome, "agents"), { recursive: true });
 		await writeFile(
 			join(fixture.codexHome, "agents", "explorer.toml"),
-			'description = "Explorer agent"\nmodel_reasoning_effort = "low"\nservice_tier = "flex"\n',
+			'name = "explorer"\ndescription = "Explorer agent"\nmodel_reasoning_effort = "low"\nservice_tier = "flex"\n',
 		);
 
 		await runWorkerSetup(setupOptions(fixture));
@@ -183,6 +183,18 @@ test("#given user-tuned reasoning and service tier on an installed agent #when a
 		const linked = await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8");
 		assert.match(linked, /model_reasoning_effort = "low"/);
 		assert.match(linked, /service_tier = "flex"/);
+	});
+});
+
+test("#given a user-tuned model on an installed agent #when bootstrap re-links agents #then the custom model is preserved", async () => {
+	await withSetupFixture(async (fixture) => {
+		await mkdir(join(fixture.codexHome, "agents"), { recursive: true });
+		const customized = 'name = "explorer"\ndescription = "Explorer agent"\nmodel = "custom-provider/explorer"\nmodel_reasoning_effort = "medium"\n';
+		await writeFile(join(fixture.codexHome, "agents", "explorer.toml"), customized);
+
+		await runWorkerSetup(setupOptions(fixture));
+
+		assert.equal(await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8"), customized);
 	});
 });
 

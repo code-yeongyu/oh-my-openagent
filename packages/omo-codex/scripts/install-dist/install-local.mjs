@@ -257,7 +257,7 @@ function shouldRetainLine(line, cutoffMs) {
 function parseDiagnosticLine(line) {
   try {
     const parsed = JSON.parse(line);
-    if (!isRecord2(parsed)) {
+    if (!isRecord3(parsed)) {
       return null;
     }
     return parsed;
@@ -268,7 +268,7 @@ function parseDiagnosticLine(line) {
     throw error;
   }
 }
-function isRecord2(value) {
+function isRecord3(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function trimToMaxBytes(lines) {
@@ -337,18 +337,18 @@ var init_env = __esm(() => {
 });
 
 // packages/telemetry-core/src/machine-id.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
   return os2;
 }
 function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
-  return createHash2("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
+  return createHash3("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
 }
 var init_machine_id = () => {};
 
 // node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
-import { dirname as dirname8, posix, sep as sep7 } from "node:path";
+import { dirname as dirname9, posix, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
   return async (frames) => {
@@ -357,7 +357,7 @@ function createModulerModifier() {
     return frames;
   };
 }
-function createGetModuleFromFilename(basePath = process.argv[1] ? dirname8(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
+function createGetModuleFromFilename(basePath = process.argv[1] ? dirname9(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
   const normalizedBase = isWindows ? normalizeWindowsPath(basePath) : basePath;
   return (filename) => {
     if (!filename)
@@ -5907,7 +5907,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.12.1",
+    version: "4.13.0",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6042,7 +6042,7 @@ function createPostHogClient(source, options = {}) {
     osProvider: options.osProvider ?? resolveOsProvider(),
     product: createCodexTelemetryProductConfig(),
     source,
-    transportFactory: options.transportFactory
+    transportFactory: options.transportFactory ?? transportFactoryOverride ?? undefined
   });
   if (!client.enabled) {
     return NO_OP_POSTHOG;
@@ -6093,7 +6093,7 @@ function __setActivityStateProviderForTesting(provider) {
 function __resetActivityStateProviderForTesting() {
   activityStateProviderOverride = null;
 }
-var osProviderOverride2 = null, activityStateProviderOverride = null, NO_OP_POSTHOG;
+var osProviderOverride2 = null, activityStateProviderOverride = null, transportFactoryOverride = null, NO_OP_POSTHOG;
 var init_posthog = __esm(() => {
   init_src();
   init_diagnostics2();
@@ -6127,7 +6127,7 @@ var init_telemetry = __esm(() => {
 
 // packages/omo-codex/src/install/install-local-cli.ts
 import { readFile as readFile19 } from "node:fs/promises";
-import { dirname as dirname10, join as join35, resolve as resolve11 } from "node:path";
+import { dirname as dirname11, join as join35, resolve as resolve11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -8245,8 +8245,9 @@ function toCodexResolution(resolution) {
 }
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
-import { copyFile, lstat as lstat7, mkdir as mkdir6, readFile as readFile13, readdir as readdir4, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { basename as basename4, join as join18 } from "node:path";
+import { createHash as createHash2 } from "node:crypto";
+import { lstat as lstat7, mkdir as mkdir6, readFile as readFile13, readdir as readdir4, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
+import { basename as basename4, dirname as dirname6, join as join18 } from "node:path";
 
 // packages/omo-codex/src/install/retired-managed-agent-purge.ts
 import { lstat as lstat6, readFile as readFile12, rm as rm5 } from "node:fs/promises";
@@ -8308,6 +8309,7 @@ function nodeErrorCode(error) {
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
 var MANIFEST_FILE = ".installed-agents.json";
+var AGENT_INSTALL_MANIFEST_FILE = "native-agents.json";
 async function capturePreservedAgentReasoning(input) {
   const agentsDir = join18(input.codexHome, "agents");
   if (!await exists4(agentsDir))
@@ -8351,38 +8353,22 @@ async function linkCachedPluginAgents(input) {
   }
   const agentsDir = join18(input.codexHome, "agents");
   await mkdir6(agentsDir, { recursive: true });
+  const agentInstallManifest = await readAgentInstallManifest(input.codexHome);
   const linked = [];
   for (const agentPath of bundledAgents) {
     const agentFileName = basename4(agentPath);
-    const agentName = agentNameFromToml(agentFileName);
     const linkPath = join18(agentsDir, agentFileName);
-    await replaceWithCopy(linkPath, agentPath);
-    await restorePreservedReasoning({
-      agentName,
+    await writeManagedAgentToml({
+      fileName: agentFileName,
       linkPath,
-      target: agentPath,
-      value: input.preservedReasoning?.get(agentName)
-    });
-    await restorePreservedServiceTier({
-      linkPath,
-      preserved: input.preservedServiceTier?.has(agentName) ?? false,
-      value: input.preservedServiceTier?.get(agentName) ?? null
+      manifest: agentInstallManifest,
+      target: agentPath
     });
     linked.push({ name: agentFileName, path: linkPath, target: agentPath });
   }
   await writeManifest(input.pluginRoot, linked.map((entry) => entry.path));
+  await writeAgentInstallManifest(input.codexHome, agentInstallManifest);
   return linked;
-}
-async function restorePreservedServiceTier(input) {
-  if (!input.preserved)
-    return;
-  const content = await readFile13(input.linkPath, "utf8");
-  if (extractServiceTier(content) === input.value)
-    return;
-  const replacement = replaceServiceTier(content, input.value);
-  if (!replacement.replaced)
-    return;
-  await writeFile6(input.linkPath, replacement.content);
 }
 async function discoverBundledAgents(pluginRoot) {
   const componentsRoot = join18(pluginRoot, "components");
@@ -8406,9 +8392,9 @@ async function discoverBundledAgents(pluginRoot) {
   agents.sort();
   return agents;
 }
-async function replaceWithCopy(linkPath, target) {
+async function replaceWithContent(linkPath, content) {
   await prepareReplacement(linkPath);
-  await copyFile(target, linkPath);
+  await writeFile6(linkPath, content);
 }
 async function prepareReplacement(linkPath) {
   if (!await exists4(linkPath))
@@ -8425,17 +8411,66 @@ async function writeManifest(pluginRoot, agentPaths) {
   await writeFile6(manifestPath, `${JSON.stringify(payload, null, "\t")}
 `);
 }
-async function restorePreservedReasoning(input) {
-  if (input.value === undefined)
+async function writeManagedAgentToml(input) {
+  const bundledContent = await readFile13(input.target, "utf8");
+  const bundledHash = hashContent(bundledContent);
+  const existingContent = await readTextIfExists2(input.linkPath);
+  if (existingContent === bundledContent) {
+    input.manifest.files[input.fileName] = { sha256: bundledHash };
     return;
-  const content = await readFile13(input.target, "utf8");
-  const bundledEffort = extractReasoningEffort(content);
-  if (bundledEffort === input.value)
-    return;
-  const replacement = replaceReasoningEffort(content, input.value);
-  if (!replacement.replaced)
-    return;
-  await writeFile6(input.linkPath, replacement.content);
+  }
+  if (existingContent !== null) {
+    const previousHash = input.manifest.files[input.fileName]?.sha256;
+    const existingAgentName = extractAgentName(existingContent);
+    if (previousHash !== hashContent(existingContent) && existingAgentName === agentNameFromToml(input.fileName)) {
+      return;
+    }
+  }
+  await replaceWithContent(input.linkPath, bundledContent);
+  input.manifest.files[input.fileName] = { sha256: bundledHash };
+}
+function hashContent(content) {
+  return createHash2("sha256").update(content).digest("hex");
+}
+function agentInstallManifestPath(codexHome) {
+  return join18(codexHome, ".omo", AGENT_INSTALL_MANIFEST_FILE);
+}
+async function readAgentInstallManifest(codexHome) {
+  const content = await readTextIfExists2(agentInstallManifestPath(codexHome));
+  if (content === null)
+    return { version: 1, files: {} };
+  try {
+    const parsed = JSON.parse(content);
+    if (!isRecord(parsed) || parsed["version"] !== 1 || !isRecord(parsed["files"])) {
+      return { version: 1, files: {} };
+    }
+    const files = {};
+    for (const [fileName, entry] of Object.entries(parsed["files"])) {
+      if (!fileName.endsWith(".toml") || !isRecord(entry))
+        continue;
+      const sha256 = entry["sha256"];
+      if (typeof sha256 === "string" && /^[0-9a-f]{64}$/i.test(sha256)) {
+        files[fileName] = { sha256: sha256.toLowerCase() };
+      }
+    }
+    return { version: 1, files };
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      return { version: 1, files: {} };
+    throw error;
+  }
+}
+async function writeAgentInstallManifest(codexHome, manifest) {
+  const manifestPath = agentInstallManifestPath(codexHome);
+  await mkdir6(dirname6(manifestPath), { recursive: true });
+  const files = {};
+  for (const fileName of Object.keys(manifest.files).sort()) {
+    const entry = manifest.files[fileName];
+    if (entry !== undefined)
+      files[fileName] = entry;
+  }
+  await writeFile6(manifestPath, `${JSON.stringify({ version: 1, files }, null, 2)}
+`);
 }
 async function readTextIfExists2(path) {
   try {
@@ -8452,6 +8487,9 @@ function extractReasoningEffort(content) {
 function extractServiceTier(content) {
   return extractTopLevelStringSetting(content, "service_tier");
 }
+function extractAgentName(content) {
+  return extractTopLevelStringSetting(content, "name");
+}
 function extractTopLevelStringSetting(content, key) {
   for (const line of content.split(/\n/)) {
     if (isSectionHeader2(line))
@@ -8465,35 +8503,6 @@ function extractTopLevelStringSetting(content, key) {
   }
   return null;
 }
-function replaceReasoningEffort(content, value) {
-  return replaceTopLevelStringSetting(content, "model_reasoning_effort", value, { insertIfMissing: false });
-}
-function replaceServiceTier(content, value) {
-  return replaceTopLevelStringSetting(content, "service_tier", value, { insertIfMissing: true });
-}
-function replaceTopLevelStringSetting(content, key, value, options) {
-  const lines = content.split(/\n/);
-  for (let index = 0;index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line === undefined || isSectionHeader2(line))
-      break;
-    if (topLevelStringSettingRawValue(line, key) === undefined)
-      continue;
-    if (value === null) {
-      lines.splice(index, 1);
-      return { content: lines.join(`
-`), replaced: true };
-    }
-    lines[index] = line.replace(/=\s*"(?:[^"\\]|\\.)*"/, `= ${JSON.stringify(value)}`);
-    return { content: lines.join(`
-`), replaced: true };
-  }
-  if (value === null || !options.insertIfMissing)
-    return { content, replaced: false };
-  lines.splice(topLevelInsertionIndex(lines), 0, `${key} = ${JSON.stringify(value)}`);
-  return { content: lines.join(`
-`), replaced: true };
-}
 function topLevelStringSettingRawValue(line, key) {
   const match = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*")/);
   if (match === null)
@@ -8503,15 +8512,6 @@ function topLevelStringSettingRawValue(line, key) {
   if (settingKey !== key || rawValue === undefined)
     return;
   return rawValue;
-}
-function topLevelInsertionIndex(lines) {
-  const sectionIndex = lines.findIndex((line) => isSectionHeader2(line));
-  const topLevelEnd = sectionIndex === -1 ? lines.length : sectionIndex;
-  let insertionIndex = topLevelEnd;
-  while (insertionIndex > 0 && lines[insertionIndex - 1] === "") {
-    insertionIndex -= 1;
-  }
-  return insertionIndex;
 }
 function isSectionHeader2(line) {
   const trimmed = line.trim();
@@ -8529,6 +8529,9 @@ function parseJsonString(value) {
       return null;
     return null;
   }
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function exists4(path) {
   try {
@@ -8830,8 +8833,8 @@ function stampHookStatusMessage(hook, version) {
 }
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
-import { copyFile as copyFile2, lstat as lstat8, readFile as readFile16, writeFile as writeFile9 } from "node:fs/promises";
-import { dirname as dirname6, join as join22, resolve as resolve6 } from "node:path";
+import { copyFile, lstat as lstat8, readFile as readFile16, writeFile as writeFile9 } from "node:fs/promises";
+import { dirname as dirname7, join as join22, resolve as resolve6 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 var PROJECT_LOCAL_ARTIFACT_PATHS = [
   ".codex/hooks.json",
@@ -8862,7 +8865,7 @@ async function repairNearestProjectLocalCodexArtifacts(input) {
       continue;
     }
     const backupPath = `${configPath}.backup-${formatBackupTimestamp(input.now?.() ?? new Date)}`;
-    await copyFile2(configPath, backupPath);
+    await copyFile(configPath, backupPath);
     await writeFile9(configPath, `${repair.config.trimEnd()}
 `);
     configs.push({
@@ -8951,13 +8954,13 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
         artifactRoots: artifactRootsForConfigPaths(configPathsFromCwd)
       };
     }
-    const parent = dirname6(current);
+    const parent = dirname7(current);
     if (parent === current) {
       const nearestConfigPath = configPathsFromCwd[0];
       return nearestConfigPath === undefined ? null : {
-        projectRoot: dirname6(dirname6(nearestConfigPath)),
+        projectRoot: dirname7(dirname7(nearestConfigPath)),
         configPaths: [nearestConfigPath],
-        artifactRoots: [dirname6(dirname6(nearestConfigPath))]
+        artifactRoots: [dirname7(dirname7(nearestConfigPath))]
       };
     }
     current = parent;
@@ -8973,7 +8976,7 @@ async function isRegularProjectLocalConfig(directory, configPath) {
 function artifactRootsForConfigPaths(configPaths) {
   const roots = [];
   for (const configPath of configPaths) {
-    const root = dirname6(dirname6(configPath));
+    const root = dirname7(dirname7(configPath));
     if (!roots.includes(root))
       roots.push(root);
   }
@@ -9166,7 +9169,7 @@ import { join as join28 } from "node:path";
 // packages/utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 // packages/utils/src/record-type-guard.ts
-function isRecord(value) {
+function isRecord2(value) {
   return typeof value === "object" && value !== null;
 }
 // node_modules/.bun/js-yaml@4.2.0/node_modules/js-yaml/dist/js-yaml.mjs
@@ -12262,7 +12265,7 @@ var execFileAsync = promisify(execFile);
 // packages/utils/src/codegraph/resolve.ts
 import { existsSync as existsSync4 } from "node:fs";
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { basename as basename5, dirname as dirname7, join as join27 } from "node:path";
+import { basename as basename5, dirname as dirname8, join as join27 } from "node:path";
 import { createRequire } from "node:module";
 var CODEGRAPH_NODE_CANDIDATES = ["node24", "node22", "node20", "node"];
 var requireFromHere = createRequire(import.meta.url);
@@ -12417,10 +12420,10 @@ function withStatusTimeout(promise, timeoutMs) {
 }
 var ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"]);
 function getSessionStatusPayload(response) {
-  if (isRecord(response) && isRecord(response.data)) {
+  if (isRecord2(response) && isRecord2(response.data)) {
     return response.data;
   }
-  if (isRecord(response)) {
+  if (isRecord2(response)) {
     return response;
   }
   return {};
@@ -12435,7 +12438,7 @@ async function isSessionActive(client, sessionID, statusTimeoutMs = DEFAULT_SESS
   try {
     const statusResult = await withStatusTimeout(client.session.status(), statusTimeoutMs);
     const status = getSessionStatusPayload(statusResult)[sessionID];
-    if (!isRecord(status)) {
+    if (!isRecord2(status)) {
       return false;
     }
     const statusType = status.type;
@@ -12450,21 +12453,21 @@ async function isSessionActive(client, sessionID, statusTimeoutMs = DEFAULT_SESS
 
 // packages/utils/src/prompt-async-gate/prompt-message-state.ts
 function messageRole(message) {
-  if (!isRecord(message)) {
+  if (!isRecord2(message)) {
     return;
   }
   const info = message.info;
-  if (isRecord(info) && typeof info.role === "string") {
+  if (isRecord2(info) && typeof info.role === "string") {
     return info.role;
   }
   return typeof message.role === "string" ? message.role : undefined;
 }
 function messageFinish(message) {
-  if (!isRecord(message)) {
+  if (!isRecord2(message)) {
     return;
   }
   const info = message.info;
-  if (isRecord(info)) {
+  if (isRecord2(info)) {
     if (info.finish === true) {
       return true;
     }
@@ -12478,11 +12481,11 @@ function messageFinish(message) {
   return typeof message.finish === "string" && message.finish.length > 0 ? message.finish : undefined;
 }
 function messageCompleted(message) {
-  if (!isRecord(message)) {
+  if (!isRecord2(message)) {
     return false;
   }
   const info = message.info;
-  const time = isRecord(info) && isRecord(info.time) ? info.time : undefined;
+  const time = isRecord2(info) && isRecord2(info.time) ? info.time : undefined;
   const completed = time?.completed;
   if (typeof completed === "number" && Number.isFinite(completed)) {
     return true;
@@ -12490,18 +12493,18 @@ function messageCompleted(message) {
   return typeof completed === "string" && completed.length > 0;
 }
 function messageHasTerminalError(message) {
-  if (!isRecord(message)) {
+  if (!isRecord2(message)) {
     return false;
   }
   const info = message.info;
-  if (isRecord(info) && info.error !== undefined && info.error !== null) {
+  if (isRecord2(info) && info.error !== undefined && info.error !== null) {
     return true;
   }
   return message.error !== undefined && message.error !== null;
 }
 function toInternalInitiatorTextPartLike(part) {
   const result = {};
-  if (!isRecord(part)) {
+  if (!isRecord2(part)) {
     return result;
   }
   if (typeof part.type === "string") {
@@ -12516,12 +12519,12 @@ function toInternalInitiatorTextPartLike(part) {
   return result;
 }
 function toInternalInitiatorMessageLike(message) {
-  if (!isRecord(message)) {
+  if (!isRecord2(message)) {
     return;
   }
   const result = {};
   const info = message.info;
-  if (isRecord(info) && typeof info.role === "string") {
+  if (isRecord2(info) && typeof info.role === "string") {
     result.info = { role: info.role };
   }
   if (typeof message.role === "string") {
@@ -12554,47 +12557,47 @@ function partIsToolCall(part) {
   return part.type === "tool" || part.type === "tool_use" || part.type === "tool-call" || part.type === "tool-invocation";
 }
 function partIsQuestionTool(part) {
-  if (!isRecord(part) || !partIsToolCall(part)) {
+  if (!isRecord2(part) || !partIsToolCall(part)) {
     return false;
   }
   const toolName = partToolName(part);
   return toolName !== undefined && QUESTION_TOOL_NAMES.has(toolName.toLowerCase());
 }
 function partIsUnansweredQuestionTool(part) {
-  if (!partIsQuestionTool(part) || !isRecord(part)) {
+  if (!partIsQuestionTool(part) || !isRecord2(part)) {
     return false;
   }
   const state = part.state;
-  if (!isRecord(state)) {
+  if (!isRecord2(state)) {
     return true;
   }
   return state.status !== "completed";
 }
 function partIsWaitingOnTool(part) {
-  if (!isRecord(part)) {
+  if (!isRecord2(part)) {
     return false;
   }
   if (!partIsToolCall(part)) {
     return false;
   }
   const state = part.state;
-  if (!isRecord(state)) {
+  if (!isRecord2(state)) {
     return false;
   }
   return state.status === "pending" || state.status === "running";
 }
 function partIsUnresolvedTool(part) {
-  if (!isRecord(part) || !partIsToolCall(part)) {
+  if (!isRecord2(part) || !partIsToolCall(part)) {
     return false;
   }
   const state = part.state;
-  if (!isRecord(state)) {
+  if (!isRecord2(state)) {
     return true;
   }
   return state.status !== "completed";
 }
 function partHasSubstantiveAssistantOutput(part) {
-  if (!isRecord(part)) {
+  if (!isRecord2(part)) {
     return false;
   }
   if (part.type === "step-start" || part.type === "step-finish") {
@@ -12606,16 +12609,16 @@ function partHasSubstantiveAssistantOutput(part) {
   return typeof part.type === "string" && part.type.length > 0;
 }
 function messageHasQuestionTool(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsUnansweredQuestionTool);
+  return isRecord2(message) && Array.isArray(message.parts) && message.parts.some(partIsUnansweredQuestionTool);
 }
 function messageHasWaitingTool(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsWaitingOnTool);
+  return isRecord2(message) && Array.isArray(message.parts) && message.parts.some(partIsWaitingOnTool);
 }
 function messageHasUnresolvedTool(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partIsUnresolvedTool);
+  return isRecord2(message) && Array.isArray(message.parts) && message.parts.some(partIsUnresolvedTool);
 }
 function messageHasSubstantiveAssistantOutput(message) {
-  return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partHasSubstantiveAssistantOutput);
+  return isRecord2(message) && Array.isArray(message.parts) && message.parts.some(partHasSubstantiveAssistantOutput);
 }
 
 // packages/utils/src/prompt-async-gate/message-inspection-error.ts
@@ -12623,7 +12626,7 @@ function isPromptMessageInspectionAborted(error) {
   if (error instanceof Error && error.name === "MessageAbortedError") {
     return true;
   }
-  return isRecord(error) && error.name === "MessageAbortedError";
+  return isRecord2(error) && error.name === "MessageAbortedError";
 }
 
 // packages/utils/src/prompt-async-gate/timing.ts
@@ -12653,11 +12656,11 @@ async function withDispatchTimeout(operation, dispatchTimeoutMs, operationName) 
 
 // packages/utils/src/prompt-async-gate/pending-tool-turn.ts
 function getPromptQuery(input) {
-  if (!isRecord(input)) {
+  if (!isRecord2(input)) {
     return { directory: "" };
   }
   const query = input.query;
-  if (!isRecord(query)) {
+  if (!isRecord2(query)) {
     return { directory: "" };
   }
   const promptQuery = { directory: "" };
@@ -12670,7 +12673,7 @@ function getPromptQuery(input) {
   return promptQuery;
 }
 function getMessagesData(response) {
-  if (isRecord(response) && Array.isArray(response.data)) {
+  if (isRecord2(response) && Array.isArray(response.data)) {
     return response.data;
   }
   return Array.isArray(response) ? response : [];
@@ -12687,7 +12690,7 @@ function latestAssistantTurnBlocksInternalPrompt(messages) {
       }
       const finish = messageFinish(message);
       if (finish === "tool-calls") {
-        return !isRecord(message) || !Array.isArray(message.parts) || messageHasUnresolvedTool(message);
+        return !isRecord2(message) || !Array.isArray(message.parts) || messageHasUnresolvedTool(message);
       }
       if ((finish === undefined || finish === "unknown") && !messageHasSubstantiveAssistantOutput(message)) {
         return !(messageCompleted(message) && messageHasTerminalError(message));
@@ -12701,7 +12704,7 @@ function latestAssistantTurnBlocksInternalPrompt(messages) {
       if (finish === undefined || finish === "unknown") {
         return true;
       }
-      if (!isRecord(message) || !Array.isArray(message.parts)) {
+      if (!isRecord2(message) || !Array.isArray(message.parts)) {
         return finish === "tool-calls";
       }
       return messageHasWaitingTool(message);
@@ -13532,7 +13535,7 @@ function shellQuote(value) {
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn4, spawnSync as spawnSync3 } from "node:child_process";
 import { readFileSync as readFileSync3 } from "node:fs";
-import { dirname as dirname9, join as join33 } from "node:path";
+import { dirname as dirname10, join as join33 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
@@ -13641,7 +13644,7 @@ function resolveArgs(env3) {
 function resolveCurrentVersion(env3) {
   if (env3.LAZYCODEX_CURRENT_VERSION?.trim())
     return env3.LAZYCODEX_CURRENT_VERSION.trim();
-  const pluginRoot = dirname9(dirname9(fileURLToPath(import.meta.url)));
+  const pluginRoot = dirname10(dirname10(fileURLToPath(import.meta.url)));
   return readVersionManifest(resolveInstalledVersionPath(env3, pluginRoot)) ?? readVersionManifest(join33(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join33(pluginRoot, ".codex-plugin", "plugin.json"));
 }
 function resolveLatestVersion(env3) {
@@ -13821,7 +13824,7 @@ async function installMarketplaceLocally(options = {}) {
   return runCodexInstaller(options);
 }
 function resolveDefaultRepoRootForEntrypoint(entrypointPath) {
-  return resolve11(dirname10(entrypointPath), "..", "..", "..");
+  return resolve11(dirname11(entrypointPath), "..", "..", "..");
 }
 function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
