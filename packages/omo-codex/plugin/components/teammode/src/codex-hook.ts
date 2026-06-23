@@ -64,7 +64,7 @@ function threadTitleReminder(threadReference: ThreadCreationReference): string {
 	const id = formatIdentifier(threadReference.id);
 	return threadReference.kind === "thread"
 		? `THREAD ID ${id}: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE.`
-		: `PENDING WORKTREE ID ${id}: CALL codex_app.set_thread_title AS SOON AS THREAD ID EXISTS. USE THE REAL TASK/ROLE.`;
+		: `PENDING WORKTREE ID ${id}: WORKTREE THREAD IS NOT READY YET. DO NOT bind-thread OR SEND THE MEMBER BOOTSTRAP UNTIL A REAL THREAD ID EXISTS. THEN CALL codex_app.set_thread_title USING THE REAL TASK/ROLE.`;
 }
 
 function formatIdentifier(value: string): string {
