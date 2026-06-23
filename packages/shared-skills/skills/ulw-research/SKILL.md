@@ -33,7 +33,7 @@ You are the research orchestrator. The user has explicitly ordered exhaustive re
 
 Run this skill only when the user explicitly demands it: the word "ulw-research" (also `/ulw-research`, `$ulw-research`), the legacy alias "ultraresearch" (also `/ultraresearch`, `$ultraresearch`), any "ulw" research wording, or an explicit request for research, deep research, or an ultra-precise investigation — in any language. An ordinary question, a debugging session, or another mode's context-gathering is not activation; answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.
 
-Open your reply with the line `ULTRARESEARCH MODE ENABLED!`. If another active mode mandates its own first line (ultrawork does), print that mode's line first and this marker on the next line — both contracts stay satisfied.
+Open your reply with the line `ULW-RESEARCH MODE ENABLED!`. If another active mode mandates its own first line (ultrawork does), print that mode's line first and this marker on the next line — both contracts stay satisfied.
 
 ## Authority while active
 
