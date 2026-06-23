@@ -9,7 +9,7 @@ export * from "./polling-constants"
 export * from "./session-created-event"
 export * from "./session-created-handler"
 export * from "./session-deleted-handler"
-export * from "./session-message-count"
+
 export * from "./session-ready-waiter"
 export * from "./session-status-parser"
 export * from "./types"
