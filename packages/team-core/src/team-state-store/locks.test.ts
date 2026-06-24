@@ -21,6 +21,10 @@ function createSignal(): { readonly promise: Promise<void>; readonly resolve: ()
   return { promise, resolve: resolveSignal }
 }
 
+function createErrnoError(code: string): Error & { code: string } {
+  return Object.assign(new Error(code), { code })
+}
+
 test("withLock serializes concurrent work", async () => {
   // given
   const { withLock } = await import("./locks")
@@ -88,6 +92,35 @@ test("atomicWrite leaves no partial file when rename fails", async () => {
 
   const directoryEntries = await readdir(rootDirectory)
   expect(directoryEntries.some((entry) => entry.startsWith("target.txt.tmp."))).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("lock open treats EPERM as contention when the lock path exists", async () => {
+  // given
+  const { assertRetryableLockOpenError } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-eperm-existing-")
+  const lockPath = join(rootDirectory, "lock")
+  await writeFile(lockPath, "owner\n123\n456\n")
+
+  // when
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"))
+
+  // then
+  await expect(result).resolves.toBeUndefined()
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("lock open rethrows EPERM when the lock path does not exist", async () => {
+  // given
+  const { assertRetryableLockOpenError } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-eperm-missing-")
+  const lockPath = join(rootDirectory, "lock")
+
+  // when
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"))
+
+  // then
+  await expect(result).rejects.toThrow("EPERM")
   await rm(rootDirectory, { recursive: true, force: true })
 })
 

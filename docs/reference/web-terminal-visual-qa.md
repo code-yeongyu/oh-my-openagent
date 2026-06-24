@@ -8,11 +8,11 @@ Each run writes these files under the chosen evidence directory:
 
 - `terminal.txt`: plain terminal text for review and assertions.
 - `terminal-ansi.txt`: original ANSI capture when available.
-- `terminal.html`: browser-renderable terminal frame.
-- `terminal.png`: Chrome/Chromium screenshot, unless `--no-browser` is used.
+- `terminal.html`: browser-renderable terminal frame that preserves ANSI colors and SGR styles.
+- `terminal.png`: Chrome/Chromium screenshot with the same ANSI styling, unless `--no-browser` is used.
 - `metadata.json`: connector, source, output paths, and cleanup receipt.
 
-The PR should cite `metadata.json` and attach or link `terminal.png` for OpenCode/Codex TUI proof.
+The PR should cite `metadata.json` and attach or link `terminal.png` for OpenCode/Codex TUI proof. For PR-body image hosting, use GitHub user attachments as documented in [docs/reference/github-attachment-upload.md](github-attachment-upload.md); do not commit temporary PNGs, use releases, or use external image hosts.
 
 ## Replay An Existing Capture
 
@@ -24,6 +24,8 @@ node script/qa/web-terminal-visual-qa.mjs \
   --from-file .omo/evidence/run/capture.txt \
   --evidence-dir .omo/evidence/run/codex-web-terminal
 ```
+
+Long terminal lines wrap by default for readable PR evidence. Pass `--no-wrap` only when horizontal scrolling is part of the behavior under test.
 
 ## Run Through The PTY Connector
 
