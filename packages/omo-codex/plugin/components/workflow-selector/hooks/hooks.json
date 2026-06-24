@@ -1,0 +1,16 @@
+{
+	"hooks": {
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 5,
+						"statusMessage": "(OmO) Selecting LazyCodex Workflow"
+					}
+				]
+			}
+		]
+	}
+}

@@ -7,6 +7,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 test("#given packaged lazycodex tarball layout #when installing Codex plugin #then uses bundled artifacts without source builds", async () => {
   // given
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-"))
@@ -20,6 +22,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   await writeFile(join(repoRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "4.5.12" }))
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
   await mkdir(join(pluginRoot, "dist"), { recursive: true })
+  await mkdir(join(pluginRoot, "components", "comment-checker", "dist"), { recursive: true })
   await mkdir(join(pluginRoot, "components", "ulw-loop", "hooks"), { recursive: true })
   await mkdir(join(lspRuntimeRoot, "dist"), { recursive: true })
   await writeFile(
@@ -82,6 +85,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
     JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." } } }),
   )
   await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await writeFile(join(pluginRoot, "components", "comment-checker", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
   // when
@@ -90,6 +94,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
     binDir,
     repoRoot,
     platform: "linux",
+    astGrepInstaller: skipAstGrepInstall,
     runCommand: async (command, args, options) => {
       commands.push([command, args.join(" "), options.cwd])
     },
@@ -116,8 +121,8 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   expect(cachedManifest.version).toBe("4.5.12")
   expect(cachedPackage.version).toBe("4.5.12")
   expect(cachedComponentPackage.version).toBe("4.5.12")
-  expect(cachedHooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("LazyCodex(4.5.12): Checking Comments")
-  expect(cachedComponentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage).toBe("LazyCodex(4.5.12): Checking Ulw-Loop Steering")
+  expect(cachedHooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("(OmO) Checking Comments")
+  expect(cachedComponentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage).toBe("(OmO) Checking Ulw-Loop Steering")
   expect(commands).toHaveLength(2)
   const installCommand = commands.find((command) => command[0] === "npm")
   if (installCommand === undefined) throw new Error("missing cached plugin npm install command")
@@ -178,6 +183,7 @@ test("#given packaged lazycodex tarball layout #when simulating Windows install 
     binDir,
     repoRoot,
     platform: "win32",
+    astGrepInstaller: skipAstGrepInstall,
     gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
     runCommand: async () => undefined,
   })

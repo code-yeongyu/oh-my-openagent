@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PostCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-compact",
+						"timeout": 5,
+						"statusMessage": "(OmO) Resetting LSP Diagnostics Cache"
+					}
+				],
+				"matcher": "manual|auto"
+			}
+		]
+	}
+}

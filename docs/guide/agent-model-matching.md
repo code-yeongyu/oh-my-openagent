@@ -183,7 +183,7 @@ There are two separate systems:
 
 Two things move at different speeds, and the difference explains why "Opus 4.7" still appears as a default below:
 
-- **The current top models** are Claude **Fable 5** and **Opus 4.8**, and Kimi **K2.7**. Sisyphus and Atlas have dedicated tuned prompt paths for these models; Prometheus keeps one `ulw-plan`-backed prompt. Pin one in your config: `"anthropic/claude-opus-4-8"`, `"anthropic/claude-fable-5"`, `"opencode-go/kimi-k2.7"`. Use that when you want to opt into the newer model explicitly.
+- **The current top models** are Claude **Fable 5** and **Opus 4.8**, and Kimi **K2.7**. Sisyphus and Atlas have dedicated tuned prompt paths for these models; Prometheus keeps one `ulw-plan`-backed prompt. Pin one in your config: `"anthropic/claude-opus-4-8"`, `"anthropic/claude-fable-5"`, `"opencode-go/kimi-k2.7-code"`. Use that when you want to opt into the newer model explicitly.
 - **The auto-resolution fallback chains** below still lead with **Opus 4.7** and **Kimi K2.6**. That is intentional, not stale: the chains only auto-select models the bundled capability snapshot is built against, so variant and context-window resolution stay correct. They promote Opus 4.8 / K2.7 to chain defaults once those land in the model catalog; until then you opt into the newer models — and their prompts — by naming them explicitly.
 
 So an "Opus 4.7 (max)" entry in the chains below is the snapshot-backed floor, not a recommendation to prefer 4.7 over 4.8.
@@ -269,7 +269,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent | Role | Fallback Chain |
 |---|---|---|
-| **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|venice\|opencode\|vercel/gpt-5.5` (medium) — single-entry chain, requires one of those providers. The craftsman. |
+| **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — single-entry chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.1` |
 | **Momus** | Ruthless reviewer | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.1` |
 
@@ -389,8 +389,8 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
   "agents": {
     // Sisyphus: Kimi K2.7 is the top alternative to Claude for orchestration
     "sisyphus": {
-      "model": "opencode-go/kimi-k2.7",
-      "ultrawork": { "model": "opencode-go/kimi-k2.7" },
+      "model": "opencode-go/kimi-k2.7-code",
+      "ultrawork": { "model": "opencode-go/kimi-k2.7-code" },
     },
 
     // Hephaestus: needs GPT. ChatGPT Plus gets you here.
@@ -400,10 +400,10 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
 
     // Prometheus keeps the same ulw-plan-backed prompt across model families
-    "prometheus": { "model": "opencode-go/kimi-k2.7" },
+    "prometheus": { "model": "opencode-go/kimi-k2.7-code" },
 
     // Atlas also communicative — Kimi works great
-    "atlas": { "model": "opencode-go/kimi-k2.7" },
+    "atlas": { "model": "opencode-go/kimi-k2.7-code" },
 
     // Utility agents stay cheap
     "explore": { "model": "opencode-go/qwen3.5-plus" },
@@ -415,9 +415,9 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     "deep": { "model": "openai/gpt-5.5", "variant": "medium" },
     "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
     "quick": { "model": "openai/gpt-5.4-mini" },
-    "unspecified-low": { "model": "opencode-go/kimi-k2.7" },
-    "unspecified-high": { "model": "opencode-go/kimi-k2.7" },
-    "writing": { "model": "opencode-go/kimi-k2.7" },
+    "unspecified-low": { "model": "opencode-go/kimi-k2.7-code" },
+    "unspecified-high": { "model": "opencode-go/kimi-k2.7-code" },
+    "writing": { "model": "opencode-go/kimi-k2.7-code" },
   },
 
   "background_task": {
@@ -458,8 +458,8 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
 ```jsonc
 {
   "agents": {
-    "sisyphus": { "model": "opencode-go/kimi-k2.7" },
-    "atlas": { "model": "opencode-go/kimi-k2.7" },
+    "sisyphus": { "model": "opencode-go/kimi-k2.7-code" },
+    "atlas": { "model": "opencode-go/kimi-k2.7-code" },
     // Omit hephaestus entirely; it needs GPT.
     "oracle": { "model": "opencode-go/glm-5.1" },  // Degraded but functional
     "explore": { "model": "opencode-go/qwen3.5-plus" },
@@ -467,11 +467,11 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
   },
   "categories": {
     "visual-engineering": { "model": "opencode-go/qwen3.6-plus" },
-    "deep": { "model": "opencode-go/kimi-k2.7" },  // Not ideal — Kimi isn't GPT, but best available
-    "unspecified-high": { "model": "opencode-go/kimi-k2.7" },
-    "unspecified-low": { "model": "opencode-go/kimi-k2.7" },
+    "deep": { "model": "opencode-go/kimi-k2.7-code" },  // Not ideal — Kimi isn't GPT, but best available
+    "unspecified-high": { "model": "opencode-go/kimi-k2.7-code" },
+    "unspecified-low": { "model": "opencode-go/kimi-k2.7-code" },
     "quick": { "model": "opencode-go/minimax-m2.7" },
-    "writing": { "model": "opencode-go/kimi-k2.7" },
+    "writing": { "model": "opencode-go/kimi-k2.7-code" },
   },
 }
 ```

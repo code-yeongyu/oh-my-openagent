@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "^(create_thread|codex_app\\.create_thread)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/teammode/dist/cli.js\" hook post-tool-use",
+						"timeout": 10,
+						"statusMessage": "(OmO) Checking Thread Title Hygiene"
+					}
+				]
+			}
+		]
+	}
+}

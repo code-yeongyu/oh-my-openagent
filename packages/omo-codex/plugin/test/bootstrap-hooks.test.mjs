@@ -3,7 +3,13 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { collectCommandHooks, readComponentHookManifests, readJson, root } from "./aggregate-plugin-fixture.mjs";
+import {
+	collectCommandHooks,
+	readAggregateHookManifests,
+	readComponentHookManifests,
+	readJson,
+	root,
+} from "./aggregate-plugin-fixture.mjs";
 
 const PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}([^"']+)/g;
 const SKIPPED_DIRECTORY_NAMES = new Set([".git", "node_modules"]);
@@ -58,13 +64,13 @@ function collectPluginRootTargets(handler) {
 }
 
 async function readHookManifestsWithRoots() {
-	const aggregate = { source: "hooks/hooks.json", hooks: await readJson("hooks/hooks.json"), roots: [root] };
+	const aggregate = (await readAggregateHookManifests()).map(({ source, hooks }) => ({ source, hooks, roots: [root] }));
 	const components = (await readComponentHookManifests()).map(({ source, hooks }) => ({
 		source,
 		hooks,
 		roots: [dirname(dirname(join(root, source))), root],
 	}));
-	return [aggregate, ...components];
+	return [...aggregate, ...components];
 }
 
 function findBootstrapSessionStartHandlers(hooks) {
@@ -123,11 +129,13 @@ test("#given aggregate and component hook manifests #when command targets are re
 
 test("#given the bootstrap component #when its SessionStart registration is inspected #then aggregate and component entries declare both platform commands", async () => {
 	// given
-	const aggregateHooks = await readJson("hooks/hooks.json");
+	const aggregateHooks = (await readAggregateHookManifests()).find(({ source }) =>
+		source.endsWith("session-start-checking-bootstrap-provisioning.json"),
+	)?.hooks;
 	const componentHooks = await readJson("components/bootstrap/hooks/hooks.json");
 
 	// when
-	const aggregateEntries = findBootstrapSessionStartHandlers(aggregateHooks);
+	const aggregateEntries = findBootstrapSessionStartHandlers(aggregateHooks ?? {});
 	const componentEntries = findBootstrapSessionStartHandlers(componentHooks);
 
 	// then
@@ -144,7 +152,7 @@ test("#given the bootstrap component #when its SessionStart registration is insp
 		assert.equal(typeof handler.timeout, "number");
 		assert(handler.timeout <= 60, `${label} bootstrap timeout must stay <= 60 seconds`);
 		assert.equal(typeof handler.statusMessage, "string");
-		assert.match(handler.statusMessage, /^LazyCodex\([^)]+\): .+$/);
+		assert.match(handler.statusMessage, /^\(OmO\) .+$/);
 	}
 });
 

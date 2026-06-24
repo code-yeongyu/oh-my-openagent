@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test("#given aggregate MCP config #when inspected #then registers research and structural-search MCPs", async () => {
+test("#given aggregate MCP config #when inspected #then registers research MCPs without ast-grep MCP", async () => {
 	// given
 	const mcp = JSON.parse(await readFile(join(root, ".mcp.json"), "utf8"));
 
@@ -14,10 +14,10 @@ test("#given aggregate MCP config #when inspected #then registers research and s
 	const serverNames = Object.keys(mcp.mcpServers).sort();
 
 	// then
-	assert.deepEqual(serverNames, ["ast_grep", "codegraph", "context7", "git_bash", "grep_app", "lsp"]);
+	assert.deepEqual(serverNames, ["codegraph", "context7", "git_bash", "grep_app", "lsp"]);
 	assert.equal(mcp.mcpServers.grep_app.url, "https://mcp.grep.app");
 	assert.equal(mcp.mcpServers.context7.url, "https://mcp.context7.com/mcp");
-	assert.deepEqual(mcp.mcpServers.ast_grep.args, ["../../ast-grep-mcp/dist/cli.js", "mcp"]);
+	assert.equal(Object.hasOwn(mcp.mcpServers, "ast_grep"), false);
 	assert.deepEqual(mcp.mcpServers.codegraph.args, ["components/codegraph/dist/serve.js"]);
 	assert.equal(mcp.mcpServers.codegraph.required, false);
 });

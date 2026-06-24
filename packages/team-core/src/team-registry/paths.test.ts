@@ -51,6 +51,17 @@ describe("paths", () => {
     expect(resolvedBaseDir).toBe("/tmp/test-abc")
   })
 
+  test("#given base dir starts with tilde #when resolving team base dir #then it expands to the user home directory", () => {
+    // given
+    const config = TeamModeConfigSchema.parse({ base_dir: "~/.omo" })
+
+    // when
+    const resolvedBaseDir = resolveBaseDir(config)
+
+    // then
+    expect(resolvedBaseDir).toBe(path.join(homedir(), ".omo"))
+  })
+
   test("#given team runtime ids contain traversal #when runtime paths are built #then they are rejected before escaping base dir", () => {
     // given
     const baseDir = "/tmp/omo-contained"

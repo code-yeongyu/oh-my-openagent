@@ -20,11 +20,6 @@ const runtimes = [
 		install: true,
 	},
 	{
-		label: "ast-grep-mcp",
-		packageRoot: join(repoPackagesRoot, "ast-grep-mcp"),
-		requiredOutputs: ["dist/cli.js"],
-	},
-	{
 		label: "git-bash-mcp",
 		packageRoot: join(repoPackagesRoot, "git-bash-mcp"),
 		requiredOutputs: ["dist/cli.js"],

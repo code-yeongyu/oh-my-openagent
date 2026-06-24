@@ -9,6 +9,22 @@ type ParentWakeDispatchedTrackerOptions = {
 export class ParentWakeDispatchedTracker {
   private dispatchedParentWakes: Map<string, PendingParentWake> = new Map()
   private dispatchedParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  // Sessions whose wake has left the pending queue but is still mid-dispatch
+  // (the `await dispatchInternalPrompt(...)` window, which can span the prompt
+  // gate's status/message checks plus the dispatch itself). The pending entry is
+  // already deleted and the dispatched entry is not yet tracked, so without this
+  // marker `hasPendingParentWake` would briefly report "no wake owed" and let the
+  // sync poller settle on a stale pre-results turn.
+  private inFlightDispatches: Set<string> = new Set()
+  // Parent sessions whose final child has been marked terminal but whose wake has
+  // not yet been queued, because the completion path is still awaiting the child's
+  // session teardown (abort with a 10s timeout, plus the tmux callback). During
+  // that window the child no longer counts as active and the wake is not yet in any
+  // of the maps above, so without this reservation `hasPendingParentWake` would
+  // report "no wake owed" and let a parent sync poller settle on a stale turn. A
+  // counter (not a set) so concurrent child teardowns for the same parent each hold
+  // their own slot and the predicate only clears once every one has queued its wake.
+  private notificationPreparations: Map<string, number> = new Map()
 
   constructor(private readonly options: ParentWakeDispatchedTrackerOptions) {}
 
@@ -18,6 +34,38 @@ export class ParentWakeDispatchedTracker {
 
   getTimers(): Map<string, ReturnType<typeof setTimeout>> {
     return this.dispatchedParentWakeTimers
+  }
+
+  markInFlight(sessionID: string): void {
+    this.inFlightDispatches.add(sessionID)
+  }
+
+  clearInFlight(sessionID: string): void {
+    this.inFlightDispatches.delete(sessionID)
+  }
+
+  hasInFlight(sessionID: string): boolean {
+    return this.inFlightDispatches.has(sessionID)
+  }
+
+  reserveNotificationPreparation(sessionID: string): void {
+    this.notificationPreparations.set(sessionID, (this.notificationPreparations.get(sessionID) ?? 0) + 1)
+  }
+
+  releaseNotificationPreparation(sessionID: string): void {
+    const count = this.notificationPreparations.get(sessionID)
+    if (count === undefined) {
+      return
+    }
+    if (count <= 1) {
+      this.notificationPreparations.delete(sessionID)
+    } else {
+      this.notificationPreparations.set(sessionID, count - 1)
+    }
+  }
+
+  hasNotificationPreparation(sessionID: string): boolean {
+    return (this.notificationPreparations.get(sessionID) ?? 0) > 0
   }
 
   getWake(sessionID: string): PendingParentWake | undefined {
@@ -75,5 +123,7 @@ export class ParentWakeDispatchedTracker {
     }
     this.dispatchedParentWakeTimers.clear()
     this.dispatchedParentWakes.clear()
+    this.inFlightDispatches.clear()
+    this.notificationPreparations.clear()
   }
 }
