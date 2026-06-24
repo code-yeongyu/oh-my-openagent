@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Readable, Writable } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { PassThrough, Readable, Writable } from "node:stream";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type DaemonServerHandle, startDaemonServer } from "../src/daemon-server.js";
 import { type DaemonPaths, daemonPaths } from "../src/paths.js";
@@ -102,6 +102,30 @@ describe("mcp stdio proxy", () => {
 
 		const responses = parseResponses(out);
 		expect((responses[0]?.["error"] as { code: number }).code).toBe(-32700);
+	});
+
+	it("#given an idle proxy #when the next request arrives after ten minutes #then it still responds", async () => {
+		vi.useFakeTimers();
+		try {
+			const paths = tempPaths();
+			const input = new PassThrough();
+			const out: string[] = [];
+			const server = runMcpStdioProxy({
+				input,
+				output: collectingWritable(out),
+				paths,
+				ensure: noSpawn,
+			});
+
+			await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
+			input.end(`${JSON.stringify({ jsonrpc: "2.0", id: 6, method: "initialize", params: {} })}\n`);
+			await server;
+
+			const responses = parseResponses(out);
+			expect((responses[0]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("#given an unreachable daemon #when several tools are proxied #then each gets a structured error and the proxy keeps serving", async () => {
