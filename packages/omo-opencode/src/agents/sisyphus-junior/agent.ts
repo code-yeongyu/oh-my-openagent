@@ -27,6 +27,7 @@ import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
 import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
+import { buildGlm52SisyphusJuniorPrompt } from "./glm-5-2"
 
 const MODE: AgentMode = "subagent"
 
@@ -47,6 +48,7 @@ export type SisyphusJuniorPromptSource =
   | "gpt-5-5"
   | "gpt-5-4"
   | "gemini"
+  | "glm-5-2"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
   if (model && isKimiK27Model(model)) return "kimi-k2-7"
@@ -60,6 +62,7 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
   if (model && isGeminiModel(model)) {
     return "gemini"
   }
+  if (model && isGlmModel(model)) return "glm-5-2"
   return "default"
 }
 
@@ -86,6 +89,8 @@ export function buildSisyphusJuniorPrompt(
       return buildGptSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gemini":
       return buildGeminiSisyphusJuniorPrompt(useTaskSystem, promptAppend)
+    case "glm-5-2":
+      return buildGlm52SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "default":
     default:
       return buildDefaultSisyphusJuniorPrompt(useTaskSystem, promptAppend)

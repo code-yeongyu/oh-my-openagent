@@ -42,6 +42,7 @@ function createDeps(promptCalls: { count: number }): HookDeps {
       cooldown_seconds: 60,
       timeout_seconds: 0,
       notify_on_fallback: false,
+      restore_primary_after_cooldown: false,
     },
     options: undefined,
     pluginConfig: undefined,

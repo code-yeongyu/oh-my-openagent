@@ -10,6 +10,8 @@ import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
+const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
 }
@@ -116,7 +118,7 @@ describe("install-codex", () => {
     await writeFile(join(legacyCacheRoot, ".mcp.json"), JSON.stringify({ mcpServers: { lsp: { args: ["old-lsp"] } } }))
 
     // when
-    const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
+    const first = await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
 
     // then
     expect(first.marketplaceName).toBe("sisyphuslabs")
@@ -161,10 +163,9 @@ describe("install-codex", () => {
     expect((await stat(join(pluginPath ?? "", "components", "ultrawork", "skills", "ulw-plan"))).isDirectory()).toBe(true)
     expect((await stat(join(pluginPath ?? "", "components", "ulw-loop", "skills", "ulw-loop"))).isDirectory()).toBe(true)
     const mcpManifest = JSON.parse(await readFile(join(pluginPath ?? "", ".mcp.json"), "utf8")) as {
-      mcpServers: { ast_grep: { args: string[] }; git_bash: { args: string[] }; lsp: { args: string[] } }
+      mcpServers: { git_bash: { args: string[] }; lsp: { args: string[] } }
     }
-    expect(mcpManifest.mcpServers.ast_grep.args[0]).toBe(join(pluginPath ?? "", "components", "ast-grep-mcp", "dist", "cli.js"))
-    expect((await stat(mcpManifest.mcpServers.ast_grep.args[0] ?? "")).isFile()).toBe(true)
+    expect(Object.hasOwn(mcpManifest.mcpServers, "ast_grep")).toBe(false)
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath ?? "", "components", "git-bash-mcp", "dist", "cli.js"))
     expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
     expect(mcpManifest.mcpServers.lsp.args[0]).toBe(join(pluginPath ?? "", "components", "lsp-daemon", "dist", "cli.js"))
@@ -184,6 +185,33 @@ describe("install-codex", () => {
     expect(legacyCacheMissing).toBe(true)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
+  test("#given codex installer #when installing omo #then seeds OMO SOT through local migration script", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-sot-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-sot-"))
+    const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-sot-"))
+    const repoRoot = process.cwd()
+    const invocations: Array<{ readonly command: string; readonly args: readonly string[]; readonly home: string | undefined }> = []
+
+    // when
+    await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot,
+      astGrepInstaller: skipAstGrepInstall,
+      env: { HOME: home },
+      runCommand: async (command, args, options) => {
+        invocations.push({ command, args: [...args], home: options.env?.HOME })
+      },
+    })
+
+    // then
+    const sotInvocation = invocations.find((invocation) => invocation.args.some((arg) => arg.endsWith("migrate-omo-sot.mjs")))
+    expect(sotInvocation?.command).toBe(process.execPath)
+    expect(sotInvocation?.args).toContain("--seed")
+    expect(sotInvocation?.home).toBe(home)
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
   test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
@@ -196,6 +224,7 @@ describe("install-codex", () => {
       binDir,
       repoRoot,
       platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
       gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
       runCommand: async () => undefined,
     })
@@ -227,6 +256,7 @@ describe("install-codex", () => {
       binDir,
       repoRoot,
       platform: "linux",
+      astGrepInstaller: skipAstGrepInstall,
       runCommand: async () => undefined,
     })
 
@@ -249,7 +279,7 @@ describe("install-codex", () => {
     const logs: string[] = []
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined, log: (line) => logs.push(line) })
+    await runCodexInstaller({ codexHome, binDir, repoRoot, astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined, log: (line) => logs.push(line) })
 
     // then
     const cliPath = join(repoRoot, "dist", "cli", "index.js")
@@ -272,6 +302,7 @@ describe("install-codex", () => {
       codexHome,
       binDir,
       repoRoot,
+      astGrepInstaller: skipAstGrepInstall,
       runCommand: async () => undefined,
       autonomousPermissions: true,
     })

@@ -29,7 +29,7 @@ The plugin ships:
 The hook command is:
 
 ```bash
-node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit
+node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit --with-ultrawork
 ```
 
 No MCP server or Codex tool is exposed in this scaffold.

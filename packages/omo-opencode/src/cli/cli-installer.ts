@@ -27,6 +27,8 @@ import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version
 import { runCodexInstaller } from "./install-codex"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
+import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
+import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -108,6 +110,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printSuccess(
       `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
     )
+    try {
+      ensureTuiPluginEntry()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printWarning(`Could not update OpenCode TUI config: ${message}`)
+    }
 
     printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
     const omoResult = writeOmoConfig(config)
@@ -116,6 +124,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       return 1
     }
     printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
+    await astGrepInstall.installAstGrepForOpenCode({ log: printWarning })
   }
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")

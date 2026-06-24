@@ -69,6 +69,7 @@ describe("package.json", () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const files = pkg["files"] as readonly string[];
 		expect(files).toContain("dist");
+		expect(files).toContain("directive.md");
 		expect(files).toContain("hooks");
 		expect(files).toContain("skills");
 		expect(files).not.toContain(".codex-plugin");
@@ -90,6 +91,7 @@ describe("hooks/hooks.json", () => {
 		expect(command).toContain(`$${"{PLUGIN_ROOT}"}`);
 		expect(command).toContain("dist/cli.js");
 		expect(command).toContain("hook user-prompt-submit");
+		expect(command).toContain("--with-ultrawork");
 	});
 
 	it("#given ulw-loop component is enabled #when hooks are inspected #then create_goal PreToolUse guard is registered", async () => {
@@ -123,7 +125,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop surfaces the ulw-loop alias", async () => {
 		const text = await readText("skills/ulw-loop/agents/openai.yaml");
 
-		expect(text).toContain('display_name: "ulw-loop (omo)"');
+		expect(text).toContain('display_name: "(OmO) ulw-loop"');
 		expect(text).not.toContain("ulw-loop / ulw-loop");
 		expect(text).toContain('short_description: "Goal-like ultrawork loop for systematic decomposition"');
 		expect(text).toContain("Use $ulw-loop");

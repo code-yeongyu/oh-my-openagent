@@ -24,7 +24,6 @@ function createDoctorResult(): DoctorResult {
         { id: "pyright", extensions: [".py", ".pyi"] },
       ],
       astGrepCli: true,
-      astGrepNapi: false,
       commentChecker: true,
       ghCli: { installed: true, authenticated: true, username: "yeongyu" },
       mcpBuiltin: ["context7", "grep_app"],

@@ -25,19 +25,16 @@ describe("LazyCodex marketplace sync workflow", () => {
     )
 
     // #when
-    const astGrepBuildIndex = syncStep.indexOf("bun run build:ast-grep-mcp")
     const gitBashBuildIndex = syncStep.indexOf("bun run build:git-bash-mcp")
     const lspBuildIndex = syncStep.indexOf("bun run build:lsp-tools-mcp")
     const lspDaemonBuildIndex = syncStep.indexOf("bun run build:lsp-daemon")
     const codexPluginBuildIndex = syncStep.indexOf("bun run --cwd packages/omo-codex/plugin build")
     const syncScriptIndex = syncStep.indexOf("bun run script/sync-lazycodex-marketplace.ts")
     const buildsMcpDistsBeforeCodexPlugin =
-      astGrepBuildIndex >= 0 &&
       gitBashBuildIndex >= 0 &&
       lspBuildIndex >= 0 &&
       lspDaemonBuildIndex >= 0 &&
       codexPluginBuildIndex >= 0 &&
-      astGrepBuildIndex < codexPluginBuildIndex &&
       gitBashBuildIndex < codexPluginBuildIndex &&
       lspBuildIndex < codexPluginBuildIndex &&
       lspDaemonBuildIndex < codexPluginBuildIndex

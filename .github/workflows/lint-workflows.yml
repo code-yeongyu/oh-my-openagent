@@ -20,3 +20,15 @@ jobs:
 
       - name: Run actionlint
         run: ./actionlint -color -shellcheck=""
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Workflow lint
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Downloads the pinned actionlint release.
+            - Validates every workflow changed in this repository.
+          JOB_SUMMARY_NEXT: Fix the first actionlint diagnostic; most failures point to an exact workflow line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

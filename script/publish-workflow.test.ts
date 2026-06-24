@@ -37,6 +37,18 @@ function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: 
   return workflow.slice(start, end)
 }
 
+function sliceWorkflowSectionToEnd(workflow: string, startMarker: string): string {
+  const start = workflow.indexOf(startMarker)
+  if (start < 0) {
+    throw new Error(`missing workflow section starting at ${startMarker}`)
+  }
+  return workflow.slice(start)
+}
+
+function normalizeWorkflowText(workflow: string): string {
+  return workflow.replace(/\r\n/g, "\n")
+}
+
 function expectBunSetupBeforeLspToolsBuild(workflowSection: string, label: string): void {
   const bunSetupIndex = workflowSection.indexOf("uses: oven-sh/setup-bun@v2")
   const lspBuildIndex = workflowSection.indexOf("name: Build vendored lsp-tools-mcp package")
@@ -44,6 +56,20 @@ function expectBunSetupBeforeLspToolsBuild(workflowSection: string, label: strin
   expect(bunSetupIndex, `${label} must setup Bun`).toBeGreaterThanOrEqual(0)
   expect(lspBuildIndex, `${label} must build lsp-tools-mcp`).toBeGreaterThanOrEqual(0)
   expect(bunSetupIndex, `${label} must setup Bun before lsp-tools-mcp build`).toBeLessThan(lspBuildIndex)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function readPackageScript(scriptName: string): string {
+  const parsed: unknown = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+  if (!isRecord(parsed)) throw new Error("package.json must be an object")
+  const scripts = parsed["scripts"]
+  if (!isRecord(scripts)) throw new Error("package.json scripts must be an object")
+  const script = scripts[scriptName]
+  if (typeof script !== "string") throw new Error(`package.json scripts.${scriptName} must be a string`)
+  return script
 }
 
 describe("test workflows", () => {
@@ -96,10 +122,14 @@ describe("test workflows", () => {
         codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
     const runsCodexCommand = codexCompatibilityJob.includes("run: bun run test:codex")
     const publishMainNeedsCodex =
-      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
+      workflow.includes(
+        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+      ) &&
       workflow.includes("needs.codex-compatibility.result == 'success'")
     const publishPlatformNeedsCodex =
-      workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]") &&
+      workflow.includes(
+        "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state]",
+      ) &&
       workflow.includes("needs.codex-compatibility.result == 'success'")
 
     // #then
@@ -125,19 +155,31 @@ describe("test workflows", () => {
     expect(hasMatrixRunner, "CI root checks must run on the selected matrix OS").toBe(true)
   })
 
-  test("runs codex compatibility checks on every supported os", () => {
+  test("runs codex compatibility checks on every supported os without serializing build", () => {
     // #given
-    const workflow = readFileSync(ciWorkflowPath, "utf8")
+    const workflow = normalizeWorkflowText(readFileSync(ciWorkflowPath, "utf8"))
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
+    const buildJob = sliceWorkflowSection(workflow, "  build:", "  auto-commit-schema:")
+    const autoCommitSchemaJob = sliceWorkflowSection(workflow, "  auto-commit-schema:", "  draft-release:")
+    const draftReleaseJob = sliceWorkflowSectionToEnd(workflow, "  draft-release:")
 
     // #when
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
+    const hasSupportedOsMatrix = codexCompatibilityJob.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
-    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility]")
+    const buildWaitsForChecks = buildJob.includes("needs:")
+    const buildHasReadOnlyContentsPermission = buildJob.includes("permissions:\n      contents: read")
+    const writeGateNeedsAllChecks = autoCommitSchemaJob.includes("needs: [test, typecheck, codex-compatibility, build]")
+    const draftReleaseNeedsAllChecks = draftReleaseJob.includes("needs: [test, typecheck, codex-compatibility, build]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
+    expect(hasSupportedOsMatrix, "CI Codex compatibility must cover supported OSes").toBe(true)
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
-    expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
+    expect(buildWaitsForChecks, "Build has no artifact dependency on test/typecheck/codex and must not serialize CI").toBe(false)
+    expect(buildHasReadOnlyContentsPermission, "Parallel build must explicitly stay read-only; write actions belong behind the all-check gate").toBe(true)
+    expect(writeGateNeedsAllChecks, "Schema auto-commit must wait for all root checks and build").toBe(true)
+    expect(draftReleaseNeedsAllChecks, "Draft release must wait for all root checks and build").toBe(true)
   })
 
   test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
@@ -179,16 +221,28 @@ describe("test workflows", () => {
 
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {
     // #given
-    const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
+    const codexTestScript = readPackageScript("test:codex")
 
     // #when
-    const codexTestScriptBuildsMcpRuntimes =
-      packageManifest.includes(
-        '"test:codex": "bun run build:codex-install && bun run build:ast-grep-mcp && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
-      )
+    const requiredPrerequisites = [
+      ["generated Codex installer", "bun run build:codex-install"],
+      ["Git Bash MCP runtime", "bun run build:git-bash-mcp"],
+      ["lsp-tools MCP runtime", "bun run build:lsp-tools-mcp"],
+      ["lsp daemon runtime", "bun run build:lsp-daemon"],
+      ["vendored lsp-tools package tests", "npm --prefix packages/lsp-tools-mcp test"],
+      ["nested Codex plugin npm install", "npm --prefix packages/omo-codex/plugin ci"],
+      ["nested Codex plugin build", "bun run --cwd packages/omo-codex/plugin build"],
+      ["third-party notices ship check", "node scripts/check-third-party-notices.mjs --ship"],
+      ["Codex compatibility Bun tests", "bun test"],
+    ] as const
 
     // #then
-    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must build the generated Codex installer, install nested Codex plugin deps, and build bundled runtimes before installer tests copy them").toBe(true)
+    let previousIndex = -1
+    for (const [description, command] of requiredPrerequisites) {
+      const index = codexTestScript.indexOf(command)
+      expect(index, `test:codex must run ${description}`).toBeGreaterThan(previousIndex)
+      previousIndex = index
+    }
   })
 
   test("runs Git Bash installer regressions in Codex compatibility checks", () => {
@@ -246,7 +300,9 @@ describe("test workflows", () => {
     const computesVersionOnce = (workflow.match(/id: version/g) ?? []).length === 1
     const platformUsesMetadata = workflow.includes("version: ${{ needs.release-metadata.outputs.version }}") &&
       workflow.includes("dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}")
-    const mainWaitsForPlatform = workflow.includes("needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, publish-platform]") &&
+    const mainWaitsForPlatform = workflow.includes(
+      "needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata, prepare-release-state, publish-platform]",
+    ) &&
       workflow.includes("inputs.skip_platform == true || needs.publish-platform.result == 'success'")
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")
     const wrappersVerifyPlatformPackages = workflow.includes("name: Verify platform packages are published") &&
@@ -454,7 +510,7 @@ describe("test workflows", () => {
     expect(publishIds, "PLATFORM_PACKAGE_IDS must match build-binaries PLATFORMS exactly").toEqual(
       buildBinariesPlatforms,
     )
-    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 2 version-bump loops").toBe(4)
+    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 3 version-bump loops").toBe(5)
     for (const publishYmlList of publishYmlLists) {
       expect(publishYmlList, "every publish.yml platform list must match build-binaries PLATFORMS exactly").toEqual(
         buildBinariesPlatforms,

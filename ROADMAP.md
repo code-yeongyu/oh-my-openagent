@@ -41,7 +41,7 @@ The refactor splits packages into strict layers by runtime boundary:
 
 **Current extraction status:**
 
-- 19 Core packages are now extracted under `packages/`: `utils`, `model-core`, `prompts-core`, `rules-engine`, `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, and `delegate-core`.
+- 18 Core packages are now extracted under `packages/`: `utils`, `model-core`, `prompts-core`, `rules-engine`, `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, and `delegate-core`.
 - `omo` consumes these packages via workspace dependencies, with adapter shims left at original `packages/omo-opencode/src/` locations where OpenCode-facing import paths or runtime wiring still need stable anchors.
 - `pi-extensions` and `codex-plugins` are not yet migrated to consume these packages. That migration is the next phase.
 - The `lsp-tools-mcp` and `lsp-daemon` packages are vendored in-tree and now consume `lsp-core` plus `mcp-stdio-core` instead of deep-importing each other's source internals.

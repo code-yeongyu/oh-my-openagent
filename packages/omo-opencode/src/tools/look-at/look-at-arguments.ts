@@ -44,9 +44,9 @@ export function validateArgs(args: LookAtArgs): string | null {
   const normalizedArgs = args as NormalizedLookAtArgs
   const filePath = args.file_path
   const hasFilePath = hasNonEmptyString(args.file_path)
-  const hasFilePaths = Array.isArray(args.file_paths)
+  const hasFilePaths = hasValues(args.file_paths)
   const hasImageData = hasNonEmptyString(args.image_data)
-  const hasImageDataList = Array.isArray(args.image_data_list)
+  const hasImageDataList = hasValues(args.image_data_list)
   const filePathsFromSingular = normalizedArgs._normalized_file_paths_from_singular === true
   const imageDataListFromSingular = normalizedArgs._normalized_image_data_list_from_singular === true
 
@@ -56,14 +56,6 @@ export function validateArgs(args: LookAtArgs): string | null {
 
   if (hasImageData && hasImageDataList && !imageDataListFromSingular) {
     return "Error: Provide either 'image_data' or 'image_data_list', not both."
-  }
-
-  if (hasFilePaths && !hasValues(args.file_paths)) {
-    return "Error: 'file_paths' must contain at least one local file path."
-  }
-
-  if (hasImageDataList && !hasValues(args.image_data_list)) {
-    return "Error: 'image_data_list' must contain at least one Base64 image string."
   }
 
   if (hasValues(args.file_paths)) {
@@ -88,7 +80,7 @@ export function validateArgs(args: LookAtArgs): string | null {
   if (hasNonEmptyString(filePath) && isRemoteUrl(filePath)) {
     return "Error: Remote URLs are not supported for file_path. Download the file first or use a local path."
   }
-  if (!hasFilePath && !hasValues(args.file_paths) && !hasImageData && !hasValues(args.image_data_list)) {
+  if (!hasFilePath && !hasFilePaths && !hasImageData && !hasImageDataList) {
     return `Error: Must provide at least one of 'file_path', 'file_paths', 'image_data', or 'image_data_list'. Usage:
 - look_at(file_path="/path/to/file", goal="what to extract")
 - look_at(file_paths=["/path/to/file-1", "/path/to/file-2"], goal="what to extract")

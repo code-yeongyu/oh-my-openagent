@@ -10,16 +10,15 @@ import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./git
 import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
-import {
-  readDistributionManifest,
-  resolveLazyCodexPluginVersion,
-  stampLazyCodexPluginVersion,
-  writeLazyCodexInstallSnapshot,
-} from "./lazycodex-version-stamp"
+import { readDistributionManifest, resolveLazyCodexPluginVersion, stampLazyCodexPluginVersion, writeLazyCodexInstallSnapshot } from "./lazycodex-version-stamp"
 import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import { reapLspDaemons } from "./lsp-daemon-reaper"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
+import { seedAndMigrateOmoSot } from "./omo-sot-migration"
+import { installAstGrepForCodex } from "./install-ast-grep-sg"
+import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
+import { resolveCodegraphNodeSupport } from "@oh-my-opencode/utils"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -105,6 +104,14 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     installed.push(plugin)
   }
 
+  await installAstGrepForCodex({
+    codexHome,
+    installed,
+    installer: options.astGrepInstaller,
+    log,
+    platform,
+  })
+
   const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
   const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
   const agentSourceRoots = await agentSourceRootsForInstall({
@@ -171,11 +178,13 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceSource: codexMarketplaceSource(marketplaceRoot),
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     platform,
+    codegraphMcpEnabled: options.codegraphMcpEnabled ?? resolveCodegraphNodeSupport({ env }).supported,
     gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false,
   })
+  await seedAndMigrateOmoSot({ env, log, repoRoot, runCommand })
 
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
     startDirectory: projectDirectory,
@@ -261,16 +270,4 @@ function isRepoRootWithCodexPlugin(repoRoot: string): boolean {
 
 function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource {
   return { sourceType: "local", source: marketplaceRoot }
-}
-
-async function trackCodexInstallTelemetry(): Promise<void> {
-  try {
-    const { createInstallPostHog, getPostHogDistinctId } = await import("../telemetry")
-    const posthog = createInstallPostHog()
-    posthog.trackActive(getPostHogDistinctId(), "install_completed")
-    await posthog.shutdown()
-  } catch (error) {
-    if (!(error instanceof Error)) return
-    return
-  }
 }

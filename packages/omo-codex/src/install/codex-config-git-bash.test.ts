@@ -86,9 +86,43 @@ describe("Codex config Git Bash MCP policy", () => {
       // then
       const content = await readFile(configPath, "utf8")
       expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+      expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.codegraph]')
       expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = false/)
+      expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.codegraph\][\s\S]*?enabled = true/)
       expect(content).toContain('[plugins."omo@sisyphuslabs"]')
       expect(content).toContain("enabled = true")
     }
   })
+
+  test("#given codegraph MCP is not runnable #when updating sisyphuslabs plugin config #then disables codegraph plugin mcp policy", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-codegraph-disabled-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+      pluginNames: ["omo"],
+      platform: "darwin",
+      codegraphMcpEnabled: false,
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    const codegraphSection = readSection(content, '[plugins."omo@sisyphuslabs".mcp_servers.codegraph]')
+    expect(codegraphSection).toContain("enabled = false")
+    expect(content).toContain('[plugins."omo@sisyphuslabs"]')
+    expect(content).toContain("enabled = true")
+  })
 })
+
+function readSection(content: string, header: string): string {
+  const start = content.indexOf(header)
+  if (start < 0) return ""
+  const rest = content.slice(start)
+  const nextSection = rest.indexOf("\n[", 1)
+  return nextSection < 0 ? rest : rest.slice(0, nextSection)
+}
