@@ -14,6 +14,7 @@ export type ChatParamsInput = {
 
 type ChatParamsHookInput = ChatParamsInput & {
   rawMessage?: Record<string, unknown>
+  apiNpm?: string
 }
 
 export type ChatParamsOutput = {
@@ -22,6 +23,12 @@ export type ChatParamsOutput = {
   topK?: number
   maxOutputTokens?: number
   options: Record<string, unknown>
+}
+
+const NATIVE_OPENAI_NPM = "@ai-sdk/openai"
+
+function isNativeOpenAIProvider(apiNpm: string | undefined): boolean {
+  return apiNpm === NATIVE_OPENAI_NPM
 }
 
 
@@ -62,6 +69,9 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (typeof modelID !== "string") return null
   if (typeof providerId !== "string") return null
 
+  const api = isRecord(model.api) ? model.api : undefined
+  const apiNpm = api && typeof api.npm === "string" ? api.npm : undefined
+
   return {
     sessionID,
     agent: { name: agentName },
@@ -69,6 +79,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     provider: { id: providerId },
     message,
     rawMessage: message,
+    apiNpm,
   }
 }
 
@@ -143,7 +154,15 @@ export function createChatParamsHandler(_args: {
     normalizedInput.message = normalizedInput.rawMessage as { variant?: string }
 
     if (compatibility.reasoningEffort !== undefined) {
-      output.options.reasoningEffort = compatibility.reasoningEffort
+      if (normalizedInput.apiNpm !== undefined && !isNativeOpenAIProvider(normalizedInput.apiNpm)) {
+        // OpenAI rejects requests that combine tools + reasoning_effort on
+        // /v1/chat/completions (issue #5529). openai-compatible providers and
+        // non-native OpenAI variants may use that endpoint, so drop the
+        // reasoning_effort injection entirely.
+        delete output.options.reasoningEffort
+      } else {
+        output.options.reasoningEffort = compatibility.reasoningEffort
+      }
     } else if ("reasoningEffort" in output.options) {
       delete output.options.reasoningEffort
     }
