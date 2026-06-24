@@ -10,6 +10,7 @@ import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparati
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 
 export type SessionStartAction = "skipped-disabled" | "spawned";
+export type PostToolUseAction = "emitted-guidance" | "skipped";
 export type WorkerAction = "failed" | "initialized" | "skipped-disabled" | "skipped-status" | "skipped-unavailable" | "skipped-unsupported-node" | "synced";
 
 export interface WorkerSpawnInvocation {
@@ -24,6 +25,11 @@ export interface HookStdout {
 
 export interface SessionStartHookResult {
 	readonly action: SessionStartAction;
+	readonly exitCode: 0;
+}
+
+export interface PostToolUseHookResult {
+	readonly action: PostToolUseAction;
 	readonly exitCode: 0;
 }
 
@@ -71,6 +77,12 @@ export interface SessionStartHookOptions {
 	readonly stdin?: Readable & { readonly isTTY?: boolean };
 	readonly stdout?: HookStdout;
 	readonly workerCliPath?: string;
+}
+
+export interface PostToolUseHookOptions {
+	readonly env?: Record<string, string | undefined>;
+	readonly stdin?: Readable & { readonly isTTY?: boolean };
+	readonly stdout?: HookStdout;
 }
 
 export interface SessionStartWorkerOptions {

@@ -87,8 +87,14 @@ function isDisabledConfigSkillEntryName(
 export async function createSkillContext(args: {
   directory: string
   pluginConfig: OhMyOpenCodeConfig
+  /**
+   * Host skill config from opencode's merged runtime config (e.g. fetched via
+   * the plugin client). Includes runtime-injected `skills.paths` from other
+   * plugins. When omitted, falls back to reading the on-disk opencode config.
+   */
+  hostSkills?: { paths?: string[]; urls?: string[] }
 }): Promise<SkillContext> {
-  const { directory, pluginConfig } = args
+  const { directory, pluginConfig, hostSkills } = args
 
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
@@ -103,7 +109,7 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const hostSkillConfig = adaptHostSkillConfig(readOpencodeConfigSkills(directory))
+  const hostSkillConfig = adaptHostSkillConfig(hostSkills ?? readOpencodeConfigSkills(directory))
   const [
     configSourceSkills,
     hostConfigSkills,

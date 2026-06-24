@@ -5,8 +5,10 @@ import { stderr as processStderr } from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+	runCodegraphPostToolUseHookCli,
 	runCodegraphSessionStartHook,
 	runCodegraphSessionStartWorker,
+	type PostToolUseHookOptions,
 	type SessionStartHookOptions,
 	type SessionStartWorkerOptions,
 } from "./hook.js";
@@ -23,6 +25,15 @@ export async function runCodegraphCli(options: RunCodegraphCliOptions = {}): Pro
 
 	if (command === "hook" && subcommand === "session-start") {
 		return runCodegraphSessionStartHook(options);
+	}
+
+	if (command === "hook" && subcommand === "post-tool-use") {
+		const hookOptions: PostToolUseHookOptions = {
+			...(options.env === undefined ? {} : { env: options.env }),
+			...(options.stdin === undefined ? {} : { stdin: options.stdin }),
+			...(options.stdout === undefined ? {} : { stdout: options.stdout }),
+		};
+		return runCodegraphPostToolUseHookCli(hookOptions);
 	}
 
 	if (command === "hook" && subcommand === "session-start-worker") {

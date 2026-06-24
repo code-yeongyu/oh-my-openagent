@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
-test("#given empty Codex config #when script installer updates config #then enables MultiAgentV2 with ten thousand session threads", async () => {
+test("#given empty Codex config #when script installer updates config #then enables steering mode with ten thousand session threads", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-"));
 	const configPath = join(root, "config.toml");
@@ -22,9 +22,38 @@ test("#given empty Codex config #when script installer updates config #then enab
 
 	// then
 	const config = await readFile(configPath, "utf8");
+	assert.match(config, /^multi_agent_mode = "steering"$/m);
 	assert.match(config, /\[features\.multi_agent_v2\]/);
-	assert.match(config, /enabled = true/);
+	const v2Section = config.slice(config.indexOf("[features.multi_agent_v2]")).split(/^\[/m).slice(0, 1).join("");
+	assert.doesNotMatch(v2Section, /enabled\s*=/);
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
+});
+
+test("#given queue multi-agent mode #when script installer updates config #then switches to steering mode for team support", async () => {
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-mode-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'multi_agent_mode = "queue"',
+			"",
+			"[features]",
+			"multi_agent = true",
+			"",
+		].join("\n"),
+	);
+
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /^multi_agent_mode = "steering"$/m);
+	assert.doesNotMatch(config, /multi_agent_mode = "queue"/);
 });
 
 test("#given empty Codex config #when script installer updates config #then leaves Context7 to the plugin MCP manifest", async () => {

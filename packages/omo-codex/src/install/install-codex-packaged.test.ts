@@ -22,6 +22,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   await writeFile(join(repoRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "4.5.12" }))
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
   await mkdir(join(pluginRoot, "dist"), { recursive: true })
+  await mkdir(join(pluginRoot, "components", "comment-checker", "dist"), { recursive: true })
   await mkdir(join(pluginRoot, "components", "ulw-loop", "hooks"), { recursive: true })
   await mkdir(join(lspRuntimeRoot, "dist"), { recursive: true })
   await writeFile(
@@ -84,6 +85,7 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
     JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." } } }),
   )
   await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await writeFile(join(pluginRoot, "components", "comment-checker", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
   // when

@@ -95,7 +95,7 @@ async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<v
 }
 
 describe("ParentWakeNotifier late error recovery", () => {
-  test("#given session.error arrives after the recovery window #when no assistant output accepted the wake #then the final wake is still requeued", async () => {
+  test("#given session.error arrives after the recovery window #when no assistant output accepted the wake #then the final wake is already requeued", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
     const sessionID = "parent-late-session-error-after-window"
@@ -111,7 +111,7 @@ describe("ParentWakeNotifier late error recovery", () => {
       const requeued = await notifier.requeueDispatchedParentWake(sessionID, "late session.error")
 
       // then
-      expect(requeued).toBe(true)
+      expect(requeued).toBe(false)
       expect(notifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([FINAL_WAKE])
       expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
       releaseParentWakeHold(sessionID)

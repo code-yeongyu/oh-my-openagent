@@ -57,7 +57,8 @@ export async function fetchSDKMessages(client: OpencodeClient, sessionID: string
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const emptyMessages: SDKMessage[] = []
-    return normalizeSDKResponse(response, emptyMessages, { preferResponseOnMissingData: true })
+    const normalized = normalizeSDKResponse(response, emptyMessages, { preferResponseOnMissingData: true })
+    return Array.isArray(normalized) ? normalized : emptyMessages
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log("[hook-message-injector] SDK message fetch failed", {

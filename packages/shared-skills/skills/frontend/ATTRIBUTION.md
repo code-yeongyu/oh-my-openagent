@@ -7,16 +7,27 @@ oh-my-opencode Software are licensed under the original license provided by the 
 the applicable component"). Each upstream's license and required notices are reproduced
 below. Modifications to the original files are noted where applicable.
 
+These third-party references are NOT committed to this repository. Each upstream is
+tracked as a pinned git submodule under `packages/shared-skills/upstreams/<name>`, and the
+build materializes the referenced files verbatim, path-mapped into this skill's
+`references/` tree, when packaging the published artifact. The `Pinned upstream commit`
+line in each section below records the exact submodule commit that the materialization
+reads.
+
 ---
 
 ## 1. Open Design (brand design-system DESIGN.md references)
 
 The brand design-system reference files under `frontend/references/design/<brand>.md`
 (Apple, Stripe, Linear, Nike, BMW, Airbnb, Bugatti, Tesla, and the other named brands)
-are condensed/adapted derivatives of the `design-systems/<brand>/DESIGN.md` files from the
-Open Design project.
+are path-mapped verbatim copies of the `design-systems/<brand>/DESIGN.md` files from the
+Open Design project. They are not committed here; the build materializes them from the
+pinned submodule under `packages/shared-skills/upstreams/open-design` into
+`frontend/references/design/<brand>.md` (dots in `<brand>` map to dashes for the upstream
+directory name, e.g. `linear.app` -> `linear-app`).
 
 - Source: https://github.com/nexu-io/open-design
+- Pinned upstream commit: 6afe7eae156bfa29251a51fd0636649c257f7444
 - Copyright 2026 Open Design contributors
 - Licensed under the Apache License, Version 2.0 (the "License"); you may not use these
   files except in compliance with the License. You may obtain a copy of the License at:
@@ -29,10 +40,12 @@ Open Design project.
   permissions and limitations under the License. A full copy of the Apache-2.0 license
   text is provided in `LICENSE-Apache-2.0.txt` alongside this notice.
 
-- **Changes (Apache-2.0 §4(b)):** the original `DESIGN.md` design-system files have been
-  condensed/adapted from the Open Design project for use as frontend skill references.
-  Specifically, the leading "> Category: ..." blockquote was removed and the documents were
-  shortened into derivative single-file brand references.
+- **Changes (Apache-2.0 §4(b)):** the original `DESIGN.md` design-system files are
+  redistributed verbatim. The only modification is path-mapping: each upstream
+  `design-systems/<brand>/DESIGN.md` is renamed to `frontend/references/design/<brand>.md`
+  (with dots in the brand name mapped to dashes for the upstream directory lookup). The
+  file contents are byte-for-byte identical to the pinned upstream commit; no text is
+  abridged, summarized, or rewritten.
 
 - **Trademark notice:** All product names, brand names, trademarks, and registered
   trademarks referenced in these design-system files (e.g. Apple, BMW, Airbnb, Bugatti,
@@ -50,9 +63,14 @@ The taste-skill files and image-generation skills under `frontend/references/des
 (`taste-skill.md`, `gpt-tasteskill.md`, `minimalist-skill.md`, `brutalist-skill.md`,
 `soft-skill.md`, `redesign-skill.md`, `image-to-code-skill.md`, `output-skill.md`,
 `stitch-skill.md`, `imagegen-frontend-web.md`, `imagegen-frontend-mobile.md`,
-`imagegen-brandkit.md`) are derived from the taste-skill project.
+`imagegen-brandkit.md`) are path-mapped verbatim copies of the per-skill `SKILL.md` files
+from the taste-skill project (each `skills/<name>/SKILL.md` is renamed to
+`references/design/<name>.md`; `imagegen-brandkit.md` maps from `skills/brandkit/SKILL.md`).
+They are not committed here; the build materializes them from the pinned submodule under
+`packages/shared-skills/upstreams/taste-skill`.
 
 - Source: https://github.com/Leonxlnx/taste-skill
+- Pinned upstream commit: 06d6028b5c623016c59ce8536f578e5a1127b499
 
 ```
 MIT License
@@ -84,9 +102,15 @@ SOFTWARE.
 
 The search engine and dataset under `frontend/references/ui-ux-db/` (`scripts/core.py`,
 `scripts/search.py`, `scripts/design_system.py`, `README.md`, and the `data/*.csv`
-knowledge base) are derived from the UI/UX Pro Max skill.
+knowledge base) are path-mapped verbatim copies from the UI/UX Pro Max skill. They are not
+committed here; the build materializes them from the pinned submodule under
+`packages/shared-skills/upstreams/ui-ux-pro-max`:
+`scripts/*.py` from `src/ui-ux-pro-max/scripts/`, `data/*.csv` from
+`src/ui-ux-pro-max/data/` (`data/web-interface.csv` maps from the upstream
+`data/app-interface.csv`), and `README.md` from `.claude/skills/ui-ux-pro-max/SKILL.md`.
 
 - Source: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+- Pinned upstream commit: f32d6a61cdf0bfd57404c45854583fd19ff95088
 - "UI/UX Pro Max" is the upstream project's branding; no trademark rights are granted by
   the MIT license, and this distribution does not claim that name as its own.
 

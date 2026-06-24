@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises"
 import { join, sep } from "node:path"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 
-const PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}\/([^"']+)/g
+const PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}[\\/]+([^"']+)/g
 
 export async function findMissingHookCommandTargets(pluginRoot: string): Promise<readonly string[]> {
   const commands: string[] = []
@@ -18,7 +18,7 @@ export async function findMissingHookCommandTargets(pluginRoot: string): Promise
     for (const match of command.matchAll(PLUGIN_ROOT_TARGET_PATTERN)) {
       const targetSuffix = match[1]
       if (targetSuffix === undefined) continue
-      const target = join(pluginRoot, ...targetSuffix.split("/"))
+      const target = join(pluginRoot, ...targetSuffix.split(/[\\/]+/))
       if (seen.has(target)) continue
       seen.add(target)
       if (!(await fileExistsStrict(target))) missing.push(target)
@@ -64,5 +64,6 @@ function collectCommands(value: unknown, commands: string[]): void {
   }
   if (!isPlainRecord(value)) return
   if (value["type"] === "command" && typeof value["command"] === "string") commands.push(value["command"])
+  if (value["type"] === "command" && typeof value["commandWindows"] === "string") commands.push(value["commandWindows"])
   for (const entry of Object.values(value)) collectCommands(entry, commands)
 }

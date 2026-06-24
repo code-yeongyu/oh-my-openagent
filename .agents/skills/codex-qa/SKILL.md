@@ -69,6 +69,20 @@ Windows.
 | `scripts/hook-unit-probe.sh` | the `ultrawork` component injects `<ultrawork-mode>` on an `ulw` UserPromptSubmit (also a manual `--component/--event` mode) |
 | `scripts/tui-smoke.sh` | the real codex TUI boots in the isolated home, renders, and survives (no early exit); captures the pane |
 
+When TUI visual QA evidence is needed, do not stop at the raw pane. Replay the
+captured pane through the repository web-terminal helper so the PR can attach a
+stable browser screenshot:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "Codex TUI QA" \
+  --from-file .omo/evidence/<slug>/codex-tui-pane.txt \
+  --evidence-dir .omo/evidence/<slug>/codex-web-terminal
+```
+
+The helper writes `terminal.txt`, `terminal-ansi.txt`, `terminal.html`,
+`terminal.png`, and `metadata.json`. Use that artifact set for TUI visual QA;
+use `app-server-drive.sh --plugin` for assertion-grade hook behavior.
+
 ## Match QA to your change scope
 
 - **Component / hook logic** (`packages/omo-codex/plugin/components/*`):

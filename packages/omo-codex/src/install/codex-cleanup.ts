@@ -3,7 +3,9 @@ import { lstat, readFile, readdir, rm, rmdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
 import { cleanupCodexConfig, MANAGED_CODEX_AGENT_NAMES } from "./codex-cleanup-config"
+import { validateManagedCleanupTarget } from "./codex-cleanup-safety"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
+import type { SkippedCleanupPath } from "./codex-cleanup-safety"
 import type { ProjectLocalCodexCleanupResult } from "./codex-project-local-cleanup"
 
 const INSTALLED_AGENTS_MANIFEST = ".installed-agents.json"
@@ -21,6 +23,7 @@ export interface CodexCleanupResult {
   readonly configChanged: boolean
   readonly configBackupPath?: string
   readonly removedPaths: readonly string[]
+  readonly skippedPaths: readonly SkippedCleanupPath[]
   readonly removedAgentLinks: readonly string[]
   readonly skippedAgentLinks: readonly string[]
   readonly projectCleanup: ProjectLocalCodexCleanupResult
@@ -36,12 +39,15 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
   const agentCleanup = await removeManifestListedAgentLinks(codexHome, agentPaths)
 
   const removedPaths: string[] = []
+  const skippedPaths: SkippedCleanupPath[] = []
   const managedStatePaths = new Set([
     ...managedGlobalStatePaths(codexHome),
     ...(await collectBootstrapDataDirsByGlob(codexHome)),
   ])
   for (const path of managedStatePaths) {
-    if (await removeManagedPathBestEffort(path)) removedPaths.push(path)
+    if (await removeManagedPathBestEffort(path, { codexHome, onSkip: (skip) => skippedPaths.push(skip) })) {
+      removedPaths.push(path)
+    }
   }
   await pruneEmptyRuntimeDirBestEffort(codexHome)
 
@@ -59,6 +65,7 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
     configChanged: configCleanup.changed,
     configBackupPath: configCleanup.backupPath,
     removedPaths,
+    skippedPaths,
     removedAgentLinks: agentCleanup.removed,
     skippedAgentLinks: agentCleanup.skipped,
     projectCleanup,
@@ -66,6 +73,7 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
 }
 
 export { cleanupCodexLightConfigText } from "./codex-cleanup-config"
+export type { SkippedCleanupPath } from "./codex-cleanup-safety"
 
 function managedGlobalStatePaths(codexHome: string): readonly string[] {
   return [
@@ -113,6 +121,8 @@ function isManagedBootstrapOwnerName(name: string): boolean {
 
 export interface RemoveManagedPathSeams {
   readonly afterFirstAttempt?: () => Promise<void> | void
+  readonly codexHome: string
+  readonly onSkip?: (skip: SkippedCleanupPath) => void
 }
 
 // Removal is best-effort with a single retry: a mid-flight bootstrap worker
@@ -121,8 +131,14 @@ export interface RemoveManagedPathSeams {
 // second `lazycodex-ai uninstall` run clears it.
 export async function removeManagedPathBestEffort(
   path: string,
-  seams: RemoveManagedPathSeams = {},
+  seams: RemoveManagedPathSeams,
 ): Promise<boolean> {
+  const skip = validateManagedCleanupTarget({ codexHome: seams.codexHome, path })
+  if (skip !== null) {
+    seams.onSkip?.(skip)
+    return false
+  }
+
   const removedOnFirstAttempt = await attemptRemove(path)
   await seams.afterFirstAttempt?.()
   const removedOnRetry = await attemptRemove(path)
@@ -145,9 +161,14 @@ async function attemptRemove(path: string): Promise<boolean> {
 async function pruneEmptyRuntimeDirBestEffort(codexHome: string): Promise<void> {
   try {
     await rmdir(join(codexHome, "runtime"))
-  } catch {
-    // best-effort: missing, non-empty, or locked runtime dirs are left as-is
+  } catch (error) {
+    if (isExpectedRuntimePruneFailure(error)) return
+    throw error
   }
+}
+
+function isExpectedRuntimePruneFailure(error: unknown): boolean {
+  return ["ENOENT", "ENOTEMPTY", "EEXIST", "EPERM", "EBUSY", "ENOTDIR"].includes(nodeErrorCode(error) ?? "")
 }
 
 async function collectInstalledAgentPaths(codexHome: string, configPath: string): Promise<readonly string[]> {
