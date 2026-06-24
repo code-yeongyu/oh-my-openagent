@@ -32,6 +32,9 @@ const BASIC_ANSI_COLORS = {
   "bright-white": "#ffffff",
 };
 
+export const DEFAULT_TERMINAL_FOREGROUND = "#d8dee9";
+export const DEFAULT_TERMINAL_BACKGROUND = "#090b10";
+
 export function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
@@ -169,14 +172,16 @@ function spanAttributes(state) {
   if (state.dim) classes.push("ansi-dim");
   if (state.italic) classes.push("ansi-italic");
   if (state.underline) classes.push("ansi-underline");
-  if (state.inverse) classes.push("ansi-inverse");
   if (state.strike) classes.push("ansi-strike");
+  const effectiveFg = state.inverse ? state.bg || DEFAULT_TERMINAL_BACKGROUND : state.fg;
+  const effectiveBg = state.inverse ? state.fg || DEFAULT_TERMINAL_FOREGROUND : state.bg;
   for (const [value, cssProperty, classPrefix] of [
-    [state.fg, "color", "fg-"],
-    [state.bg, "background-color", "bg-"],
+    [effectiveFg, "color", "fg-"],
+    [effectiveBg, "background-color", "bg-"],
   ]) {
     if (!value) continue;
-    if (value.startsWith(classPrefix)) classes.push(`ansi-${value}`);
+    const colorName = value.match(/^(?:fg|bg)-(.+)$/)?.[1];
+    if (colorName) classes.push(`ansi-${classPrefix}${colorName}`);
     else styles.push(`${cssProperty}: ${value}`);
   }
   const attrs = [];
