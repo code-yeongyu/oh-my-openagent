@@ -18,6 +18,17 @@ This file is a router, not a rulebook. The rules live in four rulesets under `re
 
 **For implementation work, design + perfection load together.** A page that hits Lighthouse 100 but looks like AI slop has failed; a page that looks beautiful but ships a 2 MB bundle has failed. Both win or neither does.
 
+## Design System Workflow
+
+When `references/designpowers/README.md` is loaded for implementation, redesign, or design-system work, it feeds the project design-system step first. Do not treat designpowers as another loose inspiration folder.
+
+1. Before writing UI components, synthesize or update the project `DESIGN.md` from the user brief, designpowers references, brand/taste direction, accessibility and persona constraints, accepted design debt, and existing UI context.
+2. Make `DESIGN.md` the implementation contract. It must name the tokens, typography, spacing, component primitives, motion rules, responsive behavior, accessibility constraints, and accepted design debt that downstream UI work will follow.
+3. Implement against that `DESIGN.md`, using `references/design/README.md` for the design-system gate and `references/perfection/README.md` for performance, SEO, accessibility, and real-browser verification.
+4. Verify the actual surface with visual QA evidence, then pass the design-system decisions, implementation evidence, and unresolved debt into `/review-work` for significant implementation work.
+
+If designpowers guidance is relevant but the project has no `DESIGN.md`, create it before components. If `DESIGN.md` exists, update it before components whenever designpowers inputs change tokens, typography, spacing, primitives, motion, responsive behavior, accessibility constraints, or accepted debt.
+
 ## Ruleset 1 — design (`references/design/`)
 
 The reference library has one architecture file, 12 taste skills (Layer A — *how to execute*), and 69 brand design systems (Layer B — *what it should look like*). Most non-trivial tasks load **one Layer A + one Layer B**. `README.md` carries the full routing flow, stacking rules, anti-patterns, and the mandatory browser-based Design QA phase; `_INDEX.md` catalogs all 81 files with mood-to-brand mappings — read it whenever routing is not obvious from the tables below.
@@ -82,7 +93,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 
 ## Ruleset 4 — designpowers (`references/designpowers/`)
 
-`README.md` routes design operating-layer guidance from the pinned `Owl-Listener/designpowers` reference corpus into the existing frontend workflow. Load it when a frontend task needs explicit personas, accessibility and cognitive constraints, design critique, design debt, handoff, synthetic user testing, motion guidance, or role-reference prompts. It does not replace this frontend skill, `/visual-qa`, `/ulw-plan`, `/start-work`, or `/review-work`; it only supplies richer design context inside those existing routes.
+`README.md` routes design operating-layer guidance from the pinned `Owl-Listener/designpowers` reference corpus into the existing frontend workflow. Load it when a frontend task needs explicit personas, accessibility and cognitive constraints, design critique, design debt, handoff, synthetic user testing, motion guidance, or role-reference prompts. It does not replace this frontend skill, `/visual-qa`, `/ulw-plan`, `/start-work`, or `/review-work`; it supplies richer design context that must first be distilled into the project `DESIGN.md`, then used as the design-system contract for implementation and verification.
 
 ## Quick routes — most common requests
 
