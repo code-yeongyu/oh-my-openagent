@@ -105,6 +105,55 @@ describe("web terminal visual QA helper", () => {
     expect(html).toContain("bold green")
   })
 
+  test("#given truecolor and OSC controls #when rendering #then colors are preserved and controls are stripped", async () => {
+    // given
+    const dir = makeTempDir()
+    const transcript = join(dir, "truecolor-osc.txt")
+    writeFileSync(
+      transcript,
+      [
+        "\u001b[38;2;12;34;56msemicolon truecolor\u001b[0m",
+        "\u001b[38:2::255:0:0mcolon truecolor\u001b[0m",
+        "\u001b[38:2:0:255:0:0mcolon truecolor colorspace\u001b[0m",
+        "\u001b]8;;https://example.com\u0007visible label\u001b]8;;\u0007",
+      ].join("\n"),
+      "utf8",
+    )
+
+    // when
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "Truecolor OSC QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+
+    // then
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toBe(
+      "semicolon truecolor\ncolon truecolor\ncolon truecolor colorspace\nvisible label",
+    )
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain('style="color: rgb(12, 34, 56)"')
+    expect(html).toContain('<span style="color: rgb(255, 0, 0)">colon truecolor</span>')
+    expect(html).toContain('<span style="color: rgb(255, 0, 0)">colon truecolor colorspace</span>')
+    expect(html).toContain("visible label")
+    expect(html).not.toContain("\u001b]")
+    expect(html).not.toContain("https://example.com")
+  })
+
   test("#given a very long line #when rendering with defaults #then wrapping is enabled and recorded", async () => {
     // given
     const dir = makeTempDir()

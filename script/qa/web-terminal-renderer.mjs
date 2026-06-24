@@ -1,4 +1,5 @@
 const ANSI_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/g;
+const OSC_PATTERN = /\u001b\][\s\S]*?(?:\u0007|\u001b\\|\u009c)/g;
 const SGR_PATTERN = /\u001b\[([0-9;:]*)m/g;
 
 const COLOR_NAMES = [
@@ -36,7 +37,7 @@ export function escapeHtml(value) {
 }
 
 export function stripAnsi(value) {
-  return value.replace(ANSI_PATTERN, "");
+  return value.replace(OSC_PATTERN, "").replace(ANSI_PATTERN, "");
 }
 
 function createState() {
@@ -53,8 +54,20 @@ function createState() {
 }
 
 function parseCodes(raw) {
-  if (raw === "") return [0];
-  return raw.split(/[;:]/).map((part) => Number.parseInt(part || "0", 10));
+  if (raw === "") return { values: [0], separators: [null] };
+  const values = [];
+  const separators = [];
+  let separator = null;
+  for (const part of raw.split(/([;:])/)) {
+    if (part === ";" || part === ":") {
+      separator = part;
+      continue;
+    }
+    values.push(part === "" ? null : Number.parseInt(part, 10));
+    separators.push(separator);
+    separator = null;
+  }
+  return { values, separators };
 }
 
 function basicColor(code, base, brightBase, prefix) {
@@ -100,20 +113,21 @@ function rgbFrom256(index) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function readExtendedColor(codes, index) {
+function readExtendedColor(codes, separators, index) {
   const mode = codes[index + 1];
   if (mode === 5) return { color: rgbFrom256(codes[index + 2] ?? -1), next: index + 3 };
   if (mode === 2) {
-    const [r, g, b] = [codes[index + 2], codes[index + 3], codes[index + 4]];
+    const offset = separators[index + 1] === ":" && codes[index + 5] !== undefined ? 3 : 2;
+    const [r, g, b] = [codes[index + offset], codes[index + offset + 1], codes[index + offset + 2]];
     if ([r, g, b].every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
-      return { color: `rgb(${r}, ${g}, ${b})`, next: index + 5 };
+      return { color: `rgb(${r}, ${g}, ${b})`, next: index + offset + 3 };
     }
   }
   return { color: null, next: index + 1 };
 }
 
 function applySgr(state, raw) {
-  const codes = parseCodes(raw);
+  const { values: codes, separators } = parseCodes(raw);
   let nextState = { ...state };
   for (let i = 0; i < codes.length; i += 1) {
     const code = codes[i] ?? 0;
@@ -134,7 +148,7 @@ function applySgr(state, raw) {
     else if (code === 39) nextState.fg = null;
     else if (code === 49) nextState.bg = null;
     else if (code === 38 || code === 48) {
-      const extended = readExtendedColor(codes, i);
+      const extended = readExtendedColor(codes, separators, i);
       if (code === 38) nextState.fg = extended.color;
       else nextState.bg = extended.color;
       i = extended.next - 1;
@@ -178,16 +192,17 @@ function renderSegment(value, state) {
 }
 
 export function renderAnsiToHtml(value) {
+  const cleanValue = value.replace(OSC_PATTERN, "");
   let state = createState();
   let cursor = 0;
   let output = "";
-  for (const match of value.matchAll(SGR_PATTERN)) {
+  for (const match of cleanValue.matchAll(SGR_PATTERN)) {
     const index = match.index ?? 0;
-    if (index > cursor) output += renderSegment(value.slice(cursor, index), state);
+    if (index > cursor) output += renderSegment(cleanValue.slice(cursor, index), state);
     state = applySgr(state, match[1] ?? "");
     cursor = index + match[0].length;
   }
-  if (cursor < value.length) output += renderSegment(value.slice(cursor), state);
+  if (cursor < cleanValue.length) output += renderSegment(cleanValue.slice(cursor), state);
   return output.replace(ANSI_PATTERN, "");
 }
 
