@@ -28,14 +28,14 @@ Before touching any UI code, before routing to any reference, before even thinki
 
 **Search for it:** Look at project root, then `docs/`, then `src/`. Any file named `DESIGN.md`, `design-system.md`, or `design-tokens.md`.
 
-#### If NO design system exists → CREATE ONE FIRST
+#### If NO design system exists → RUN THE TRIAGE
 
 1. Read `design-system-architecture.md` — it defines the exact structure.
-2. Explore the project: what is the product domain? Who are the users? What feeling should it evoke?
-3. If the project has existing UI code, **extract** the implicit system (colors, fonts, spacing already in use) rather than inventing from scratch.
-4. If the project is greenfield, **ask the user one question**: "What should this feel like?" — or infer from context.
-5. Write `DESIGN.md` at project root following the 7-section structure from the reference.
-6. **Do not proceed to any component implementation until `DESIGN.md` exists and is committed to context.**
+2. Identify the branch: greenfield setup, existing UI with implicit patterns/components, or existing UI with no reusable component layer.
+3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then deeply load exactly one Layer A style skill and one Layer B brand/design-system reference; use `open-design` only when the curated set has no fit. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
+4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
+5. **Existing UI with no reusable component layer:** STOP and ask whether to preserve the current style with copy-nearby edits or extract a `DESIGN.md` plus reusable components first. Do not silently choose the cheaper path or the larger refactor.
+6. **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.**
 
 #### If YES design system exists → READ IT, FOLLOW IT
 
@@ -104,7 +104,7 @@ Map their phrasing to one taste-skill style file:
 | "brutalist", "raw", "Swiss", "experimental", "industrial", "anti-design", "unstyled" | `brutalist-skill.md` |
 | "premium", "luxury", "calm", "expensive", "spa", "wellness", "boutique", "elegant" | `soft-skill.md` |
 | "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` |
-| Nothing specific — just "make a good UI" | `taste-skill.md` (default all-rounder) |
+| Nothing specific — just "make a good UI" | `taste-skill.md` as Layer A, plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference when there is no concrete visual reference |
 
 You may also load a brand DESIGN.md from Layer B as a *concrete reference* if the user's mood maps cleanly (see the "Mood-based shortcuts" section in `_INDEX.md`).
 
@@ -186,7 +186,7 @@ Once references are loaded, before writing any UI code:
 
 | User asks for... | Load these |
 |---|---|
-| "Build me a landing page" (no other info) | `taste-skill.md` |
+| "Build me a landing page" (no other info) | `_INDEX.md` shortlist → exactly one Layer B reference + `taste-skill.md` |
 | "Build me a Linear-style landing page" | `linear.app.md` + `taste-skill.md` |
 | "Make it Notion-like and minimal" | `notion.md` + `minimalist-skill.md` |
 | "Premium SaaS hero, like Stripe" | `stripe.md` + `soft-skill.md` |
