@@ -139,6 +139,8 @@ git push -u origin "$BRANCH_NAME"
 
 Write the PR body in English for a human reviewer who has not followed the implementation thread. It must explain the work in plain terms, group changes by reviewer-relevant area instead of dumping files, and make QA evidence auditable without forcing the reviewer to guess what each log proves. Cite sanitized artifacts; do not paste raw secret-bearing logs, env dumps, tokens, auth headers, or private credentials into the PR.
 
+If the PR body needs screenshots or terminal PNGs, follow `docs/reference/github-attachment-upload.md`: upload via GitHub user attachments from an authenticated web session, include only the final `https://github.com/user-attachments/assets/<uuid>` URLs, and never commit temporary images, use release assets, use external hosts, or log cookies/tokens.
+
 ```bash
 gh pr create \
   --base "$BASE_BRANCH" \

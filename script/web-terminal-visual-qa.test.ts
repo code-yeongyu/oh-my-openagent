@@ -61,10 +61,135 @@ describe("web terminal visual QA helper", () => {
     expect(metadata).toMatchObject({
       connector: "file-replay",
       browserCapture: "skipped",
+      wrap: "on",
       files: {
         html: join(dir, "terminal.html"),
         text: join(dir, "terminal.txt"),
       },
+    })
+  })
+
+  test("#given ANSI color and style escapes #when rendering #then HTML preserves terminal styling while text stays plain", async () => {
+    // given
+    const dir = makeTempDir()
+    const transcript = join(dir, "ansi-capture.txt")
+    writeFileSync(transcript, "\u001b[31mred\u001b[0m \u001b[1;32mbold green\u001b[0m\n", "utf8")
+
+    // when
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "ANSI QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+
+    // then
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+    expect(readFileSync(join(dir, "terminal-ansi.txt"), "utf8")).toContain("\u001b[31mred")
+    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toBe("red bold green\n")
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain('class="ansi-fg-red"')
+    expect(html).toContain('class="ansi-bold ansi-fg-green"')
+    expect(html).toContain("bold green")
+  })
+
+  test("#given truecolor and OSC controls #when rendering #then colors are preserved and controls are stripped", async () => {
+    // given
+    const dir = makeTempDir()
+    const transcript = join(dir, "truecolor-osc.txt")
+    writeFileSync(
+      transcript,
+      [
+        "\u001b[38;2;12;34;56msemicolon truecolor\u001b[0m",
+        "\u001b[38:2::255:0:0mcolon truecolor\u001b[0m",
+        "\u001b[38:2:0:255:0:0mcolon truecolor colorspace\u001b[0m",
+        "\u001b]8;;https://example.com\u0007visible label\u001b]8;;\u0007",
+      ].join("\n"),
+      "utf8",
+    )
+
+    // when
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "Truecolor OSC QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+
+    // then
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toBe(
+      "semicolon truecolor\ncolon truecolor\ncolon truecolor colorspace\nvisible label",
+    )
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain('style="color: rgb(12, 34, 56)"')
+    expect(html).toContain('<span style="color: rgb(255, 0, 0)">colon truecolor</span>')
+    expect(html).toContain('<span style="color: rgb(255, 0, 0)">colon truecolor colorspace</span>')
+    expect(html).toContain("visible label")
+    expect(html).not.toContain("\u001b]")
+    expect(html).not.toContain("https://example.com")
+  })
+
+  test("#given a very long line #when rendering with defaults #then wrapping is enabled and recorded", async () => {
+    // given
+    const dir = makeTempDir()
+    const transcript = join(dir, "long-line.txt")
+    writeFileSync(transcript, `${"x".repeat(260)}\n`, "utf8")
+
+    // when
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "Long Line QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+
+    // then
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain("white-space: pre-wrap")
+    expect(html).toContain("overflow-wrap: anywhere")
+
+    const metadata: unknown = JSON.parse(readFileSync(join(dir, "metadata.json"), "utf8"))
+    expect(metadata).toMatchObject({
+      wrap: "on",
+      dimensions: { cols: 140, rows: 40 },
     })
   })
 
@@ -86,6 +211,7 @@ describe("web terminal visual QA helper", () => {
     expect(exitCode).toBe(0)
     expect(stdoutText).toContain("--command")
     expect(stdoutText).toContain("--from-file")
+    expect(stdoutText).toContain("--no-wrap")
     expect(stdoutText).toContain("tmux-backed PTY connector")
     expect(stdoutText).toContain("PNG")
   })
@@ -121,5 +247,37 @@ describe("web terminal visual QA helper", () => {
       )
     }
     expect(contents.map((content) => content.text).join("\n")).toContain("TUI visual")
+  })
+
+  test("#given PR visual evidence docs #when attaching screenshots #then GitHub user attachment guidance is discoverable", () => {
+    // given
+    const repo = new URL("..", import.meta.url)
+    const attachmentDoc = readFileSync(new URL("docs/reference/github-attachment-upload.md", repo), "utf8")
+    const pointerFiles = [
+      "docs/AGENTS.md",
+      "docs/reference/web-terminal-visual-qa.md",
+      "packages/shared-skills/skills/git-master/SKILL.md",
+      ".agents/skills/work-with-pr/SKILL.md",
+      ".opencode/skills/work-with-pr/SKILL.md",
+    ] as const
+
+    // when
+    const pointers = pointerFiles.map((path) => ({
+      path,
+      text: readFileSync(new URL(path, repo), "utf8"),
+    }))
+
+    // then
+    expect(attachmentDoc).toContain("/upload/policies/assets")
+    expect(attachmentDoc).toContain("asset_upload_authenticity_token")
+    expect(attachmentDoc).toContain("https://github.com/user-attachments/assets/<uuid>")
+    expect(attachmentDoc).toContain("Never use GitHub Releases")
+    expect(attachmentDoc).toContain("Never use external image hosters")
+    expect(attachmentDoc).toContain("Do not print cookies")
+    for (const pointer of pointers) {
+      expect(pointer.text, `${pointer.path} must point at attachment upload guidance`).toContain(
+        "docs/reference/github-attachment-upload.md",
+      )
+    }
   })
 })
