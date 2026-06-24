@@ -8,7 +8,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
-  getLoadedSkills: () => LoadedSkill[]
+  getLoadedSkills: () => LoadedSkill[] | Promise<LoadedSkill[]>
   getSessionID?: () => string | undefined
 }
 
@@ -100,7 +100,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
   const { manager, getLoadedSkills, getSessionID } = options
 
   return tool({
-    description: SKILL_MCP_DESCRIPTION,
+    description: `${SKILL_MCP_DESCRIPTION} Optional cdp_url connects Playwright to a runtime CDP endpoint.`,
     args: {
       mcp_name: tool.schema.string().describe("Name of the MCP server from skill config"),
       tool_name: tool.schema.string().optional().describe("MCP tool to call"),
@@ -114,10 +114,16 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .string()
         .optional()
         .describe("Regex pattern to filter output lines (only matching lines returned)"),
+      cdp_url: tool.schema
+        .string()
+        .optional()
+        .describe(
+          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL."
+        ),
     },
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {
       const operation = validateOperationParams(args)
-      const skills = getLoadedSkills()
+      const skills = await getLoadedSkills()
       const found = findMcpServer(args.mcp_name, skills)
 
       if (!found) {
@@ -156,14 +162,16 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       const parsedArgs = parseSkillMcpArguments(args.arguments)
 
       let output: string
+      const cdpOptions = args.cdp_url ? { cdpUrl: args.cdp_url } : undefined
+
       switch (operation.type) {
         case "tool": {
-          const result = await manager.callTool(info, context, operation.name, parsedArgs)
+          const result = await manager.callTool(info, context, operation.name, parsedArgs, cdpOptions)
           output = JSON.stringify(result, null, 2)
           break
         }
         case "resource": {
-          const result = await manager.readResource(info, context, operation.name)
+          const result = await manager.readResource(info, context, operation.name, cdpOptions)
           output = JSON.stringify(result, null, 2)
           break
         }
@@ -172,7 +180,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           for (const [key, value] of Object.entries(parsedArgs)) {
             stringArgs[key] = String(value)
           }
-          const result = await manager.getPrompt(info, context, operation.name, stringArgs)
+          const result = await manager.getPrompt(info, context, operation.name, stringArgs, cdpOptions)
           output = JSON.stringify(result, null, 2)
           break
         }

@@ -4,6 +4,7 @@ export { buildGptSisyphusJuniorPrompt } from "./gpt"
 export { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 export { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
 export { buildGeminiSisyphusJuniorPrompt } from "./gemini"
+export { buildGlm52SisyphusJuniorPrompt } from "./glm-5-2"
 
 export {
   SISYPHUS_JUNIOR_DEFAULTS,

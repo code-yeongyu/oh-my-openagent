@@ -84,12 +84,12 @@ lsp_rename(filePath, line, character, newName)  // Execute rename
 \`\`\`
 
 **For Pattern Transformations:**
-\`\`\`typescript
+\`\`\`bash
 // Preview first
-ast_grep_replace(pattern, rewrite, lang, dryRun=true)
+sg --pattern '[pattern]' --rewrite '[rewrite]' --lang ts path/to/file.ts
 
 // If preview looks good, execute
-ast_grep_replace(pattern, rewrite, lang, dryRun=false)
+python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' --lang ts path/to/file.ts --apply
 \`\`\`
 
 **For Structural Changes:**

@@ -1,0 +1,13 @@
+COMMAND: bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts packages/omo-codex/plugin/components/ulw-loop/test/skill-contract.test.ts packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-status.test.ts packages/omo-codex/plugin/components/ulw-loop/test/codex-goal-instruction.test.ts packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts
+
+
+ RUN  v4.1.9 <WORKTREE>
+
+
+ Test Files  7 passed (7)
+      Tests  64 passed (64)
+   Start at  20:38:54
+   Duration  180ms (transform 261ms, setup 0ms, import 349ms, tests 45ms, environment 0ms)
+
+
+EXIT_CODE=0

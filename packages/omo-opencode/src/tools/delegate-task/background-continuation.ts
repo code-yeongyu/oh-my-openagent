@@ -66,9 +66,7 @@ Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
-System notifies on completion. Use \`background_output\` with task_id="${backgroundTaskId}" to check.
-
-Do NOT call background_output now. Wait for <system-reminder> notification first.
+Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
 
 ${buildTaskMetadataBlock({
       sessionId,

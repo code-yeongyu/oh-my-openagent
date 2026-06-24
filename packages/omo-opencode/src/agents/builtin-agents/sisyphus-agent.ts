@@ -8,8 +8,8 @@ import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
-import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
+import { setSisyphusRuntimePromptContext } from "../sisyphus-runtime-prompt-reconciler"
 
 export function maybeCreateSisyphusConfig(input: {
   disabledAgents: string[]
@@ -103,13 +103,29 @@ export function maybeCreateSisyphusConfig(input: {
     (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
 
-  const gptDeny = getGptApplyPatchPermission(resolvedModel)
-  if (Object.keys(gptDeny).length > 0 && sisyphusConfig.permission) {
-    Object.assign(sisyphusConfig.permission, gptDeny)
-  }
-
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
     disableOmoEnv,
+  })
+
+  // The body above is baked from the *configured* model. If the user switches to
+  // a different model family in the TUI, the system-transform hook rebuilds the
+  // prompt for the runtime model using this captured pipeline (issue #5297/#5316).
+  setSisyphusRuntimePromptContext({
+    configuredModel: sisyphusModel,
+    bakedPrompt: sisyphusConfig.prompt ?? "",
+    rebuildPromptForModel: (runtimeModel: string): string => {
+      let rebuilt = createSisyphusAgent(
+        runtimeModel,
+        availableAgents,
+        undefined,
+        availableSkills,
+        availableCategories,
+        useTaskSystem
+      )
+      rebuilt = applyOverrides(rebuilt, sisyphusOverride, mergedCategories, directory)
+      rebuilt = applyEnvironmentContext(rebuilt, directory, { disableOmoEnv })
+      return rebuilt.prompt ?? ""
+    },
   })
 
   return sisyphusConfig

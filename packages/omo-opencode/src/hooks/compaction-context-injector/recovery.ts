@@ -5,7 +5,10 @@ import {
 import {
   getCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
+import {
+  createInternalAgentContinuationTextPart,
+  withInternalNoReplyMarker,
+} from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { setSessionModel } from "../../shared/session-model-state"
@@ -96,7 +99,7 @@ export function createRecoveryLogic(
             agent: launchAgent ?? expectedPromptConfig.agent,
             ...(model ? { model } : {}),
             ...(tools ? { tools } : {}),
-            parts: [createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT)],
+            parts: [withInternalNoReplyMarker(createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT))],
           },
           query: { directory: ctx.directory },
         },

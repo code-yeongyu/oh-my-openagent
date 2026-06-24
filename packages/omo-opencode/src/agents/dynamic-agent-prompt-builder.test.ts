@@ -19,7 +19,7 @@ describe("buildCategorySkillsDelegationGuide", () => {
 
   const builtinSkills: AvailableSkill[] = [
     { name: "playwright", description: "Browser automation via Playwright", location: "plugin" },
-    { name: "frontend-ui-ux", description: "Designer-turned-developer", location: "plugin" },
+    { name: "frontend", description: "Frontend, UI/UX, and design work", location: "plugin" },
   ]
 
   const customUserSkills: AvailableSkill[] = [
@@ -39,7 +39,7 @@ describe("buildCategorySkillsDelegationGuide", () => {
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
     //#then: should use compact format with both sections
-    expect(result).toContain("**Built-in**: playwright, frontend-ui-ux")
+    expect(result).toContain("**Built-in**: playwright, frontend")
     expect(result).toContain("YOUR SKILLS (PRIORITY)")
     expect(result).toContain("react-19 (user)")
     expect(result).toContain("tailwind-4 (user)")

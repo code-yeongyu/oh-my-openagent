@@ -33,8 +33,8 @@ function setupConnectedProviderCacheMocks(): void {
 
 describe("createEventHandler - model fallback", () => {
   const createHandler = (args?: {
-    hooks?: any
-    pluginConfig?: any
+    hooks?: unknown
+    pluginConfig?: unknown
     abort?: (input: { path: { id: string } }) => Promise<unknown>
     promptAsync?: (input: { path: { id: string } }) => Promise<unknown>
   }) => {
@@ -86,7 +86,7 @@ describe("createEventHandler - model fallback", () => {
           disconnectSession: async () => {},
         },
       }),
-      hooks: args?.hooks ?? (unsafeTestValue({})),
+      hooks: unsafeTestValue(args?.hooks ?? {}),
     })
     const handler = (input: EventInput): Promise<void> => eventHandler(asEventHandlerInput(input))
 

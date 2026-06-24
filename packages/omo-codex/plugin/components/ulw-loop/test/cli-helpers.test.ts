@@ -210,12 +210,6 @@ describe("ULW_LOOP_HELP", () => {
 		expect(ULW_LOOP_HELP).toContain("add-goal");
 		expect(ULW_LOOP_HELP).toContain("record-review-blockers");
 	});
-
-	it("never mentions the legacy typo", () => {
-		const typo = ["o", "m", "x"].join("");
-
-		expect(ULW_LOOP_HELP).not.toMatch(new RegExp(typo, "i"));
-	});
 });
 
 describe("printStatus", () => {

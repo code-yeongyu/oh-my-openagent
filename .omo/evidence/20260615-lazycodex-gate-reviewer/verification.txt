@@ -1,0 +1,31 @@
+PR #5318 follow-up: direct gate reviewer anti-slop obligation
+
+Issue:
+- Final anti-slop reviewer found that the LazyCodex gate reviewer only checked whether the code review report performed the remove-ai-slops + programming skill-perspective check.
+- The user requirement is stricter: the gate reviewer/verifier itself must load, consult, or directly apply those criteria.
+
+Changed files:
+- packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-gate-reviewer.toml
+- packages/omo-codex/plugin/test/aggregate-agents.test.mjs
+
+Verification commands:
+- node --test packages/omo-codex/plugin/test/aggregate-agents.test.mjs
+  Result: PASS, 4 tests passed.
+- rg -n 'remove-ai-slops|programming|load or consult|documented criteria|Run the `remove-ai-slops`' packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-gate-reviewer.toml
+  Result: PASS, prompt line includes direct load/consult, documented-criteria fallback, and direct remove-ai-slops pass wording.
+- git diff --check
+  Result: PASS.
+- git diff --check origin/dev..HEAD
+  Result: PASS.
+- bun run test:codex
+  Result: PASS. LSP tools test suite passed 95 tests; Codex compatibility/install/plugin suites passed 339 tests.
+- git fetch origin dev && git rev-list --left-right --count origin/dev...HEAD
+  Result: 0 28; no rebase needed because the branch is not behind origin/dev.
+
+Review evidence:
+- Verifier 57: FAIL before this patch; blocker was report-only gate reviewer wording.
+- Verifier 58: PASS for merge-gate review of the prior HEAD.
+- Worker follow-up: implemented direct gate reviewer obligation, captured red/green focused prompt test, and reported isolated Codex QA pass.
+
+Evidence hygiene:
+- This receipt is sanitized and contains no local absolute paths, temp directories, credentials, or private config contents.

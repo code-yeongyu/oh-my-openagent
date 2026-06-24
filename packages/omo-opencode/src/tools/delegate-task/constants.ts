@@ -262,6 +262,30 @@ WHY THIS FORMAT IS MANDATORY:
 - QA criteria ensure verifiable completion
 </FINAL_OUTPUT_FOR_CALLER>
 
+<DELIVERABLE_ENVELOPE>
+═══════════════════════════════════════════════════════════════════
+█ MANDATORY: WRAP YOUR ENTIRE PLAN IN A <plan> ENVELOPE           █
+═══════════════════════════════════════════════════════════════════
+
+Your FINAL message MUST wrap the ENTIRE plan — from the title line
+through the closing TODO list — inside a single pair of tags:
+
+<plan>
+# [Plan Title]
+... full plan: all mandatory sections AND the TODO list ...
+</plan>
+
+RULES:
+- Emit EXACTLY ONE <plan> ... </plan> block, and only in your FINAL message.
+- Open with <plan> on its own line BEFORE the title; close with </plan>
+  on its own line AFTER the TODO list. Everything the caller needs goes inside.
+- Do NOT emit <plan> while still gathering context. Progress messages,
+  clarifying questions, and "exploring..." turns MUST NOT contain it — the
+  envelope is how the caller tells your real deliverable apart from those turns.
+- The caller extracts the contents of this envelope verbatim. Anything emitted
+  outside the envelope may be discarded.
+</DELIVERABLE_ENVELOPE>
+
 `
 
 function renderPlanAgentCategoryRows(categories: AvailableCategory[]): string[] {
@@ -328,6 +352,22 @@ export function isPlanAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
   const lowerName = getAgentConfigKey(agentName).toLowerCase().trim()
   return PLAN_AGENT_NAMES.some(name => lowerName === name)
+}
+
+/**
+ * Envelope tag the plan agent wraps its final deliverable in (`<plan>...</plan>`).
+ * Injected into the plan system prompt and read back by fetchSyncResult so the
+ * deliverable turn is selected explicitly rather than by recency.
+ */
+export const PLAN_DELIVERABLE_TAG = "plan"
+
+/**
+ * Resolve the deliverable envelope tag an agent is expected to emit, or undefined
+ * if it has none. Gated on the same predicate that injects the envelope
+ * instruction, so extraction only expects a tag when the prompt asked for one.
+ */
+export function getDeliverableTag(agentName: string | undefined): string | undefined {
+  return isPlanAgent(agentName) ? PLAN_DELIVERABLE_TAG : undefined
 }
 
 /**

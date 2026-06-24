@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import * as deps from "./dependencies"
@@ -21,19 +22,6 @@ describe("dependencies check", () => {
       expect(typeof info.installed).toBe("boolean")
       expect(typeof info.version === "string" || info.version === null).toBe(true)
       expect(typeof info.path === "string" || info.path === null).toBe(true)
-    })
-  })
-
-  describe("checkAstGrepNapi", () => {
-    it("returns valid dependency info", async () => {
-      //#given ast-grep napi check
-      //#when checking
-      const info = await deps.checkAstGrepNapi()
-
-      //#then should return valid DependencyInfo
-      expect(info.name).toBe("AST-Grep NAPI")
-      expect(info.required).toBe(false)
-      expect(typeof info.installed).toBe("boolean")
     })
   })
 
@@ -109,6 +97,27 @@ describe("dependencies check", () => {
 
       //#then returns the bin path
       expect(result).toBe(expected)
+    })
+
+    it("#given a zero-dependency install where require.resolve throws Bun's non-Error ResolveMessage #when resolving package binary #then returns null instead of crashing", () => {
+      //#given a real ResolveMessage captured from a genuinely failing require.resolve (lazycodex-ai ships no node_modules)
+      const requireFromHere = createRequire(import.meta.url)
+      let resolveMessage: unknown
+      try {
+        requireFromHere.resolve("definitely-not-a-real-package-omo-doctor-test/package.json")
+        throw new Error("expected the require.resolve probe to fail")
+      } catch (error) {
+        resolveMessage = error
+      }
+      expect(resolveMessage instanceof Error).toBe(false)
+
+      //#when resolving without an override so the failing resolver is exercised
+      const result = deps.findCommentCheckerPackageBinary(undefined, () => {
+        throw resolveMessage
+      })
+
+      //#then degrades to null instead of rethrowing
+      expect(result).toBeNull()
     })
   })
 })

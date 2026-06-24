@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
@@ -129,10 +128,7 @@ describe("claude-code command loader", () => {
     const repositoryDir = join(TEST_DIR, "repo")
     const nestedDirectory = join(repositoryDir, "packages", "app", "src")
     mkdirSync(nestedDirectory, { recursive: true })
-    execFileSync("git", ["init"], {
-      cwd: repositoryDir,
-      stdio: ["ignore", "ignore", "ignore"],
-    })
+    mkdirSync(join(repositoryDir, ".git"), { recursive: true })
     writeCommand(join(repositoryDir, ".opencode", "commands", "deploy"), "staging", "Deploy staging")
     writeCommand(join(repositoryDir, ".opencode", "command"), "release", "Release command")
     writeCommand(join(TEST_DIR, ".opencode", "commands"), "outside", "Outside command")

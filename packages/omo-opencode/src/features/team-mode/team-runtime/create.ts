@@ -53,19 +53,9 @@ async function pathExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath)
     return true
-  } catch (error) {
-    if (error instanceof Error) return false
+  } catch {
     return false
   }
-}
-
-function ignoreTeamSessionSweepFailure(error: unknown): void {
-  if (error instanceof Error) return
-}
-
-function resolveRuntimeStateLoadFailure(error: unknown): undefined {
-  if (error instanceof Error) return undefined
-  return undefined
 }
 
 async function resolveSpecSource(spec: TeamSpec, ctx: ExecutorContext, config: TeamModeConfig): Promise<"project" | "user"> {
@@ -78,7 +68,7 @@ async function resolveSpecSource(spec: TeamSpec, ctx: ExecutorContext, config: T
 async function findExistingRuntime(spec: TeamSpec, leadSessionId: string, config: TeamModeConfig): Promise<RuntimeState | undefined> {
   for (const candidate of await listActiveTeams(config)) {
     if (candidate.teamName !== spec.name || (candidate.status !== "creating" && candidate.status !== "active")) continue
-    const runtimeState = await loadRuntimeState(candidate.teamRunId, config).catch(resolveRuntimeStateLoadFailure)
+    const runtimeState = await loadRuntimeState(candidate.teamRunId, config).catch(() => undefined)
     if (runtimeState?.leadSessionId === leadSessionId && !hasUnresolvedTeamMembers(runtimeState.members)) return runtimeState
   }
 }
@@ -117,6 +107,20 @@ function buildMemberPrompt(
   return promptLines.join("\n")
 }
 
+async function updateMemberInRuntimeState(
+  teamRunId: string,
+  memberName: string,
+  patch: (member: RuntimeState["members"][number]) => RuntimeState["members"][number],
+  config: TeamModeConfig,
+): Promise<RuntimeState> {
+  return transitionRuntimeState(teamRunId, (currentState) => ({
+    ...currentState,
+    members: currentState.members.map((member) =>
+      member.name === memberName ? patch(member) : member,
+    ),
+  }), config)
+}
+
 export async function createTeamRun(
   spec: TeamSpec,
   leadSessionId: string,
@@ -131,7 +135,7 @@ export async function createTeamRun(
 
   const activeTeams = await listActiveTeams(config)
   const activeRunIds = new Set(activeTeams.map((t) => t.teamRunId))
-  sweepStaleTeamSessions(activeRunIds).catch(ignoreTeamSessionSweepFailure)
+  sweepStaleTeamSessions(activeRunIds).catch(() => {})
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)
@@ -145,16 +149,11 @@ export async function createTeamRun(
       memberName: spec.leadAgentId,
       role: "lead",
     })
-    runtimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
-      ...currentState,
-      members: currentState.members.map((member) => member.name === spec.leadAgentId
-        ? {
-            ...member,
-            sessionId: leadSessionId,
-            status: "running",
-            ...(callerLeadSubagentType ? { subagent_type: callerLeadSubagentType } : {}),
-          }
-        : member),
+    runtimeState = await updateMemberInRuntimeState(runtimeState.teamRunId, spec.leadAgentId, (member) => ({
+      ...member,
+      sessionId: leadSessionId,
+      status: "running",
+      ...(callerLeadSubagentType ? { subagent_type: callerLeadSubagentType } : {}),
     }), config)
   }
   await Promise.all(spec.members.map((member) => mkdir(getInboxDir(baseDir, runtimeState.teamRunId, member.name), { recursive: true })))
@@ -185,11 +184,9 @@ export async function createTeamRun(
           if (member.worktreePath) resource.worktreePath = await createMemberWorktree(member.worktreePath, ctx.directory)
           if (reusesCallerLeadSession && member.name === spec.leadAgentId) {
             if (resource.worktreePath) {
-              await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
-                ...currentState,
-                members: currentState.members.map((currentMember) => currentMember.name === member.name
-                  ? { ...currentMember, worktreePath: resource.worktreePath }
-                  : currentMember),
+              await updateMemberInRuntimeState(runtimeState.teamRunId, member.name, (currentMember) => ({
+                ...currentMember,
+                worktreePath: resource.worktreePath,
               }), config)
             }
             continue
@@ -214,11 +211,10 @@ export async function createTeamRun(
                 memberName: member.name,
                 role: member.name === spec.leadAgentId ? "lead" : "member",
               })
-              runtimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
-                ...currentState,
-                members: currentState.members.map((currentMember) => currentMember.name === member.name
-                  ? { ...currentMember, sessionId, status: "running" }
-                  : currentMember),
+              runtimeState = await updateMemberInRuntimeState(runtimeState.teamRunId, member.name, (currentMember) => ({
+                ...currentMember,
+                sessionId,
+                status: "running",
               }), config)
             },
           })
@@ -241,19 +237,14 @@ export async function createTeamRun(
                 ...(resolvedMember.model.thinking ? { thinking: resolvedMember.model.thinking } : {}),
               }
             : undefined
-          await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
-            ...currentState,
-            members: currentState.members.map((currentMember) => currentMember.name === member.name
-              ? {
-                  ...currentMember,
-                  sessionId,
-                  status: "running",
-                  worktreePath: resource.worktreePath,
-                  subagent_type: resolvedMember.agentToUse,
-                  ...(member.kind === "category" ? { category: member.category } : {}),
-                  ...(persistedModel ? { model: persistedModel } : {}),
-                }
-              : currentMember),
+          await updateMemberInRuntimeState(runtimeState.teamRunId, member.name, (currentMember) => ({
+            ...currentMember,
+            sessionId,
+            status: "running",
+            worktreePath: resource.worktreePath,
+            subagent_type: resolvedMember.agentToUse,
+            ...(member.kind === "category" ? { category: member.category } : {}),
+            ...(persistedModel ? { model: persistedModel } : {}),
           }), config)
         } catch (error) {
           failure = error instanceof Error ? error : new Error(String(error))

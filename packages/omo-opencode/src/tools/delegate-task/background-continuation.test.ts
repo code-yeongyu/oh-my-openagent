@@ -95,4 +95,51 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     expect(result).toContain("session_id: ses_resumed_456")
     expect(result).not.toContain("subagent:")
   })
+
+  test("does not advertise background_output CTA in continuation return (issue #5221)", async () => {
+    //#given - mock manager.resume
+    const mockManager = {
+      resume: async () => ({
+        id: "bg_task_cta",
+        description: "continue task",
+        agent: "oracle",
+        status: "running",
+        sessionId: "ses_resumed_cta",
+      }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-cta",
+      metadata: mock(() => Promise.resolve()),
+    }
+
+    const mockExecutorCtx = {
+      manager: mockManager,
+    }
+
+    const parentContext = {
+      sessionID: "parent-session",
+      messageID: "msg-parent",
+      agent: "sisyphus",
+    }
+
+    const args = {
+      task_id: "ses_resumed_cta",
+      prompt: "continue",
+      description: "resume task",
+      load_skills: [],
+      run_in_background: true,
+    }
+
+    //#when
+    const { executeBackgroundContinuation } = require("./background-continuation")
+    const result = await executeBackgroundContinuation(args, mockCtx, mockExecutorCtx, parentContext)
+
+    //#then - no polling CTA, anti-polling instruction preserved
+    expect(result).not.toContain("Use `background_output` with task_id=")
+    expect(result).not.toContain("to check.")
+    expect(result).toContain("Do NOT call background_output now")
+    expect(result).toContain("<system-reminder>")
+  })
 })

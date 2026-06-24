@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isRecord } from "@oh-my-opencode/utils"
 import { log } from "../../shared/logger"
 import type { AutoUpdateCheckerOptions } from "./types"
-import { getCachedVersion, getLocalDevVersion } from "./checker"
+import { getBundledVersion, getCachedVersion, getLocalDevVersion } from "./checker"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
 import { scheduleDeferredStartupCheck } from "./hook/deferred-startup-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
@@ -12,6 +13,7 @@ import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 import { ignoreToastError } from "./hook/ignore-toast-error"
 
 interface AutoUpdateCheckerDeps {
+  getBundledVersion?: typeof getBundledVersion
   getCachedVersion: typeof getCachedVersion
   getLocalDevVersion: typeof getLocalDevVersion
   showConfigErrorsIfAny: typeof showConfigErrorsIfAny
@@ -25,6 +27,7 @@ interface AutoUpdateCheckerDeps {
 }
 
 const defaultDeps: AutoUpdateCheckerDeps = {
+  getBundledVersion,
   getCachedVersion,
   getLocalDevVersion,
   showConfigErrorsIfAny,
@@ -35,10 +38,6 @@ const defaultDeps: AutoUpdateCheckerDeps = {
   showVersionToast,
   runBackgroundUpdateCheck,
   log,
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null
 }
 
 const getParentID = (properties: unknown): string | undefined => {
@@ -90,9 +89,15 @@ export function createAutoUpdateCheckerHook(
       scheduleDeferredStartupCheck(() => {
         hasChecked = true
         void (async () => {
-          const cachedVersion = deps.getCachedVersion()
+          const bundledVersion = deps.getBundledVersion?.()
           const localDevVersion = deps.getLocalDevVersion(ctx.directory)
-          const displayVersion = localDevVersion ?? cachedVersion
+          // Banner reflects the bundled (build-time) version so it never drifts
+          // from `--version`, even if a stale cache copy lingers in OpenCode's
+          // plugin sandbox. Background update-check still uses `getCachedVersion()`
+          // because that's the artifact we're comparing against npm's `latest`.
+          // getBundledVersion is optional so injected-deps callers built before
+          // it existed keep the legacy cached-version banner instead of crashing.
+          const displayVersion = localDevVersion ?? bundledVersion ?? deps.getCachedVersion()
 
           await deps.showConfigErrorsIfAny(ctx)
           await deps.updateAndShowConnectedProvidersCacheStatus(ctx)

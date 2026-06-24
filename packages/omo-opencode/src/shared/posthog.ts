@@ -1,6 +1,17 @@
 import os from "os"
-import { createHash } from "node:crypto"
-import { PostHog } from "posthog-node"
+import {
+  DEFAULT_POSTHOG_API_KEY,
+  DEFAULT_POSTHOG_HOST,
+  createDefaultPostHogTransport,
+  getTelemetryDistinctId,
+  getTelemetryHost,
+} from "@oh-my-opencode/telemetry-core"
+import type {
+  TelemetryCaptureMessage,
+  TelemetryTransport,
+  TelemetryTransportFactory,
+  TelemetryTransportOptions,
+} from "@oh-my-opencode/telemetry-core"
 import packageJson from "../../../../package.json" with { type: "json" }
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "./plugin-identity"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
@@ -9,6 +20,7 @@ import { getPostHogActivityCaptureState } from "./posthog-activity-state"
 let activityStateProviderOverride: typeof getPostHogActivityCaptureState | null = null
 type OsProvider = Pick<typeof os, "arch" | "cpus" | "hostname" | "platform" | "release" | "totalmem" | "type">
 let osProviderOverride: OsProvider | null = null
+let transportFactoryOverride: TelemetryTransportFactory | null = null
 
 function resolveActivityState(): ReturnType<typeof getPostHogActivityCaptureState> {
   return (activityStateProviderOverride ?? getPostHogActivityCaptureState)()
@@ -16,6 +28,10 @@ function resolveActivityState(): ReturnType<typeof getPostHogActivityCaptureStat
 
 function resolveOsProvider(): OsProvider {
   return osProviderOverride ?? os
+}
+
+function resolveTransportFactory(): TelemetryTransportFactory {
+  return transportFactoryOverride ?? createDefaultPostHogTransport
 }
 
 /** @internal test-only */
@@ -40,10 +56,15 @@ export function __resetOsProviderForTesting(): void {
   osProviderOverride = null
 }
 
-const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
-const DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74"
+export function __setTransportFactoryForTesting(provider: TelemetryTransportFactory): void {
+  transportFactoryOverride = provider
+}
 
-type PostHogCaptureEvent = Parameters<PostHog["capture"]>[0]
+export function __resetTransportFactoryForTesting(): void {
+  transportFactoryOverride = null
+}
+
+type PostHogCaptureProperties = NonNullable<TelemetryCaptureMessage["properties"]>
 type PostHogSource = "cli" | "plugin"
 type PostHogActivityReason = "run_started"
 
@@ -82,7 +103,7 @@ function getPostHogApiKey(): string {
 }
 
 function getPostHogHost(): string {
-  return process.env.POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST
+  return getTelemetryHost(process.env, DEFAULT_POSTHOG_HOST)
 }
 
 function safeCpus(): { length: number; model: string | undefined } {
@@ -97,7 +118,7 @@ function safeCpus(): { length: number; model: string | undefined } {
   }
 }
 
-function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureEvent["properties"]> {
+function getSharedProperties(source: PostHogSource): PostHogCaptureProperties {
   const cpus = safeCpus()
   const osProvider = resolveOsProvider()
 
@@ -126,16 +147,16 @@ function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureE
 
 function createPostHogClient(
   source: PostHogSource,
-  options: ConstructorParameters<typeof PostHog>[1],
+  options: Omit<TelemetryTransportOptions, "disableGeoip" | "host">,
 ): PostHogClient {
   if (shouldDisablePostHog() || !hasPostHogApiKey()) {
     return NO_OP_POSTHOG
   }
 
-  let configuredClient: PostHog
+  let configuredClient: TelemetryTransport
 
   try {
-    configuredClient = new PostHog(getPostHogApiKey(), {
+    configuredClient = resolveTransportFactory()(getPostHogApiKey(), {
       ...options,
       host: getPostHogHost(),
       disableGeoip: false,
@@ -153,26 +174,40 @@ function createPostHogClient(
       const activityState = resolveActivityState()
 
       if (activityState.captureDaily) {
-        configuredClient.capture({
-          distinctId,
-          event: "omo_daily_active",
-          properties: {
-            ...sharedProperties,
-            $process_person_profile: false,
-            day_utc: activityState.dayUTC,
-            reason,
-          },
-        })
+        try {
+          configuredClient.capture({
+            distinctId,
+            event: "omo_daily_active",
+            properties: {
+              ...sharedProperties,
+              $process_person_profile: false,
+              day_utc: activityState.dayUTC,
+              reason,
+            },
+          })
+        } catch (error) {
+          if (error instanceof Error) {
+            return
+          }
+          return
+        }
       }
     },
-    shutdown: async () => configuredClient.shutdown(),
+    shutdown: async () => {
+      try {
+        await configuredClient.shutdown()
+      } catch (error) {
+        if (error instanceof Error) {
+          return
+        }
+        return
+      }
+    },
   }
 }
 
 export function getPostHogDistinctId(): string {
-  return createHash("sha256")
-    .update(`${PUBLISHED_PACKAGE_NAME}:${resolveOsProvider().hostname()}`)
-    .digest("hex")
+  return getTelemetryDistinctId(`${PUBLISHED_PACKAGE_NAME}:`, resolveOsProvider())
 }
 
 export function createCliPostHog(): PostHogClient {

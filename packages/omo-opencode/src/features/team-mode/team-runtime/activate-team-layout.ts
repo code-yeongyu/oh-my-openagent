@@ -35,6 +35,10 @@ export async function activateTeamLayout(
   )
   if (!layout) return false
   const normalizedLayout = normalizeTeamLayout(runtimeState.teamRunId, layout)
+  const paneIds = [
+    ...Object.values(normalizedLayout.focusPanesByMember),
+    ...Object.values(normalizedLayout.gridPanesByMember),
+  ]
 
   await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
     ...currentState,
@@ -43,6 +47,7 @@ export async function activateTeamLayout(
       targetSessionId: normalizedLayout.targetSessionId,
       focusWindowId: normalizedLayout.focusWindowId,
       gridWindowId: normalizedLayout.gridWindowId,
+      ...(paneIds.length > 0 ? { paneIds } : {}),
     },
     members: currentState.members.map((member) => ({
       ...member,

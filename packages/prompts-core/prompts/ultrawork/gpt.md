@@ -50,7 +50,7 @@
 **Decision Factors:**
 - Delegation overhead ≈ 10-15 seconds. If task takes less, do it yourself.
 - If you already have full context loaded, do it yourself.
-- If task requires specialized expertise (frontend-ui-ux, git operations), delegate.
+- If task requires specialized expertise (frontend, git operations), delegate.
 - If you need information from multiple sources, fire parallel background agents.
 
 ## AVAILABLE RESOURCES
@@ -67,6 +67,7 @@ Before acting, survey the skills available in this system: scan their descriptio
 
 <tool_usage_rules>
 - Prefer tools over internal knowledge for fresh or user-specific data
+- Use `codegraph_explore` first when codegraph_* tools are available for how/where/what/flow questions and before edits; if absent or inactive/cold-start unavailable, continue with Grep/Read/LSP and the ast-grep skill.
 - Parallelize independent reads (read_file, grep, explore, librarian) to reduce latency
 - After any write/update, briefly restate: What changed, Where (path), Follow-up needed
 </tool_usage_rules>
@@ -77,7 +78,7 @@ Before acting, survey the skills available in this system: scan their descriptio
 
 | Track | Tools | Speed | Purpose |
 |-------|-------|-------|---------|
-| **Direct** | Grep, Read, LSP, AST-grep | Instant | Quick wins, known locations |
+| **Direct** | codegraph_explore (primary), Grep, Read, LSP, ast-grep skill (`sg`) | Instant | Quick wins, known locations |
 | **Background** | explore, librarian agents | Async | Deep search, external docs |
 
 **ALWAYS run both tracks in parallel:**
@@ -88,7 +89,7 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNO
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
-read_file(filePath="known/important/file.ts")
+read_file(filePath="known/important/file")
 
 // Collect background results when ready
 deep_context = background_output(task_id=...)

@@ -38,6 +38,7 @@ function createPluginInputWithToast(showToast: (options: ToastOptions) => Promis
     directory: "/tmp/keyword-detector-test",
     worktree: "/tmp/keyword-detector-test",
     serverUrl: new URL("http://localhost"),
+    experimental_workspace: { register: () => {} },
     $: {} as PluginInput["$"],
   }
 }
@@ -85,7 +86,7 @@ describe("keyword-detector message transform", () => {
     expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
-  test("should prepend search message to text part", async () => {
+  test("should leave search wording as plain user text", async () => {
     // given - mock getMainSessionID to return our session (isolate from global state)
     const collector = new ContextCollector()
     const sessionID = "search-test-session"
@@ -99,17 +100,13 @@ describe("keyword-detector message transform", () => {
     // when - keyword detection runs
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - search message should be prepended to text part
+    // then - search wording should not activate a mode prompt
     const text = expectTextPartText(output.parts)
-    expect(text).toContain("---")
-    expect(text).toContain("for the bug")
-    expect(text).toContain("[search-mode]")
+    expect(text).toBe("search for the bug")
   })
 
   test("should not prepend mode messages twice when an injected message is processed again", async () => {
     const cases = [
-      { prompt: "search for the bug", marker: "[search-mode]" },
-      { prompt: "analyze the failing test", marker: "[analyze-mode]" },
       { prompt: "team mode for this refactor", marker: "[team-mode]" },
       { prompt: "hyperplan the migration", marker: "<hyperplan-mode>" },
       { prompt: "ultrawork fix the flaky suite", marker: "<ultrawork-mode>" },
@@ -140,26 +137,6 @@ describe("keyword-detector message transform", () => {
     }
   })
 
-  test("should tell analyze-mode agents to evaluate skills before delegating", async () => {
-    // given - analyze mode keyword detection runs on a user investigation request
-    const collector = new ContextCollector()
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const sessionID = "analyze-skill-guidance-session"
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "investigate why subagents miss recovery skills" }],
-    }
-
-    // when - analyze mode is injected
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - guidance should require evaluating skills, not hard-code an empty skill list
-    const text = expectTextPartText(output.parts)
-    expect(text).toContain("Evaluate available skills before dispatch")
-    expect(text).toContain("pass [] ONLY when no skill matches")
-    expect(text).not.toContain("ALWAYS include load_skills=[]")
-  })
-
   test("should NOT transform when no keywords detected", async () => {
     // given - no keywords in message
     const collector = new ContextCollector()
@@ -179,7 +156,7 @@ describe("keyword-detector message transform", () => {
   })
 
   test("should not prepend mode instructions to synthetic team peer messages", async () => {
-    // given - team mailbox injection created a synthetic peer message containing search keywords
+    // given - team mailbox injection created a synthetic peer message containing plain search wording
     const collector = new ContextCollector()
     const sessionID = "synthetic-peer-message-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
@@ -196,14 +173,13 @@ describe("keyword-detector message transform", () => {
     // when - keyword detection sees the synthetic peer message
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - peer message content is preserved without search-mode becoming part of the user turn
+    // then - peer message content is preserved without mode injection
     const text = expectTextPartText(output.parts)
     expect(text).toBe('<peer_message from="researcher">search the issue thread and report findings</peer_message>')
-    expect(text).not.toContain("[search-mode]")
   })
 
   test("should not prepend mode instructions to internally marked peer messages", async () => {
-    // given - an internal peer message contains a search keyword but is not user intent
+    // given - an internal peer message contains search wording but is not user intent
     const collector = new ContextCollector()
     const sessionID = "internal-peer-message-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
@@ -220,7 +196,6 @@ describe("keyword-detector message transform", () => {
     // then
     const textPart = output.parts.find((part) => part.type === "text")
     expect(textPart?.text).toBe(peerText)
-    expect(textPart?.text).not.toContain("[search-mode]")
   })
 
   test("should only fire ultrawork when enabled_expansions is set to [ultrawork]", async () => {
@@ -241,19 +216,19 @@ describe("keyword-detector message transform", () => {
     // when - keyword detection runs with enabled_expansions restricting to ultrawork
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - search should be blocked by allowlist even though it matches
+    // then - search wording remains plain text
     const text = expectTextPartText(output.parts)
-    expect(text).toBe("search for the bug") // no search-mode injection
+    expect(text).toBe("search for the bug")
   })
 
-  test("should fire only allowed expansions from allowlist", async () => {
-    // given - allowlist configured to only enable analyze
+  test("should ignore removed expansions in allowlist", async () => {
+    // given - allowlist configured with no active expansion for analyze wording
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(
       createMockPluginInput(),
       collector,
       undefined,
-      { enabled_expansions: ["analyze"] }
+      { enabled_expansions: [] }
     )
     const sessionID = "enabled-expansions-analyze-only"
     const output = {
@@ -261,12 +236,12 @@ describe("keyword-detector message transform", () => {
       parts: [{ type: "text", text: "investigate the bug" }],
     }
 
-    // when - keyword detection runs with enabled_expansions restricting to analyze
+    // when - keyword detection runs against analyze wording
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - analyze should fire because it's in the allowlist
+    // then - analyze wording should not activate a mode prompt
     const text = expectTextPartText(output.parts)
-    expect(text).toContain("[analyze-mode]")
+    expect(text).toBe("investigate the bug")
   })
 
   test("should block all expansions when enabled_expansions is empty array", async () => {
@@ -293,29 +268,26 @@ describe("keyword-detector message transform", () => {
   })
 
   test("should allow both allowlist and denylist to coexist", async () => {
-    // given - allowlist enables ultrawork and search, but denylist also blocks search
+    // given - allowlist enables team, but denylist also blocks team
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(
       createMockPluginInput(),
       collector,
       undefined,
-      { enabled_expansions: ["ultrawork", "search"], disabled_keywords: ["search"] }
+      { enabled_expansions: ["team"], disabled_keywords: ["team"] }
     )
     const sessionID = "enabled-and-disabled-coexist"
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "search for the bug" }],
+      parts: [{ type: "text", text: "team mode for this bug" }],
     }
 
     // when - both config fields are set
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - search blocked by both allowlist (allowed) AND denylist (blocked)
-    // Actually search is in enabled_expansions so it would fire, but disabled_keywords blocks it
-    // Wait, let me reconsider: with enabled_expansions=["ultrawork", "search"], search passes the allowlist.
-    // Then disabled_keywords=["search"] blocks it. So no injection.
+    // then - team is allowed by allowlist and blocked by denylist, so no injection
     const text = expectTextPartText(output.parts)
-    expect(text).toBe("search for the bug")
+    expect(text).toBe("team mode for this bug")
   })
 })
 
@@ -343,8 +315,8 @@ describe("keyword-detector session filtering", () => {
     })
   }
 
-  test("should skip non-ultrawork keywords in non-main session (using mainSessionID check)", async () => {
-    // given - main session is set, different session submits search keyword
+  test("should leave removed keyword wording plain in non-main session", async () => {
+    // given - main session is set, different session submits removed keyword wording
     const mainSessionID = "main-123"
     const subagentSessionID = "subagent-456"
     setMainSession(mainSessionID)
@@ -352,7 +324,7 @@ describe("keyword-detector session filtering", () => {
     const hook = createKeywordDetectorHook(createMockPluginInput())
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "search mode 찾아줘" }],
+      parts: [{ type: "text", text: "find this 찾아줘" }],
     }
 
     // when - non-main session triggers keyword detection
@@ -361,9 +333,9 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - search keyword should be filtered out based on mainSessionID comparison
+    // then - removed keyword wording stays plain
     expect(output.message.variant).toBeUndefined()
-    expect(output.parts[0]?.text).toBe("search mode 찾아줘")
+    expect(output.parts[0]?.text).toBe("find this 찾아줘")
   })
 
   test("should allow ultrawork keywords in non-main session", async () => {
@@ -390,15 +362,15 @@ describe("keyword-detector session filtering", () => {
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 
-  test("should allow all keywords in main session", async () => {
-    // given - main session submits search keyword
+  test("should allow active keywords in main session", async () => {
+    // given - main session submits ultrawork keyword
     const mainSessionID = "main-123"
     setMainSession(mainSessionID)
 
     const hook = createKeywordDetectorHook(createMockPluginInput())
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "search mode 찾아줘" }],
+      parts: [{ type: "text", text: "ultrawork 찾아줘" }],
     }
 
     // when - main session triggers keyword detection
@@ -407,10 +379,10 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - search keyword should be detected (output unchanged but detection happens)
-    // Note: search keywords don't set variant, they inject messages via context-injector
-    // This test verifies the detection logic runs without filtering
-    expect(output.message.variant).toBeUndefined() // search doesn't set variant
+    // then - active keyword should be detected without forcing a runtime variant
+    expect(output.message.variant).toBeUndefined()
+    const text = expectTextPartText(output.parts)
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
 
   test("should allow all keywords when mainSessionID is not set", async () => {
@@ -570,8 +542,8 @@ describe("keyword-detector system-reminder filtering", () => {
     return createPluginInputWithToast(async () => {})
   }
 
-  test("should NOT trigger search mode from keywords inside <system-reminder> tags", async () => {
-    // given - message contains search keywords only inside system-reminder tags
+  test("should keep system-reminder search wording plain", async () => {
+    // given - message contains search wording only inside system-reminder tags
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
     const sessionID = "test-session"
@@ -589,14 +561,13 @@ Please locate and scan the directory.
     // when - keyword detection runs on system-reminder content
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should NOT trigger search mode (text should remain unchanged)
+    // then - text should remain unchanged
     const text = expectTextPartText(output.parts)
-    expect(text).not.toContain("[search-mode]")
     expect(text).toContain("<system-reminder>")
   })
 
-  test("should NOT trigger analyze mode from keywords inside <system-reminder> tags", async () => {
-    // given - message contains analyze keywords only inside system-reminder tags
+  test("should keep system-reminder analyze wording plain", async () => {
+    // given - message contains analyze wording only inside system-reminder tags
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
     const sessionID = "test-session"
@@ -614,14 +585,13 @@ Research the implementation details.
     // when - keyword detection runs on system-reminder content
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should NOT trigger analyze mode
+    // then - text should remain unchanged
     const text = expectTextPartText(output.parts)
-    expect(text).not.toContain("[analyze-mode]")
     expect(text).toContain("<system-reminder>")
   })
 
-  test("should detect keywords in user text even when system-reminder is present", async () => {
-    // given - message contains both system-reminder and user search keyword
+  test("should detect active keywords in user text even when system-reminder is present", async () => {
+    // given - message contains both system-reminder and user ultrawork keyword
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
     const sessionID = "test-session"
@@ -633,17 +603,17 @@ Research the implementation details.
 System will find and locate files.
 </system-reminder>
 
-Please search for the bug in the code.`
+Please ultrawork the bug in the code.`
       }],
     }
 
     // when - keyword detection runs on mixed content
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should trigger search mode from user text only
+    // then - should trigger ultrawork from user text only
     const text = expectTextPartText(output.parts)
-    expect(text).toContain("[search-mode]")
-    expect(text).toContain("Please search for the bug in the code.")
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(text).toContain("Please ultrawork the bug in the code.")
   })
 
   test("should handle multiple system-reminder tags in message", async () => {
@@ -670,10 +640,9 @@ Second reminder with investigate and examine keywords.
     // when - keyword detection runs on message with multiple system-reminders
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should NOT trigger any mode (only user text exists, no keywords)
+    // then - should not trigger any mode because only plain user text remains
     const text = expectTextPartText(output.parts)
-    expect(text).not.toContain("[search-mode]")
-    expect(text).not.toContain("[analyze-mode]")
+    expect(text).toContain("User message without keywords.")
   })
 
   test("should handle case-insensitive system-reminder tags", async () => {
@@ -694,13 +663,13 @@ System will search and find files.
     // when - keyword detection runs on uppercase system-reminder
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should NOT trigger search mode
+    // then - text should remain unchanged
     const text = expectTextPartText(output.parts)
-    expect(text).not.toContain("[search-mode]")
+    expect(text).toContain("<SYSTEM-REMINDER>")
   })
 
-  test("should handle multiline system-reminder content with search keywords", async () => {
-    // given - system-reminder with multiline content containing various search keywords
+  test("should handle multiline system-reminder content with search wording", async () => {
+    // given - system-reminder with multiline content containing various search words
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
     const sessionID = "test-session"
@@ -722,9 +691,9 @@ Please explore the codebase and discover patterns.
     // when - keyword detection runs on multiline system-reminder
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should NOT trigger search mode
+    // then - text should remain unchanged
     const text = expectTextPartText(output.parts)
-    expect(text).not.toContain("[search-mode]")
+    expect(text).toContain("Commands executed:")
   })
 })
 
@@ -978,7 +947,7 @@ describe("keyword-detector non-OMO agent skipping", () => {
     const sessionID = "plan-session"
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "search mode analyze mode ultrawork" }],
+      parts: [{ type: "text", text: "find this inspect this ultrawork" }],
     }
 
     // when - keyword detection runs with Plan agent
@@ -986,7 +955,7 @@ describe("keyword-detector non-OMO agent skipping", () => {
 
     // then - no keywords should be injected for non-OMO Plan agent
     const text = expectTextPartText(output.parts)
-    expect(text).toBe("search mode analyze mode ultrawork")
+    expect(text).toBe("find this inspect this ultrawork")
   })
 
   test("should still inject keywords for OMO agents like Sisyphus", async () => {
@@ -1021,10 +990,9 @@ describe("keyword-detector non-OMO agent skipping", () => {
     // when - keyword detection runs with a builder-type agent
     await hook["chat.message"]({ sessionID, agent: "Custom-Builder" }, output)
 
-    // then - search-mode should NOT be injected
+    // then - text should remain unchanged
     const text = expectTextPartText(output.parts)
     expect(text).toBe("search this codebase")
-    expect(text).not.toContain("[search-mode]")
   })
 })
 
@@ -1154,52 +1122,50 @@ describe("keyword-detector disabled_keywords config", () => {
     })
   }
 
-  test("should NOT inject search-mode when disabled_keywords includes 'search'", async () => {
-    // given - keyword detector with search disabled
+  test("should leave search wording plain without a disable flag", async () => {
+    // given - keyword detector with no config
     const sessionID = "search-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const hook = createKeywordDetectorHook(
       createMockPluginInput(),
       undefined,
       undefined,
-      { disabled_keywords: ["search"] },
+      undefined,
     )
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "search for the bug in the code" }],
     }
 
-    // when - search keyword would normally trigger
+    // when - search wording is submitted
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - search-mode injection should be skipped
+    // then - search wording remains plain text
     const text = expectTextPartText(output.parts)
     expect(text).toBe("search for the bug in the code")
-    expect(text).not.toContain("[search-mode]")
   })
 
-  test("should NOT inject analyze-mode when disabled_keywords includes 'analyze'", async () => {
-    // given - keyword detector with analyze disabled
+  test("should leave analyze wording plain without a disable flag", async () => {
+    // given - keyword detector with no config
     const sessionID = "analyze-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const hook = createKeywordDetectorHook(
       createMockPluginInput(),
       undefined,
       undefined,
-      { disabled_keywords: ["analyze"] },
+      undefined,
     )
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "how to do this" }],
     }
 
-    // when - analyze keyword would normally trigger
+    // when - analyze wording is submitted
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - analyze-mode injection should be skipped
+    // then - analyze wording remains plain text
     const text = expectTextPartText(output.parts)
     expect(text).toBe("how to do this")
-    expect(text).not.toContain("[analyze-mode]")
   })
 
   test("should NOT inject team-mode when disabled_keywords includes 'team'", async () => {
@@ -1251,58 +1217,50 @@ describe("keyword-detector disabled_keywords config", () => {
     expect(toastCalls).not.toContain("Ultrawork Mode Activated")
   })
 
-  test("should disable multiple keywords simultaneously when listed together", async () => {
-    // given - keyword detector with both search and analyze disabled
+  test("should leave combined search and analyze wording plain", async () => {
+    // given - keyword detector with no config
     const sessionID = "multi-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const hook = createKeywordDetectorHook(
       createMockPluginInput(),
       undefined,
       undefined,
-      { disabled_keywords: ["search", "analyze"] },
+      undefined,
     )
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "search and analyze the codebase" }],
     }
 
-    // when - both search and analyze would normally fire
+    // when - search and analyze wording is submitted
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - neither mode should inject
+    // then - neither wording activates a mode prompt
     const text = expectTextPartText(output.parts)
     expect(text).toBe("search and analyze the codebase")
-    expect(text).not.toContain("[search-mode]")
-    expect(text).not.toContain("[analyze-mode]")
   })
 
-  test("should let other keywords through when only one is disabled", async () => {
-    // given - keyword detector with only search disabled, but message contains both search and analyze triggers
+  test("should let active keywords through when search and analyze wording is present", async () => {
+    // given - keyword detector with an active ultrawork keyword plus removed mode wording
     const sessionID = "partial-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput(),
-      undefined,
-      undefined,
-      { disabled_keywords: ["search"] },
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput())
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "search and analyze the codebase" }],
+      parts: [{ type: "text", text: "ultrawork search and analyze the codebase" }],
     }
 
-    // when - both keywords match but only search is disabled
+    // when - active and removed keywords are submitted together
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - analyze should still inject, search should be skipped
+    // then - ultrawork still injects and removed mode prompts do not
     const text = expectTextPartText(output.parts)
-    expect(text).not.toContain("[search-mode]")
-    expect(text).toContain("[analyze-mode]")
+    expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
     expect(text).toContain("search and analyze the codebase")
   })
 
-  test("should behave normally (all keywords enabled) when config is undefined", async () => {
-    // given - keyword detector with no config (regression test for backward compat)
+  test("should leave search wording plain when config is undefined", async () => {
+    // given - keyword detector with no config
     const sessionID = "no-config-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const hook = createKeywordDetectorHook(
@@ -1316,15 +1274,15 @@ describe("keyword-detector disabled_keywords config", () => {
       parts: [{ type: "text", text: "search for the answer" }],
     }
 
-    // when - search keyword fires with no config
+    // when - search wording is submitted with no config
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - search-mode should inject as usual
+    // then - search wording remains plain text
     const text = expectTextPartText(output.parts)
-    expect(text).toContain("[search-mode]")
+    expect(text).toBe("search for the answer")
   })
 
-  test("should behave normally when disabled_keywords is an empty array", async () => {
+  test("should leave analyze wording plain when disabled_keywords is an empty array", async () => {
     // given - keyword detector with empty disable list
     const sessionID = "empty-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
@@ -1339,11 +1297,11 @@ describe("keyword-detector disabled_keywords config", () => {
       parts: [{ type: "text", text: "investigate this issue" }],
     }
 
-    // when - analyze keyword fires with empty disable list
+    // when - analyze wording is submitted with empty disable list
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - analyze-mode should still inject
+    // then - analyze wording remains plain text
     const text = expectTextPartText(output.parts)
-    expect(text).toContain("[analyze-mode]")
+    expect(text).toBe("investigate this issue")
   })
 })
