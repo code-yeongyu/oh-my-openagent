@@ -2,7 +2,8 @@ const { beforeEach, describe, test, expect, mock } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
 const { clearCallableAgentsCache } = require("./agent-resolver")
 
-type PluginInput = { client: any; directory: string }
+type OpencodeClient = import("@opencode-ai/plugin").PluginInput["client"]
+type PluginInput = { client: OpencodeClient; directory: string }
 type BackgroundManager = {
   assertCanSpawn: Function
   reserveSubagentSpawn: Function
@@ -16,7 +17,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       app: {
         agents: mock(() => Promise.resolve({ data: agents })),
       },
-    },
+    } as unknown as OpencodeClient,
     directory: "/test",
     }
 }
@@ -27,7 +28,7 @@ function createFailingMockCtx(error: Error = new Error("API unavailable")): Plug
       app: {
         agents: mock(() => Promise.reject(error)),
       },
-    },
+    } as unknown as OpencodeClient,
     directory: "/test",
     }
 }
@@ -495,6 +496,51 @@ describe("createCallOmoAgent", () => {
     expect(launchArgs.model).toEqual({
       providerID: "openai",
       modelID: "gpt-5.4",
+    })
+  })
+
+  test("falls back to first entry in agent's fallbackChain when no override is configured (#5301)", async () => {
+    //#given
+    const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({
+      id: "task-default-model",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    }
+    // no agentOverrides, no userCategories — the default fallback path
+    const toolDef = createCallOmoAgent(
+      createMockCtx(DEFAULT_AGENTS),
+      managerWithLaunch,
+      [],
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test default model resolution",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    const firstLaunchCall = launch.mock.calls[0]
+    if (firstLaunchCall === undefined) {
+      throw new Error("Expected launch to be called")
+    }
+    const [launchArgs] = firstLaunchCall
+    // explore's first fallbackChain entry is openai/gpt-5.4-mini-fast
+    expect(launchArgs.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4-mini-fast",
     })
   })
 

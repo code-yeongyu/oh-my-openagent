@@ -1,0 +1,25 @@
+Summary:
+- Non-final aggregate checkpoints now require only essential criteria; final aggregate completion requires every criterion across the whole plan.
+- The shipped ulw-loop workflow reference now states the same non-final/final gate split as the implementation.
+- Non-final task-scoped Codex completion no longer marks the aggregate plan complete; the next pending goal remains startable.
+- Per-story completion still requires every criterion to pass; the essential-only relaxation is scoped to non-final aggregate goals.
+- Quality-gate fixture artifacts use tracked `rejection.txt` instead of ignored `rejection.log`.
+- Deleted-literal absence tests were removed from the component tests; remaining tests assert positive behavior and durable artifact guidance.
+- Final code-reviewer prompts must inspect excessive useless test/code slop, including tests that only prove a removed literal is absent and production code that needlessly dissects data.
+
+Raw command evidence:
+- biome.txt: component Biome lint via `npm --prefix packages/omo-codex/plugin/components/ulw-loop run lint`; exit 0.
+- loc.txt: changed/new TypeScript files are all below 250 pure LOC; highest recorded file is 235 pure LOC.
+- typecheck.txt: component `tsc --noEmit`; exit 0.
+- focused-tests.txt: focused ulw-loop gate suite via `bunx vitest`; 7 files, 64 tests passed; exit 0.
+- component-test.txt: full ulw-loop component suite; 29 files, 313 tests passed; exit 0.
+- plugin-check.txt: aggregate Codex plugin check; Node test pass 217; exit 0.
+- test-codex.txt: mandatory `bun run test:codex`; lsp-tools 25 files/95 tests and Bun suite pass 339; exit 0.
+- isolated-install.txt: local build installed into isolated CODEX_HOME; real ~/.codex/config.toml hash unchanged before/after; exit 0.
+- tmux-smoke.txt: isolated tmux smoke ran `codex plugin list --json` against the isolated CODEX_HOME; tmux and temp dir cleaned; exit 0.
+- diff-check-smart-rebase.txt: working-tree `git diff --check` and post-commit `origin/dev...HEAD` diff-check are recorded here.
+
+Evidence hygiene:
+- Evidence files were sanitized to replace worktree, home, and temp paths with placeholders.
+- Secret/path leak scan over this directory returned no sensitive path or API-key matches.
+- Stale slop scan over the touched ulw-loop tests and workflow reference found no reviewer-blocking stale deleted-literal patterns; the only remaining `biome-ignore-all format` match is an existing package smoke test that preserves verbatim JSON.

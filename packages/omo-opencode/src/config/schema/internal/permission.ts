@@ -15,6 +15,6 @@ export const AgentPermissionSchema = z.object({
   task: PermissionValueSchema.optional(),
   doom_loop: PermissionValueSchema.optional(),
   external_directory: PermissionValueSchema.optional(),
-})
+}).catchall(PermissionValueSchema.optional())
 
 export type AgentPermission = z.infer<typeof AgentPermissionSchema>

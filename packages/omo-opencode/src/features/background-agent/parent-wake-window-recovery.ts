@@ -3,11 +3,15 @@ import type { PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
 
+const MAX_NO_ASSISTANT_OUTPUT_RETRIES = 1
+
 type ParentWakeWindowRecoveryInput = {
   readonly sessionID: string
   readonly wake: PendingParentWake
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
+  readonly requeueWake: (wake: PendingParentWake) => void
+  readonly scheduleFlush: () => void
 }
 
 export async function handleDispatchedParentWakeWindowElapsed(
@@ -26,9 +30,23 @@ export async function handleDispatchedParentWakeWindowElapsed(
     return
   }
 
-  input.dispatchedTracker.refreshWakeTimer(input.sessionID)
-  log("[background-agent] Kept dispatched parent wake awaiting late failure or assistant output:", {
+  const retryCount = input.wake.noAssistantOutputRetryCount ?? 0
+  if (retryCount >= MAX_NO_ASSISTANT_OUTPUT_RETRIES) {
+    input.dispatchedTracker.clearWake(input.sessionID)
+    log("[background-agent] Stopped retrying parent wake after repeated no-output dispatch:", {
+      sessionID: input.sessionID,
+      retryCount,
+    })
+    return
+  }
+
+  input.dispatchedTracker.clearWake(input.sessionID)
+  input.wake.noAssistantOutputRetryCount = retryCount + 1
+  input.requeueWake(input.wake)
+  input.scheduleFlush()
+  log("[background-agent] Requeued dispatched parent wake after no assistant output:", {
     sessionID: input.sessionID,
+    retryCount: input.wake.noAssistantOutputRetryCount,
   })
 }
 

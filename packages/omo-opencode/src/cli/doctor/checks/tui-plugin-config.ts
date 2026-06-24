@@ -7,10 +7,11 @@ import {
   PLUGIN_NAME,
   getOpenCodeConfigDir,
   getOpenCodeConfigPaths,
+  log,
   parseJsonc,
 } from "../../../shared"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue } from "../types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, DoctorIssue } from "../framework/types"
 
 const TUI_SUBPATH = "tui"
 const TUI_EXPORT_SUBPATH = `./${TUI_SUBPATH}`
@@ -26,6 +27,7 @@ interface TuiConfigShape {
 interface ServerPluginInfo {
   registered: boolean
   configPath: string | null
+  entry: string | null
   packageExportsTui: boolean | null
 }
 
@@ -33,7 +35,9 @@ interface TuiPluginInfo {
   registered: boolean
   configPath: string | null
   exists: boolean
+  hasPackageTuiEntry: boolean
   hasNamedTuiEntry: boolean
+  hasCanonicalNamedTuiEntry: boolean
 }
 
 function fileEntryPackageJsonPath(entry: string): string {
@@ -52,7 +56,10 @@ function packageJsonExportsTui(pkgJsonPath: string): boolean | null {
     if (parsed.exports == null || typeof parsed.exports !== "object" || Array.isArray(parsed.exports)) return null
     return Object.hasOwn(parsed.exports, TUI_EXPORT_SUBPATH)
   } catch (error) {
-    void error
+    log("[tui-plugin-config] Failed to inspect package exports", {
+      pkgJsonPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return null
   }
 }
@@ -61,6 +68,10 @@ function packageNameFromServerEntry(entry: string): string | null {
   if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) return PLUGIN_NAME
   if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) return LEGACY_PLUGIN_NAME
   return null
+}
+
+function isPackagePluginEntry(entry: string): boolean {
+  return packageNameFromServerEntry(entry) !== null
 }
 
 function packageExportsTuiForServerEntry(entry: string): boolean | null {
@@ -72,13 +83,7 @@ function packageExportsTuiForServerEntry(entry: string): boolean | null {
   return packageJsonExportsTui(join(getOpenCodeConfigDir({ binary: "opencode" }), "node_modules", packageName, "package.json"))
 }
 
-// Returns true if `entry` is a file:-URL pointing at a directory whose
-// package.json declares one of our accepted package names. opencode-tui loads
-// such entries via the `./tui` subpath export, so a `file:` entry already
-// satisfies the TUI plugin registration even without an explicit
-// `oh-my-openagent/tui` entry. Mirrors the helper used in
-// add-tui-plugin-to-tui-config.ts during installation.
-function isOurFilePluginEntry(entry: string): boolean {
+export function isOurFilePluginEntry(entry: string): boolean {
   if (!entry.startsWith("file:")) return false
   try {
     const pkgJsonPath = fileEntryPackageJsonPath(entry)
@@ -87,32 +92,38 @@ function isOurFilePluginEntry(entry: string): boolean {
     return typeof parsed.name === "string"
       && (ACCEPTED_PACKAGE_NAMES as readonly string[]).includes(parsed.name)
   } catch (error) {
-    void error
+    log("[tui-plugin-config] Failed to inspect file plugin package", {
+      entry,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return false
   }
 }
 
-function isServerPluginEntry(entry: string): boolean {
+export function isServerPluginEntry(entry: string): boolean {
   if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) return true
   if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) return true
   if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
   return false
 }
 
-function isTuiPluginEntry(entry: string): boolean {
-  if (isNamedTuiPluginEntry(entry)) return true
-  // file: entries pointing at our package already expose the ./tui subpath via
-  // package.json `exports`, so the TUI plugin loads without a separate entry.
+export function isTuiPluginEntry(entry: string): boolean {
+  if (isPackagePluginEntry(entry)) return true
   if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
   return false
 }
 
-function isNamedTuiPluginEntry(entry: string): boolean {
+export function isNamedTuiPluginEntry(entry: string): boolean {
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
   const legacyPrefix = `${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}`
   if (entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)) return true
   if (entry === legacyPrefix || entry.startsWith(`${legacyPrefix}@`)) return true
   return false
+}
+
+function isCanonicalNamedTuiPluginEntry(entry: string): boolean {
+  const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
+  return entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)
 }
 
 export function detectServerPluginRegistration(): ServerPluginInfo {
@@ -124,7 +135,7 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
       : null
 
   if (!configPath) {
-    return { registered: false, configPath: null, packageExportsTui: null }
+    return { registered: false, configPath: null, entry: null, packageExportsTui: null }
   }
 
   try {
@@ -134,18 +145,29 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
     return {
       registered: serverEntry !== undefined,
       configPath,
+      entry: serverEntry ?? null,
       packageExportsTui: serverEntry === undefined ? null : packageExportsTuiForServerEntry(serverEntry),
     }
   } catch (error) {
-    void error
-    return { registered: false, configPath, packageExportsTui: null }
+    log("[tui-plugin-config] Failed to inspect opencode plugin config", {
+      configPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return { registered: false, configPath, entry: null, packageExportsTui: null }
   }
 }
 
 export function detectTuiPluginRegistration(): TuiPluginInfo {
   const tuiJsonPath = join(getOpenCodeConfigDir({ binary: "opencode" }), "tui.json")
   if (!existsSync(tuiJsonPath)) {
-    return { registered: false, configPath: tuiJsonPath, exists: false, hasNamedTuiEntry: false }
+    return {
+      registered: false,
+      configPath: tuiJsonPath,
+      exists: false,
+      hasPackageTuiEntry: false,
+      hasNamedTuiEntry: false,
+      hasCanonicalNamedTuiEntry: false,
+    }
   }
 
   try {
@@ -155,11 +177,23 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       registered: plugins.some(isTuiPluginEntry),
       configPath: tuiJsonPath,
       exists: true,
+      hasPackageTuiEntry: plugins.some(isPackagePluginEntry),
       hasNamedTuiEntry: plugins.some(isNamedTuiPluginEntry),
+      hasCanonicalNamedTuiEntry: plugins.some(isCanonicalNamedTuiPluginEntry),
     }
   } catch (error) {
-    void error
-    return { registered: false, configPath: tuiJsonPath, exists: true, hasNamedTuiEntry: false }
+    log("[tui-plugin-config] Failed to inspect TUI plugin config", {
+      configPath: tuiJsonPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return {
+      registered: false,
+      configPath: tuiJsonPath,
+      exists: true,
+      hasPackageTuiEntry: false,
+      hasNamedTuiEntry: false,
+      hasCanonicalNamedTuiEntry: false,
+    }
   }
 }
 
@@ -183,14 +217,21 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
     }
   }
 
-  if (server.registered && server.packageExportsTui === false && tui.hasNamedTuiEntry) {
+  if (tui.hasNamedTuiEntry) {
+    const exportStatus = server.packageExportsTui === null
+      ? `may expose "${TUI_EXPORT_SUBPATH}", but the package could not be inspected`
+      : server.packageExportsTui
+        ? `does export "${TUI_EXPORT_SUBPATH}", but OpenCode resolves TUI exports from the package spec`
+        : `does not export "${TUI_EXPORT_SUBPATH}"`
+    const desiredEntry = server.entry ?? PLUGIN_NAME
     issues.push({
       title: "TUI plugin entry in tui.json is unresolvable",
       description:
-        `The installed ${PLUGIN_NAME} package registered in opencode.json does not export `
-        + `"${TUI_EXPORT_SUBPATH}", but tui.json contains "${PLUGIN_NAME}/${TUI_SUBPATH}". `
-        + "OpenCode TUI may try to resolve that package subpath as a GitHub repository and fail.",
-      fix: `Remove "${PLUGIN_NAME}/${TUI_SUBPATH}" or "${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}" from the "plugin" array in ${tui.configPath}.`,
+        `tui.json contains "${PLUGIN_NAME}/${TUI_SUBPATH}" or "${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}". `
+        + `The server package ${exportStatus}. `
+        + "OpenCode installs the configured package spec before resolving the TUI export, so "
+        + `the TUI config should use "${desiredEntry}" instead of the package subpath.`,
+      fix: `Remove "${PLUGIN_NAME}/${TUI_SUBPATH}" and "${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}" from the "plugin" array in ${tui.configPath}, then add "${desiredEntry}".`,
       affects: ["TUI startup", "plugin loading"],
       severity: "warning",
     })
@@ -198,6 +239,25 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
       name,
       status: "warn",
       message: "TUI plugin entry in tui.json is unresolvable",
+      details: details.length > 0 ? details : undefined,
+      issues,
+    }
+  }
+
+  if (server.registered && server.packageExportsTui === false && tui.hasPackageTuiEntry) {
+    issues.push({
+      title: "TUI plugin package does not expose ./tui",
+      description:
+        `The installed ${server.entry ?? PLUGIN_NAME} package registered in opencode.json does not export "${TUI_EXPORT_SUBPATH}", `
+        + "but tui.json contains the package entry for TUI loading.",
+      fix: `Remove "${server.entry ?? PLUGIN_NAME}" from the "plugin" array in ${tui.configPath}, or update the installed package to a version that exports "${TUI_EXPORT_SUBPATH}".`,
+      affects: ["TUI sidebar", "TUI commands"],
+      severity: "warning",
+    })
+    return {
+      name,
+      status: "warn",
+      message: "TUI plugin package does not expose ./tui",
       details: details.length > 0 ? details : undefined,
       issues,
     }
@@ -218,10 +278,10 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
       title: "TUI plugin entry missing from tui.json",
       description:
         "The server plugin is registered in opencode.json, but the TUI plugin entry "
-        + `("${PLUGIN_NAME}/${TUI_SUBPATH}") is missing from tui.json. The Roles · `
+        + `("${server.entry ?? PLUGIN_NAME}") is missing from tui.json. The Roles · `
         + "Models sidebar section and TUI-only commands will not appear.",
       fix: "Re-run the installer (`npx oh-my-openagent install`) to auto-write tui.json, "
-        + `or add "${PLUGIN_NAME}/${TUI_SUBPATH}" to the "plugin" array in ${tui.configPath}.`,
+        + `or add "${server.entry ?? PLUGIN_NAME}" to the "plugin" array in ${tui.configPath}.`,
       affects: ["TUI sidebar", "TUI commands"],
       severity: "warning",
     })
@@ -238,7 +298,7 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
     issues.push({
       title: "Server plugin entry missing from opencode.json",
       description:
-        `The TUI plugin entry ("${PLUGIN_NAME}/${TUI_SUBPATH}") is registered in tui.json, `
+        `The TUI plugin entry ("${PLUGIN_NAME}") is registered in tui.json, `
         + "but the server plugin (oh-my-openagent) is missing from opencode.json. "
         + "The plugin cannot function correctly without both halves — the server side "
         + "handles tool dispatch, hook execution, and SDK integration.",

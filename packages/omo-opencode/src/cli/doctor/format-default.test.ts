@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
-import { formatDefault } from "./format-default"
-import { stripAnsi } from "./format-shared"
-import type { DoctorResult } from "./types"
+import { formatDefault } from "./framework/format-default"
+import { stripAnsi } from "./framework/format-shared"
+import type { DoctorResult } from "./framework/types"
 
 function createBaseResult(): DoctorResult {
   return {
@@ -22,7 +22,6 @@ function createBaseResult(): DoctorResult {
     tools: {
       lspServers: [],
       astGrepCli: false,
-      astGrepNapi: false,
       commentChecker: false,
       ghCli: { installed: false, authenticated: false, username: null },
       mcpBuiltin: [],

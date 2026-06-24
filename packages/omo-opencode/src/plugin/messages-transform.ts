@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { Message, Part } from "@opencode-ai/sdk"
 
 import { log } from "../shared/logger"
@@ -32,8 +33,8 @@ type MessagesTransformHooks = {
   contextInjectorMessagesTransform?: CreatedHooks["contextInjectorMessagesTransform"]
   teamModeStatusInjector?: CreatedHooks["teamModeStatusInjector"]
   teamMailboxInjector?: CreatedHooks["teamMailboxInjector"]
-  thinkingBlockValidator?: CreatedHooks["thinkingBlockValidator"]
   toolPairValidator?: CreatedHooks["toolPairValidator"]
+  monitorStatusInjector?: CreatedHooks["monitorStatusInjector"]
 }
 type MessagesTransformHookKey = keyof MessagesTransformHooks
 type MessagesTransformHookEntry = {
@@ -50,8 +51,8 @@ const MESSAGES_TRANSFORM_HOOKS = [
   { key: "contextInjectorMessagesTransform", name: "contextInjectorMessagesTransform" },
   { key: "teamModeStatusInjector", name: "teamModeStatusInjector" },
   { key: "teamMailboxInjector", name: "teamMailboxInjector" },
-  { key: "thinkingBlockValidator", name: "thinkingBlockValidator" },
   { key: "toolPairValidator", name: "toolPairValidator" },
+  { key: "monitorStatusInjector", name: "monitorStatusInjector" },
 ] satisfies readonly MessagesTransformHookEntry[]
 
 function getSessionID(message: MessageWithParts): string | undefined {
@@ -80,9 +81,7 @@ function findLastUserTurn(messages: MessageWithParts[]): MessageWithParts | unde
   return undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function readStringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key]

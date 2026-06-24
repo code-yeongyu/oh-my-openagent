@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from "fs"
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, statSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { writeFileAtomically } from "./write-file-atomically"
@@ -42,6 +42,29 @@ describe("writeFileAtomically", () => {
     expect(existsSync(filePath)).toBe(true)
     expect(readFileSync(filePath, "utf-8")).toBe(newContent)
     expect(existsSync(`${filePath}.tmp`)).toBe(false)
+  })
+
+  it("#given private mode #when writeFileAtomically called #then temp and final files use that mode", () => {
+    // given
+    const filePath = join(testDir, "private-file.txt")
+    const tempModes: number[] = []
+
+    // when
+    writeFileAtomically(filePath, "private", {
+      mode: 0o600,
+      beforeRenameSync: (tempPath) => {
+        tempModes.push(statSync(tempPath).mode & 0o777)
+      },
+    })
+
+    // then
+    expect(readFileSync(filePath, "utf-8")).toBe("private")
+    if (process.platform === "win32") {
+      expect(tempModes).toHaveLength(1)
+      return
+    }
+    expect(tempModes).toEqual([0o600])
+    expect(statSync(filePath).mode & 0o777).toBe(0o600)
   })
 
   it("#given parent directory does not exist #when writeFileAtomically called #then throws", () => {

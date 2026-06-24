@@ -1,17 +1,21 @@
 {
 	"name": "@sisyphuslabs/omo-codex-plugin",
-	"version": "4.8.1",
+	"version": "4.13.0",
 	"description": "Aggregate Codex plugin root for OMO components.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
 	"private": true,
 	"workspaces": [
+		"components/codegraph",
 		"components/comment-checker",
 		"components/git-bash",
+		"components/lazycodex-executor-verify",
 		"components/rules",
 		"components/lsp",
 		"components/telemetry",
+		"components/teammode",
 		"components/start-work-continuation",
+		"components/workflow-selector",
 		"components/ulw-loop",
 		"components/ultrawork"
 	],
@@ -19,7 +23,7 @@
 		"@oh-my-opencode/shared-skills": "file:../../shared-skills"
 	},
 	"scripts": {
-		"build": "node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"build": "node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs",
 		"sync:version": "node scripts/sync-version.mjs",
 		"check": "npm run build && npm test",
 		"sync:hooks": "node scripts/sync-hook-status-messages.mjs",

@@ -21,7 +21,7 @@ import { transformModelForProvider } from "./provider-model-id-transform"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
+export const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
 type CompatibleFallbackSettings = {

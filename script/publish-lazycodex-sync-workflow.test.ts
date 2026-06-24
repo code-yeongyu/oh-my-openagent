@@ -25,19 +25,19 @@ describe("LazyCodex marketplace sync workflow", () => {
     )
 
     // #when
-    const astGrepBuildIndex = syncStep.indexOf("bun run build:ast-grep-mcp")
     const gitBashBuildIndex = syncStep.indexOf("bun run build:git-bash-mcp")
     const lspBuildIndex = syncStep.indexOf("bun run build:lsp-tools-mcp")
+    const lspDaemonBuildIndex = syncStep.indexOf("bun run build:lsp-daemon")
     const codexPluginBuildIndex = syncStep.indexOf("bun run --cwd packages/omo-codex/plugin build")
     const syncScriptIndex = syncStep.indexOf("bun run script/sync-lazycodex-marketplace.ts")
     const buildsMcpDistsBeforeCodexPlugin =
-      astGrepBuildIndex >= 0 &&
       gitBashBuildIndex >= 0 &&
       lspBuildIndex >= 0 &&
+      lspDaemonBuildIndex >= 0 &&
       codexPluginBuildIndex >= 0 &&
-      astGrepBuildIndex < codexPluginBuildIndex &&
       gitBashBuildIndex < codexPluginBuildIndex &&
-      lspBuildIndex < codexPluginBuildIndex
+      lspBuildIndex < codexPluginBuildIndex &&
+      lspDaemonBuildIndex < codexPluginBuildIndex
     const buildsCodexPluginBeforeMarketplaceSync =
       codexPluginBuildIndex >= 0 && syncScriptIndex > codexPluginBuildIndex
 
@@ -61,11 +61,13 @@ describe("LazyCodex marketplace sync workflow", () => {
     // #when
     const gitBashBuildIndex = syncStep.indexOf("bun run build:git-bash-mcp")
     const lspBuildIndex = syncStep.indexOf("bun run build:lsp-tools-mcp")
+    const lspDaemonBuildIndex = syncStep.indexOf("bun run build:lsp-daemon")
 
     // #then
     expect(syncStep).not.toContain("git submodule")
     expect(gitBashBuildIndex, "release marketplace sync must build the vendored Git Bash MCP package").toBeGreaterThanOrEqual(0)
     expect(lspBuildIndex, "release marketplace sync must build the vendored LSP package").toBeGreaterThanOrEqual(0)
+    expect(lspDaemonBuildIndex, "release marketplace sync must build the vendored LSP daemon package").toBeGreaterThanOrEqual(0)
   })
 
   test("stages generated LazyCodex repository workflow changes", () => {

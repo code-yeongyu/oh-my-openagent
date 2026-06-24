@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import { getSessionAgent, handedBackSyncSessions } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
@@ -51,6 +51,11 @@ export async function handleSessionIdle(args: {
 
   if (state.wasCancelled) {
     log(`[${HOOK_NAME}] Skipped: session was cancelled`, { sessionID })
+    return
+  }
+
+  if (handedBackSyncSessions.has(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped: sync subagent already handed back to parent`, { sessionID })
     return
   }
 

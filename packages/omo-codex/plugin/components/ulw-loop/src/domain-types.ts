@@ -14,6 +14,7 @@ export interface UlwLoopSuccessCriterion {
 	readonly scenario: string;
 	readonly userModel: UlwLoopSuccessCriterionUserModel;
 	readonly expectedEvidence: string;
+	readonly essential?: boolean;
 	capturedEvidence: string | null;
 	status: UlwLoopCriterionStatus;
 	capturedAt?: string;
@@ -69,10 +70,72 @@ export interface UlwLoopPlan {
 	goals: UlwLoopItem[];
 }
 
+export type UlwLoopManualQaSurface = "cli" | "http" | "tmux" | "browser" | "gui" | "data";
+export type UlwLoopManualQaArtifactKind = "cli-transcript" | "log" | "screenshot" | "image" | "http-dump" | "data-diff";
+
+export interface UlwLoopManualQaArtifactRef {
+	readonly id: string;
+	readonly kind: UlwLoopManualQaArtifactKind;
+	readonly description: string;
+	readonly path: string;
+}
+
+export interface UlwLoopManualQaSurfaceEvidence {
+	readonly id: string;
+	readonly criterionRef: string;
+	readonly surface: UlwLoopManualQaSurface;
+	readonly invocation: string;
+	readonly verdict: "passed";
+	readonly artifactRefs: readonly string[];
+}
+
+export interface UlwLoopManualQaAdversarialCase {
+	readonly id: string;
+	readonly criterionRef: string;
+	readonly scenario: string;
+	readonly expectedBehavior: string;
+	readonly verdict: "passed";
+	readonly artifactRefs: readonly string[];
+}
+
 export interface UlwLoopQualityGate {
-	aiSlopCleaner: { status: "passed"; evidence: string };
-	verification: { status: "passed"; commands: string[]; evidence: string };
-	codeReview: { recommendation: "APPROVE"; architectStatus: "CLEAR"; evidence: string };
+	readonly codeReview: {
+		readonly by: string;
+		readonly recommendation: "APPROVE";
+		readonly codeQualityStatus: "CLEAR";
+		readonly reportPath: string;
+		readonly evidence: string;
+		readonly blockers: readonly [];
+	};
+	readonly manualQa: {
+		readonly by: string;
+		readonly status: "passed";
+		readonly evidence: string;
+		readonly surfaceEvidence: readonly UlwLoopManualQaSurfaceEvidence[];
+		readonly adversarialCases: readonly UlwLoopManualQaAdversarialCase[];
+		readonly artifactRefs: readonly UlwLoopManualQaArtifactRef[];
+	};
+	readonly gateReview: {
+		readonly by: string;
+		readonly recommendation: "APPROVE";
+		readonly reportPath: string;
+		readonly evidence: string;
+		readonly blockers: readonly [];
+	};
+	readonly iteration: {
+		readonly fullRerun: true;
+		readonly status: "passed";
+		readonly rerunCommands: readonly string[];
+		readonly evidence: string;
+	};
+	readonly criteriaCoverage: {
+		readonly totalCriteria: number;
+		readonly passCount: number;
+		readonly originalIntent: string;
+		readonly desiredOutcome: string;
+		readonly userOutcomeReview: string;
+		readonly adversarialClassesCovered: readonly string[];
+	};
 }
 
 export interface UlwLoopLedgerEntry {
@@ -86,7 +149,7 @@ export interface UlwLoopLedgerEntry {
 	codexGoal?: unknown;
 	evidence?: string;
 	capturedEvidence?: string;
-	qualityGate?: UlwLoopQualityGate;
+	qualityGate?: unknown;
 	steering?: UlwLoopSteeringAudit;
 	before?: unknown;
 	after?: unknown;

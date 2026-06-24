@@ -1,6 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
-import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 import { buildClaudeThinkingConfig } from "./types";
 import type { AgentMode } from "./types";
 
@@ -12,7 +11,6 @@ function buildSisyphusPermission(model: string): AgentConfig["permission"] {
     question: "allow",
     call_omo_agent: "deny",
     ...getFrontierToolSchemaPermission(model),
-    ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
 }
 
@@ -41,6 +39,14 @@ export function buildGptSisyphusAgentConfig(
     ...buildBaseSisyphusAgentConfig(mode, model, prompt),
     reasoningEffort: "medium",
   };
+}
+
+export function buildGlmSisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return buildBaseSisyphusAgentConfig(mode, model, prompt);
 }
 
 export function buildClaudeSisyphusAgentConfig(

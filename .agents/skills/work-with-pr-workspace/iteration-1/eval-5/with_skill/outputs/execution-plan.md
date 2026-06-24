@@ -107,6 +107,6 @@ gh pr create --base dev \
 ```bash
 gh pr merge --squash --auto
 # Cleanup worktree
-cd /Users/yeongyu/local-workspaces/omo
+cd <repo-root>
 git worktree remove ../omo-wt/fix/comment-checker-note-false-positive
 ```

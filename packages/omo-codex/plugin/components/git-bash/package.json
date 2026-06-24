@@ -1,6 +1,6 @@
 {
 	"name": "@sisyphuslabs/codex-git-bash-hook",
-	"version": "4.8.1",
+	"version": "4.13.0",
 	"description": "Codex hook component that reminds Windows sessions to prefer the OMO git_bash MCP.",
 	"type": "module",
 	"private": true,
@@ -17,7 +17,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@types/node": "^25.7.0",
+		"@oh-my-opencode/utils": "file:../../../../utils",
+		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3"
 	},
 	"engines": {

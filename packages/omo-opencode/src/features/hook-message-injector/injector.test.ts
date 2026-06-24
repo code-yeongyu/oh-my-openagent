@@ -152,6 +152,21 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
     expect(result).toBeNull()
   })
 
+  it("returns null when the SDK returns a non-array messages payload", async () => {
+    // given
+    const mockClient = {
+      session: {
+        messages: async () => ({ info: { agent: "sisyphus" } }),
+      },
+    }
+
+    // when
+    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+
+    // then
+    expect(result).toBeNull()
+  })
+
   it("includes tools when available", async () => {
     const mockClient = createMockClient([
       {
@@ -314,6 +329,21 @@ describe("findFirstMessageWithAgentFromSDK", () => {
 
     const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
 
+    expect(result).toBeNull()
+  })
+
+  it("returns null when the SDK returns a non-array messages payload", async () => {
+    // given
+    const mockClient = {
+      session: {
+        messages: async () => ({ info: { agent: "sisyphus" } }),
+      },
+    }
+
+    // when
+    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+
+    // then
     expect(result).toBeNull()
   })
 })

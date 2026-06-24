@@ -1,13 +1,14 @@
 import type { OhMyOpenCodeConfig } from "../../config"
+import type { MonitorManager } from "../../features/monitor"
 import type { PluginContext } from "../types"
 import type { RalphLoopHook } from "../../hooks/ralph-loop"
 
 import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
+  createMonitorStatusInjectorHook,
   createTeamMailboxInjector,
   createTeamModeStatusInjector,
-  createThinkingBlockValidatorHook,
   createToolPairValidatorHook,
 } from "../../hooks"
 import {
@@ -22,8 +23,8 @@ export type TransformHooks = {
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   teamModeStatusInjector: ReturnType<typeof createTeamModeStatusInjector> | null
   teamMailboxInjector: ReturnType<typeof createTeamMailboxInjector> | null
-  thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
+  monitorStatusInjector: ReturnType<typeof createMonitorStatusInjectorHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -32,8 +33,9 @@ export function createTransformHooks(args: {
   isHookEnabled: (hookName: string) => boolean
   safeHookEnabled?: boolean
   ralphLoop?: RalphLoopHook | null
+  monitorManager?: MonitorManager
 }): TransformHooks {
-  const { ctx, pluginConfig, isHookEnabled, ralphLoop } = args
+  const { ctx, pluginConfig, isHookEnabled, ralphLoop, monitorManager } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
 
   const claudeCodeHooks = isHookEnabled("claude-code-hooks")
@@ -88,18 +90,19 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
-    ? safeCreateHook(
-        "thinking-block-validator",
-        () => createThinkingBlockValidatorHook(),
-        { enabled: safeHookEnabled },
-      )
-    : null
-
   const toolPairValidator = isHookEnabled("tool-pair-validator")
     ? safeCreateHook(
         "tool-pair-validator",
         () => createToolPairValidatorHook(),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
+  const monitorConfig = pluginConfig.monitor
+  const monitorStatusInjector = monitorConfig?.enabled && monitorManager && isHookEnabled("monitor-status-injector")
+    ? safeCreateHook(
+        "monitor-status-injector",
+        () => createMonitorStatusInjectorHook(monitorManager, { enabled: monitorConfig.enabled }),
         { enabled: safeHookEnabled },
       )
     : null
@@ -110,7 +113,7 @@ export function createTransformHooks(args: {
     contextInjectorMessagesTransform,
     teamModeStatusInjector,
     teamMailboxInjector,
-    thinkingBlockValidator,
     toolPairValidator,
+    monitorStatusInjector,
   }
 }

@@ -64,6 +64,16 @@ export async function pollForCompletion(
     }
 
     if (eventState.mainSessionError) {
+      // A session.error is only terminal while the session stays idle:
+      // runtime fallback rearms the session (status "busy"/"retry") after
+      // retryable errors, so a live recovery clears the latch (#3745).
+      const statusDuringError = await getMainSessionStatus(ctx)
+      if (statusDuringError === "busy" || statusDuringError === "retry") {
+        eventState.mainSessionError = false
+        eventState.mainSessionIdle = false
+        errorCycleCount = 0
+        continue
+      }
       errorCycleCount++
       if (errorCycleCount >= ERROR_GRACE_CYCLES) {
         console.error(

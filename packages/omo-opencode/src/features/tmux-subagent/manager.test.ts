@@ -90,6 +90,7 @@ const mockSpawnTmuxSession = mock<(
 }))
 const mockKillTmuxSessionIfExists = mock<(sessionName: string) => Promise<boolean>>(async () => true)
 const mockSweepStaleOmoAgentSessions = mock<() => Promise<number>>(async () => 0)
+const mockSweepStaleOmoAttachPanes = mock<() => Promise<number>>(async () => 0)
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
@@ -130,6 +131,7 @@ function registerModuleMocks(): void {
       killTmuxSessionIfExists: mockKillTmuxSessionIfExists,
       getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
       sweepStaleOmoAgentSessions: mockSweepStaleOmoAgentSessions,
+      sweepStaleOmoAttachPanes: mockSweepStaleOmoAttachPanes,
     }
   })
 }
@@ -237,8 +239,9 @@ function getTrackedSessions(manager: object): Map<string, { paneId: string; clos
   return Reflect.get(manager, 'sessions') as Map<string, { paneId: string; closePending: boolean; closeRetryCount: number }>
 }
 
-function getFailedReadinessSessions(manager: object): Map<string, { sessionId: string; title: string }> {
-  return Reflect.get(manager, 'failedReadinessSessions') as Map<string, { sessionId: string; title: string }>
+function getFailedReadinessSessions(manager: object): Map<string, { sessionId: string; title: string; rememberedAt: number }> {
+  const cache = Reflect.get(manager, 'failedReadinessCache') as object
+  return Reflect.get(cache, 'sessions') as Map<string, { sessionId: string; title: string; rememberedAt: number }>
 }
 
 describe('TmuxSessionManager', () => {
@@ -253,6 +256,7 @@ describe('TmuxSessionManager', () => {
     mockWaitForSessionReady.mockClear()
     mockSpawnTmuxWindow.mockClear()
     mockSpawnTmuxSession.mockClear()
+    mockSweepStaleOmoAttachPanes.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
     trackedSessions.clear()
@@ -655,6 +659,32 @@ describe('TmuxSessionManager', () => {
       )
       expect(skippedSessionIds).toEqual(['ses_team_member', 'ses_plain_subagent'])
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+    })
+
+    test('#given skipped team-mode session #when onSessionCreated runs #then stale attach panes are still swept once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 1)
+      mockIsInsideTmux.mockReturnValue(true)
+
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'inline',
+      }), mockTmuxDeps, {
+        shouldSkipSession: (sessionId) => sessionId.startsWith('ses_team_member'),
+      })
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_team_member', 'ses_parent', 'team member task'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_team_member_two', 'ses_parent', 'team member task 2'))
+
+      // then
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockQueryWindowState).not.toHaveBeenCalled()
+      expect(mockExecuteActions).not.toHaveBeenCalled()
     })
 
     test('second agent spawns with correct split direction', async () => {
@@ -1686,7 +1716,7 @@ describe('TmuxSessionManager', () => {
         mockTmuxDeps,
       )
 
-      Reflect.get(manager, 'failedReadinessSessions').set('ses_bounce', {
+      getFailedReadinessSessions(manager).set('ses_bounce', {
         sessionId: 'ses_bounce',
         title: 'Bounce Session',
         rememberedAt: Date.now(),
@@ -2571,6 +2601,48 @@ describe('TmuxSessionManager', () => {
       expect(mockKillTmuxSessionIfExists).toHaveBeenCalledTimes(0)
     })
 
+    test('#given inline isolation #when the first subagent session is created #then stale OMO attach sweep runs once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 0)
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'inline',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_inline_a', 'ses_parent', 'A'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_inline_b', 'ses_parent', 'B'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
+    })
+
+    test('#given window isolation #when the first subagent session is created #then stale OMO attach sweep runs once', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 0)
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'window',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_window_a', 'ses_parent', 'A'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_window_b', 'ses_parent', 'B'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
+    })
+
     test('#given sweepStaleOmoAgentSessions throws on first onSessionCreated #when second onSessionCreated fires #then sweep is retried instead of skipped forever', async () => {
       // given
       mockSweepStaleOmoAgentSessions.mockClear()
@@ -2596,6 +2668,7 @@ describe('TmuxSessionManager', () => {
       // given
       mockSweepStaleOmoAgentSessions.mockClear()
       mockSweepStaleOmoAgentSessions.mockImplementation(async () => 0)
+      mockSweepStaleOmoAttachPanes.mockClear()
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
       const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
@@ -2610,6 +2683,27 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(1)
+    })
+
+    test('#given inline isolation #when onSessionCreated runs #then stale OMO attach panes are swept once without isolated session sweep', async () => {
+      // given
+      mockSweepStaleOmoAgentSessions.mockClear()
+      mockSweepStaleOmoAttachPanes.mockClear()
+      mockSweepStaleOmoAttachPanes.mockImplementation(async () => 1)
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({
+        enabled: true,
+        isolation: 'inline',
+      }), mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_inline', 'ses_parent', 'Inline'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_inline_second', 'ses_parent', 'Inline Second'))
+
+      // then
+      expect(mockSweepStaleOmoAgentSessions).toHaveBeenCalledTimes(0)
+      expect(mockSweepStaleOmoAttachPanes).toHaveBeenCalledTimes(1)
     })
 
     test('#given killTmuxSessionIfExists throws #when cleanup runs #then cleanup still completes without throwing', async () => {

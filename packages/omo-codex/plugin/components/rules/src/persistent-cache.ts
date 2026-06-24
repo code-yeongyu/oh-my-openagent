@@ -9,7 +9,7 @@ import {
 	postCompactPendingKinds,
 	postCompactRecoveringKinds,
 } from "./post-compact-state.js";
-import type { Engine } from "./rules/engine.js";
+import type { Engine } from "@oh-my-opencode/rules-engine/engine";
 import { SESSION_STATE_LOCK_CONTENDED, withSessionStateLock } from "./session-state-lock.js";
 
 export type PostCompactClaimResult = "claimed" | "not-pending" | "contended";

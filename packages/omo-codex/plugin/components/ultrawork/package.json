@@ -1,7 +1,7 @@
 {
 	"name": "@code-yeongyu/codex-ultrawork",
-	"version": "4.8.1",
-	"description": "Codex plugin that injects the ultrawork orchestration directive and syncs the ultrawork reviewer agent role.",
+	"version": "4.13.0",
+	"description": "Codex plugin that injects the ultrawork orchestration directive and ships LazyCodex planning, review, QA, and gate agent roles.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
 	"license": "MIT",
@@ -25,7 +25,7 @@
 		"omo-ultrawork": "./dist/cli.js"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "node scripts/sync-directive.mjs && node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
@@ -43,10 +43,11 @@
 		"NOTICE"
 	],
 	"devDependencies": {
-		"@biomejs/biome": "2.4.15",
-		"@types/node": "^25.7.0",
+		"@biomejs/biome": "2.4.16",
+		"@oh-my-opencode/prompts-core": "file:../../../../prompts-core",
+		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.5"
+		"vitest": "^4.1.8"
 	},
 	"engines": {
 		"node": ">=20.0.0"

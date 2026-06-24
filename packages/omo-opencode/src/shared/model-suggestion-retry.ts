@@ -1,5 +1,8 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { parseModelSuggestion as parseModelSuggestionFromCore } from "@oh-my-opencode/model-core"
+import type {
+  SessionPromptAsyncData,
+  SessionPromptData,
+} from "@opencode-ai/sdk"
 import { log } from "./logger"
 import {
   createPromptTimeoutContext,
@@ -12,8 +15,6 @@ import {
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
-
-type Client = ReturnType<typeof createOpencodeClient>
 
 export type { ModelSuggestionInfo } from "@oh-my-opencode/model-core"
 export { parseModelSuggestionFromCore as parseModelSuggestion }
@@ -43,21 +44,34 @@ function shouldReleaseReservationAfterFailedAsyncPrompt(error: unknown): boolean
   return parseModelSuggestionFromCore(error) !== null || isAgentResolutionError(error)
 }
 
-interface PromptBody {
-  model?: { providerID: string; modelID: string }
-  [key: string]: unknown
+type PromptAsyncArgs = Omit<SessionPromptAsyncData, "url" | "body"> & {
+  readonly body: NonNullable<SessionPromptAsyncData["body"]>
+  readonly signal?: AbortSignal
+}
+type PromptSyncArgs = Omit<SessionPromptData, "url" | "body"> & {
+  readonly body: NonNullable<SessionPromptData["body"]>
+  readonly signal?: AbortSignal
 }
 
-interface PromptArgs {
-  path: { id: string }
-  body: PromptBody
-  signal?: AbortSignal
-  [key: string]: unknown
+type PromptAsyncRetryClient = {
+  readonly session?: {
+    readonly status?: () => Promise<unknown>
+    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: { readonly directory: string; readonly limit?: number } }) => Promise<unknown>
+    promptAsync?(input: PromptAsyncArgs): Promise<unknown>
+  }
+}
+
+type PromptSyncRetryClient = {
+  readonly session?: {
+    readonly status?: () => Promise<unknown>
+    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: { readonly directory: string; readonly limit?: number } }) => Promise<unknown>
+    prompt?(input: PromptSyncArgs): Promise<unknown>
+  }
 }
 
 export async function promptWithModelSuggestionRetry(
-  client: Client,
-  args: PromptArgs,
+  client: PromptAsyncRetryClient,
+  args: PromptAsyncArgs,
   options: PromptRetryOptions = {},
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
@@ -71,7 +85,7 @@ export async function promptWithModelSuggestionRetry(
       input: {
         ...args,
         signal: timeoutContext.signal,
-      } as Parameters<typeof client.session.promptAsync>[0],
+      },
       source: "model-suggestion-retry",
       settleMs: 0,
       ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
@@ -107,8 +121,8 @@ export async function promptWithModelSuggestionRetry(
 }
 
 export async function promptSyncWithModelSuggestionRetry(
-  client: Client,
-  args: PromptArgs,
+  client: PromptSyncRetryClient,
+  args: PromptSyncArgs,
   options: PromptRetryOptions = {},
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
@@ -123,7 +137,7 @@ export async function promptSyncWithModelSuggestionRetry(
         input: {
           ...args,
           signal: timeoutContext.signal,
-        } as Parameters<typeof client.session.prompt>[0],
+        },
         source: "model-suggestion-retry:sync",
         settleMs: 0,
         checkStatus: false,
@@ -169,7 +183,7 @@ export async function promptSyncWithModelSuggestionRetry(
       suggested: suggestion.suggestion,
     })
 
-    const retryArgs: PromptArgs = {
+    const retryArgs: PromptSyncArgs = {
       ...args,
       body: {
         ...args.body,
@@ -189,7 +203,7 @@ export async function promptSyncWithModelSuggestionRetry(
         input: {
           ...retryArgs,
           signal: timeoutContext.signal,
-        } as Parameters<typeof client.session.prompt>[0],
+        },
         source: "model-suggestion-retry:sync-retry",
         settleMs: 0,
         checkStatus: false,
