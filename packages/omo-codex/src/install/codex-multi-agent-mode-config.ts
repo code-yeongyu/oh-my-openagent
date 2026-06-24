@@ -1,16 +1,16 @@
-import { replaceOrInsertRootSetting } from "./toml-section-editor"
+import { isTomlTableHeaderLine, replaceOrInsertRootSetting } from "./toml-section-editor"
 
 const CODEX_MULTI_AGENT_MODE_KEY = "multi_agent_mode"
-const CODEX_MULTI_AGENT_MODE_STEERING = "steering"
+const CODEX_MULTI_AGENT_MODE_PROACTIVE = "proactive"
 
 export function ensureCodexMultiAgentModeConfig(config: string): string {
-  if (readRootStringSetting(config, CODEX_MULTI_AGENT_MODE_KEY) === CODEX_MULTI_AGENT_MODE_STEERING) {
+  if (readRootStringSetting(config, CODEX_MULTI_AGENT_MODE_KEY) === CODEX_MULTI_AGENT_MODE_PROACTIVE) {
     return config
   }
   return replaceOrInsertRootSetting(
     config,
     CODEX_MULTI_AGENT_MODE_KEY,
-    JSON.stringify(CODEX_MULTI_AGENT_MODE_STEERING),
+    JSON.stringify(CODEX_MULTI_AGENT_MODE_PROACTIVE),
   )
 }
 
@@ -24,6 +24,5 @@ function readRootStringSetting(config: string, key: string): string | null {
 }
 
 function isSectionHeader(line: string): boolean {
-  const trimmed = line.trim()
-  return trimmed.startsWith("[") && trimmed.endsWith("]")
+  return isTomlTableHeaderLine(line)
 }

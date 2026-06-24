@@ -15,7 +15,7 @@ export function findTomlSection(config: string, header: string): TomlSection | n
     const trimmed = line.trim()
     if (start === -1) {
       if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath)) start = offset
-    } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    } else if (isTomlTableHeaderLine(line)) {
       return { start, end: offset, text: config.slice(start, offset) }
     }
     offset += line.length
@@ -25,7 +25,7 @@ export function findTomlSection(config: string, header: string): TomlSection | n
 }
 
 export function replaceOrInsertSetting(config: string, section: TomlSection, key: string, value: string): string {
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
+  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m")
   const replacement = linePattern.test(section.text)
     ? section.text.replace(linePattern, `${key} = ${value}`)
     : insertSetting(section.text, key, value)
@@ -33,7 +33,7 @@ export function replaceOrInsertSetting(config: string, section: TomlSection, key
 }
 
 export function removeSetting(config: string, section: TomlSection, key: string): string {
-  const linePattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m")
+  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*(?:\\n|$)`, "m")
   const replacement = section.text.replace(linePattern, "")
   return config.slice(0, section.start) + replacement + config.slice(section.end)
 }
@@ -42,7 +42,7 @@ export function replaceOrInsertRootSetting(config: string, key: string, value: s
   const sectionStart = findFirstTableStart(config)
   const root = config.slice(0, sectionStart)
   const suffix = config.slice(sectionStart)
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
+  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m")
   const replacement = linePattern.test(root)
     ? root.replace(linePattern, `${key} = ${value}`)
     : `${root.trimEnd()}${root.trimEnd().length > 0 ? "\n" : ""}${key} = ${value}\n`
@@ -56,8 +56,14 @@ export function appendBlock(config: string, block: string): string {
 }
 
 function findFirstTableStart(config: string): number {
-  const match = config.match(/^[[].*$/m)
-  return match?.index ?? config.length
+  const lines = config.match(/[^\n]*\n?|$/g) ?? []
+  let offset = 0
+  for (const line of lines) {
+    if (line.length === 0) break
+    if (isTomlTableHeaderLine(line)) return offset
+    offset += line.length
+  }
+  return config.length
 }
 
 function insertSetting(sectionText: string, key: string, value: string): string {
@@ -71,16 +77,53 @@ export function escapeRegExp(value: string): string {
 }
 
 function tomlTableHeaderMatches(line: string, headerLine: string, targetHeaderPath: readonly string[] | null): boolean {
-  if (line === headerLine) return true
+  const normalizedLine = stripUnquotedInlineComment(line).trim()
+  if (normalizedLine === headerLine) return true
   if (!targetHeaderPath) return false
-  const candidateHeaderPath = parseTomlTableHeader(line)
+  const candidateHeaderPath = parseTomlTableHeader(normalizedLine)
   if (!candidateHeaderPath || candidateHeaderPath.length !== targetHeaderPath.length) return false
   return candidateHeaderPath.every((part, index) => part === targetHeaderPath[index])
 }
 
 function parseTomlTableHeader(line: string): readonly string[] | null {
-  if (!line.startsWith("[") || !line.endsWith("]") || line.startsWith("[[")) return null
-  return parseTomlDottedKey(line.slice(1, -1).trim())
+  const normalizedLine = stripUnquotedInlineComment(line).trim()
+  if (!normalizedLine.startsWith("[") || !normalizedLine.endsWith("]") || normalizedLine.startsWith("[[")) return null
+  return parseTomlDottedKey(normalizedLine.slice(1, -1).trim())
+}
+
+export function isTomlTableHeaderLine(line: string): boolean {
+  const normalizedLine = stripUnquotedInlineComment(line).trim()
+  return normalizedLine.startsWith("[") && normalizedLine.endsWith("]")
+}
+
+function stripUnquotedInlineComment(line: string): string {
+  let quote: "'" | '"' | null = null
+  let index = 0
+  while (index < line.length) {
+    const char = line[index]
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2
+        continue
+      }
+      if (char === '"') quote = null
+      index += 1
+      continue
+    }
+    if (quote === "'") {
+      if (char === "'") quote = null
+      index += 1
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      index += 1
+      continue
+    }
+    if (char === "#") return line.slice(0, index)
+    index += 1
+  }
+  return line
 }
 
 export function parseTomlDottedKey(input: string): readonly string[] | null {
