@@ -54,6 +54,10 @@ yt-dlp --write-sub --write-auto-sub --sub-lang "en,ko" --skip-download -o "/tmp/
 
 The full engine harness (rules R1-R7, the Phase 0 official-API index, the no-site-name rule, and the `references/insane-search/*.md` deep-dives for TLS, Playwright routing, Naver, media, etc.) is in [`references/insane-search/README.md`](references/insane-search/README.md). Read it before tuning the engine or adding a WAF profile.
 
+### Research-source handoff
+
+When a higher-level research skill (especially `ulw-research` / `ultraresearch`) asks for blocked-source evidence, return an `INSANE_SOURCE_RECORD` instead of only prose. Include `url`, `final_url`, `title`, `access_method`, `waf_profile`, `verdict`, `selector_proof`, `fetched_at`, `trace_summary`, `source_quality_hint`, and extracted text or a pointer to it. This keeps WAF-bypassed sources eligible for the research source registry, citation ledger, and later claim verification.
+
 ### Escalate to Tier 1.5 or Tier 2 when
 - The target is a Chinese / social platform with a native reader -> Tier 1.5.
 - insane-search returns empty/partial, or the page needs JS interaction, a screenshot, a persistent login, or media playback -> Tier 2.
