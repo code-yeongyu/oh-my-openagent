@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `src/plugin/`. Native tools are factory-based (`createXXXTool`) except `interactive_bash` (`ToolDefinition`). LSP and AST-grep tools are no longer native `src/tools/` implementations; they are served by Tier-1 built-in MCPs `lsp` and `ast_grep` and keep the same exposed names (`lsp_diagnostics`, `ast_grep_search`, etc.).
+Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `src/plugin/`. Native tools are factory-based (`createXXXTool`) except `interactive_bash` (`ToolDefinition`). LSP tools are served by the Tier-1 built-in MCP `lsp`; structural search and rewrite is handled by the `ast-grep` skill.
 
 ## TOOL CATALOG
 
@@ -18,7 +18,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | **Delegation** (2) | `task` (delegate, full skill+category support), `call_omo_agent` (named agent only: explore, librarian) |
 | **Skills/MCP** (2) | `skill` (load skill or invoke command), `skill_mcp` (call skill-embedded MCP tool/resource/prompt) |
 
-> LSP and AST-grep tools are now provided by built-in MCP servers `lsp` and `ast_grep` (Tier-1 stdio), backed by `packages/lsp-tools-mcp/` and `packages/ast-grep-mcp/`. OpenCode-compatible aliases remain available (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `ast_grep_search`, `ast_grep_replace`).
+> LSP tools are provided by the built-in `lsp` MCP (Tier-1 stdio), backed by `packages/lsp-tools-mcp/`. AST-aware code search and rewrite is available through the `ast-grep` skill using `sg`.
 
 ### Conditional (up to +19 native tools)
 

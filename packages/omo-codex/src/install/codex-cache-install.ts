@@ -4,6 +4,7 @@ import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
+import { assertHookCommandTargets } from "./codex-hook-targets"
 import type { InstalledPlugin, RunCommand } from "./types"
 
 type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
@@ -31,8 +32,10 @@ export async function installCachedPlugin(input: {
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
+    if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
+    await assertHookCommandTargets(tempPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
   } catch (error) {
     await rm(tempPath, { recursive: true, force: true })
@@ -53,6 +56,15 @@ async function maybeRunNpmBuild(cwd: string, runCommand: RunCommand): Promise<vo
   const scripts = packageJson.scripts
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string") return
   await runCommand("npm", ["run", "build"], { cwd })
+}
+
+async function maybeRunNpmSyncSkills(cwd: string, runCommand: RunCommand): Promise<void> {
+  if (!(await fileExistsStrict(join(cwd, "package.json")))) return
+  const packageJson: unknown = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"))
+  if (!isPlainRecord(packageJson)) return
+  const scripts = packageJson.scripts
+  if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string") return
+  await runCommand("npm", ["run", "sync:skills"], { cwd })
 }
 
 function createTempSiblingPath(targetPath: string): string {

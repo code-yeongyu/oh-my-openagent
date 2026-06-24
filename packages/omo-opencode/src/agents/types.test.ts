@@ -22,6 +22,7 @@ describe("isGptNativeSisyphusModel", () => {
   test("allows with various providers and suffixes", () => {
     expect(isGptNativeSisyphusModel("github-copilot/gpt-5.4")).toBe(true);
     expect(isGptNativeSisyphusModel("venice/gpt-5-4")).toBe(true);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.3-codex")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.4-codex")).toBe(true);
     expect(isGptNativeSisyphusModel("openai/gpt-5.5-mini")).toBe(true);
   });

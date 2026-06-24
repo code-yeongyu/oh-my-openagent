@@ -6,24 +6,6 @@ Generator/checker note: update this file with the audited component list, then r
 
 ## Components
 
-### @ast-grep/cli@0.42.3
-- License: MIT, from package metadata. The inspected package did not include a separate LICENSE file.
-- Copyright: ast-grep contributors.
-- Upstream URL: https://github.com/ast-grep/ast-grep
-- Where-bundled: root production dependency and AST-grep MCP/runtime resolver.
-
-### @ast-grep/cli binary payload@0.42.3
-- License: MIT, from `@ast-grep/cli` package metadata and `@ast-grep/napi` LICENSE.
-- Copyright: ast-grep contributors.
-- Upstream URL: https://github.com/ast-grep/ast-grep
-- Where-bundled: executable `ast-grep`/`sg` payload installed through the root dependency and used by AST-grep MCP tooling.
-
-### @ast-grep/napi@0.42.3
-- License: MIT, from `node_modules/@ast-grep/napi/LICENSE`.
-- Copyright: Copyright (c) 2020 N-API for Rust.
-- Upstream URL: https://github.com/ast-grep/ast-grep
-- Where-bundled: root production dependency, externalized native binding for bundled runtime code.
-
 ### @clack/core@1.3.0
 - License: MIT, from CodeGraph platform bundle `lib/node_modules/@clack/core/LICENSE`.
 - Copyright: Copyright (c) Nate Moore.
@@ -103,7 +85,7 @@ Generator/checker note: update this file with the audited component list, then r
 - Where-bundled: root production dependency for OpenCode API access.
 
 ### CodeGraph bundled Node.js runtime
-- License: Node.js MIT license plus bundled third-party licenses for runtime components such as OpenSSL and V8. The inspected CodeGraph platform tarballs include the Node.js binary but no separate Node LICENSE or NOTICE files.
+- License: Node.js MIT license plus bundled third-party licenses for runtime components such as OpenSSL and V8. The inspected CodeGraph platform tarballs include the Node.js binary but no separate Node LICENSE or NOTICE files; the Codex CodeGraph component therefore ships Node.js v24.16.0 license text at `packages/omo-codex/plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
 - Copyright: Node.js contributors, OpenSSL Software Foundation, V8 authors, and other Node.js third-party contributors.
 - Upstream URL: https://nodejs.org/
 - Where-bundled: each `@colbymchenry/codegraph-*` platform bundle includes `node` or `node.exe`.

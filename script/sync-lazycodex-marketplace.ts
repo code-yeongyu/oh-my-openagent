@@ -5,7 +5,6 @@ import { validateLazycodexPluginBundle } from "./lazycodex-marketplace-validatio
 
 const MARKETPLACE_SOURCE_PATH = join("packages", "omo-codex", "marketplace.json")
 const PLUGIN_SOURCE_PATH = join("packages", "omo-codex", "plugin")
-const AST_GREP_MCP_DIST_SOURCE_PATH = join("packages", "ast-grep-mcp", "dist")
 const GIT_BASH_MCP_DIST_SOURCE_PATH = join("packages", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_SOURCE_PATH = join("packages", "lsp-tools-mcp", "dist")
 const LSP_DAEMON_DIST_SOURCE_PATH = join("packages", "lsp-daemon", "dist")
@@ -20,12 +19,9 @@ const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
 const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
-const AST_GREP_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "ast-grep-mcp", "dist")
 const GIT_BASH_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "lsp-tools-mcp", "dist")
 const LSP_DAEMON_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "lsp-daemon", "dist")
-const AST_GREP_MCP_SOURCE_ARG = "../../ast-grep-mcp/dist/cli.js"
-const AST_GREP_MCP_PLUGIN_ARG = "./components/ast-grep-mcp/dist/cli.js"
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
 const GIT_BASH_MCP_PLUGIN_ARG = "./components/git-bash-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_SOURCE_ARG = "../../lsp-tools-mcp/dist/cli.js"
@@ -34,11 +30,6 @@ const LSP_DAEMON_SOURCE_ARG = "../../lsp-daemon/dist/cli.js"
 const LSP_DAEMON_PLUGIN_ARG = "./components/lsp-daemon/dist/cli.js"
 
 const BUNDLED_MCP_DISTS = [
-  {
-    label: "ast-grep MCP",
-    sourcePath: AST_GREP_MCP_DIST_SOURCE_PATH,
-    destinationPath: AST_GREP_MCP_DIST_DESTINATION_PATH,
-  },
   {
     label: "git-bash MCP",
     sourcePath: GIT_BASH_MCP_DIST_SOURCE_PATH,
@@ -57,7 +48,6 @@ const BUNDLED_MCP_DISTS = [
 ] as const
 
 const MCP_ARG_REWRITES = [
-  [AST_GREP_MCP_SOURCE_ARG, AST_GREP_MCP_PLUGIN_ARG],
   [GIT_BASH_MCP_SOURCE_ARG, GIT_BASH_MCP_PLUGIN_ARG],
   [LSP_TOOLS_MCP_SOURCE_ARG, LSP_TOOLS_MCP_PLUGIN_ARG],
   [LSP_DAEMON_SOURCE_ARG, LSP_DAEMON_PLUGIN_ARG],

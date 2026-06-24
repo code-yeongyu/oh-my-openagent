@@ -5,6 +5,7 @@ import type { OpenClawConfig } from "./types"
 
 export function sanitizeReplyInput(text: string): string {
   return text
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally strip terminal control characters before tmux send-keys
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")
     .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
     .replace(/\r?\n/g, " ")

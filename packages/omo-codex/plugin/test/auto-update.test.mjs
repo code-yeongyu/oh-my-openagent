@@ -313,7 +313,7 @@ test("#given marketplace plugin root without install snapshot #when running chec
 	assert.equal(result.reason, "marketplace-flow");
 	assert.equal(result.notices.length, 1);
 	assert.match(result.notices[0], /codex plugin marketplace upgrade sisyphuslabs/);
-	assert.match(result.notices[0], /re-approve/);
+	assert.match(result.notices[0], /hook re-approval/);
 	await assert.rejects(readFile(spawnLogPath, "utf8"), { code: "ENOENT" });
 	const state = JSON.parse(await readFile(env.LAZYCODEX_AUTO_UPDATE_STATE_PATH, "utf8"));
 	assert.equal(state.lastCheckedAt, 123_456);

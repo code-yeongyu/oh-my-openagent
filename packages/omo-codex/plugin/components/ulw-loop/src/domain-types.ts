@@ -131,6 +131,9 @@ export interface UlwLoopQualityGate {
 	readonly criteriaCoverage: {
 		readonly totalCriteria: number;
 		readonly passCount: number;
+		readonly originalIntent: string;
+		readonly desiredOutcome: string;
+		readonly userOutcomeReview: string;
 		readonly adversarialClassesCovered: readonly string[];
 	};
 }

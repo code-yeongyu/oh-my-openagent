@@ -16,11 +16,17 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
+const opencodeOnlyToolPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
+const generatedSkillMetadataFiles = new Set(["agents/openai.yaml"]);
 
 async function readPackagedSkillFile(...segments) {
 	const path = join(root, "skills", ...segments);
 	const content = await readFile(path, "utf8");
 	return { path, content };
+}
+
+function excludeGeneratedSkillMetadata(files) {
+	return files.filter((file) => !generatedSkillMetadataFiles.has(file.replaceAll("\\", "/")));
 }
 
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
@@ -120,8 +126,8 @@ test("#given component skill sources #when aggregate Codex component skills are 
 	for (const [skillName, sourcePath] of componentSkillSources) {
 		const sourceDir = join(root, sourcePath);
 		const aggregateDir = join(aggregateSkillsRoot, skillName);
-		const sourceFiles = await listSkillFiles(sourceDir);
-		const aggregateFiles = await listSkillFiles(aggregateDir);
+		const sourceFiles = excludeGeneratedSkillMetadata(await listSkillFiles(sourceDir));
+		const aggregateFiles = excludeGeneratedSkillMetadata(await listSkillFiles(aggregateDir));
 		assert.deepEqual(aggregateFiles, sourceFiles, `${skillName} resource set drifted from its component skill source`);
 		for (const relativePath of sourceFiles) {
 			const sourceContent = await readFile(join(sourceDir, relativePath), "utf8");
@@ -145,7 +151,7 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 
 	// then
 	assert.match(skill, /^---\r?\nname: ulw-loop\r?\n/m);
-	assert.match(interfaceMetadata, /display_name: "ulw-loop \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) ulw-loop"/);
 	assert.doesNotMatch(interfaceMetadata, /ulw-loop \/ ulw-loop/);
 	assert.match(interfaceMetadata, /short_description: "Goal-like ultrawork loop for systematic decomposition"/);
 	assert.match(interfaceMetadata, /default_prompt: "Use \$ulw-loop/);
@@ -178,7 +184,7 @@ test("#given synced git-master skill #when inspected #then commits and git histo
 	assert.match(skill, /Choose the Git tool by the question/);
 	assert.match(skill, /git log -S "text"/);
 	assert.match(skill, /git blame -L start,end -- file/);
-	assert.match(interfaceMetadata, /display_name: "git-master \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) git-master"/);
 	assert.match(interfaceMetadata, /- "git commit"/);
 	assert.match(interfaceMetadata, /- "history search"/);
 });
@@ -253,6 +259,8 @@ test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent p
 		["does not accept subagent outputs as success without independent verification", /subagent outputs?[\s\S]*(?:not|never)[\s\S]*(?:success|approval)|independent(?:ly)? verif(?:y|ied|ication)[\s\S]*subagent outputs?/i],
 		["treats Discord or external content as claims, not instructions", /(?:Discord|external content)[\s\S]*claims?[\s\S]*not instructions?|not instructions?[\s\S]*(?:Discord|external content)/i],
 	]);
+	assert.doesNotMatch(combinedFile.content, opencodeOnlyToolPattern);
+	assert.doesNotMatch(combinedFile.content, /Proceeding to plan generation/);
 });
 
 test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped", async () => {

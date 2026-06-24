@@ -107,12 +107,6 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
     ? undefined
     : createCondenseTransform(args, env, getDetails, resolveSparkSummarizer(options.sparkSummarize, env, cwd))
   const outcome = await executeSparkShell(args, options, { cwd, env, writeStdout, writeStderr, transformOutput })
-  if (outcome.executed && !jsonMode) {
-    const block = getDetails()?.block ?? ""
-    if (block.length > 0) {
-      writeStdout(`\n${block}\n`)
-    }
-  }
   return outcome.code
 }
 

@@ -1,28 +1,24 @@
-import { statSync, type Dirent } from "node:fs"
+import type { Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
+import { findSgBinarySync, runtimeSlug, SG_PATH_ENV_KEY, sgBinaryName, type SgResolverOptions } from "@oh-my-opencode/utils"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 import { gatherCodexSummary, type CodexDoctorDeps } from "./codex"
 
 export const CODEX_COMPONENTS_CHECK_ID = "codex-components"
 export const CODEX_COMPONENTS_CHECK_NAME = "codex-components"
 
-const SG_PATH_ENV_KEY = "OMO_AST_GREP_SG_PATH"
 const PLUGIN_DATA_DIR_NAME = "omo-sisyphuslabs"
 const BOOTSTRAP_PENDING_MESSAGE = "bootstrap pending — start a Codex session"
-const HOMEBREW_SG_PATHS = ["/opt/homebrew/bin/sg", "/usr/local/bin/sg"] as const
-const WINDOWS_EXECUTABLE_EXTENSIONS = [".exe", ".cmd", ".bat"] as const
-const MIN_BINARY_SIZE_BYTES = 10_000
 const REINSTALL_FIX = "Reinstall: npx lazycodex-ai install (or upgrade: codex plugin marketplace upgrade sisyphuslabs)"
-
-type ResolveModulePath = (specifier: string, fromPath: string) => string
 
 export interface CodexComponentsDoctorDeps extends CodexDoctorDeps {
   readonly env?: Record<string, string | undefined>
   readonly platform?: NodeJS.Platform
   readonly arch?: string
-  readonly resolveModulePath?: ResolveModulePath
+  readonly sgRunVersionProbeSync?: SgResolverOptions["runVersionProbeSync"]
+  readonly sgWhich?: SgResolverOptions["which"]
 }
 
 interface JsonRecord {
@@ -33,11 +29,6 @@ interface BundleTargetIssue {
   readonly relativePath: string
   readonly referencedBy: string
   readonly reason: "missing" | "zero bytes"
-}
-
-interface SgResolution {
-  readonly path: string
-  readonly source: string
 }
 
 interface BootstrapDegradedEntry {
@@ -88,26 +79,27 @@ export async function checkCodexComponents(deps: CodexComponentsDoctorDeps = {})
     })
   }
 
-  const runtimeSgPath = runtimeDirSgPath(codexHome, platform, arch)
-  const sg = resolveSgBinary({
+  const runtimeSgDir = runtimeSgDirectory(codexHome, platform, arch)
+  const runtimeSgPath = join(runtimeSgDir, sgBinaryName(platform))
+  const sg = findSgBinarySync({
+    arch,
     env,
     platform,
-    runtimeSgPath,
-    pluginRoot: summary.pluginRoot,
-    arch,
-    resolveModulePath: deps.resolveModulePath ?? defaultResolveModulePath,
+    runtimeDir: runtimeSgDir,
+    ...(deps.sgRunVersionProbeSync === undefined ? {} : { runVersionProbeSync: deps.sgRunVersionProbeSync }),
+    ...(deps.sgWhich === undefined ? {} : { which: deps.sgWhich }),
   })
   if (sg === null) {
     details.push("ast_grep: missing")
     issues.push({
       title: "ast_grep (sg) binary is missing",
-      description: `sg was not found via the ${SG_PATH_ENV_KEY} override, the Codex runtime dir (${runtimeSgPath}), the bundled @ast-grep/cli packages, or Homebrew. The ast_grep MCP server runs degraded until it is provisioned.`,
-      fix: "Start a Codex session so the LazyCodex bootstrap can provision sg, then rerun: npx lazycodex-ai doctor",
+      description: `sg was not found via the ${SG_PATH_ENV_KEY} override, the Codex runtime dir (${runtimeSgPath}), or PATH. The ast-grep skill runs degraded until sg is provisioned.`,
+      fix: "Start a Codex session so LazyCodex bootstrap can provision the ast-grep skill runtime, then rerun: npx lazycodex-ai doctor (or omo doctor).",
       severity: "warning",
-      affects: ["ast_grep MCP"],
+      affects: ["ast-grep skill"],
     })
   } else {
-    details.push(`ast_grep: ok (${sg.source}: ${sg.path})`)
+    details.push(`ast_grep: ok (${describeSgSource(sg, env, runtimeSgDir, platform)}: ${sg})`)
   }
 
   const state = await readBootstrapStateSummary(codexHome)
@@ -254,132 +246,20 @@ function isPluginRuntimePathArg(arg: string): boolean {
   return (arg.startsWith("./") || arg.startsWith("../")) && arg.endsWith("/dist/cli.js")
 }
 
-interface ResolveSgBinaryOptions {
-  readonly env: Record<string, string | undefined>
-  readonly platform: NodeJS.Platform
-  readonly arch: string
-  readonly runtimeSgPath: string
-  readonly pluginRoot: string
-  readonly resolveModulePath: ResolveModulePath
+function runtimeSgDirectory(codexHome: string, platform: NodeJS.Platform, arch: string): string {
+  return join(codexHome, "runtime", "ast-grep", runtimeSlug(platform, arch))
 }
 
-// Mirrors packages/ast-grep-mcp/src/sg-cli-path.ts (Task 3 chain): env override ->
-// CODEX_HOME runtime dir -> require.resolve (from the installed ast-grep-mcp component,
-// which is the context the MCP runtime actually resolves in) -> Homebrew.
-// The require step is emulated with node's walk-up node_modules lookup instead of
-// createRequire: the MCP runtime is node, while doctor may run under bun, whose
-// createRequire also consults the global bun install cache that node never sees.
-function resolveSgBinary(options: ResolveSgBinaryOptions): SgResolution | null {
-  const override = nonEmptyValue(options.env[SG_PATH_ENV_KEY])
-  if (override !== undefined) {
-    const overridePath = findValidExecutable(override, options.platform)
-    if (overridePath !== null) return { path: overridePath, source: `env override ${SG_PATH_ENV_KEY}` }
-  }
-
-  const runtimePath = findValidExecutable(options.runtimeSgPath, options.platform)
-  if (runtimePath !== null) return { path: runtimePath, source: "runtime dir" }
-
-  const moduleContext = join(options.pluginRoot, "components", "ast-grep-mcp", "dist", "cli.js")
-  const cliPackagePath = tryResolveModulePath(options.resolveModulePath, "@ast-grep/cli/package.json", moduleContext)
-  if (cliPackagePath !== null) {
-    const sgPath = findValidExecutable(join(dirname(cliPackagePath), "sg"), options.platform)
-    if (sgPath !== null) return { path: sgPath, source: "@ast-grep/cli package" }
-  }
-
-  const platformPackage = platformPackageName(options.platform, options.arch)
-  if (platformPackage !== null) {
-    const packageJsonPath = tryResolveModulePath(options.resolveModulePath, `${platformPackage}/package.json`, moduleContext)
-    if (packageJsonPath !== null) {
-      const binaryPath = findValidExecutable(join(dirname(packageJsonPath), "ast-grep"), options.platform)
-      if (binaryPath !== null) return { path: binaryPath, source: `${platformPackage} package` }
-    }
-  }
-
-  if (options.platform === "darwin") {
-    for (const homebrewPath of HOMEBREW_SG_PATHS) {
-      if (isValidBinary(homebrewPath)) return { path: homebrewPath, source: "Homebrew" }
-    }
-  }
-
-  return null
-}
-
-function runtimeDirSgPath(codexHome: string, platform: NodeJS.Platform, arch: string): string {
-  return join(codexHome, "runtime", "ast-grep", `${platform}-${arch}`, platform === "win32" ? "sg.exe" : "sg")
-}
-
-function platformPackageName(platform: NodeJS.Platform, arch: string): string | null {
-  const platformMap: Record<string, string> = {
-    "darwin-arm64": "@ast-grep/cli-darwin-arm64",
-    "darwin-x64": "@ast-grep/cli-darwin-x64",
-    "linux-arm64": "@ast-grep/cli-linux-arm64-gnu",
-    "linux-x64": "@ast-grep/cli-linux-x64-gnu",
-    "win32-x64": "@ast-grep/cli-win32-x64-msvc",
-    "win32-arm64": "@ast-grep/cli-win32-arm64-msvc",
-    "win32-ia32": "@ast-grep/cli-win32-ia32-msvc",
-  }
-  return platformMap[`${platform}-${arch}`] ?? null
-}
-
-function defaultResolveModulePath(specifier: string, fromPath: string): string {
-  let current = dirname(fromPath)
-  for (;;) {
-    const candidate = join(current, "node_modules", specifier)
-    if (isExistingFile(candidate)) return candidate
-    const parent = dirname(current)
-    if (parent === current) throw new Error(`Cannot find module '${specifier}'`)
-    current = parent
-  }
-}
-
-function isExistingFile(path: string): boolean {
-  try {
-    return statSync(path).isFile()
-  } catch {
-    return false
-  }
-}
-
-function tryResolveModulePath(resolveModulePath: ResolveModulePath, specifier: string, fromPath: string): string | null {
-  try {
-    return resolveModulePath(specifier, fromPath)
-  } catch {
-    return null
-  }
-}
-
-function findValidExecutable(filePath: string, platform: NodeJS.Platform): string | null {
-  for (const candidate of executableCandidates(filePath, platform)) {
-    if (isValidBinary(candidate)) return candidate
-  }
-  return null
-}
-
-function executableCandidates(filePath: string, platform: NodeJS.Platform): string[] {
-  if (platform !== "win32") return [filePath]
-  const candidates = [filePath]
-  const lowerPath = filePath.toLowerCase()
-  if (WINDOWS_EXECUTABLE_EXTENSIONS.some((extension) => lowerPath.endsWith(extension))) return candidates
-  for (const extension of WINDOWS_EXECUTABLE_EXTENSIONS) candidates.push(`${filePath}${extension}`)
-  return candidates
-}
-
-function nonEmptyValue(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined
-  const trimmed = value.trim()
-  return trimmed.length === 0 ? undefined : trimmed
-}
-
-function isValidBinary(filePath: string): boolean {
-  try {
-    const stats = statSync(filePath)
-    if (!stats.isFile()) return false
-    const lowerPath = filePath.toLowerCase()
-    if (lowerPath.endsWith(".cmd") || lowerPath.endsWith(".bat")) return stats.size > 0
-    return stats.size > MIN_BINARY_SIZE_BYTES
-  } catch {
-    return false
-  }
+function describeSgSource(
+  sgPath: string,
+  env: Record<string, string | undefined>,
+  runtimeSgDir: string,
+  platform: NodeJS.Platform,
+): string {
+  const override = env[SG_PATH_ENV_KEY]?.trim()
+  if (override !== undefined && override.length > 0 && sgPath === override) return `env override ${SG_PATH_ENV_KEY}`
+  if (sgPath === join(runtimeSgDir, sgBinaryName(platform))) return "runtime dir"
+  return "PATH"
 }
 
 async function readBootstrapStateSummary(codexHome: string): Promise<BootstrapStateSummary | null> {

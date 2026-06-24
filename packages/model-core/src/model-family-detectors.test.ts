@@ -4,6 +4,7 @@ import {
   isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
+  isClaudeFableOrMythosModel,
   isClaudeOpus48Model,
   isGeminiModel,
   isGlmModel,
@@ -93,6 +94,17 @@ describe("model family detectors", () => {
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-6")).toBe(false)
     expect(isClaudeOpus47OrLaterModel("anthropic/claude-sonnet-4-6")).toBe(false)
     expect(isClaudeOpus47OrLaterModel("openai/gpt-5.5")).toBe(false)
+  })
+
+  test("#given Claude Fable/Mythos model ids #then detects fable and mythos families", () => {
+    expect(isClaudeFableOrMythosModel("anthropic/claude-fable-5")).toBe(true)
+    expect(isClaudeFableOrMythosModel("claude-fable-5")).toBe(true)
+    expect(isClaudeFableOrMythosModel("anthropic.claude-fable-5")).toBe(true)
+    expect(isClaudeFableOrMythosModel("anthropic/claude-mythos-5")).toBe(true)
+    expect(isClaudeFableOrMythosModel("anthropic/claude-mythos-preview")).toBe(true)
+    expect(isClaudeFableOrMythosModel("anthropic/claude-opus-4-8")).toBe(false)
+    expect(isClaudeFableOrMythosModel("anthropic/claude-sonnet-4-6")).toBe(false)
+    expect(isClaudeFableOrMythosModel("openai/gpt-5.5")).toBe(false)
   })
 
   test("#given MiniMax model ids #then detects MiniMax family only", () => {

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { buildCodegraphEnv, resolveCodegraphCommand } from "@oh-my-opencode/utils"
+import { buildCodegraphEnv, resolveCodegraphCommand, resolveCodegraphNodeSupport } from "@oh-my-opencode/utils"
 import type { ResolveCodegraphCommandOptions } from "@oh-my-opencode/utils"
 import type { CodegraphConfig } from "../config/schema/codegraph"
 import type { LocalMcpConfig } from "./lsp"
@@ -12,6 +12,7 @@ export type CodegraphMcpConfigOptions = {
   readonly env?: ResolveCodegraphCommandOptions["env"]
   readonly fileExists?: ResolveCodegraphCommandOptions["fileExists"]
   readonly homeDir?: string
+  readonly nodeVersionForExecutable?: ResolveCodegraphCommandOptions["nodeVersion"]
   readonly provisioned?: ResolveCodegraphCommandOptions["provisioned"]
   readonly requireResolve?: ResolveCodegraphCommandOptions["requireResolve"]
   readonly resolveExecutable?: RuntimeExecutableResolver
@@ -20,13 +21,6 @@ export type CodegraphMcpConfigOptions = {
 function createWhichResolver(resolveExecutable: RuntimeExecutableResolver): (commandName: string) => string | null {
   return (commandName: string): string | null => {
     const resolved = resolveExecutable(commandName)
-    return resolved.available ? resolved.command : null
-  }
-}
-
-function createNodeRuntimeResolver(resolveExecutable: RuntimeExecutableResolver): () => string | null {
-  return (): string | null => {
-    const resolved = resolveExecutable("node")
     return resolved.available ? resolved.command : null
   }
 }
@@ -46,22 +40,32 @@ function codegraphEnvForConfig(config: Partial<CodegraphConfig> | undefined, hom
 }
 
 export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}): LocalMcpConfig {
+  const env = options.env ?? process.env
   const resolveExecutable = options.resolveExecutable ?? resolveRuntimeExecutable
+  const which = createWhichResolver(resolveExecutable)
   const fileExists = options.fileExists ?? existsSync
   const resolvedCommand = resolveCodegraphCommand({
-    env: options.env,
+    env,
     fileExists,
     homeDir: options.homeDir,
-    nodeRuntime: createNodeRuntimeResolver(resolveExecutable),
+    nodeVersion: options.nodeVersionForExecutable,
     provisioned: options.provisioned ?? (() => provisionedBinFromInstallDir(options.config?.install_dir, fileExists)),
     requireResolve: options.requireResolve,
-    which: createWhichResolver(resolveExecutable),
+    which,
   })
+  const nodeSupport = resolveCodegraphNodeSupport({
+    env,
+    fileExists,
+    nodeVersion: options.nodeVersionForExecutable,
+    which,
+  })
+  const enabled =
+    resolvedCommand.exists && (resolvedCommand.source === "bundled" || resolvedCommand.source === "env" || nodeSupport.supported)
 
   return {
     type: "local",
     command: [resolvedCommand.command, ...resolvedCommand.argsPrefix, "serve", "--mcp"],
-    enabled: resolvedCommand.exists,
+    enabled,
     environment: codegraphEnvForConfig(options.config, options.homeDir),
   }
 }

@@ -55,4 +55,31 @@ You are starting a Sisyphus work session.
     // then
     expect(state?.session_ids).toEqual(["opencode:raw-sess"])
   })
+
+  test("#given raw chat session id #when locating the recent session plan #then the SDK receives the bare ses id (#5285)", async () => {
+    // given
+    writeFileSync(join(testDir, ".omo", "plans", "work.md"), "# Work\n- [ ] First task\n")
+    const sessionMessageIds: string[] = []
+    const hook = createStartWorkHook(unsafeTestValue<Parameters<typeof createStartWorkHook>[0]>({
+      directory: testDir,
+      client: {
+        session: {
+          messages: async (args: { path: { id: string } }) => {
+            sessionMessageIds.push(args.path.id)
+            return { data: [] }
+          },
+        },
+      },
+    }))
+    const output = {
+      parts: [{ type: "text", text: createStartWorkPrompt() }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID: "raw-sess" }, output)
+
+    // then
+    expect(sessionMessageIds).toContain("raw-sess")
+    expect(sessionMessageIds).not.toContain("opencode:raw-sess")
+  })
 })

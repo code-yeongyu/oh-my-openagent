@@ -20,6 +20,10 @@ async function readSkill(skillName) {
 	return readFile(join(root, "skills", skillName, "SKILL.md"), "utf8");
 }
 
+async function readSharedSkill(skillName) {
+	return readFile(join(root, "../../shared-skills/skills", skillName, "SKILL.md"), "utf8");
+}
+
 function patternFromParts(parts, flags) {
 	return new RegExp(parts.join(""), flags);
 }
@@ -213,4 +217,23 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
 	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
+});
+
+test("#given PR and review skills #when synced for Codex #then worktree lifecycle is mandatory", async () => {
+	const startWork = await readSkill("start-work");
+	const reviewWork = await readSkill("review-work");
+	const sharedStartWork = await readSharedSkill("start-work");
+
+	assert.match(startWork, /PR creation, PR handoff, branch handoff, or merge/);
+	assert.match(startWork, /Finish the PR\/branch lifecycle from its task-owned worktree/);
+	assert.match(startWork, /merge by default unless explicitly opted out/);
+	assert.match(startWork, /No PR\/branch implementation or review in the main worktree/);
+
+	assert.match(sharedStartWork, /required for PR\/branch work/);
+	assert.match(sharedStartWork, /No PR\/branch implementation, review, or merge in the main worktree/);
+	assert.doesNotMatch(sharedStartWork, /If worktree mode was used/);
+	assert.doesNotMatch(sharedStartWork, /merge or hand off exactly as requested/);
+
+	assert.match(reviewWork, /dedicated review worktree attached to that branch/);
+	assert.match(reviewWork, /Never\s+checkout, test, or edit the review branch in the main worktree/);
 });

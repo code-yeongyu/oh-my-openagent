@@ -77,7 +77,7 @@ const allTools = {
   ...hashlineToolsRecord,             // +1 conditional
 }
 
-// lsp_* and ast_grep_* tools are supplied by built-in MCP servers "lsp" and "ast_grep"
+// lsp_* tools are supplied by the built-in MCP server "lsp"
 ```
 
 ## KEY PATTERNS

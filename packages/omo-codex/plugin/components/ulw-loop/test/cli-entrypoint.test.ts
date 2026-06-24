@@ -23,6 +23,15 @@ function sanitizedEnv(): NodeJS.ProcessEnv {
 }
 
 async function runProcess(command: string, args: readonly string[], cwd: string): Promise<CliResult> {
+	return runProcessWithInput(command, args, cwd, "");
+}
+
+async function runProcessWithInput(
+	command: string,
+	args: readonly string[],
+	cwd: string,
+	input: string,
+): Promise<CliResult> {
 	return new Promise((resolvePromise, reject) => {
 		const child = spawn(command, [...args], { cwd, env: sanitizedEnv() });
 		const stdout: Buffer[] = [];
@@ -37,13 +46,14 @@ async function runProcess(command: string, args: readonly string[], cwd: string)
 				stderr: Buffer.concat(stderr).toString("utf8"),
 			});
 		});
+		child.stdin.end(input);
 	});
 }
 
 let workspace: string;
 
-async function runCli(args: readonly string[]): Promise<CliResult> {
-	return runProcess(process.execPath, [builtCli, ...args], workspace);
+async function runCli(args: readonly string[], input = ""): Promise<CliResult> {
+	return runProcessWithInput(process.execPath, [builtCli, ...args], workspace, input);
 }
 
 beforeAll(async () => {
@@ -91,5 +101,26 @@ describe("dist/cli.js entrypoint dispatch", () => {
 
 		expect(result.code).toBe(1);
 		expect(result.stderr).toContain("[omo] unknown command: frobnicate");
+	});
+
+	it("#given standalone ulw-loop hook asks for ultrawork context #when user prompt is ulw #then emits the ultrawork directive", async () => {
+		const payload = {
+			cwd: workspace,
+			hook_event_name: "UserPromptSubmit",
+			model: "gpt-5.5",
+			permission_mode: "default",
+			prompt: "ulw this change",
+			session_id: "s1",
+			transcript_path: null,
+			turn_id: "t1",
+		};
+
+		const result = await runCli(["hook", "user-prompt-submit", "--with-ultrawork"], `${JSON.stringify(payload)}\n`);
+		const parsed = JSON.parse(result.stdout);
+
+		expect(result.code).toBe(0);
+		expect(result.stderr).toBe("");
+		expect(parsed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
 	});
 });

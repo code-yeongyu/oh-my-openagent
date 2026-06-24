@@ -22,7 +22,6 @@ function createBaseResult(): DoctorResult {
     tools: {
       lspServers: [],
       astGrepCli: false,
-      astGrepNapi: false,
       commentChecker: false,
       ghCli: { installed: false, authenticated: false, username: null },
       mcpBuiltin: [],
