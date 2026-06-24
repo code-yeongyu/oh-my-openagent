@@ -104,7 +104,7 @@ Map their phrasing to one taste-skill style file:
 | "brutalist", "raw", "Swiss", "experimental", "industrial", "anti-design", "unstyled" | `brutalist-skill.md` |
 | "premium", "luxury", "calm", "expensive", "spa", "wellness", "boutique", "elegant" | `soft-skill.md` |
 | "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` |
-| Nothing specific — just "make a good UI" | `taste-skill.md` (default all-rounder) |
+| Nothing specific — just "make a good UI" | `taste-skill.md` as Layer A, plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference when there is no concrete visual reference |
 
 You may also load a brand DESIGN.md from Layer B as a *concrete reference* if the user's mood maps cleanly (see the "Mood-based shortcuts" section in `_INDEX.md`).
 
@@ -186,7 +186,7 @@ Once references are loaded, before writing any UI code:
 
 | User asks for... | Load these |
 |---|---|
-| "Build me a landing page" (no other info) | `taste-skill.md` |
+| "Build me a landing page" (no other info) | `_INDEX.md` shortlist → exactly one Layer B reference + `taste-skill.md` |
 | "Build me a Linear-style landing page" | `linear.app.md` + `taste-skill.md` |
 | "Make it Notion-like and minimal" | `notion.md` + `minimalist-skill.md` |
 | "Premium SaaS hero, like Stripe" | `stripe.md` + `soft-skill.md` |
