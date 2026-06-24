@@ -4,7 +4,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { ansiColorCss, escapeHtml, renderAnsiToHtml, stripAnsi } from "./web-terminal-renderer.mjs";
+import {
+  DEFAULT_TERMINAL_BACKGROUND,
+  DEFAULT_TERMINAL_FOREGROUND,
+  ansiColorCss,
+  escapeHtml,
+  renderAnsiToHtml,
+  stripAnsi,
+} from "./web-terminal-renderer.mjs";
 
 const HELP = `web-terminal-visual-qa
 
@@ -102,9 +109,9 @@ function writeHtml({ title, ansi, outPath, cols, wrap }) {
 <title>${escapeHtml(title)}</title>
 <style>
 :root { color-scheme: dark; }
-body { margin: 0; background: #101217; color: #d8dee9; font: 13px/1.35 "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", "Menlo", "Consolas", "Liberation Mono", ui-monospace, monospace; }
+body { margin: 0; background: #101217; color: ${DEFAULT_TERMINAL_FOREGROUND}; font: 13px/1.35 "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", "Menlo", "Consolas", "Liberation Mono", ui-monospace, monospace; }
 main { min-height: 100vh; box-sizing: border-box; padding: 20px; }
-.terminal { width: min(100%, ${terminalWidth}ch); max-width: calc(100vw - 40px); border: 1px solid #3b4452; background: #090b10; box-shadow: 0 20px 80px rgb(0 0 0 / 40%); }
+.terminal { width: min(100%, ${terminalWidth}ch); max-width: calc(100vw - 40px); border: 1px solid #3b4452; background: ${DEFAULT_TERMINAL_BACKGROUND}; box-shadow: 0 20px 80px rgb(0 0 0 / 40%); }
 .bar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #303846; color: #aab7c4; background: #171b22; font-size: 12px; }
 .dot { width: 10px; height: 10px; border-radius: 999px; background: #6b7280; }
 pre { margin: 0; padding: 14px 16px; white-space: ${whiteSpace}; overflow-wrap: ${overflowWrap}; tab-size: 8; overflow: auto; }
@@ -113,7 +120,6 @@ pre { margin: 0; padding: 14px 16px; white-space: ${whiteSpace}; overflow-wrap: 
 .ansi-italic { font-style: italic; }
 .ansi-underline { text-decoration: underline; }
 .ansi-strike { text-decoration: line-through; }
-.ansi-inverse { filter: invert(1); }
 ${ansiColorCss()}
 </style>
 </head>
