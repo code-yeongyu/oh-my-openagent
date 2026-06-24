@@ -1,16 +1,1 @@
-import type { SkillMcpConfig } from "../skill-mcp-manager/types"
-
-export interface BuiltinSkill {
-  name: string
-  description: string
-  template: string
-  license?: string
-  compatibility?: string
-  metadata?: Record<string, unknown>
-  allowedTools?: string[]
-  agent?: string
-  model?: string
-  subtask?: boolean
-  argumentHint?: string
-  mcpConfig?: SkillMcpConfig
-}
+export * from "@oh-my-opencode/skills-loader-core/builtin-skills/types"

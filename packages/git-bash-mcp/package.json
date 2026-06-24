@@ -17,6 +17,10 @@
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test src/*.test.ts"
   },
+  "dependencies": {
+    "@oh-my-opencode/mcp-stdio-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
+  },
   "devDependencies": {
     "bun-types": "1.3.12"
   }

@@ -20,9 +20,11 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   }
 
   let description = typeof args.description === "string" ? args.description : undefined
+  let descriptionSource: DelegateTaskArgs["descriptionSource"] = "explicit"
   if (!description || description.trim() === "") {
     const words = prompt.trim().split(/\s+/)
     description = words.slice(0, 4).join(" ") || "Delegated task"
+    descriptionSource = "generated"
   }
 
   await ctx.metadata?.({
@@ -88,6 +90,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     subagent_type: subagentType,
     requested_subagent_type: originalSubagentType,
     description,
+    descriptionSource,
     prompt,
     run_in_background: runInBackground === true,
     task_id: taskID,

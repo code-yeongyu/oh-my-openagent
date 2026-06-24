@@ -344,7 +344,7 @@ describe("BackgroundManager circuit breaker", () => {
               sessionID: task.sessionId,
               type: "tool",
               tool: "read",
-              input: { filePath: "/src/hooks/thinking-block-validator/hook.ts" },
+              input: { filePath: "/src/hooks/tool-pair-validator/hook.ts" },
             },
           },
         })

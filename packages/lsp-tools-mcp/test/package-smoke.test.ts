@@ -8,6 +8,7 @@ type PackageJson = {
 	readonly license: string;
 	readonly bin: Record<string, string>;
 	readonly files: readonly string[];
+	readonly scripts: Record<string, string>;
 	readonly dependencies?: Record<string, unknown>;
 };
 
@@ -32,6 +33,7 @@ describe("package metadata", () => {
 		expect(packageJson.bin["omo-lsp"]).toBe("./dist/cli.js");
 		expect(packageJson.bin["lsp-tools-mcp"]).toBeUndefined();
 		expect(packageJson.files).toEqual(["dist", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md"]);
+		expect(packageJson.scripts["build"]).toMatch(/^node scripts\/ensure-core-links\.mjs && /);
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(cliSource).toContain("Usage: omo-lsp [mcp]");
 	});
@@ -47,6 +49,7 @@ function isPackageJson(value: unknown): value is PackageJson {
 		value["license"] === "MIT" &&
 		isStringRecord(value["bin"]) &&
 		isStringArray(value["files"]) &&
+		isStringRecord(value["scripts"]) &&
 		(dependencies === undefined || isRecord(dependencies))
 	);
 }

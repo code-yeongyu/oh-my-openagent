@@ -1,0 +1,41 @@
+{
+  "name": "@oh-my-opencode/lsp-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-neutral Language Server Protocol engine and tool definitions for oh-my-opencode.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./tools": {
+      "types": "./src/tools.ts",
+      "import": "./src/tools.ts"
+    },
+    "./request-context": {
+      "types": "./src/request-context.ts",
+      "import": "./src/request-context.ts"
+    },
+    "./missing-dependency-result": {
+      "types": "./src/missing-dependency-result.ts",
+      "import": "./src/missing-dependency-result.ts"
+    },
+    "./mcp": {
+      "types": "./src/mcp.ts",
+      "import": "./src/mcp.ts"
+    },
+    "./lsp/*": {
+      "types": "./src/lsp/*.ts",
+      "import": "./src/lsp/*.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/mcp-stdio-core": "workspace:*"
+  }
+}

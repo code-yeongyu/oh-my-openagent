@@ -6,15 +6,17 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
 
-function makeMockCtx(): ToolContextWithMetadata & { captured: any[] } {
-  const captured: any[] = []
+type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
+
+function makeMockCtx(): ToolContextWithMetadata & { captured: CapturedMetadata[] } {
+  const captured: CapturedMetadata[] = []
   return {
     sessionID: "ses_parent",
     messageID: "msg_parent",
     agent: "sisyphus",
     abort: new AbortController().signal,
     callID: "call_001",
-    metadata: async (input: any) => { captured.push(input) },
+    metadata: async (input: { title?: string; metadata?: Record<string, unknown> }) => { captured.push(input as CapturedMetadata) },
     captured,
   }
 }
@@ -48,7 +50,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         onSyncSessionCreated: null,
       }, parentContext, "explore", MODEL, undefined, undefined, undefined, deps)
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.taskId).toBe("ses_sync")
       expect(meta.metadata.sessionId).toBe("ses_sync")
@@ -75,7 +77,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext, "explore", MODEL, undefined)
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.taskId).toBe("ses_xyz789")
       expect(meta.metadata.sessionId).toBe("ses_xyz789")
@@ -120,7 +122,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         parentContext, "explore", MODEL, undefined, "anthropic/claude-sonnet-4-6",
       )
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.taskId).toBe("ses_unstable_xyz")
       expect(meta.metadata.sessionId).toBe("ses_unstable_xyz")
@@ -146,7 +148,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext)
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.taskId).toBe("ses_resumed_x")
       expect(meta.metadata.sessionId).toBe("ses_resumed_x")
@@ -170,7 +172,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.category).toBe("deep")
     })
@@ -197,7 +199,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.requested_subagent_type).toBe("oracle")
     })
@@ -228,7 +230,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext, deps)
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.taskId).toBe("ses_cont_abc")
       expect(meta.metadata.sessionId).toBe("ses_cont_abc")
@@ -258,7 +260,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext, deps)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.agent).toBe("explore")
     })
@@ -287,7 +289,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext, deps)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.category).toBe("quick")
     })
@@ -321,7 +323,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext, deps)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.requested_subagent_type).toBe("oracle")
     })
@@ -352,7 +354,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         onSyncSessionCreated: null,
       }, parentContext, "Sisyphus-Junior", MODEL, undefined, undefined, undefined, deps)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.requested_subagent_type).toBe("oracle")
     })
@@ -379,7 +381,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext, "Sisyphus-Junior", MODEL, undefined)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.requested_subagent_type).toBe("oracle")
     })
@@ -424,7 +426,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         parentContext, "Sisyphus-Junior", MODEL, undefined, "anthropic/claude-sonnet-4-6",
       )
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.requested_subagent_type).toBe("oracle")
     })
@@ -448,7 +450,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }), parentContext)
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.title).toBe("continue work")
     })
@@ -475,7 +477,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       })
 
-      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      const meta = ctx.captured.find((item: CapturedMetadata) => item.metadata?.sessionId)!
       expect(meta).toBeDefined()
       expect(meta.title).toBe("continue sync")
     })
@@ -504,7 +506,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       const bgOutput = createBackgroundOutput(unsafeTestValue(manager), unsafeTestValue(client))
       await bgOutput.execute(unsafeTestValue({ task_id: "bg_output_xyz" }), unsafeTestValue(ctx))
 
-      const meta = ctx.captured.find((m: any) => m.metadata?.backgroundTaskId)
+      const meta = ctx.captured.find((m: CapturedMetadata) => m.metadata?.backgroundTaskId)!
       expect(meta).toBeDefined()
       expect(meta.metadata.backgroundTaskId).toBe("bg_output_xyz")
       expect(meta.metadata.sessionId).toBe("ses_bg_session")

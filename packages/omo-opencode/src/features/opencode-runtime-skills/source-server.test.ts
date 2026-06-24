@@ -12,7 +12,7 @@ afterEach(() => {
 describe("runtime security skill source server", () => {
   test("serves an OpenCode skill index and markdown files with matching frontmatter names", async () => {
     // given
-    const source = createRuntimeSkillSourceServer({
+    const source = await createRuntimeSkillSourceServer({
       skills: selectRuntimeSecuritySkills(),
     })
     cleanupServer = source
@@ -43,7 +43,7 @@ describe("runtime security skill source server", () => {
 
   test("returns 404 for unknown paths", async () => {
     // given
-    const source = createRuntimeSkillSourceServer({
+    const source = await createRuntimeSkillSourceServer({
       skills: selectRuntimeSecuritySkills(),
     })
     cleanupServer = source
@@ -53,5 +53,30 @@ describe("runtime security skill source server", () => {
 
     // then
     expect(response.status).toBe(404)
+  })
+
+  test("falls back to a Node HTTP server when Bun.serve is unavailable", async () => {
+    // given
+    const source = await createRuntimeSkillSourceServer(
+      {
+        skills: selectRuntimeSecuritySkills(),
+      },
+      {},
+    )
+    cleanupServer = source
+
+    // when
+    const indexResponse = await source.fetch(new Request(new URL("index.json", source.url)))
+    const index = await indexResponse.json()
+
+    // then
+    expect(source.url).toStartWith("http://127.0.0.1:")
+    expect(indexResponse.status).toBe(200)
+    expect(index).toEqual({
+      skills: [
+        { name: "security-research", files: ["SKILL.md"] },
+        { name: "security-review", files: ["SKILL.md"] },
+      ],
+    })
   })
 })

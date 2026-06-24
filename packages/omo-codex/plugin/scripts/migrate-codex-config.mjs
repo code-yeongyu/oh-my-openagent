@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
+import { removeUnsupportedRootMultiAgentMode } from "./migrate-codex-config/multi-agent-mode-guard.mjs";
 import { forceDisableMultiAgentV2 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
 import { readState, resolveStatePath, writeState } from "./migrate-codex-config/state.mjs";
@@ -22,6 +23,7 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 	const state = await readState(statePath);
 	const paths = await configPaths({ env, cwd });
 	const changed = [];
+	const modeChanged = [];
 	const nextState = { catalogVersion: catalog.version, files: {} };
 	for (const configPath of paths) {
 		const result = await migrateConfigFile(configPath, {
@@ -29,6 +31,7 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 			previousState: state.files?.[configPath],
 		});
 		if (result.changed) changed.push(configPath);
+		if (result.multiAgentModeChanged) modeChanged.push(configPath);
 		nextState.files[configPath] = {
 			catalogVersion: catalog.version,
 			written: result.written,
@@ -36,7 +39,7 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 		};
 	}
 	await writeState(statePath, nextState);
-	return { changed };
+	return { changed, modeChanged };
 }
 
 export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG, previousState } = {}) {
@@ -55,7 +58,11 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 	const multiAgentChanged = afterMultiAgentGuard !== config;
 	if (multiAgentChanged) config = afterMultiAgentGuard;
 
-	const changed = reasoningApplied || multiAgentChanged;
+	const afterMultiAgentModeGuard = removeUnsupportedRootMultiAgentMode(config);
+	const multiAgentModeChanged = afterMultiAgentModeGuard !== config;
+	if (multiAgentModeChanged) config = afterMultiAgentModeGuard;
+
+	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged;
 	if (changed) {
 		await mkdir(dirname(configPath), { recursive: true });
 		await writeFile(configPath, `${config.trimEnd()}\n`);
@@ -63,7 +70,7 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 
 	const written = decision.apply ? catalog.current : readRootSettings(config);
 	const managed = decision.apply ? true : decision.managed;
-	return { changed, written, managed };
+	return { changed, written, managed, multiAgentModeChanged };
 }
 
 function shouldApplyCatalog(config, catalog, previousState) {

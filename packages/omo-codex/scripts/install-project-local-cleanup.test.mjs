@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { installMarketplaceLocally } from "./install-local.mjs";
-import { repairNearestProjectLocalCodexArtifacts } from "./install/project-local-cleanup.mjs";
+import { repairNearestProjectLocalCodexArtifacts } from "./install-dist/install-local.mjs";
 import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs";
 
 test("#given stale project-local Codex config #when Node installer runs #then repairs the local conflict", async () => {

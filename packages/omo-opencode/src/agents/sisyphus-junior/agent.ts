@@ -12,27 +12,28 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, buildClaudeThinkingConfig } from "../types"
+import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model, isKimiK27Model, buildClaudeThinkingConfig } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
+  migrateAgentConfig,
   type PermissionValue,
 } from "../../shared/permission-compat"
-import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
 
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
+import { buildKimiK27SisyphusJuniorPrompt } from "./kimi-k2-7"
 import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
 import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
+import { buildGlm52SisyphusJuniorPrompt } from "./glm-5-2"
 
 const MODE: AgentMode = "subagent"
 
 // Core tools that Sisyphus-Junior must NEVER have access to
 // Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
 const BLOCKED_TOOLS = ["task"]
-const GPT_BLOCKED_TOOLS = ["task", "apply_patch"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
   model: "anthropic/claude-sonnet-4-6",
@@ -42,12 +43,15 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 export type SisyphusJuniorPromptSource =
   | "default"
   | "kimi-k2"
+  | "kimi-k2-7"
   | "gpt"
   | "gpt-5-5"
   | "gpt-5-4"
   | "gemini"
+  | "glm-5-2"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
+  if (model && isKimiK27Model(model)) return "kimi-k2-7"
   if (model && isKimiK2Model(model)) return "kimi-k2"
   if (model && isGptModel(model)) {
     if (isGpt5_5Model(model)) return "gpt-5-5"
@@ -58,6 +62,7 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
   if (model && isGeminiModel(model)) {
     return "gemini"
   }
+  if (model && isGlmModel(model)) return "glm-5-2"
   return "default"
 }
 
@@ -72,6 +77,8 @@ export function buildSisyphusJuniorPrompt(
   const source = getSisyphusJuniorPromptSource(model)
 
   switch (source) {
+    case "kimi-k2-7":
+      return buildKimiK27SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "kimi-k2":
       return buildKimiK26SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gpt-5-5":
@@ -82,6 +89,8 @@ export function buildSisyphusJuniorPrompt(
       return buildGptSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "gemini":
       return buildGeminiSisyphusJuniorPrompt(useTaskSystem, promptAppend)
+    case "glm-5-2":
+      return buildGlm52SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "default":
     default:
       return buildDefaultSisyphusJuniorPrompt(useTaskSystem, promptAppend)
@@ -103,11 +112,14 @@ export function createSisyphusJuniorAgentWithOverrides(
 
   const promptAppend = override?.prompt_append
   const prompt = buildSisyphusJuniorPrompt(model, useTaskSystem, promptAppend)
-  const blockedTools = isGptModel(model) ? GPT_BLOCKED_TOOLS : BLOCKED_TOOLS
+  const blockedTools = BLOCKED_TOOLS
 
   const baseRestrictions = createAgentToolRestrictions(blockedTools)
 
-  const userPermission = (override?.permission ?? {}) as Record<string, PermissionValue>
+  const migratedOverride = override
+    ? (migrateAgentConfig(override as Record<string, unknown>) as typeof override)
+    : undefined
+  const userPermission = (migratedOverride?.permission ?? {}) as Record<string, PermissionValue>
   const basePermission = baseRestrictions.permission
   const merged: Record<string, PermissionValue> = { ...userPermission }
   for (const tool of blockedTools) {
@@ -117,7 +129,6 @@ export function createSisyphusJuniorAgentWithOverrides(
   const toolsConfig = { permission: { ...merged, ...basePermission } as Record<string, PermissionValue> }
   const permission: Record<string, PermissionValue> = {
     ...toolsConfig.permission,
-    ...getGptApplyPatchPermission(model),
   }
 
   const base: AgentConfig = {

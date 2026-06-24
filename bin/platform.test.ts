@@ -302,4 +302,60 @@ describe("getPlatformPackageCandidates", () => {
     // #then baseline fallback is not included
     expect(result).toEqual(["oh-my-opencode-linux-arm64"]);
   });
+
+  test("returns arm64 and x64-baseline candidates for Windows ARM64", () => {
+    // #given Windows arm64
+    const input = { platform: "win32", arch: "arm64" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then arm64 package first then the x64 baseline fallback
+    expect(result).toEqual([
+      "oh-my-opencode-windows-arm64",
+      "oh-my-opencode-windows-x64-baseline",
+    ]);
+  });
+
+  test("supports renamed package family for Windows ARM64 via packageBaseName override", () => {
+    // #given Windows arm64 with renamed package base
+    const input = { platform: "win32", arch: "arm64", packageBaseName: "oh-my-openagent" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then returns renamed arm64 and x64 baseline candidates
+    expect(result).toEqual([
+      "oh-my-openagent-windows-arm64",
+      "oh-my-openagent-windows-x64-baseline",
+    ]);
+  });
+
+  test("returns x64 and baseline candidates for Windows x64", () => {
+    // #given Windows x64
+    const input = { platform: "win32", arch: "x64" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then modern x64 first then x64 baseline
+    expect(result).toEqual([
+      "oh-my-opencode-windows-x64",
+      "oh-my-opencode-windows-x64-baseline",
+    ]);
+  });
+
+  test("returns baseline first for Windows x64 when preferBaseline is true", () => {
+    // #given Windows x64 with baseline preference
+    const input = { platform: "win32", arch: "x64", preferBaseline: true };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then baseline package is preferred first
+    expect(result).toEqual([
+      "oh-my-opencode-windows-x64-baseline",
+      "oh-my-opencode-windows-x64",
+    ]);
+  });
 });

@@ -1,16 +1,10 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-
-import { OhMyOpenCodeConfigSchema } from "../../../config"
-import { detectPluginConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
-import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../../shared/plugin-identity"
-import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
-import type { CheckResult, DoctorIssue } from "../types"
+import type { OhMyOpenCodeConfig } from "../../../config"
+import { validatePluginConfig } from "../../../config/validate"
+import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../framework/constants"
+import type { CheckResult, DoctorIssue } from "../framework/types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
 import type { OmoConfig } from "./model-resolution-types"
-
-const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode")
 
 interface ConfigValidationResult {
   exists: boolean
@@ -20,53 +14,42 @@ interface ConfigValidationResult {
   errors: string[]
 }
 
-function findConfigPath(): string | null {
-  const projectConfig = detectPluginConfigFile(PROJECT_CONFIG_DIR, {
-    basenames: [CONFIG_BASENAME],
-    legacyBasenames: [LEGACY_CONFIG_BASENAME],
-  })
-  if (projectConfig.format !== "none") return projectConfig.path
+function toOmoConfig(config: OhMyOpenCodeConfig): OmoConfig {
+  const agents: OmoConfig["agents"] = {}
+  const categories: OmoConfig["categories"] = {}
 
-  const userConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const userConfig = detectPluginConfigFile(userConfigDir, {
-    basenames: [CONFIG_BASENAME],
-    legacyBasenames: [LEGACY_CONFIG_BASENAME],
-  })
-  if (userConfig.format !== "none") return userConfig.path
+  for (const [name, agent] of Object.entries(config.agents ?? {})) {
+    if (!agent) continue
+    const entry: NonNullable<OmoConfig["agents"]>[string] = {}
+    if (agent.model !== undefined) entry.model = agent.model
+    if (agent.variant !== undefined) entry.variant = agent.variant
+    if (agent.category !== undefined) entry.category = agent.category
+    agents[name] = entry
+  }
 
-  return null
+  for (const [name, category] of Object.entries(config.categories ?? {})) {
+    if (!category) continue
+    const entry: NonNullable<OmoConfig["categories"]>[string] = {}
+    if (category.model !== undefined) entry.model = category.model
+    if (category.variant !== undefined) entry.variant = category.variant
+    categories[name] = entry
+  }
+
+  return { agents, categories }
 }
 
 function validateConfig(): ConfigValidationResult {
-  const configPath = findConfigPath()
-  if (!configPath) {
+  const validation = validatePluginConfig(process.cwd())
+  if (!validation.path) {
     return { exists: false, path: null, valid: true, config: null, errors: [] }
   }
 
-  try {
-    const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<OmoConfig>(content)
-    const schemaResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
-
-    if (!schemaResult.success) {
-      return {
-        exists: true,
-        path: configPath,
-        valid: false,
-        config: rawConfig,
-        errors: schemaResult.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
-      }
-    }
-
-    return { exists: true, path: configPath, valid: true, config: rawConfig, errors: [] }
-  } catch (error) {
-    return {
-      exists: true,
-      path: configPath,
-      valid: false,
-      config: null,
-      errors: [error instanceof Error ? error.message : "Failed to parse config"],
-    }
+  return {
+    exists: true,
+    path: validation.path,
+    valid: validation.valid,
+    config: toOmoConfig(validation.config),
+    errors: [...validation.messages],
   }
 }
 

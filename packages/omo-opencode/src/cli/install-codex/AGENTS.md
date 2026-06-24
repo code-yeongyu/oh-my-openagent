@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. Entry: `runCodexInstaller()` in `install-codex.ts`. Triggered by `bunx oh-my-openagent install --platform=codex` (alias `npx lazycodex-ai install`).
+Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. This directory is now an OpenCode CLI adapter shim over the canonical installer source in [`packages/omo-codex/src/install/`](../../../../../packages/omo-codex/src/install). Entry: `runCodexInstaller()` in `install-codex.ts`. Triggered by `bunx oh-my-openagent install --platform=codex` (alias `npx lazycodex-ai install`).
 
 ## KEY FILES
 
@@ -15,7 +15,7 @@ Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. Entr
 | `codex-marketplace.ts` | Reads `packages/omo-codex/marketplace.json` and per-plugin `.codex-plugin/plugin.json`; validates path segments |
 | `codex-cache-install.ts` | Builds source, copies to temp cache dir, runs `npm ci --omit=dev`, rewrites MCP manifest, atomically promotes to `~/.codex/plugins/cache/{marketplace}/{name}/{version}/` |
 | `codex-cache-bins.ts` | Discovers `package.json` `bin` entries, links component CLIs into bin dir; writes `omo` runtime wrapper (POSIX shell / Windows `.cmd`) |
-| `link-cached-plugin-agents.ts` | Discovers bundled agent TOMLs under `components/*/agents/`, copies to `~/.codex/agents/`, preserves existing `model_reasoning_effort`, writes `.installed-agents.json` manifest |
+| `link-cached-plugin-agents.ts` | Discovers bundled agent TOMLs under `components/*/agents/`, copies to `~/.codex/agents/`, preserves existing `model_reasoning_effort` and `service_tier`, writes `.installed-agents.json` manifest |
 | `codex-marketplace-snapshot.ts` | Writes local marketplace snapshot to `~/.codex/.tmp/marketplaces/{marketplace}/` |
 | `codex-config-toml.ts` | Mutates `~/.codex/config.toml`: enables features, sets marketplace/plugin/agent/hook-trust blocks, optional autonomous permissions |
 | `codex-cleanup.ts` | Uninstall orchestrator: removes cache, agents, config blocks, project-local artifacts |
@@ -53,7 +53,8 @@ runCodexInstaller()
 - All TOML mutation is string-based via `toml-section-editor.ts` (no TOML parser dependency)
 - Atomic directory promotion: copy to temp sibling, then `rename()`; backup restored on failure
 - Windows uses `.cmd` shims; POSIX uses symlinks
-- `MANAGED_CODEX_AGENT_NAMES` hardcodes 6 agent names: `codex-ultrawork-reviewer`, `explorer`, `librarian`, `metis`, `momus`, `plan`
+- Current managed Codex agent roster: `explorer`, `librarian`, `metis`, `momus`, `plan`
+- Legacy purge/back-compat code still tracks the retired reviewer agent so installs can remove stale config and agent files from older releases
 - Legacy marketplace cleanup: `lazycodex` and `code-yeongyu-codex-plugins` are pruned on `sisyphuslabs` install
 
 ## ANTI-PATTERNS

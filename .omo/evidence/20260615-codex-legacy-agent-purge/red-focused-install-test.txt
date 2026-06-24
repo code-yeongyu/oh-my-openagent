@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-codex/src/install/install-codex.test.ts:
+261 |
+262 |     // then
+263 |     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+264 |     expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")
+265 |     expect(configContent).not.toContain('config_file = "./agents/codex-ultrawork-reviewer.toml"')
+266 |     expect(await pathExists(join(agentsDir, "codex-ultrawork-reviewer.toml"))).toBe(false)
+                                                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (<WORKTREE>/packages/omo-codex/src/install/install-codex.test.ts:266:80)
+(fail) install-codex > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [448.77ms]
+
+ 0 pass
+ 15 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [538.00ms]

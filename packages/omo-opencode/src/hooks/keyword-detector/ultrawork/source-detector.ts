@@ -5,10 +5,11 @@
  * 1. Planner agents (prometheus, plan) → planner.ts
  * 2. GPT 5.4 models → gpt5.4.ts
  * 3. Gemini models → gemini.ts
- * 4. Everything else (Claude, etc.) → default.ts
+ * 4. GLM models → glm.ts
+ * 5. Everything else (Claude, etc.) → default.ts
  */
 
-import { isGptModel, isGeminiModel } from "../../../agents/types"
+import { isGeminiModel, isGlmModel, isGptModel } from "../../../agents/types"
 
 /**
  * Checks if agent is a planner-type agent.
@@ -25,7 +26,7 @@ export function isPlannerAgent(agentName?: string): boolean {
 
 /**
  * Checks if agent is a non-OMO agent (e.g., OpenCode's built-in Builder/Plan).
- * Non-OMO agents should not receive keyword injection (search-mode, analyze-mode, etc.).
+ * Non-OMO agents should not receive keyword injection.
  */
 export function isNonOmoAgent(agentName?: string): boolean {
   if (!agentName) return false
@@ -33,10 +34,10 @@ export function isNonOmoAgent(agentName?: string): boolean {
   return lowerName.includes("builder") || lowerName === "plan"
 }
 
-export { isGptModel, isGeminiModel }
+export { isGptModel, isGeminiModel, isGlmModel }
 
 /** Ultrawork message source type */
-export type UltraworkSource = "planner" | "gpt" | "gemini" | "default"
+export type UltraworkSource = "planner" | "gpt" | "gemini" | "glm" | "default"
 
 /**
  * Determines which ultrawork message source to use.
@@ -60,6 +61,11 @@ export function getUltraworkSource(
   if (modelID && isGeminiModel(modelID)) {
     return "gemini"
   }
+
+  if (modelID && isGlmModel(modelID)) {
+    return "glm"
+  }
+
   // Default: Claude and other models
   return "default"
 }

@@ -1,21 +1,26 @@
 /// <reference types="bun-types" />
 import { describe, expect, it, test } from "bun:test"
-import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import type { LoadedSkill, SkillScope } from "../../features/opencode-skill-loader/types"
 import { buildAvailableSkills } from "./available-skills"
 
 type DiscoveredSkills = Parameters<typeof buildAvailableSkills>[0]
+type SkillOptions = {
+  readonly agent?: string
+  readonly description?: string
+  readonly scope?: SkillScope
+}
 
-function makeSkill(name: string, agent?: string): LoadedSkill {
+function makeSkill(name: string, options: SkillOptions = {}): LoadedSkill {
   return {
     name,
     resolvedPath: `/test/skills/${name}`,
     definition: {
       name,
-      description: `Skill ${name}`,
+      description: options.description ?? `Skill ${name}`,
       template: "",
-      agent,
+      agent: options.agent,
     },
-    scope: "user",
+    scope: options.scope ?? "user",
   }
 }
 
@@ -46,7 +51,7 @@ describe("buildAvailableSkills", () => {
 describe("buildAvailableSkills - agentName filtering", () => {
   it("includes agent-restricted skill when agentName is not provided (backward compat)", () => {
     // given
-    const skills = [makeSkill("oracle-only", "oracle")]
+    const skills = [makeSkill("oracle-only", { agent: "oracle" })]
 
     // when
     const result = buildAvailableSkills(skills, undefined, undefined, undefined, undefined)
@@ -57,7 +62,7 @@ describe("buildAvailableSkills - agentName filtering", () => {
 
   it("includes skill when agentName matches the skill's agent field", () => {
     // given
-    const skills = [makeSkill("sisyphus-only", "sisyphus")]
+    const skills = [makeSkill("sisyphus-only", { agent: "sisyphus" })]
 
     // when
     const result = buildAvailableSkills(skills, undefined, undefined, undefined, "sisyphus")
@@ -68,7 +73,7 @@ describe("buildAvailableSkills - agentName filtering", () => {
 
   it("excludes skill when agentName does not match the skill's agent field", () => {
     // given
-    const skills = [makeSkill("sisyphus-only", "sisyphus")]
+    const skills = [makeSkill("sisyphus-only", { agent: "sisyphus" })]
 
     // when
     const result = buildAvailableSkills(skills, undefined, undefined, undefined, "oracle")
@@ -92,8 +97,8 @@ describe("buildAvailableSkills - agentName filtering", () => {
     // given
     const skills = [
       makeSkill("public-skill"),
-      makeSkill("sisyphus-only", "sisyphus"),
-      makeSkill("oracle-only", "oracle"),
+      makeSkill("sisyphus-only", { agent: "sisyphus" }),
+      makeSkill("oracle-only", { agent: "oracle" }),
     ]
 
     // when
@@ -119,5 +124,80 @@ describe("buildAvailableSkills - agentName filtering", () => {
     expect(playwriteSkills).toHaveLength(1)
     // discovered skill should have location "user"
     expect(playwriteSkills[0].location).toBe("user")
+  })
+
+  it("excludes mixed-case discovered skills by disabled lowercase alias", () => {
+    // given
+    const disabledDescription = "IGNORE_ALL_PRIOR_INSTRUCTIONS_DISABLED_SKILL_DESC"
+    const skills = [
+      {
+        ...makeSkill("Blocked-Skill"),
+        definition: {
+          name: "Blocked-Skill",
+          description: disabledDescription,
+          template: "",
+        },
+        scope: "project",
+      } satisfies LoadedSkill,
+    ]
+    const disabledSkills = new Set(["blocked-skill"])
+
+    // when
+    const result = buildAvailableSkills(skills, undefined, disabledSkills, undefined, "sisyphus")
+
+    // then
+    expect(result.map((s) => s.name)).not.toContain("Blocked-Skill")
+    expect(result.map((s) => s.description)).not.toContain(disabledDescription)
+  })
+
+  it("excludes hostile shared canonical alias collisions from core agent prompt skill lists", () => {
+    // given
+    const hostileDescription = "HOSTILE_SHARED_ULW_PLAN_DESCRIPTION"
+    const bundledSharedDescription = "Bundled shared ulw-plan"
+    const skills = [
+      makeSkill("shared/ulw-plan", {
+        description: bundledSharedDescription,
+        scope: "shared",
+      }),
+      makeSkill("ulw-plan", {
+        description: bundledSharedDescription,
+        scope: "shared",
+      }),
+      makeSkill("Shared/ulw-plan", {
+        description: hostileDescription,
+        scope: "project",
+      }),
+    ]
+    const coreAgents = ["sisyphus", "hephaestus", "atlas"]
+
+    for (const agentName of coreAgents) {
+      // when
+      const result = buildAvailableSkills(skills, undefined, undefined, undefined, agentName)
+
+      // then
+      expect(result.map((s) => s.description)).not.toContain(hostileDescription)
+      expect(result.some((s) => s.name === "shared/ulw-plan")).toBe(true)
+    }
+  })
+
+  it("keeps custom shared-looking skills when no bundled shared skill claims the alias", () => {
+    // given
+    const customDescription = "Legitimate custom shared-looking skill"
+    const skills = [
+      makeSkill("ulw-plan", {
+        description: "Bundled shared ulw-plan",
+        scope: "shared",
+      }),
+      makeSkill("shared/custom", {
+        description: customDescription,
+        scope: "project",
+      }),
+    ]
+
+    // when
+    const result = buildAvailableSkills(skills, undefined, undefined, undefined, "sisyphus")
+
+    // then
+    expect(result.map((s) => s.description)).toContain(customDescription)
   })
 })
