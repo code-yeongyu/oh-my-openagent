@@ -7,6 +7,13 @@ builds [`Dockerfile`](./Dockerfile) (Node 24 + Bun 1.3.12 + tmux) and runs
 getting your credentials and per-harness config INTO the container so OpenCode,
 Codex, and Claude Code all work inside it.
 
+`setup.sh` also initializes the frontend provenance submodules under
+`packages/shared-skills/upstreams/` and materializes their references (both steps
+are non-fatal). The container has network on create, so the submodules clone and
+the frontend brand / taste / ui-ux references materialize automatically; if you
+build the image offline they are skipped and the frontend skill simply lacks those
+brand refs until the next online `script/agent/setup.sh` run.
+
 ## Provider credentials (required)
 
 `setup.sh` and [`script/agent/qa-sandbox.sh`](../script/agent/qa-sandbox.sh)

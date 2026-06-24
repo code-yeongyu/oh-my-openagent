@@ -69,6 +69,42 @@ describe("pollSyncSession internal all-complete wakes", () => {
     expect(result).toBeNull()
   })
 
+  test("#given terminal assistant error followed by internal all-complete wake #when polling #then the error is returned", async () => {
+    // given
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 1,
+      MAX_POLL_TIME_MS: 50,
+    })
+    const client = createClientForMessages([
+      { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+      {
+        info: {
+          id: "msg_002",
+          role: "assistant",
+          time: { created: 2000 },
+          finish: "stop",
+          error: { message: "child failed after stale output" },
+        },
+        parts: [{ type: "text", text: "old deliverable" }],
+      },
+      {
+        info: { id: "msg_003", role: "user", time: { created: 3000 } },
+        parts: [{ type: "text", text: internalAllCompleteWake }],
+      },
+    ])
+
+    // when
+    const result = await pollSyncSession(toolContext, client, {
+      sessionID: "ses_test",
+      agentToUse: "sisyphus",
+      toastManager: null,
+      taskId: undefined,
+    }, 50)
+
+    // then
+    expect(result).toBe("child failed after stale output")
+  })
+
   test("#given terminal assistant turn followed by ordinary user turn #when polling #then the sync task remains incomplete", async () => {
     // given
     __setTimingConfig({

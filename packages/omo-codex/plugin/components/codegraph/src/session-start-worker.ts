@@ -28,6 +28,9 @@ export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 const CODEGRAPH_VERSION = "1.0.1";
 const COMMAND_TIMEOUT_MS = 60_000;
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+type CodegraphBootstrapConfig = CodegraphConfig & {
+	readonly trustedCodegraphInstallDir?: string;
+};
 
 const defaultDeps: CodegraphSessionStartDeps = {
 	ensureGitignored: ensureCodegraphGitignored,
@@ -49,12 +52,16 @@ export async function runCodegraphSessionStartWorker(options: SessionStartWorker
 	}
 
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-	return runBootstrap(projectRoot, config.codegraph ?? {}, env, homeDir, nodeSupport, { ...defaultDeps, ...options.deps }, logOutcome);
+	const bootstrapConfig: CodegraphBootstrapConfig = {
+		...(config.codegraph ?? {}),
+		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
+	};
+	return runBootstrap(projectRoot, bootstrapConfig, env, homeDir, nodeSupport, { ...defaultDeps, ...options.deps }, logOutcome);
 }
 
 async function runBootstrap(
 	projectRoot: string,
-	config: CodegraphConfig,
+	config: CodegraphBootstrapConfig,
 	env: Record<string, string | undefined>,
 	homeDir: string,
 	nodeSupport: CodegraphNodeSupport,
@@ -72,7 +79,7 @@ async function runBootstrap(
 
 		deps.prepareWorkspace(projectRoot, { homeDir });
 		deps.ensureGitignored(projectRoot);
-		const codegraphEnv = config.install_dir === undefined ? buildCodegraphEnv({ homeDir }) : { ...buildCodegraphEnv({ homeDir }), CODEGRAPH_INSTALL_DIR: config.install_dir };
+		const codegraphEnv = codegraphEnvForConfig(config, homeDir);
 		const status = await deps.runCommand(projectRoot, command.resolution.command, [...command.resolution.argsPrefix, "status", "--json"], { env: codegraphEnv, timeoutMs: COMMAND_TIMEOUT_MS });
 		const decision = decideStartupAction(status);
 		if (decision.kind === "skip") return finish("skipped-status", { error: decision.reason, projectRoot }, logOutcome);
@@ -97,27 +104,34 @@ type ResolutionResult =
 
 async function resolveOrProvisionCommand(
 	deps: CodegraphSessionStartDeps,
-	config: CodegraphConfig,
+	config: CodegraphBootstrapConfig,
 	env: Record<string, string | undefined>,
 	homeDir: string,
 	nodeSupport: CodegraphNodeSupport,
 ): Promise<ResolutionResult> {
-	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(config.install_dir) });
-	if (resolved.exists) {
-		if (codegraphCommandRequiresSupportedLocalNode(resolved) && !nodeSupport.supported) {
-			return { kind: "unsupported-node" };
-		}
+	const trustedInstallDir = config.trustedCodegraphInstallDir;
+	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(trustedInstallDir) });
+	if (resolved.exists && canUseResolvedCommand(resolved, nodeSupport)) {
 		return { kind: "resolved", resolution: resolved };
 	}
-	if (!nodeSupport.supported) return { kind: "unsupported-node" };
+	if (resolved.exists && config.auto_provision === false) return { kind: "unsupported-node" };
 	if (config.auto_provision === false) return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
 
-	const installDir = config.install_dir ?? join(homeDir, ".omo", "codegraph");
-	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, "locks"), version: CODEGRAPH_VERSION });
+	const installDir = trustedInstallDir ?? join(homeDir, ".omo", "codegraph");
+	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, ".locks"), version: CODEGRAPH_VERSION });
 	if (!provisioned.provisioned || provisioned.binPath === undefined) {
 		return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
 	}
 	return { kind: "resolved", resolution: { argsPrefix: [], command: provisioned.binPath, exists: true, source: "provisioned" } };
+}
+
+function codegraphEnvForConfig(config: CodegraphBootstrapConfig, homeDir: string): Record<string, string> {
+	const env = buildCodegraphEnv({ homeDir });
+	return config.trustedCodegraphInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.trustedCodegraphInstallDir };
+}
+
+function canUseResolvedCommand(resolved: CodegraphCommandResolution, nodeSupport: CodegraphNodeSupport): boolean {
+	return !codegraphCommandRequiresSupportedLocalNode(resolved) || nodeSupport.supported;
 }
 
 function decideStartupAction(status: CodegraphCommandResult): { readonly kind: "init" } | { readonly kind: "skip"; readonly reason: string } | { readonly kind: "sync" } {

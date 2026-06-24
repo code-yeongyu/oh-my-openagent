@@ -89,7 +89,6 @@ function replayAgentConfigSideEffects(params: {
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState, runtimeSkillSourceUrl } = deps;
-  let pluginComponentsPromise: ReturnType<typeof loadPluginComponents> | undefined;
   let agentConfigSnapshot: AgentConfigSnapshot | undefined;
 
   return async (config: Record<string, unknown>) => {
@@ -103,14 +102,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     });
     clearFormatterCache()
 
-    pluginComponentsPromise ??= loadPluginComponents({ pluginConfig });
-    const pluginComponents = await pluginComponentsPromise;
+    const pluginComponents = await loadPluginComponents({ pluginConfig });
+    const pluginComponentsLoadFailed = pluginComponents.retryableLoadFailure === true;
 
     applyHookConfig({ pluginComponents });
 
     const agentCacheKey = createAgentConfigCacheKey(config);
     let agentResult: Record<string, unknown>;
-    if (agentConfigSnapshot?.cacheKey === agentCacheKey) {
+    if (!pluginComponentsLoadFailed && agentConfigSnapshot?.cacheKey === agentCacheKey) {
       config.agent = cloneAgentConfig(agentConfigSnapshot.agents);
       if (agentConfigSnapshot.defaultAgent !== undefined) {
         config.default_agent = agentConfigSnapshot.defaultAgent;
@@ -129,12 +128,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ctx,
         pluginComponents,
       });
-      agentConfigSnapshot = {
-        cacheKey: agentCacheKey,
-        configuredDefaultAgent,
-        defaultAgent: config.default_agent,
-        agents: cloneAgentConfig(agentResult),
-      };
+      agentConfigSnapshot = pluginComponentsLoadFailed
+        ? undefined
+        : {
+            cacheKey: agentCacheKey,
+            configuredDefaultAgent,
+            defaultAgent: config.default_agent,
+            agents: cloneAgentConfig(agentResult),
+          };
     }
 
     applyToolConfig({ config, pluginConfig, agentResult });

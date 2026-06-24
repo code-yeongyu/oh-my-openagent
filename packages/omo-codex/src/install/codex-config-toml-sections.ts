@@ -1,3 +1,5 @@
+import { parseTomlDottedKey } from "./toml-section-editor"
+
 export interface TomlSection {
   readonly header: string | null
   readonly text: string
@@ -30,16 +32,13 @@ export function splitTomlSections(config: string): readonly TomlSection[] {
 }
 
 export function parsePluginHeaderKey(header: string): string | null {
-  const prefix = "plugins."
-  if (!header.startsWith(prefix)) return null
-  return parseLeadingJsonString(header.slice(prefix.length))
+  const path = parseTomlDottedKey(header)
+  return path?.[0] === "plugins" ? (path[1] ?? null) : null
 }
 
 export function parseAgentHeaderName(header: string): string | null {
-  const prefix = "agents."
-  if (!header.startsWith(prefix)) return null
-  const key = header.slice(prefix.length)
-  return key.startsWith('"') ? parseLeadingJsonString(key) : key
+  const path = parseTomlDottedKey(header)
+  return path?.[0] === "agents" ? (path[1] ?? null) : null
 }
 
 export function parseJsonString(value: string): string | null {
@@ -52,26 +51,14 @@ export function parseJsonString(value: string): string | null {
   }
 }
 
+export function parseHookStateHeaderKey(header: string): string | null {
+  const path = parseTomlDottedKey(header)
+  if (path?.[0] !== "hooks" || path[1] !== "state") return null
+  return path[2] ?? null
+}
+
 function parseTomlHeader(line: string): string | null {
   const trimmed = line.trim()
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]") || trimmed.startsWith("[[")) return null
   return trimmed.slice(1, -1)
-}
-
-function parseLeadingJsonString(value: string): string | null {
-  if (!value.startsWith('"')) return parseJsonString(value)
-  let escaped = false
-  for (let index = 1; index < value.length; index += 1) {
-    const char = value[index]
-    if (escaped) {
-      escaped = false
-      continue
-    }
-    if (char === "\\") {
-      escaped = true
-      continue
-    }
-    if (char === '"') return parseJsonString(value.slice(0, index + 1))
-  }
-  return null
 }

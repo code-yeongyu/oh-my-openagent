@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createInterface } from "node:readline/promises"
 import { fileURLToPath } from "node:url"
+import { isBunGlobalEntrypointPath } from "./lazycodex-bun-global-paths"
 import type { RunCommand } from "./types"
 
 const DEFAULT_UPDATE_COMMAND = "npx"
@@ -63,6 +64,7 @@ export async function runLazyCodexManualUpdate(input: {
   }
   if (input.dryRun) {
     log(`${plan.command} ${plan.args.join(" ")}`)
+    if (plan.postUpdate === "bun-global-trust") log(`${DEFAULT_UPDATE_COMMAND} ${DEFAULT_UPDATE_ARGS.join(" ")}`)
     return 0
   }
   await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env })
@@ -73,6 +75,7 @@ export async function runLazyCodexManualUpdate(input: {
       commandRunner,
       isInteractive: input.isInteractive ?? (process.stdin.isTTY === true && process.stdout.isTTY === true),
     })
+    await commandRunner(DEFAULT_UPDATE_COMMAND, DEFAULT_UPDATE_ARGS, { cwd: process.cwd(), env })
   }
   return 0
 }
@@ -189,21 +192,7 @@ function isKnownLazyCodexBunTrustPackage(packageName: string): boolean {
 }
 
 function isBunGlobalEntrypoint(invokedPath: string | undefined, env: NodeJS.ProcessEnv): boolean {
-  if (typeof invokedPath !== "string" || invokedPath.trim().length === 0) return false
-  const normalizedPath = normalizePathForPrefix(invokedPath)
-  return resolveBunGlobalNodeModulesRoots(env).some((root) => normalizedPath.startsWith(root))
-}
-
-function resolveBunGlobalNodeModulesRoots(env: NodeJS.ProcessEnv): readonly string[] {
-  return [
-    env.BUN_INSTALL?.trim() ? join(env.BUN_INSTALL.trim(), "install", "global", "node_modules") : undefined,
-    env.HOME?.trim() ? join(env.HOME.trim(), ".bun", "install", "global", "node_modules") : undefined,
-  ].flatMap((root) => root === undefined ? [] : [normalizePathForPrefix(root)])
-}
-
-function normalizePathForPrefix(path: string): string {
-  const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "")
-  return normalized.endsWith("/node_modules") ? `${normalized}/` : normalized
+  return isBunGlobalEntrypointPath(invokedPath, env)
 }
 
 function defaultRunCommandForManualUpdate(command: string, args: readonly string[], options: { readonly cwd: string; readonly env?: NodeJS.ProcessEnv }): Promise<void> {

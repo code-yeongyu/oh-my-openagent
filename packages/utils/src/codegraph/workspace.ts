@@ -25,6 +25,12 @@ export interface CodegraphWorkspacePreparation {
   readonly reason?: string
 }
 
+export interface CodegraphWorkspacePaths {
+  readonly dataDir: string
+  readonly dataRoot: string
+  readonly projectLink: string
+}
+
 export interface PrepareCodegraphWorkspaceOptions {
   readonly homeDir?: string
   readonly platform?: NodeJS.Platform
@@ -55,7 +61,7 @@ export function sanitizeBase(value: string): string {
   return sanitized.length > 0 ? sanitized : "workspace"
 }
 
-function codegraphDataRoot(homeDir: string): string {
+export function codegraphDataRoot(homeDir: string): string {
   return join(homeDir, ".omo", "codegraph")
 }
 
@@ -63,6 +69,19 @@ function workspaceStorageName(workspace: string): string {
   const resolved = resolve(workspace)
   const hash = createHash("sha256").update(resolved).digest("hex").slice(0, 16)
   return `${sanitizeBase(basename(resolved))}-${hash}`
+}
+
+export function resolveCodegraphWorkspacePaths(
+  workspace: string,
+  options: { readonly homeDir?: string } = {},
+): CodegraphWorkspacePaths {
+  const resolvedWorkspace = resolve(workspace)
+  const dataRoot = codegraphDataRoot(options.homeDir ?? homedir())
+  return {
+    dataDir: join(dataRoot, "projects", workspaceStorageName(resolvedWorkspace)),
+    dataRoot,
+    projectLink: join(resolvedWorkspace, ".codegraph"),
+  }
 }
 
 function fallbackResult(
@@ -87,9 +106,7 @@ export function prepareCodegraphWorkspace(
   options: PrepareCodegraphWorkspaceOptions = {},
 ): CodegraphWorkspacePreparation {
   const resolvedWorkspace = resolve(workspace)
-  const dataRoot = codegraphDataRoot(options.homeDir ?? homedir())
-  const dataDir = join(dataRoot, "projects", workspaceStorageName(resolvedWorkspace))
-  const projectLink = join(resolvedWorkspace, ".codegraph")
+  const { dataDir, dataRoot, projectLink } = resolveCodegraphWorkspacePaths(resolvedWorkspace, options)
 
   try {
     mkdirSync(dataDir, { recursive: true })

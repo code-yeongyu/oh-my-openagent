@@ -17,6 +17,7 @@ describe("AGENTS.md dev-environment documentation", () => {
     const required: ReadonlyArray<readonly [token: string, why: string]> = [
       ["script/agent/setup.sh", "shared bootstrap"],
       ["script/agent/cleanup.sh", "shared teardown"],
+      ["script/agent/cleanup-hook.sh", "Claude shutdown-safe teardown launcher"],
       ["script/agent/qa-sandbox.sh", "isolated QA helper"],
       [".env.example", "credential injection point"],
       [".devcontainer", "Codespaces + Dev Containers wiring"],

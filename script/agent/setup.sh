@@ -57,6 +57,16 @@ node_major="$(node --version 2>/dev/null | sed -E 's/^v?([0-9]+).*/\1/')"
 log "installing dependencies (bun install --ignore-scripts)"
 bun install --ignore-scripts
 
+# Frontend third-party references live as pinned submodules under
+# packages/shared-skills/upstreams/ and are materialized into the skill at build
+# time. Both steps are NON-FATAL: an offline dev still gets a working tree (the
+# brand refs are simply absent locally); CI/publish run the build chain which
+# materializes them with --strict so the shipped package is complete.
+log "initializing provenance submodules (non-fatal)"
+git submodule update --init --recursive || log "WARN: submodule init skipped (offline?); frontend brand refs will be absent locally"
+log "materializing frontend references from submodules (non-fatal)"
+node packages/shared-skills/scripts/materialize-frontend-refs.mjs || log "WARN: frontend refs not materialized (submodules missing?)"
+
 if [ ! -f "$REPO_ROOT/dist/index.js" ] || [ "${OMO_AGENT_FORCE_BUILD:-0}" = "1" ]; then
   log "building plugin (dist/index.js missing or OMO_AGENT_FORCE_BUILD=1)"
   bun run build

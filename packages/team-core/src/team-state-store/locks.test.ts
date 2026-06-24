@@ -8,6 +8,19 @@ async function createTempDirectory(prefix: string): Promise<string> {
   return await mkdtemp(join(tmpdir(), prefix))
 }
 
+function createSignal(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolveSignal: (() => void) | undefined
+  const promise = new Promise<void>((resolve) => {
+    resolveSignal = resolve
+  })
+
+  if (resolveSignal === undefined) {
+    throw new Error("signal resolver was not initialized")
+  }
+
+  return { promise, resolve: resolveSignal }
+}
+
 test("withLock serializes concurrent work", async () => {
   // given
   const { withLock } = await import("./locks")
@@ -17,16 +30,21 @@ test("withLock serializes concurrent work", async () => {
   await writeFile(probePath, "ready")
   const activeMarkers = new Set<string>()
   const overlapObserved: string[] = []
+  const firstAcquired = createSignal()
+  const releaseFirst = createSignal()
 
   // when
   const first = withLock(lockPath, async () => {
     activeMarkers.add("first")
     await writeFile(probePath, "first-start")
-    await new Promise((resolve) => setTimeout(resolve, 75))
+    firstAcquired.resolve()
+    await releaseFirst.promise
     if (activeMarkers.has("second")) overlapObserved.push("first")
     activeMarkers.delete("first")
     return "first"
   })
+
+  await firstAcquired.promise
 
   const second = withLock(lockPath, async () => {
     activeMarkers.add("second")
@@ -36,6 +54,7 @@ test("withLock serializes concurrent work", async () => {
     return currentProbe
   })
 
+  releaseFirst.resolve()
   const results = await Promise.all([first, second])
 
   // then
