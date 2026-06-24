@@ -2,14 +2,14 @@ import { log } from "../../shared/logger"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { findEmptyMessages } from "./storage/empty-messages"
 import {
-  findEmptyMessages,
   findMessagesWithEmptyTextParts,
-  injectTextPart,
+  findMessagesWithEmptyTextPartsFromSDK,
   replaceEmptyTextParts,
-} from "../session-recovery/storage"
-import { findMessagesWithEmptyTextPartsFromSDK, replaceEmptyTextPartsAsync } from "../session-recovery/storage/empty-text"
-import { injectTextPartAsync } from "../session-recovery/storage/text-part-injector"
+  replaceEmptyTextPartsAsync,
+} from "./storage/empty-text"
+import { injectTextPart, injectTextPartAsync } from "./storage/text-part-injector"
 
 export const PLACEHOLDER_TEXT = "[user interrupted]"
 

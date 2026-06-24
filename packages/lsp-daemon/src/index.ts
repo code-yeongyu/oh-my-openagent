@@ -1,4 +1,4 @@
-export { disposeDefaultLspManager } from "@code-yeongyu/lsp-tools-mcp/dist/lsp/manager.js";
+export { disposeDefaultLspManager } from "@oh-my-opencode/lsp-core/lsp/manager";
 export {
 	type CallToolOptions,
 	callDiagnosticsViaDaemon,

@@ -1,0 +1,25 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-codex/src/install/link-cached-plugin-agents.test.ts:
+(pass) linkCachedPluginAgents > creates regular file copies on linux so agent roles survive snapshot cleanup [4.50ms]
+(pass) linkCachedPluginAgents > creates regular file copies on darwin (macOS) [1.59ms]
+(pass) linkCachedPluginAgents > creates regular file copies on Windows (no symlinks) [1.67ms]
+(pass) linkCachedPluginAgents > replaces stale broken symlinks with regular files on unix [1.48ms]
+(pass) linkCachedPluginAgents > overwrites stale copies on Windows [1.43ms]
+(pass) linkCachedPluginAgents > preserves installed agent reasoning effort when reinstalling file copies [1.94ms]
+(pass) linkCachedPluginAgents > preserves removed installed agent service tier when reinstalling file copies [1.72ms]
+(pass) linkCachedPluginAgents > preserves legacy reviewer reasoning like any other compatibility fixture [1.72ms]
+(pass) linkCachedPluginAgents > writes a manifest under the plugin cache listing installed agent paths for clean uninstall [1.57ms]
+(pass) linkCachedPluginAgents > is idempotent across re-runs [2.53ms]
+(pass) linkCachedPluginAgents > discovers TOMLs across multiple component agent directories [1.17ms]
+(pass) linkCachedPluginAgents > returns empty list when plugin has no bundled agents [0.31ms]
+(pass) linkCachedPluginAgents > auto-detects host platform when platform parameter is omitted [1.39ms]
+
+packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:
+(pass) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [317.88ms]
+(pass) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML [268.27ms]
+
+ 15 pass
+ 0 fail
+ 60 expect() calls
+Ran 15 tests across 2 files. [663.00ms]

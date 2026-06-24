@@ -51,6 +51,28 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(1_000_000)
   })
 
+  it("returns GA 1M for Anthropic claude-opus-4-8 without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for Anthropic claude-opus-4-8-high without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8-high", {
+      anthropicContext1MEnabled: false,
+    })
+
+    expect(actualLimit).toBe(1_000_000)
+  })
+
   it("returns GA 1M for Antigravity Claude models served by google", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
@@ -111,5 +133,36 @@ describe("resolveActualContextLimit", () => {
     })
 
     expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-fable-5 and claude-mythos-5", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-fable-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-mythos-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-opus-4-8", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-4-8", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-fable-5 on google-vertex-anthropic", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("google-vertex-anthropic", "claude-fable-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
   })
 })

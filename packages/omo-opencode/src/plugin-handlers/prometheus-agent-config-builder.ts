@@ -20,6 +20,7 @@ type PrometheusOverride = Record<string, unknown> & {
   temperature?: number;
   top_p?: number;
   maxTokens?: number;
+  prompt?: string;
   prompt_append?: string;
 };
 
@@ -118,10 +119,14 @@ export async function buildPrometheusAgentConfig(params: {
   const override = params.pluginPrometheusOverride;
   if (!override) return base;
 
-  const { prompt_append, ...restOverride } = override;
+  const { prompt, prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
-  if (prompt_append && typeof merged.prompt === "string") {
-    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
+  if (typeof merged.prompt === "string") {
+    for (const promptAddition of [prompt, prompt_append]) {
+      if (promptAddition) {
+        merged.prompt = merged.prompt + "\n" + resolvePromptAppend(promptAddition);
+      }
+    }
   }
   return merged;
 }

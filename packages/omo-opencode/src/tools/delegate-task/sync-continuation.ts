@@ -1,6 +1,7 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
-import { isPlanFamily } from "./constants"
+import { getDeliverableTag, isPlanFamily } from "./constants"
+import { handedBackSyncSessions } from "../../features/claude-code-session-state"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
@@ -14,6 +15,7 @@ import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { log } from "../../shared/logger"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -119,6 +121,7 @@ export async function executeSyncContinuation(
   let resumeModel: ResumeModel | undefined
   let resumeVariant: string | undefined
   let anchorMessageCount: number | undefined
+  let handedBackToParent = false
 
   try {
     const resumeContext = await resolveResumeContext(client, continuationID)
@@ -197,12 +200,14 @@ export async function executeSyncContinuation(
         }
         const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
           strictAbortRecovery: true,
+          deliverableTag: getDeliverableTag(resumeAgent),
         })
         if (!recoveredResult.ok) {
           return pollError
         }
 
         const duration = formatDuration(startTime)
+        handedBackToParent = true
 
         return `Task continued and completed in ${duration}.
 
@@ -220,12 +225,15 @@ ${buildTaskMetadataBlock({
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
+      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+        deliverableTag: getDeliverableTag(resumeAgent),
+      })
       if (!result.ok) {
         return result.error
       }
 
      const duration = formatDuration(startTime)
+     handedBackToParent = true
 
      return `Task continued and completed in ${duration}.
 
@@ -242,6 +250,14 @@ ${buildTaskMetadataBlock({
    } finally {
      if (toastManager) {
        toastManager.removeTask(taskId)
+     }
+     if (handedBackToParent) {
+       handedBackSyncSessions.add(continuationID)
+       if (typeof client.session.abort === "function") {
+         void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
+           log(`[task] Failed to abort completed sync continuation session:`, error)
+         })
+       }
      }
    }
 }

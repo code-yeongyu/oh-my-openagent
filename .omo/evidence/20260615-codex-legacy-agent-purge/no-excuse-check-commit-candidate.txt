@@ -1,0 +1,3 @@
+COMMAND: bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-codex/src/install/link-cached-plugin-agents.ts packages/omo-codex/src/install/retired-managed-agent-purge.ts
+
+No violations in 2 file(s).

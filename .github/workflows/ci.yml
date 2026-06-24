@@ -11,26 +11,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Block PRs targeting master branch
+  # Block PRs targeting master branch (comment + auto-close, then fail the check)
   block-master-pr:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
     steps:
       - name: Check PR target branch
         env:
           BASE_REF: ${{ github.base_ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          if [ "$BASE_REF" = "master" ]; then
-            echo "::error::PRs to master branch are not allowed. Please target the 'dev' branch instead."
-            echo ""
-            echo "PULL REQUESTS TO MASTER ARE BLOCKED"
-            echo ""
-            echo "All PRs must target the 'dev' branch."
-            echo "Please close this PR and create a new one targeting 'dev'."
-            exit 1
-          else
+          if [ "$BASE_REF" != "master" ]; then
             echo "PR targets '${BASE_REF}' branch - OK"
+            exit 0
           fi
+
+          echo "::error::PRs to master branch are not allowed. Please target the 'dev' branch instead."
+
+          gh pr comment "$PR_URL" --body "$(cat <<EOF
+          Hi @${PR_AUTHOR}, thanks for the contribution!
+
+          This repository does not accept pull requests that target the \`master\` branch, so this PR is being closed automatically.
+
+          **What to do instead:**
+          1. Re-target (or recreate) this PR against the \`dev\` branch.
+          2. All changes land on \`dev\` first; \`master\` is updated only by the release workflow.
+
+          No worries, nothing is lost. Just open a new PR against \`dev\` and we'll take it from there. Thanks again!
+          EOF
+          )"
+
+          gh pr close "$PR_URL"
+
+          echo "PR was auto-closed because it targeted 'master'."
+          exit 1
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## PR target guard"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Base branch | \`${{ github.base_ref || 'n/a' }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Blocks pull requests that target \`master\`."
+            echo "- Leaves non-master pull requests alone."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Retarget the pull request to \`dev\`; release automation owns \`master\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   test:
     runs-on: ${{ matrix.os }}
@@ -40,36 +81,51 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v4
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
         working-directory: packages/lsp-daemon
 
+      - name: Run vendored lsp-daemon tests
+        run: npm test
+        working-directory: packages/lsp-daemon
+
       - name: Run tests
         run: bun test
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Root test suite (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages before tests.
+            - Runs `npm test` for `packages/lsp-daemon`.
+            - Runs the full root `bun test` suite on `${{ matrix.os }}`.
+          JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   typecheck:
     runs-on: ${{ matrix.os }}
@@ -78,29 +134,27 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v4
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
@@ -109,8 +163,17 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
-      - name: Type check script tooling
-        run: bun run typecheck:script
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: TypeScript checks (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages required by the workspace.
+            - Runs root `bun run typecheck`, including script and package checks.
+          JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; shared package failures can cascade into adapters.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   codex-compatibility:
     runs-on: ${{ matrix.os }}
@@ -119,29 +182,27 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v4
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
@@ -150,11 +211,24 @@ jobs:
       - name: Run Codex compatibility tests
         run: bun run test:codex
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Codex compatibility (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the MCP runtimes needed by the Codex adapter.
+            - Runs the hermetic `bun run test:codex` gate.
+            - Covers Linux, macOS, and Windows compatibility.
+          JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   lazycodex-published-smoke:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
 
@@ -186,33 +260,53 @@ jobs:
             echo "::warning::lazycodex-ai doctor dry-run output changed: $npx_doctor_output"
           fi
 
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Published LazyCodex smoke"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Ref | \`${{ github.ref_name }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Runs non-blocking smoke checks against \`lazycodex-ai@latest\`."
+            echo "- Verifies dry-run install and doctor command routing from an isolated temp directory."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Treat warnings as registry or alias drift signals; this job is intentionally non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility]
     permissions:
-      contents: write
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v4
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
@@ -229,8 +323,54 @@ jobs:
       - name: Verify dist bundle tests
         run: bun test packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Root build
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the distributable OpenCode/Codex packages.
+            - Confirms `dist/index.js` and `dist/index.d.ts` exist.
+            - Runs dist bundle regression tests.
+          JOB_SUMMARY_NEXT: Fix the first failing build prerequisite before debugging downstream dist checks.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  auto-commit-schema:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, codex-compatibility, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
+
+      - name: Build
+        run: bun run build
+
       - name: Auto-commit schema changes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           if git diff --quiet assets/oh-my-opencode.schema.json; then
             echo "No schema changes to commit"
@@ -242,14 +382,26 @@ jobs:
             git push
           fi
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Schema auto-commit
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Rebuilds the schema artifact on `master` pushes.
+            - Commits `assets/oh-my-opencode.schema.json` only when generation changes it.
+          JOB_SUMMARY_NEXT: If this fails, inspect schema generation first, then check bot write permissions.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   draft-release:
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [test, typecheck, codex-compatibility, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -297,3 +449,15 @@ jobs:
           $NOTES
           EOF
           fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Draft release notes
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Generates changelog notes from the current `dev` branch.
+            - Creates or updates the `next` draft release.
+          JOB_SUMMARY_NEXT: Check changelog generation output first, then GitHub release permissions.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

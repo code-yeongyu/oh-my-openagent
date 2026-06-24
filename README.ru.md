@@ -169,9 +169,9 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | ⚡   | **`ultrawork` / `ulw`**                                  | Both     | Одно слово. Все агенты (Ultimate) или Codex-компонент `ultrawork` (Light) активируются. Не останавливается, пока задача не выполнена.                                                                                            |
 | 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Анализирует истинное намерение пользователя перед классификацией и действием. Триггеры `search` / `analyze` / `team` / `hyperplan`. (Light хукает только `ulw` / `ultrawork`.)                                                   |
 | 🔗   | **Инструмент правок на основе хэш-якорей**               | Ultimate | Хэш содержимого `LINE#ID` проверяет каждое изменение. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex использует собственный `apply_patch`.) |
-| 🛠️   | **LSP + AST-Grep**                                       | Both     | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. Ultimate предоставляет это как встроенные инструменты, Light — как plugin-scoped MCP `lsp` / `ast_grep`.                            |
+| 🛠️   | **LSP + AST-Grep**                                       | Both     | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. LSP предоставляется через MCP, AST-Grep — через общий skill `ast-grep` и `sg`.                            |
 | 🧠   | **Фоновые агенты**                                       | Ultimate | Запускайте 5+ специалистов параллельно. Контекст остаётся компактным. Результаты — когда готовы.                                                                                                                                 |
-| 📚   | **Встроенные MCP**                                       | Both     | Ultimate внедряет Exa (веб-поиск), Context7 (официальная документация) и Grep.app (поиск по GitHub) во время выполнения. Light предоставляет plugin-scoped MCP: `ast_grep`, `grep_app`, `context7`, `git_bash`, `lsp`.                                                                                                     |
+| 📚   | **Встроенные MCP**                                       | Both     | Ultimate внедряет Exa (веб-поиск), Context7 (официальная документация) и Grep.app (поиск по GitHub) во время выполнения. Light предоставляет plugin-scoped MCP: `grep_app`, `context7`, `git_bash`, `lsp`.                                                                                                     |
 | 🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Самореферентный цикл. Не останавливается, пока задача не выполнена на 100%.                                                                                                                                                      |
 | ✅   | **Todo Enforcer** (Boulder)                              | Ultimate | Агент завис? Система немедленно возвращает его в работу. Ваша задача будет выполнена, точка.                                                                                                                                     |
 | 💬   | **Comment Checker**                                      | Both     | Никакого AI-мусора в комментариях. Тот же бинарник `@code-yeongyu/comment-checker` работает в обеих редакциях.                                                                                                                   |
@@ -311,7 +311,7 @@ project/
 - Встроенные MCP-серверы, запускаемые по необходимости.
 - Ограниченные разрешения, чтобы агенты оставались в рамках.
 
-Встроенные: `playwright` (автоматизация браузера), `git-master` (атомарные коммиты, хирургия rebase), `frontend-ui-ux` (UI с упором на дизайн).
+Встроенные: `playwright` (автоматизация браузера), `git-master` (атомарные коммиты, хирургия rebase), `frontend` (UI с упором на дизайн).
 
 Добавьте свои в `.opencode/skills/*/SKILL.md` или `~/.config/opencode/skills/*/SKILL.md`.
 

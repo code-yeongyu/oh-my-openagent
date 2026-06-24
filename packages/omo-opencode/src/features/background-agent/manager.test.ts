@@ -11,6 +11,7 @@ import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/s
 import {
   getSessionAgent,
   registerAgentName,
+  setSessionAgent,
   _resetForTesting as resetClaudeCodeSessionState,
   subagentSessions,
 } from "../claude-code-session-state"
@@ -1395,6 +1396,71 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 })
 
+describe("BackgroundManager.getTasksSnapshot", () => {
+  test("getTasksSnapshot empty returns an empty defensive snapshot", () => {
+    //#given
+    const manager = createBackgroundManager()
+
+    //#when
+    const snapshots = manager.getTasksSnapshot()
+    snapshots.push({
+      title: "external mutation",
+      status: "pending",
+      toolCalls: null,
+      lastTool: null,
+      agent: "atlas",
+    })
+
+    //#then
+    expect(manager.getTasksSnapshot()).toEqual([])
+
+    manager.shutdown()
+  })
+
+  test("returns frozen snapshots without exposing the internal task map", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-snapshot",
+      parentSessionId: "parent-session",
+      description: "inspect background task",
+      prompt: "fallback prompt",
+      agent: "sisyphus",
+      status: "running",
+      progress: {
+        toolCalls: 2,
+        lastTool: "glob",
+        lastUpdate: new Date("2026-06-15T00:00:00.000Z"),
+      },
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const snapshots = manager.getTasksSnapshot()
+    const first = snapshots[0]
+    task.description = "changed internal task"
+
+    //#then
+    expect(first).toEqual({
+      title: "inspect background task",
+      status: "running",
+      toolCalls: 2,
+      lastTool: "glob",
+      agent: "sisyphus",
+    })
+    expect(first ? Object.isFrozen(first) : false).toBe(true)
+    expect(manager.getTasksSnapshot()).toEqual([{
+      title: "changed internal task",
+      status: "running",
+      toolCalls: 2,
+      lastTool: "glob",
+      agent: "sisyphus",
+    }])
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.notifyParentSession - release ordering", () => {
   test("should unblock queued task even when prompt hangs", async () => {
     // given - concurrency limit 1, task1 running, task2 waiting
@@ -2374,6 +2440,142 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(abortedSessionIDs).toEqual(["session-1"])
   })
 
+  test("should fire onSubagentSessionDeleted callback on completion", async () => {
+    // #given
+    const deletedSessionIDs: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      onSubagentSessionDeleted: async (event) => {
+        deletedSessionIDs.push(event.sessionID)
+      },
+    })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-deleted-callback",
+      sessionId: "session-deleted-cb",
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "test task for deleted callback",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+
+    // #then
+    expect(deletedSessionIDs).toEqual(["session-deleted-cb"])
+  })
+
+  test("#given the final child is mid-teardown #when its session abort is still pending #then hasPendingParentWake keeps reporting an owed wake", async () => {
+    // #given a session abort that blocks until released, simulating the awaited
+    // teardown window (abort carries a 10s timeout, plus the tmux callback) during
+    // which the child is already marked completed but the parent wake has not yet
+    // been queued.
+    let releaseAbort: (() => void) | undefined
+    const abortGate = new Promise<void>((resolve) => { releaseAbort = resolve })
+    let signalAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { signalAbortStarted = resolve })
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        messages: async () => ({ data: [] }),
+        abort: async () => {
+          signalAbortStarted?.()
+          await abortGate
+          return {}
+        },
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    // notifyParentSession is stubbed so no real wake is ever queued; this isolates
+    // the notification-preparation reservation as the SOLE bridge across the gap.
+    stubNotifyParentSession(manager)
+
+    const parentSessionId = "session-parent-teardown-gap"
+    const task: BackgroundTask = {
+      id: "task-teardown-gap",
+      sessionId: "session-child-teardown-gap",
+      parentSessionId,
+      parentMessageId: "msg-1",
+      description: "child whose teardown outlives the settle window",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    try {
+      // #when completion begins but the session abort has not resolved yet.
+      const completion = tryCompleteTaskForTest(manager, task)
+      await abortStarted
+
+      // #then the child is already terminal (no longer an active child)...
+      expect(task.status).toBe("completed")
+      // ...and no wake is tracked in any pending/dispatched map yet...
+      expect(getPendingParentWakes(manager).has(parentSessionId)).toBe(false)
+      expect(getDispatchedParentWakes(manager).has(parentSessionId)).toBe(false)
+      // ...but the reservation keeps hasPendingParentWake true so a parent sync
+      // poller keeps waiting instead of settling on a stale pre-result turn.
+      expect(manager.hasPendingParentWake(parentSessionId)).toBe(true)
+
+      // #when teardown finishes and the notification has been enqueued.
+      releaseAbort?.()
+      await completion
+
+      // #then the reservation is released; with notify stubbed nothing is owed.
+      expect(manager.hasPendingParentWake(parentSessionId)).toBe(false)
+    } finally {
+      releaseAbort?.()
+    }
+  })
+
+  test("should immediately clear completed subagent runtime-fallback eligibility", async () => {
+    // #given
+    resetClaudeCodeSessionState()
+    const sessionID = "session-completed-runtime-fallback"
+    subagentSessions.add(sessionID)
+    setSessionAgent(sessionID, "explore")
+
+    const task: BackgroundTask = {
+      id: "task-completed-runtime-fallback",
+      sessionId: sessionID,
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "completed task should not be retried by runtime fallback",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    try {
+      // #when
+      await tryCompleteTaskForTest(manager, task)
+
+      // #then
+      expect(task.status).toBe("completed")
+      expect(subagentSessions.has(sessionID)).toBe(false)
+      expect(getSessionAgent(sessionID)).toBeUndefined()
+    } finally {
+      resetClaudeCodeSessionState()
+    }
+  })
+
   test("should clean pendingByParent even when promptAsync notification fails", async () => {
     // given
     const client = {
@@ -3048,7 +3250,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     function createMockClient() {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async () => ({ data: { directory: "/test/dir" } }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
@@ -3066,7 +3268,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     ) {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async ({ path }: { path: { id: string } }) => {
             if (options?.sessionLookupError) {
               throw options.sessionLookupError
@@ -3348,7 +3550,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   describe("task transitions pending→running when slot available", () => {
     test("does not override parent session permission when creating child session", async () => {
       // given
-      const createCalls: any[] = []
+      const createCalls: Array<{ body?: { permission?: unknown } }> = []
       const parentPermission = [
         { permission: "question", action: "allow" as const, pattern: "*" },
         { permission: "plan_enter", action: "deny" as const, pattern: "*" },
@@ -3356,7 +3558,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const customClient = {
         session: {
-          create: async (args?: any) => {
+          create: async (args: { body?: { permission?: unknown } }) => {
             createCalls.push(args)
             return { data: { id: `ses_${crypto.randomUUID()}` } }
           },

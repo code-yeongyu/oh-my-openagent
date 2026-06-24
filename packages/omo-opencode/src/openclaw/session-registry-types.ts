@@ -1,11 +1,1 @@
-export interface SessionMapping {
-  sessionId: string
-  tmuxSession: string
-  tmuxPaneId: string
-  projectPath: string
-  platform: string
-  messageId: string
-  channelId?: string
-  threadId?: string
-  createdAt: string
-}
+export * from "@oh-my-opencode/openclaw-core/session-registry-types"

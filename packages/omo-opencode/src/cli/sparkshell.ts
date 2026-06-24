@@ -10,20 +10,48 @@ import {
 } from "./sparkshell-appserver"
 import {
   hasTopLevelSparkShellHelpFlag,
+  hasTopLevelSparkShellJsonFlag,
   parseSparkShellFallbackInvocation,
+  parseTopLevelSparkShellBudget,
   SPARKSHELL_USAGE,
+  stripTopLevelSparkShellArgs,
   type SparkShellFallbackInvocation,
 } from "./sparkshell-parse"
+import { condenseOutput, extractContextHints } from "./sparkshell-condense"
+import { loadCodexSessionContextDetails, type SessionContextDetails } from "./sparkshell-session-context"
+import {
+  createDefaultSparkSummarizer,
+  isSparkSummaryEnabled,
+  resolveSparkModel,
+  SPARKSHELL_SPARK_ENV,
+  type SparkSummarizer,
+  type SparkSummaryRequest,
+} from "./sparkshell-spark"
 
 export const SPARKSHELL_BIN_ENV = "OMO_SPARKSHELL_BIN"
+export const SPARKSHELL_CONDENSE_ENV = "OMO_SPARKSHELL_CONDENSE"
+export const SPARKSHELL_CONDENSE_BUDGET_ENV = "OMO_SPARKSHELL_CONDENSE_BUDGET"
+
+const DEFAULT_CONDENSE_BUDGET_CHARS = 20_000
 
 export type { SparkShellAppServerClient, SparkShellAppServerCommand, SparkShellAppServerResult }
 
 export {
   parseSparkShellFallbackInvocation,
+  parseTopLevelSparkShellBudget,
   resolveFallbackShellArgv,
   SPARKSHELL_USAGE,
 } from "./sparkshell-parse"
+
+export {
+  DEFAULT_SPARK_MODEL,
+  SPARKSHELL_SPARK_BIN_ENV,
+  SPARKSHELL_SPARK_ENV,
+  SPARKSHELL_SPARK_MODEL_ENV,
+  SPARKSHELL_SPARK_TIMEOUT_ENV,
+  type SparkSummarizer,
+  type SparkSummaryRequest,
+} from "./sparkshell-spark"
 
 export type SparkShellSpawnResult = {
   readonly status?: number | null
@@ -48,6 +76,13 @@ export type SparkShellRunOptions = {
   readonly writeStderr?: (value: string) => void
   readonly commandExists?: (command: string) => boolean
   readonly appServerClient?: SparkShellAppServerClient | null
+  readonly loadSessionContext?: (env: RuntimeEnv) => SessionContextDetails | null
+  readonly sparkSummarize?: SparkSummarizer | null
+}
+
+type SparkShellExecOutcome = {
+  readonly code: number
+  readonly executed: boolean
 }
 
 export async function runSparkShell(args: readonly string[], options: SparkShellRunOptions = {}): Promise<number> {
@@ -66,10 +101,127 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
     return 1
   }
 
+  const jsonMode = hasTopLevelSparkShellJsonFlag(args)
+  const getDetails = createLazySessionDetails(env, options.loadSessionContext)
+  const transformOutput = jsonMode
+    ? undefined
+    : createCondenseTransform(args, env, getDetails, resolveSparkSummarizer(options.sparkSummarize, env, cwd))
+  const outcome = await executeSparkShell(args, options, { cwd, env, writeStdout, writeStderr, transformOutput })
+  return outcome.code
+}
+
+function createLazySessionDetails(
+  env: RuntimeEnv,
+  load: ((env: RuntimeEnv) => SessionContextDetails | null) | undefined,
+): () => SessionContextDetails | null {
+  const loadDetails = load ?? loadCodexSessionContextDetails
+  let loaded = false
+  let details: SessionContextDetails | null = null
+  return () => {
+    if (!loaded) {
+      loaded = true
+      try {
+        details = loadDetails(env)
+      } catch {
+        details = null
+      }
+    }
+    return details
+  }
+}
+
+function createCondenseTransform(
+  args: readonly string[],
+  env: RuntimeEnv,
+  getDetails: () => SessionContextDetails | null,
+  sparkSummarize: SparkSummarizer | null,
+): ((text: string) => string) | undefined {
+  if (isFalsyEnvValue(env[SPARKSHELL_CONDENSE_ENV])) {
+    return undefined
+  }
+  const budget = parseTopLevelSparkShellBudget(args) ?? parseEnvBudget(env) ?? DEFAULT_CONDENSE_BUDGET_CHARS
+  const commandLine = stripTopLevelSparkShellArgs(args).join(" ")
+  return (text: string): string => {
+    if (text.length <= budget) {
+      return text
+    }
+    const details = getDetails()
+    if (sparkSummarize) {
+      const summary = summarizeWithSpark(sparkSummarize, {
+        commandLine,
+        text,
+        budgetChars: budget,
+        sessionContext: details?.block ?? "",
+      })
+      if (summary !== null) {
+        return formatSparkSummary(summary, resolveSparkModel(env), text)
+      }
+    }
+    const hints = details === null ? [] : extractContextHints([details.firstUserRequest, details.latestUserRequest])
+    return condenseOutput(text, { budgetChars: budget, hints }).output
+  }
+}
+
+function resolveSparkSummarizer(
+  option: SparkSummarizer | null | undefined,
+  env: RuntimeEnv,
+  cwd: string,
+): SparkSummarizer | null {
+  if (!isSparkSummaryEnabled(env)) {
+    return null
+  }
+  if (option !== undefined) {
+    return option
+  }
+  return createDefaultSparkSummarizer(env, cwd)
+}
+
+function summarizeWithSpark(sparkSummarize: SparkSummarizer, request: SparkSummaryRequest): string | null {
+  try {
+    const summary = sparkSummarize(request)
+    return summary !== null && summary.trim().length > 0 ? summary : null
+  } catch {
+    return null
+  }
+}
+
+function formatSparkSummary(summary: string, model: string, originalText: string): string {
+  const totalLines = originalText.split("\n").length
+  const header = [
+    `[sparkshell] spark summary (model: ${model}; original output: ${totalLines} lines, ${originalText.length} chars);`,
+    `as-is excerpt with a bottom [sparkshell caption]. Set ${SPARKSHELL_SPARK_ENV}=0 to disable.`,
+  ].join(" ")
+  return `${header}\n${summary.trim()}\n`
+}
+
+function parseEnvBudget(env: RuntimeEnv): number | null {
+  const parsed = Number.parseInt(env[SPARKSHELL_CONDENSE_BUDGET_ENV]?.trim() ?? "", 10)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? Math.max(2000, parsed) : null
+}
+
+function isFalsyEnvValue(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false
+  }
+  return ["0", "false", "no", "off"].includes(value.trim().toLowerCase())
+}
+
+async function executeSparkShell(
+  args: readonly string[],
+  options: SparkShellRunOptions,
+  context: {
+    readonly cwd: string
+    readonly env: RuntimeEnv
+    readonly writeStdout: (value: string) => void
+    readonly writeStderr: (value: string) => void
+    readonly transformOutput?: (text: string) => string
+  },
+): Promise<SparkShellExecOutcome> {
+  const { cwd, env, writeStdout, writeStderr, transformOutput } = context
   const nativeBinaryPath = resolveNativeBinaryOverride(env, cwd)
   const spawn = options.spawn ?? defaultSpawn
   if (nativeBinaryPath.length > 0) {
-    return runSpawnedCommand(spawn, nativeBinaryPath, args, { cwd, env }, writeStdout, writeStderr)
+    return { code: runSpawnedCommand(spawn, nativeBinaryPath, args, { cwd, env }, writeStdout, writeStderr), executed: true }
   }
 
   const appServerClient = options.appServerClient === undefined ? createDefaultSparkShellAppServerClient(env) : options.appServerClient
@@ -83,6 +235,7 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
         spawn,
         writeStdout,
         writeStderr,
+        transformOutput,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -100,15 +253,15 @@ export async function runSparkShell(args: readonly string[], options: SparkShell
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     writeStderr(`${message}\n`)
-    return 1
+    return { code: 1, executed: false }
   }
 
   const [command, ...commandArgs] = invocation.argv
   if (command === undefined) {
     writeStderr(`Missing command to run.\n${SPARKSHELL_USAGE}\n`)
-    return 1
+    return { code: 1, executed: false }
   }
-  return runSpawnedCommand(spawn, command, commandArgs, { cwd, env }, writeStdout, writeStderr)
+  return { code: runSpawnedCommand(spawn, command, commandArgs, { cwd, env }, writeStdout, writeStderr, transformOutput), executed: true }
 }
 
 function resolveNativeBinaryOverride(env: RuntimeEnv, cwd: string): string {
@@ -130,8 +283,9 @@ async function runAppServerCommand(
     readonly spawn: SparkShellSpawn
     readonly writeStdout: (value: string) => void
     readonly writeStderr: (value: string) => void
+    readonly transformOutput?: (text: string) => string
   },
-): Promise<number> {
+): Promise<SparkShellExecOutcome> {
   let invocation: SparkShellFallbackInvocation
   const platform = isShellInvocation(args) ? await appServerClient.getPlatform() : options.platform
   try {
@@ -143,16 +297,27 @@ async function runAppServerCommand(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     options.writeStderr(`${message}\n`)
-    return 1
+    return { code: 1, executed: false }
   }
 
   if (invocation.kind === "tmux-pane") {
     const [command, ...commandArgs] = invocation.argv
     if (command === undefined) {
       options.writeStderr(`Missing command to run.\n${SPARKSHELL_USAGE}\n`)
-      return 1
+      return { code: 1, executed: false }
     }
-    return runSpawnedCommand(options.spawn, command, commandArgs, { cwd: options.cwd, env: options.env }, options.writeStdout, options.writeStderr)
+    return {
+      code: runSpawnedCommand(
+        options.spawn,
+        command,
+        commandArgs,
+        { cwd: options.cwd, env: options.env },
+        options.writeStdout,
+        options.writeStderr,
+        options.transformOutput,
+      ),
+      executed: true,
+    }
   }
 
   const result = await appServerClient.exec({
@@ -161,12 +326,12 @@ async function runAppServerCommand(
     env: options.env,
   })
   if (result.stdout.length > 0) {
-    options.writeStdout(result.stdout)
+    options.writeStdout(options.transformOutput ? options.transformOutput(result.stdout) : result.stdout)
   }
   if (result.stderr.length > 0) {
-    options.writeStderr(result.stderr)
+    options.writeStderr(options.transformOutput ? options.transformOutput(result.stderr) : result.stderr)
   }
-  return result.exitCode
+  return { code: result.exitCode, executed: true }
 }
 
 function isDefaultWindowsAppServerShell(command: string): boolean {
@@ -202,22 +367,48 @@ function runSpawnedCommand(
   options: { readonly cwd: string; readonly env: RuntimeEnv },
   writeStdout: (value: string) => void,
   writeStderr: (value: string) => void,
+  transformOutput?: (text: string) => string,
 ): number {
   const result = spawn(command, args, options)
   if (result.stdout && result.stdout.length > 0) {
-    writeStdout(result.stdout)
+    writeStdout(transformOutput ? transformOutput(result.stdout) : result.stdout)
   }
   if (result.stderr && result.stderr.length > 0) {
-    writeStderr(result.stderr)
+    writeStderr(transformOutput ? transformOutput(result.stderr) : result.stderr)
   }
   if (result.error) {
+    if (isCaptureOverflowError(result.error)) {
+      writeStderr(
+        `[sparkshell] ${command} exceeded the 64MB output capture limit; the command was terminated and truncated output is shown above. Pipe to a file or narrow the command instead.\n`,
+      )
+      return 1
+    }
     writeStderr(`[sparkshell] failed to launch ${command}: ${result.error.message}\n`)
+    if (isSpawnNotFoundError(result.error) && hasShellMetacharacters(command)) {
+      writeStderr(
+        `[sparkshell] '${command}' looks like a shell command; re-run with: omo sparkshell --shell '${command}'\n`,
+      )
+    }
     return 1
   }
   if (typeof result.status === "number") {
     return result.status
   }
   return signalExitCode(result.signal)
+}
+
+function isCaptureOverflowError(error: Error): boolean {
+  return (error as NodeJS.ErrnoException).code === "ENOBUFS"
+}
+
+function isSpawnNotFoundError(error: Error): boolean {
+  return (error as NodeJS.ErrnoException).code === "ENOENT"
+}
+
+const SHELL_METACHARACTER_PATTERN = /(\s&&\s|\s\|\|\s|[|;<>]|\$\(|`)/
+
+function hasShellMetacharacters(command: string): boolean {
+  return SHELL_METACHARACTER_PATTERN.test(command)
 }
 
 function signalExitCode(signal: string | null | undefined): number {
@@ -239,8 +430,9 @@ function defaultSpawn(command: string, args: readonly string[], options: { reado
   const result = spawnSync(command, [...args], {
     cwd: options.cwd,
     env: { ...process.env, ...options.env },
-    stdio: "inherit",
+    stdio: ["inherit", "pipe", "pipe"],
     encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
   })
   return {
     status: result.status,

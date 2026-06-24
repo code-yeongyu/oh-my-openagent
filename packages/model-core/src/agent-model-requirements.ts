@@ -32,12 +32,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   hephaestus: {
     fallbackChain: [
       {
-        providers: ["openai", "github-copilot", "venice", "opencode", "vercel"],
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.5",
         variant: "medium",
       },
     ],
-    requiresProvider: ["openai", "github-copilot", "venice", "opencode", "vercel"],
+    requiresProvider: ["openai", "github-copilot", "opencode", "vercel"],
+    requiresAnyModel: true,
   },
   oracle: {
     fallbackChain: [
@@ -67,7 +68,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "vercel"], model: "claude-haiku-4-5" },
+      { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
       { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
@@ -79,7 +80,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "vercel"], model: "claude-haiku-4-5" },
+      { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
       { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
     ],
   },

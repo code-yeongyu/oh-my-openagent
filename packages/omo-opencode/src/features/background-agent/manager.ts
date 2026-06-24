@@ -1,13 +1,13 @@
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
-import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import {
   dispatchInternalPrompt,
   type PromptAsyncGateResult,
 } from "../../hooks/shared/prompt-async-gate"
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
+import { resolveDispatchClient } from "../../shared/live-server-route"
 import {
   createInternalAgentTextPart,
   getAgentToolRestrictions,
@@ -49,6 +49,7 @@ import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
+import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -105,6 +106,7 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import { toBackgroundTaskSnapshots } from "./task-snapshot"
 import {
   archiveBackgroundTask,
   forgetBackgroundTask,
@@ -114,6 +116,7 @@ import {
 import type {
   BackgroundTask,
   BackgroundTaskAttempt,
+  BackgroundTaskSnapshot,
   LaunchInput,
   ResumeInput,
 } from "./types"
@@ -216,6 +219,12 @@ export interface SubagentSessionCreatedEvent {
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
 
+export interface SubagentSessionDeletedEvent {
+  sessionID: string
+}
+
+export type OnSubagentSessionDeleted = (event: SubagentSessionDeletedEvent) => Promise<void>
+
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
 const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
@@ -225,6 +234,7 @@ export interface BackgroundManagerConfig {
   config?: BackgroundTaskConfig
   tmuxConfig?: TmuxConfig
   onSubagentSessionCreated?: OnSubagentSessionCreated
+  onSubagentSessionDeleted?: OnSubagentSessionDeleted
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
@@ -248,6 +258,7 @@ export class BackgroundManager {
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
+  private onSubagentSessionDeleted?: OnSubagentSessionDeleted
   private onShutdown?: () => void | Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
@@ -283,6 +294,7 @@ export class BackgroundManager {
     this.config = options.config
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
+    this.onSubagentSessionDeleted = options?.onSubagentSessionDeleted
     this.onShutdown = options?.onShutdown
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
@@ -294,6 +306,8 @@ export class BackgroundManager {
         client: this.client,
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
+        onPendingWakeRequeued: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
+        onScheduledFlushSettled: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,
@@ -869,10 +883,18 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(sessionID, input.model)
     }
 
+    const userDenied: Record<string, boolean> = {}
+    if (input.userPermission) {
+      for (const [tool, value] of Object.entries(input.userPermission)) {
+        if (value === "deny") userDenied[tool] = false
+      }
+    }
+
     const launchTools = {
       task: false,
       call_omo_agent: true,
       question: false,
+      ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
@@ -1032,6 +1054,8 @@ The fallback retry session is now created and can be inspected directly.
     return this.tasks.get(id) ?? this.completedTaskArchive.get(id) ?? getRegisteredBackgroundTask(id)
   }
 
+  getTasksSnapshot(): BackgroundTaskSnapshot[] { return toBackgroundTaskSnapshots(this.tasks.values()) }
+
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
     const taskIDs = this.tasksByParentSession.get(sessionID)
     if (!taskIDs) {
@@ -1054,24 +1078,58 @@ The fallback retry session is now created and can be inspected directly.
     return tasks
   }
 
-  /** Return whether a session has direct child background tasks still in flight. */
+  /**
+   * Return whether a session has direct child background tasks still in flight.
+   *
+   * Intentionally checks immediate children only, not all descendants. A
+   * grandchild's completion wake is addressed to its immediate parent session,
+   * never to this ancestor, so blocking on descendants would make the sync poll
+   * loop wait for grandchildren it can never be woken for (returning a stale
+   * pre-grandchild turn after the settle window, or hitting the sync timeout for
+   * long-running descendants). When a deliverable genuinely depends on a
+   * grandchild, the direct child stays running until that grandchild resolves, so
+   * the immediate-child check already covers it; when the child fire-and-forgets
+   * a grandchild, this session correctly does not wait for work it cannot consume.
+   */
   hasActiveChildTasks(sessionID: string): boolean {
     return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
+  }
+
+  /**
+   * Return whether a parent-wake notification for this session is queued, scheduled,
+   * mid-dispatch, or dispatched-but-not-yet-consumed. Lets a sync poll loop keep
+   * waiting across the gap between "all children finished" and "the
+   * notification-triggered turn started", instead of declaring the task complete
+   * during that window. The in-flight check is essential: while a wake is being
+   * dispatched the pending entry is already deleted and the dispatched entry is not
+   * yet tracked, so the other three maps would all report false for several seconds.
+   * The notification-preparation check covers the earlier window: a child is marked
+   * terminal (so it no longer counts as active) before the completion path finishes
+   * awaiting its session teardown and queues the wake, so without it the predicate
+   * would report false between the status flip and the wake landing in the pending map.
+   */
+  hasPendingParentWake(sessionID: string): boolean {
+    return this.hasUndeliveredParentWake(sessionID) || this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+  }
+
+  private hasUndeliveredParentWake(sessionID: string): boolean {
+    return (
+      this.parentWakeNotifier.hasNotificationPreparation(sessionID) ||
+      this.parentWakeNotifier.getPendingParentWakes().has(sessionID) ||
+      this.parentWakeNotifier.getPendingParentWakeTimers().has(sessionID) ||
+      this.parentWakeNotifier.hasInFlightParentWakeDispatch(sessionID)
+    )
   }
 
   private updateBackgroundTaskMarker(parentSessionID: string): void {
     const tasks = this.getTasksByParentSession(parentSessionID)
     const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
-    if (activeTasks.length > 0) {
-      setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "active",
-        `${activeTasks.length} background task(s) active`,
-      )
-    } else {
-      setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "idle",
-      )
-    }
+    writeBackgroundTaskMarker({
+      directory: this.directory,
+      parentSessionID,
+      activeTaskCount: activeTasks.length,
+      hasUndeliveredParentWake: this.hasUndeliveredParentWake(parentSessionID),
+    })
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1899,6 +1957,23 @@ The fallback retry session is now created and can be inspected directly.
     errorMessage: string,
     reason: string,
   ): Promise<void> {
+    // Reserve a notification-preparation slot for the parent BEFORE flipping the
+    // child to a terminal status, for the same reason as the completion path: the
+    // status flip drops the child from hasActiveChildTasks() immediately, but the
+    // parent wake is not queued until after the awaited session abort below. The
+    // notification is fire-and-forget here, so the reservation is released when that
+    // promise settles (see the `.finally` on the enqueue call).
+    const notificationParentSessionID = task.parentSessionId
+    if (notificationParentSessionID) {
+      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
+    }
+    const releaseNotificationPreparation = (): void => {
+      if (notificationParentSessionID) {
+        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      }
+    }
+
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "interrupt", errorMessage)
     } else {
@@ -1953,7 +2028,7 @@ The fallback retry session is now created and can be inspected directly.
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Failed to notify on async prompt failure:", { taskId: task.id, error: err })
-    })
+    }).finally(releaseNotificationPreparation)
   }
 
   private async handleSessionErrorEvent(args: {
@@ -2184,12 +2259,12 @@ The task was re-queued on a fallback model after a retryable failure.
       // - "tool" with .state.output property (tool call results)
       // - "text" with .text property (final text output)
       // - "step-start"/"step-finish" (metadata, no content)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hasContent = messages.some((m: any) => {
+      type SessionPart = { type?: string; text?: string; content?: string | unknown[] }
+      type SessionMessage = { info?: { role?: string }; parts?: SessionPart[] }
+      const hasContent = messages.some((m: SessionMessage) => {
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) =>
+      return parts.some((p: SessionPart) =>
         // Text content (final output)
         (p.type === "text" && p.text && p.text.trim().length > 0) ||
         // Reasoning content (thinking blocks)
@@ -2447,57 +2522,85 @@ The task was re-queued on a fallback model after a retryable failure.
       return false
     }
 
-    // Atomically mark as completed to prevent race conditions
-    if (task.currentAttemptID) {
-      finalizeAttempt(task, task.currentAttemptID, "completed")
-    } else {
-      task.status = "completed"
-      task.completedAt = new Date()
+    // Reserve a notification-preparation slot for the parent BEFORE flipping the
+    // child to a terminal status. The instant status becomes "completed",
+    // hasActiveChildTasks() returns false, yet the parent wake is not queued until
+    // after the awaited session teardown below (abort carries a 10s timeout, plus
+    // the tmux callback). Without this reservation a parent sync poller would see
+    // "no active children and no pending wake" during that window and settle on a
+    // stale, pre-result turn. The reservation is released in `finally`, by which
+    // point the wake has been queued (or notification has otherwise concluded).
+    const notificationParentSessionID = task.parentSessionId
+    if (notificationParentSessionID) {
+      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
     }
-    this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-
-    if (task.rootSessionId) {
-      this.unregisterRootDescendant(task.rootSessionId)
-    }
-
-    removeTaskToastTracking(task.id)
-
-    // Release concurrency BEFORE any async operations to prevent slot leaks
-    if (task.concurrencyKey) {
-      this.concurrencyManager.release(task.concurrencyKey)
-      task.concurrencyKey = undefined
-    }
-
-    this.markForNotification(task)
-
-    const idleTimer = this.idleDeferralTimers.get(task.id)
-    if (idleTimer) {
-      clearTimeout(idleTimer)
-      this.idleDeferralTimers.delete(task.id)
-    }
-
-    if (task.sessionId) {
-      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
-      await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
-
-      clearDelegatedChildSessionBootstrap(task.sessionId)
-      SessionCategoryRegistry.remove(task.sessionId)
-    }
-
-    // Update continuation marker for CLI run mode
-    if (task.parentSessionId) {
-      this.updateBackgroundTaskMarker(task.parentSessionId)
-    }
-
     try {
-      await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
-      log(`[background-agent] Task completed via ${source}:`, task.id)
-    } catch (err) {
-      log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
-      // Concurrency already released, notification failed but task is complete
-    }
+      // Atomically mark as completed to prevent race conditions
+      if (task.currentAttemptID) {
+        finalizeAttempt(task, task.currentAttemptID, "completed")
+      } else {
+        task.status = "completed"
+        task.completedAt = new Date()
+      }
+      this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
-    return true
+      if (task.rootSessionId) {
+        this.unregisterRootDescendant(task.rootSessionId)
+      }
+
+      removeTaskToastTracking(task.id)
+
+      // Release concurrency BEFORE any async operations to prevent slot leaks
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      this.markForNotification(task)
+
+      const idleTimer = this.idleDeferralTimers.get(task.id)
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        this.idleDeferralTimers.delete(task.id)
+      }
+
+      if (task.sessionId) {
+        subagentSessions.delete(task.sessionId)
+        clearSessionAgent(task.sessionId)
+        clearDelegatedChildSessionBootstrap(task.sessionId)
+        SessionCategoryRegistry.remove(task.sessionId)
+
+        // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+        await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
+
+        // @allow Notify tmux to close the pane immediately. client.session.abort() does not
+        // reliably emit session.deleted, so the polling fallback (60-min SESSION_TIMEOUT_MS)
+        // leaves panes orphaned for too long. See #4773.
+        await this.onSubagentSessionDeleted?.({ sessionID: task.sessionId }).catch((error) => {
+          log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID: task.sessionId, error: String(error) })
+        })
+      }
+
+      // Update continuation marker for CLI run mode
+      if (task.parentSessionId) {
+        this.updateBackgroundTaskMarker(task.parentSessionId)
+      }
+
+      try {
+        await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+        log(`[background-agent] Task completed via ${source}:`, task.id)
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
+        // Concurrency already released, notification failed but task is complete
+      }
+
+      return true
+    } finally {
+      if (notificationParentSessionID) {
+        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      }
+    }
   }
 
   private async notifyParentSession(task: BackgroundTask): Promise<void> {
@@ -2687,7 +2790,8 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
-    return isOpenCodeSessionActive(this.client, sessionID)
+    const resolved = await resolveDispatchClient(this.client, sessionID)
+    return isOpenCodeSessionActive(resolved.client as Parameters<typeof isOpenCodeSessionActive>[0], sessionID)
   }
 
   private queuePendingParentWake(
@@ -2698,10 +2802,15 @@ The task was re-queued on a fallback model after a retryable failure.
     delayMs?: number,
   ): void {
     this.parentWakeNotifier.queuePendingParentWake(sessionID, notification, promptContext, shouldReply, delayMs)
+    this.updateBackgroundTaskMarker(sessionID)
   }
 
   private async flushPendingParentWake(sessionID: string): Promise<void> {
-    await this.parentWakeNotifier.flushPendingParentWake(sessionID)
+    try {
+      await this.parentWakeNotifier.flushPendingParentWake(sessionID)
+    } finally {
+      this.updateBackgroundTaskMarker(sessionID)
+    }
   }
 
   private hasRunningTasks(): boolean {

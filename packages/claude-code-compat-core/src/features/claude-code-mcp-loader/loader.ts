@@ -1,0 +1,160 @@
+import { existsSync, readFileSync } from "fs"
+import { join } from "path"
+import { homedir } from "os"
+import { getClaudeConfigDir } from "../../shared"
+import type {
+  ClaudeCodeMcpConfig,
+  LoadedMcpServer,
+  McpLoadResult,
+  McpScope,
+} from "./types"
+import { transformMcpServer } from "./transformer"
+import { log } from "../../shared/logger"
+import { shouldLoadMcpServer } from "./scope-filter"
+import { bunFile } from "../../shared/bun-file-shim"
+
+interface McpConfigPath {
+  path: string
+  scope: McpScope
+}
+
+function getMcpConfigPaths(): McpConfigPath[] {
+  const claudeConfigDir = getClaudeConfigDir()
+  const homeDir = getHomeDir()
+  const cwd = process.cwd()
+
+  return [
+    { path: join(homeDir, ".claude.json"), scope: "user" },
+    { path: join(claudeConfigDir, ".mcp.json"), scope: "user" },
+    { path: join(cwd, ".mcp.json"), scope: "project" },
+    { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
+  ]
+}
+
+function getHomeDir(): string {
+  return process.env.HOME || process.env.USERPROFILE || homedir()
+}
+
+async function loadMcpConfigFile(
+  filePath: string
+): Promise<ClaudeCodeMcpConfig | null> {
+  if (!existsSync(filePath)) {
+    return null
+  }
+
+  try {
+    const content = await bunFile(filePath).text()
+    return JSON.parse(content) as ClaudeCodeMcpConfig
+  } catch (error) {
+    if (error instanceof Error) {
+      log(`Failed to load MCP config from ${filePath}`, error)
+      return null
+    }
+    log(`Failed to load MCP config from ${filePath}`, error)
+    return null
+  }
+}
+
+export function getSystemMcpServerNames(): Set<string> {
+  const names = new Set<string>()
+  const paths = getMcpConfigPaths()
+  const cwd = process.cwd()
+
+  for (const { path } of paths) {
+    if (!existsSync(path)) continue
+
+    try {
+      const content = readFileSync(path, "utf-8")
+      const config = JSON.parse(content) as ClaudeCodeMcpConfig
+      if (!config?.mcpServers) continue
+
+      for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+        if (serverConfig.disabled) {
+          names.delete(name)
+          continue
+        }
+        if (!shouldLoadMcpServer(serverConfig, cwd)) continue
+        names.add(name)
+      }
+    } catch (error) {
+      if (error instanceof Error) continue
+      continue
+    }
+  }
+
+  return names
+}
+
+export async function loadMcpConfigs(
+  disabledMcps: string[] = []
+): Promise<McpLoadResult> {
+  const servers: McpLoadResult["servers"] = {}
+  const loadedServers: LoadedMcpServer[] = []
+  const paths = getMcpConfigPaths()
+  const disabledSet = new Set(disabledMcps)
+  const cwd = process.cwd()
+
+  for (const { path, scope } of paths) {
+    const config = await loadMcpConfigFile(path)
+    if (!config?.mcpServers) continue
+
+    for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+      if (disabledSet.has(name)) {
+        log(`Skipping MCP "${name}" (in disabled_mcps)`, { path })
+        continue
+      }
+
+      if (!shouldLoadMcpServer(serverConfig, cwd)) {
+        log(`Skipping MCP server "${name}" because local scope does not match cwd`, {
+          path,
+          projectPath: serverConfig.projectPath,
+          cwd,
+        })
+        continue
+      }
+
+      if (serverConfig.disabled) {
+        log(`Disabling MCP server "${name}"`, { path })
+        delete servers[name]
+        const existingIndex = loadedServers.findIndex((s) => s.name === name)
+        if (existingIndex !== -1) {
+          loadedServers.splice(existingIndex, 1)
+          log(`Removed previously loaded MCP server "${name}"`, { path })
+        }
+        continue
+      }
+
+      try {
+        const transformed = transformMcpServer(name, serverConfig)
+        servers[name] = transformed
+
+        const existingIndex = loadedServers.findIndex((s) => s.name === name)
+        if (existingIndex !== -1) {
+          loadedServers.splice(existingIndex, 1)
+        }
+
+        loadedServers.push({ name, scope, config: transformed })
+
+        log(`Loaded MCP server "${name}" from ${scope}`, { path })
+      } catch (error) {
+        if (error instanceof Error) {
+          log(`Failed to transform MCP server "${name}"`, error)
+          continue
+        }
+        log(`Failed to transform MCP server "${name}"`, error)
+      }
+    }
+  }
+
+  return { servers, loadedServers }
+}
+
+export function formatLoadedServersForToast(
+  loadedServers: LoadedMcpServer[]
+): string {
+  if (loadedServers.length === 0) return ""
+
+  return loadedServers
+    .map((server) => `${server.name} (${server.scope})`)
+    .join(", ")
+}

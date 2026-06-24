@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:
+(pass) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [309.43ms]
+(pass) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML [321.07ms]
+
+ 2 pass
+ 0 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [687.00ms]

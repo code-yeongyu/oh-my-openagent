@@ -1,28 +1,21 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import { getStats, formatStats } from "@/lib/stats"
+import { getStats, formatStats, FALLBACK_FORMATTED_STATS } from "@/lib/stats"
 import { HeroStats } from "@/components/landing/hero-stats"
 import { InstallCommand } from "@/components/landing/install-command"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
 import { GithubIcon } from "@/components/icons/github-icon"
 
-const FALLBACK_STATS = {
-  stars: "40k+",
-  totalDownloads: "1M+",
-  monthlyDownloads: "580k+",
-  weeklyDownloads: "90k+",
-}
-
 export async function HeroSection(): Promise<JSX.Element> {
   const t = await getTranslations("landing")
 
-  let formattedStats = FALLBACK_STATS
+  let formattedStats = FALLBACK_FORMATTED_STATS
   try {
     const stats = await getStats()
     formattedStats = formatStats(stats)
   } catch {
-    formattedStats = FALLBACK_STATS
+    formattedStats = FALLBACK_FORMATTED_STATS
   }
 
   return (

@@ -1,0 +1,34 @@
+COMMAND: bun test packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts packages/omo-codex/src/install/link-cached-plugin-agents.test.ts packages/omo-codex/src/install/lazycodex-install-surface.test.ts
+
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-codex/src/install/link-cached-plugin-agents.test.ts:
+(pass) linkCachedPluginAgents > creates regular file copies on linux so agent roles survive snapshot cleanup [3.92ms]
+(pass) linkCachedPluginAgents > creates regular file copies on darwin (macOS) [1.55ms]
+(pass) linkCachedPluginAgents > creates regular file copies on Windows (no symlinks) [1.49ms]
+(pass) linkCachedPluginAgents > replaces stale broken symlinks with regular files on unix [1.49ms]
+(pass) linkCachedPluginAgents > overwrites stale copies on Windows [1.76ms]
+(pass) linkCachedPluginAgents > preserves installed agent reasoning effort when reinstalling file copies [2.10ms]
+(pass) linkCachedPluginAgents > preserves removed installed agent service tier when reinstalling file copies [1.63ms]
+(pass) linkCachedPluginAgents > preserves legacy reviewer reasoning like any other compatibility fixture [1.83ms]
+(pass) linkCachedPluginAgents > writes a manifest under the plugin cache listing installed agent paths for clean uninstall [1.25ms]
+(pass) linkCachedPluginAgents > is idempotent across re-runs [2.81ms]
+(pass) linkCachedPluginAgents > discovers TOMLs across multiple component agent directories [1.28ms]
+(pass) linkCachedPluginAgents > returns empty list when plugin has no bundled agents [0.48ms]
+(pass) linkCachedPluginAgents > auto-detects host platform when platform parameter is omitted [1.31ms]
+
+packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:
+(pass) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [336.78ms]
+(pass) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML [272.83ms]
+
+packages/omo-codex/src/install/lazycodex-install-surface.test.ts:
+(pass) lazycodex install surface > #given codex installer #when installing omo #then exposes durable LazyCodex agent roles [265.78ms]
+(pass) lazycodex install surface > #given codex installer #when installing omo #then links documented component binaries to cached runtimes [30.07ms]
+(pass) lazycodex install surface > #given installation guide #when component binaries and LazyCodex roles are documented #then docs match install surface [0.62ms]
+(pass) lazycodex install surface > #given Codex prunes an old plugin cache version #when LazyCodex roles were installed #then roles still resolve from Codex home [320.48ms]
+(pass) lazycodex install surface > #given Codex temporary marketplace snapshot is removed #when LazyCodex roles were installed #then roles still resolve from Codex home [391.15ms]
+
+ 20 pass
+ 0 fail
+ 151 expect() calls
+Ran 20 tests across 3 files. [1.70s]

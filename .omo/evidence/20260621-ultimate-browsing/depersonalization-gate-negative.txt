@@ -1,0 +1,3 @@
+FAIL: 1 personal-context violation(s):
+  [personal-host:jobdori] x.md:1  see jobdori machine
+exit=1

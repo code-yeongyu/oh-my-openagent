@@ -304,3 +304,75 @@ describe("createPluginInterface - backward compatibility", () => {
     expect(getSessionAgent("ses-legacy-zwsp")).toBe("Hephaestus - Deep Agent")
   })
 })
+
+describe("createPluginInterface - chat.params variant injection", () => {
+  test("injects variant from agent config into chat.params message", async () => {
+    // given
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          sisyphus: { variant: "max" },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-variant-inject",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      provider: { id: "anthropic" },
+      message: {} as { variant?: string },
+    }
+    const output = { options: {} }
+
+    // when
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    // then
+    expect(input.message.variant).toBe("max")
+  })
+
+  test("does not overwrite existing variant in chat.params message", async () => {
+    // given
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          sisyphus: { variant: "max" },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-variant-keep",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      provider: { id: "anthropic" },
+      message: { variant: "high" } as { variant?: string },
+    }
+    const output = { options: {} }
+
+    // when
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    // then
+    expect(input.message.variant).toBe("high")
+  })
+})

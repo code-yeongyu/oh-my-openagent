@@ -1,0 +1,27 @@
+COMMAND: npm --prefix packages/omo-codex/plugin/components/ulw-loop run lint
+
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 lint
+> biome check .
+
+biome.json:2:13 deserialize ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The configuration schema version does not match the CLI version 2.4.16
+
+    1 │ {
+  > 2 │ 	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+      │ 	           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    3 │ 	"linter": {
+    4 │ 		"enabled": true,
+
+  i   Expected:                     2.4.16
+      Found:                        2.4.15
+
+
+  i Run the command biome migrate to migrate the configuration file.
+
+
+Checked 61 files in 13ms. No fixes applied.
+Found 1 info.
+
+EXIT_CODE=0

@@ -2,13 +2,21 @@ import { z } from "zod"
 
 import type { AgentOverrides, CategoriesConfig } from "../../../config/schema"
 import { mergeCategories } from "../../../shared/merge-categories"
-import { normalizeTeamSpecInput } from "../team-registry/loader"
-import { validateSpec } from "../team-registry/validator"
-import { TeamSpecSchema, type TeamSpec } from "../types"
+import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry/loader"
+import { validateSpec } from "@oh-my-opencode/team-core/team-registry/validator"
+import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
 
 export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
 
-export const TeamCreateArgsSchema = z.object({
+function omitEmptyStringArgs(rawArgs: unknown): unknown {
+  if (typeof rawArgs !== "object" || rawArgs === null || Array.isArray(rawArgs)) {
+    return rawArgs
+  }
+
+  return Object.fromEntries(Object.entries(rawArgs).filter(([, value]) => value !== ""))
+}
+
+export const TeamCreateArgsSchema = z.preprocess(omitEmptyStringArgs, z.object({
   teamName: z.string().min(1).nullish(),
   inline_spec: z.unknown().nullish(),
   leadSessionId: z.string().nullish(),
@@ -17,7 +25,7 @@ export const TeamCreateArgsSchema = z.object({
   if (optionCount !== 1) {
     ctx.addIssue({ code: "custom", message: "Provide exactly one of teamName or inline_spec." })
   }
-})
+}))
 
 export type TeamCreateArgs = z.infer<typeof TeamCreateArgsSchema>
 

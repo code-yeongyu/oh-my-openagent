@@ -21,6 +21,7 @@ import {
   createGrepTools,
   createHashlineEditTool,
   createLookAt,
+  createMonitorTools,
   createSessionManagerTools,
   createSkillMcpTool,
   createSkillTool,
@@ -36,6 +37,7 @@ export type ToolRegistryFactories = {
   createBackgroundTools: typeof createBackgroundTools
   createCallOmoAgent: typeof createCallOmoAgent
   createLookAt: typeof createLookAt
+  createMonitorTools: typeof createMonitorTools
   createSkillMcpTool: typeof createSkillMcpTool
   createSkillTool: typeof createSkillTool
   createGrepTools: typeof createGrepTools
@@ -67,6 +69,7 @@ export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createBackgroundTools,
   createCallOmoAgent,
   createLookAt,
+  createMonitorTools,
   createSkillMcpTool,
   createSkillTool,
   createGrepTools,

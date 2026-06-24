@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-comment-checker",
-	"version": "4.8.1",
+	"version": "4.13.0",
 	"description": "Codex plugin that runs comment-checker after edit-like PostToolUse hooks.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -34,8 +34,8 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "vitest --run",
+		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
+		"test": "npm run build --silent && vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
@@ -46,10 +46,11 @@
 		"@code-yeongyu/comment-checker": "^0.8.0"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.15",
-		"@types/node": "^25.7.0",
+		"@oh-my-opencode/comment-checker-core": "file:../../../../comment-checker-core",
+		"@biomejs/biome": "2.4.16",
+		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.5"
+		"vitest": "^4.1.8"
 	},
 	"engines": {
 		"node": ">=20.0.0"

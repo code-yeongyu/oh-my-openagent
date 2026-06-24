@@ -92,4 +92,4 @@ export const CATEGORY_ROUTING = [
   { cat: "git", model: "Claude Haiku 4.5" },
 ] as const
 
-export const SKILL_INJECTIONS = ["playwright", "git-master", "frontend-ui-ux", "team-mode"] as const
+export const SKILL_INJECTIONS = ["playwright", "git-master", "frontend", "team-mode"] as const

@@ -8,12 +8,100 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./src/index.ts"
+    },
+    "./atomic-write": {
+      "types": "./src/atomic-write.ts",
+      "import": "./src/atomic-write.ts"
+    },
+    "./runtime": {
+      "types": "./runtime.d.ts",
+      "import": "./src/runtime/index.ts"
+    },
+    "./xdg-data-dir": {
+      "types": "./src/xdg-data-dir.ts",
+      "import": "./src/xdg-data-dir.ts"
+    },
+    "./record-type-guard": {
+      "types": "./src/record-type-guard.ts",
+      "import": "./src/record-type-guard.ts"
+    },
+    "./archive-entry-validator": {
+      "types": "./src/archive-entry-validator.ts",
+      "import": "./src/archive-entry-validator.ts"
+    },
+    "./classify-path-environment": {
+      "types": "./src/classify-path-environment.ts",
+      "import": "./src/classify-path-environment.ts"
+    },
+    "./codegraph": {
+      "types": "./src/codegraph/index.ts",
+      "import": "./src/codegraph/index.ts"
+    },
+    "./codegraph/resolve": {
+      "types": "./src/codegraph/resolve.ts",
+      "import": "./src/codegraph/resolve.ts"
+    },
+    "./command-executor": {
+      "types": "./src/command-executor.ts",
+      "import": "./src/command-executor.ts"
+    },
+    "./command-executor/*": {
+      "types": "./src/command-executor/*.ts",
+      "import": "./src/command-executor/*.ts"
+    },
+    "./git-worktree": {
+      "types": "./src/git-worktree/index.ts",
+      "import": "./src/git-worktree/index.ts"
+    },
+    "./git-worktree/*": {
+      "types": "./src/git-worktree/*.ts",
+      "import": "./src/git-worktree/*.ts"
+    },
+    "./internal-initiator-marker": {
+      "types": "./src/internal-initiator-marker.ts",
+      "import": "./src/internal-initiator-marker.ts"
+    },
+    "./migration": {
+      "types": "./src/migration.ts",
+      "import": "./src/migration.ts"
+    },
+    "./migration/*": {
+      "types": "./src/migration/*.ts",
+      "import": "./src/migration/*.ts"
+    },
+    "./process-stream-reader": {
+      "types": "./src/process-stream-reader.ts",
+      "import": "./src/process-stream-reader.ts"
+    },
+    "./prompt-async-gate": {
+      "types": "./src/prompt-async-gate.ts",
+      "import": "./src/prompt-async-gate.ts"
+    },
+    "./prompt-async-gate/*": {
+      "types": "./src/prompt-async-gate/*.ts",
+      "import": "./src/prompt-async-gate/*.ts"
+    },
+    "./prompt-failure-classifier": {
+      "types": "./src/prompt-failure-classifier.ts",
+      "import": "./src/prompt-failure-classifier.ts"
+    },
+    "./session-idle-settle": {
+      "types": "./src/session-idle-settle.ts",
+      "import": "./src/session-idle-settle.ts"
+    },
+    "./zip-entry-listing": {
+      "types": "./src/zip-entry-listing.ts",
+      "import": "./src/zip-entry-listing.ts"
+    },
+    "./zip-entry-listing/*": {
+      "types": "./src/zip-entry-listing/*.ts",
+      "import": "./src/zip-entry-listing/*.ts"
     }
   },
   "types": "./index.d.ts",
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "bun test src/*.test.ts"
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",

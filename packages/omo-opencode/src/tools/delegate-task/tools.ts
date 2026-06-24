@@ -15,7 +15,9 @@ import {
 } from "./executor"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
-import type { NativeSkillEntry } from "../skill/native-skills"
+import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
+import { mergeNativeSkillInfos, type NativeSkillEntry } from "../skill/native-skills"
+import type { SkillInfo } from "../skill/types"
 
 async function loadNativeSkillEntries(
   nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
@@ -29,6 +31,27 @@ async function loadNativeSkillEntries(
     log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: errorMessage })
     return []
   }
+}
+
+function buildPromptNativeSkillInfos(
+  availableSkills: AvailableSkill[],
+  nativeSkillEntries: NativeSkillEntry[],
+  disabledSkills: ReadonlySet<string> | undefined,
+): Array<{ name: string; description: string; location: string }> {
+  if (nativeSkillEntries.length === 0) return []
+  const availableSkillInfos: SkillInfo[] = availableSkills.map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    location: undefined,
+    scope: skill.location === "plugin" ? "builtin" : skill.location,
+  }))
+  const initialCount = availableSkillInfos.length
+  mergeNativeSkillInfos(availableSkillInfos, nativeSkillEntries, disabledSkills)
+  return availableSkillInfos.slice(initialCount).map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    location: skill.location ?? "",
+  }))
 }
 
 export { resolveCategoryConfig } from "./categories"
@@ -82,13 +105,18 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       if (skillError) {
         return skillError
       }
+      const nativeSkillInfos = buildPromptNativeSkillInfos(
+        availableSkills,
+        nativeSkillEntries,
+        options.disabledSkills,
+      )
 
       const continuationSystemContent = buildSystemContent({
         skillContent,
         skillContents,
         availableCategories,
         availableSkills,
-        nativeSkillInfos: nativeSkillEntries,
+        nativeSkillInfos,
       })
 
       const parentContext = await resolveParentContext(ctx, options.client)
@@ -162,7 +190,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             model: categoryModel,
             availableCategories,
             availableSkills,
-            nativeSkillInfos: nativeSkillEntries,
+            nativeSkillInfos,
           })
           return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
@@ -185,7 +213,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         model: categoryModel,
         availableCategories,
         availableSkills,
-        nativeSkillInfos: nativeSkillEntries,
+        nativeSkillInfos,
       })
 
       if (runInBackground) {

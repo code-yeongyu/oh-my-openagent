@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
+import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
-test("#given empty Codex config #when script installer updates config #then enables MultiAgentV2 with ten thousand session threads", async () => {
+test("#given empty Codex config #when script installer updates config #then avoids unsupported root multi-agent mode", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-"));
 	const configPath = join(root, "config.toml");
@@ -22,9 +22,68 @@ test("#given empty Codex config #when script installer updates config #then enab
 
 	// then
 	const config = await readFile(configPath, "utf8");
+	assert.doesNotMatch(config, /^\s*multi_agent_mode\s*=/m);
 	assert.match(config, /\[features\.multi_agent_v2\]/);
-	assert.match(config, /enabled = true/);
+	const v2Section = config.slice(config.indexOf("[features.multi_agent_v2]")).split(/^\[/m).slice(0, 1).join("");
+	assert.doesNotMatch(v2Section, /enabled\s*=/);
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
+});
+
+test("#given queue multi-agent mode #when script installer updates config #then removes unsupported root key", async () => {
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-mode-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'multi_agent_mode = "queue"',
+			"",
+			"[features]",
+			"multi_agent = true",
+			"",
+		].join("\n"),
+	);
+
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	const config = await readFile(configPath, "utf8");
+	assert.doesNotMatch(config, /^\s*multi_agent_mode\s*=/m);
+	assert.doesNotMatch(config, /multi_agent_mode = "queue"/);
+});
+
+test("#given indented steering mode and inline-comment features table #when script installer updates config #then removes root key and keeps one features table", async () => {
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-toml-root-regression-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'  multi_agent_mode = "steering"',
+			"",
+			"[features] # keep comment",
+			"plugins = false",
+			"",
+		].join("\n"),
+	);
+
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	const config = await readFile(configPath, "utf8");
+	assert.equal(config.match(/^\s*multi_agent_mode\s*=/gm)?.length ?? 0, 0);
+	assert.equal(config.match(/^\s*\[features\](?:\s*#.*)?$/gm)?.length, 1);
+	assert.match(config, /^\[features\] # keep comment$/m);
+	assert.doesNotMatch(config, /multi_agent_mode = "queue"/);
+	assert.doesNotMatch(config, /multi_agent_mode = "steering"/);
 });
 
 test("#given empty Codex config #when script installer updates config #then leaves Context7 to the plugin MCP manifest", async () => {
@@ -139,6 +198,7 @@ test("#given sisyphuslabs config without explicit source #when script installer 
 		configPath,
 		repoRoot: "/repo/packages/omo-codex",
 		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
 		pluginNames: ["omo"],
 	});
 
@@ -182,6 +242,57 @@ test("#given existing MultiAgentV2 table #when script installer updates config #
 	assert.match(config, /usage_hint_enabled = false/);
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
 	assert.doesNotMatch(config, /max_concurrent_threads_per_session = 4/);
+});
+
+test("#given empty Codex config #when script installer updates config #then sets the generated MultiAgentV2 thread limit", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-roles-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const v2Section = config.slice(config.indexOf("[features.multi_agent_v2]"));
+	assert.match(v2Section, /max_concurrent_threads_per_session = 10000/);
+	assert.doesNotMatch(v2Section, /hide_spawn_agent_metadata/);
+});
+
+test("#given user config hiding spawn_agent metadata #when script installer updates config #then preserves the generated source behavior", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-hide-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features.multi_agent_v2]",
+			"usage_hint_enabled = false",
+			"hide_spawn_agent_metadata = true",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /hide_spawn_agent_metadata = true/);
+	assert.doesNotMatch(config, /hide_spawn_agent_metadata = false/);
+	assert.match(config, /usage_hint_enabled = false/);
 });
 
 test("#given legacy boolean MultiAgentV2 flag and table #when script installer updates config #then normalizes to table config", async () => {
@@ -324,48 +435,4 @@ test("#given existing trust and lsp blocks #when updating config #then existing 
 	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.lsp\]/);
 	assert.match(content, /\[hooks\.state\."omo@sisyphuslabs:hooks\/hooks\.json:post_tool_use:0:0"\]/);
 	assert.match(content, /trusted_hash = "sha256:keep"/);
-});
-
-test("#given windows platform #when updating config #then enables git_bash plugin mcp policy", async () => {
-	// given
-	const root = await mkdtemp(join(tmpdir(), "omo-codex-config-git-bash-win32-"));
-	const configPath = join(root, "config.toml");
-
-	// when
-	await updateCodexConfig({
-		configPath,
-		repoRoot: "/repo/packages/omo-codex",
-		marketplaceName: "sisyphuslabs",
-		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
-		pluginNames: ["omo"],
-		platform: "win32",
-	});
-
-	// then
-	const content = await readFile(configPath, "utf8");
-	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\]/);
-	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = true/);
-});
-
-test("#given non-windows platforms #when updating config #then disables git_bash plugin mcp policy", async () => {
-	for (const platform of ["linux", "darwin"]) {
-		// given
-		const root = await mkdtemp(join(tmpdir(), `omo-codex-config-git-bash-${platform}-`));
-		const configPath = join(root, "config.toml");
-
-		// when
-		await updateCodexConfig({
-			configPath,
-			repoRoot: "/repo/packages/omo-codex",
-			marketplaceName: "sisyphuslabs",
-			marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
-			pluginNames: ["omo"],
-			platform,
-		});
-
-		// then
-		const content = await readFile(configPath, "utf8");
-		assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\]/);
-		assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = false/);
-	}
 });
