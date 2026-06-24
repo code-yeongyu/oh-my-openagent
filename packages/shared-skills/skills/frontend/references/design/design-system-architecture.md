@@ -9,7 +9,7 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## When to Create
 
-- **New project**: If the user gave no concrete visual reference, select one Layer A style skill and one Layer B brand/design-system reference first. Then create `DESIGN.md` before UI, with Section 5 primitives and states defined before implementation.
+- **New project**: If the user gave no concrete visual reference, select one Layer A style skill and one Layer B brand/design-system reference first. Treat them as source material for tokens, layout, component anatomy, states, motion, and taste; customize for the user's product without freestyling past the selected references. Then create `DESIGN.md` before UI, with Section 5 primitives and states defined before implementation.
 - **Existing project without one, but with implicit patterns/components**: Extract the design system from existing code before continuing work.
 - **Existing project without one and without a reusable component layer**: Ask whether to preserve the current look with copy-nearby styling or extract a `DESIGN.md` plus reusable components first. Do not silently choose.
 - **Existing project with one**: Read it. Follow it. Update it only when a genuinely new pattern emerges.
@@ -123,9 +123,10 @@ Document reusable patterns before implementation for greenfield work, and as the
 - **Accessibility**: keyboard, ARIA, contrast
 - **Motion**: entry/exit animations
 
-Greenfield starts with the primitives you are about to build. Existing projects
-start with components used 2+ times or already shared in code; do not invent
-future components just to fill the section.
+Greenfield starts with the primitives you are about to build, assembled from
+the selected references' component anatomy and adapted to the user's product.
+Existing projects start with components used 2+ times or already shared in
+code; do not invent future components just to fill the section.
 
 ## 6. Motion & Interaction
 
@@ -171,11 +172,11 @@ Surfaces use progressively lighter/darker shades. No borders, no shadows.
 ### For New Projects
 
 1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
-2. **Extract, don't copy** — adapt tokens, layout grammar, component patterns, and states; never copy logos, trademarked assets, or brand-specific copy.
+2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
 3. **Define the system** — atmosphere, palette, typography, spacing, and one depth strategy, grounded in the selected references and product semantics.
 4. **Document initial primitives** — only components you are about to build, including variants and states.
 5. **Write it to `DESIGN.md`** at project root.
-6. **Build a primitive showcase first** — exercise default, hover, active, focus, disabled, loading, empty, and error states at mobile/tablet/desktop widths before composing product screens.
+6. **Build a primitive showcase first** — exercise each primitive's default, hover, active, focus, disabled, loading, empty, and error states at mobile/tablet/desktop widths before composing product screens.
 
 ### For Existing Projects (Extraction)
 
@@ -197,6 +198,7 @@ After every component implementation, check:
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
 - [ ] Motion follows the timing table. No arbitrary durations.
+- [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 
 ## Memory Management
 
