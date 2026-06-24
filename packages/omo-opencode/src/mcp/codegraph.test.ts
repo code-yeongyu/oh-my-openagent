@@ -10,14 +10,17 @@ describe("createCodegraphMcpConfig", () => {
   it("returns a local MCP command that launches codegraph serve --mcp when the binary is present", () => {
     // given
     const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+    const nodePath = "/opt/node22/bin/node"
 
     // when
     const config = createCodegraphMcpConfig({
       cwd: "/workspace/project",
       config: { enabled: true },
+      env: {},
       fileExists: () => false,
       homeDir: "/tmp/omo-codegraph-test-home",
-      resolveExecutable: createResolver({ codegraph: codegraphPath }),
+      nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "22.14.0" : "26.3.0"),
+      resolveExecutable: createResolver({ codegraph: codegraphPath, node: nodePath }),
     })
 
     // then
@@ -65,6 +68,75 @@ describe("createCodegraphMcpConfig", () => {
     expect(config.enabled).toBe(false)
   })
 
+  it("#given only a PATH CodeGraph binary and an unsupported host Node #when creating the MCP config #then it stays disabled", () => {
+    // given
+    const codegraphPath = "/usr/local/bin/codegraph"
+    const nodePath = "/opt/node26/bin/node"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { enabled: true },
+      env: {},
+      fileExists: () => false,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "26.3.0" : "0.0.0"),
+      requireResolve: () => {
+        throw new Error("bundled package absent")
+      },
+      resolveExecutable: createResolver({ codegraph: codegraphPath, node: nodePath }),
+    })
+
+    // then
+    expect(config.command).toEqual([codegraphPath, "serve", "--mcp"])
+    expect(config.enabled).toBe(false)
+  })
+
+  it("#given OMO_CODEGRAPH_BIN points at an explicit command #when host Node is unsupported #then the MCP stays enabled", () => {
+    // given
+    const codegraphPath = "/opt/codegraph-node22/bin/codegraph"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { enabled: true },
+      env: { OMO_CODEGRAPH_BIN: codegraphPath },
+      fileExists: (filePath) => filePath === codegraphPath,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      nodeVersionForExecutable: () => "26.3.0",
+      resolveExecutable: createResolver({}),
+    })
+
+    // then
+    expect(config.command).toEqual([codegraphPath, "serve", "--mcp"])
+    expect(config.enabled).toBe(true)
+  })
+
+  it("#given a bundled CodeGraph shim and CODEGRAPH_NODE_BIN points at Node 22 #when creating the MCP config #then it enables the compatible command", () => {
+    // given
+    const packageJson = join("/bundle", "node_modules", "@colbymchenry", "codegraph", "package.json")
+    const shim = join("/bundle", "node_modules", "@colbymchenry", "codegraph", "bin", "codegraph.js")
+    const nodeBin = "/opt/node22/bin/node"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { enabled: true },
+      env: { CODEGRAPH_NODE_BIN: nodeBin },
+      fileExists: (filePath) => filePath === shim || filePath === nodeBin,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      nodeVersionForExecutable: (candidate) => (candidate === nodeBin ? "22.22.3" : "26.3.0"),
+      requireResolve: () => packageJson,
+      resolveExecutable: createResolver({}),
+    })
+
+    // then
+    expect(config).toMatchObject({
+      command: [nodeBin, shim, "serve", "--mcp"],
+      enabled: true,
+      type: "local",
+    })
+  })
   it("forces telemetry off in the MCP environment", () => {
     // given
     const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
@@ -87,17 +159,20 @@ describe("createCodegraphMcpConfig", () => {
     // given
     const installDir = "/custom/codegraph"
     const provisionedPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
+    const nodePath = "/opt/node22/bin/node"
 
     // when
     const config = createCodegraphMcpConfig({
       cwd: "/workspace/project",
       config: { enabled: true, install_dir: installDir },
+      env: {},
       fileExists: (filePath) => filePath === provisionedPath,
       homeDir: "/tmp/omo-codegraph-test-home",
+      nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "22.14.0" : "26.3.0"),
       requireResolve: () => {
         throw new Error("bundled package absent")
       },
-      resolveExecutable: createResolver({}),
+      resolveExecutable: createResolver({ node: nodePath }),
     })
 
     // then

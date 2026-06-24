@@ -36,13 +36,17 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
     expect(getAtlasPromptSource("anthropic/claude-haiku-4-5")).toBe("default")
   })
 
+  test("GLM models route to glm", () => {
+    expect(getAtlasPromptSource("zai-coding-plan/glm-5.1")).toBe("glm")
+    expect(getAtlasPromptSource("zai/glm-5.2")).toBe("glm")
+  })
+
   test("undefined model falls through to default", () => {
     expect(getAtlasPromptSource(undefined)).toBe("default")
   })
 
   test("unrecognized model falls through to default", () => {
     expect(getAtlasPromptSource("opencode-go/big-pickle")).toBe("default")
-    expect(getAtlasPromptSource("zai-coding-plan/glm-5.1")).toBe("default")
   })
 
   test("GPT detection takes priority over Claude family naming", () => {

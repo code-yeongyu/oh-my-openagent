@@ -312,12 +312,13 @@ describe("codex cleanup", () => {
   test("#given an artifact recreated after the first removal pass #when removeManagedPathBestEffort runs #then the retry clears it within one call", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-retry-"))
-    const bootstrapDir = join(root, "bootstrap")
+    const bootstrapDir = join(root, "plugins", "data", "omo-sisyphuslabs", "bootstrap")
     const statePath = join(bootstrapDir, "state.json")
     await writeFixtureFile(statePath, "{}\n")
 
     // when
     const removed = await removeManagedPathBestEffort(bootstrapDir, {
+      codexHome: root,
       afterFirstAttempt: async () => {
         await writeFixtureFile(statePath, "{}\n")
       },
@@ -387,6 +388,27 @@ describe("codex cleanup", () => {
     expect(cleaned).not.toContain("sisyphuslabs")
     expect(cleaned).not.toContain("hooks.state")
     expect(cleaned).not.toContain("[agents.explorer]")
+  })
+
+  test("#given single-quoted managed hook state table #when config text cleanup runs #then removes the managed hook state", () => {
+    // given
+    const config = String.raw`[features]
+plugins = true
+
+[hooks.state.'omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0']
+trusted_hash = "sha256:managed"
+
+[hooks.state.'other@local:hooks/hooks.json:post_tool_use:0:0']
+trusted_hash = "sha256:user"
+`
+
+    // when
+    const cleaned = cleanupCodexLightConfigText(config)
+
+    // then
+    expect(cleaned).toContain("[features]")
+    expect(cleaned).not.toContain("omo@sisyphuslabs")
+    expect(cleaned).toContain("other@local")
   })
 })
 

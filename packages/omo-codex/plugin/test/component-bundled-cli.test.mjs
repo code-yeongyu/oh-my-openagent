@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { readJson, root } from "./aggregate-plugin-fixture.mjs";
+import { readAggregateHookManifests, readJson, root } from "./aggregate-plugin-fixture.mjs";
 import { componentHookContractCases } from "./component-hook-contract-cases.mjs";
 
 const HOOK_EVENTS_BY_COMPONENT = {
@@ -17,8 +17,10 @@ const HOOK_EVENTS_BY_COMPONENT = {
 	rules: "session-start",
 	"start-work-continuation": "stop",
 	telemetry: "session-start",
+	teammode: "post-tool-use",
 	ultrawork: "user-prompt-submit",
 	"ulw-loop": "pre-tool-use",
+	"workflow-selector": "user-prompt-submit",
 };
 const MCP_ONLY_COMPONENTS = new Set(["codegraph"]);
 const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;
@@ -142,8 +144,8 @@ test("#given malformed comment-checker stdin #when executed through dist CLI con
 
 test("#given aggregate hook manifest #when command hooks are inspected #then component CLI invocation contract is unchanged", async () => {
 	// given
-	const hooks = await readJson("hooks/hooks.json");
-	const commands = collectHookCommands(hooks.hooks);
+	const manifests = await readAggregateHookManifests();
+	const commands = manifests.flatMap(({ hooks }) => collectHookCommands(hooks.hooks));
 	const components = await workspaceComponents();
 
 	// when

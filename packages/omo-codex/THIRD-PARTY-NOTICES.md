@@ -5,17 +5,19 @@ This file enumerates third-party and ported components redistributed by the
 bundle, component workspaces, generated installer scripts, bundled MCP runtime
 payloads, and component NOTICE files.
 
-CodeGraph is documented in the root notice as a planned integration payload.
-It is not currently an omo-codex plugin component in this wave, so it is not
-listed as a shipped codex component here.
-
 ## Components
 
-### @ast-grep/cli binary payload@0.42.3
-- License: MIT, from root dependency metadata and the root third-party notice.
-- Copyright: ast-grep contributors.
-- Upstream URL: https://github.com/ast-grep/ast-grep
-- Where-bundled: AST-grep MCP runtime payload used by the codex plugin MCP surface and bootstrap provisioning manifests.
+### @colbymchenry/codegraph@1.0.1
+- License: MIT, from npm package metadata and root third-party notice inspection.
+- Copyright: CodeGraph contributors.
+- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
+- Where-bundled: optional runtime dependency of `plugin/components/codegraph`.
+
+### @colbymchenry/codegraph platform bundles@1.0.1
+- License: MIT for CodeGraph package metadata; bundled payloads also include a Node.js v24.16.0 runtime and vendored JavaScript/WASM dependencies. The Codex CodeGraph component ships the Node.js runtime license and bundled third-party license text at `plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
+- Copyright: CodeGraph contributors, Node.js contributors, and bundled dependency contributors.
+- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
+- Where-bundled: optional platform packages selected by `@colbymchenry/codegraph` for darwin, linux, and win32 on arm64 and x64.
 
 ### @code-yeongyu/comment-checker@0.8.0
 - License: MIT, from package metadata and the root third-party notice.
@@ -32,6 +34,11 @@ listed as a shipped codex component here.
 - License: MIT, from `plugin/components/lsp/LICENSE`.
 - Notice: `plugin/components/lsp/NOTICE`.
 - Where-bundled: Codex LSP hook component and MCP-facing LSP integration.
+
+### @code-yeongyu/codex-lazycodex-executor-verify@4.12.1
+- License: MIT, from component package metadata.
+- Copyright: Yeongyu Kim and contributors.
+- Where-bundled: Codex `SubagentStop` evidence-verifier hook component.
 
 ### @code-yeongyu/codex-rules@4.10.0
 - License: MIT, from `plugin/components/rules/LICENSE`.
@@ -68,11 +75,6 @@ listed as a shipped codex component here.
 - License: MIT, from `packages/lsp-tools-mcp/LICENSE`.
 - Notice: `packages/lsp-tools-mcp/NOTICE`.
 - Where-bundled: LSP MCP runtime built and copied by codex marketplace sync and root package layout.
-
-### @oh-my-opencode/ast-grep-mcp@0.0.0
-- License: project license plus third-party ast-grep notices in the root notice.
-- Copyright: Yeongyu Kim and contributors.
-- Where-bundled: Codex plugin `ast_grep` MCP server runtime.
 
 ### @oh-my-opencode/boulder-state@0.1.0
 - License: project license.
@@ -119,10 +121,20 @@ listed as a shipped codex component here.
 - Copyright: Yeongyu Kim and contributors.
 - Where-bundled: Codex `SessionStart` bootstrap provisioning component and reviewed checksum manifests.
 
+### @sisyphuslabs/codex-codegraph@4.12.1
+- License: MIT, from `plugin/components/codegraph/LICENSE`.
+- Notice: `plugin/components/codegraph/NOTICE`.
+- Where-bundled: Codex CodeGraph session bootstrap hooks and MCP wrapper component.
+
 ### @sisyphuslabs/codex-git-bash-hook@4.10.0
 - License: private project component distributed as part of the codex plugin bundle.
 - Copyright: Yeongyu Kim and contributors.
 - Where-bundled: Codex git-bash reminder hook component.
+
+### @sisyphuslabs/codex-teammode@4.12.1
+- License: private project component distributed as part of the codex plugin bundle.
+- Copyright: Yeongyu Kim and contributors.
+- Where-bundled: Codex team-mode helper hook component and bundled team-mode skills.
 
 ### @sisyphuslabs/omo-codex-plugin@4.10.0
 - License: MIT, from `.codex-plugin/plugin.json`.

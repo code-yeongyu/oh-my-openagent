@@ -5,7 +5,7 @@ description: "Thorough, file-cited technical debt audit across 9 dimensions usin
 
 # Tech Debt Audit Protocol
 
-Model-agnostic technical debt audit for oh-my-openagent (OMO). Uses OMO's built-in tools (`ast_grep_search`, `grep`, `glob`, `bash`, `read`, `lsp_diagnostics`, `task`) plus **optional CodeGraph MCP** for enhanced code graph analysis when available. Produces a grounded, citable `TECH_DEBT_AUDIT.md` artifact.
+Model-agnostic technical debt audit for oh-my-openagent (OMO). Uses OMO's built-in tools (`grep`, `glob`, `bash` with `sg`, `read`, `lsp_diagnostics`, `task`) plus **optional CodeGraph MCP** for enhanced code graph analysis when available. Produces a grounded, citable `TECH_DEBT_AUDIT.md` artifact.
 
 ## CodeGraph Enhancement (Optional)
 
@@ -62,8 +62,8 @@ Use OMO tools for each dimension. Run parallel tool calls within each dimension.
 ### 1. Architectural Decay
 
 #### Standard (always run)
-- `ast_grep_search(pattern="import { $$$ } from '$SRC'", lang="typescript")` — map module graph, look for circular patterns
-- `ast_grep_search(pattern="class $NAME { $$$ }", lang="typescript")` — check for god classes
+- `bash("sg -p \"import { $$$ } from '$SRC'\" -l ts .")` — map module graph, look for circular patterns
+- `bash("sg -p \"class $NAME { $$$ }\" -l ts .")` — check for god classes
 - `grep("TODO|FIXME|HACK|XXX|WORKAROUND|TEMP")` — tagged debt markers
 - `grep("async|await")` on sync-looking files — misplaced async boundaries
 - `bash("wc -l <file>")` on each large file found in Phase 0
@@ -100,9 +100,9 @@ Use `codegraph_explore` to survey actual module structure.
 ### 2. Consistency Rot
 
 #### Standard (always run)
-- `ast_grep_search(pattern="import axios|import fetch|import got|import superagent", lang="typescript")` — multiple HTTP clients
+- `bash("sg -p \"import $CLIENT from '$PKG'\" -l ts .")` — multiple HTTP clients
 - `grep("console.log|console.error|console.warn")` — direct console use vs logger
-- `ast_grep_search(pattern="try { $$$ } catch ($$$) { $$$ }", lang="typescript")` — error handling patterns
+- `bash("sg -p \"try { $$$ } catch ($$$) { $$$ }\" -l ts .")` — error handling patterns
 - `grep("as any|@ts-ignore|@ts-expect-error|as unknown")` — type escapes
 - `grep("eslint-disable|prettier-ignore")` — lint suppressions
 
@@ -115,10 +115,10 @@ Use `codegraph_explore` to survey actual module structure.
 ### 3. Type & Contract Debt
 
 #### Standard (always run)
-- `ast_grep_search(pattern="as any", lang="typescript")` — runtime type escapes
-- `ast_grep_search(pattern="@ts-expect-error", lang="typescript")` — suppressed errors
-- `ast_grep_search(pattern="@ts-ignore", lang="typescript")` — suppressed errors (legacy)
-- `ast_grep_search(pattern=": any", lang="typescript")` — typed as any
+- `bash("sg -p \"$VALUE as any\" -l ts .")` — runtime type escapes
+- `grep("@ts-expect-error")` — suppressed errors
+- `grep("@ts-ignore")` — suppressed errors (legacy)
+- `bash("sg -p \"$NAME: any\" -l ts .")` — typed as any
 - `lsp_diagnostics(filePath="<src-dir>")` — current type errors
 
 #### What to flag
@@ -165,7 +165,7 @@ Run this on a few key internal modules (logger, config loader, HTTP client) to s
 ### 6. Performance & Resource Hygiene
 
 #### Standard (always run)
-- `ast_grep_search(pattern="for ($$$ of $$$) { $$$ await $$$ }", lang="typescript")` — async-in-loop
+- `bash("sg -p \"for ($$$ of $$$) { $$$ await $$$ }\" -l ts .")` — async-in-loop
 - `grep("await.*map|await.*filter|await.*forEach")` — sequential async iteration
 - `grep("Promise\\.all|Promise\\.allSettled")` — existing parallel patterns (good signal)
 - `grep("addEventListener|on\\(|subscribe")` without `removeEventListener|off\\(|unsubscribe` nearby — listener hygiene
@@ -179,10 +179,10 @@ Run this on a few key internal modules (logger, config loader, HTTP client) to s
 ### 7. Error Handling & Observability
 
 #### Standard (always run)
-- `ast_grep_search(pattern="catch ($$$) { $$$ }", lang="typescript")` — catch blocks
+- `bash("sg -p \"catch ($$$) { $$$ }\" -l ts .")` — catch blocks
 - `grep("catch.*{}|catch.*{\\s*}")` — empty catch blocks
 - `grep("console.error|logger\\.error|log\\.error")` — actual error logging
-- `ast_grep_search(pattern="throw new $ERR(", lang="typescript")` — error types used
+- `bash("sg -p \"throw new $ERR($$$)\" -l ts .")` — error types used
 
 #### CodeGraph Enhancement (if available)
 
@@ -210,8 +210,8 @@ Check the blast radius of custom error classes. If changing an error type would 
 
 #### Standard (always run)
 - `grep("api[Kk]ey|api_secret|password|secret|token|credential")` in source files (not config or env)
-- `ast_grep_search(pattern="SELECT .* FROM|INSERT INTO|UPDATE.*SET|DELETE FROM", lang="typescript")` — SQL construction
-- `ast_grep_search(pattern="innerHTML|dangerouslySetInnerHTML", lang="typescript")` — XSS vectors
+- `grep("SELECT .* FROM|INSERT INTO|UPDATE.*SET|DELETE FROM")` — SQL construction
+- `grep("innerHTML|dangerouslySetInnerHTML")` — XSS vectors
 - `grep("eval\\(|Function\\(|setTimeout\\(.*string|setInterval\\(.*string")` — code injection
 
 #### What to flag

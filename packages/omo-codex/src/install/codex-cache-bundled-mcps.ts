@@ -12,13 +12,6 @@ interface BundledMcpRuntime {
 
 const BUNDLED_MCP_RUNTIMES = [
   {
-    label: "ast-grep MCP",
-    sourceArg: "../../ast-grep-mcp/dist/cli.js",
-    sourceDistFromPlugin: "../../ast-grep-mcp/dist",
-    destinationArg: "./components/ast-grep-mcp/dist/cli.js",
-    destinationDistFromPlugin: "components/ast-grep-mcp/dist",
-  },
-  {
     label: "Git Bash MCP",
     sourceArg: "../../git-bash-mcp/dist/cli.js",
     sourceDistFromPlugin: "../../git-bash-mcp/dist",

@@ -41,6 +41,14 @@ export function buildGptSisyphusAgentConfig(
   };
 }
 
+export function buildGlmSisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return buildBaseSisyphusAgentConfig(mode, model, prompt);
+}
+
 export function buildClaudeSisyphusAgentConfig(
   mode: AgentMode,
   model: string,

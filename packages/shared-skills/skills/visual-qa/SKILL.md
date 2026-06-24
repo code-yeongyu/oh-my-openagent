@@ -1,6 +1,6 @@
 ---
 name: visual-qa
-description: "Rigorous visual QA for any UI you built or changed, across BOTH web/page UIs and TUI/terminal UIs. MUST USE after building or changing any UI to verify it visually before declaring it done. Captures objective reference evidence with a bundled diff script (image-diff for screenshots, tui-check for terminal captures), then runs two parallel read-only oracle passes (design-system and functional integrity; visual fidelity and CJK precision) and synthesizes one good/bad verdict. Triggers: visual QA, visual regression, screenshot diff, pixel diff, image comparison, UI looks wrong, design system check, is this really a design system or just an image, alpha channel breakage, responsive check, CJK text, Korean/Japanese/Chinese text clipping, baseline drop, glyph drop, TUI alignment, terminal UI, tmux capture, box-drawing border misalignment, wide-character column drift. Use it even when the user does not say visual QA but asks whether a page, component, or terminal layout looks right."
+description: "Rigorous visual QA for any UI you built or changed, across BOTH web/page UIs and TUI/terminal UIs. MUST USE after building or changing any UI to verify it visually before declaring it done. Captures objective reference evidence with a bundled diff script (image-diff for screenshots, tui-check for terminal captures), then runs two parallel read-only oracle passes (design-system and functional integrity; visual fidelity and CJK precision) and synthesizes one good/bad verdict. Triggers: visual QA, visual regression, screenshot diff, pixel diff, image comparison, UI looks wrong, design system check, is this really a design system or just an image, alpha channel breakage, responsive check, CJK text, Korean/Japanese/Chinese text clipping or semantic line breaks, baseline drop, glyph drop, TUI alignment, terminal UI, tmux capture, box-drawing border misalignment, wide-character column drift. Use it even when the user does not say visual QA but asks whether a page, component, or terminal layout looks right."
 ---
 
 # Visual QA - Dual-Oracle Web and TUI Verification
@@ -24,6 +24,16 @@ If the change touches both, run both capture tracks and feed both into the passe
 
 ## Step 2 - Capture objective reference evidence
 
+### Coverage - capture every page, not a sample
+
+A surface is rarely one screen. If the UI has multiple pages, slides, routes, tabs, modal states, viewport breakpoints, or scroll positions, enumerate the COMPLETE set first and capture every one. A 40-slide deck means 40 captures, not 5. Never sample a few representative screens and generalize: the defect you miss is always on the page you did not open.
+
+The verdict is per page. One failing page fails the whole surface, so "most pages look fine" is not a PASS. Record the enumerated list (page count and identifiers) so the reviewer in Step 3 can confirm nothing was skipped.
+
+### Evidence must be fresh
+
+Every gate runs on captures produced AFTER the last edit to the rendered source. If any screenshot, PDF, capture, or QA JSON is older than the source file it claims to verify, it is stale and invalid - regenerate it before trusting it. Never report a PASS from an artifact you did not just produce against the current build.
+
 ### Web
 
 1. Capture a REFERENCE image: the user's mock/target, or a known-good baseline. Save as PNG.
@@ -45,7 +55,22 @@ tmux capture-pane -p > capture.txt
 tmux capture-pane -e -p > capture-ansi.txt
 ```
 
-2. Run the check with the REAL terminal width and keep the JSON:
+2. When the TUI evidence will be attached to a PR or reviewed visually, render
+   the capture through the browser helper from the repository root:
+
+```
+node script/qa/web-terminal-visual-qa.mjs --title "TUI Visual QA" \
+  --from-file capture.txt \
+  --evidence-dir .omo/evidence/<slug>/tui-web-terminal
+```
+
+This produces `terminal.png`, `terminal.html`, `terminal.txt`,
+`terminal-ansi.txt`, and `metadata.json`. Treat this as the standard TUI visual
+artifact pattern for terminal screenshots. If the project is outside this repo,
+copy the same pattern: terminal capture -> browser-rendered page -> PNG +
+metadata with cleanup receipt.
+
+3. Run the check with the REAL terminal width and keep the JSON:
 
 ```
 bun "$SKILL_DIR/scripts/cli.ts" tui-check capture.txt --cols <N>
@@ -57,7 +82,11 @@ This JSON (diff ratio, similarity score, hotspots or overflow lines, border alig
 
 ## Step 3 - Dispatch two read-only QA subagents in parallel
 
-Send BOTH task calls in a single message so they run concurrently. Each oracle is read-only: it reviews and reports, it cannot modify files. Each returns PASS, REVISE, or FAIL with concrete, located findings. Pass A proves the surface is a real design-system implementation, not a mock-only or faked-image substitute. Pass B directly opens screenshots and inspects source/content for visual and CJK defects.
+This independent review is REQUIRED before any "done" claim. Do not self-review inside the main agent and call the UI verified - a self-graded pass is the failure mode this step exists to stop. Dispatch it yourself, every time, without waiting to be told. Give each reviewer the captures for every enumerated page from Step 2, not a sample, and tell it the page count so it can confirm none were skipped.
+
+Dispatch through your harness's own subagent tool. In OpenCode: `task(subagent_type="oracle", ...)`. In Codex: `multi_agent_v1.spawn_agent({"message": "...", "agent_type": "lazycodex-gate-reviewer", "fork_context": false})` (the code blocks below are written in OpenCode `task(...)` form; translate them to that `spawn_agent` call, putting the full prompt in `message`).
+
+Send BOTH calls in a single message so they run concurrently. Each oracle is read-only: it reviews and reports, it cannot modify files. Each returns PASS, REVISE, or FAIL with concrete, located findings. Pass A proves the surface is a real design-system implementation, not a mock-only or faked-image substitute. Pass B directly opens screenshots and inspects source/content for visual and CJK defects.
 
 Paste evidence directly into each prompt: source code, the plain-text TUI captures, the script JSON, and the screenshot paths plus your described observations for web. The two passes differ in depth by charter, not by any model or effort setting, which cannot be pinned per call.
 
@@ -137,7 +166,12 @@ USE THE EVIDENCE:
 CHECK:
 1. Does the rendered output match what the user requested: layout, spacing, color, type, alignment?
 2. CJK precision:
-   - Web: natural CJK line breaking for display and body text. Flag oversized headings that create orphaned one-character or final-syllable lines, split Korean/Japanese/Chinese semantic phrases unnaturally, detach labels such as `[Image #1]` from their content, clip baselines/descenders, drop glyphs (tofu), or show font metric mismatch. Treat the screenshot pattern `에이전트 오케스트 / 레이션 현황 및 미 / 래` as REVISE/FAIL, not acceptable wrapping.
+   - Web: natural CJK line breaking for display and body text. Inspect every page's screenshot for this, not a sample. A high `similarityScore` never excuses a break: each class below is REVISE/FAIL and blocking regardless of similarityScore. Flag every one of:
+     - a particle or ending orphaned onto its own line, for example `핵심 자료 / 도` or `끝에서 / 만난다`.
+     - a short subject or topic phrase split from its predicate, for example `두 강은 / 끝에서 만난다` (the whole clause should sit on one line).
+     - a connective or auxiliary expression split mid-phrase, for example `쓸 수 / 있지만` or `방 / 식이`.
+     - a parenthetical or source/citation English string broken across lines, for example `(Vaswani et al. 2017, Attention Is / All You Need)` or `(Schulman et al. 2017); AlphaGo (Silver et al. / 2016)`.
+     - oversized headings or narrow containers that create orphaned one-character or final-syllable lines, split Korean/Japanese/Chinese semantic phrases unnaturally (for example `놀라운 변 / 화`), detach labels such as `[Image #1]` from their content, clip baselines/descenders, drop glyphs (tofu), or show font metric mismatch. Treat screenshot patterns like `에이전트 오케스트 / 레이션 현황 및 미 / 래` as REVISE/FAIL, not acceptable wrapping.
    - TUI: wide-character column drift (CJK cells counted as 1 instead of 2), box-drawing border misalignment, content overflowing past the terminal width.
 
 OUTPUT:
@@ -155,7 +189,15 @@ BLOCKING: items that must be fixed; empty if PASS
 
 When both passes return, merge them into a single report. Per dimension, mark good or bad with evidence. For each bad item, state what is wrong, where (file/line, hotspot grid, or capture line), and the concrete fix. Call out what is genuinely good so it is not regressed later.
 
-Completion gate: do not declare the UI done until both passes are satisfied, OR the remaining gaps are explicitly listed and accepted by the user. A high `similarityScore` with an open Pass A finding, for example a faked-image layout or a broken feature, is still a FAIL.
+### Completion gate - loop until an independent pass on fresh evidence
+
+This is a hard stop rule, not a guideline. The UI is NOT done until ALL of these hold at once on the SAME current build:
+
+- An independent read-only reviewer subagent returned PASS with no BLOCKING findings.
+- That reviewer judged a FRESH capture of every enumerated page from Step 2 - no stale artifacts, no skipped pages.
+- Every CJK and layout finding is resolved in the rendered output, not merely noted.
+
+If any page fails, you are not done: fix it, re-capture the full set, re-dispatch the reviewer, and repeat. Loop until the independent reviewer passes on the current build. Do not stop because the automated script reports zero issues - the script aims the reviewer, it does not replace it, and it routinely passes text while the rendered page is still broken. Do not stop because an earlier pass approved an older build. The only non-loop exit is to list the exact remaining gaps and get explicit user acceptance; never self-certify a silent PASS.
 
 ```markdown
 # Visual QA - Verdict: GOOD | NEEDS WORK

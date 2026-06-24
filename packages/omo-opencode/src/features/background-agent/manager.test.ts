@@ -2479,6 +2479,71 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(deletedSessionIDs).toEqual(["session-deleted-cb"])
   })
 
+  test("#given the final child is mid-teardown #when its session abort is still pending #then hasPendingParentWake keeps reporting an owed wake", async () => {
+    // #given a session abort that blocks until released, simulating the awaited
+    // teardown window (abort carries a 10s timeout, plus the tmux callback) during
+    // which the child is already marked completed but the parent wake has not yet
+    // been queued.
+    let releaseAbort: (() => void) | undefined
+    const abortGate = new Promise<void>((resolve) => { releaseAbort = resolve })
+    let signalAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { signalAbortStarted = resolve })
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        messages: async () => ({ data: [] }),
+        abort: async () => {
+          signalAbortStarted?.()
+          await abortGate
+          return {}
+        },
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    // notifyParentSession is stubbed so no real wake is ever queued; this isolates
+    // the notification-preparation reservation as the SOLE bridge across the gap.
+    stubNotifyParentSession(manager)
+
+    const parentSessionId = "session-parent-teardown-gap"
+    const task: BackgroundTask = {
+      id: "task-teardown-gap",
+      sessionId: "session-child-teardown-gap",
+      parentSessionId,
+      parentMessageId: "msg-1",
+      description: "child whose teardown outlives the settle window",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    try {
+      // #when completion begins but the session abort has not resolved yet.
+      const completion = tryCompleteTaskForTest(manager, task)
+      await abortStarted
+
+      // #then the child is already terminal (no longer an active child)...
+      expect(task.status).toBe("completed")
+      // ...and no wake is tracked in any pending/dispatched map yet...
+      expect(getPendingParentWakes(manager).has(parentSessionId)).toBe(false)
+      expect(getDispatchedParentWakes(manager).has(parentSessionId)).toBe(false)
+      // ...but the reservation keeps hasPendingParentWake true so a parent sync
+      // poller keeps waiting instead of settling on a stale pre-result turn.
+      expect(manager.hasPendingParentWake(parentSessionId)).toBe(true)
+
+      // #when teardown finishes and the notification has been enqueued.
+      releaseAbort?.()
+      await completion
+
+      // #then the reservation is released; with notify stubbed nothing is owed.
+      expect(manager.hasPendingParentWake(parentSessionId)).toBe(false)
+    } finally {
+      releaseAbort?.()
+    }
+  })
+
   test("should immediately clear completed subagent runtime-fallback eligibility", async () => {
     // #given
     resetClaudeCodeSessionState()

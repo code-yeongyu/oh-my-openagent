@@ -1,5 +1,5 @@
 import { readFile, readdir, stat } from "node:fs/promises"
-import { dirname, join, resolve, sep } from "node:path"
+import { basename, dirname, join, resolve, sep } from "node:path"
 import { isPlainRecord } from "@oh-my-opencode/utils"
 
 export async function validateLazycodexPluginBundle(pluginRoot: string): Promise<void> {
@@ -64,8 +64,26 @@ async function validatePluginHookCommands(pluginRoot: string, issues: string[]):
 }
 
 async function findHookManifestPaths(root: string): Promise<string[]> {
-  const paths = await findManifestPaths(root, "hooks.json")
-  return paths.filter((path) => dirname(path).endsWith(`${sep}hooks`))
+  const entries = await readdir(root, { withFileTypes: true })
+  const paths: string[] = []
+
+  if (basename(root) === "hooks") {
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith(".json")) {
+        paths.push(join(root, entry.name))
+      }
+    }
+    return paths
+  }
+
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name === ".git") continue
+    if (entry.isDirectory()) {
+      paths.push(...(await findHookManifestPaths(join(root, entry.name))))
+    }
+  }
+
+  return paths
 }
 
 async function findManifestPaths(root: string, manifestName: string): Promise<string[]> {

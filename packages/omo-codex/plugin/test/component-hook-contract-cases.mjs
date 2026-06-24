@@ -66,6 +66,33 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
+			name: "workflow-selector user-prompt-submit start-work",
+			component: "workflow-selector",
+			event: "user-prompt-submit",
+			payload: {
+				hook_event_name: "UserPromptSubmit",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: null,
+				cwd: tempRoot,
+				model: "gpt-5.5",
+				permission_mode: "default",
+				prompt: "Continue the approved plan",
+			},
+			env: { OMO_CODEX_AUTO_WORKFLOW: "1" },
+			assertOutput(stdout) {
+				const output = JSON.parse(stdout);
+				assert.equal(
+					output.hookSpecificOutput.hookEventName,
+					"UserPromptSubmit",
+				);
+				assert.match(
+					output.hookSpecificOutput.additionalContext,
+					/\$start-work/,
+				);
+			},
+		},
+		{
 			name: "ulw-loop pre-tool-use budget guard",
 			component: "ulw-loop",
 			event: "pre-tool-use",
@@ -136,6 +163,30 @@ export function componentHookContractCases(tempRoot) {
 			},
 			assertOutput(stdout) {
 				assert.equal(stdout, "");
+			},
+		},
+		{
+			name: "teammode post-tool-use create-thread title reminder",
+			component: "teammode",
+			event: "post-tool-use",
+			payload: {
+				hook_event_name: "PostToolUse",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: null,
+				cwd: tempRoot,
+				model: "gpt-5.5",
+				permission_mode: "default",
+				tool_name: "create_thread",
+				tool_use_id: "tool-task12",
+				tool_input: { prompt: "Investigate flaky release packaging" },
+				tool_response: { threadId: "thread-task12" },
+			},
+			assertOutput(stdout) {
+				const output = JSON.parse(stdout);
+				assert.equal(output.hookSpecificOutput.hookEventName, "PostToolUse");
+				assert.match(output.hookSpecificOutput.additionalContext, /codex_app\.set_thread_title/);
+				assert.match(output.hookSpecificOutput.additionalContext, /thread-task12/);
 			},
 		},
 		{

@@ -117,9 +117,7 @@ Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
 
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-
-Do NOT call background_output now. Wait for <system-reminder> notification first.`
+Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.`
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return `[ERROR] Failed to launch background task: ${message}`

@@ -29,6 +29,7 @@ function getObjectProperty(value: unknown, key: string): unknown {
 function collectFiles(root: string, relativePrefix = ""): string[] {
   const files: string[] = []
   for (const entry of readdirSync(join(root, relativePrefix), { withFileTypes: true })) {
+    if (entry.name === "node_modules") continue
     const relativePath = join(relativePrefix, entry.name)
     const fullPath = join(root, relativePath)
     if (entry.isDirectory()) {
@@ -43,7 +44,7 @@ function collectFiles(root: string, relativePrefix = ""): string[] {
 describe("omo-codex telemetry single-source guard", () => {
   describe("#given the omo-codex package tree", () => {
     it("#when sync-copy references are searched #then no telemetry sync script or build hook remains", () => {
-      const files = collectFiles(CODEX_ROOT).filter((file) => !file.includes("node_modules/"))
+      const files = collectFiles(CODEX_ROOT)
       const offenders: string[] = []
 
       for (const file of files) {

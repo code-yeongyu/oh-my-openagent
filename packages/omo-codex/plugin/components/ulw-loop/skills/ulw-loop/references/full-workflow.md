@@ -23,10 +23,17 @@ Run each criterion's real-surface proof yourself through the channel that faithf
 3. **Browser use** — use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture action log + screenshot path. Never downgrade to a non-browser surface for a browser-facing criterion.
 4. **Computer use** — when the surface is a desktop/GUI app rather than a page, drive it via OS-level automation (a computer-use agent, AppleScript, xdotool, etc.) against the running app; capture action log + screenshot. Use this for any non-browser GUI criterion.
 
+For TUI visual QA, pair the tmux transcript with a browser-rendered terminal
+screenshot. In this repo run `node script/qa/web-terminal-visual-qa.mjs
+--from-file <capture.txt> --evidence-dir <dir>` and record `terminal.png`,
+`terminal.html`, `terminal.txt`, and `metadata.json` as the visual evidence
+bundle. This is mandatory when a PR or review needs to inspect the terminal
+screen, not just the text.
+
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump) are first-class evidence for CLI- or data-shaped criteria; use a channel scenario when the behavior is user-facing. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
 
 ## Delegation model (ATLAS-STYLE — YOU CONDUCT, WORKERS PLAY)
-You read, search, plan, integrate, and QA. You DELEGATE every code edit, test write, bug fix, and QA execution to a right-sized `multi_agent_v1.spawn_agent` worker, then verify what comes back. Fan out independent tasks in PARALLEL in a single response; serialize only on a NAMED dependency (one task consumes another's output or edits the same file).
+You read, search, plan, integrate, and QA. You DELEGATE every code edit, test write, bug fix, and QA execution to a right-sized `multi_agent_v1.spawn_agent` worker, then verify what comes back. Fan out independent tasks in PARALLEL in one response; serialize only on a NAMED dependency (one task consumes another's output or edits the same file).
 
 Size each worker to the task. Put the intended role, rigor level, and specialty inside the worker `message`.
 
@@ -42,7 +49,7 @@ Size each worker to the task. Put the intended role, rigor level, and specialty 
 
 For reviewer work, use a self-contained reviewer assignment, tight scope, and explicit verification in `message`. Never spawn a context-only child for review.
 
-Every worker message MUST carry: goal + exact files in scope; the PIN + failing-first proof required before production code (Per-Criterion Cycle step 3); constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture; for git-tracked edits, require `git-master` plus repository-wide and touched-path commit history inspection before commit. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker.
+Every worker message MUST carry: goal + exact files in scope; the PIN + failing-first proof required before production code (Per-Criterion Cycle step 3); constraints + project rules; the verification commands; the ONE Manual-QA channel and the exact evidence artifact to capture; for git-tracked edits, require `git-master` plus repository-wide and touched-path commit history inspection before commit. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker.
 
 Codex subagent reliability:
 - Start every `multi_agent_v1.spawn_agent` message with `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and `VERIFY`. State that it is an executable assignment, not a context handoff.
@@ -58,14 +65,14 @@ Codex subagent reliability:
 - `.omo/ulw-loop/goals.json`: goals with embedded `successCriteria` per goal.
 - `.omo/ulw-loop/ledger.jsonl`: append-only audit trail.
 - Read artifacts before resuming, steering, or checkpointing.
-- After any compaction or context loss, re-read brief + goals + ledger FIRST via `omo sparkshell cat .omo/ulw-loop/ledger.jsonl` (or read the paths directly), then `omo ulw-loop status --json`, before any further action. Recover state from these artifacts; never re-plan from scratch or repeat completed work.
+- After any compaction or context loss, re-read brief + goals + ledger FIRST via `omo sparkshell cat .omo/ulw-loop/ledger.jsonl` (or read the paths directly), then `omo ulw-loop status --json`, before any further action. Recover state from these artifacts; never re-plan from scratch or repeat completed work (re-hypothesizing inside a research goal is not a re-plan).
 - Never invent state outside `.omo/ulw-loop` artifacts or `omo ulw-loop status --json`.
 
 ## Bootstrap
 Do all three steps before execution. No edits, goal tools, or checkpointing before bootstrap completes.
 
 ### 1. Create goals from the brief
-Resolve the CLI before the first command. If `omo` is absent from PATH or does not support `ulw-loop`, use the stable local installer bin or cached Codex component CLI. This is the same ulw-loop CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, and records the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
+Resolve the CLI before the first command. If `omo` is absent from PATH or lacks `ulw-loop`, use the stable local installer bin or cached Codex component CLI — same CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, recording the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
 ```sh
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 ULW_LOOP_NODE="$(command -v node 2>/dev/null || true)"
@@ -116,13 +123,15 @@ only when deliberately overwriting completed evidence.
 Write state through the CLI path. Do not hand-edit state files.
 
 ### 2. Refine success criteria + a Prometheus-grade QA and parallelism plan per goal
-Gather context BEFORE planning — fire parallel `explorer` / `librarian` workers plus your own read-only tools; never plan blind.
-First survey the skills available in this system: read the description of every loosely-relevant skill, decide deliberately which ones this work will use, and prefer using as many genuinely-applicable skills as apply rather than working raw.
-Then run tier triage per goal and record it with an `annotate_ledger` steering entry. Default is LIGHT — a narrow change inside existing layers. Take HEAVY only on a fact you can point to: a new module / abstraction / domain model; auth, security, or session; an external integration; a DB schema or migration; concurrency, transaction boundaries, or cache invalidation; a cross-domain refactor; or the user signaled care or demanded review. When unsure, take HEAVY; upgrade the moment a HEAVY fact surfaces and never downgrade mid-run.
+Gather context BEFORE planning with parallel `explorer` / `librarian` workers plus your own read-only tools.
+First survey available skills: read every loosely-relevant skill's description, deliberately choose which this work uses, and prefer applying genuinely-relevant skills over working raw.
+Then run tier triage per goal — rigor (LIGHT/HEAVY below) and shape (`delivery` default, or `research` when the deliverable is a cited answer, not an artifact) — and record both in an `annotate_ledger` steering entry. Default is LIGHT — a narrow change inside existing layers. Take HEAVY only on a fact you can point to: a new module / abstraction / domain model; auth, security, or session; an external integration; a DB schema or migration; concurrency, transaction boundaries, or cache invalidation; a cross-domain refactor; or the user signaled care or demanded review. When unsure, take HEAVY; upgrade the moment a HEAVY fact surfaces, never downgrade mid-run.
 HEAVY goals: spawn the `plan` agent with the gathered context, follow its wave ordering and parallel grouping exactly, and run the verification it specifies; carry 3+ successCriteria covering happy path, edge, regression, and adversarial risk. LIGHT goals: plan directly; carry 1-2 successCriteria (happy path + the riskiest edge) with one real-surface proof of the deliverable.
-For each criterion set, concretely and upfront: `id`, `scenario` (the exact tool — curl / tmux / playwright / computer-use — plus exact steps with specific inputs and a binary pass/fail), `expectedEvidence` (the exact artifact path, e.g. `.omo/ulw-loop/evidence/<goal>-<criterion>.<ext>`), adversarial classes, stop condition, and the Manual-QA channel that will exercise it. Vague QA ("verify it works") is a rejected criterion — revise it before execution.
+Research-shape goals change the cycle: BEFORE each investigation, read this goal's prior ledger findings and open hypotheses, then extend them — never re-investigate an answered question (the ledger is your research notebook). Record findings via `annotate_ledger` with their source (`file:line`, command output, doc URL) as `--evidence`. Track hypotheses as `HYPOTHESIS[id]: <claim> | status: open`, flipped to `confirmed`/`refuted` only on an observed source. A research criterion passes on a cited answer — skip QA-channel, cleanup, and commit, but keep source-observability (never "looks correct"). Keep hypotheses inside the user's stated question; a scope-widening one is an `add_subgoal` proposal you surface, never silent creep. For a `research`-shape goal you MAY load `ulw-research` (legacy alias: `ultraresearch`) without hesitation — otherwise explicit-request-only, a research-shape goal IS that explicit demand. Research-only: never for a `delivery` goal. It composes with the librarian routing above — `ulw-research` for saturation (many parallel sources, recursive expansion), a single `librarian` for one lookup.
+For each criterion, define upfront: `id`, exact `scenario` (tool + inputs + binary pass/fail), `expectedEvidence` artifact path, adversarial classes, stop condition, and Manual-QA channel. Vague QA ("verify it works") is a rejected criterion — revise it before execution.
+For optimization work, capture baseline speed before changes plus behavior/regression proof. Every attempt records speed, behavior/regression, and the keep/revert/iterate decision.
 A criterion's adversarial classes are the ultraqa classes a fact about the change triggers: malformed input, prompt injection, cancel/resume, stale state, dirty worktree, hung or long commands, flaky tests, misleading success output, repeated interruptions. Record untriggered classes as not-applicable in one line.
-Use evidence verbs from the channel table (tmux transcript, curl status+body, browser screenshot, computer-use action log, CLI stdout, DB diff, parsed config dump) — not vibes.
+Use channel-table evidence verbs (tmux transcript, curl status+body, screenshot, action log, CLI stdout, DB diff, parsed config dump) — not vibes.
 
 **Plan for maximum parallelism (HEAVY goals).** Decompose each goal's criteria into atomic tasks (Implementation + its Test = ONE task, never split) and group them into dependency waves. Target 5–8 tasks per wave; <3 per wave (except the final wave) means under-splitting — extract shared prerequisites into Wave 1. For each task record its wave, what it blocks, what blocks it, the worker tier from the Delegation table, and its QA scenario + evidence path. Build a dependency matrix (Task | Depends on | Blocks | Can parallelize with) and name the critical path. Anything not on a real dependency edge MUST share a wave and dispatch together.
 Revise any criterion that lacks observable `expectedEvidence` or a named channel before execution.
@@ -175,7 +184,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
 2. Run Manual-QA for every criterion; confirm each artifact exists and is non-empty.
-3. Spawn the three final reviewer roles in parallel with self-contained prompts and `fork_context: false`: `lazycodex-code-reviewer` for diff review, `lazycodex-qa-executor` for scenario/evidence review, and `lazycodex-gate-reviewer` for final criteria/checkpoint review. If unavailable, describe those roles in generic worker prompts.
+3. Spawn final reviewers with `fork_context: false`: code review, QA review, gate review. Include original brief, goals, desired outcome, and diff.
 4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Fix, rerun affected verification/Manual-QA, and repeat review.
 5. If review remains blocked, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 6. If clean, checkpoint final completion:
@@ -189,10 +198,10 @@ omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e eviden
   "manualQa":{"by":"lazycodex-qa-executor","status":"passed","evidence":"CLI and data surfaces passed.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"omo ulw-loop checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-diff"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt"},{"id":"artifact-data-diff","kind":"data-diff","description":"Data diff artifact.","path":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/data-diff.txt"}]},
   "gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":"packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md","evidence":"Gate review passed.","blockers":[]},
   "iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-doc.test.ts"],"evidence":"Focused rerun passed."},
-  "criteriaCoverage":{"totalCriteria":3,"passCount":3,"adversarialClassesCovered":["malformed_input","stale_state"]}
+  "criteriaCoverage":{"totalCriteria":3,"passCount":3,"originalIntent":"User wanted artifact-backed completion.","desiredOutcome":"Behavior ships with review and QA evidence.","userOutcomeReview":"Result matches brief and goals.","adversarialClassesCovered":["malformed_input","stale_state"]}
 }
 ```
-Artifacts must be non-empty. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
+Artifacts must be non-empty; counts alone fail. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
 
 ## Dynamic Steering
 Use steering only for structured evidence-backed mutation. Reject natural-language steering requests.

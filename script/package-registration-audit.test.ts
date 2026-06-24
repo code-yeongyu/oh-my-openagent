@@ -10,7 +10,6 @@ const corePackagePaths: readonly string[] = [
   "packages/prompts-core",
   "packages/rules-engine",
   "packages/agents-md-core",
-  "packages/ast-grep-core",
   "packages/lsp-core",
   "packages/mcp-stdio-core",
   "packages/mcp-client-core",
@@ -26,7 +25,6 @@ const corePackagePaths: readonly string[] = [
 ] as const
 
 const mcpPackagePaths: readonly string[] = [
-  "packages/ast-grep-mcp",
   "packages/git-bash-mcp",
   "packages/lsp-daemon",
   "packages/lsp-tools-mcp",
