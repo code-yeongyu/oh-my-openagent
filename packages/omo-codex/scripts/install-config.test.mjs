@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
-test("#given empty Codex config #when script installer updates config #then enables proactive mode with ten thousand session threads", async () => {
+test("#given empty Codex config #when script installer updates config #then avoids unsupported root multi-agent mode", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-"));
 	const configPath = join(root, "config.toml");
@@ -22,14 +22,14 @@ test("#given empty Codex config #when script installer updates config #then enab
 
 	// then
 	const config = await readFile(configPath, "utf8");
-	assert.match(config, /^multi_agent_mode = "proactive"$/m);
+	assert.doesNotMatch(config, /^\s*multi_agent_mode\s*=/m);
 	assert.match(config, /\[features\.multi_agent_v2\]/);
 	const v2Section = config.slice(config.indexOf("[features.multi_agent_v2]")).split(/^\[/m).slice(0, 1).join("");
 	assert.doesNotMatch(v2Section, /enabled\s*=/);
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
 });
 
-test("#given queue multi-agent mode #when script installer updates config #then switches to proactive mode for team support", async () => {
+test("#given queue multi-agent mode #when script installer updates config #then removes unsupported root key", async () => {
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-mode-"));
 	const configPath = join(root, "config.toml");
 	await writeFile(
@@ -52,17 +52,17 @@ test("#given queue multi-agent mode #when script installer updates config #then 
 	});
 
 	const config = await readFile(configPath, "utf8");
-	assert.match(config, /^multi_agent_mode = "proactive"$/m);
+	assert.doesNotMatch(config, /^\s*multi_agent_mode\s*=/m);
 	assert.doesNotMatch(config, /multi_agent_mode = "queue"/);
 });
 
-test("#given indented root mode and inline-comment features table #when script installer updates config #then emits one proactive root key and one features table", async () => {
+test("#given indented steering mode and inline-comment features table #when script installer updates config #then removes root key and keeps one features table", async () => {
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-toml-root-regression-"));
 	const configPath = join(root, "config.toml");
 	await writeFile(
 		configPath,
 		[
-			'  multi_agent_mode = "queue"',
+			'  multi_agent_mode = "steering"',
 			"",
 			"[features] # keep comment",
 			"plugins = false",
@@ -79,9 +79,8 @@ test("#given indented root mode and inline-comment features table #when script i
 	});
 
 	const config = await readFile(configPath, "utf8");
-	assert.equal(config.match(/^\s*multi_agent_mode\s*=/gm)?.length, 1);
+	assert.equal(config.match(/^\s*multi_agent_mode\s*=/gm)?.length ?? 0, 0);
 	assert.equal(config.match(/^\s*\[features\](?:\s*#.*)?$/gm)?.length, 1);
-	assert.match(config, /^multi_agent_mode = "proactive"$/m);
 	assert.match(config, /^\[features\] # keep comment$/m);
 	assert.doesNotMatch(config, /multi_agent_mode = "queue"/);
 	assert.doesNotMatch(config, /multi_agent_mode = "steering"/);
