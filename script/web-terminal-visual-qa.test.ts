@@ -3,11 +3,6 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import {
-  DEFAULT_TERMINAL_BACKGROUND,
-  DEFAULT_TERMINAL_FOREGROUND,
-  renderAnsiToHtml,
-} from "./qa/web-terminal-renderer.mjs"
 
 const helperPath = new URL("./qa/web-terminal-visual-qa.mjs", import.meta.url)
 const helperFilePath = fileURLToPath(helperPath)
@@ -140,32 +135,74 @@ describe("web terminal visual QA helper", () => {
 
     const html = readFileSync(join(dir, "terminal.html"), "utf8")
     expect(html).toContain(
-      `<span style="color: ${DEFAULT_TERMINAL_BACKGROUND}; background-color: ${DEFAULT_TERMINAL_FOREGROUND}"> selected row </span>`,
+      '<span style="color: #090b10; background-color: #d8dee9"> selected row </span>',
     )
     expect(html).not.toContain("ansi-inverse")
     expect(html).not.toContain("filter: invert")
   })
 
-  test("#given inverse video with explicit colors #when rendering #then foreground and background classes swap", () => {
+  test("#given inverse video with explicit colors #when rendering #then foreground and background classes swap", async () => {
     // given
-    const ansi = "\u001b[31;44;7m selected \u001b[0m"
+    const dir = makeTempDir()
+    const transcript = join(dir, "inverse-explicit.txt")
+    writeFileSync(transcript, "\u001b[31;44;7m selected \u001b[0m\n", "utf8")
 
     // when
-    const html = renderAnsiToHtml(ansi)
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "Inverse Explicit QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
 
     // then
-    expect(html).toBe('<span class="ansi-fg-blue ansi-bg-red"> selected </span>')
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain('<span class="ansi-fg-blue ansi-bg-red"> selected </span>')
   })
 
-  test("#given inverse video is reset #when rendering #then later text uses normal colors", () => {
+  test("#given inverse video is reset #when rendering #then later text uses normal colors", async () => {
     // given
-    const ansi = "\u001b[31;44;7minverse\u001b[27m normal\u001b[0m plain"
+    const dir = makeTempDir()
+    const transcript = join(dir, "inverse-reset.txt")
+    writeFileSync(transcript, "\u001b[31;44;7minverse\u001b[27m normal\u001b[0m plain\n", "utf8")
 
     // when
-    const html = renderAnsiToHtml(ansi)
+    const proc = Bun.spawn({
+      cmd: [
+        process.execPath,
+        helperFilePath,
+        "--title",
+        "Inverse Reset QA",
+        "--from-file",
+        transcript,
+        "--evidence-dir",
+        dir,
+        "--no-browser",
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
 
     // then
-    expect(html).toBe(
+    expect(stderrText).toBe("")
+    expect(exitCode).toBe(0)
+
+    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    expect(html).toContain(
       '<span class="ansi-fg-blue ansi-bg-red">inverse</span><span class="ansi-fg-red ansi-bg-blue"> normal</span> plain',
     )
   })
