@@ -1,7 +1,7 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { log } from "../../../shared/logger"
-import { transitionRuntimeState } from "../team-state-store/store"
-import type { RuntimeState } from "../types"
+import { transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
+import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 import { releaseReservationsForRecipients } from "./messaging-live-delivery-reservation"
 import type { TeamSendMessageToolDeps } from "./messaging-runtime"
 

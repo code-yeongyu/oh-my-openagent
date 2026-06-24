@@ -93,7 +93,9 @@ describe("normalizeToolArgSchemas", () => {
     expect(afterQuery?.description).toBe("Free-text search query")
     expect(afterQuery?.title).toBe("Query")
     expect(afterQuery?.examples).toEqual(["issue 2314"])
-  })
+    // loadSeparateHostZodModule cpSync-copies the whole zod package; Windows CI
+    // runners exceed the 5s default on that copy alone
+  }, 15000)
 })
 
 describe("sanitizeJsonSchema", () => {

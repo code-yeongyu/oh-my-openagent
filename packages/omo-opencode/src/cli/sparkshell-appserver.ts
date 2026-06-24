@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import { existsSync } from "node:fs"
 import type { Socket } from "node:net"
 import { homedir } from "node:os"
@@ -190,9 +191,7 @@ function parseResponseError(value: unknown): { readonly message?: string } | und
   return { message: typeof message === "string" ? message : undefined }
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null
-}
+
 
 function parseInitializeResult(value: unknown): InitializeResult {
   if (!isRecord(value)) {

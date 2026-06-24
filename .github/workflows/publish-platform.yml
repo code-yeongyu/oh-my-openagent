@@ -43,9 +43,9 @@ jobs:
       fail-fast: false
       max-parallel: 11
       matrix:
-        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
+        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -53,8 +53,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Validate release inputs
         id: validate
@@ -134,7 +132,7 @@ jobs:
 
       - name: Build launcher
         if: steps.check.outputs.skip != 'true'
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 5
           max_attempts: 5
@@ -176,7 +174,7 @@ jobs:
 
       - name: Upload artifact
         if: steps.check.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-${{ matrix.platform }}
           path: |
@@ -184,6 +182,19 @@ jobs:
             binary-${{ matrix.platform }}.zip
           retention-days: 1
           if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Platform build (${{ matrix.platform }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Validates release inputs for `${{ matrix.platform }}`.
+            - Skips already-published platform packages.
+            - Builds and uploads the launcher artifact when publishing is needed.
+          JOB_SUMMARY_NEXT: Check validation output first, then the build launcher or artifact upload step for this platform.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish:
     needs: build
@@ -193,7 +204,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
+        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
       - name: Validate release inputs
         id: validate
@@ -249,7 +260,7 @@ jobs:
       - name: Download artifact
         id: download
         if: steps.check.outputs.skip_all != 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: binary-${{ matrix.platform }}
           path: .
@@ -328,3 +339,29 @@ jobs:
             npm publish --access public --provenance --loglevel verbose
           fi
         timeout-minutes: 15
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_SUMMARY_DIST_TAG: ${{ inputs.dist_tag || 'latest' }}
+        run: |
+          {
+            echo "## Platform publish (${{ matrix.platform }})"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Platform | \`${{ matrix.platform }}\` |"
+            echo "| Dist tag | \`$JOB_SUMMARY_DIST_TAG\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Rechecks whether platform packages are already published."
+            echo "- Downloads the matching build artifact only when needed."
+            echo "- Publishes legacy and renamed platform packages with trusted publishing."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Check artifact download status, npm trusted publishing, and the package-specific publish log."
+          } >> "$GITHUB_STEP_SUMMARY"

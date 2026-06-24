@@ -248,7 +248,7 @@ describe("AgentOverrideConfigSchema", () => {
   describe("skills field", () => {
     test("accepts skills as optional string array", () => {
       // given
-      const config = { skills: ["frontend-ui-ux", "code-reviewer"] }
+      const config = { skills: ["frontend", "code-reviewer"] }
 
       // when
       const result = AgentOverrideConfigSchema.safeParse(config)
@@ -256,7 +256,7 @@ describe("AgentOverrideConfigSchema", () => {
       // then
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.skills).toEqual(["frontend-ui-ux", "code-reviewer"])
+        expect(result.data.skills).toEqual(["frontend", "code-reviewer"])
       }
     })
 
@@ -287,7 +287,7 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("rejects non-array skills", () => {
       // given
-      const config = { skills: "frontend-ui-ux" }
+      const config = { skills: "frontend" }
 
       // when
       const result = AgentOverrideConfigSchema.safeParse(config)
@@ -336,7 +336,7 @@ describe("AgentOverrideConfigSchema", () => {
       // given
       const config = { 
         category: "visual-engineering",
-        skills: ["frontend-ui-ux"]
+        skills: ["frontend"]
       }
 
       // when
@@ -346,7 +346,7 @@ describe("AgentOverrideConfigSchema", () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.category).toBe("visual-engineering")
-        expect(result.data.skills).toEqual(["frontend-ui-ux"])
+        expect(result.data.skills).toEqual(["frontend"])
       }
     })
 
@@ -511,6 +511,17 @@ describe("BuiltinCategoryNameSchema", () => {
 })
 
 describe("HookNameSchema", () => {
+  test("accepts codegraph bootstrap hook name", () => {
+    //#given
+    const input = "codegraph-bootstrap"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
   test("rejects removed beast-mode-system hook name", () => {
     //#given
     const input = "beast-mode-system"
@@ -536,6 +547,28 @@ describe("HookNameSchema", () => {
   test("rejects removed context-window-monitor hook name", () => {
     //#given
     const input = "context-window-monitor"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects removed thinking-block-validator hook name", () => {
+    //#given
+    const input = "thinking-block-validator"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects removed session-recovery hook name", () => {
+    //#given
+    const input = "session-recovery"
 
     //#when
     const result = HookNameSchema.safeParse(input)
@@ -945,6 +978,59 @@ describe("ExperimentalConfigSchema feature flags", () => {
   test("rejects non-boolean disable_omo_env", () => {
     //#given
     const config = { disable_omo_env: "true" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts disable_live_parent_wake_routing as true", () => {
+    //#given
+    const config = { disable_live_parent_wake_routing: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_live_parent_wake_routing).toBe(true)
+    }
+  })
+
+  test("accepts disable_live_parent_wake_routing as false", () => {
+    //#given
+    const config = { disable_live_parent_wake_routing: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_live_parent_wake_routing).toBe(false)
+    }
+  })
+
+  test("disable_live_parent_wake_routing is optional (absent = routing enabled)", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_live_parent_wake_routing).toBeUndefined()
+    }
+  })
+
+  test("rejects non-boolean disable_live_parent_wake_routing", () => {
+    //#given
+    const config = { disable_live_parent_wake_routing: "yes" }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)

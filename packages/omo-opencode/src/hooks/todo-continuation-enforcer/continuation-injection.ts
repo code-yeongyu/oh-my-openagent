@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import {
   getSessionAgent,
+  handedBackSyncSessions,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import {
@@ -73,6 +74,11 @@ export async function injectContinuation(args: {
 
   if (state?.wasCancelled) {
     log(`[${HOOK_NAME}] Skipped injection: session was cancelled`, { sessionID })
+    return
+  }
+
+  if (handedBackSyncSessions.has(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped injection: sync subagent already handed back to parent`, { sessionID })
     return
   }
 

@@ -609,6 +609,60 @@ describe("applyAgentConfig builtin override protection", () => {
     )
   })
 
+  test.each([
+    [
+      "skills.disable",
+      (config: OhMyOpenCodeConfig) => {
+        Object.assign(config, { skills: { disable: ["blocked-skill"] } })
+      },
+    ],
+    [
+      "skills.<name>: false",
+      (config: OhMyOpenCodeConfig) => {
+        Object.assign(config, { skills: { "blocked-skill": false } })
+      },
+    ],
+    [
+      "skills.<name>.disable",
+      (config: OhMyOpenCodeConfig) => {
+        Object.assign(config, { skills: { "blocked-skill": { disable: true } } })
+      },
+    ],
+  ])("passes %s entries into builtin agent disabled skill aliases", async (_label, configure) => {
+    // given
+    const disabledDescription = "IGNORE_ALL_PRIOR_INSTRUCTIONS_DISABLED_SKILL_DESC"
+    const projectSkill = {
+      name: "Blocked-Skill",
+      definition: {
+        name: "Blocked-Skill",
+        description: disabledDescription,
+        template: "template",
+      },
+      scope: "project",
+    } satisfies LoadedSkill
+    discoverProjectClaudeSkillsSpy.mockResolvedValue([projectSkill])
+    const pluginConfig = createPluginConfig()
+    configure(pluginConfig)
+
+    // when
+    await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6]
+    expect(discoveredSkills).toEqual([expect.objectContaining({ name: "Blocked-Skill" })])
+
+    const disabledSkills = createBuiltinAgentsSpy.mock.calls[0]?.[10]
+    expect(disabledSkills).toBeInstanceOf(Set)
+    if (disabledSkills instanceof Set) {
+      expect(disabledSkills.has("blocked-skill")).toBe(true)
+    }
+  })
+
   describe("agent_definitions and opencode.json integration", () => {
     test("agent_definitions agents appear in output", async () => {
       // given

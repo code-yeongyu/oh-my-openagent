@@ -1,9 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import * as p from "@clack/prompts"
 import * as configManager from "./config-manager"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import * as starRequest from "./star-request"
 import * as tuiInstallPrompts from "./tui-install-prompts"
+import { ULTIMATE_FALLBACK } from "./model-fallback"
+import { getNoModelProvidersWarning } from "./provider-availability"
 import { runTuiInstaller } from "./tui-installer"
+import { PLUGIN_NAME } from "../shared"
+import type { InstallConfig } from "./types"
 
 function createMockSpinner(): ReturnType<typeof p.spinner> {
   return {
@@ -24,11 +32,13 @@ describe("runTuiInstaller", () => {
   beforeEach(() => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true })
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
   })
 
   afterEach(() => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: originalIsStdinTty })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: originalIsStdoutTty })
+    mock.restore()
   })
 
   it("blocks installation when OpenCode is below the minimum version", async () => {
@@ -145,6 +155,209 @@ describe("runTuiInstaller", () => {
     for (const spy of restoreSpies) {
       spy.mockRestore()
     }
+  })
+
+  it("registers the TUI plugin entry after adding the OpenCode server plugin", async () => {
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const configDir = mkdtempSync(join(tmpdir(), "omo-tui-installer-entry-"))
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    try {
+      const restoreSpies = [
+        spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
+        spyOn(p, "intro").mockImplementation(() => undefined),
+        spyOn(p.log, "info").mockImplementation(() => undefined),
+        spyOn(p.log, "warn").mockImplementation(() => undefined),
+        spyOn(p.log, "success").mockImplementation(() => undefined),
+        spyOn(p.log, "message").mockImplementation(() => undefined),
+        spyOn(p, "note").mockImplementation(() => undefined),
+        spyOn(p, "confirm").mockResolvedValue(false),
+        spyOn(p, "outro").mockImplementation(() => undefined),
+        spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
+        spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+          isInstalled: false,
+          installedVersion: null,
+          hasClaude: false,
+          isMax20: false,
+          hasOpenAI: false,
+          hasGemini: false,
+          hasCopilot: false,
+          hasCodex: false,
+          hasOpencodeZen: false,
+          hasZaiCodingPlan: false,
+          hasKimiForCoding: false,
+          hasOpencodeGo: false,
+          hasBailianCodingPlan: false,
+          hasMinimaxCnCodingPlan: false,
+          hasMinimaxCodingPlan: false,
+          hasVercelAiGateway: false,
+        }),
+        spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+        spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+        spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue(createOpenCodeInstallConfig()),
+        spyOn(configManager, "addPluginToOpenCodeConfig").mockImplementation(async () => {
+          writeFileSync(join(configDir, "opencode.json"), JSON.stringify({ plugin: [PLUGIN_NAME] }), "utf-8")
+          return { success: true, configPath: join(configDir, "opencode.json") }
+        }),
+        spyOn(configManager, "writeOmoConfig").mockReturnValue({
+          success: true,
+          configPath: join(configDir, "oh-my-openagent.jsonc"),
+        }),
+      ]
+
+      const result = await runTuiInstaller({ tui: true }, "3.16.0")
+
+      expect(result).toBe(0)
+      expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
+
+      for (const spy of restoreSpies) {
+        spy.mockRestore()
+      }
+    } finally {
+      rmSync(configDir, { recursive: true, force: true })
+      if (originalConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+      }
+    }
+  })
+
+  function createOpenCodeInstallConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
+    return {
+      platform: "opencode",
+      hasOpenCode: true,
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasCodex: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+      hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
+      hasVercelAiGateway: false,
+      codexAutonomous: false,
+      ...overrides,
+    }
+  }
+
+  it("does not warn about missing providers when only Bailian is configured", async () => {
+    const warnSpy = spyOn(p.log, "warn").mockImplementation(() => undefined)
+    const restoreSpies = [
+      spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
+      spyOn(p, "intro").mockImplementation(() => undefined),
+      spyOn(p.log, "info").mockImplementation(() => undefined),
+      spyOn(p.log, "success").mockImplementation(() => undefined),
+      spyOn(p.log, "message").mockImplementation(() => undefined),
+      spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "confirm").mockResolvedValue(false),
+      spyOn(p, "outro").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue(
+        createOpenCodeInstallConfig({ hasBailianCodingPlan: true }),
+      ),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/oh-my-opencode.jsonc",
+      }),
+    ]
+
+    const result = await runTuiInstaller({ tui: true }, "3.16.0")
+
+    expect(result).toBe(0)
+    const warnMessages = warnSpy.mock.calls.map((call) => String(call[0]))
+    expect(warnMessages.some((m) => m.includes("No model providers configured"))).toBe(false)
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+    warnSpy.mockRestore()
+  })
+
+  it("warns with ultimate fallback when no providers are configured", async () => {
+    const warnSpy = spyOn(p.log, "warn").mockImplementation(() => undefined)
+    const restoreSpies = [
+      spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
+      spyOn(p, "intro").mockImplementation(() => undefined),
+      spyOn(p.log, "info").mockImplementation(() => undefined),
+      spyOn(p.log, "success").mockImplementation(() => undefined),
+      spyOn(p.log, "message").mockImplementation(() => undefined),
+      spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "confirm").mockResolvedValue(false),
+      spyOn(p, "outro").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue(createOpenCodeInstallConfig()),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/oh-my-opencode.jsonc",
+      }),
+    ]
+
+    const result = await runTuiInstaller({ tui: true }, "3.16.0")
+
+    expect(result).toBe(0)
+    const warnMessages = warnSpy.mock.calls.map((call) => String(call[0]))
+    expect(warnMessages.some((m) => m.includes(getNoModelProvidersWarning()))).toBe(true)
+    expect(warnMessages.some((m) => m.includes(ULTIMATE_FALLBACK))).toBe(true)
+    expect(warnMessages.some((m) => m.includes("big-pickle"))).toBe(false)
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+    warnSpy.mockRestore()
   })
 
   it("skips OpenCode checks and writes when platform is codex", async () => {

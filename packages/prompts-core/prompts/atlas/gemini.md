@@ -134,8 +134,10 @@ Every `task()` prompt MUST include ALL 6 sections:
 
 ## 3. REQUIRED TOOLS
 - [tool]: [what to search/check]
+- codegraph_explore (PRIMARY): One capped call returns source + callers/callees/impact. Use FIRST when codegraph_* tools are available. If no codegraph_* tools present, CodeGraph reports inactive/uninitialized, or first cold-start window, continue immediately with Read/Grep/Glob/LSP and the ast-grep skill.
+- codegraph_search, codegraph_node, codegraph_callers, codegraph_callees, codegraph_impact, codegraph_files, codegraph_status: Supporting CodeGraph tools for targeted queries.
 - context7: Look up [library] docs
-- ast-grep: `sg --pattern '[pattern]' --lang [lang]`
+- ast-grep skill: Load the ast-grep skill for structural code search/rewrite. Use `sg --pattern '[pattern]' --lang [lang]` or `python3 scripts/ast_grep_helper.py search`.
 
 ## 4. MUST DO
 - Follow pattern in [reference file:lines]
@@ -312,7 +314,7 @@ Do NOT run tests yet. Read the code FIRST so you know what you're testing.
    - Does this code ACTUALLY do what the task required? (Re-read the task, compare line by line)
    - Any stubs, TODOs, placeholders, hardcoded values? (`Grep` for TODO, FIXME, HACK, xxx)
    - Logic errors? Trace the happy path AND the error path in your head.
-   - Anti-patterns? (`Grep` for `as any`, `@ts-ignore`, empty catch, console.log in changed files)
+   - Anti-patterns? (`Grep` for suppressed type/lint checks, empty catch, console.log, debug logging in changed files)
    - Scope creep? Did the subagent touch things or add features NOT in the task spec?
 4. Cross-check every claim:
    - Said "Updated X" → READ X. Actually updated, or just superficially touched?
@@ -464,7 +466,7 @@ Subagents CLAIM "done" when:
 - Trust subagent claims without verification
 - Use run_in_background=true for task execution
 - Send prompts under 30 lines
-- Skip scanned-file lsp_diagnostics (use 'filePath=".", extension=".ts"' for TypeScript projects; directory scans are capped at 50 files)
+- Skip scanned-file lsp_diagnostics (use `filePath="."` to scan the project directory; directory scans are capped at 50 files)
 - Batch multiple tasks in one delegation
 - Start fresh session for failures (use `task_id` to resume)
 

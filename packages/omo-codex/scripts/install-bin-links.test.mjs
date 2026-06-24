@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmod, lstat, mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { linkCachedPluginBins, linkRootRuntimeBin } from "./install/cache.mjs";
+import { linkCachedPluginBins, linkRootRuntimeBin } from "./install-dist/install-local.mjs";
 import { makeTempDir, writeJson } from "./install-test-fixtures.mjs";
 
-async function writeRuntimeWrapperFixture() {
+async function writeRuntimeWrapperFixture({ withNodeCli = false } = {}) {
 	const root = await makeTempDir();
 	const repoRoot = join(root, "repo");
 	const binDir = join(root, "bin");
@@ -15,9 +15,20 @@ async function writeRuntimeWrapperFixture() {
 	const homeDir = join(root, "home");
 	await mkdir(join(repoRoot, "dist", "cli"), { recursive: true });
 	await writeFile(join(repoRoot, "dist", "cli", "index.js"), "");
+	if (withNodeCli) {
+		await mkdir(join(repoRoot, "dist", "cli-node"), { recursive: true });
+		await writeFile(
+			join(repoRoot, "dist", "cli-node", "index.js"),
+			'console.log("OMO_NODE_OK", process.argv.slice(2).join(" "));\n',
+		);
+	}
 	await mkdir(homeDir, { recursive: true });
 	const link = await linkRootRuntimeBin({ binDir, codexHome, repoRoot, platform: "linux" });
-	return { homeDir, link };
+	return { homeDir, link, repoRoot };
+}
+
+function runtimeWrapperEnv(homeDir) {
+	return { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: homeDir };
 }
 
 test("#given bun absent from PATH but present in ~/.bun/bin #when running the omo runtime wrapper #then resolves the bun fallback", async (t) => {
@@ -48,6 +59,63 @@ test("#given bun absent everywhere #when running the omo runtime wrapper #then f
 	assert.equal(result.status, 127);
 	assert.match(result.stderr, /bun runtime not found/);
 	assert.match(result.stderr, /https:\/\/bun\.sh/);
+});
+
+test("#given OMO_RUNTIME=node and a node CLI bundle #when running the omo runtime wrapper #then executes the node CLI", async (t) => {
+	if (process.platform === "win32") return t.skip("posix wrapper execution");
+	const { homeDir, link } = await writeRuntimeWrapperFixture({ withNodeCli: true });
+
+	const result = spawnSync(link.path, ["--help"], {
+		encoding: "utf8",
+		env: { ...runtimeWrapperEnv(homeDir), OMO_RUNTIME: "node" },
+	});
+
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /OMO_NODE_OK --help/);
+});
+
+test("#given bun absent everywhere and a node CLI bundle #when running the omo runtime wrapper #then falls back to node", async (t) => {
+	if (process.platform === "win32") return t.skip("posix wrapper execution");
+	const { homeDir, link } = await writeRuntimeWrapperFixture({ withNodeCli: true });
+
+	const result = spawnSync(link.path, ["--version"], {
+		encoding: "utf8",
+		env: runtimeWrapperEnv(homeDir),
+	});
+
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /OMO_NODE_OK --version/);
+});
+
+test("#given bun absent and no node CLI bundle #when running the omo runtime wrapper #then the error names both runtimes", async (t) => {
+	if (process.platform === "win32") return t.skip("posix wrapper execution");
+	const { homeDir, link } = await writeRuntimeWrapperFixture();
+
+	const result = spawnSync(link.path, ["--version"], {
+		encoding: "utf8",
+		env: runtimeWrapperEnv(homeDir),
+	});
+
+	assert.equal(result.status, 127);
+	assert.match(result.stderr, /bun runtime not found/);
+	assert.match(result.stderr, /https:\/\/bun\.sh/);
+	assert.match(result.stderr, /dist\/cli-node\/index\.js/);
+	assert.match(result.stderr, /OMO_RUNTIME=node/);
+});
+
+test("#given Windows platform #when writing the omo runtime wrapper #then embeds the node fallback chain", async () => {
+	const root = await makeTempDir();
+	const repoRoot = join(root, "repo");
+	const binDir = join(root, "bin");
+	await mkdir(join(repoRoot, "dist", "cli"), { recursive: true });
+	await writeFile(join(repoRoot, "dist", "cli", "index.js"), "");
+
+	const link = await linkRootRuntimeBin({ binDir, codexHome: join(root, "codex"), repoRoot, platform: "win32" });
+
+	const wrapper = await readFile(link.path, "utf8");
+	assert.match(wrapper, /OMO_RUNTIME/);
+	assert.match(wrapper, /dist[\\/]cli-node[\\/]index\.js/);
+	assert.ok(wrapper.indexOf("OMO_RUNTIME") < wrapper.indexOf("where bun"), "node override must precede bun discovery");
 });
 
 test("#given Windows platform #when writing the omo runtime wrapper #then embeds the bun fallback chain", async () => {
@@ -302,7 +370,7 @@ test("#given package bin name escapes bin directory #when linking bins #then rej
 
 	await assert.rejects(
 		linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" }),
-		/invalid package bin name/,
+		/Invalid package bin command name/,
 	);
 	await assert.rejects(lstat(escapedLink));
 });
@@ -322,7 +390,7 @@ test("#given package bin target escapes plugin root #when linking bins #then rej
 
 	await assert.rejects(
 		linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" }),
-		/escapes package root/,
+		/Package bin target must stay inside package root/,
 	);
 	await assert.rejects(readlink(join(binDir, "omo")));
 });

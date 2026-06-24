@@ -20,11 +20,13 @@ export class ParentWakeNotifier {
   private readonly dispatchedTracker: ParentWakeDispatchedTracker
   private readonly sessionInspector: ParentWakeSessionInspector
   private readonly flushRunner: ParentWakeFlushRunner
+  private readonly onPendingWakeRequeued?: (sessionID: string) => void
 
   constructor(
     deps: ParentWakeNotifierDeps,
     options: ParentWakeNotifierOptions,
   ) {
+    this.onPendingWakeRequeued = deps.onPendingWakeRequeued
     this.pendingQueue = new ParentWakePendingQueue({
       pendingRetryMs: options.pendingRetryMs,
       enqueueNotificationForParent: deps.enqueueNotificationForParent,
@@ -37,6 +39,8 @@ export class ParentWakeNotifier {
           wake,
           dispatchedTracker: this.dispatchedTracker,
           sessionInspector: this.sessionInspector,
+          requeueWake: (latestWake) => this.requeueWake(sessionID, latestWake),
+          scheduleFlush: () => this.schedulePendingParentWakeFlush(sessionID),
         }).catch((error: unknown) => {
           logParentWakeWindowRecoveryError(
             sessionID,
@@ -79,6 +83,22 @@ export class ParentWakeNotifier {
 
   getDispatchedParentWakeTimers(): Map<string, ReturnType<typeof setTimeout>> {
     return this.dispatchedTracker.getTimers()
+  }
+
+  hasInFlightParentWakeDispatch(sessionID: string): boolean {
+    return this.dispatchedTracker.hasInFlight(sessionID)
+  }
+
+  reserveNotificationPreparation(sessionID: string): void {
+    this.dispatchedTracker.reserveNotificationPreparation(sessionID)
+  }
+
+  releaseNotificationPreparation(sessionID: string): void {
+    this.dispatchedTracker.releaseNotificationPreparation(sessionID)
+  }
+
+  hasNotificationPreparation(sessionID: string): boolean {
+    return this.dispatchedTracker.hasNotificationPreparation(sessionID)
   }
 
   recordParentSessionActivity(sessionID: string): void {
@@ -161,6 +181,7 @@ export class ParentWakeNotifier {
 
   private requeueWake(sessionID: string, latestWake: PendingParentWake): void {
     this.pendingQueue.requeueWake(sessionID, latestWake)
+    this.onPendingWakeRequeued?.(sessionID)
   }
 
   private async shouldDeferParentWakeForSessionHistory(

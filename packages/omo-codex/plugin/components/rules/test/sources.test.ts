@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { SOURCE_PRIORITY } from "../src/rules/constants.js";
-import { defaultConfig } from "../src/rules/engine.js";
-import { disabledSourcesFromConfig } from "../src/rules/sources.js";
-import type { PiRulesConfig } from "../src/rules/types.js";
+import { SOURCE_PRIORITY } from "@oh-my-opencode/rules-engine/engine";
+import { defaultConfig } from "@oh-my-opencode/rules-engine/engine";
+import { disabledSourcesFromConfig } from "@oh-my-opencode/rules-engine/engine";
+import type { PiRulesConfig } from "@oh-my-opencode/rules-engine/engine";
 
 describe("rules source selection", () => {
 	it("#given default config #when disabled sources are derived #then opt-out sources stay disabled", () => {

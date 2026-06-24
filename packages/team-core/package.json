@@ -1,0 +1,55 @@
+{
+  "name": "@oh-my-opencode/team-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-neutral team-mode registry, mailbox, tasklist, state, worktree, and tmux layout domain primitives.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./config": {
+      "types": "./src/config.ts",
+      "import": "./src/config.ts"
+    },
+    "./team-registry": {
+      "types": "./src/team-registry/index.ts",
+      "import": "./src/team-registry/index.ts"
+    },
+    "./team-mailbox": {
+      "types": "./src/team-mailbox/index.ts",
+      "import": "./src/team-mailbox/index.ts"
+    },
+    "./team-tasklist": {
+      "types": "./src/team-tasklist/index.ts",
+      "import": "./src/team-tasklist/index.ts"
+    },
+    "./team-state-store": {
+      "types": "./src/team-state-store/index.ts",
+      "import": "./src/team-state-store/index.ts"
+    },
+    "./team-worktree": {
+      "types": "./src/team-worktree/index.ts",
+      "import": "./src/team-worktree/index.ts"
+    },
+    "./team-layout-tmux": {
+      "types": "./src/team-layout-tmux/index.ts",
+      "import": "./src/team-layout-tmux/index.ts"
+    },
+    "./*": {
+      "types": "./src/*.ts",
+      "import": "./src/*.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/tmux-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

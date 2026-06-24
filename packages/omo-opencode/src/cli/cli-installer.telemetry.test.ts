@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import * as configManager from "./config-manager"
+import * as astGrepInstall from "./install-ast-grep-sg"
 import type { InstallArgs } from "./types"
 
 describe("runCliInstaller telemetry isolation", () => {
+  beforeEach(() => {
+    spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+  })
+
   afterEach(() => {
     mock.restore()
   })

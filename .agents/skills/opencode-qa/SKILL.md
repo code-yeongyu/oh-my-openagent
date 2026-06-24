@@ -10,7 +10,7 @@ helper script and a deep reference. Every script ships a `--self-test` that
 asserts its scenario against the live machine, so the scripts are both the QA
 tools and their own regression checks.
 
-Verified against opencode v1.15.13 (bun 1.3.12, macOS). Confirm the installed
+Verified against opencode v1.17.7 (bun 1.3.12, macOS). Confirm the installed
 version with `opencode --version`; the surface is stable but always sanity
 check a flag with `opencode <cmd> --help`.
 
@@ -39,6 +39,12 @@ cd <this-skill-dir>                        # .agents/skills/opencode-qa
 bash scripts/lib/common.sh --self-check    # confirm the harness + deps
 ```
 
+**Docker is the default QA surface.** Run QA inside a disposable container that
+has the latest opencode and a copy of your config, with the host untouched:
+`script/agent/qa-docker.sh` (see [references/docker-qa.md](references/docker-qa.md)).
+The local scripts below are the fallback for when Docker is unavailable or on
+Windows.
+
 `common.sh` provides the shared harness (DB path, SQL escaping, isolated XDG
 sandbox, free port, server start/stop, and an EXIT-trap cleanup). It requires
 `opencode`, `sqlite3`, `curl`, `jq`, and `tmux` on PATH.
@@ -54,6 +60,7 @@ sandbox, free port, server start/stop, and an EXIT-trap cleanup). It requires
 | Export a whole session as JSON | D | `scripts/export-roundtrip.sh <ses_id>` | `references/db-investigation.md` |
 | Check the HTTP server / an endpoint | B | `scripts/server-smoke.sh` | `references/server-api.md` |
 | Prove a hook / action / event fired | B | `scripts/sse-hook-probe.sh` | `references/events-hooks.md` |
+| Prove serve-topology wake runner-split (reproduced/fixed) | B | `scripts/serve-wake-split-probe.sh --expect reproduced\|fixed --evidence-dir DIR` (self-test: `--self-test`; fake LLM: `scripts/lib/fake-openai-server.mjs`) | `references/events-hooks.md` |
 | Smoke-test the TUI | C | `scripts/tui-smoke.sh` | `references/tui-tmux.md` |
 | Write/run a test in the opencode source | - | (bun test) | `references/testing-harness.md` |
 | Drive opencode from a Bun/TS script | - | (SDK) | `references/sdk.md` |
@@ -116,6 +123,22 @@ bash scripts/tui-smoke.sh --self-test
 This launches the TUI under tmux in an isolated sandbox, confirms it renders
 (`capture-pane`), confirms `send-keys` reaches the composer, tears the tmux
 session down, and verifies the real DB session count is unchanged.
+
+When TUI visual QA evidence is needed for a PR, attach a browser-rendered
+terminal artifact in addition to the tmux pane. From the repository root, replay
+the captured pane or run a short tmux-backed command through:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "OpenCode TUI QA" \
+  --from-file .omo/evidence/<slug>/opencode-tui-pane.txt \
+  --evidence-dir .omo/evidence/<slug>/opencode-web-terminal
+```
+
+This writes `terminal.txt`, `terminal-ansi.txt`, `terminal.html`,
+`terminal.png`, and `metadata.json` so the PR can attach a stable TUI visual
+screenshot plus the cleanup receipt. Use `--command "<cmd>"` only for short
+ad-hoc terminal checks; the isolated `scripts/tui-smoke.sh` remains the
+canonical OpenCode TUI smoke.
 
 Honest verdict: tmux is fine for SMOKE (did it boot, render, accept a key) but
 fragile for asserting conversation output (the TUI is a 60fps full-screen app).
@@ -192,3 +215,4 @@ isolated sandbox and clean up on exit.
 - `references/tui-tmux.md` - tmux recipe, isolation, TUI control API
 - `references/testing-harness.md` - how opencode tests itself (bun test)
 - `references/sdk.md` - the @opencode-ai/sdk client (reference only)
+- `references/docker-qa.md` - run QA in a disposable Docker container (default; local is the fallback)

@@ -29,7 +29,9 @@ type SessionMessageForTest = {
 
 type FakeTimers = {
   getDelay: (timer: ReturnType<typeof setTimeout>) => number | undefined
-  run: (timer: ReturnType<typeof setTimeout>) => void
+  run: (timer: ReturnType<typeof setTimeout>) => Promise<void>
+  advanceBy: (ms: number) => Promise<void>
+  runNext: () => Promise<boolean>
   restore: () => void
 }
 
@@ -82,6 +84,10 @@ function createManager(
   manager: BackgroundManager
   promptAsyncCalls: PromptAsyncCall[]
 } {
+  if (enableParentSessionNotifications && !fakeTimers) {
+    fakeTimers = installFakeTimers()
+  }
+
   const promptAsyncCalls: PromptAsyncCall[] = []
   const client = {
     session: {
@@ -117,8 +123,11 @@ function createManager(
 function installFakeTimers(): FakeTimers {
   const originalSetTimeout = globalThis.setTimeout
   const originalClearTimeout = globalThis.clearTimeout
-  const callbacks = new Map<ReturnType<typeof setTimeout>, () => void>()
+  const originalDateNow = Date.now
+  const callbacks = new Map<ReturnType<typeof setTimeout>, () => void | Promise<void>>()
   const delays = new Map<ReturnType<typeof setTimeout>, number>()
+  const dueTimes = new Map<ReturnType<typeof setTimeout>, number>()
+  let now = Date.now()
 
   globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]): ReturnType<typeof setTimeout> => {
     if (typeof handler !== "function") {
@@ -129,33 +138,66 @@ function installFakeTimers(): FakeTimers {
     originalClearTimeout(timer)
     const callback = handler as (...callbackArgs: Array<unknown>) => void
     callbacks.set(timer, () => callback(...args))
-    delays.set(timer, delay ?? 0)
+    const normalizedDelay = Math.max(0, delay ?? 0)
+    delays.set(timer, normalizedDelay)
+    dueTimes.set(timer, now + normalizedDelay)
     return timer
   }) as typeof setTimeout
 
   globalThis.clearTimeout = ((timer: ReturnType<typeof setTimeout>): void => {
     callbacks.delete(timer)
     delays.delete(timer)
+    dueTimes.delete(timer)
   }) as typeof clearTimeout
+  Date.now = () => now
 
   return {
     getDelay(timer) {
       return delays.get(timer)
     },
-    run(timer) {
+    async run(timer) {
       const callback = callbacks.get(timer)
       if (!callback) {
         throw new Error(`Timer not found: ${String(timer)}`)
       }
 
+      now = dueTimes.get(timer) ?? now
       callbacks.delete(timer)
       delays.delete(timer)
-      callback()
+      dueTimes.delete(timer)
+      await callback()
+      await flushMicrotasks()
+    },
+    async advanceBy(ms) {
+      const target = now + ms
+      while (true) {
+        const nextTimer = nextTimerDueBefore(target)
+        if (!nextTimer) break
+        await this.run(nextTimer)
+      }
+      now = target
+      await flushMicrotasks()
+    },
+    async runNext() {
+      const nextTimer = nextTimerDueBefore(Number.POSITIVE_INFINITY)
+      if (!nextTimer) {
+        await flushMicrotasks()
+        return false
+      }
+      await this.run(nextTimer)
+      return true
     },
     restore() {
       globalThis.setTimeout = originalSetTimeout
       globalThis.clearTimeout = originalClearTimeout
+      Date.now = originalDateNow
     },
+  }
+
+  function nextTimerDueBefore(target: number): ReturnType<typeof setTimeout> | undefined {
+    return [...dueTimes.entries()]
+      .filter(([, dueAt]) => dueAt <= target)
+      .sort((left, right) => left[1] - right[1])[0]?.[0]
   }
 }
 
@@ -178,6 +220,13 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingP
   return parentWakeNotifier.getPendingParentWakes()
 }
 
+function getPendingParentWakeTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>>
+  }
+  return parentWakeNotifier.getPendingParentWakeTimers()
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return Reflect.get(manager, "completionTimers") as Map<string, ReturnType<typeof setTimeout>>
 }
@@ -187,30 +236,55 @@ async function notifyParentSessionForTest(manager: BackgroundManager, task: Back
   return notifyParentSession.call(manager, task)
 }
 
-async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  const startedAt = Date.now()
-  while (!predicate()) {
-    if (Date.now() - startedAt >= timeoutMs) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10))
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve()
   }
 }
 
-function waitForDeferredWake(promptAsyncCalls: PromptAsyncCall[]): Promise<void> {
-  return waitUntil(() => promptAsyncCalls.length > 0, 600)
+async function flushParentWake(manager: BackgroundManager, sessionID = "parent-1"): Promise<void> {
+  if (!fakeTimers) {
+    throw new Error("Fake timers must be installed before flushing parent wakes")
+  }
+
+  const pendingTimer = getPendingParentWakeTimers(manager).get(sessionID)
+  if (pendingTimer) {
+    await fakeTimers.run(pendingTimer)
+  } else {
+    const flushPendingParentWake = Reflect.get(manager, "flushPendingParentWake") as (id: string) => Promise<void>
+    void flushPendingParentWake.call(manager, sessionID)
+    await flushMicrotasks()
+  }
+
+  await fakeTimers.advanceBy(151)
 }
 
-function waitForDeferredWakeRetry(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 1_180))
+async function waitForDeferredWake(manager: BackgroundManager, promptAsyncCalls: PromptAsyncCall[]): Promise<void> {
+  if (!fakeTimers) {
+    throw new Error("Fake timers must be installed before waiting for parent wakes")
+  }
+
+  for (let attempts = 0; attempts < 12 && promptAsyncCalls.length === 0; attempts += 1) {
+    await flushParentWake(manager)
+    if (promptAsyncCalls.length > 0) break
+    await fakeTimers.runNext()
+  }
 }
 
-function waitForRequeuedParentWake(manager: BackgroundManager, sessionID: string): Promise<void> {
-  return waitUntil(() => (getPendingParentWakes(manager).get(sessionID)?.notifications.length ?? 0) > 0, 600)
+async function waitForRequeuedParentWake(manager: BackgroundManager, sessionID: string): Promise<void> {
+  if (!fakeTimers) {
+    throw new Error("Fake timers must be installed before waiting for parent wakes")
+  }
+
+  for (let attempts = 0; attempts < 12 && (getPendingParentWakes(manager).get(sessionID)?.notifications.length ?? 0) === 0; attempts += 1) {
+    await flushParentWake(manager, sessionID)
+    if ((getPendingParentWakes(manager).get(sessionID)?.notifications.length ?? 0) > 0) break
+    await fakeTimers.runNext()
+  }
 }
 
-function waitForCoalescedFlush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 400))
+function waitForCoalescedFlush(manager: BackgroundManager, promptAsyncCalls: PromptAsyncCall[]): Promise<void> {
+  return waitForDeferredWake(manager, promptAsyncCalls)
 }
 
 function getRequiredTimer(manager: BackgroundManager, taskID: string): ReturnType<typeof setTimeout> {
@@ -242,7 +316,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await notifyParentSessionForTest(manager, taskA)
       const taskATimer = getRequiredTimer(manager, taskA.id)
       expect(fakeTimers.getDelay(taskATimer)).toBe(TASK_CLEANUP_DELAY_MS)
-      fakeTimers.run(taskATimer)
+      await fakeTimers.run(taskATimer)
 
       // then
       expect(fakeTimers.getDelay(taskATimer)).toBeUndefined()
@@ -259,7 +333,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await notifyParentSessionForTest(manager, taskC)
       const rescheduledTaskATimer = getRequiredTimer(manager, taskA.id)
       expect(fakeTimers.getDelay(rescheduledTaskATimer)).toBe(TASK_CLEANUP_DELAY_MS)
-      fakeTimers.run(rescheduledTaskATimer)
+      await fakeTimers.run(rescheduledTaskATimer)
 
       // then
       expect(getTasks(manager).has(taskA.id)).toBe(false)
@@ -283,7 +357,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       await notifyParentSessionForTest(manager, taskB)
-      await waitForCoalescedFlush()
+      await waitForCoalescedFlush(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -322,7 +396,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       for (const task of tasks) {
         await notifyParentSessionForTest(manager, task)
       }
-      await waitForCoalescedFlush()
+      await waitForCoalescedFlush(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -379,7 +453,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -415,7 +489,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -463,7 +537,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await notifyParentSessionForTest(manager, task)
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -505,7 +579,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       try {
         // when
         await notifyParentSessionForTest(manager, task)
-        await waitForCoalescedFlush()
+        await waitForCoalescedFlush(manager, promptAsyncCalls)
 
         // then
         expect(promptAsyncCalls).toHaveLength(1)
@@ -551,7 +625,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       try {
         // when
         await notifyParentSessionForTest(manager, task)
-        await waitForCoalescedFlush()
+        await waitForCoalescedFlush(manager, promptAsyncCalls)
 
         // then
         expect(promptAsyncCalls).toHaveLength(1)
@@ -562,7 +636,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
     })
 
-    test("#when stale tool-call history keeps blocking an all-complete wake #then completion eventually wakes the parent", async () => {
+    test("#when stale tool-call history keeps blocking an all-complete wake #then the wake is admitted as noReply with reply liveness retained", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
@@ -603,16 +677,17 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     })
 
-    test("#when stale sdk tool-call part keeps blocking an all-complete wake #then completion eventually wakes the parent", async () => {
+    test("#when stale sdk tool-call part keeps blocking an all-complete wake #then the wake is admitted as noReply with reply liveness retained", async () => {
       // given
       const sessionStatuses: Record<string, { type: string }> = {
         "parent-1": { type: "idle" },
@@ -653,13 +728,14 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
     })
 
     test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake records a no-reply wake", async () => {
@@ -694,7 +770,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       try {
         // when
         await notifyParentSessionForTest(manager, task)
-        await waitForCoalescedFlush()
+        await waitForCoalescedFlush(manager, promptAsyncCalls)
 
         // then
         expect(promptAsyncCalls).toHaveLength(1)
@@ -716,7 +792,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       await notifyParentSessionForTest(manager, task)
-      await waitForCoalescedFlush()
+      await waitForCoalescedFlush(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -740,7 +816,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -764,7 +840,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       await notifyParentSessionForTest(manager, task)
       sessionStatuses["parent-1"] = { type: "idle" }
-      await waitForDeferredWakeRetry()
+      await waitForDeferredWake(manager, promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -793,7 +869,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await notifyParentSessionForTest(manager, task)
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake(promptAsyncCalls)
+      await waitForDeferredWake(manager, promptAsyncCalls)
       await waitForRequeuedParentWake(manager, "parent-1")
 
       // then
@@ -821,7 +897,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       expect(fakeTimers.getDelay(cleanupTimer)).toBe(TASK_CLEANUP_DELAY_MS)
-      fakeTimers.run(cleanupTimer)
+      await fakeTimers.run(cleanupTimer)
 
       // then
       expect(getCompletionTimers(manager).has(task.id)).toBe(false)

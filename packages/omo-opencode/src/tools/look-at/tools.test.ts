@@ -1,8 +1,59 @@
 import { afterEach, describe, expect, test, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { clearVisionCapableModelsCache, setVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
+import type { LookAtArgs } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+
+type LookAtPart = { type: string; url: string; mime: string; filename: string; text: string }
+type LookAtPromptBody = { model?: unknown; tools: Record<string, boolean>; parts: LookAtPart[] }
+
+function createToolContext(): ToolContext {
+  return {
+    sessionID: "parent-session",
+    messageID: "parent-message",
+    agent: "sisyphus",
+    directory: "/project",
+    worktree: "/project",
+    abort: new AbortController().signal,
+    metadata: () => {},
+    ask: async () => {},
+  }
+}
+
+function createPromptCaptureHarness() {
+  let promptBody: LookAtPromptBody | undefined
+
+  const lookAtTool = createLookAt({
+    client: {
+      app: {
+        agents: async () => ({ data: [] }),
+      },
+      session: {
+        get: async () => ({ data: { directory: "/project" } }),
+        create: async () => ({ data: { id: "ses_multi_file_test" } }),
+        prompt: async (input: { body: LookAtPromptBody }) => {
+          promptBody = input.body
+          return { data: {} }
+        },
+        messages: async () => ({
+          data: [
+            { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
+          ],
+        }),
+      },
+    },
+    directory: "/project",
+  } as never)
+
+  return {
+    lookAtTool,
+    getPromptBody: () => promptBody,
+  }
+}
 
 describe("look-at tool", () => {
   afterEach(() => {
@@ -70,7 +121,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when neither file_path nor image_data provided", () => {
-      const args = unsafeTestValue({ goal: "analyze" })
+      const args = unsafeTestValue<LookAtArgs>({ goal: "analyze" })
       const error = validateArgs(args)
       expect(error).toContain("file_path")
       expect(error).toContain("image_data")
@@ -78,18 +129,17 @@ describe("look-at tool", () => {
 
     // given both file_path and image_data
     // when validated
-    // then return error (mutually exclusive)
-    test("returns error when both file_path and image_data provided", () => {
+    // then allow mixed local-file and base64 inputs
+    test("returns null when both file_path and image_data provided", () => {
       const args = { file_path: "/path.png", image_data: "base64data", goal: "analyze" }
-      const error = validateArgs(args)
-      expect(error).toContain("only one")
+      expect(validateArgs(args)).toBeNull()
     })
 
     // given goal missing
     // when validated
     // then clear error message
     test("returns error when goal is missing", () => {
-      const args = unsafeTestValue({ file_path: "/some/path.png" })
+      const args = unsafeTestValue<LookAtArgs>({ file_path: "/some/path.png" })
       const error = validateArgs(args)
       expect(error).toContain("goal")
       expect(error).toContain("required")
@@ -263,7 +313,7 @@ describe("look-at tool", () => {
     test("passes multimodal-looker model to sync prompt when available", async () => {
       setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]))
 
-      let promptBody: any
+      let promptBody!: LookAtPromptBody
 
       const mockClient = {
         app: {
@@ -280,7 +330,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_model_passthrough" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -567,6 +617,51 @@ describe("look-at tool", () => {
       expect(result).toContain("Error")
       expect(result).toContain("string error thrown")
     })
+
+    test("sends JSON files as text instead of unsupported application/json file parts", async () => {
+      const temporaryDirectory = mkdtempSync(join(tmpdir(), "omo-look-at-json-"))
+      const jsonPath = join(temporaryDirectory, "sample.json")
+      writeFileSync(jsonPath, JSON.stringify({ hello: "world" }), "utf-8")
+
+      let promptBody: { parts: Array<{ type: string; text?: string; mime?: string }> } | undefined
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: temporaryDirectory } }),
+          create: async () => ({ data: { id: "ses_json_text" } }),
+          prompt: async (input: { body: { parts: Array<{ type: string; text?: string; mime?: string }> } }) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] },
+            ],
+          }),
+        },
+      }
+
+      try {
+        const tool = createLookAt(unsafeTestValue({
+          client: mockClient,
+          directory: temporaryDirectory,
+        }))
+
+        const result = await tool.execute(
+          { file_path: jsonPath, goal: "summarize json" },
+          createToolContext(),
+        )
+
+        expect(result).toBe("ok")
+        expect(promptBody).toBeDefined()
+        expect(promptBody?.parts.some((part) => part.type === "file" && part.mime === "application/json")).toBe(false)
+        expect(promptBody?.parts.some((part) => part.type === "text" && part.text?.includes('{"hello":"world"}'))).toBe(true)
+      } finally {
+        rmSync(temporaryDirectory, { recursive: true, force: true })
+      }
+    })
   })
 
   describe("createLookAt with image_data", () => {
@@ -574,7 +669,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then should send data URL to sync prompt
     test("sends data URL when image_data provided", async () => {
-      let promptBody: any
+      let promptBody!: LookAtPromptBody
 
       const mockClient = {
         app: {
@@ -583,7 +678,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_image_data_test" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -616,7 +711,7 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      const filePart = promptBody.parts.find((p: LookAtPart) => p.type === "file")!
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:image/png;base64")
       expect(filePart.mime).toBe("image/png")
@@ -627,7 +722,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then should detect mime type and create proper data URL
     test("handles raw base64 without data URI prefix", async () => {
-      let promptBody: any
+      let promptBody!: LookAtPromptBody
 
       const mockClient = {
         app: {
@@ -636,7 +731,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_raw_base64_test" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -669,7 +764,7 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      const filePart = promptBody.parts.find((p: LookAtPart) => p.type === "file")!
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:")
       expect(filePart.url).toContain("base64")
@@ -678,7 +773,7 @@ describe("look-at tool", () => {
 
   describe("createLookAt prompt conditional on Read availability", () => {
     const captureLastPromptBody = () => {
-      const captured: { body: any } = { body: undefined }
+      const captured: { body: LookAtPromptBody } = { body: undefined as unknown as LookAtPromptBody }
       const mockClient = {
         app: {
           agents: async () => ({ data: [] }),
@@ -686,7 +781,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_prompt_conditional" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: LookAtPromptBody }) => {
             captured.body = input.body
             return { data: {} }
           },
@@ -728,7 +823,7 @@ describe("look-at tool", () => {
       )
 
       expect(captured.body.tools.read).toBe(false)
-      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptPart = captured.body.parts.find((p: LookAtPart) => p.type === "text")!
       expect(promptPart).toBeDefined()
       const promptText: string = promptPart.text
       expect(promptText).toContain("attached")
@@ -753,7 +848,7 @@ describe("look-at tool", () => {
       )
 
       expect(captured.body.tools.read).toBe(false)
-      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptPart = captured.body.parts.find((p: LookAtPart) => p.type === "text")!
       expect(promptPart).toBeDefined()
       const promptText: string = promptPart.text
       expect(promptText).toContain("attached")
@@ -761,10 +856,7 @@ describe("look-at tool", () => {
       expect(promptText).not.toMatch(/\buse\s+Read\b/i)
     })
 
-    // given prompt is generated for any invocation where Read is denied
-    // when LookAt tool sends prompt to multimodal-looker
-    // then prompt explicitly tells the agent NOT to attempt Read tool
-    test("explicitly warns the agent not to attempt Read when Read is disabled", async () => {
+    test("does not mention the Read tool when Read is disabled", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
       const tool = createLookAt(unsafeTestValue({
@@ -777,10 +869,161 @@ describe("look-at tool", () => {
         buildToolContext(),
       )
 
-      const promptPart = captured.body.parts.find((p: any) => p.type === "text")
+      const promptPart = captured.body.parts.find((p: LookAtPart) => p.type === "text")!
       const promptText: string = promptPart.text
-      // The prompt must mention the agent cannot use Read so the agent does not hallucinate
-      expect(promptText.toLowerCase()).toContain("read tool")
+      expect(promptText).not.toMatch(/\bread tool\b/i)
+      expect(promptText).not.toMatch(/\buse\s+Read\b/i)
+    })
+  })
+
+  describe("createLookAt multi-file processing", () => {
+    test("schema exposes file_paths as an optional string array", () => {
+      const lookAtTool = createLookAt({ client: {}, directory: "/project" } as never)
+      const filePathsSchema = lookAtTool.args.file_paths
+      const filePathsDef = typeof filePathsSchema === "object" && filePathsSchema !== null
+        ? Reflect.get(filePathsSchema, "def")
+        : undefined
+      const filePathsInnerType = typeof filePathsDef === "object" && filePathsDef !== null
+        ? Reflect.get(filePathsDef, "innerType")
+        : undefined
+      const filePathsInnerDef = typeof filePathsInnerType === "object" && filePathsInnerType !== null
+        ? Reflect.get(filePathsInnerType, "def")
+        : undefined
+      const filePathsElement = typeof filePathsInnerDef === "object" && filePathsInnerDef !== null
+        ? Reflect.get(filePathsInnerDef, "element")
+        : undefined
+      const filePathsElementDef = typeof filePathsElement === "object" && filePathsElement !== null
+        ? Reflect.get(filePathsElement, "def")
+        : undefined
+
+      expect(filePathsSchema).toBeDefined()
+      expect(Reflect.get(filePathsDef as object, "type")).toBe("optional")
+      expect(Reflect.get(filePathsInnerDef as object, "type")).toBe("array")
+      expect(Reflect.get(filePathsElementDef as object, "type")).toBe("string")
+    })
+
+    test("schema exposes image_data_list as an optional string array", () => {
+      const lookAtTool = createLookAt({ client: {}, directory: "/project" } as never)
+      const imageDataListSchema = lookAtTool.args.image_data_list
+      const imageDataListDef = typeof imageDataListSchema === "object" && imageDataListSchema !== null
+        ? Reflect.get(imageDataListSchema, "def")
+        : undefined
+      const imageDataListInnerType = typeof imageDataListDef === "object" && imageDataListDef !== null
+        ? Reflect.get(imageDataListDef, "innerType")
+        : undefined
+      const imageDataListInnerDef = typeof imageDataListInnerType === "object" && imageDataListInnerType !== null
+        ? Reflect.get(imageDataListInnerType, "def")
+        : undefined
+      const imageDataListElement = typeof imageDataListInnerDef === "object" && imageDataListInnerDef !== null
+        ? Reflect.get(imageDataListInnerDef, "element")
+        : undefined
+      const imageDataListElementDef = typeof imageDataListElement === "object" && imageDataListElement !== null
+        ? Reflect.get(imageDataListElement, "def")
+        : undefined
+
+      expect(imageDataListSchema).toBeDefined()
+      expect(Reflect.get(imageDataListDef as object, "type")).toBe("optional")
+      expect(Reflect.get(imageDataListInnerDef as object, "type")).toBe("array")
+      expect(Reflect.get(imageDataListElementDef as object, "type")).toBe("string")
+    })
+
+    test("builds two file parts and plural prompt text for multi-file paths", async () => {
+      const { lookAtTool, getPromptBody } = createPromptCaptureHarness()
+
+      await lookAtTool.execute(
+        {
+          file_paths: ["/tmp/first.png", "/tmp/second.jpg"],
+          goal: "compare the screenshots",
+        },
+        createToolContext(),
+      )
+
+      const promptBody = getPromptBody()
+      expect(promptBody).toBeDefined()
+
+      const fileParts = promptBody!.parts.filter((part) => part.type === "file")
+      const promptText = promptBody!.parts[0]?.text ?? ""
+
+      expect(fileParts).toHaveLength(2)
+      expect(fileParts.map((part) => part.filename)).toEqual(["first.png", "second.jpg"])
+      expect(promptText).toContain("these files/images")
+      expect(promptText).toContain("File 1: first.png")
+      expect(promptText).toContain("File 2: second.jpg")
+    })
+
+    test("builds one file part and singular prompt text for backward-compatible file_path input", async () => {
+      const { lookAtTool, getPromptBody } = createPromptCaptureHarness()
+
+      await lookAtTool.execute(
+        {
+          file_path: "/tmp/single.png",
+          goal: "describe the screenshot",
+        },
+        createToolContext(),
+      )
+
+      const promptBody = getPromptBody()
+      expect(promptBody).toBeDefined()
+
+      const fileParts = promptBody!.parts.filter((part) => part.type === "file")
+      const promptText = promptBody!.parts[0]?.text ?? ""
+
+      expect(fileParts).toHaveLength(1)
+      expect(fileParts[0]?.filename).toBe("single.png")
+      expect(promptText).toContain("this file/image")
+      expect(promptText).not.toContain("File 1:")
+    })
+
+    test("builds one file part per image_data_list entry", async () => {
+      const { lookAtTool, getPromptBody } = createPromptCaptureHarness()
+
+      await lookAtTool.execute(
+        {
+          image_data_list: [
+            "data:image/png;base64,iVBORw0KGgo=",
+            "data:image/png;base64,iVBORw0KGgo=",
+            "data:image/png;base64,iVBORw0KGgo=",
+          ],
+          goal: "compare these pasted images",
+        },
+        createToolContext(),
+      )
+
+      const promptBody = getPromptBody()
+      expect(promptBody).toBeDefined()
+
+      const fileParts = promptBody!.parts.filter((part) => part.type === "file")
+      const promptText = promptBody!.parts[0]?.text ?? ""
+
+      expect(fileParts).toHaveLength(3)
+      expect(fileParts.every((part) => part.url.startsWith("data:image/png;base64,"))).toBe(true)
+      expect(promptText).toContain("these files/images")
+    })
+
+    test("combines file_paths and image_data_list into one parts array", async () => {
+      const { lookAtTool, getPromptBody } = createPromptCaptureHarness()
+
+      await lookAtTool.execute(
+        {
+          file_paths: ["/tmp/local.png"],
+          image_data_list: ["data:image/png;base64,iVBORw0KGgo="],
+          goal: "compare the local file and pasted image",
+        },
+        createToolContext(),
+      )
+
+      const promptBody = getPromptBody()
+      expect(promptBody).toBeDefined()
+
+      const fileParts = promptBody!.parts.filter((part) => part.type === "file")
+      const promptText = promptBody!.parts[0]?.text ?? ""
+
+      expect(fileParts).toHaveLength(2)
+      expect(fileParts[0]?.filename).toBe("local.png")
+      expect(fileParts[1]?.filename).toContain("clipboard-image")
+      expect(promptText).toContain("these files/images")
+      expect(promptText).toContain("File 1: local.png")
+      expect(promptText).toContain("File 2: clipboard-image")
     })
   })
 })

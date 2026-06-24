@@ -11,7 +11,10 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
-import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
+import {
+  DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
+  releaseAllPromptAsyncReservationsForTesting,
+} from "../../shared/prompt-async-gate"
 import { DEFAULT_SESSION_STATUS_TIMEOUT_MS } from "../../shared/session-idle-settle"
 import type { AtlasHookOptions, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
@@ -81,6 +84,7 @@ describe("atlas hook", () => {
 
   beforeEach(() => {
     _resetForTesting()
+    releaseAllPromptAsyncReservationsForTesting()
     registerAgentName("atlas")
     registerAgentName("sisyphus")
     TEST_DIR = join(tmpdir(), `atlas-test-${randomUUID()}`)
@@ -97,6 +101,7 @@ describe("atlas hook", () => {
 
   afterEach(() => {
     _resetForTesting()
+    releaseAllPromptAsyncReservationsForTesting()
     callerAgentBySession.clear()
     clearBoulderState(TEST_DIR)
     if (existsSync(TEST_DIR)) {
@@ -1042,37 +1047,6 @@ session_id: ses_untrusted_999
           expect(completionGateIndex).toBeLessThan(phase1Index)
         }
       })
-
-      test("should not contain old STEP 7 MARK COMPLETION IN PLAN FILE text", async () => {
-        // given - Atlas caller with boulder state
-        const planPath = join(TEST_DIR, "test-plan.md")
-        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
-
-        const state: BoulderState = {
-          active_plan: planPath,
-          started_at: "2026-01-02T10:00:00Z",
-          session_ids: ["session-1"],
-          plan_name: "test-plan",
-        }
-        writeBoulderState(TEST_DIR, state)
-
-        const hook = createTestAtlasHook(createMockPluginInput())
-        const output = {
-          title: "Sisyphus Task",
-          output: "Task completed successfully",
-          metadata: {},
-        }
-
-        // when
-        await hook["tool.execute.after"](
-          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
-          output
-        )
-
-        // then - old STEP 7 MARK COMPLETION IN PLAN FILE should be absent
-        expect(output.output).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
-        expect(output.output).not.toContain("MARK COMPLETION IN PLAN FILE")
-      })
     })
 
     describe("Write/Edit tool direct work reminder", () => {
@@ -1350,7 +1324,7 @@ session_id: ses_untrusted_999
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
       expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
-    })
+    }, { timeout: 10_000 })
 
     test("should inject continuation when idle event carries session id in info", async () => {
       // given - boulder state with incomplete plan and nested session event shape

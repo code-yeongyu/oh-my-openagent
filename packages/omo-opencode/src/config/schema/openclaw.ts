@@ -1,4 +1,10 @@
 import { z } from "zod"
+import type {
+  OpenClawConfig as CoreOpenClawConfig,
+  OpenClawGateway as CoreOpenClawGateway,
+  OpenClawHook as CoreOpenClawHook,
+  OpenClawReplyListenerConfig as CoreOpenClawReplyListenerConfig,
+} from "@oh-my-opencode/openclaw-core"
 
 export const OpenClawGatewaySchema = z.object({
   type: z.enum(["http", "command"]).default("http"),
@@ -44,7 +50,8 @@ export const OpenClawConfigSchema = z.object({
   replyListener: OpenClawReplyListenerConfigSchema.optional(),
 })
 
-export type OpenClawConfig = z.infer<typeof OpenClawConfigSchema>
-export type OpenClawGateway = z.infer<typeof OpenClawGatewaySchema>
-export type OpenClawHook = z.infer<typeof OpenClawHookSchema>
-export type OpenClawReplyListenerConfig = z.infer<typeof OpenClawReplyListenerConfigSchema>
+export type OpenClawConfig = z.infer<typeof OpenClawConfigSchema> & CoreOpenClawConfig
+export type OpenClawGateway = z.infer<typeof OpenClawGatewaySchema> & CoreOpenClawGateway
+export type OpenClawHook = z.infer<typeof OpenClawHookSchema> & CoreOpenClawHook
+export type OpenClawReplyListenerConfig =
+  z.infer<typeof OpenClawReplyListenerConfigSchema> & CoreOpenClawReplyListenerConfig

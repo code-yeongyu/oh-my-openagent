@@ -1,1 +1,1 @@
-export { spawn } from "../../bun-spawn-shim"
+export { spawn } from "@oh-my-opencode/tmux-core"

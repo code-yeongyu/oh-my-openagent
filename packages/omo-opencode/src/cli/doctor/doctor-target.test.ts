@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { resolveDoctorTarget } from "./doctor-target"
+import { resolveDoctorTarget } from "./framework/doctor-target"
 
 describe("resolveDoctorTarget", () => {
   test("#given lazycodex invocation #when resolving doctor target #then selects Codex diagnostics", () => {
