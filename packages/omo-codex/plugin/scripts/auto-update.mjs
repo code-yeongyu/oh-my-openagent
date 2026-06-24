@@ -220,7 +220,7 @@ async function runConfigMigration({ env }) {
 		const result = await migrateCodexConfig({ env });
 		if (result.modeChanged.length === 0) return [];
 		return [
-			'[LazyCodex] Codex multi_agent_mode was changed to "steering" for Team Mode support. Tell the user LazyCodex updated the setting from SessionStart so team-mode steering works by default.',
+			'[LazyCodex] Codex multi_agent_mode was changed to "proactive" for Team Mode support. Tell the user LazyCodex updated the setting from SessionStart so proactive team mode works by default.',
 		];
 	} catch (error) {
 		if (!(error instanceof Error)) throw error;
