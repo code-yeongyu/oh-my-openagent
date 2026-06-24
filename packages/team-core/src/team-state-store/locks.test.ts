@@ -8,6 +8,23 @@ async function createTempDirectory(prefix: string): Promise<string> {
   return await mkdtemp(join(tmpdir(), prefix))
 }
 
+function createSignal(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolveSignal: (() => void) | undefined
+  const promise = new Promise<void>((resolve) => {
+    resolveSignal = resolve
+  })
+
+  if (resolveSignal === undefined) {
+    throw new Error("signal resolver was not initialized")
+  }
+
+  return { promise, resolve: resolveSignal }
+}
+
+function createErrnoError(code: string): Error & { code: string } {
+  return Object.assign(new Error(code), { code })
+}
+
 test("withLock serializes concurrent work", async () => {
   // given
   const { withLock } = await import("./locks")
@@ -17,16 +34,21 @@ test("withLock serializes concurrent work", async () => {
   await writeFile(probePath, "ready")
   const activeMarkers = new Set<string>()
   const overlapObserved: string[] = []
+  const firstAcquired = createSignal()
+  const releaseFirst = createSignal()
 
   // when
   const first = withLock(lockPath, async () => {
     activeMarkers.add("first")
     await writeFile(probePath, "first-start")
-    await new Promise((resolve) => setTimeout(resolve, 75))
+    firstAcquired.resolve()
+    await releaseFirst.promise
     if (activeMarkers.has("second")) overlapObserved.push("first")
     activeMarkers.delete("first")
     return "first"
   })
+
+  await firstAcquired.promise
 
   const second = withLock(lockPath, async () => {
     activeMarkers.add("second")
@@ -36,6 +58,7 @@ test("withLock serializes concurrent work", async () => {
     return currentProbe
   })
 
+  releaseFirst.resolve()
   const results = await Promise.all([first, second])
 
   // then
@@ -69,6 +92,35 @@ test("atomicWrite leaves no partial file when rename fails", async () => {
 
   const directoryEntries = await readdir(rootDirectory)
   expect(directoryEntries.some((entry) => entry.startsWith("target.txt.tmp."))).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("lock open treats EPERM as contention when the lock path exists", async () => {
+  // given
+  const { assertRetryableLockOpenError } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-eperm-existing-")
+  const lockPath = join(rootDirectory, "lock")
+  await writeFile(lockPath, "owner\n123\n456\n")
+
+  // when
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"))
+
+  // then
+  await expect(result).resolves.toBeUndefined()
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("lock open rethrows EPERM when the lock path does not exist", async () => {
+  // given
+  const { assertRetryableLockOpenError } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-eperm-missing-")
+  const lockPath = join(rootDirectory, "lock")
+
+  // when
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"))
+
+  // then
+  await expect(result).rejects.toThrow("EPERM")
   await rm(rootDirectory, { recursive: true, force: true })
 })
 

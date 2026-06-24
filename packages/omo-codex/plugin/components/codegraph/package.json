@@ -1,6 +1,6 @@
 {
 	"name": "@sisyphuslabs/codex-codegraph",
-	"version": "4.12.1",
+	"version": "4.13.0",
 	"description": "Codex plugin MCP wrapper for CodeGraph.",
 	"type": "module",
 	"private": true,
@@ -8,10 +8,13 @@
 		"omo-codegraph": "./dist/cli.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"LICENSE",
+		"NODE-RUNTIME-LICENSES.md",
+		"NOTICE"
 	],
 	"scripts": {
-		"build": "bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
+		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
 		"test": "bun test test/*.test.ts",
 		"typecheck": "tsc --noEmit"
 	},
@@ -20,6 +23,9 @@
 		"@types/node": "^25.9.3",
 		"bun-types": "^1.3.1",
 		"typescript": "^6.0.3"
+	},
+	"optionalDependencies": {
+		"@colbymchenry/codegraph": "1.0.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"

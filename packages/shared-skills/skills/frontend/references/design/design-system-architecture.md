@@ -9,8 +9,9 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## When to Create
 
-- **New project**: Create `DESIGN.md` during initial setup, before any UI component.
-- **Existing project without one**: Extract the design system from existing code before continuing work.
+- **New project**: If the user gave no concrete visual reference, select one Layer A style skill and one Layer B brand/design-system reference first. Treat them as source material for tokens, layout, component anatomy, states, motion, and taste; customize for the user's product without freestyling past the selected references. Then create `DESIGN.md` before UI, with Section 5 primitives and states defined before implementation.
+- **Existing project without one, but with implicit patterns/components**: Extract the design system from existing code before continuing work.
+- **Existing project without one and without a reusable component layer**: Ask whether to preserve the current look with copy-nearby styling or extract a `DESIGN.md` plus reusable components first. Do not silently choose.
 - **Existing project with one**: Read it. Follow it. Update it only when a genuinely new pattern emerges.
 
 ## DESIGN.md Structure
@@ -112,18 +113,20 @@ All spacing derives from a base of **4px**.
 
 ## 5. Components
 
-Document reusable patterns as they emerge. Format:
+Document reusable patterns before implementation for greenfield work, and as they emerge or are extracted for existing work. Format:
 
 ### [Component Name]
 - **Structure**: HTML/JSX outline
 - **Variants**: list
 - **Spacing**: which tokens
-- **States**: default, hover, active, focus, disabled, loading, error
+- **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
 - **Motion**: entry/exit animations
 
-Start with components used 2+ times. Do not pre-document components
-that don't exist yet.
+Greenfield starts with the primitives you are about to build, assembled from
+the selected references' component anatomy and adapted to the user's product.
+Existing projects start with components used 2+ times or already shared in
+code; do not invent future components just to fill the section.
 
 ## 6. Motion & Interaction
 
@@ -168,22 +171,21 @@ Surfaces use progressively lighter/darker shades. No borders, no shadows.
 
 ### For New Projects
 
-1. **Ask or infer the product domain** — SaaS dashboard? Marketing site? Dev tool?
-2. **Write the Atmosphere paragraph** — one chance to establish identity.
-3. **Define palette** — derive from atmosphere. Not random. Not generic.
-4. **Set typography** — match the atmosphere. Editorial = serif. Technical = mono-heavy. Clean = geometric sans.
-5. **Lock spacing** — base-4 system. Customize only the section-level values.
-6. **Document initial components** — only those you are about to build.
-7. **Choose depth strategy** — one. Not "a mix."
-8. **Write it to `DESIGN.md`** at project root.
+1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
+2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
+3. **Define the system** — atmosphere, palette, typography, spacing, and one depth strategy, grounded in the selected references and product semantics.
+4. **Document initial primitives** — only components you are about to build, including variants and states.
+5. **Write it to `DESIGN.md`** at project root.
+6. **Build a primitive showcase first** — exercise each primitive's default, hover, active, focus, disabled, loading, empty, and error states at mobile/tablet/desktop widths before composing product screens.
 
 ### For Existing Projects (Extraction)
 
 1. **Read all CSS/styling files** — find the actual tokens in use.
-2. **Identify the implicit system** — what colors, fonts, spacing values repeat?
-3. **Codify it** — write the `DESIGN.md` reflecting what EXISTS, not what you wish existed.
-4. **Flag inconsistencies** — note where the code deviates from its own patterns.
-5. **Propose consolidation** — but do not apply it until approved.
+2. **Identify the implicit system** — what colors, fonts, spacing values, components, and states repeat?
+3. **If no reusable component layer exists**, ask whether to preserve the current look with copy-nearby edits or extract reusable components first.
+4. **Codify it** — write the `DESIGN.md` reflecting what EXISTS, not what you wish existed.
+5. **Flag inconsistencies** — note where the code deviates from its own patterns.
+6. **Propose consolidation** — but do not apply it until approved.
 
 ## Validation Rules
 
@@ -192,10 +194,11 @@ After every component implementation, check:
 - [ ] All colors reference tokens from Section 2. No raw hex outside `DESIGN.md`.
 - [ ] All font sizes match Section 3 scale. No arbitrary sizes.
 - [ ] All spacing values are multiples of `--space-1` (4px). No magic numbers.
-- [ ] Interactive elements have all required states from Section 6.
+- [ ] Interactive elements have all required states from Section 5 and Section 6.
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
 - [ ] Motion follows the timing table. No arbitrary durations.
+- [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 
 ## Memory Management
 

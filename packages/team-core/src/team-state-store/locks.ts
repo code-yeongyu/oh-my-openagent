@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { open, readFile, rename, rm, unlink } from "node:fs/promises"
+import { access, open, readFile, rename, rm, unlink } from "node:fs/promises"
 
 import { tolerantFsync } from "../tolerant-fsync"
 
@@ -39,6 +39,28 @@ function parseOwnerContent(content: string): { ownerPid: number; acquiredAtEpoch
   return { ownerPid, acquiredAtEpochMs }
 }
 
+function errorCode(error: unknown): string | null {
+  if (!(error instanceof Error) || !("code" in error)) return null
+  return typeof error.code === "string" ? error.code : null
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return false
+  }
+}
+
+export async function assertRetryableLockOpenError(lockPath: string, error: unknown): Promise<void> {
+  const code = errorCode(error)
+  if (code === "EEXIST") return
+  if (code === "EPERM" && (await pathExists(lockPath))) return
+  throw error
+}
+
 function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
@@ -68,8 +90,7 @@ async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: num
       }
       return
     } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code !== "EEXIST") throw error
+      await assertRetryableLockOpenError(lockPath, error)
 
       if (await detectStaleLock(lockPath, staleAfterMs)) {
         await reapStaleLock(lockPath)

@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/script/agent/cleanup.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/script/agent/cleanup-hook.sh\""
           }
         ]
       }

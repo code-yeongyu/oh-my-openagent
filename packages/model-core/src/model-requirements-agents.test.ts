@@ -244,7 +244,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
   })
 
-  test("hephaestus supports openai, github-copilot, venice, opencode, and vercel providers", () => {
+  test("hephaestus supports openai, github-copilot, opencode, and vercel providers", () => {
     // given
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
@@ -252,10 +252,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresProvider).toEqual([
       "openai",
       "github-copilot",
-      "venice",
       "opencode",
       "vercel",
     ])
+    expect(hephaestus.requiresProvider).not.toContain("venice")
+    expect(hephaestus.fallbackChain[0]?.providers).not.toContain("venice")
     expect(hephaestus.requiresModel).toBeUndefined()
     expect(hephaestus.requiresAnyModel).toBe(true)
   })

@@ -45,7 +45,7 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 
 			// when
 			const result = await runCodegraphSessionStartWorker({
-				config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], warnings: [] },
+				config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], trustedCodegraphInstallDir: installDir, warnings: [] },
 				nodeVersion: "26.3.0",
 				cwd: workspace,
 				env: { HOME: homeDir },

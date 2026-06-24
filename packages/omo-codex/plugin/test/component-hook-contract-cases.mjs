@@ -66,6 +66,33 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
+			name: "workflow-selector user-prompt-submit start-work",
+			component: "workflow-selector",
+			event: "user-prompt-submit",
+			payload: {
+				hook_event_name: "UserPromptSubmit",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: null,
+				cwd: tempRoot,
+				model: "gpt-5.5",
+				permission_mode: "default",
+				prompt: "Continue the approved plan",
+			},
+			env: { OMO_CODEX_AUTO_WORKFLOW: "1" },
+			assertOutput(stdout) {
+				const output = JSON.parse(stdout);
+				assert.equal(
+					output.hookSpecificOutput.hookEventName,
+					"UserPromptSubmit",
+				);
+				assert.match(
+					output.hookSpecificOutput.additionalContext,
+					/\$start-work/,
+				);
+			},
+		},
+		{
 			name: "ulw-loop pre-tool-use budget guard",
 			component: "ulw-loop",
 			event: "pre-tool-use",

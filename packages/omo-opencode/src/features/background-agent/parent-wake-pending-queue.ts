@@ -59,6 +59,7 @@ export class ParentWakePendingQueue {
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
       if (notificationsChanged) {
         delete pendingWake.noReplyAdmittedAt
+        delete pendingWake.noAssistantOutputRetryCount
       }
       return
     }
@@ -82,6 +83,13 @@ export class ParentWakePendingQueue {
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
+      const noAssistantOutputRetryCount = Math.max(
+        pendingWake.noAssistantOutputRetryCount ?? 0,
+        latestWake.noAssistantOutputRetryCount ?? 0,
+      )
+      if (noAssistantOutputRetryCount > 0) {
+        pendingWake.noAssistantOutputRetryCount = noAssistantOutputRetryCount
+      }
       return
     }
     this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))

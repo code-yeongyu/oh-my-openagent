@@ -15,6 +15,7 @@ import { ensureAutonomousPermissions } from "./codex-config-permissions"
 import { ensureHookTrusted, ensureOmoBuiltinMcpPolicies, ensurePluginEnabled } from "./codex-config-plugins"
 import { ensureCodexReasoningConfig } from "./codex-config-reasoning"
 import { readCodexModelCatalog } from "./codex-model-catalog"
+import { removeUnsupportedCodexMultiAgentModeConfig } from "./codex-multi-agent-mode-config"
 import { ensureCodexMultiAgentV2Config } from "./codex-multi-agent-v2-config"
 import type { CodexAgentConfig, CodexInstallPlatform, CodexMarketplaceSource, TrustedHookState } from "./types"
 
@@ -25,6 +26,7 @@ export async function updateCodexConfig(input: {
   readonly marketplaceSource: CodexMarketplaceSource
   readonly pluginNames: readonly string[]
   readonly platform?: CodexInstallPlatform
+  readonly codegraphMcpEnabled?: boolean
   readonly gitBashEnabled?: boolean
   readonly trustedHookStates?: readonly TrustedHookState[]
   readonly agentConfigs?: readonly CodexAgentConfig[]
@@ -51,6 +53,7 @@ export async function updateCodexConfig(input: {
   config = ensureFeatureEnabled(config, "plugin_hooks")
   config = ensureFeatureEnabled(config, "multi_agent")
   config = ensureFeatureEnabled(config, "child_agents_md")
+  config = removeUnsupportedCodexMultiAgentModeConfig(config)
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
   config = ensureCodexMultiAgentV2Config(config)
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)

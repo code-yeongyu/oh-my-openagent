@@ -68,6 +68,8 @@ describe("visual-qa skill prompt contract", () => {
 			expect(lowerPassB, fixture.label).toContain("view_image")
 			expect(lowerPassB, fixture.label).toContain("source code")
 			expect(passB, fixture.label).toContain("[Image #1]")
+			expect(passB, fixture.label).toContain("semantic phrases")
+			expect(passB, fixture.label).toContain("놀라운 변 / 화")
 			expect(passB, fixture.label).toContain("에이전트 오케스트")
 			expect(passB, fixture.label).toContain("레이션 현황 및 미")
 			expect(passB, fixture.label).toContain("래")
@@ -122,6 +124,74 @@ describe("visual-qa skill prompt contract", () => {
 			expect(cloneMode, fixture.label).toContain("image-diff")
 			expect(cloneMode, fixture.label).toContain("lazycodex-clone-fidelity-reviewer")
 			expect(lowerCloneMode, fixture.label).toContain("retry")
+		}
+	})
+})
+
+describe("visual-qa skill exhaustive-coverage and review-gate contract", () => {
+	test("#given a multi-page surface #when capturing #then every page is enumerated and verified per page, not sampled", () => {
+		for (const fixture of fixtures()) {
+			const capture = sectionBetween(fixture.text, "## Step 2", "## Step 3")
+			const lower = capture.toLowerCase()
+
+			expect(lower, fixture.label).toContain("every page")
+			expect(lower, fixture.label).toContain("enumerate")
+			expect(lower, fixture.label).toContain("never sample")
+			expect(lower, fixture.label).toContain("per page")
+			expect(lower, fixture.label).toContain("one failing page fails")
+		}
+	})
+
+	test("#given prior QA artifacts #when verifying #then stale evidence older than the source must be regenerated", () => {
+		for (const fixture of fixtures()) {
+			const capture = sectionBetween(fixture.text, "## Step 2", "## Step 3")
+			const lower = capture.toLowerCase()
+
+			expect(lower, fixture.label).toContain("stale")
+			expect(lower, fixture.label).toContain("older than")
+			expect(lower, fixture.label).toContain("regenerate")
+		}
+	})
+
+	test("#given Step 3 dispatch #when running the review #then it is required pre-done, harness-native, and covers every enumerated page", () => {
+		for (const fixture of fixtures()) {
+			const dispatch = sectionBetween(fixture.text, "## Step 3", "### Pass A")
+			const lower = dispatch.toLowerCase()
+
+			expect(lower, fixture.label).toContain("required before")
+			expect(lower, fixture.label).toContain("do not self-review")
+			expect(dispatch, fixture.label).toContain("spawn_agent")
+			expect(dispatch, fixture.label).toContain("lazycodex-gate-reviewer")
+			expect(lower, fixture.label).toContain("every enumerated page")
+		}
+	})
+
+	test("#given the completion gate #when deciding done #then an independent reviewer must PASS on a fresh full capture, looping until clean", () => {
+		for (const fixture of fixtures()) {
+			const gate = sectionBetween(fixture.text, "## Step 4", "## Step 5")
+			const lower = gate.toLowerCase()
+
+			expect(lower, fixture.label).toContain("hard stop rule")
+			expect(lower, fixture.label).toContain("independent")
+			expect(lower, fixture.label).toContain("no blocking")
+			expect(lower, fixture.label).toContain("fresh")
+			expect(lower, fixture.label).toContain("every enumerated page")
+			expect(lower, fixture.label).toContain("loop until")
+			expect(lower, fixture.label).toContain("do not stop because the automated script")
+		}
+	})
+
+	test("#given Pass B CJK checks #when inspecting #then it flags topic, connective, and source-citation splits across every page", () => {
+		for (const fixture of fixtures()) {
+			const passB = sectionBetween(fixture.text, "### Pass B", "## Step 4")
+			const lower = passB.toLowerCase()
+
+			expect(passB, fixture.label).toContain("두 강은")
+			expect(passB, fixture.label).toContain("쓸 수")
+			expect(passB, fixture.label).toContain("Attention Is")
+			expect(lower, fixture.label).toContain("citation")
+			expect(lower, fixture.label).toContain("every page")
+			expect(lower, fixture.label).toContain("regardless of similarityscore")
 		}
 	})
 })

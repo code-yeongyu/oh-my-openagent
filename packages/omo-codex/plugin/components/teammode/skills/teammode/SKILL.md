@@ -26,11 +26,15 @@ Use plain subagents (`$ulw` / `multi_agent_v1.spawn_agent`) - NOT a team - when 
 A team buys cross-member coordination at a real overhead cost; only spend it when coordination
 is the thing you actually need.
 
-## You are the leader
+## You are the leader - orchestrate, do not implement
 
-The main session is ALWAYS the team leader. Do NOT create a separate leader thread - you
-orchestrate directly. Members are the threads you create; they report to you, and you own the
-final synthesis and any integration.
+The main session is ALWAYS the team leader; you orchestrate directly and never spin up a separate
+leader thread. Your job is orchestration, NOT writing product code: split the work and assign each
+slice, hold live situational awareness of every member, verify and QA what they deliver, relay
+findings between members, instruct and unblock, and synthesize the result. DELEGATE every code edit
+to a member - if you catch yourself editing product files while the team runs, that work was a
+member's slice you should have handed off. You own direction, verification, and integration (the
+merge), not the keystrokes.
 
 ## Compose by part, ownership, or perspective - not by job title
 
@@ -61,6 +65,9 @@ node "<skill-root>/scripts/team.mjs" add-member  --team <session_id> --id A --na
 node "<skill-root>/scripts/team.mjs" bind-thread  --team <session_id> --id A --thread <thread_id> [--cwd <path>]
 node "<skill-root>/scripts/team.mjs" member-prompt --team <session_id> --id A
 node "<skill-root>/scripts/team.mjs" set-status   --team <session_id> --id A --status reported|blocked|active|archived [--note "<...>"]
+node "<skill-root>/scripts/team.mjs" worktree-add    --team <session_id> --id A [--base-branch <branch>]
+node "<skill-root>/scripts/team.mjs" worktree-remove --team <session_id> --id A [--force]
+node "<skill-root>/scripts/team.mjs" integrate       --team <session_id> [--id A]
 node "<skill-root>/scripts/team.mjs" archive      --team <session_id> [--id A]
 node "<skill-root>/scripts/team.mjs" delete       --team <session_id> [--force]
 node "<skill-root>/scripts/team.mjs" status       --team <session_id>
@@ -82,10 +89,18 @@ subcommand rewrites `guide.md`, so the manual always matches the current team.
    exact title to use. If `codex_app.create_thread` accepts a working directory / cwd argument,
    set it to that member's worktree; otherwise the member's manual tells it to `cd` there first.
    Use `codex_app.set_thread_title` if the title did not land at creation.
+   If Codex returns only `pendingWorktreeId`, the worktree-backed thread is not ready yet: do not
+   `bind-thread` and do not send the member bootstrap. Wait until Codex surfaces a real `threadId`
+   or the thread appears in the thread list, then set the title, bind that real id with the cwd,
+   and only then send the bootstrap.
 3. `bind-thread` to record each thread id (and `--cwd`), then send that member's bootstrap
    trigger (printed by `add-member` / `member-prompt`) as the thread's first message. The trigger
    is short on purpose: it tells the new thread to READ its `guide.md` and `team.json` rather than
    carrying the whole protocol inline.
+4. Whenever you report, audit, reopen, or hand off a member thread, include the app deep link
+   `codex://threads/<thread_id>` next to the raw id. For example:
+   `codex://threads/019ef350-ee78-72a3-bd5e-e40cebc3d814`. Worktree-backed threads are easy to
+   lose in the sidebar without this link.
 
 Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
 not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
@@ -98,24 +113,51 @@ fall back to a spawned agent.
 
 ## Communication
 
-Coordinate with `codex_app.send_message_to_thread` (leader-to-member and peer digests) and inspect
-status with `codex_app.read_thread`. The generated manual already binds members to the hard rules,
-so you mostly enforce them: all member-to-member and member-to-leader communication is in English;
-when the END user addresses a member, that member replies in the user's own language. Members
-over-communicate relentlessly - constant, small, lean updates that report every finding, hand-off,
-and even the smallest or most trivial step as it happens rather than one final dump - and send
-`WORKING:`/`BLOCKED:` markers so the leader always knows their state; stale, stuck, or
-silently-blocked members are not acceptable, and a finished
-member reports to the leader immediately. Members hand off files and
-memos through the team `artifacts/` directory and reference them by path instead of pasting large
-content. Wait for every required member's final report before you declare the team done.
+Members push to you and to one another with `codex_app.send_message_to_thread`; you inspect their
+state with `codex_app.read_thread`. So members can actually reach you, run `init` with
+`--session <your own thread id>` - that makes `leader.sessionId` in team.json a real, messageable
+thread; without it members cannot report to you and you are stuck polling. The generated manual binds
+members to the hard rules, so you mainly keep the channel open: expect frequent small inbound updates
+from each member - findings, `WORKING:`/`BLOCKED:` markers, peer digests - rather than one final
+dump, and act on them as they arrive. All member-to-member and member-to-leader traffic is in English;
+when the END user addresses a member, that member replies in the user's own language. Members hand off
+files and memos through the team `artifacts/` directory and reference them by path. Wait for every
+required member's final report before you declare the team done.
 
-## Worktrees (optional isolation)
+## Worktrees - isolate members who would touch the same files
 
-When parallel members would edit overlapping files, enable isolation with `init --worktree`. Create
-one git worktree per member off the base branch, `bind-thread --cwd <worktree>` so each member's
-worktree is recorded in `team.json`, and rely on the manual to direct each member into its own
-worktree. Each member commits inside its worktree so you can integrate.
+The moment two members' slices would edit the same files, give each its own git worktree so they
+cannot clobber each other. Decide this whenever you see the collision - at team creation OR mid-run,
+not only up front. For each colliding member run `worktree-add --team <id> --id <member>`: it creates
+the worktree off the base branch on a derived branch, flips the team into worktree mode, records it in
+`team.json`, and prints the `cd` path to hand that member. The member works and commits only inside
+its own worktree. To land the work, `integrate --team <id>` merges every member branch into your
+current branch with a merge commit (never a squash or rebase); resolve any conflict it reports, then
+`worktree-remove` each worktree at cleanup.
+
+After `worktree-add`, immediately send the member a follow-up that includes both its assigned
+worktree path and its `codex://threads/<thread_id>` link. Use `bind-thread --cwd <worktree>` or
+`--worktree-path <worktree>` after the thread exists so `team.json`, `guide.md`, `status`, and
+`member-prompt` all point at the same worktree-backed thread.
+
+When the member starts inside a worktree, it must verify the assigned cwd exists and contains the
+repository checkout before editing. If the directory is missing, empty, or does not look like a git
+worktree/repository yet, the member reports `BLOCKED: worktree not ready` to the leader and waits
+instead of editing a parent checkout or an empty directory.
+
+## Run a ulw-plan in parallel
+
+When a decision-complete plan already exists at `.omo/plans/<slug>.md` (from ulw-plan), execute its
+parallel waves as a team instead of one todo at a time. Map it directly:
+- one wave's independent todos -> one member each; the todo's scope/files become that member's `focus`,
+  and its acceptance criteria + QA become the member's `deliverable`.
+- the plan's dependency matrix sets the shape: todos with no unmet dependency inside a wave run as
+  concurrent members; a todo that depends on another waits, so launch the next wave only after the
+  blocking members report.
+- todos in the same wave that touch overlapping files -> give those members worktrees (see above).
+
+Keep the plan file as the shared spec: point each member at its todo by path, and verify the member's
+result against that todo's acceptance criteria before you integrate.
 
 ## Archive, delete, and cleanup
 
@@ -129,9 +171,9 @@ then delete the team state. A finished team that is never disbanded is a leak.
   and tell the user - never pretend a member was archived.
 - `delete` removes `.omo/teams/{session_id}` and refuses while the team is unarchived or any member
   is still active unless `--force`.
-- When the work wraps up, integrate each member's worktree the way the user asked - merge directly,
-  or open a fresh PR and merge it - then archive and delete. Cleanup is real work; respect the
-  user's instruction on how to land it.
+- When the work wraps up, land it the way the user asked: `integrate --team <id>` for a direct merge
+  commit, or push each member branch and open a PR. Then `worktree-remove` each worktree, archive, and
+  delete. Cleanup is real work; respect the user's instruction on how to land it.
 
 ## Stop rules
 

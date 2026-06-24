@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "4.12.1",
+	"version": "4.13.0",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -26,6 +26,7 @@
 		"./hooks/session-start-checking-bootstrap-provisioning.json",
 		"./hooks/session-start-checking-codegraph-bootstrap.json",
 		"./hooks/user-prompt-submit-loading-project-rules.json",
+		"./hooks/user-prompt-submit-selecting-lazycodex-workflow.json",
 		"./hooks/user-prompt-submit-checking-ultrawork-trigger.json",
 		"./hooks/user-prompt-submit-checking-ulw-loop-steering.json",
 		"./hooks/pre-tool-use-recommending-git-bash-mcp.json",

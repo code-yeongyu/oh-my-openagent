@@ -124,6 +124,22 @@ This launches the TUI under tmux in an isolated sandbox, confirms it renders
 (`capture-pane`), confirms `send-keys` reaches the composer, tears the tmux
 session down, and verifies the real DB session count is unchanged.
 
+When TUI visual QA evidence is needed for a PR, attach a browser-rendered
+terminal artifact in addition to the tmux pane. From the repository root, replay
+the captured pane or run a short tmux-backed command through:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "OpenCode TUI QA" \
+  --from-file .omo/evidence/<slug>/opencode-tui-pane.txt \
+  --evidence-dir .omo/evidence/<slug>/opencode-web-terminal
+```
+
+This writes `terminal.txt`, `terminal-ansi.txt`, `terminal.html`,
+`terminal.png`, and `metadata.json` so the PR can attach a stable TUI visual
+screenshot plus the cleanup receipt. Use `--command "<cmd>"` only for short
+ad-hoc terminal checks; the isolated `scripts/tui-smoke.sh` remains the
+canonical OpenCode TUI smoke.
+
 Honest verdict: tmux is fine for SMOKE (did it boot, render, accept a key) but
 fragile for asserting conversation output (the TUI is a 60fps full-screen app).
 For real behavior assertions use Case A (`opencode run`), Case B (server API +

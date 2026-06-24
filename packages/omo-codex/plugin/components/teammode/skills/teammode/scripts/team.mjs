@@ -20,23 +20,25 @@ import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { buildGuide, buildMemberPrompt } from "./team-guide.mjs";
+import { buildGuide, buildMemberPrompt, codexThreadLink } from "./team-guide.mjs";
 import {
 	addMember,
 	archive,
 	assertSafeTeamDir,
 	bindThread,
 	buildTeam,
+	clearMemberWorktree,
 	ensureTeamDir,
 	isUnderstaffed,
 	MIN_MEMBERS,
 	readTeam,
-	resolveTeamDir,
 	setMemberStatus,
+	setMemberWorktree,
 	teamExists,
 	writeGuideAtomic,
 	writeTeamAtomic,
 } from "./team-state.mjs";
+import { addMemberWorktree, integrateMemberBranch, removeMemberWorktree } from "./team-worktree.mjs";
 
 function parseFlags(args) {
 	const flags = { _: [] };
@@ -67,6 +69,12 @@ function requireFlag(flags, name) {
 async function loadTeam(cwd, sessionId) {
 	const dir = await assertSafeTeamDir(cwd, sessionId);
 	return { dir, team: await readTeam(dir) };
+}
+
+function memberOrThrow(team, id) {
+	const member = team.members.find((m) => m.id === id);
+	if (!member) throw new Error(`no member with id "${id}"`);
+	return member;
 }
 
 async function persist(team, dir) {
@@ -146,6 +154,58 @@ const handlers = {
 		process.stdout.write(`member ${flags.id} -> ${flags.status}\n`);
 	},
 
+	async "worktree-add"(cwd, flags) {
+		const sessionId = requireFlag(flags, "team");
+		const { dir, team } = await loadTeam(cwd, sessionId);
+		const member = memberOrThrow(team, requireFlag(flags, "id"));
+		const result = addMemberWorktree(cwd, team, member, {
+			baseBranch: typeof flags["base-branch"] === "string" ? flags["base-branch"] : null,
+		});
+		setMemberWorktree(team, { id: member.id, path: result.path, branch: result.branch });
+		await persist(team, dir);
+		const note = result.created ? "" : " (already exists)";
+		const thread = member.threadId
+			? `\nMember thread: ${codexThreadLink(member.threadId)}\nTell that member to: cd "${result.path}"`
+			: "\nMember thread is not bound yet; wait for the real Codex thread id, then bind-thread before sending bootstrap. After binding, send the member this worktree path.";
+		process.stdout.write(
+			`worktree for member ${member.id}${note}: ${result.path} on branch ${result.branch} (off ${result.base}).${thread}\n`,
+		);
+	},
+
+	async "worktree-remove"(cwd, flags) {
+		const sessionId = requireFlag(flags, "team");
+		const { dir, team } = await loadTeam(cwd, sessionId);
+		const member = memberOrThrow(team, requireFlag(flags, "id"));
+		removeMemberWorktree(cwd, team, member, { force: flags.force === true });
+		clearMemberWorktree(team, { id: member.id });
+		await persist(team, dir);
+		process.stdout.write(`removed worktree for member ${member.id}\n`);
+	},
+
+	async integrate(cwd, flags) {
+		const sessionId = requireFlag(flags, "team");
+		const { team } = await loadTeam(cwd, sessionId);
+		const targets = typeof flags.id === "string" ? [memberOrThrow(team, flags.id)] : team.members.filter((m) => m.worktree?.branch);
+		if (targets.length === 0) throw new Error("no member has a worktree branch to integrate; run worktree-add first");
+		for (const member of targets) {
+			const result = integrateMemberBranch(cwd, member.worktree.branch);
+			if (!result.merged) {
+				if (result.conflicts.length > 0) {
+					process.stdout.write(`member ${member.id} (${member.worktree.branch}): CONFLICT into ${result.into}\n`);
+					throw new Error(
+						`merge conflict integrating member ${member.id} (branch ${member.worktree.branch}). Resolve the conflict, commit the merge, then re-run integrate. Conflicting files: ${result.conflicts.join(", ")}`,
+					);
+				}
+				process.stdout.write(`member ${member.id} (${member.worktree.branch}): could not start merge into ${result.into}\n`);
+				throw new Error(
+					`could not integrate member ${member.id} (branch ${member.worktree.branch}): ${result.message || "git merge failed; see git status"}`,
+				);
+			}
+			process.stdout.write(`member ${member.id} (${member.worktree.branch}): merged into ${result.into}\n`);
+		}
+		process.stdout.write(`integrated ${targets.length} member branch(es) with merge commits\n`);
+	},
+
 	async archive(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
 		const { dir, team } = await loadTeam(cwd, sessionId);
@@ -175,7 +235,8 @@ const handlers = {
 		const { team } = await loadTeam(cwd, sessionId);
 		process.stdout.write(`Team ${team.teamName} [${team.status}] - leader: main session - ${team.members.length} member(s)\n`);
 		for (const m of team.members) {
-			process.stdout.write(`  ${m.id} (${m.lens}) ${m.focus} -> ${m.deliverable || "(no deliverable)"} [${m.status}]${m.threadId ? ` thread=${m.threadId}` : ""}${m.cwd ? ` cwd=${m.cwd}` : ""}\n`);
+			const thread = m.threadId ? ` thread=${m.threadId} link=${codexThreadLink(m.threadId)}` : "";
+			process.stdout.write(`  ${m.id} (${m.lens}) ${m.focus} -> ${m.deliverable || "(no deliverable)"} [${m.status}]${thread}${m.cwd ? ` cwd=${m.cwd}` : ""}\n`);
 		}
 		if (isUnderstaffed(team)) {
 			process.stdout.write(
