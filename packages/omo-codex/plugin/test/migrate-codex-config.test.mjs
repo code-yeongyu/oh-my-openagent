@@ -556,6 +556,42 @@ test("#given global config without multi_agent_v2 section #when full migration r
 	assert.match(content, /^multi_agent_mode = "proactive"$/m);
 });
 
+test("#given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-root-settings-inline-features-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features] # keep comment",
+			"plugins = true",
+			"",
+		].join("\n"),
+	);
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	assert.deepEqual(result.changed, [configPath]);
+	const content = await readFile(configPath, "utf8");
+	const parsed = parseTomlWithPython(content);
+	assert.equal(parsed.multi_agent_mode, "proactive");
+	assert.equal(parsed.model, "gpt-5.5");
+	assert.equal(parsed.model_context_window, 400000);
+	assert.equal(parsed.model_reasoning_effort, "high");
+	assert.equal(parsed.plan_mode_reasoning_effort, "xhigh");
+	assert.equal(parsed.features.plugins, true);
+	assert.equal("multi_agent_mode" in parsed.features, false);
+	assert.equal("model" in parsed.features, false);
+	assert.equal("model_context_window" in parsed.features, false);
+	assert.match(content, /^model = "gpt-5\.5"\nmodel_context_window = 400000/m);
+	assert.match(content, /^multi_agent_mode = "proactive"$/m);
+	assert.match(content, /\[features\] # keep comment\nplugins = true/);
+});
+
 test("#given queue multi-agent mode #when forcing proactive #then patches root setting", () => {
 	const config = ['multi_agent_mode = "queue"', "", "[features]", "multi_agent = true", ""].join("\n");
 
