@@ -50,6 +50,7 @@ async function pathExists(path: string): Promise<boolean> {
     return true
   } catch (error) {
     if (!(error instanceof Error)) throw error
+    if (errorCode(error) === "EPERM") return true
     return false
   }
 }
