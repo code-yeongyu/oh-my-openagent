@@ -28,6 +28,10 @@ Before touching any UI code, before routing to any reference, before even thinki
 
 **Search for it:** Look at project root, then `docs/`, then `src/`. Any file named `DESIGN.md`, `design-system.md`, or `design-tokens.md`.
 
+### Check: Does `DESIGN.md` declare numeric reuse governance?
+
+`DESIGN.md` must include the reuse budget ledger from `design-system-architecture.md` Section 5 or an equivalent project-local contract. The ledger names the current surface label and the budgets for tokens, color roles, icon families, buttons, forms, cards, layout breakpoints, radius, shadow, and component variants. Before code, map the requested UI to a surface label and to the existing budget rows. If the request exceeds a budget, update `DESIGN.md` first with the new number, rationale, and whether it is an external design-system limit or a pragmatic agent-control default.
+
 #### If NO design system exists → RUN THE TRIAGE
 
 1. Read `design-system-architecture.md` — it defines the exact structure.
@@ -35,14 +39,17 @@ Before touching any UI code, before routing to any reference, before even thinki
 3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then deeply load exactly one Layer A style skill and one Layer B brand/design-system reference; use `open-design` only when the curated set has no fit. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
 4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
 5. **Existing UI with no reusable component layer:** STOP and ask whether to preserve the current style with copy-nearby edits or extract a `DESIGN.md` plus reusable components first. Do not silently choose the cheaper path or the larger refactor.
-6. **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.**
+6. Add numeric reuse governance from `design-system-architecture.md` Section 5 before implementation.
+7. **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives, states, and reuse budgets, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.**
 
 #### If YES design system exists → READ IT, FOLLOW IT
 
 1. Read the entire `DESIGN.md` into context.
 2. Every color, font size, spacing value, and component pattern you produce MUST reference tokens from this file.
 3. If you need a token that doesn't exist, **add it to `DESIGN.md` first**, then use it.
-4. Never introduce raw hex codes, arbitrary px values, or ad-hoc component patterns that bypass the system.
+4. If the `DESIGN.md` lacks numeric reuse governance, add the Section 5 reuse budget ledger from `design-system-architecture.md` before implementation.
+5. If the implementation needs more variants, components, icon families, color roles, spacing steps, card shells, button styles, or form patterns than the budget allows, update `DESIGN.md` first with rationale or consolidate the design.
+6. Never introduce raw hex codes, arbitrary px values, or ad-hoc component patterns that bypass the system.
 
 **This gate is non-negotiable. No design system = no UI work. Period.**
 
@@ -84,6 +91,10 @@ Open the entry file. Each tool must sit behind a `NODE_ENV === 'development'` or
 
 Run through this in order and stop at the first match. Do not skip — earlier rules dominate later ones.
 
+### Step 0 — Choose a surface label
+
+Before loading taste or brand references, classify the requested surface as one of: `marketing`, `product-app`, `dashboard`, `editorial`, `commerce`, `mobile-app`, `brandkit`, `image-only`, or `image-to-code`. Use the label to choose the relevant reuse budgets in `DESIGN.md`; for example, `marketing` may justify more layout sections, while `product-app` should reuse primitives aggressively.
+
 ### Step 1 — Did the user name a specific brand or site?
 
 Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
@@ -124,7 +135,7 @@ Triggers: "generate the design first then code it", "make a mockup before we bui
 - `image-to-code-skill.md` (the workflow: generate → analyze → implement)
 - `imagegen-frontend-web.md` for web, or `imagegen-frontend-mobile.md` for mobile screens
 
-If the user wants only the imagery (no code), load only the imagegen file.
+If the user wants only the imagery (no code), load only the imagegen file. If the user wants an image-first advertising or campaign concept that may later become code, extract tokens and primitives from the image, then reconcile them against the `DESIGN.md` reuse budget before implementation.
 
 ### Step 5 — Image-only requests (no code)
 
@@ -137,6 +148,8 @@ Triggers: "generate a mockup image", "create a brand kit board", "design referen
 | Website mockup image | `imagegen-frontend-web.md` |
 | Mobile app screen images | `imagegen-frontend-mobile.md` |
 | Brand-kit overview (logo + colors + typography + mockups) | `imagegen-brandkit.md` |
+
+Imagegen output must still collapse similar shapes into existing tokens, components, and variants instead of spawning one-off UI parts.
 
 ### Step 6 — Stitch / DESIGN.md export
 
@@ -158,6 +171,7 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 4. **`redesign-skill.md` replaces a style-skill** when the task is auditing, not building. Stack a Layer B brand if the user wants a specific direction.
 5. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
+7. **Budget governance is not a style skill.** The numeric reuse budget applies across every Layer A and Layer B reference; style files can influence aesthetics but cannot bypass the budget.
 
 ## Anti-patterns — do not do these
 
@@ -167,6 +181,8 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 - **Don't apply a Layer B brand verbatim if the project is not that brand.** The DESIGN.md captures *inspiration* — extract the tokens (palette, type scale, component patterns) and apply them to the project's own content. Do not copy logos or trademarked imagery.
 - **Don't use imagegen skills to write code.** They are explicitly image-only. The agent has been observed trying to "describe" the image as React code — that is the wrong skill, switch to `image-to-code-skill.md` instead.
 - **Don't suppress style differences with `as any` or `@ts-ignore` to make a borrowed component work.** That is type-safety slop. Adapt the component cleanly.
+- **Don't invent one-off variants for variety.** A fourth button style, second icon family, extra card shell, new radius, new shadow, or raw color needs a `DESIGN.md` budget update before code.
+- **Don't treat imagegen output as permission to exceed the budget.** Generated images are inputs to extract primitives from, not a license to create every visible difference as a new component.
 
 ## Execution checklist after routing
 
@@ -181,6 +197,8 @@ Once references are loaded, before writing any UI code:
 7. **Match the project's existing patterns FIRST.** If the codebase already uses CSS Modules, don't introduce Tailwind. If it uses styled-components, don't introduce CSS-in-JS variants. The references guide *style*, not *infrastructure*.
 8. **All tokens trace back to `DESIGN.md`.** No orphan hex codes, no magic px values. If you need a new token, update `DESIGN.md` first.
 9. **New reusable patterns (used 2+ times) get documented back into `DESIGN.md` Section 5.**
+10. **Surface label selected.** `DESIGN.md` names the current surface label and the relevant reuse budgets before implementation.
+11. **Variants counted before code.** Button, card, form, icon, navigation, color, radius, shadow, and layout additions are counted against Section 5; over-budget changes are consolidated or documented with rationale first.
 
 ## Quick lookup table — most common requests
 
@@ -219,6 +237,7 @@ Code that "looks correct" in an editor is not verified. Colors render differentl
    - [ ] Dark mode (if declared in `DESIGN.md`) works completely
    - [ ] No layout overflow, no horizontal scroll on mobile
    - [ ] Motion/animation feels smooth — no jank, no missing transitions
+   - [ ] Numeric reuse governance still holds — visible button, card, form, icon, navigation, surface, color, radius, shadow, and layout variants fit the `DESIGN.md` budget or the budget expansion is documented
 4. **If anything fails**, fix it and re-check. Do not report "done" with visual bugs.
 5. **If you cannot launch a browser** (e.g. no dev server, CI-only environment), state this explicitly and list what you would check. Never silently skip QA.
 
