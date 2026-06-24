@@ -38,7 +38,7 @@ export interface BackgroundTask {
   error?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: { providerID: string; modelID: string; variant?: string; temperature?: number }
   /** Active concurrency slot key */
   concurrencyKey?: string
   /** Persistent key for re-acquiring concurrency on resume */
@@ -67,7 +67,7 @@ export interface LaunchInput {
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: { providerID: string; modelID: string; variant?: string; temperature?: number }
   isUnstableAgent?: boolean
   skills?: string[]
   skillContent?: string
