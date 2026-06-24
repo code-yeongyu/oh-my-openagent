@@ -15,6 +15,44 @@ function makeTempDir(): string {
   return path
 }
 
+async function renderTranscript(fileName: string, title: string, contents: string) {
+  const dir = makeTempDir()
+  const transcript = join(dir, fileName)
+  writeFileSync(transcript, contents, "utf8")
+
+  const proc = Bun.spawn({
+    cmd: [
+      process.execPath,
+      helperFilePath,
+      "--title",
+      title,
+      "--from-file",
+      transcript,
+      "--evidence-dir",
+      dir,
+      "--no-browser",
+    ],
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [exitCode, stdoutText, stderrText] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ])
+
+  expect(stderrText).toBe("")
+  expect(exitCode).toBe(0)
+  return {
+    dir,
+    stdoutText,
+    html: () => readFileSync(join(dir, "terminal.html"), "utf8"),
+    text: () => readFileSync(join(dir, "terminal.txt"), "utf8"),
+    ansi: () => readFileSync(join(dir, "terminal-ansi.txt"), "utf8"),
+    metadata: () => JSON.parse(readFileSync(join(dir, "metadata.json"), "utf8")),
+  }
+}
+
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
@@ -24,82 +62,37 @@ afterEach(() => {
 describe("web terminal visual QA helper", () => {
   test("#given a transcript file #when rendering without browser capture #then evidence files and metadata are written", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "capture.txt")
-    writeFileSync(transcript, "Codex TUI\n> ready\n", "utf8")
-
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "Codex TUI QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stdoutText, stderrText] = await Promise.all([
-      proc.exited,
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ])
+    const rendered = await renderTranscript("capture.txt", "Codex TUI QA", "Codex TUI\n> ready\n")
 
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-    expect(stdoutText).toContain("metadata.json")
-    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toContain("Codex TUI")
-    expect(readFileSync(join(dir, "terminal.html"), "utf8")).toContain("Codex TUI QA")
+    expect(rendered.stdoutText).toContain("metadata.json")
+    expect(rendered.text()).toContain("Codex TUI")
+    expect(rendered.html()).toContain("Codex TUI QA")
 
-    const metadata: unknown = JSON.parse(readFileSync(join(dir, "metadata.json"), "utf8"))
-    expect(metadata).toMatchObject({
+    expect(rendered.metadata()).toMatchObject({
       connector: "file-replay",
       browserCapture: "skipped",
       wrap: "on",
       files: {
-        html: join(dir, "terminal.html"),
-        text: join(dir, "terminal.txt"),
+        html: join(rendered.dir, "terminal.html"),
+        text: join(rendered.dir, "terminal.txt"),
       },
     })
   })
 
   test("#given ANSI color and style escapes #when rendering #then HTML preserves terminal styling while text stays plain", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "ansi-capture.txt")
-    writeFileSync(transcript, "\u001b[31mred\u001b[0m \u001b[1;32mbold green\u001b[0m\n", "utf8")
-
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "ANSI QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    const rendered = await renderTranscript(
+      "ansi-capture.txt",
+      "ANSI QA",
+      "\u001b[31mred\u001b[0m \u001b[1;32mbold green\u001b[0m\n",
+    )
 
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-    expect(readFileSync(join(dir, "terminal-ansi.txt"), "utf8")).toContain("\u001b[31mred")
-    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toBe("red bold green\n")
+    expect(rendered.ansi()).toContain("\u001b[31mred")
+    expect(rendered.text()).toBe("red bold green\n")
 
-    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    const html = rendered.html()
     expect(html).toContain('class="ansi-fg-red"')
     expect(html).toContain('class="ansi-bold ansi-fg-green"')
     expect(html).toContain("bold green")
@@ -107,33 +100,14 @@ describe("web terminal visual QA helper", () => {
 
   test("#given inverse video with default colors #when rendering #then foreground and background swap without filter CSS", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "inverse-default.txt")
-    writeFileSync(transcript, "\u001b[7m selected row \u001b[0m\n", "utf8")
-
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "Inverse Default QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    const rendered = await renderTranscript(
+      "inverse-default.txt",
+      "Inverse Default QA",
+      "\u001b[7m selected row \u001b[0m\n",
+    )
 
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-
-    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    const html = rendered.html()
     expect(html).toContain(
       '<span style="color: #090b10; background-color: #d8dee9"> selected row </span>',
     )
@@ -143,111 +117,49 @@ describe("web terminal visual QA helper", () => {
 
   test("#given inverse video with explicit colors #when rendering #then foreground and background classes swap", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "inverse-explicit.txt")
-    writeFileSync(transcript, "\u001b[31;44;7m selected \u001b[0m\n", "utf8")
-
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "Inverse Explicit QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    const rendered = await renderTranscript(
+      "inverse-explicit.txt",
+      "Inverse Explicit QA",
+      "\u001b[31;44;7m selected \u001b[0m\n",
+    )
 
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-
-    const html = readFileSync(join(dir, "terminal.html"), "utf8")
-    expect(html).toContain('<span class="ansi-fg-blue ansi-bg-red"> selected </span>')
+    expect(rendered.html()).toContain('<span class="ansi-fg-blue ansi-bg-red"> selected </span>')
   })
 
   test("#given inverse video is reset #when rendering #then later text uses normal colors", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "inverse-reset.txt")
-    writeFileSync(transcript, "\u001b[31;44;7minverse\u001b[27m normal\u001b[0m plain\n", "utf8")
-
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "Inverse Reset QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    const rendered = await renderTranscript(
+      "inverse-reset.txt",
+      "Inverse Reset QA",
+      "\u001b[31;44;7minverse\u001b[27m normal\u001b[0m plain\n",
+    )
 
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-
-    const html = readFileSync(join(dir, "terminal.html"), "utf8")
-    expect(html).toContain(
+    expect(rendered.html()).toContain(
       '<span class="ansi-fg-blue ansi-bg-red">inverse</span><span class="ansi-fg-red ansi-bg-blue"> normal</span> plain',
     )
   })
 
   test("#given truecolor and OSC controls #when rendering #then colors are preserved and controls are stripped", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "truecolor-osc.txt")
-    writeFileSync(
-      transcript,
+    const rendered = await renderTranscript(
+      "truecolor-osc.txt",
+      "Truecolor OSC QA",
       [
         "\u001b[38;2;12;34;56msemicolon truecolor\u001b[0m",
         "\u001b[38:2::255:0:0mcolon truecolor\u001b[0m",
         "\u001b[38:2:0:255:0:0mcolon truecolor colorspace\u001b[0m",
         "\u001b]8;;https://example.com\u0007visible label\u001b]8;;\u0007",
       ].join("\n"),
-      "utf8",
     )
 
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "Truecolor OSC QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
-
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-    expect(readFileSync(join(dir, "terminal.txt"), "utf8")).toBe(
+    expect(rendered.text()).toBe(
       "semicolon truecolor\ncolon truecolor\ncolon truecolor colorspace\nvisible label",
     )
 
-    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    const html = rendered.html()
     expect(html).toContain('style="color: rgb(12, 34, 56)"')
     expect(html).toContain('<span style="color: rgb(255, 0, 0)">colon truecolor</span>')
     expect(html).toContain('<span style="color: rgb(255, 0, 0)">colon truecolor colorspace</span>')
@@ -258,38 +170,14 @@ describe("web terminal visual QA helper", () => {
 
   test("#given a very long line #when rendering with defaults #then wrapping is enabled and recorded", async () => {
     // given
-    const dir = makeTempDir()
-    const transcript = join(dir, "long-line.txt")
-    writeFileSync(transcript, `${"x".repeat(260)}\n`, "utf8")
-
-    // when
-    const proc = Bun.spawn({
-      cmd: [
-        process.execPath,
-        helperFilePath,
-        "--title",
-        "Long Line QA",
-        "--from-file",
-        transcript,
-        "--evidence-dir",
-        dir,
-        "--no-browser",
-      ],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    const rendered = await renderTranscript("long-line.txt", "Long Line QA", `${"x".repeat(260)}\n`)
 
     // then
-    expect(stderrText).toBe("")
-    expect(exitCode).toBe(0)
-
-    const html = readFileSync(join(dir, "terminal.html"), "utf8")
+    const html = rendered.html()
     expect(html).toContain("white-space: pre-wrap")
     expect(html).toContain("overflow-wrap: anywhere")
 
-    const metadata: unknown = JSON.parse(readFileSync(join(dir, "metadata.json"), "utf8"))
-    expect(metadata).toMatchObject({
+    expect(rendered.metadata()).toMatchObject({
       wrap: "on",
       dimensions: { cols: 140, rows: 40 },
     })
