@@ -37,7 +37,9 @@ describe("DMCA provenance gate", () => {
 		// then nothing tracked is a third-party path; only section-4 originals remain
 		const committedThirdParty = tracked.filter((relPath) => {
 			if (keptDesign.has(relPath)) return false;
-			return relPath.startsWith("references/design/") || relPath.startsWith("references/ui-ux-db/");
+			return relPath.startsWith("references/design/")
+				|| relPath.startsWith("references/ui-ux-db/")
+				|| relPath.startsWith("references/designpowers/vendor/");
 		});
 		expect(committedThirdParty).toEqual([]);
 	});
@@ -57,7 +59,7 @@ describe("DMCA provenance gate", () => {
 		const attributionPath = process.env.ATTRIBUTION_OVERRIDE ?? join(repoRoot, attributionRel);
 		const attribution = readFileSync(attributionPath, "utf8");
 		const pins = [...attribution.matchAll(/Pinned upstream commit:\s*([0-9a-f]{40})/g)].map((match) => match[1]);
-		const heads = ["open-design", "taste-skill", "ui-ux-pro-max"].map((name) => submoduleHead(name));
+		const heads = ["open-design", "taste-skill", "ui-ux-pro-max", "designpowers"].map((name) => submoduleHead(name));
 		// then every recorded pin matches a live submodule HEAD
 		for (const head of heads) {
 			expect(pins).toContain(head);

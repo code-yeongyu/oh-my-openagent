@@ -1,11 +1,11 @@
 ---
 name: frontend
-description: "MUST USE for ANY frontend, web UI, UX, or visual work — building, styling, or redesigning pages/components, React project setup, performance audits, design QA. Routes three rulesets: design (anti-slop taste router over 12 taste skills + 69 brand DESIGN.md refs — Apple, Stripe, Linear, Notion, Vercel, Claude, Nike — plus React dev tooling gate: react-grab, react-scan, react-doctor), perfection (Lighthouse 100 in every category via real Playwright Chromium audits, NEVER the lighthouse CLI, never by weakening UX), ui-ux-db (searchable 50+ styles, 97 palettes, 57 font pairings, 99 UX guidelines). Triggers: frontend, UI, UX, design, redesign, styling, layout, animation, motion, taste, premium, luxury, minimal, brutalist, Awwwards, anti-slop, polish, DESIGN.md, mockup, react setup, react-scan, react-doctor, lighthouse, performance, Core Web Vitals, LCP, CLS, INP, SEO, accessibility, a11y, WCAG, audit my site, make this faster, color palette, font pairing, looks generic, make it pretty, like X brand."
+description: "MUST USE for ANY frontend, web UI, UX, or visual work — building, styling, or redesigning pages/components, React project setup, performance audits, design QA. Routes four rulesets: design (anti-slop taste router over 12 taste skills + 69 brand DESIGN.md refs — Apple, Stripe, Linear, Notion, Vercel, Claude, Nike — plus React dev tooling gate: react-grab, react-scan, react-doctor), perfection (Lighthouse 100 in every category via real Playwright Chromium audits, NEVER the lighthouse CLI, never by weakening UX), ui-ux-db (searchable 50+ styles, 97 palettes, 57 font pairings, 99 UX guidelines), designpowers (design operating layer, personas, accessibility, critique, debt, handoff, and role-reference guidance). Triggers: frontend, UI, UX, design, redesign, styling, layout, animation, motion, taste, premium, luxury, minimal, brutalist, Awwwards, anti-slop, polish, DESIGN.md, mockup, react setup, react-scan, react-doctor, lighthouse, performance, Core Web Vitals, LCP, CLS, INP, SEO, accessibility, a11y, WCAG, audit my site, make this faster, color palette, font pairing, looks generic, make it pretty, like X brand."
 ---
 
 # Frontend
 
-This file is a router, not a rulebook. The rules live in three rulesets under `references/`; your first job is to load the smallest set of files that covers the request, state which you loaded in one sentence, then execute under their guidance. Loading nothing and freestyling produces the generic AI-slop output this skill exists to prevent; loading everything wastes context and creates contradictory instructions.
+This file is a router, not a rulebook. The rules live in four rulesets under `references/`; your first job is to load the smallest set of files that covers the request, state which you loaded in one sentence, then execute under their guidance. Loading nothing and freestyling produces the generic AI-slop output this skill exists to prevent; loading everything wastes context and creates contradictory instructions.
 
 ## Phase 0 — Route (before any UI work)
 
@@ -14,8 +14,20 @@ This file is a router, not a rulebook. The rules live in three rulesets under `r
 | ANY UI implementation, styling, redesign, mockup, or visual decision | `references/design/README.md` FIRST. It enforces two mandatory gates — the Design System Gate (a `DESIGN.md` must exist before any component is written) and the React Dev Tooling Gate (react-grab / react-scan / react-doctor installed by default) — then routes to the taste and brand references below. |
 | Writing or modifying frontend code, OR auditing performance / SEO / accessibility / quality | ALSO `references/perfection/README.md`. Lighthouse 100 in every category, measured on real Playwright Chromium (never the `lighthouse` CLI), achieved through architecture — never by dropping animations or hiding content. |
 | Looking up a concrete style, color palette, font pairing, chart type, landing-page structure, or UX guideline — or generating a project design system from keywords | `references/ui-ux-db/README.md`. A searchable CSV database with a CLI; a lookup tool, not a posture. Load on demand; `design` stays the source of truth for taste and the `DESIGN.md` contract. |
+| Design operating-layer work: personas, cognitive accessibility, design critique, design debt, handoff, synthetic user testing, or designpowers-style guidance | `references/designpowers/README.md`. This is an internal frontend ruleset, not a separate skill. It enriches `/frontend` routing with design brief, role-reference, accessibility, evidence, and debt language while preserving the `design` and `perfection` gates. |
 
 **For implementation work, design + perfection load together.** A page that hits Lighthouse 100 but looks like AI slop has failed; a page that looks beautiful but ships a 2 MB bundle has failed. Both win or neither does.
+
+## Design System Workflow
+
+When `references/designpowers/README.md` is loaded for implementation, redesign, or design-system work, it feeds the project design-system step first. Do not treat designpowers as another loose inspiration folder.
+
+1. Before writing UI components, synthesize or update the project `DESIGN.md` from the user brief, designpowers references, brand/taste direction, accessibility and persona constraints, accepted design debt, and existing UI context.
+2. Make `DESIGN.md` the implementation contract. It must name the tokens, typography, spacing, component primitives, motion rules, responsive behavior, accessibility constraints, and accepted design debt that downstream UI work will follow.
+3. Implement against that `DESIGN.md`, using `references/design/README.md` for the design-system gate and `references/perfection/README.md` for performance, SEO, accessibility, and real-browser verification.
+4. Verify the actual surface with visual QA evidence, then pass the design-system decisions, implementation evidence, and unresolved debt into `/review-work` for significant implementation work.
+
+If designpowers guidance is relevant but the project has no `DESIGN.md`, create it before components. If `DESIGN.md` exists, update it before components whenever designpowers inputs change tokens, typography, spacing, primitives, motion, responsive behavior, accessibility constraints, or accepted debt.
 
 ## Ruleset 1 — design (`references/design/`)
 
@@ -79,6 +91,10 @@ python3 $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --stack <stac
 
 Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `web` `prompt`. Stacks: `html-tailwind` (default) `react` `nextjs` `vue` `svelte` `astro` `swiftui` `react-native` `flutter` `shadcn` `jetpack-compose`.
 
+## Ruleset 4 — designpowers (`references/designpowers/`)
+
+`README.md` routes design operating-layer guidance from the pinned `Owl-Listener/designpowers` reference corpus into the existing frontend workflow. Load it when a frontend task needs explicit personas, accessibility and cognitive constraints, design critique, design debt, handoff, synthetic user testing, motion guidance, or role-reference prompts. It does not replace this frontend skill, `/visual-qa`, `/ulw-plan`, `/start-work`, or `/review-work`; it supplies richer design context that must first be distilled into the project `DESIGN.md`, then used as the design-system contract for implementation and verification.
+
 ## Quick routes — most common requests
 
 | Request | Load |
@@ -91,8 +107,9 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 | "Mockup image of a fintech app" — no code | `design/imagegen-frontend-mobile.md` (+ a Layer B brand if named) |
 | "What palette/fonts fit a wellness brand?" | `ui-ux-db/README.md` → search CLI |
 | "Set up this React project" | `design/README.md` + `design/react-dev-tooling-skill.md` |
+| "Use designpowers", "make the design workflow stronger", "add personas/accessibility/debt/handoff" | `design/README.md` + `designpowers/README.md` (+ `perfection/README.md` if implementation or audit follows) |
 
-## Shared axioms (all three rulesets agree — apply always)
+## Shared axioms (all four rulesets agree — apply always)
 
 - **No design system = no UI work.** `DESIGN.md` exists before components do; every color, font size, and spacing value traces back to a token in it.
 - **Never weaken UX to buy points.** No dropping animations, hiding content, or simplifying interactions for a score or a deadline.

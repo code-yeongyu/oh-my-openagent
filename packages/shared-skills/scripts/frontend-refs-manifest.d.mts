@@ -15,4 +15,5 @@ export function designMaterializeMap(): MaterializeMap;
 export function uiUxDbMaterializeMap(): MaterializeMap;
 export function thirdPartyMaterializeMap(): MaterializeMap;
 export function thirdPartyRelativePaths(): string[];
+export function designpowersThirdPartyRelativePaths(): string[];
 export function keptDesignRelativePaths(): string[];
