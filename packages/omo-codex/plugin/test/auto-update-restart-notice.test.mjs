@@ -48,8 +48,8 @@ test("#given a newer version #when resolving auto update plan #then plan carries
 	assert.equal(plan.latestVersion, "1.0.1");
 });
 
-test("#given SessionStart migration changes multi-agent mode #when startup check runs #then emits team-mode support notice", async () => {
-	const root = await mkdtemp(join(tmpdir(), "lazycodex-proactive-notice-"));
+test("#given SessionStart migration removes unsupported root multi-agent mode #when startup check runs #then emits cleanup notice", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-root-mode-cleanup-notice-"));
 	const env = autoUpdateEnv(root, {
 		LAZYCODEX_CURRENT_VERSION: "1.0.1",
 		LAZYCODEX_LATEST_VERSION: "1.0.1",
@@ -64,10 +64,10 @@ test("#given SessionStart migration changes multi-agent mode #when startup check
 	assert.equal(result.reason, "up-to-date");
 	assert.equal(result.notices.length, 1);
 	assert.match(result.notices[0], /multi_agent_mode/);
-	assert.match(result.notices[0], /proactive/);
-	assert.match(result.notices[0], /Team Mode support/);
+	assert.match(result.notices[0], /Removed unsupported Codex root/);
+	assert.match(result.notices[0], /per-turn multiAgentMode API/);
 	const config = await readFile(join(env.CODEX_HOME, "config.toml"), "utf8");
-	assert.match(config, /^multi_agent_mode = "proactive"$/m);
+	assert.doesNotMatch(config, /^\s*multi_agent_mode\s*=/m);
 });
 
 test("#given a newer version #when waited update succeeds #then returns update-started notice and persists pendingNotice", async () => {

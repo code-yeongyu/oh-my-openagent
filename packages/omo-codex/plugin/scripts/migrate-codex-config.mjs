@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
-import { forceMultiAgentModeProactive } from "./migrate-codex-config/multi-agent-mode-guard.mjs";
+import { removeUnsupportedRootMultiAgentMode } from "./migrate-codex-config/multi-agent-mode-guard.mjs";
 import { forceDisableMultiAgentV2 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
 import { readState, resolveStatePath, writeState } from "./migrate-codex-config/state.mjs";
@@ -58,7 +58,7 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 	const multiAgentChanged = afterMultiAgentGuard !== config;
 	if (multiAgentChanged) config = afterMultiAgentGuard;
 
-	const afterMultiAgentModeGuard = forceMultiAgentModeProactive(config);
+	const afterMultiAgentModeGuard = removeUnsupportedRootMultiAgentMode(config);
 	const multiAgentModeChanged = afterMultiAgentModeGuard !== config;
 	if (multiAgentModeChanged) config = afterMultiAgentModeGuard;
 
