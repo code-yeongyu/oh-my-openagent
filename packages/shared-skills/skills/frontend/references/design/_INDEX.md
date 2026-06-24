@@ -52,7 +52,7 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 
 ---
 
-## Layer B — Design Systems (69)
+## Layer B — Design Systems (71)
 
 From [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md), based on [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/overview/). Each file captures one website's complete visual language: color palette, typography, components, layout principles, depth, do/don't, responsive behavior, and an agent prompt guide.
 
@@ -79,10 +79,11 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 | `voltagent.md` | AI agent framework. Void-black canvas, emerald accent, terminal-native. |
 | `x.ai.md` | Elon Musk's AI lab. Stark monochrome, futuristic minimalism. |
 
-### Developer Tools & IDEs (7)
+### Developer Tools & IDEs (8)
 
 | File | Aesthetic |
 |---|---|
+| `aside.md` | AI browser agent. Dark-mode squircle UI, AsideDisplay variable font, sky-blue brand accent. |
 | `cursor.md` | AI-first code editor. Sleek dark interface, gradient accents. |
 | `expo.md` | React Native platform. Dark theme, tight letter-spacing, code-centric. |
 | `lovable.md` | AI full-stack builder. Playful gradients, friendly dev aesthetic. |
@@ -91,7 +92,7 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 | `vercel.md` | Frontend deployment platform. Black and white precision, Geist font. |
 | `warp.md` | Modern terminal. Dark IDE-like interface, block-based command UI. |
 
-### Backend, Database & DevOps (8)
+### Backend, Database & DevOps (9)
 
 | File | Aesthetic |
 |---|---|
@@ -102,6 +103,7 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 | `posthog.md` | Product analytics. Playful hedgehog branding, developer-friendly dark UI. |
 | `sanity.md` | Headless CMS. Red accent, content-first editorial layout. |
 | `sentry.md` | Error monitoring. Dark dashboard, data-dense, pink-purple accent. |
+| `motherduck.md` | Serverless DuckDB data warehouse. Warm cream canvas, duck-yellow brand accent, Aeonik Fono display type. |
 | `supabase.md` | Open-source Firebase alternative. Dark emerald theme, code-first. |
 
 ### Productivity & SaaS (7)
