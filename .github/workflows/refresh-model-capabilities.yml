@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -22,8 +22,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Refresh bundled model capabilities snapshot
         run: bun run build:model-capabilities
@@ -32,7 +30,7 @@ jobs:
         run: bun run test:model-capabilities
 
       - name: Create refresh pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore: refresh model capabilities snapshot"
           title: "chore: refresh model capabilities snapshot"
@@ -44,3 +42,16 @@ jobs:
           delete-branch: true
           labels: |
             maintenance
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Model capability refresh
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Refreshes the bundled model capability snapshot.
+            - Runs model capability guardrail tests.
+            - Opens or updates the automated refresh pull request.
+          JOB_SUMMARY_NEXT: Check snapshot generation first, then guardrail failures or create-pull-request output.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

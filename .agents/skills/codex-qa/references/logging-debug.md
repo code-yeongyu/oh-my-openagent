@@ -46,6 +46,18 @@ tmux send-keys -t <sess> "/debug-config" Enter
 tmux capture-pane -t <sess> -p -S -
 ```
 
+For TUI visual QA evidence, replay that pane capture through the browser helper
+from the repository root:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "Codex TUI /debug-config" \
+  --from-file .omo/evidence/<slug>/codex-debug-config-pane.txt \
+  --evidence-dir .omo/evidence/<slug>/codex-debug-config-web-terminal
+```
+
+Attach the resulting `terminal.png` and keep `metadata.json` with the cleanup
+receipt. The pane proves terminal text; the PNG proves the visual TUI surface.
+
 ## 5. `codex debug` subcommands
 
 `codex debug models` (raw model catalog), `codex debug prompt-input` (the

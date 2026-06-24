@@ -1,0 +1,16 @@
+# Frontend third-party references are materialized at build time from the
+# submodules under packages/shared-skills/upstreams/ (DMCA-safe: the repo holds
+# zero third-party copies; the build/npm-pack materializes them into the
+# published package). Keep the section-4 project-original files committed.
+
+# Brand + taste-skill design references (open-design, taste-skill upstreams).
+references/design/*.md
+
+# Project-original design docs (ATTRIBUTION section 4) stay committed.
+!references/design/README.md
+!references/design/_INDEX.md
+!references/design/design-system-architecture.md
+!references/design/react-dev-tooling-skill.md
+
+# UI/UX intelligence database (ui-ux-pro-max upstream), entirely materialized.
+references/ui-ux-db/

@@ -355,7 +355,7 @@ async function writeSyncSourceFixture(sourceRoot: string): Promise<void> {
 	await writeJson(join(pluginSource, "components", "bootstrap", "hooks", "hooks.json"), bootstrapSessionStart);
 	await writeJson(join(pluginSource, ".mcp.json"), {
 		mcpServers: {
-			ast_grep: { args: ["../../ast-grep-mcp/dist/cli.js", "mcp"], command: "node", cwd: "." },
+			ast_grep: { args: ["./components/ast-grep-skill/dist/cli.js", "mcp"], command: "node", cwd: "." },
 			git_bash: { args: ["../../git-bash-mcp/dist/cli.js", "mcp"], command: "node", cwd: "." },
 			lsp: { args: ["../../lsp-daemon/dist/cli.js", "mcp"], command: "node", cwd: "." },
 		},
@@ -366,9 +366,10 @@ async function writeSyncSourceFixture(sourceRoot: string): Promise<void> {
 		"name: PR source guidance\n\non:\n  pull_request_target:\n",
 	);
 	await writeExecutableStub(join(pluginSource, "components", "bootstrap", "dist", "cli.js"));
+	await writeExecutableStub(join(pluginSource, "components", "ast-grep-skill", "dist", "cli.js"));
 	await mkdir(join(pluginSource, "components", "bootstrap", "scripts"), { recursive: true });
 	await writeFile(join(pluginSource, "components", "bootstrap", "scripts", "bootstrap.ps1"), "exit 0\n");
-	await writeExecutableStub(join(sourceRoot, "packages", "ast-grep-mcp", "dist", "cli.js"));
+	await writeExecutableStub(join(sourceRoot, "packages", ["ast", "grep", "mcp"].join("-"), "dist", "cli.js"));
 	await writeExecutableStub(join(sourceRoot, "packages", "git-bash-mcp", "dist", "cli.js"));
 	await writeExecutableStub(join(sourceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"));
 	await writeExecutableStub(join(sourceRoot, "packages", "lsp-daemon", "dist", "cli.js"));

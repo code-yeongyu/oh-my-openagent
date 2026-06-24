@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
+import { forceMultiAgentModeSteering } from "../scripts/migrate-codex-config/multi-agent-mode-guard.mjs";
 import { forceDisableMultiAgentV2 } from "../scripts/migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig, migrateCodexConfig } from "../scripts/migrate-codex-config.mjs";
 
@@ -205,11 +206,13 @@ test("#given user-customized Codex model config #when migrating #then user value
 	});
 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
-	assert.deepEqual(result.changed, []);
+	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
+	assert.deepEqual(result.modeChanged, [join(codexHome, "config.toml")]);
 	assert.match(content, /model = "gpt-5\.4"/);
 	assert.match(content, /model_context_window = 123456/);
 	assert.match(content, /model_reasoning_effort = "medium"/);
 	assert.match(content, /plan_mode_reasoning_effort = "medium"/);
+	assert.match(content, /^multi_agent_mode = "steering"$/m);
 });
 
 test("#given managed config state is malformed #when migrating #then migration ignores stale state safely", async () => {
@@ -328,6 +331,7 @@ test("#given config already matches current catalog #when catalog version advanc
 			"model_context_window = 400000",
 			'model_reasoning_effort = "high"',
 			'plan_mode_reasoning_effort = "xhigh"',
+			'multi_agent_mode = "steering"',
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
@@ -520,8 +524,28 @@ test("#given global config without multi_agent_v2 section #when full migration r
 	});
 
 	assert.deepEqual(result.changed, [configPath]);
+	assert.deepEqual(result.modeChanged, [configPath]);
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /\[features\.multi_agent_v2\]\nenabled = false\n/);
+	assert.match(content, /^multi_agent_mode = "steering"$/m);
+});
+
+test("#given queue multi-agent mode #when forcing steering #then patches root setting", () => {
+	const config = ['multi_agent_mode = "queue"', "", "[features]", "multi_agent = true", ""].join("\n");
+
+	const result = forceMultiAgentModeSteering(config);
+
+	assert.match(result, /^multi_agent_mode = "steering"$/m);
+	assert.doesNotMatch(result, /multi_agent_mode = "queue"/);
+	assert.match(result, /\[features\]/);
+});
+
+test("#given steering multi-agent mode #when forcing steering #then returns config unchanged", () => {
+	const config = ['multi_agent_mode = "steering" # user already opted in', "", "[features]", "multi_agent = true", ""].join("\n");
+
+	const result = forceMultiAgentModeSteering(config);
+
+	assert.equal(result, config);
 });
 
 test("#given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk", async () => {

@@ -39,6 +39,36 @@ describe("OhMyOpenCodeConfigSchema team_mode", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema tui", () => {
+  it("defaults the TUI sidebar to enabled", () => {
+    // given
+    const rawConfig = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.enabled).toBe(true)
+  })
+
+  it("allows the TUI sidebar to be disabled", () => {
+    // given
+    const rawConfig = {
+      tui: {
+        sidebar: {
+          enabled: false,
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.enabled).toBe(false)
+  })
+})
+
 describe("OhMyOpenCodeConfigSchema agent_order", () => {
   it("accepts string agent ordering when provided", () => {
     // given

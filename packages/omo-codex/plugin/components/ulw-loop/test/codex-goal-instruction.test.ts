@@ -115,6 +115,7 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expectTextToContainAll(text, QUALITY_GATE_SECTIONS);
 		expect(text).toMatch(/targeted verification/i);
 		expect(text).toMatch(/artifact path.*non-zero size/i);
+		expectTextToContainAll(text, ["original brief", "desired user-visible outcome", "userOutcomeReview"]);
 		expect(text).toMatch(/not clean.*do not call update_goal/i);
 		expect(text).toContain("record-review-blockers");
 		expect(text).toContain("checkpoint");

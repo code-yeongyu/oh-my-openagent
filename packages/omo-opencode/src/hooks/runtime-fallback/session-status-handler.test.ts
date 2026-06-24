@@ -31,6 +31,7 @@ function createDeps(): HookDeps {
       cooldown_seconds: 60,
       timeout_seconds: 30,
       notify_on_fallback: false,
+      restore_primary_after_cooldown: false,
     },
     options: undefined,
     pluginConfig: {
@@ -58,6 +59,7 @@ function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: stri
     scheduleSessionFallbackTimeout: () => {},
     autoRetryWithFallback: async (sessionID: string, model: string, _resolvedAgent: string | undefined, source: string) => {
       retryCalls.push({ sessionID, model, source })
+      return { accepted: true, status: "dispatched" }
     },
     resolveAgentForSessionFromContext: async () => undefined,
     cleanupStaleSessions: () => {},

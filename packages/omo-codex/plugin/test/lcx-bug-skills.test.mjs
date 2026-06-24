@@ -20,7 +20,7 @@ test("#given synced lcx-report-bug skill #when inspected #then it files LazyCode
 	assert.match(skill, /gh pr create --repo openai\/codex/);
 	assert.doesNotMatch(skill, /gh pr create --repo "\$TARGET_REPO"/);
 	assert.doesNotMatch(skill, /gh pr create --repo code-yeongyu\/lazycodex/);
-	assert.match(interfaceMetadata, /display_name: "lcx-report-bug \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) lcx-report-bug"/);
 	assert.match(interfaceMetadata, /- "lazycodex bug"/);
 	assert.match(interfaceMetadata, /- "openai codex bug"/);
 });
@@ -40,7 +40,7 @@ test("#given synced lcx-contribute-bug-fix skill #when inspected #then it delive
 	assert.match(skill, /gh pr create --repo openai\/codex/);
 	assert.doesNotMatch(skill, /gh pr create --repo "\$TARGET_REPO"/);
 	assert.doesNotMatch(skill, /gh pr create --repo code-yeongyu\/lazycodex/);
-	assert.match(interfaceMetadata, /display_name: "lcx-contribute-bug-fix \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) lcx-contribute-bug-fix"/);
 	assert.match(interfaceMetadata, /- "contribute a bug fix"/);
 	assert.match(interfaceMetadata, /- "fix bug pr"/);
 });
@@ -55,7 +55,7 @@ test("#given synced lcx-doctor skill #when inspected #then it diagnoses installs
 
 	// then
 	assert.match(skill, /^---\r?\nname: lcx-doctor\r?\n/m);
-	assert.match(interfaceMetadata, /display_name: "lcx-doctor \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) lcx-doctor"/);
 	assert.match(interfaceMetadata, /- "lazycodex doctor"/);
 	assert.match(interfaceMetadata, /- "lazycodex health check"/);
 });

@@ -28,6 +28,34 @@ describe("codex-cache", () => {
     expect(rewritten.mcpServers.lsp.args[0]).toBe(join(root, "./components/lsp/dist/cli.js"))
   })
 
+  test("#given cached CodeGraph manifest uses bare package-relative entrypoint #when rewriting before bootstrap #then entrypoint becomes absolute under plugin root", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-codegraph-"))
+    await writeFile(
+      join(root, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          codegraph: {
+            command: "node",
+            args: ["components/codegraph/dist/serve.js"],
+            cwd: ".",
+            required: false,
+          },
+        },
+      }),
+    )
+
+    // when
+    await rewriteCachedMcpManifest(root)
+
+    // then
+    const rewritten = JSON.parse(await readFile(join(root, ".mcp.json"), "utf8")) as {
+      mcpServers: { codegraph: { cwd?: string; args: string[] } }
+    }
+    expect(rewritten.mcpServers.codegraph.cwd).toBeUndefined()
+    expect(rewritten.mcpServers.codegraph.args).toEqual([join(root, "components", "codegraph", "dist", "serve.js")])
+  })
+
   test("rewrites bundled mcp manifest args that point outside the plugin cache into bundled cache paths", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))
@@ -38,7 +66,6 @@ describe("codex-cache", () => {
       join(cacheRoot, ".mcp.json"),
       JSON.stringify({
         mcpServers: {
-          ast_grep: { cwd: ".", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
           custom: { args: ["/usr/local/bin/custom-mcp", "--stdio"] },
           git_bash: { cwd: ".", args: ["../../git-bash-mcp/dist/cli.js", "mcp"] },
           lsp: { cwd: ".", args: ["../../lsp-daemon/dist/cli.js", "mcp"] },
@@ -52,15 +79,12 @@ describe("codex-cache", () => {
     // then
     const rewritten = JSON.parse(await readFile(join(cacheRoot, ".mcp.json"), "utf8")) as {
       mcpServers: {
-        ast_grep: { cwd?: string; args: string[] }
         custom: { args: string[] }
         git_bash: { cwd?: string; args: string[] }
         lsp: { cwd?: string; args: string[] }
       }
     }
-    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["ast_grep", "custom", "git_bash", "lsp"])
-    expect(rewritten.mcpServers.ast_grep.cwd).toBeUndefined()
-    expect(rewritten.mcpServers.ast_grep.args[0]).toBe(join(cacheRoot, "components", "ast-grep-mcp", "dist", "cli.js"))
+    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["custom", "git_bash", "lsp"])
     expect(rewritten.mcpServers.custom.args).toEqual(["/usr/local/bin/custom-mcp", "--stdio"])
     expect(rewritten.mcpServers.git_bash.cwd).toBeUndefined()
     expect(rewritten.mcpServers.git_bash.args[0]).toBe(join(cacheRoot, "components", "git-bash-mcp", "dist", "cli.js"))

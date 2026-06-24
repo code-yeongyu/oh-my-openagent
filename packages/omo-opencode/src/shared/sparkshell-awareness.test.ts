@@ -46,6 +46,8 @@ describe("sparkshell runtime awareness", () => {
     // then
     expect(context).toContain("omo sparkshell <command>")
     expect(context).toContain("repo inspection")
+    expect(context).toContain("never appends that context to command output")
+    expect(context).not.toContain("appends recent session context")
   })
 
   test("#given explicit force-off env #when Codex Desktop is present #then returns empty context", () => {
@@ -82,7 +84,9 @@ describe("sparkshell runtime awareness", () => {
     expect(context).toContain("OMO_SPARKSHELL_CONDENSE")
     expect(context).toContain("OMO_SPARKSHELL_SPARK")
     expect(context).toContain("[sparkshell caption]")
+    expect(context).toContain("what the full output contained")
     expect(context).not.toContain("[REDACTED]")
+    expect(context).not.toContain("appends recent session context")
     expect(context).toContain("log")
   })
 })

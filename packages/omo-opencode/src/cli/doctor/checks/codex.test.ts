@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { checkCodex, gatherCodexSummary } from "./codex"
+import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
 
 async function createPlatformBin(binDir: string, name: string, target: string): Promise<void> {
   if (process.platform === "win32") {
@@ -170,6 +171,31 @@ describe("codex doctor checks", () => {
     // then
     expect(result.status).toBe("fail")
     expect(result.issues.map((issue) => issue.title)).toContain("omo runtime command is not linked")
+  })
+
+  test("#given generated omo wrapper points at a deleted runtime target #when checking runtime wrapper #then warns with reinstall guidance", async () => {
+    // given
+    const { codexHome, binDir, pluginRoot } = await createInstalledCodexHome()
+    const wrapperPath = join(binDir, process.platform === "win32" ? "omo.cmd" : "omo")
+    await rm(wrapperPath)
+    const missingCliPath = join(pluginRoot, "dist", "cli", "index.js")
+    await writeFile(
+      wrapperPath,
+      process.platform === "win32"
+        ? ["@echo off", "rem OMO_GENERATED_RUNTIME_WRAPPER", `"%%BUN_BINARY%%" "${missingCliPath}" %%*`, ""].join("\r\n")
+        : ["#!/bin/sh", "# OMO_GENERATED_RUNTIME_WRAPPER", `exec "$BUN_BINARY" "${missingCliPath}" "$@"`, ""].join("\n"),
+    )
+
+    // when
+    const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
+
+    // then
+    expect(result.status).toBe("warn")
+    const issue = result.issues.find((entry) => entry.title === "omo runtime wrapper target is missing")
+    expect(issue).toBeDefined()
+    expect(issue?.severity).toBe("warning")
+    expect(issue?.description).toContain(missingCliPath)
+    expect(issue?.fix).toContain("npx --yes lazycodex-ai@latest install --no-tui")
   })
 
   test("#given installed LazyCodex #when checking Codex doctor #then details include Codex-specific health surfaces", async () => {

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { getLocale, initI18n, t } from "../shared/i18n"
+import { PLUGIN_NAME } from "../shared"
 import { createPluginModule } from "./create-plugin-module"
 
 const sourcePlugin = new URL("../index.ts", import.meta.url).href
@@ -132,6 +136,66 @@ describe("createPluginModule()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given OpenCode server config is present", () => {
+    it("#then startup self-heals the matching TUI plugin entry", async () => {
+      // given
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-entry-"))
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      writeFileSync(join(configDir, "opencode.json"), JSON.stringify({ plugin: [PLUGIN_NAME] }), "utf-8")
+
+      try {
+        const pluginModule = createTestPluginModule()
+        mockLoadPluginConfig.mockReturnValue({})
+
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
+      } finally {
+        rmSync(configDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+      }
+    })
+
+    it("#given sidebar is disabled #then startup does not write a TUI plugin entry", async () => {
+      // given
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-disabled-"))
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      writeFileSync(join(configDir, "opencode.json"), JSON.stringify({ plugin: [PLUGIN_NAME] }), "utf-8")
+
+      try {
+        const pluginModule = createTestPluginModule()
+        mockLoadPluginConfig.mockReturnValue({ tui: { sidebar: { enabled: false } } })
+
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(() => readFileSync(join(configDir, "tui.json"), "utf-8")).toThrow()
+      } finally {
+        rmSync(configDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+      }
     })
   })
 

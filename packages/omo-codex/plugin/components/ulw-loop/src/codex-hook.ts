@@ -1,5 +1,6 @@
 import type { UlwLoopScope } from "./paths.js";
 import { parseUlwLoopSteeringDirective, steerUlwLoop } from "./steering.js";
+import { buildUltraworkDirectiveOutput } from "./ultrawork-directive.js";
 
 export interface UserPromptSubmitPayload {
 	readonly cwd: string;
@@ -8,8 +9,12 @@ export interface UserPromptSubmitPayload {
 	readonly permission_mode?: string;
 	readonly prompt: string;
 	readonly session_id: string;
-	readonly transcript_path?: string;
+	readonly transcript_path?: string | null;
 	readonly turn_id?: string;
+}
+
+export interface UserPromptSubmitHookOptions {
+	readonly includeUltraworkDirective?: boolean;
 }
 
 export interface PreToolUsePayload {
@@ -60,11 +65,14 @@ export function parsePreToolUsePayload(raw: string): PreToolUsePayload | null {
 	}
 }
 
-export async function applyUserPromptUlwLoopSteering(payload: UserPromptSubmitPayload): Promise<string> {
+export async function applyUserPromptUlwLoopSteering(
+	payload: UserPromptSubmitPayload,
+	options: UserPromptSubmitHookOptions = {},
+): Promise<string> {
 	try {
 		if (payload.hook_event_name !== "UserPromptSubmit") return "";
 		const proposal = parseUlwLoopSteeringDirective(payload.prompt);
-		if (proposal === null) return "";
+		if (proposal === null) return options.includeUltraworkDirective ? buildUltraworkDirectiveOutput(payload) : "";
 		const result = await steerUlwLoop(payload.cwd, proposal, payloadScope(payload));
 		if (!result.accepted) return "";
 		return JSON.stringify({
@@ -98,11 +106,15 @@ export function applyPreToolUseGoalBudgetGuard(payload: PreToolUsePayload): stri
 	return `${JSON.stringify(output)}\n`;
 }
 
-export async function runUlwLoopHookCli(stdin: NodeJS.ReadableStream, stdout: NodeJS.WritableStream): Promise<void> {
+export async function runUlwLoopHookCli(
+	stdin: NodeJS.ReadableStream,
+	stdout: NodeJS.WritableStream,
+	options: UserPromptSubmitHookOptions = {},
+): Promise<void> {
 	try {
 		const payload = parseUserPromptSubmitPayload(await readAll(stdin));
 		if (payload === null) return;
-		const output = await applyUserPromptUlwLoopSteering(payload);
+		const output = await applyUserPromptUlwLoopSteering(payload, options);
 		if (output.length > 0) stdout.write(output);
 	} catch (error) {
 		if (error instanceof Error) return;
@@ -132,7 +144,10 @@ function isUserPromptSubmitPayload(value: unknown): value is UserPromptSubmitPay
 		typeof value["cwd"] === "string" &&
 		typeof value["prompt"] === "string" &&
 		typeof value["session_id"] === "string" &&
-		["model", "permission_mode", "transcript_path", "turn_id"].every((key) => optionalString(value[key]))
+		["model", "permission_mode", "turn_id"].every((key) => optionalString(value[key])) &&
+		(value["transcript_path"] === undefined ||
+			value["transcript_path"] === null ||
+			typeof value["transcript_path"] === "string")
 	);
 }
 

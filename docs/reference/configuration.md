@@ -388,7 +388,7 @@ This table documents the first entry of each hardcoded provider fallback chain, 
 | ---------------------- | ------------------- | -------------------------------------------------------------- |
 | **visual-engineering** | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `zai-coding-plan\|opencode/glm-5` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
 | **ultrabrain**         | `gpt-5.5`           | `openai\|opencode/gpt-5.5 (xhigh)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1` |
-| **deep**               | `gpt-5.5`           | `openai\|github-copilot\|venice\|opencode/gpt-5.5 (medium)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` |
+| **deep**               | `gpt-5.5`           | `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` |
 | **artistry**           | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5` |
 | **quick**              | `gpt-5.4-mini`      | `openai\|github-copilot\|opencode/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.5-codex (medium)` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
@@ -623,10 +623,10 @@ Force-enable session notifications:
 
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `ast_grep` (local structural search/rewrite tools).
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), and `lsp` (local language-server tools). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "ast_grep"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp"] }
 ```
 
 ### LSP
@@ -1016,8 +1016,8 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `OMO_CODEX_CONFIG_MIGRATION_DISABLED` | Alias of `LAZYCODEX_CONFIG_MIGRATION_DISABLED` |
 | `OMO_SPARKSHELL_CONDENSE` | Set to `0` to disable sparkshell's oversized-output condensation and always print raw output |
 | `OMO_SPARKSHELL_CONDENSE_BUDGET` | Character budget before sparkshell condenses command output (default `20000`) |
-| `OMO_SPARKSHELL_SESSION_CONTEXT` | Set to `0` to stop sparkshell from appending Codex session context (first/latest user request and recent messages) to command output |
-| `OMO_SPARKSHELL_SPARK` | Set to `0` to skip the spark-model summarization of oversized sparkshell output and go straight to deterministic condensation. The spark summary is generated via `codex exec` from the shell output plus session context, reproduces the output as-is without masking anything, and appends a `[sparkshell caption]` line at the bottom stating what was omitted |
+| `OMO_SPARKSHELL_SESSION_CONTEXT` | Set to `0` to stop sparkshell from loading Codex session context (first/latest user request and recent messages) for oversized-output relevance ranking. Session context is never appended to command output |
+| `OMO_SPARKSHELL_SPARK` | Set to `0` to skip the spark-model summarization of oversized sparkshell output and go straight to deterministic condensation. The spark summary is generated via `codex exec` from the shell output plus session context, keeps selected output as-is without masking anything, and appends a `[sparkshell caption]` line at the bottom stating what the full output contained and what was omitted |
 | `OMO_SPARKSHELL_SPARK_MODEL` | Model used for the sparkshell spark summary (default `gpt-5.3-codex-spark`) |
 | `OMO_SPARKSHELL_SPARK_TIMEOUT_MS` | Timeout for the spark summary `codex exec` invocation in milliseconds (default `30000`) |
 | `OMO_SPARKSHELL_SPARK_BIN` | Binary used to invoke the spark model (default `codex`) |

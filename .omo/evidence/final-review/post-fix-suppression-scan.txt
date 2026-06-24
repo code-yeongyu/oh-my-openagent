@@ -1,0 +1,2 @@
+no suppression/empty-catch hits in scoped changed source
+EXIT:0

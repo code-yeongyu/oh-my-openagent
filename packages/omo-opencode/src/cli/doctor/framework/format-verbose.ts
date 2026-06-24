@@ -84,7 +84,6 @@ export function formatVerbose(result: DoctorResult): string {
     }
   }
   lines.push(`  ${formatStatusSymbol(tools.astGrepCli ? "pass" : "fail")} ast-grep CLI ${tools.astGrepCli ? "installed" : "not found"}`)
-  lines.push(`  ${formatStatusSymbol(tools.astGrepNapi ? "pass" : "fail")} ast-grep napi ${tools.astGrepNapi ? "installed" : "not found"}`)
   lines.push(`  ${formatStatusSymbol(tools.commentChecker ? "pass" : "fail")} comment-checker ${tools.commentChecker ? "installed" : "not found"}`)
   lines.push(`  ${formatStatusSymbol(tools.ghCli.installed && tools.ghCli.authenticated ? "pass" : "fail")} gh CLI ${tools.ghCli.installed ? "installed" : "not found"}${tools.ghCli.authenticated && tools.ghCli.username ? ` (${tools.ghCli.username})` : ""}`)
   lines.push("")

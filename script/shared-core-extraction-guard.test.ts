@@ -9,7 +9,6 @@ const corePackages = [
   "packages/prompts-core",
   "packages/rules-engine",
   "packages/agents-md-core",
-  "packages/ast-grep-core",
   "packages/lsp-core",
   "packages/mcp-stdio-core",
   "packages/mcp-client-core",

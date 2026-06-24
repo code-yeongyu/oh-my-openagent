@@ -8,7 +8,7 @@ export interface AvailableAgent {
 
 export interface AvailableTool {
   name: string
-  category: "lsp" | "ast" | "search" | "session" | "command" | "other"
+  category: "lsp" | "search" | "session" | "command" | "other"
 }
 
 export interface AvailableSkill {

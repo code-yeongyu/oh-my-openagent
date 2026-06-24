@@ -88,7 +88,7 @@ async function probe(registration: RouteRegistration): Promise<boolean> {
     return false
   }
 
-  const probeUrl = new URL("/session", registration.serverUrl)
+  const probeUrl = new URL("/global/health", registration.serverUrl)
   const authHeader = getServerBasicAuthHeader()
   const headers: Record<string, string> = authHeader ? { Authorization: authHeader } : {}
 
@@ -128,13 +128,18 @@ async function probe(registration: RouteRegistration): Promise<boolean> {
   }
 }
 
-function hasFreshProbe(registration: RouteRegistration): boolean {
-  return registration.available !== undefined && Date.now() - registration.probeTimestamp < PROBE_TTL_MS
+function getFreshProbeAvailability(registration: RouteRegistration): boolean | undefined {
+  const available = registration.available
+  if (available === undefined || Date.now() - registration.probeTimestamp >= PROBE_TTL_MS) {
+    return undefined
+  }
+  return available
 }
 
 async function resolveAvailability(registration: RouteRegistration): Promise<boolean> {
-  if (hasFreshProbe(registration)) {
-    return registration.available!
+  const freshAvailability = getFreshProbeAvailability(registration)
+  if (freshAvailability !== undefined) {
+    return freshAvailability
   }
 
   if (!registration.inFlightProbe) {
@@ -177,11 +182,12 @@ export function tryResolveDispatchClientSync(client: unknown, sessionID: string)
     return { client, route: "in-process", reason: "unavailable" }
   }
 
-  if (!hasFreshProbe(registration)) {
+  const freshAvailability = getFreshProbeAvailability(registration)
+  if (freshAvailability === undefined) {
     return undefined
   }
 
-  if (!registration.available) {
+  if (!freshAvailability) {
     return { client, route: "in-process", reason: "unavailable" }
   }
 
@@ -199,7 +205,10 @@ export async function resolveDispatchClient(client: unknown, sessionID: string):
     return syncResult
   }
 
-  const registration = registrations.get(client)!
+  const registration = registrations.get(client)
+  if (!registration) {
+    return { client, route: "in-process", reason: "identity" }
+  }
   const isAvailable = await resolveAvailability(registration)
   if (!isAvailable) {
     return { client, route: "in-process", reason: "unavailable" }
