@@ -30,6 +30,22 @@ Example: "A quiet command center. Dense when needed, spacious when not.
 The signature is muted depth — surfaces separated by subtle tonal shifts
 rather than borders, creating layers you feel more than see."
 
+### Aesthetic Intent Brief
+
+Every non-trivial visual surface must turn user intent into observable design targets before component budgeting starts.
+
+| Field | Required answer | Why it matters |
+| --- | --- | --- |
+| Surface intent | `operational`, `commercial`, `campaign`, or `translation` | Sets how strictly reusable-component governance applies. |
+| Target emotion | 2-3 words such as calm authority, kinetic urgency, luxurious trust | Prevents generic "nice UI" decisions. |
+| Signature visual idea | One memorable visual metaphor or spatial system | Creates a recognizable design instead of interchangeable AI output. |
+| Attention path | First 3 seconds: what the eye sees first, second, and third | Makes hierarchy measurable during QA. |
+| Motion role | none, state feedback, spatial orientation, storytelling, or spectacle | Distinguishes useful motion from decoration. |
+| Bespoke visual layer | Custom 3D, illustration, shader-like background, scroll scene, kinetic type, or none | Names what may intentionally sit outside reusable component budgets. |
+| Reusable primitive boundary | Which controls, cards, forms, icons, nav, and data displays still follow Section 5 | Keeps expressive surfaces from becoming unmanaged component drift. |
+
+Operational surfaces optimize clarity, speed, and consistency. Commercial surfaces balance conversion and reuse. Campaign surfaces optimize emotion and memorability first, then reuse only the interaction primitives. Translation surfaces start expressive, then collapse repeated controls back into the system.
+
 ## 2. Color
 
 ### Palette
@@ -138,6 +154,8 @@ The Component reuse budget is part of Section 5, not a separate control file. Us
 
 Treat these rows as governance defaults, not literal naming mandates. When a project `DESIGN.md` already names variants such as `panel`, `metric`, or `alert`, those project-local names are authoritative; compare count, behavior, and semantic fit instead of replacing them with the example names below.
 
+Bespoke visual layers declared in Section 1 are not automatically reusable components. A scroll-linked 3D object, hero-only shader, campaign illustration, or kinetic typography treatment stays outside this budget unless it repeats across surfaces, becomes interactive UI, or needs product-state variants.
+
 | Area | Budget | Current | Owner section | Rule |
 | --- | ---: | ---: | --- | --- |
 | Component reuse budget | 80% semantic/behavior match requires reuse | 0 | Section 5 | Reuse existing primitives when they cover at least 80% of the need; create only for a semantic or behavioral gap. |
@@ -180,6 +198,8 @@ Treat these rows as governance defaults, not literal naming mandates. When a pro
 - Every interactive element has hover + active + focus states.
 - Scroll-triggered animations use `IntersectionObserver`, not scroll listeners.
 - Reduced motion: respect `prefers-reduced-motion` — disable non-essential animation.
+- Motion must match the Section 1 motion role. State feedback stays subtle; spatial orientation may guide navigation; storytelling and spectacle are reserved for commercial, campaign, and translation surfaces.
+- 3D, parallax, scroll-linked, or shader-like effects need a fallback that preserves content, hierarchy, and interaction when motion is reduced or unsupported.
 
 ## 7. Depth & Surface
 
@@ -237,6 +257,7 @@ After every component implementation, check:
 - [ ] No second icon family, fourth button variant, fourth card variant, new semantic color, new radius, new shadow, or new spacing step without a documented Section 5 budget update.
 - [ ] Motion follows the timing table. No arbitrary durations.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
+- [ ] Section 1 aesthetic intent is visible: target emotion, signature visual idea, attention path, motion role, bespoke visual layer, and reusable primitive boundary all match the implementation.
 
 ## Memory Management
 

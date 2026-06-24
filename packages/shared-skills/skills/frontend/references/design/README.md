@@ -95,6 +95,19 @@ Run through this in order and stop at the first match. Do not skip — earlier r
 
 Before loading taste or brand references, classify the requested surface as one of: `marketing`, `product-app`, `dashboard`, `editorial`, `commerce`, `mobile-app`, `brandkit`, `image-only`, or `image-to-code`. Use the label to choose the relevant reuse budgets in `DESIGN.md`; for example, `marketing` may justify more layout sections, while `product-app` should reuse primitives aggressively.
 
+### Step 0.5 — Set surface intent and governance strength
+
+Design-system governance protects the baseline; it does not replace art direction. Before choosing components, decide how much of the screen is a reusable interaction surface and how much is an expressive visual surface.
+
+| Surface intent | Examples | Governance strength | Expression allowance |
+| --- | --- | --- | --- |
+| `operational` | `product-app`, `dashboard`, settings, forms, data tables | Strict | Reuse primitives first; bespoke visuals are rare and must not reduce clarity. |
+| `commercial` | `marketing`, landing, pricing, commerce | Balanced | Reuse interaction primitives, but allow bespoke hero, section rhythm, illustration, and motion layers. |
+| `campaign` | launch page, ad concept, brand story, `brandkit`, `image-only` | Expressive | Start with emotion, signature visual idea, and motion role; only reusable controls and repeated patterns enter the component budget. |
+| `translation` | `image-to-code`, mockup-to-implementation | Two-phase | Explore visually first, then collapse repeated interaction pieces back into the `DESIGN.md` budget. |
+
+For expressive surfaces, numeric reuse governance controls reusable product primitives, not every visual flourish. Custom 3D objects, scroll-linked scenes, shader-like backgrounds, campaign illustrations, kinetic typography, or one-off spatial compositions are allowed when they directly serve the emotional target. Do not promote them into Section 5 unless they repeat across surfaces or become an interaction primitive.
+
 ### Step 1 — Did the user name a specific brand or site?
 
 Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
@@ -172,6 +185,7 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 5. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
 7. **Budget governance is not a style skill.** The numeric reuse budget applies across every Layer A and Layer B reference; style files can influence aesthetics but cannot bypass the budget.
+8. **Art direction is not a budget bypass.** Bespoke visual layers may exceed the reusable-component budget only when the surface intent is `commercial`, `campaign`, or `translation`, and only outside shared interaction primitives.
 
 ## Anti-patterns — do not do these
 
@@ -183,6 +197,8 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 - **Don't suppress style differences with `as any` or `@ts-ignore` to make a borrowed component work.** That is type-safety slop. Adapt the component cleanly.
 - **Don't invent one-off variants for variety.** A fourth button style, second icon family, extra card shell, new radius, new shadow, or raw color needs a `DESIGN.md` budget update before code.
 - **Don't treat imagegen output as permission to exceed the budget.** Generated images are inputs to extract primitives from, not a license to create every visible difference as a new component.
+- **Don't mistake consistency for beauty.** A perfectly tokenized screen can still fail if it has no emotional target, no signature visual idea, no attention path, and no intentional motion role.
+- **Don't force expressive surfaces into app-shell uniformity.** Landing pages and campaign scenes may need fewer reusable components and stronger bespoke motion; the controls inside them still obey `DESIGN.md`.
 
 ## Execution checklist after routing
 
@@ -199,6 +215,7 @@ Once references are loaded, before writing any UI code:
 9. **New reusable patterns (used 2+ times) get documented back into `DESIGN.md` Section 5.**
 10. **Surface label selected.** `DESIGN.md` names the current surface label and the relevant reuse budgets before implementation.
 11. **Variants counted before code.** Button, card, form, icon, navigation, color, radius, shadow, and layout additions are counted against Section 5; over-budget changes are consolidated or documented with rationale first.
+12. **Aesthetic intent declared.** For any non-trivial visual surface, `DESIGN.md` names the target emotion, signature visual idea, attention path, motion role, and which parts are bespoke art direction versus reusable primitives.
 
 ## Quick lookup table — most common requests
 
@@ -238,6 +255,7 @@ Code that "looks correct" in an editor is not verified. Colors render differentl
    - [ ] No layout overflow, no horizontal scroll on mobile
    - [ ] Motion/animation feels smooth — no jank, no missing transitions
    - [ ] Numeric reuse governance still holds — visible button, card, form, icon, navigation, surface, color, radius, shadow, and layout variants fit the `DESIGN.md` budget or the budget expansion is documented
+   - [ ] Expressive surfaces match the declared emotion, signature visual idea, attention path, and motion role instead of merely being consistent
 4. **If anything fails**, fix it and re-check. Do not report "done" with visual bugs.
 5. **If you cannot launch a browser** (e.g. no dev server, CI-only environment), state this explicitly and list what you would check. Never silently skip QA.
 
