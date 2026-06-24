@@ -8186,25 +8186,33 @@ function parseProfileMatch(match) {
 
 // packages/omo-codex/src/install/codex-multi-agent-mode-config.ts
 var CODEX_MULTI_AGENT_MODE_KEY = "multi_agent_mode";
-var CODEX_MULTI_AGENT_MODE_PROACTIVE = "proactive";
-function ensureCodexMultiAgentModeConfig(config) {
-  if (readRootStringSetting(config, CODEX_MULTI_AGENT_MODE_KEY) === CODEX_MULTI_AGENT_MODE_PROACTIVE) {
-    return config;
+function removeUnsupportedCodexMultiAgentModeConfig(config) {
+  const lines = config.split(/\n/);
+  const output = [];
+  let inRoot = true;
+  let changed = false;
+  for (const line of lines) {
+    const sectionHeader = isSectionHeader2(line);
+    if (inRoot && isRootSetting2(line, CODEX_MULTI_AGENT_MODE_KEY)) {
+      changed = true;
+      continue;
+    }
+    output.push(line);
+    if (sectionHeader)
+      inRoot = false;
   }
-  return replaceOrInsertRootSetting(config, CODEX_MULTI_AGENT_MODE_KEY, JSON.stringify(CODEX_MULTI_AGENT_MODE_PROACTIVE));
-}
-function readRootStringSetting(config, key) {
-  for (const line of config.split(/\n/)) {
-    if (isSectionHeader2(line))
-      return null;
-    const match = line.trimStart().match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*)"/);
-    if (match?.[1] === key)
-      return match[2] ?? null;
-  }
-  return null;
+  return changed ? output.join(`
+`) : config;
 }
 function isSectionHeader2(line) {
   return isTomlTableHeaderLine(line);
+}
+function isRootSetting2(line, key) {
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith("#") || trimmed.startsWith("["))
+    return false;
+  const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+  return match?.[1] === key;
 }
 
 // packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
@@ -8253,7 +8261,7 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
   config = ensureFeatureEnabled(config, "child_agents_md");
-  config = ensureCodexMultiAgentModeConfig(config);
+  config = removeUnsupportedCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
   config = ensureCodexMultiAgentV2Config(config);
   if (input.autonomousPermissions === true)

@@ -57,7 +57,7 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain('sandbox = "elevated"')
   })
 
-  test("#given empty Codex config #when updating config #then creates MultiAgentV2 section with thread limit but no forced enabled flag", async () => {
+  test("#given empty Codex config #when updating config #then creates MultiAgentV2 section without root multi-agent mode", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-"))
     const configPath = join(root, "config.toml")
@@ -73,7 +73,7 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain('multi_agent_mode = "proactive"')
+    expect(content).not.toMatch(/^\s*multi_agent_mode\s*=/m)
     expect(content).toContain("[features.multi_agent_v2]")
     const v2Section = content.slice(content.indexOf("[features.multi_agent_v2]"))
       .split(/^\[/m).slice(0, 1).join("")
@@ -81,7 +81,7 @@ describe("codex-config-toml", () => {
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
   })
 
-  test("#given queue multi-agent mode #when updating config #then switches to proactive mode for team support", async () => {
+  test("#given stale queue multi-agent mode #when updating config #then removes unsupported root key", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-mode-"))
     const configPath = join(root, "config.toml")
@@ -107,18 +107,18 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain('multi_agent_mode = "proactive"')
+    expect(content).not.toMatch(/^\s*multi_agent_mode\s*=/m)
     expect(content).not.toContain('multi_agent_mode = "queue"')
   })
 
-  test("#given indented root mode and inline-comment features table #when updating config #then replaces without duplicate TOML keys", async () => {
+  test("#given stale indented steering mode and inline-comment features table #when updating config #then removes root key and preserves table", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-toml-root-regression-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
-        '  multi_agent_mode = "queue"',
+        '  multi_agent_mode = "steering"',
         "",
         "[features] # keep comment",
         "plugins = false",
@@ -137,12 +137,32 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content.match(/^\s*multi_agent_mode\s*=/gm)).toHaveLength(1)
+    expect(content.match(/^\s*multi_agent_mode\s*=/gm)).toBeNull()
     expect(content.match(/^\s*\[features\](?:\s*#.*)?$/gm)).toHaveLength(1)
-    expect(content).toContain('multi_agent_mode = "proactive"')
     expect(content).toContain("[features] # keep comment")
     expect(content).not.toContain('multi_agent_mode = "queue"')
     expect(content).not.toContain('multi_agent_mode = "steering"')
+  })
+
+  test("#given stale proactive multi-agent mode #when updating config #then removes unsupported root key", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-proactive-cleanup-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['multi_agent_mode = "proactive"', "", "[features]", "multi_agent = true", ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^\s*multi_agent_mode\s*=/m)
+    expect(content).toContain("[features]")
   })
 
   test("#given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning while setting thread limit", async () => {
