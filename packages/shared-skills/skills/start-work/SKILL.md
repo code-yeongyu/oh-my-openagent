@@ -37,7 +37,7 @@ $start-work [plan-name] [--worktree <absolute-path>]
 ```
 
 - `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
-- `--worktree` (optional): only when the user explicitly asks for a separate git worktree.
+- `--worktree` (required for PR/branch work; otherwise optional): the task-owned git worktree path.
 
 ## Phase 1: Select the plan
 
@@ -80,7 +80,7 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
 }
 ```
 
-If `--worktree` is set, verify the path with `git worktree list --porcelain` or create it with `git worktree add <path> <branch-or-HEAD>`, then store the absolute path as `worktree_path`. All edits, commands, tests, and evidence capture must run inside that worktree.
+For PR/branch work, `--worktree` is mandatory before implementation starts. Verify the path with `git worktree list --porcelain` or create it with `git worktree add <path> <branch-or-HEAD>`, then store the absolute path as `worktree_path`. All edits, commands, tests, and evidence capture must run inside that worktree.
 
 ## Phase 3: Execute the next checkbox
 
@@ -102,6 +102,7 @@ Each sub-task message must include:
    - tmux: a `tmux` session driven with `send-keys`, dumped via `capture-pane`.
    - Browser use: drive the real page with Chrome, or agent-browser (https://github.com/vercel-labs/agent-browser) when Chrome is unavailable.
    - Computer use: OS-level GUI automation against the running desktop app when the surface is not a page.
+   - TUI visual evidence: when a tmux/TUI claim needs visual QA or PR proof, run `node script/qa/web-terminal-visual-qa.mjs --from-file <capture.txt> --evidence-dir <dir>` and attach `terminal.png` plus `metadata.json`.
 6. The adversarial classes that apply to this sub-task (from the 9 ultraqa classes) and how each is probed.
 7. Required artifact path and cleanup receipt.
 
@@ -163,7 +164,7 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. If worktree mode was used, sync `.omo/` state back to the main repo, merge or hand off exactly as requested, and remove the worktree only after successful merge or explicit handoff.
+2. For PR/branch work, finish the lifecycle from the task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
 3. Remove or mark the Boulder work as completed.
 4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
 
@@ -174,5 +175,6 @@ When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are
 - No tests-only completion claim. A Manual-QA artifact is required.
 - **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
+- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.
 - No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.
 - No stale-memory execution. The plan and ledger are the durable source of truth.

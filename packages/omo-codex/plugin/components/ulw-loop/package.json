@@ -27,6 +27,7 @@
 	},
 	"files": [
 		"dist",
+		"directive.md",
 		"hooks",
 		"skills",
 		"LICENSE",

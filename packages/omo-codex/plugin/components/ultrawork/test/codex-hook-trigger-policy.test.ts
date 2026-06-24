@@ -108,4 +108,28 @@ describe("codex ultrawork trigger policy", () => {
 		expect(output).toBe("");
 		expect(isUltraworkPrompt(payload.prompt)).toBe(false);
 	});
+
+	it("#given prior transcript contains auto workflow guidance #when current prompt explicitly says ulw #then emits ultrawork directive", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "ulw fix this failing test",
+			transcript_path: writeTranscript(
+				JSON.stringify({
+					hookSpecificOutput: {
+						hookEventName: "UserPromptSubmit",
+						additionalContext: "<lazycodex-auto-workflow>\nexisting selector guidance",
+					},
+				}),
+			),
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+		expect(isUltraworkPrompt(payload.prompt)).toBe(true);
+	});
 });

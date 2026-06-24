@@ -92,7 +92,7 @@ function normalizeWorkSessionFields(works: unknown): void {
 
 export function getBoulderWorks(state: BoulderState): BoulderWorkState[] {
   if (state.works && typeof state.works === "object") {
-    return Object.values(state.works)
+    return Object.values(state.works).filter((work): work is BoulderWorkState => work != null)
   }
 
   if (!state.active_plan || !state.plan_name || !state.started_at) {

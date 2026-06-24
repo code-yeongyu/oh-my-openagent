@@ -1,12 +1,21 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { join, sep } from "node:path"
+import { resolveCodegraphNodeRuntime } from "@oh-my-opencode/utils/codegraph/resolve"
 import { resolveBundledMcpRuntimeArg } from "./codex-cache-bundled-mcps"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { resolveCachedRuntimePath } from "./codex-cache-paths"
 
 const CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"])
 
-export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = pluginRoot): Promise<void> {
+export interface RewriteCachedMcpManifestOptions {
+  readonly codegraphNodeRuntime?: () => string | null
+}
+
+export async function rewriteCachedMcpManifest(
+  pluginRoot: string,
+  sourceRoot = pluginRoot,
+  options: RewriteCachedMcpManifestOptions = {},
+): Promise<void> {
   const manifestPath = join(pluginRoot, ".mcp.json")
   if (!(await fileExistsStrict(manifestPath))) return
   const raw = await readFile(manifestPath, "utf8")
@@ -32,6 +41,13 @@ export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = 
     if (nextArgs.some((value, index) => value !== currentArgs[index])) {
       server.args = nextArgs
       changed = true
+    }
+    if (server === parsed.mcpServers.codegraph) {
+      const runtime = options.codegraphNodeRuntime?.() ?? resolveCodegraphNodeRuntime()
+      if (runtime !== null && server.command === "node") {
+        server.command = runtime
+        changed = true
+      }
     }
   }
   if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)

@@ -101,9 +101,9 @@ export async function runLazyCodexManualUpdate({ env = process.env, dryRun = fal
 }
 
 export async function runAutoUpdateCheck({ env = process.env, now = Date.now() } = {}) {
-	await runConfigMigration({ env });
+	const migrationNotices = await runConfigMigration({ env });
 	const statePath = resolveStatePath(env);
-	const notices = [];
+	const notices = [...migrationNotices];
 	const state = await settlePendingNotice({ env, now, statePath, state: await readState(statePath), notices });
 	const installFlow = detectAutoUpdateInstallFlow(env);
 	if (installFlow.flow === "unknown") {
@@ -214,13 +214,17 @@ function resolveUpdateContext({ env }) {
 }
 
 async function runConfigMigration({ env }) {
-	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return;
+	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return [];
 	try {
 		await migrateOmoSotConfig({ env, seed: true });
-		await migrateCodexConfig({ env });
+		const result = await migrateCodexConfig({ env });
+		if (result.modeChanged.length === 0) return [];
+		return [
+			"[LazyCodex] Removed unsupported Codex root multi_agent_mode from config.toml. Tell the user LazyCodex cleaned up a stale OMO-managed setting so Codex uses its supported per-turn multiAgentMode API.",
+		];
 	} catch (error) {
 		if (!(error instanceof Error)) throw error;
-		return;
+		return [];
 	}
 }
 

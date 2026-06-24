@@ -78,9 +78,12 @@ test("#given a worktree team #when worktree-add A #then a real git worktree on a
 		assert.equal(member.worktree.branch, expectedBranch);
 		assert.ok(samePath(member.cwd, expectedPath), "cwd must be the member worktree dir");
 
-		// then - the leader is told the exact cd target
-		assert.match(result.stdout, /cd /);
+		// then - the leader is told the exact worktree target without prompting an unbound member
+		assert.match(result.stdout, new RegExp(expectedPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 		assert.match(result.stdout, /A/);
+		assert.match(result.stdout, /wait for the real Codex thread id/);
+		assert.match(result.stdout, /bind-thread before sending bootstrap/);
+		assert.doesNotMatch(result.stdout, /Tell that member to:/);
 	} finally {
 		cleanupTeamRoot(tempRoot);
 	}

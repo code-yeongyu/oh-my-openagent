@@ -89,10 +89,18 @@ subcommand rewrites `guide.md`, so the manual always matches the current team.
    exact title to use. If `codex_app.create_thread` accepts a working directory / cwd argument,
    set it to that member's worktree; otherwise the member's manual tells it to `cd` there first.
    Use `codex_app.set_thread_title` if the title did not land at creation.
+   If Codex returns only `pendingWorktreeId`, the worktree-backed thread is not ready yet: do not
+   `bind-thread` and do not send the member bootstrap. Wait until Codex surfaces a real `threadId`
+   or the thread appears in the thread list, then set the title, bind that real id with the cwd,
+   and only then send the bootstrap.
 3. `bind-thread` to record each thread id (and `--cwd`), then send that member's bootstrap
    trigger (printed by `add-member` / `member-prompt`) as the thread's first message. The trigger
    is short on purpose: it tells the new thread to READ its `guide.md` and `team.json` rather than
    carrying the whole protocol inline.
+4. Whenever you report, audit, reopen, or hand off a member thread, include the app deep link
+   `codex://threads/<thread_id>` next to the raw id. For example:
+   `codex://threads/019ef350-ee78-72a3-bd5e-e40cebc3d814`. Worktree-backed threads are easy to
+   lose in the sidebar without this link.
 
 Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
 not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
@@ -126,6 +134,16 @@ the worktree off the base branch on a derived branch, flips the team into worktr
 its own worktree. To land the work, `integrate --team <id>` merges every member branch into your
 current branch with a merge commit (never a squash or rebase); resolve any conflict it reports, then
 `worktree-remove` each worktree at cleanup.
+
+After `worktree-add`, immediately send the member a follow-up that includes both its assigned
+worktree path and its `codex://threads/<thread_id>` link. Use `bind-thread --cwd <worktree>` or
+`--worktree-path <worktree>` after the thread exists so `team.json`, `guide.md`, `status`, and
+`member-prompt` all point at the same worktree-backed thread.
+
+When the member starts inside a worktree, it must verify the assigned cwd exists and contains the
+repository checkout before editing. If the directory is missing, empty, or does not look like a git
+worktree/repository yet, the member reports `BLOCKED: worktree not ready` to the leader and waits
+instead of editing a parent checkout or an empty directory.
 
 ## Run a ulw-plan in parallel
 

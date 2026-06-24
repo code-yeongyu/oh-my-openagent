@@ -1,0 +1,51 @@
+{
+	"name": "@code-yeongyu/codex-workflow-selector",
+	"version": "4.13.0",
+	"description": "Opt-in LazyCodex UserPromptSubmit workflow selector for existing Codex workflows.",
+	"type": "module",
+	"packageManager": "npm@11.12.1",
+	"license": "MIT",
+	"homepage": "https://github.com/code-yeongyu/codex-workflow-selector",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/code-yeongyu/codex-workflow-selector.git"
+	},
+	"bugs": {
+		"url": "https://github.com/code-yeongyu/codex-workflow-selector/issues"
+	},
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"lazycodex",
+		"workflow",
+		"hooks"
+	],
+	"bin": {
+		"omo-workflow-selector": "./dist/cli.js"
+	},
+	"scripts": {
+		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
+		"test": "vitest --run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check src test",
+		"lint:fix": "biome check --write src test",
+		"check": "tsc --noEmit && biome check src test && npm run build"
+	},
+	"files": [
+		"dist",
+		"hooks",
+		"README.md",
+		"LICENSE",
+		"NOTICE"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "2.4.16",
+		"@types/node": "^25.9.3",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}

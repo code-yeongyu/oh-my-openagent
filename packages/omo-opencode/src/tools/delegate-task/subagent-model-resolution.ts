@@ -35,6 +35,7 @@ export async function resolveSubagentModel(
     ? executorCtx.userCategories?.[agentOverride.category]
     : undefined
   const agentCategoryModel = agentCategoryConfig?.model
+  const hasExplicitUserModel = Boolean(agentOverride?.model ?? agentCategoryModel)
   const normalizedAgentFallbackModels = normalizeFallbackModels(
     agentOverride?.fallback_models
     ?? agentCategoryConfig?.fallback_models
@@ -88,7 +89,8 @@ export async function resolveSubagentModel(
       normalizedAgentFallbackModels,
       defaultProviderID,
     )
-    fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
+    fallbackChain = configuredFallbackChain
+      ?? ((resolutionSkipped || hasExplicitUserModel) ? undefined : agentRequirement?.fallbackChain)
     const effectiveEntry = resolveEffectiveFallbackEntry({
       categoryModel,
       configuredFallbackChain,

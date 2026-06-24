@@ -15,6 +15,7 @@
 		"components/telemetry",
 		"components/teammode",
 		"components/start-work-continuation",
+		"components/workflow-selector",
 		"components/ulw-loop",
 		"components/ultrawork"
 	],

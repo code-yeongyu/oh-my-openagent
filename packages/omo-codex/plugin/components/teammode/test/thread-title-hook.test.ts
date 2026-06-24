@@ -34,6 +34,36 @@ describe("thread title PostToolUse guidance", () => {
 		);
 	});
 
+	it("#given Codex reports create_thread output as a JSON string #when the hook runs #then it still extracts the thread id", () => {
+		// given
+		const output = runPostToolUseHook({
+			hook_event_name: "PostToolUse",
+			session_id: "s-team",
+			turn_id: "t-team",
+			transcript_path: null,
+			cwd: "/repo",
+			model: "gpt-5.5",
+			permission_mode: "default",
+			tool_name: "codex_app.create_thread",
+			tool_use_id: "tool-create-thread",
+			tool_input: {
+				prompt: "Review a worktree PR",
+				target: { type: "project", projectId: "/repo", environment: { type: "local" } },
+			},
+			tool_response: '{"threadId":"019ef350-ee78-72a3-bd5e-e40cebc3d814"}',
+		});
+
+		// when
+		const parsed: unknown = JSON.parse(output);
+
+		// then
+		expect(isHookOutput(parsed)).toBe(true);
+		if (!isHookOutput(parsed)) return;
+		expect(parsed.hookSpecificOutput.additionalContext).toBe(
+			"THREAD ID 019ef350-ee78-72a3-bd5e-e40cebc3d814: CALL codex_app.set_thread_title NOW. USE THE REAL TASK/ROLE.",
+		);
+	});
+
 	it("#given an unrelated tool completed #when the hook runs #then it stays silent", () => {
 		// given
 		const output = runPostToolUseHook({
@@ -57,7 +87,7 @@ describe("thread title PostToolUse guidance", () => {
 		expect(actual).toBe("");
 	});
 
-	it("#given worktree-backed thread creation is pending #when the hook runs #then it tells Codex to title the thread once the thread id exists", () => {
+	it("#given worktree-backed thread creation is pending #when the hook runs #then it tells Codex to wait for the real thread before bootstrapping", () => {
 		// given
 		const output = runPostToolUseHook({
 			hook_event_name: "PostToolUse",
@@ -89,7 +119,7 @@ describe("thread title PostToolUse guidance", () => {
 		expect(isHookOutput(parsed)).toBe(true);
 		if (!isHookOutput(parsed)) return;
 		expect(parsed.hookSpecificOutput.additionalContext).toBe(
-			"PENDING WORKTREE ID remote-control:env:test-worktree: CALL codex_app.set_thread_title AS SOON AS THREAD ID EXISTS. USE THE REAL TASK/ROLE.",
+			"PENDING WORKTREE ID remote-control:env:test-worktree: WORKTREE THREAD IS NOT READY YET. DO NOT bind-thread OR SEND THE MEMBER BOOTSTRAP UNTIL A REAL THREAD ID EXISTS. THEN CALL codex_app.set_thread_title USING THE REAL TASK/ROLE.",
 		);
 	});
 });

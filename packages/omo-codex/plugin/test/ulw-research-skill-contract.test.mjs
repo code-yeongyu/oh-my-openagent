@@ -22,6 +22,24 @@ function frontmatterDescription(content) {
 	return match[1];
 }
 
+function escapeRegExp(value) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function markdownSection(content, heading, nextHeading) {
+	const headingPattern = new RegExp(`^${escapeRegExp(heading)}\\r?$`, "m");
+	const headingMatch = content.match(headingPattern);
+	assert.notEqual(headingMatch, null, `SKILL.md section not found: ${heading}`);
+	assert.notEqual(headingMatch.index, undefined, `SKILL.md section index not found: ${heading}`);
+	const bodyStart = headingMatch.index + headingMatch[0].length;
+	if (nextHeading === undefined) {
+		return content.slice(bodyStart);
+	}
+	const nextHeadingIndex = content.indexOf(`\n${nextHeading}`, bodyStart);
+	assert.notEqual(nextHeadingIndex, -1, `SKILL.md next section not found: ${nextHeading}`);
+	return content.slice(bodyStart, nextHeadingIndex);
+}
+
 test("#given renamed research skill #when frontmatter is inspected #then ulw-research is the canonical name", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.match(copy.content, /^name: ulw-research$/m, `${copy.label}: frontmatter must expose ulw-research`);
@@ -197,6 +215,16 @@ test("#given ulw-research team communication #when the raise law is inspected #t
 	}
 });
 
+test("#given ulw-research default swarm #when team guidance is inspected #then teammode, many teammates, and hyperdebate are defaulted", async () => {
+	for (const copy of await readUlwResearchCopies()) {
+		const teamSection = markdownSection(copy.content, "## Run the swarm as a cooperating team", "## Worker ground rules");
+		assert.match(teamSection, /default(?:s)? to teammode|teammode by default/i, `${copy.label}: teammode must be the default`);
+		assert.match(teamSection, /many teammates|larger roster|5-8 teammates|5\+ teammates/i, `${copy.label}: body must prefer many teammates`);
+		assert.match(teamSection, /hyperdebate|ultradebate/i, `${copy.label}: body must require adversarial debate`);
+		assert.match(teamSection, /skeptic|red-team|cross-critique/i, `${copy.label}: body must include a critique perspective`);
+	}
+});
+
 test("#given ulw-research non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
@@ -214,6 +242,33 @@ test("#given ulw-research claim ledger #when ownership is inspected #then worker
 			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:ledger|verified-claims)/i,
 			`${copy.label}: workers must not be instructed to write/append/create the ledger or verified-claims`,
 		);
+	}
+});
+
+test("#given ulw-research report output #when defaults are inspected #then HTML/PDF reports go through frontend, visual QA, and reviewer approval", async () => {
+	for (const copy of await readUlwResearchCopies()) {
+		const phase0 = markdownSection(copy.content, "## Phase 0 — Decompose and open the journal", "## Phase 1 — Saturation wave");
+		const phase4 = markdownSection(copy.content, "## Phase 4 — Synthesize", "## Phase 5 — Final materials");
+		const phase5 = markdownSection(copy.content, "## Phase 5 — Final materials", "## Search craft");
+		assert.match(phase0, /Final material format:\s*<HTML\/PDF default \| explicit format \| markdown only>/, `${copy.label}: Phase 0 must track the default final-material contract`);
+		assert.match(phase4, /citation source of truth/i, `${copy.label}: Phase 4 synthesis must be a source of truth, not the default final artifact`);
+		assert.doesNotMatch(phase4, /When no report was requested, this is the deliverable/i, `${copy.label}: Phase 4 must not contradict default HTML/PDF final materials`);
+		assert.match(phase5, /Default final materials to HTML\/PDF unless the user explicitly asks/i, `${copy.label}: Phase 5 must default final materials to HTML/PDF`);
+		assert.match(phase5, /HTML first[\s\S]{0,120}PDF default/i, `${copy.label}: report output must default to HTML with PDF availability`);
+		assert.match(phase5, /\bfrontend\b/i, `${copy.label}: report assembly must load the frontend skill`);
+		assert.match(phase5, /visual-qa/i, `${copy.label}: report assembly must require visual-qa`);
+		assert.match(phase5, /ulw-loop|ULW loop/i, `${copy.label}: report QA must run under the ULW loop`);
+		assert.match(phase5, /reviewer[\s\S]{0,120}(?:approve|says no broken parts|no broken parts)/i, `${copy.label}: report completion must wait for reviewer approval`);
+	}
+});
+
+test("#given ulw-research final materials #when visual artifact guidance is inspected #then charts Mermaid graphs and imagegen are strongly required", async () => {
+	for (const copy of await readUlwResearchCopies()) {
+		const phase5 = markdownSection(copy.content, "## Phase 5 — Final materials", "## Search craft");
+		assert.match(phase5, /actively use charts/i, `${copy.label}: reports must strongly require charts`);
+		assert.match(phase5, /Mermaid graphs/i, `${copy.label}: reports must require Mermaid graphs`);
+		assert.match(phase5, /imagegen skill/i, `${copy.label}: reports must require imagegen visuals`);
+		assert.match(phase5, /generated (?:diagrams|visuals)|generated diagrams or editorial visuals/i, `${copy.label}: report assets must include generated visual guidance`);
 	}
 });
 
