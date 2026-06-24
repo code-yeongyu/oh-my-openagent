@@ -16,7 +16,7 @@ export async function executeSyncTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: { providerID: string; modelID: string; variant?: string; temperature?: number } | undefined,
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   deps: SyncTaskDeps = syncTaskDeps
