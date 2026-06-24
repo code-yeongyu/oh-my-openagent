@@ -136,6 +136,8 @@ code; do not invent future components just to fill the section.
 
 The Component reuse budget is part of Section 5, not a separate control file. Use it to prevent uncontrolled design-system growth before code is written. Numbers below are conservative agent-governance defaults: some are backed by published design-system limits, while reuse percentages and per-PR growth caps are pragmatic local controls.
 
+Treat these rows as governance defaults, not literal naming mandates. When a project `DESIGN.md` already names variants such as `panel`, `metric`, or `alert`, those project-local names are authoritative; compare count, behavior, and semantic fit instead of replacing them with the example names below.
+
 | Area | Budget | Current | Owner section | Rule |
 | --- | ---: | ---: | --- | --- |
 | Component reuse budget | 80% semantic/behavior match requires reuse | 0 | Section 5 | Reuse existing primitives when they cover at least 80% of the need; create only for a semantic or behavioral gap. |
@@ -144,7 +146,7 @@ The Component reuse budget is part of Section 5, not a separate control file. Us
 | Color budget | 5 brand/accent families plus neutrals, 6 state families, 26 semantic role aliases maximum without explicit justification | 0 | Section 2 | Add semantic roles, not one-off hex values. |
 | Icon budget | 1 primary icon family; size slots 16, 20, 24, 32; max 2 icon sizes per component | 0 | Section 5 | Custom icons require a documented library gap; do not model different glyphs as variants. |
 | Button budget | 5 intents, 3 sizes, 3 buttons per action group | 0 | Section 5 | Intents: primary, secondary/default, tertiary/ghost/link, danger/destructive, inverse/special-background. |
-| Form budget | 2 columns desktop, 1 mobile; 8 field primitive groups; validation states default/error/success | 0 | Section 5 | Reuse field, label, hint, help, and validation patterns before custom form UI. |
+| Form budget | 2 columns desktop, 1 mobile; 8 field primitive groups; validation states default/error/success | 0 | Section 5 | Reuse field, label, hint, help, and validation patterns before custom form UI; new input types inside the same field shell do not require a new primitive unless they introduce distinct composite behavior such as a calendar popover or date-range picker. |
 | Card budget | 3 card variants | 0 | Section 5 | Elevated, filled, outlined; cards represent one subject and nested cards need justification. |
 | Layout budget | 5 shared breakpoints | 0 | Section 4 | Use shared mobile/tablet/desktop/wide regimes instead of page-specific breakpoints. |
 | Spacing budget | 2/4/8-derived scale; max 8 component-local values and 12 global steps unless justified | 0 | Section 4 | No ad-hoc px values when a token exists. |
