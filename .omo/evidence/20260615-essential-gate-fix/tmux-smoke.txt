@@ -1,0 +1,247 @@
+COMMAND: isolated install then tmux CODEX_HOME=<TMP>/codex codex plugin list --json
+install_exit=0
+
+up to date, audited 87 packages in 378ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @sisyphuslabs/omo-codex-plugin@4.10.0 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 4.10.0 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled ast-grep-mcp dist
+Using bundled git-bash-mcp dist
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 11 modules in 4ms
+
+  cli.js  19.23 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 11 modules in 3ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 2ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 2ms
+
+  cli.js  8.26 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 52 modules in 5ms
+
+  cli.js  159.1 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 52 modules in 5ms
+
+  cli.js  159.32 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.10.0 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.10.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
+
+Bundling components/lsp/dist/cli.js
+Bundled 6 modules in 5ms
+
+  cli.js  124.72 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 6ms
+
+  cli.js  204.83 KB  (entry point)
+
+Bundled 76 modules in 5ms
+
+  posthog.js  202.41 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 5ms
+
+  cli.js  204.57 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 16 modules in 3ms
+
+  cli.js  14.14 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 16 modules in 3ms
+
+  cli.js  14.32 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 28 modules in 3ms
+
+  cli.js  107.52 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.10.0 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 3 modules in 2ms
+
+  cli.js  5.24 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 3 modules in 2ms
+
+  cli.js  5.34 KB  (entry point)
+
+Building components/bootstrap (standalone)
+
+> @sisyphuslabs/codex-bootstrap@4.10.0 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+
+  dist/cli.js  103.7kb
+
+⚡ Done in 11ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 36 modules in 5ms
+
+  cli.js  106.58 KB  (entry point)
+
+
+added 13 packages, and audited 31 packages in 577ms
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+Installed 1 plugin(s) from sisyphuslabs.
+tmux_capture_begin
+{
+  "installed": [
+    {
+      "pluginId": "omo@sisyphuslabs",
+      "name": "omo",
+      "marketplaceName": "sisyphuslabs",
+      "version": "4.10.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "<TMP>/codex/plugins/cache/sisyphuslabs/omo/4.10.0"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "<TMP>/codex/plugins/cache/sisyphuslabs"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    }
+  ],
+  "available": []
+}
+
+TMUX_CMD_EXIT=0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+tmux_capture_exit=0
+tmux_capture_end
+cleanup_tmux=killed lcx-gate-73952; remains=no
+cleanup_tmp=removed <TMP>; exists_after=no
+EXIT_CODE=0

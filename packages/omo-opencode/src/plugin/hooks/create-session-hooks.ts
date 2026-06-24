@@ -5,12 +5,13 @@ import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 
 import {
-  createSessionRecoveryHook,
   createSessionNotification,
   createThinkModeHook,
   createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
+  createCodegraphBootstrapHook,
+  createAstGrepSgProvisionHook,
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
@@ -41,12 +42,13 @@ import { createModelFallbackTitleUpdater } from "./model-fallback-title-updater"
 
 export type SessionHooks = {
   preemptiveCompaction: ReturnType<typeof createPreemptiveCompactionHook> | null
-  sessionRecovery: ReturnType<typeof createSessionRecoveryHook> | null
   sessionNotification: ReturnType<typeof createSessionNotification> | null
   thinkMode: ReturnType<typeof createThinkModeHook> | null
   modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
+  codegraphBootstrap: ReturnType<typeof createCodegraphBootstrapHook> | null
+  astGrepSgProvision: ReturnType<typeof createAstGrepSgProvisionHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
@@ -84,11 +86,6 @@ export function createSessionHooks(args: {
       ? safeHook("preemptive-compaction", () =>
           createPreemptiveCompactionHook(ctx, pluginConfig, modelCacheState))
       : null
-
-  const sessionRecovery = isHookEnabled("session-recovery")
-    ? safeHook("session-recovery", () =>
-        createSessionRecoveryHook(ctx, { experimental: pluginConfig.experimental }))
-    : null
 
   let sessionNotification: ReturnType<typeof createSessionNotification> | null = null
   if (isHookEnabled("session-notification")) {
@@ -144,6 +141,14 @@ export function createSessionHooks(args: {
           autoUpdate: pluginConfig.auto_update ?? true,
           modelCapabilities: pluginConfig.model_capabilities,
         }))
+    : null
+
+  const codegraphBootstrap = isHookEnabled("codegraph-bootstrap")
+    ? safeHook("codegraph-bootstrap", () => createCodegraphBootstrapHook(ctx, pluginConfig.codegraph))
+    : null
+
+  const astGrepSgProvision = isHookEnabled("ast-grep-sg-provision")
+    ? safeHook("ast-grep-sg-provision", () => createAstGrepSgProvisionHook())
     : null
 
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
@@ -231,12 +236,13 @@ export function createSessionHooks(args: {
 
   return {
     preemptiveCompaction,
-    sessionRecovery,
     sessionNotification,
     thinkMode,
     modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
+    codegraphBootstrap,
+    astGrepSgProvision,
     agentUsageReminder,
     nonInteractiveEnv,
     interactiveBashSession,

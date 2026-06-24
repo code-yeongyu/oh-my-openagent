@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
-import { readCodexModelCatalog } from "./install/model-catalog.mjs";
+import { readCodexModelCatalog, updateCodexConfig } from "./install-dist/install-local.mjs";
 
 test("#given empty Codex config #when script installer updates config #then sets worker model and reasoning defaults", async () => {
 	// given

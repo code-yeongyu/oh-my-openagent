@@ -155,4 +155,33 @@ describe("createBackgroundTask", () => {
     expect(secondResult).toContain("Task ID: task-2")
     expect(secondResult).not.toContain("interrupt")
   })
+
+  test("does not advertise background_output CTA in launch return (issue #5221)", async () => {
+    //#given - a successful launch
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-launch-cta",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+    getTaskMock.mockReturnValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-launch-cta",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+
+    //#when
+    const result = await tool.execute(testArgs, testContext)
+
+    //#then - the return must NOT nudge the model into calling background_output
+    // before the <system-reminder> arrives (Kimi K2 recency bias pulls it through)
+    expect(result).not.toContain("Use `background_output` with task_id=")
+    expect(result).not.toContain("to check.")
+    // ...but the anti-polling instruction must still be present
+    expect(result).toContain("Do NOT call background_output now")
+    expect(result).toContain("<system-reminder>")
+  })
 })

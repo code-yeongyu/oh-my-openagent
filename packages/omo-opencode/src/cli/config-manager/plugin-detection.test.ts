@@ -9,6 +9,8 @@ import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
 import * as pluginNameWithVersion from "./plugin-name-with-version"
 
+const sourcePlugin = new URL("../../index.ts", import.meta.url).href
+
 describe("detectCurrentConfig - single package detection", () => {
   let testConfigDir = ""
   let testConfigPath = ""
@@ -214,7 +216,6 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("mirrors an existing source plugin entry into profile configs", async () => {
     // given
-    const sourcePlugin = "file:///Users/yeongyu/local-workspaces/omo/src/index.ts"
     writeFileSync(testConfigPath, JSON.stringify({ plugin: [sourcePlugin] }, null, 2) + "\n", "utf-8")
 
     const profileDir = join(testConfigDir, "profiles", "today")
@@ -239,7 +240,6 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("uses the parent source plugin entry when OPENCODE_CONFIG_DIR points at a profile", async () => {
     // given
-    const sourcePlugin = "file:///Users/yeongyu/local-workspaces/omo/src/index.ts"
     writeFileSync(testConfigPath, JSON.stringify({ plugin: [sourcePlugin] }, null, 2) + "\n", "utf-8")
 
     const profileDir = join(testConfigDir, "profiles", "today")

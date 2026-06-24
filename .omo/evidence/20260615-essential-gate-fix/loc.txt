@@ -1,0 +1,36 @@
+COMMAND: changed/new TypeScript pure LOC check
+
+ 239 packages/omo-codex/plugin/components/ulw-loop/src/quality-gate.ts
+ 235 packages/omo-codex/plugin/components/ulw-loop/src/cli-subcommands.ts
+ 234 packages/omo-codex/plugin/components/ulw-loop/src/checkpoint.ts
+ 227 packages/omo-codex/plugin/components/ulw-loop/test/goal-status.test.ts
+ 218 packages/omo-codex/plugin/components/ulw-loop/test/plan-crud.test.ts
+ 214 packages/omo-codex/plugin/components/ulw-loop/src/evidence.ts
+ 213 packages/omo-codex/plugin/components/ulw-loop/test/cli-helpers.test.ts
+ 195 packages/omo-codex/plugin/components/ulw-loop/src/plan-crud.ts
+ 194 packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts
+ 192 packages/omo-codex/plugin/components/ulw-loop/test/cli-checkpoint.test.ts
+ 184 packages/omo-codex/plugin/components/ulw-loop/test/cli-commands.test.ts
+ 177 packages/omo-codex/plugin/components/ulw-loop/test/codex-goal-instruction.test.ts
+ 164 packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts
+ 148 packages/omo-codex/plugin/components/ulw-loop/src/domain-types.ts
+ 147 packages/omo-codex/plugin/components/ulw-loop/test/cli-create-goals.test.ts
+ 141 packages/omo-codex/plugin/components/ulw-loop/test/checkpoint.test.ts
+ 124 packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts
+ 123 packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-roles.test.ts
+ 114 packages/omo-codex/plugin/components/ulw-loop/src/plan-goal-factory.ts
+ 100 packages/omo-codex/plugin/components/ulw-loop/test/evidence-criteria-gate.test.ts
+  94 packages/omo-codex/plugin/components/ulw-loop/src/cli-commands.ts
+  90 packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-reconciliation.ts
+  88 packages/omo-codex/plugin/components/ulw-loop/test/fixtures/checkpoint-builders.ts
+  87 packages/omo-codex/plugin/components/ulw-loop/src/goal-status.ts
+  85 packages/omo-codex/plugin/components/ulw-loop/test/fixtures/quality-gate-builder.ts
+  83 packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-blockers.test.ts
+  75 packages/omo-codex/plugin/components/ulw-loop/test/cli-complete-goals.test.ts
+  68 packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-status.test.ts
+  41 packages/omo-codex/plugin/components/ulw-loop/src/quality-gate-blockers.ts
+  39 packages/omo-codex/plugin/components/ulw-loop/test/skill-contract.test.ts
+  35 packages/omo-codex/plugin/components/ulw-loop/src/quality-gate-fields.ts
+  28 packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-doc.test.ts
+
+EXIT_CODE=0

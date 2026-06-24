@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import { clearSessionAgent, handedBackSyncSessions, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
 import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
@@ -96,6 +96,7 @@ export async function executeSync(
     createdSessionForExecution = session.isNew
     subagentSessions.add(sessionID)
     syncSubagentSessions.add(sessionID)
+    handedBackSyncSessions.delete(sessionID)
 
     if (session.isNew) {
       spawnReservation?.commit()
@@ -199,6 +200,21 @@ export async function executeSync(
       syncSubagentSessions.delete(sessionID)
       deleteSessionTools(sessionID)
       clearSessionAgent(sessionID)
+      handedBackSyncSessions.add(sessionID)
+
+      // Prevent todo-continuation-enforcer from re-awakening a completed sync subagent.
+      // When a sync subagent finishes, its session may still exist and have incomplete
+      // todos; without an explicit abort, the continuation hook sees session.idle and
+      // injects a continuation prompt, causing the subagent to resume after the parent
+      // has already moved on. This creates a race where two agents work concurrently.
+      // Aborting an already-idle session emits no error event (opencode re-publishes
+      // session.idle), so handedBackSyncSessions is the signal the enforcer keys on;
+      // the abort still cancels the child's opencode-side background jobs.
+      if (typeof ctx.client.session.abort === "function") {
+        void ctx.client.session.abort({ path: { id: sessionID } }).catch((error: unknown) => {
+          log(`[call_omo_agent] Failed to abort completed sync session:`, error)
+        })
+      }
     }
   }
 }

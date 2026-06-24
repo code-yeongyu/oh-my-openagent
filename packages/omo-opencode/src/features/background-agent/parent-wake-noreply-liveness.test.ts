@@ -25,7 +25,8 @@ type SessionMessageStub = {
   info?: {
     role?: string
     finish?: string
-    time?: { created?: number }
+    time?: { created?: number; completed?: number }
+    error?: { name?: string }
   }
   parts?: Array<{ type?: string; text?: string; synthetic?: boolean; state?: { status?: string } }>
 }
@@ -323,6 +324,231 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
   })
 })
 
+describe("parent wake admitted-consumption drop (duplicate ALL-COMPLETE regression)", () => {
+  test("#given admitted wake consumed by live turn output #when stale tool-call deferral would force a resume #then no duplicate reply dispatch and the wake is dropped", async () => {
+    // given: reproduce ses_14a3ab27bffe — admit-only deposit at T, parent's live
+    // turn keeps producing output after the admission, then the stale tool-call
+    // hatch fires while every busy signal is blind.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let consumed = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () =>
+        consumed
+          ? [
+              ...BLOCKED_MESSAGES,
+              {
+                info: { role: "assistant", finish: "tool-calls", time: { created: 101_000 } },
+                parts: [
+                  { type: "text", text: "retrieving background results" },
+                  { type: "tool", state: { status: "running" } },
+                ],
+              },
+            ]
+          : BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: flush admits the wake as noReply during history deferral
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+
+      // when: the live turn consumes the deposit (assistant output created after
+      // admission) and the tool-call deferral goes stale
+      consumed = true
+      now = 110_000
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the retained wake is dropped instead of re-dispatched as a
+      // reply prompt (which forked a concurrent assistant chain in production)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given admitted wake while the tool-blocked turn is still mid-flight #when the tool-call deferral goes stale #then no reply dispatch forks the turn", async () => {
+    // given: reproduce ses_149e6ecb2ffe — admit-only deposit during a silent
+    // long-running tool (sleep), no post-admission output yet
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: flush admits the wake as noReply during history deferral
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when: the deferral goes stale while the same tool turn is still running
+      now = 110_000
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the admitted wake keeps waiting instead of forking a reply turn
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given un-admitted wake with a stale tool-call deferral #then it is admitted as noReply instead of a reply dispatch", async () => {
+    // given: the first admission attempt never landed (gate hold), the
+    // deferral aged out while the tool turn is still mid-flight
+    const originalDateNow = Date.now
+    Date.now = () => 110_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    const wake = notifier.getPendingParentWakes().get("parent-1")
+    expect(wake).toBeDefined()
+    if (!wake) throw new Error("missing wake")
+    wake.toolCallDeferralStartedAt = 100_000
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: content is deposited without forking, reply liveness retained
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given retained wake whose own deposit is the last message #then the resume is not deadlocked by the deposit", async () => {
+    // given: the admit-only deposit landed after the turn ended, so the session
+    // history now ends with the wake's own synthetic user message and nothing
+    // will ever answer it.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let deposited = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () =>
+        deposited
+          ? [
+              ...SAFE_MESSAGES,
+              {
+                info: { role: "user", time: { created: 100_100 } },
+                parts: [
+                  {
+                    type: "text",
+                    text: `${FINAL_WAKE}\n\n<!-- OMO_INTERNAL_INITIATOR -->`,
+                    synthetic: true,
+                  },
+                ],
+              },
+            ]
+          : BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: flush admits the wake as noReply during history deferral
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when: the deposit is now the trailing message and the parent is idle
+      deposited = true
+      now = 110_000
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the reply-producing resume dispatches instead of deferring forever
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given admitted wake with only aborted assistant output after admission #then reply liveness is preserved", async () => {
+    // given: an aborted (error) assistant message after admission is not
+    // consumption — the parent never addressed the notification.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let aborted = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () =>
+        aborted
+          ? [
+              ...SAFE_MESSAGES,
+              {
+                info: {
+                  role: "assistant",
+                  finish: "stop",
+                  time: { created: 101_000, completed: 101_500 },
+                  error: { name: "MessageAbortedError" },
+                },
+                parts: [{ type: "text", text: "partial" }],
+              },
+            ]
+          : BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: admitted as noReply while blocked
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when: the post-admission turn was aborted and the parent is now safe
+      aborted = true
+      now = 110_000
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: liveness resume still fires exactly once
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+})
+
 describe("BackgroundManager parent wake recent-activity admission liveness", () => {
   let managerUnderTest: BackgroundManager | undefined
 
@@ -413,9 +639,12 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       expect(parentWakeNotifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      // regression: the reply-required wake must be scheduled for re-flush
+      expect(parentWakeNotifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
 
       // when: activity goes stale and the gate hold expires
       now = 110_000
+      parentWakeNotifier.clearPendingParentWakeTimer("parent-1")
       releaseParentWakeHold("parent-1")
       await flushPendingParentWake.call(manager, "parent-1")
 

@@ -11,6 +11,18 @@ const {
   getSessionPromptParams,
 } = require("../../shared/session-prompt-params-state")
 
+type PromptArgs = {
+  body: {
+    agent?: string
+    model?: unknown
+    variant?: string
+    tools: Record<string, boolean>
+    options?: unknown
+    maxOutputTokens?: number
+    temperature?: number
+  }
+}
+
 bunDescribe("sendSyncPrompt", () => {
   bunAfterEach(() => {
     clearSessionPromptParams("test-session")
@@ -59,8 +71,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
       promptArgs = input
       return { data: {} }
     })
@@ -99,8 +111,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
       promptArgs = input
       return { data: {} }
     })
@@ -140,8 +152,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
       promptArgs = input
       return { data: {} }
     })
@@ -181,8 +193,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
       promptArgs = input
       return { data: {} }
     })
@@ -222,8 +234,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
       promptArgs = input
       return { data: {} }
     })
@@ -272,8 +284,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptWithModelSuggestionRetry = bunMock(async (_client: any, input: any) => {
+    let promptArgs!: PromptArgs
+    const promptWithModelSuggestionRetry = bunMock(async (_client: unknown, input: PromptArgs) => {
       promptArgs = input
     })
 
@@ -337,8 +349,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptWithModelSuggestionRetry = bunMock(async (_client: any, input: any) => {
+    let promptArgs!: PromptArgs
+    const promptWithModelSuggestionRetry = bunMock(async (_client: unknown, input: PromptArgs) => {
       promptArgs = input
     })
 

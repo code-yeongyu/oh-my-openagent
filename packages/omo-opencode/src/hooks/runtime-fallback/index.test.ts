@@ -9,9 +9,17 @@ import {
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import {
+  _resetForTesting as resetClaudeCodeSessionState,
+  subagentSessions,
+} from "../../features/claude-code-session-state"
+import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
+import {
+  installRuntimeFallbackTestClock,
+  restoreRuntimeFallbackTestClock,
+} from "./test-timeout-clock.test-support"
 import type { RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
@@ -26,6 +34,7 @@ describe("runtime-fallback", () => {
     logCalls = []
     toastCalls = []
     SessionCategoryRegistry.clear()
+    resetClaudeCodeSessionState()
     clearAllDelegatedChildSessionBootstrap()
     releaseAllPromptAsyncReservationsForTesting()
 
@@ -43,7 +52,9 @@ describe("runtime-fallback", () => {
   })
 
   afterEach(() => {
+    restoreRuntimeFallbackTestClock()
     SessionCategoryRegistry.clear()
+    resetClaudeCodeSessionState()
     clearAllDelegatedChildSessionBootstrap()
     releaseAllPromptAsyncReservationsForTesting()
     mock.restore()
@@ -86,6 +97,7 @@ describe("runtime-fallback", () => {
       max_fallback_attempts: 3,
       cooldown_seconds: 60,
       notify_on_fallback: true,
+      restore_primary_after_cooldown: false,
       ...overrides,
     }
   }
@@ -341,6 +353,7 @@ describe("runtime-fallback", () => {
     })
 
     test("should continue fallback chain when fallback model is not found", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: createMockPluginConfigWithCategoryFallback([
@@ -374,6 +387,7 @@ describe("runtime-fallback", () => {
           },
         },
       })
+      await clock.advanceBy(2_001)
 
       await hook.event({
         event: {
@@ -399,6 +413,7 @@ describe("runtime-fallback", () => {
     })
 
     test("should continue fallback chain when ProviderModelNotFoundError occurs", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: createMockPluginConfigWithCategoryFallback([
@@ -429,6 +444,7 @@ describe("runtime-fallback", () => {
           },
         },
       })
+      await clock.advanceBy(2_001)
 
       await hook.event({
         event: {
@@ -1516,6 +1532,7 @@ describe("runtime-fallback", () => {
     })
 
     test("should advance fallback after session timeout when Copilot retry emits no retryable events", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
       const abortCalls: Array<{ path?: { id?: string } }> = []
 
@@ -1576,7 +1593,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      for (let flushes = 0; flushes < 20 && retriedModels.length === 0; flushes += 1) {
+        await Promise.resolve()
+      }
+      await clock.advanceBy(50)
 
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
       expect(retriedModels).toContain("openai/gpt-5.4")
@@ -1587,6 +1607,7 @@ describe("runtime-fallback", () => {
     })
 
     test("should keep session timeout active after chat.message model override", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -1654,13 +1675,14 @@ describe("runtime-fallback", () => {
         output
       )
 
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await clock.advanceBy(50)
 
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
       expect(retriedModels).toContain("openai/gpt-5.4")
     })
 
     test("should abort in-flight fallback request before advancing on timeout", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
       const abortCalls: Array<{ path?: { id?: string } }> = []
       const never = new Promise<never>(() => {})
@@ -1727,7 +1749,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      for (let flushes = 0; flushes < 20 && retriedModels.length === 0; flushes += 1) {
+        await Promise.resolve()
+      }
+      await clock.advanceBy(50)
 
       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
@@ -1737,6 +1762,7 @@ describe("runtime-fallback", () => {
     })
 
     test("should not advance fallback after session.stop cancels timeout-driven retry", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -1801,12 +1827,87 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await clock.advanceBy(50)
 
       expect(retriedModels).toHaveLength(1)
     })
 
+    test("should not advance fallback timeout after completed subagent clears eligibility", async () => {
+      const clock = installRuntimeFallbackTestClock()
+      const retriedModels: string[] = []
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.7",
+            "anthropic/claude-opus-4-7",
+            "openai/gpt-5.4",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-completed-subagent-cancels-timeout-fallback"
+      subagentSessions.add(sessionID)
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.7"])
+
+      subagentSessions.delete(sessionID)
+      await clock.advanceBy(50)
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.7"])
+      expect(abortCalls).toEqual([])
+      const skipLog = logCalls.find((c) => c.msg.includes("Session fallback timeout skipped for completed subagent"))
+      expect(skipLog).toBeDefined()
+    })
+
     test("should not trigger second fallback after successful assistant reply", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
       const mockMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "test" }] },
@@ -1899,12 +2000,13 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await clock.advanceBy(50)
 
       expect(retriedModels).toEqual(["github-copilot/claude-opus-4.7"])
     })
 
     test("should not clear fallback timeout on assistant non-error update with Copilot retry signal", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -1975,12 +2077,13 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 60))
+      await clock.advanceBy(60)
 
       expect(retriedModels).toContain("openai/gpt-5.5")
     })
 
     test("should not clear fallback timeout on assistant non-error update with OpenAI retry signal", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2050,12 +2153,13 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 60))
+      await clock.advanceBy(60)
 
       expect(retriedModels).toContain("anthropic/claude-opus-4-7")
     })
 
     test("should not clear fallback timeout on assistant non-error update without user-visible content", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2126,12 +2230,13 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 60))
+      await clock.advanceBy(60)
 
       expect(retriedModels).toContain("openai/gpt-5.5")
     })
 
     test("should not clear fallback timeout from info.message alone without persisted assistant text", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2202,12 +2307,13 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 60))
+      await clock.advanceBy(60)
 
       expect(retriedModels).toContain("openai/gpt-5.5")
     })
 
     test("should keep timeout armed when session.idle fires before fallback result", async () => {
+      const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2272,7 +2378,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 60))
+      await clock.advanceBy(60)
 
       expect(retriedModels).toContain("openai/gpt-5.5")
     })
@@ -2537,7 +2643,7 @@ describe("runtime-fallback", () => {
 
     test("should restore configured primary when reopened on a configured fallback model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
-        config: createMockConfig({ notify_on_fallback: false }),
+        config: createMockConfig({ notify_on_fallback: false, restore_primary_after_cooldown: true }),
         pluginConfig: createMockPluginConfigWithCategoryModel(
           "test",
           "anthropic/claude-opus-4-5",
@@ -2915,6 +3021,7 @@ describe("runtime-fallback", () => {
     })
 
     test("consecutive session.errors advance chain normally when retry completes between them", async () => {
+      const clock = installRuntimeFallbackTestClock()
       //#given
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
@@ -2949,12 +3056,14 @@ describe("runtime-fallback", () => {
         },
       })
 
-      await hook.event({
+      const secondErrorPromise = hook.event({
         event: {
           type: "session.error",
           properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
         },
       })
+      await clock.advanceBy(3_000)
+      await secondErrorPromise
 
       //#then - both should advance the chain (no skip)
       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
@@ -3163,6 +3272,7 @@ describe("runtime-fallback", () => {
     })
 
     test("pendingFallbackModel advances chain on subsequent error even when persisted", async () => {
+      const clock = installRuntimeFallbackTestClock()
       //#given
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
@@ -3206,13 +3316,15 @@ describe("runtime-fallback", () => {
       await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
 
       //#when - second error fires after retry completed (retryInFlight cleared)
-      await hook.event({
+      const secondErrorPromise = hook.event({
         event: {
           type: "session.error",
           // model matches pendingFallbackModel so the awaiting-fallback gate lets this through
           properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
         },
       })
+      await clock.advanceBy(3_000)
+      await secondErrorPromise
 
       //#then - chain advances normally (not skipped), consistent with consecutive errors test
       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))

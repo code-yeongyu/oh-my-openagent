@@ -40,15 +40,19 @@ function expectSyntheticContinuation(body: PromptBody["body"]): void {
 
 describe("createEventHandler - model-fallback auto-continuation pins agent/model/variant", () => {
   const createHandler = (args?: {
-    hooks?: any
-    pluginConfig?: any
+    hooks?: unknown
+    pluginConfig?: unknown
     withPromptAsync?: boolean
   }) => {
     setupConnectedProviderCacheMocks()
     const promptAsyncBodies: PromptBody[] = []
     const promptBodies: PromptBody[] = []
 
-    const sessionClient: Record<string, any> = {
+    const sessionClient: {
+      abort: () => Promise<unknown>
+      prompt: (input: PromptBody) => Promise<unknown>
+      promptAsync?: (input: PromptBody) => Promise<unknown>
+    } = {
       abort: async () => ({}),
       prompt: async (input: PromptBody) => {
         promptBodies.push(input)
@@ -81,7 +85,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
           disconnectSession: async () => {},
         },
       }),
-      hooks: args?.hooks ?? (unsafeTestValue({})),
+      hooks: unsafeTestValue(args?.hooks ?? {}),
     })
 
     return { handler, promptAsyncBodies, promptBodies }

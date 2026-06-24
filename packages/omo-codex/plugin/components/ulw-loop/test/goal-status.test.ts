@@ -7,6 +7,7 @@ import {
 	expectedCodexObjective,
 	firstUnresolvedCriterion,
 	hasAllCriteriaPass,
+	hasEssentialCriteriaPass,
 	isFinalRunCompletionCandidate,
 	isUlwLoopDone,
 	ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE,
@@ -270,6 +271,40 @@ describe("hasAllCriteriaPass", () => {
 	it("returns false for empty criteria array", () => {
 		// when
 		const passed = hasAllCriteriaPass(makeGoal({ successCriteria: [] }));
+
+		// then
+		expect(passed).toBe(false);
+	});
+});
+
+describe("hasEssentialCriteriaPass", () => {
+	it("returns true when essential criteria pass and non-essential criteria are pending", () => {
+		// given
+		const goal = makeGoal({
+			successCriteria: [
+				makeCriterion({ id: "C001", status: "pass", essential: true }),
+				makeCriterion({ id: "C002", status: "pending", essential: false }),
+			],
+		});
+
+		// when
+		const passed = hasEssentialCriteriaPass(goal);
+
+		// then
+		expect(passed).toBe(true);
+	});
+
+	it("treats missing essential as fail-safe essential for old plans", () => {
+		// given
+		const goal = makeGoal({
+			successCriteria: [
+				makeCriterion({ id: "C001", status: "pass" }),
+				makeCriterion({ id: "C002", status: "pending" }),
+			],
+		});
+
+		// when
+		const passed = hasEssentialCriteriaPass(goal);
 
 		// then
 		expect(passed).toBe(false);

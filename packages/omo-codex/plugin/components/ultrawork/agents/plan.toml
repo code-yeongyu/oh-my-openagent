@@ -27,7 +27,7 @@ Never plan blind. Fire parallel research BEFORE drafting:
 
 - Spawn parallel read-only subagents for internal-source aspects (codebase patterns, conventions, existing implementations, test infrastructure, naming/registration patterns). One subagent per aspect.
 - Spawn parallel read-only subagents for external-source aspects (official docs, OSS reference implementations, API contracts, RFCs). One subagent per aspect.
-- While they run, use direct read-only tools (`read`, `rg`, `ast_grep_search`, `lsp_*`) for immediate context. Do not idle.
+- While they run, use direct read-only tools (`read`, `rg`, the `ast-grep` skill helper or `sg` CLI, `lsp_*`) for immediate context. Do not idle.
 - The role's own system prompt determines each subagent's output shape. Do not re-specify it; pass only a self-contained `TASK: <question to answer now>`, the minimal context you have, `DELIVERABLE`, and what decision the answer informs.
 - Use `fork_context: false` for research subagents unless full history is truly required. For work likely to exceed one wait cycle, require `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. Use `multi_agent_v1.wait_agent` for mailbox signals, not proof. A timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running; then mark that lane inconclusive and answer from direct evidence or respawn smaller.
 

@@ -6,6 +6,17 @@ export const SPARKSHELL_USAGE = [
   "Runs Sparkshell with a native sidecar when configured, otherwise falls back to raw command execution.",
   "Shell metacharacters are interpreted only with explicit --shell opt-in.",
   "Environment: OMO_SPARKSHELL_BIN selects the native sidecar path.",
+  "When CODEX_THREAD_ID (or OMO_SPARKSHELL_SESSION_ID) identifies a Codex session, recent session context",
+  "is fed to oversized-output condensation for relevance ranking, but is never appended to command output.",
+  "OMO_SPARKSHELL_SESSION_CONTEXT=0 disables that context lookup.",
+  "Oversized output is condensed to a budget (default 20000 chars; --budget <chars> or",
+  "OMO_SPARKSHELL_CONDENSE_BUDGET overrides) preserving error signatures, repeated patterns,",
+  "session-goal matches, and head/tail. OMO_SPARKSHELL_CONDENSE=0 disables condensation.",
+  "Before that deterministic condensation, oversized output is summarized by the spark model",
+  "(codex exec; default gpt-5.3-codex-spark) fed with the session context: the summary reproduces",
+  "the output as-is, unmasked, and ends with a [sparkshell caption] line stating what was omitted.",
+  "OMO_SPARKSHELL_SPARK=0 disables it; OMO_SPARKSHELL_SPARK_MODEL / OMO_SPARKSHELL_SPARK_TIMEOUT_MS /",
+  "OMO_SPARKSHELL_SPARK_BIN tune the invocation. Condensation is the automatic fallback.",
 ].join("\n")
 
 export type SparkShellFallbackInvocation =
@@ -104,6 +115,68 @@ export function hasTopLevelSparkShellHelpFlag(args: readonly string[]): boolean 
     return false
   }
   return false
+}
+
+const MIN_BUDGET_CHARS = 2000
+
+export function parseTopLevelSparkShellBudget(args: readonly string[]): number | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]
+    if (token === "--" ) {
+      return null
+    }
+    if (token === "--json") {
+      continue
+    }
+    if (token === "--budget") {
+      return normalizeBudget(args[index + 1])
+    }
+    if (token?.startsWith("--budget=")) {
+      return normalizeBudget(token.slice("--budget=".length))
+    }
+    return null
+  }
+  return null
+}
+
+function normalizeBudget(rawValue: string | undefined): number | null {
+  if (!rawValue || rawValue.startsWith("-")) {
+    return null
+  }
+  const parsed = Number.parseInt(rawValue, 10)
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    return null
+  }
+  return Math.max(MIN_BUDGET_CHARS, parsed)
+}
+
+export function hasTopLevelSparkShellJsonFlag(args: readonly string[]): boolean {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]
+    if (token === "--") {
+      return false
+    }
+    if (token === "--json") {
+      return true
+    }
+    if (token === "--budget") {
+      const next = args[index + 1]
+      if (!next || next.startsWith("-")) {
+        return false
+      }
+      index += 1
+      continue
+    }
+    if (token?.startsWith("--budget=")) {
+      continue
+    }
+    return false
+  }
+  return false
+}
+
+export function stripTopLevelSparkShellArgs(args: readonly string[]): readonly string[] {
+  return stripSparkShellOptions(args).args
 }
 
 function parseTmuxPaneInvocation(args: readonly string[], commandExists: (command: string) => boolean): SparkShellFallbackInvocation {

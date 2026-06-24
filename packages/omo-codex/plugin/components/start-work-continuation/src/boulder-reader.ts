@@ -1,26 +1,29 @@
-import { isAbsolute, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
-import type { ReadonlyFileSystem } from "./types.js";
+export type PlanChecklist = {
+	readonly completed: number;
+	readonly remaining: number;
+	readonly total: number;
+	readonly nextTaskLabel: string | null;
+};
 
-const CHECKBOX_PATTERN = /^- \[[ xX]\] /;
-const UNCHECKED_PATTERN = /^- \[ \] /;
-const TODO_HEADING = "TODOs";
-const FINAL_VERIFICATION_HEADING = "Final Verification Wave";
-
-type WorkStatus = "active" | "completed" | "paused" | "abandoned";
+type BoulderWorkStatus = "active" | "paused" | "completed" | "abandoned";
 
 type BoulderWork = {
 	readonly activePlan: string;
 	readonly planName: string;
-	readonly status: WorkStatus;
+	readonly status?: BoulderWorkStatus;
+	readonly startedAt?: string;
+	readonly updatedAt?: string;
 	readonly sessionIds: readonly string[];
-	readonly worktreePath: string | null;
+	readonly worktreePath?: string;
 };
 
-export type PlanChecklist = {
-	readonly remaining: number;
-	readonly total: number;
-	readonly nextTaskLabel: string | null;
+type BoulderState = {
+	readonly works: readonly BoulderWork[];
+	readonly mirrorWork: BoulderWork | null;
+	readonly hasWorksMap: boolean;
 };
 
 export type ContinuationState = {
@@ -32,134 +35,216 @@ export type ContinuationState = {
 	readonly checklist: PlanChecklist;
 };
 
-export function parsePlanChecklist(markdown: string): PlanChecklist {
-	const lines = markdown.split(/\r?\n/);
-	const hasCountedSections = lines.some(hasCountedSectionHeading);
-	let remaining = 0;
-	let total = 0;
-	let nextTaskLabel: string | null = null;
-	let isCountedSection = !hasCountedSections;
-	for (const line of lines) {
-		const heading = parseLevelTwoHeading(line);
-		if (heading !== null) isCountedSection = isCountedHeading(heading);
-		if (!isCountedSection) continue;
-		if (!CHECKBOX_PATTERN.test(line)) continue;
-		total += 1;
-		if (!UNCHECKED_PATTERN.test(line)) continue;
-		remaining += 1;
-		if (nextTaskLabel === null) nextTaskLabel = line.slice("- [ ] ".length);
-	}
-	return { remaining, total, nextTaskLabel };
-}
+const TODO_HEADING = "TODOs";
+const FINAL_VERIFICATION_HEADING = "Final Verification Wave";
+const CHECKBOX_PREFIX_LENGTH = "- [ ] ".length;
+const SESSION_ID_PREFIX_PATTERN = /^(codex|opencode):/;
 
-function hasCountedSectionHeading(line: string): boolean {
-	const heading = parseLevelTwoHeading(line);
-	return heading !== null && isCountedHeading(heading);
-}
+export function readContinuationState(cwd: string, sessionId: string): ContinuationState | null {
+	const boulderPath = getBoulderFilePath(cwd);
+	const boulderState = readBoulderState(boulderPath);
+	if (boulderState === null) return null;
 
-export function readContinuationState(
-	cwd: string,
-	sessionId: string,
-	fs: ReadonlyFileSystem,
-): ContinuationState | null {
-	const boulderPath = join(cwd, ".omo", "boulder.json");
-	const boulderText = readTextFile(fs, boulderPath);
-	if (boulderText === null) return null;
-	const parsed = parseJsonObject(boulderText);
-	if (parsed === null) return null;
-	const work = findMatchingWork(parsed, `codex:${sessionId}`);
-	if (work === null) return null;
-	const planPath = resolvePlanPath(cwd, work.activePlan);
-	const planText = readTextFile(fs, planPath);
-	if (planText === null) return null;
-	const checklist = parsePlanChecklist(planText);
+	const work = getWorkForSession(boulderState, normalizeSessionId(sessionId, "codex"));
+	if (work === null || !isContinuableStatus(work.status)) return null;
+
+	const planPath = resolveBoulderPlanPathForWork(cwd, work);
+	const checklist = getPlanChecklist(planPath);
 	if (checklist.remaining === 0) return null;
+
 	return {
 		planName: work.planName,
 		planPath,
 		boulderPath,
 		ledgerPath: join(cwd, ".omo", "start-work", "ledger.jsonl"),
-		worktreePath: work.worktreePath,
+		worktreePath: work.worktreePath ?? null,
 		checklist,
 	};
 }
 
-function findMatchingWork(state: Record<string, unknown>, prefixedSessionId: string): BoulderWork | null {
-	const worksValue = state["works"];
-	const candidates = isRecord(worksValue) ? Object.values(worksValue) : [state];
-	for (const candidate of candidates) {
-		const work = parseBoulderWork(candidate);
-		if (work === null) continue;
-		if (!isContinuableStatus(work.status)) continue;
-		if (work.sessionIds.includes(prefixedSessionId)) return work;
-	}
-	return null;
-}
+export function getPlanChecklist(planPath: string): PlanChecklist {
+	if (!existsSync(planPath)) return emptyChecklist();
 
-function parseBoulderWork(value: unknown): BoulderWork | null {
-	if (!isRecord(value)) return null;
-	const activePlan = value["active_plan"];
-	const planName = value["plan_name"];
-	const status = parseWorkStatus(value["status"]);
-	const sessionIds = value["session_ids"];
-	const worktreePath = value["worktree_path"];
-	if (typeof activePlan !== "string") return null;
-	if (typeof planName !== "string") return null;
-	if (status === null) return null;
-	if (!isStringArray(sessionIds)) return null;
-	return {
-		activePlan,
-		planName,
-		status,
-		sessionIds,
-		worktreePath: typeof worktreePath === "string" ? worktreePath : null,
-	};
-}
-
-function parseWorkStatus(value: unknown): WorkStatus | null {
-	if (value === "active" || value === "completed" || value === "paused" || value === "abandoned") return value;
-	return null;
-}
-
-function isContinuableStatus(status: WorkStatus): boolean {
-	return status === "active" || status === "paused";
-}
-
-function parseLevelTwoHeading(line: string): string | null {
-	if (!line.startsWith("## ")) return null;
-	if (line.startsWith("### ")) return null;
-	return line.slice("## ".length).trim();
-}
-
-function isCountedHeading(heading: string): boolean {
-	return heading === TODO_HEADING || heading === FINAL_VERIFICATION_HEADING;
-}
-
-function resolvePlanPath(cwd: string, activePlan: string): string {
-	return isAbsolute(activePlan) ? activePlan : resolve(cwd, activePlan);
-}
-
-function readTextFile(fs: ReadonlyFileSystem, path: string): string | null {
 	try {
-		return fs.readFileSync(path, "utf8");
+		return parsePlanChecklist(readFileSync(planPath, "utf8"));
+	} catch (error) {
+		if (error instanceof Error) return emptyChecklist();
+		throw error;
+	}
+}
+
+function parsePlanChecklist(markdown: string): PlanChecklist {
+	const lines = markdown.split(/\r?\n/);
+	const hasCountedSections = lines.some((line) => isCountedHeading(parseLevelTwoHeading(line)));
+	let completed = 0;
+	let remaining = 0;
+	let nextTaskLabel: string | null = null;
+	let isCountedSection = !hasCountedSections;
+
+	for (const line of lines) {
+		const heading = parseLevelTwoHeading(line);
+		if (heading !== null) {
+			isCountedSection = isCountedHeading(heading);
+			continue;
+		}
+		if (!isCountedSection) continue;
+
+		const checkbox = parseTopLevelCheckbox(line);
+		if (checkbox === null) continue;
+
+		if (checkbox.checked) {
+			completed += 1;
+		} else {
+			remaining += 1;
+			nextTaskLabel = nextTaskLabel ?? checkbox.label;
+		}
+	}
+
+	return { completed, remaining, total: completed + remaining, nextTaskLabel };
+}
+
+function readBoulderState(path: string): BoulderState | null {
+	try {
+		const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+		return parseBoulderState(parsed);
 	} catch (error) {
 		if (error instanceof Error) return null;
 		throw error;
 	}
 }
 
-function parseJsonObject(json: string): Record<string, unknown> | null {
-	try {
-		const parsed: unknown = JSON.parse(json);
-		return isRecord(parsed) ? parsed : null;
-	} catch (error) {
-		if (error instanceof SyntaxError) return null;
-		throw error;
+function parseBoulderState(value: unknown): BoulderState | null {
+	if (!isRecord(value)) return null;
+
+	const works: BoulderWork[] = [];
+	const worksValue = value["works"];
+	const hasWorksMap = isRecord(worksValue);
+	if (hasWorksMap) {
+		for (const workValue of Object.values(worksValue)) {
+			const work = parseBoulderWork(workValue);
+			if (work !== null) works.push(work);
+		}
 	}
+
+	const mirrorWork = parseBoulderWork(value);
+	if (works.length === 0 && mirrorWork === null) return null;
+	return { works, mirrorWork, hasWorksMap };
 }
 
-function isStringArray(value: unknown): value is readonly string[] {
-	return Array.isArray(value) && value.every((item) => typeof item === "string");
+function parseBoulderWork(value: unknown): BoulderWork | null {
+	if (!isRecord(value)) return null;
+
+	const activePlan = value["active_plan"];
+	const planName = value["plan_name"];
+	if (typeof activePlan !== "string") return null;
+
+	const status = parseBoulderWorkStatus(value["status"]);
+	const sessionIds = parseSessionIds(value["session_ids"]);
+	const worktreePath = value["worktree_path"];
+	const startedAt = value["started_at"];
+	const updatedAt = value["updated_at"];
+
+	return {
+		activePlan,
+		planName: typeof planName === "string" ? planName : activePlan,
+		sessionIds,
+		...(status === undefined ? {} : { status }),
+		...(typeof startedAt === "string" ? { startedAt } : {}),
+		...(typeof updatedAt === "string" ? { updatedAt } : {}),
+		...(typeof worktreePath === "string" ? { worktreePath } : {}),
+	};
+}
+
+function getWorkForSession(state: BoulderState, normalizedSessionId: string): BoulderWork | null {
+	let newestWork: BoulderWork | null = null;
+	let newestWorkMs = 0;
+
+	for (const work of state.works) {
+		if (!work.sessionIds.includes(normalizedSessionId)) continue;
+
+		const workMs = parseIsoToMs(work.updatedAt ?? work.startedAt) ?? 0;
+		if (newestWork === null || workMs > newestWorkMs) {
+			newestWork = work;
+			newestWorkMs = workMs;
+		}
+	}
+
+	if (newestWork !== null) return newestWork;
+	if (state.hasWorksMap) return null;
+	if (state.mirrorWork?.sessionIds.includes(normalizedSessionId) === true) return state.mirrorWork;
+	return null;
+}
+
+function resolveBoulderPlanPathForWork(cwd: string, work: BoulderWork): string {
+	const absolutePlanPath = resolveTrackedPath(cwd, work.activePlan);
+	const worktreePath = work.worktreePath?.trim();
+	if (worktreePath === undefined || worktreePath.length === 0) return absolutePlanPath;
+
+	const relativePlanPath = relative(resolve(cwd), absolutePlanPath);
+	if (relativePlanPath.length === 0 || relativePlanPath.startsWith("..") || isAbsolute(relativePlanPath)) {
+		return absolutePlanPath;
+	}
+
+	const worktreePlanPath = resolve(resolveTrackedPath(cwd, worktreePath), relativePlanPath);
+	return existsSync(worktreePlanPath) ? worktreePlanPath : absolutePlanPath;
+}
+
+function resolveTrackedPath(baseDirectory: string, trackedPath: string): string {
+	return isAbsolute(trackedPath) ? resolve(trackedPath) : resolve(baseDirectory, trackedPath);
+}
+
+function parseTopLevelCheckbox(line: string): { readonly checked: boolean; readonly label: string } | null {
+	if (line.startsWith("- [ ] ")) return { checked: false, label: line.slice(CHECKBOX_PREFIX_LENGTH) };
+	if (line.startsWith("- [x] ") || line.startsWith("- [X] ")) {
+		return { checked: true, label: line.slice(CHECKBOX_PREFIX_LENGTH) };
+	}
+	return null;
+}
+
+function parseLevelTwoHeading(line: string): string | null {
+	if (!line.startsWith("## ")) return null;
+	return line.slice("## ".length).trim();
+}
+
+function isCountedHeading(heading: string | null): boolean {
+	return heading === TODO_HEADING || heading === FINAL_VERIFICATION_HEADING;
+}
+
+function parseBoulderWorkStatus(value: unknown): BoulderWorkStatus | undefined {
+	if (value === "active" || value === "paused" || value === "completed" || value === "abandoned") return value;
+	return undefined;
+}
+
+function parseSessionIds(value: unknown): readonly string[] {
+	if (!Array.isArray(value)) return [];
+	const sessionIds: string[] = [];
+	for (const item of value) {
+		if (typeof item === "string") sessionIds.push(normalizeSessionId(item));
+	}
+	return sessionIds;
+}
+
+function normalizeSessionId(sessionId: string, platform: "codex" | "opencode" = "opencode"): string {
+	if (SESSION_ID_PREFIX_PATTERN.test(sessionId)) return sessionId;
+	return `${platform}:${sessionId}`;
+}
+
+function parseIsoToMs(value: string | undefined): number | null {
+	if (value === undefined) return null;
+	const parsed = Date.parse(value);
+	return Number.isNaN(parsed) ? null : parsed;
+}
+
+function isContinuableStatus(status: BoulderWorkStatus | undefined): boolean {
+	return status === "active" || status === "paused";
+}
+
+function getBoulderFilePath(cwd: string): string {
+	return join(cwd, ".omo", "boulder.json");
+}
+
+function emptyChecklist(): PlanChecklist {
+	return { completed: 0, remaining: 0, total: 0, nextTaskLabel: null };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

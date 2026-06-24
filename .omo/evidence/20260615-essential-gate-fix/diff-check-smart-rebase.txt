@@ -1,0 +1,28 @@
+COMMAND: git status --short --branch
+## fix/lazycodex-final-gate-followup...origin/fix/lazycodex-final-gate-followup [ahead 1]
+ M .omo/evidence/20260615-essential-gate-fix/biome.txt
+ M .omo/evidence/20260615-essential-gate-fix/component-test.txt
+ M .omo/evidence/20260615-essential-gate-fix/diff-check-smart-rebase.txt
+ M .omo/evidence/20260615-essential-gate-fix/focused-tests.txt
+ M .omo/evidence/20260615-essential-gate-fix/isolated-install.txt
+ M .omo/evidence/20260615-essential-gate-fix/loc.txt
+ M .omo/evidence/20260615-essential-gate-fix/plugin-check.txt
+ M .omo/evidence/20260615-essential-gate-fix/test-codex.txt
+ M .omo/evidence/20260615-essential-gate-fix/tmux-smoke.txt
+ M .omo/evidence/20260615-essential-gate-fix/verification.txt
+
+COMMAND: git rev-parse HEAD
+ab880e862d7dbfb76aec460b2440c8109b92b490
+
+COMMAND: git diff --check
+working_git_diff_check_exit=0
+
+COMMAND: git diff --check origin/dev...HEAD
+origin_dev_range_diff_check_exit=0
+
+COMMAND: stale slop scan
+packages/omo-codex/plugin/components/ulw-loop/test/package-smoke.test.ts:1:// biome-ignore-all format: smoke test pulls verbatim JSON for structural assertion.
+
+COMMAND: evidence secret/path scan
+
+EXIT_CODE=0

@@ -49,7 +49,7 @@ flowchart TB
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
-        Frontend[" visual-engineering<br/>(category + frontend-ui-ux)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -66,7 +66,7 @@ flowchart TB
     Orchestrator -->|"task(subagent_type=oracle)"| Oracle
     Orchestrator -->|"call_omo_agent(subagent_type=explore)"| Explore
     Orchestrator -->|"call_omo_agent(subagent_type=librarian)"| Librarian
-    Orchestrator -->|"task(category=visual-engineering, load_skills=[frontend-ui-ux])"| Frontend
+    Orchestrator -->|"task(category=visual-engineering, load_skills=[frontend])"| Frontend
 
     Junior -->|"Results + Learnings"| Orchestrator
     Oracle -->|"Advice"| Orchestrator
@@ -75,7 +75,7 @@ flowchart TB
     Frontend -->|"UI code"| Orchestrator
 ```
 
-Model labels above show the current fallback stacks from `src/shared/model-requirements.ts`, not marketing names.
+Model labels above show the current fallback stacks from `packages/omo-opencode/src/shared/model-requirements.ts`, not marketing names.
 
 ### Agent Inventory and Modes (Current)
 
@@ -324,7 +324,7 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 Notes:
 
-- Built-in defaults are defined in `src/tools/delegate-task/*-categories.ts` and `src/shared/model-requirements.ts`
+- Built-in defaults are defined in `packages/omo-opencode/src/tools/delegate-task/*-categories.ts` and `packages/omo-opencode/src/shared/model-requirements.ts`
 - Projects/users can extend categories via config; additional category names may appear in your session prompt
 - Regardless of category name, category dispatch goes through Sisyphus-Junior
 
@@ -336,7 +336,7 @@ Skills prepend specialized instructions to subagent prompts:
 // Category + Skill combination
 task(
   (category = "visual-engineering"),
-  (load_skills = ["frontend-ui-ux"]), // Adds UI/UX expertise
+  (load_skills = ["frontend"]), // Adds UI/UX expertise
   (prompt = "..."),
 );
 

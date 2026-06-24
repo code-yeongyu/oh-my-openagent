@@ -1,10 +1,1 @@
-import type { BrowserAutomationProvider, GitMasterConfig } from "../../config/schema"
-
-export interface SkillResolutionOptions {
-	gitMasterConfig?: GitMasterConfig
-	browserProvider?: BrowserAutomationProvider
-	disabledSkills?: Set<string>
-	teamModeEnabled?: boolean
-	/** Project directory to discover project-level skills from. Falls back to process.cwd() if not provided. */
-	directory?: string
-}
+export * from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-resolution-options"

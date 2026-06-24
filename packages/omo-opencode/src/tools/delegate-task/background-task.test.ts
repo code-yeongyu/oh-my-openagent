@@ -25,7 +25,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("does not emit synthetic pending session metadata when session id is unresolved", async () => {
     //#given - launched task without resolved subagent session id
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     const manager = {
       launch: async () => ({
         id: "bg_unresolved",
@@ -47,7 +47,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_1",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -68,7 +68,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("emits task metadata session_id when real session id is available", async () => {
     //#given - launched task with resolved subagent session id
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     const manager = {
       launch: async () => ({
         id: "bg_resolved",
@@ -90,7 +90,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_2",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -159,7 +159,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("captures late-resolved session id and emits synced metadata", async () => {
     //#given - background task session id appears after launch via manager polling
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     let reads = 0
     const manager = {
       launch: async () => ({
@@ -185,7 +185,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_3",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -208,9 +208,9 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("passes question-deny session permission when launching delegate task", async () => {
     //#given - delegate task background launch should deny question at session creation time
-    const launchCalls: any[] = []
+    const launchCalls: Array<{ sessionPermission: unknown }> = []
     const manager = {
-      launch: async (input: any) => {
+      launch: async (input: { sessionPermission: unknown }) => {
         launchCalls.push(input)
         return {
           id: "bg_permission",
@@ -298,7 +298,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("keeps launched background task alive when parent aborts before session id resolves", async () => {
     //#given - parallel tool execution can abort the parent call after launch succeeds
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     const abortController = new AbortController()
     const manager = {
       launch: async () => ({
@@ -325,7 +325,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_abort_after_launch",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: abortController.signal,
       },
       { manager },
@@ -439,7 +439,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
   testFn("reports failure when manager marks task as error during session startup", async () => {
     //#given - session created but startTask throws before prompt is sent
-    const metadataCalls: any[] = []
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
     let reads = 0
     const manager = {
       launch: async () => ({
@@ -469,7 +469,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         sessionID: "ses_parent",
         callID: "call_crash",
-        metadata: async (value: any) => metadataCalls.push(value),
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
         abort: new AbortController().signal,
       },
       { manager },
@@ -608,5 +608,47 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then
     expectFn(launchCalls).toHaveLength(1)
     expectFn(launchCalls[0].agent).toBe("Hephaestus - Deep Agent")
+  })
+
+  testFn("does not advertise background_output CTA in launch return (issue #5221)", async () => {
+    //#given - a successful launch
+    const manager = {
+      launch: async () => ({
+        id: "bg_cta_check",
+        sessionId: "ses_cta_check",
+        description: "CTA check",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionId: "ses_cta_check" }),
+    }
+
+    //#when
+    const result = await executeBackgroundTask(
+      {
+        description: "CTA check",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_cta",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_cta" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - no polling CTA, anti-polling instruction preserved
+    expectFn(result).not.toContain("Use `background_output` with task_id=")
+    expectFn(result).not.toContain("to check.")
+    expectFn(result).toContain("Do NOT call background_output now")
+    expectFn(result).toContain("<system-reminder>")
   })
 })

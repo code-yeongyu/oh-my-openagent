@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -10,14 +10,6 @@ import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import { createRuntimeState, loadRuntimeState } from "../team-state-store/store"
 import type { TeamSpec } from "../types"
 import { sendMessage } from "./send"
-
-let ackCallCount = 0
-
-mock.module("./ack", () => ({
-  ackMessages: async () => {
-    ackCallCount += 1
-  },
-}))
 
 const { pollAndBuildInjection } = await import("./poll")
 const { getInboxDir, resolveBaseDir } = await import("../team-registry/paths")
@@ -46,14 +38,6 @@ async function setupRuntime(memberNames: string[]): Promise<{ teamRunId: string;
   const runtimeState = await createRuntimeState(spec, "lead-session", "project", config)
   return { teamRunId: runtimeState.teamRunId, config }
 }
-
-afterEach(() => {
-  ackCallCount = 0
-})
-
-afterAll(() => {
-  mock.restore()
-})
 
 describe("pollAndBuildInjection", () => {
   test("prevents duplicate injection in the same turn marker", async () => {
@@ -165,8 +149,6 @@ describe("pollAndBuildInjection", () => {
       injected: true,
       messageIds: [firstMessageId, secondMessageId],
     })
-    expect(ackCallCount).toBe(0)
-
     const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "m1"))
     expect(inboxEntries).toContain(`${firstMessageId}.json`)
     expect(inboxEntries).toContain(`${secondMessageId}.json`)

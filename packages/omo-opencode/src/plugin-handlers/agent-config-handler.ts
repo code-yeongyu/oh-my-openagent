@@ -1,4 +1,5 @@
 import { createBuiltinAgents } from "../agents";
+import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import { isTaskSystemEnabled } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { assembleAgentConfig } from "./agent-config-assembly";
@@ -18,7 +19,7 @@ export async function applyAgentConfig(
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
-  const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
+  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
   const useTaskSystem = isTaskSystemEnabled(params.pluginConfig);
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
   const builtinAgents = await createBuiltinAgents(

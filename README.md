@@ -114,7 +114,7 @@ Install oh-my-openagent. Type `ultrawork`. Done.
 oh-my-openagent ships in two editions of the same product:
 
 - **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, ulw-loop, ultrawork, hashline edits — everything.
-- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `ast_grep`, `grep_app`, `context7`, `git_bash`, and `lsp`. No agent orchestration and no `team_*` tools — Codex CLI's own surface does that work.
+- **Light Edition (omo for Codex CLI)** — the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `start-work-continuation`, and `telemetry`, plus plugin-scoped MCPs for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. No agent orchestration and no `team_*` tools — Codex CLI's own surface does that work.
 
 Pick the edition(s) you want.
 
@@ -360,7 +360,7 @@ Skills aren't just prompts. Each brings:
 - Embedded MCP servers, on demand.
 - Scoped permissions so agents stay in bounds.
 
-Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend-ui-ux` (design-first UI).
+Built-ins: `playwright` (browser automation), `git-master` (atomic commits, rebase surgery), `frontend` (design-first UI).
 
 Add your own under `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*/SKILL.md`.
 

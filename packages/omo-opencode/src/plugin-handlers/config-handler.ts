@@ -11,6 +11,12 @@ import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
 import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
+import {
+  clearRegisteredAgentNames,
+  registerAgentName,
+} from "../features/claude-code-session-state";
+import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
+import { getConfiguredDefaultAgent } from "./agent-config-assembly";
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -33,8 +39,57 @@ export interface ConfigHandlerDeps {
   runtimeSkillSourceUrl?: string;
 }
 
+type AgentConfigSnapshot = {
+  readonly cacheKey: string;
+  readonly configuredDefaultAgent: string | undefined;
+  readonly defaultAgent: unknown;
+  readonly agents: Record<string, unknown>;
+}
+
+function cloneConfigValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(cloneConfigValue)
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneConfigValue(entry)]),
+    )
+  }
+
+  return value
+}
+
+function cloneAgentConfig(agents: Record<string, unknown>): Record<string, unknown> {
+  return cloneConfigValue(agents) as Record<string, unknown>
+}
+
+function createAgentConfigCacheKey(config: Record<string, unknown>): string {
+  return JSON.stringify({
+    agent: config.agent,
+    default_agent: config.default_agent,
+    model: config.model,
+    skills: config.skills,
+  })
+}
+
+function replayAgentConfigSideEffects(params: {
+  agentResult: Record<string, unknown>;
+  configuredDefaultAgent: string | undefined;
+  defaultAgent: unknown;
+}): void {
+  if (params.configuredDefaultAgent && typeof params.defaultAgent === "string") {
+    setDefaultAgentForSort(params.defaultAgent)
+  }
+  clearRegisteredAgentNames()
+  for (const name of Object.keys(params.agentResult)) {
+    registerAgentName(name)
+  }
+}
+
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState, runtimeSkillSourceUrl } = deps;
+  let agentConfigSnapshot: AgentConfigSnapshot | undefined;
 
   return async (config: Record<string, unknown>) => {
     const formatterConfig = config.formatter;
@@ -48,15 +103,40 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     clearFormatterCache()
 
     const pluginComponents = await loadPluginComponents({ pluginConfig });
+    const pluginComponentsLoadFailed = pluginComponents.retryableLoadFailure === true;
 
     applyHookConfig({ pluginComponents });
 
-    const agentResult = await applyAgentConfig({
-      config,
-      pluginConfig,
-      ctx,
-      pluginComponents,
-    });
+    const agentCacheKey = createAgentConfigCacheKey(config);
+    let agentResult: Record<string, unknown>;
+    if (!pluginComponentsLoadFailed && agentConfigSnapshot?.cacheKey === agentCacheKey) {
+      config.agent = cloneAgentConfig(agentConfigSnapshot.agents);
+      if (agentConfigSnapshot.defaultAgent !== undefined) {
+        config.default_agent = agentConfigSnapshot.defaultAgent;
+      }
+      agentResult = config.agent as Record<string, unknown>;
+      replayAgentConfigSideEffects({
+        agentResult,
+        configuredDefaultAgent: agentConfigSnapshot.configuredDefaultAgent,
+        defaultAgent: config.default_agent,
+      })
+    } else {
+      const configuredDefaultAgent = getConfiguredDefaultAgent(config);
+      agentResult = await applyAgentConfig({
+        config,
+        pluginConfig,
+        ctx,
+        pluginComponents,
+      });
+      agentConfigSnapshot = pluginComponentsLoadFailed
+        ? undefined
+        : {
+            cacheKey: agentCacheKey,
+            configuredDefaultAgent,
+            defaultAgent: config.default_agent,
+            agents: cloneAgentConfig(agentResult),
+          };
+    }
 
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });

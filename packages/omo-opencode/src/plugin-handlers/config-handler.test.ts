@@ -1408,6 +1408,63 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     })
   })
 
+  test("retries plugin component loading after an empty fallback failure", async () => {
+    //#given
+    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    let attempts = 0
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(async () => {
+      attempts += 1
+      if (attempts === 1) {
+        throw new Error("transient")
+      }
+      return {
+        commands: { "retry-cmd": { name: "retry-cmd", description: "test", template: "test" } },
+        skills: {},
+        agents: {
+          "retry-agent": {
+            name: "retry-agent",
+            description: "Recovered plugin agent",
+            prompt: "Plugin agent recovered after retry",
+            mode: "subagent",
+          },
+        },
+        mcpServers: {},
+        hooksConfigs: [],
+        plugins: [{ name: "retry-plugin", version: "1.0.0", scope: "project", installPath: "/tmp/retry-plugin", pluginKey: "retry-plugin" }],
+        errors: [],
+      }
+    })
+    const pluginConfig = createPluginConfig({})
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+    const firstConfig: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const secondConfig: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+
+    //#when
+    await handler(firstConfig)
+    await handler(secondConfig)
+
+    //#then
+    expect(attempts).toBe(2)
+    expect((firstConfig.command as Record<string, unknown>)["retry-cmd"]).toBeUndefined()
+    expect((secondConfig.command as Record<string, unknown>)["retry-cmd"]).toBeDefined()
+    expect((firstConfig.agent as Record<string, unknown>)["retry-agent"]).toBeUndefined()
+    expect((secondConfig.agent as Record<string, unknown>)["retry-agent"]).toBeDefined()
+  })
+
   test("passes through plugin data on successful load (identity test)", async () => {
     //#given
     ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
