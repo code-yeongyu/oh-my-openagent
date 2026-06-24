@@ -30,6 +30,22 @@ Example: "A quiet command center. Dense when needed, spacious when not.
 The signature is muted depth — surfaces separated by subtle tonal shifts
 rather than borders, creating layers you feel more than see."
 
+### Aesthetic Intent Brief
+
+Every non-trivial visual surface must turn user intent into observable design targets before component budgeting starts.
+
+| Field | Required answer | Why it matters |
+| --- | --- | --- |
+| Surface intent | `operational`, `commercial`, `campaign`, or `translation` | Sets how strictly reusable-component governance applies. |
+| Target emotion | 2-3 words such as calm authority, kinetic urgency, luxurious trust | Prevents generic "nice UI" decisions. |
+| Signature visual idea | One memorable visual metaphor or spatial system | Creates a recognizable design instead of interchangeable AI output. |
+| Attention path | First 3 seconds: what the eye sees first, second, and third | Makes hierarchy measurable during QA. |
+| Motion role | none, state feedback, spatial orientation, storytelling, or spectacle | Distinguishes useful motion from decoration. |
+| Bespoke visual layer | Custom 3D, illustration, shader-like background, scroll scene, kinetic type, or none | Names what may intentionally sit outside reusable component budgets. |
+| Reusable primitive boundary | Which controls, cards, forms, icons, nav, and data displays still follow Section 5 | Keeps expressive surfaces from becoming unmanaged component drift. |
+
+Operational surfaces optimize clarity, speed, and consistency. Commercial surfaces balance conversion and reuse. Campaign surfaces optimize emotion and memorability first, then reuse only the interaction primitives. Translation surfaces start expressive, then collapse repeated controls back into the system.
+
 ## 2. Color
 
 ### Palette
@@ -116,17 +132,55 @@ All spacing derives from a base of **4px**.
 Document reusable patterns before implementation for greenfield work, and as they emerge or are extracted for existing work. Format:
 
 ### [Component Name]
+- **Budget area**: component reuse budget row this belongs to
 - **Structure**: HTML/JSX outline
-- **Variants**: list
+- **Variants**: list and count
+- **Allowed variants**: named variants that can be reused
+- **Variant count**: current count against the variant budget
 - **Spacing**: which tokens
 - **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
 - **Motion**: entry/exit animations
+- **Reuse rule**: when to reuse this component instead of creating another
 
 Greenfield starts with the primitives you are about to build, assembled from
 the selected references' component anatomy and adapted to the user's product.
 Existing projects start with components used 2+ times or already shared in
 code; do not invent future components just to fill the section.
+
+### Reuse Budget
+
+The Component reuse budget is part of Section 5, not a separate control file. Use it to prevent uncontrolled design-system growth before code is written. Numbers below are conservative agent-governance defaults: some are backed by published design-system limits, while reuse percentages and per-PR growth caps are pragmatic local controls.
+
+Treat these rows as governance defaults, not literal naming mandates. When a project `DESIGN.md` already names variants such as `panel`, `metric`, or `alert`, those project-local names are authoritative; compare count, behavior, and semantic fit instead of replacing them with the example names below.
+
+Bespoke visual layers declared in Section 1 are not automatically reusable components. A scroll-linked 3D object, hero-only shader, campaign illustration, or kinetic typography treatment stays outside this budget unless it repeats across surfaces, becomes interactive UI, or needs product-state variants.
+
+| Area | Budget | Current | Owner section | Rule |
+| --- | ---: | ---: | --- | --- |
+| Component reuse budget | 80% semantic/behavior match requires reuse | 0 | Section 5 | Reuse existing primitives when they cover at least 80% of the need; create only for a semantic or behavioral gap. |
+| Variant budget | 3 visual variants per component family by default | 0 | Section 5 | A fourth variant requires a documented product need and budget update. |
+| Token budget | 3 repeated uses or a documented semantic role before adding a token; review PRs adding 12+ semantic tokens | 0 | Sections 2/3/4/7 | Prefer existing color, type, spacing, radius, shadow, and motion tokens. |
+| Color budget | 5 brand/accent families plus neutrals, 6 state families, 26 semantic role aliases maximum without explicit justification | 0 | Section 2 | Add semantic roles, not one-off hex values. |
+| Icon budget | 1 primary icon family; size slots 16, 20, 24, 32; max 2 icon sizes per component | 0 | Section 5 | Custom icons require a documented library gap; do not model different glyphs as variants. |
+| Button budget | 5 intents, 3 sizes, 3 buttons per action group | 0 | Section 5 | Intents: primary, secondary/default, tertiary/ghost/link, danger/destructive, inverse/special-background. |
+| Form budget | 2 columns desktop, 1 mobile; 8 field primitive groups; validation states default/error/success | 0 | Section 5 | Reuse field, label, hint, help, and validation patterns before custom form UI; new input types inside the same field shell do not require a new primitive unless they introduce distinct composite behavior such as a calendar popover or date-range picker. |
+| Card budget | 3 card variants | 0 | Section 5 | Elevated, filled, outlined; cards represent one subject and nested cards need justification. |
+| Layout budget | 5 shared breakpoints | 0 | Section 4 | Use shared mobile/tablet/desktop/wide regimes instead of page-specific breakpoints. |
+| Spacing budget | 2/4/8-derived scale; max 8 component-local values and 12 global steps unless justified | 0 | Section 4 | No ad-hoc px values when a token exists. |
+| Radius budget | 3 radius values | 0 | Section 7 | Small/default/full or documented equivalents. |
+| Shadow budget | 3 elevation levels | 0 | Section 7 | Must match the chosen depth strategy. |
+
+### reviewer checklist
+
+- [ ] Component reuse budget checked before creating a new component.
+- [ ] Variant budget checked before adding another visual or structural variant.
+- [ ] Token budget checked before adding color, spacing, radius, shadow, typography, or motion tokens.
+- [ ] Icon budget checked before adding a custom SVG or second icon family.
+- [ ] Button budget checked before adding a fourth style, fourth size, or crowded action group.
+- [ ] Form budget checked before creating custom field, validation, or layout patterns.
+- [ ] Card budget checked before adding new card shells or nested cards.
+- [ ] Pragmatic thresholds are described as local governance defaults, not universal industry standards.
 
 ## 6. Motion & Interaction
 
@@ -144,6 +198,8 @@ code; do not invent future components just to fill the section.
 - Every interactive element has hover + active + focus states.
 - Scroll-triggered animations use `IntersectionObserver`, not scroll listeners.
 - Reduced motion: respect `prefers-reduced-motion` — disable non-essential animation.
+- Motion must match the Section 1 motion role. State feedback stays subtle; spatial orientation may guide navigation; storytelling and spectacle are reserved for commercial, campaign, and translation surfaces.
+- 3D, parallax, scroll-linked, or shader-like effects need a fallback that preserves content, hierarchy, and interaction when motion is reduced or unsupported.
 
 ## 7. Depth & Surface
 
@@ -197,14 +253,18 @@ After every component implementation, check:
 - [ ] Interactive elements have all required states from Section 5 and Section 6.
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
+- [ ] Component reuse budget, Variant budget, Token budget, Icon budget, Button budget, Form budget, and Card budget checked before adding new primitives.
+- [ ] No second icon family, fourth button variant, fourth card variant, new semantic color, new radius, new shadow, or new spacing step without a documented Section 5 budget update.
 - [ ] Motion follows the timing table. No arbitrary durations.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
+- [ ] Section 1 aesthetic intent is visible: target emotion, signature visual idea, attention path, motion role, bespoke visual layer, and reusable primitive boundary all match the implementation.
 
 ## Memory Management
 
 ### When to UPDATE DESIGN.md
 
 - New reusable component emerges (used 2+ times) → add to Section 5
+- Budget expansion is required by a real product need → update Section 5 with the new number, rationale, and whether the number is externally supported or a pragmatic local default
 - Color added to serve a genuine new semantic role → add to Section 2
 - Spacing token insufficient for a real need → add to Section 4
 - User explicitly changes direction ("make it warmer", "go brutalist")
@@ -217,4 +277,4 @@ After every component implementation, check:
 
 ### Discipline
 
-The design system that grows every week is dying. The one that holds its size or shrinks is getting sharper. Every addition must justify itself by removing ambiguity, not adding options.
+The design system that grows every week is dying. The one that holds its size or shrinks is getting sharper. Every addition must justify itself by removing ambiguity, not adding options. Budgets should hold steady or shrink through consolidation; expanding them is a design decision that requires evidence, not a convenience for one screen.

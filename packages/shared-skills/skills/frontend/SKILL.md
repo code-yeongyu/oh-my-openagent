@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "MUST USE for ANY frontend, web UI, UX, or visual work — building, styling, or redesigning pages/components, React project setup, performance audits, design QA. Routes four rulesets: design (anti-slop taste router over 12 taste skills + 69 brand DESIGN.md refs — Apple, Stripe, Linear, Notion, Vercel, Claude, Nike — plus React dev tooling gate: react-grab, react-scan, react-doctor), perfection (Lighthouse 100 in every category via real Playwright Chromium audits, NEVER the lighthouse CLI, never by weakening UX), ui-ux-db (searchable 50+ styles, 97 palettes, 57 font pairings, 99 UX guidelines), designpowers (design operating layer, personas, accessibility, critique, debt, handoff, and role-reference guidance). Triggers: frontend, UI, UX, design, redesign, styling, layout, animation, motion, taste, premium, luxury, minimal, brutalist, Awwwards, anti-slop, polish, DESIGN.md, mockup, react setup, react-scan, react-doctor, lighthouse, performance, Core Web Vitals, LCP, CLS, INP, SEO, accessibility, a11y, WCAG, audit my site, make this faster, color palette, font pairing, looks generic, make it pretty, like X brand."
+description: "MUST USE for ANY frontend, web UI, UX, or visual work — building, styling, or redesigning pages/components, React project setup, performance audits, design QA. Routes four rulesets: design (anti-slop taste router over 12 taste skills + 69 brand DESIGN.md refs — Apple, Stripe, Linear, Notion, Vercel, Claude, Nike — plus numeric reuse governance for tokens, variants, icons, buttons, forms, cards, layouts, expressive surface intent, and React dev tooling gate: react-grab, react-scan, react-doctor), perfection (Lighthouse 100 in every category via real Playwright Chromium audits, NEVER the lighthouse CLI, never by weakening UX), ui-ux-db (searchable 50+ styles, 97 palettes, 57 font pairings, 99 UX guidelines), designpowers (design operating layer, personas, accessibility, critique, debt, handoff, and role-reference guidance). Triggers: frontend, UI, UX, design, redesign, styling, layout, animation, motion, taste, premium, luxury, minimal, brutalist, Awwwards, anti-slop, polish, DESIGN.md, mockup, react setup, react-scan, react-doctor, lighthouse, performance, Core Web Vitals, LCP, CLS, INP, SEO, accessibility, a11y, WCAG, audit my site, make this faster, color palette, font pairing, looks generic, make it pretty, like X brand."
 ---
 
 # Frontend
@@ -11,7 +11,7 @@ This file is a router, not a rulebook. The rules live in four rulesets under `re
 
 | Request involves… | Read |
 |---|---|
-| ANY UI implementation, styling, redesign, mockup, or visual decision | `references/design/README.md` FIRST. It enforces two mandatory gates — the Design System Gate (a `DESIGN.md` must exist before any component is written) and the React Dev Tooling Gate (react-grab / react-scan / react-doctor installed by default) — then routes to the taste and brand references below. |
+| ANY UI implementation, styling, redesign, mockup, or visual decision | `references/design/README.md` FIRST. It enforces the Design System Gate (a `DESIGN.md` must exist before any component is written), numeric reuse governance, surface-intent routing, and the React Dev Tooling Gate (react-grab / react-scan / react-doctor installed by default) before routing to the taste and brand references below. |
 | Writing or modifying frontend code, OR auditing performance / SEO / accessibility / quality | ALSO `references/perfection/README.md`. Lighthouse 100 in every category, measured on real Playwright Chromium (never the `lighthouse` CLI), achieved through architecture — never by dropping animations or hiding content. |
 | Looking up a concrete style, color palette, font pairing, chart type, landing-page structure, or UX guideline — or generating a project design system from keywords | `references/ui-ux-db/README.md`. A searchable CSV database with a CLI; a lookup tool, not a posture. Load on demand; `design` stays the source of truth for taste and the `DESIGN.md` contract. |
 | Design operating-layer work: personas, cognitive accessibility, design critique, design debt, handoff, synthetic user testing, or designpowers-style guidance | `references/designpowers/README.md`. This is an internal frontend ruleset, not a separate skill. It enriches `/frontend` routing with design brief, role-reference, accessibility, evidence, and debt language while preserving the `design` and `perfection` gates. |
@@ -36,7 +36,7 @@ The reference library has one architecture file, 12 taste skills (Layer A — *h
 
 | File | Read when |
 |---|---|
-| `design-system-architecture.md` | The project has no `DESIGN.md` (defines the 7-section structure you must create first), or you are extracting a design system from existing UI code. |
+| `design-system-architecture.md` | The project has no `DESIGN.md` (defines the 7-section structure, reuse budget ledger, and reviewer checklist you must create first), or you are extracting a design system from existing UI code. |
 
 ### Layer A — taste skills (pick AT MOST ONE style skill; they encode opposing philosophies)
 
@@ -111,6 +111,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 ## Shared axioms (all four rulesets agree — apply always)
 
 - **No design system = no UI work.** `DESIGN.md` exists before components do; every color, font size, and spacing value traces back to a token in it.
+- **Reuse budget is part of the design system.** Components, variants, icon families, button styles, form controls, cards, shadows, radii, spacing steps, semantic colors, and layouts must stay within the numeric reuse governance declared in `DESIGN.md`; extend that budget before exceeding it.
 - **Never weaken UX to buy points.** No dropping animations, hiding content, or simplifying interactions for a score or a deadline.
 - **No emojis as icons.** SVG icon sets only (Lucide, Heroicons, Radix, Phosphor).
 - **GPU-composited animation only** — `transform`, `opacity`, `filter`; never animate layout properties.
