@@ -128,6 +128,26 @@ describe("mcp stdio proxy", () => {
 		}
 	});
 
+	it("#given a live proxy #when stdin is destroyed mid-session #then the proxy resolves instead of hanging", async () => {
+		const paths = tempPaths();
+		const input = new PassThrough();
+		const out: string[] = [];
+		const proxy = runMcpStdioProxy({
+			input,
+			output: collectingWritable(out),
+			paths,
+			ensure: noSpawn,
+		});
+
+		input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })}\n`);
+		await new Promise((r) => setTimeout(r, 50));
+		input.destroy();
+
+		await proxy;
+		const responses = parseResponses(out);
+		expect((responses[0]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
+	});
+
 	it("#given an unreachable daemon #when several tools are proxied #then each gets a structured error and the proxy keeps serving", async () => {
 		const paths = tempPaths();
 		const out: string[] = [];

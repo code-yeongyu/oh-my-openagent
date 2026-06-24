@@ -32,16 +32,35 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 	const context = options.context ?? currentRequestContext();
 	const callOptions: CallToolOptions = { paths, context, ...(options.ensure ? { ensure: options.ensure } : {}) };
 
-	await runJsonRpcStdioServer({
-		input,
-		output,
-		idleTimeoutMs: 0,
-		handler: handleProxyRequest,
-		handlerOptions: callOptions,
-		onHandlerError: (error: unknown) => {
-			process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
-		},
-	});
+	// Prevent orphan: force-exit when stdin closes (parent died) or the server
+	// loop returns, since dangling daemon sockets can keep the event loop alive.
+	const isRealStdin = input === process.stdin;
+	if (isRealStdin) {
+		input.on("close", () => {
+			process.exitCode = 0;
+			setTimeout(() => process.exit(0), 500).unref();
+		});
+	}
+
+	try {
+		await runJsonRpcStdioServer({
+			input,
+			output,
+			idleTimeoutMs: 0,
+			handler: handleProxyRequest,
+			handlerOptions: callOptions,
+			onHandlerError: (error: unknown) => {
+				process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
+			},
+		});
+	} catch (error: unknown) {
+		// Stream destroyed (parent killed) → ERR_STREAM_PREMATURE_CLOSE; expected.
+		if (!isPrematureClose(error)) throw error;
+	}
+
+	if (isRealStdin) {
+		process.exit(0);
+	}
 }
 
 async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions): Promise<JsonRpcResponse | undefined> {
@@ -50,6 +69,10 @@ async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions)
 
 	const result = await callToolViaDaemon(toolCall.name, toolCall.args, callOptions);
 	return successResponse(toolCall.id, { content: result.content, isError: result.isError ?? false, details: result.details });
+}
+
+function isPrematureClose(error: unknown): boolean {
+	return error instanceof Error && (error as NodeJS.ErrnoException).code === "ERR_STREAM_PREMATURE_CLOSE";
 }
 
 function asToolCall(parsed: unknown): ToolCall | null {
