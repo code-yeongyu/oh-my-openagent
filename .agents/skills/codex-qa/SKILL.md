@@ -69,7 +69,8 @@ Windows.
 | `scripts/hook-unit-probe.sh` | the `ultrawork` component injects `<ultrawork-mode>` on an `ulw` UserPromptSubmit (also a manual `--component/--event` mode) |
 | `scripts/tui-smoke.sh` | the real codex TUI boots in the isolated home, renders, and survives (no early exit); captures the pane |
 
-When TUI visual QA evidence is needed, do not stop at the raw pane. Replay the
+When TUI visual QA evidence is needed, follow
+`docs/reference/web-terminal-visual-qa.md` and do not stop at the raw pane. Replay the
 captured pane through the repository web-terminal helper so the PR can attach a
 stable browser screenshot:
 
