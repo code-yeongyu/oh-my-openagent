@@ -20,6 +20,7 @@ import type { RalphLoopHook } from "../ralph-loop"
 import { isNonOmoAgent, isPlannerAgent } from "./constants"
 import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
+import { VOICE_INTENT_SENTINEL_REGEX, detectAndStripVoiceIntent } from "./voice-intent"
 
 const defaultModeUltraworkInjectedSessions = new Set<string>()
 
@@ -73,6 +74,19 @@ export function createKeywordDetectorHook(
       }
 
       const promptText = extractPromptText(output.parts)
+
+      if (VOICE_INTENT_SENTINEL_REGEX.test(promptText)) {
+        const textPartIndexForStrip = output.parts.findIndex(isRealUserTextPart)
+        if (textPartIndexForStrip !== -1) {
+          const originalText = output.parts[textPartIndexForStrip].text ?? ""
+          const { text: stripped } = detectAndStripVoiceIntent(originalText)
+          output.parts[textPartIndexForStrip].text = stripped
+        }
+        log(`[keyword-detector] Voice intent sentinel detected, suppressing all keyword injection`, {
+          sessionID: input.sessionID,
+        })
+        return
+      }
 
       if (isSystemDirective(promptText)) {
         log(`[keyword-detector] Skipping system directive message`, { sessionID: input.sessionID })
