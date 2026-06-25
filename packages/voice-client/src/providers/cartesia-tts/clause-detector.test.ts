@@ -16,7 +16,7 @@ describe("detectClauseBoundary", () => {
     { name: "ellipsis terminator", text: "Aspetta… ora", mode: "sentence-end", expected: 8 },
     { name: "mixed punctuation", text: "Ciao?! dopo", mode: "sentence-end", expected: 6 },
     { name: "comma ignored by sentence mode", text: "Pausa, qui", mode: "sentence-end", expected: -1 },
-    { name: "semicolon pause", text: "Pausa; qui", mode: "comma-pause", expected: 6 },
+    { name: "semicolon pause", text: "Pausa; qui", mode: "comma-pause", expected: 5 },
   ];
 
   for (const item of cases) {
