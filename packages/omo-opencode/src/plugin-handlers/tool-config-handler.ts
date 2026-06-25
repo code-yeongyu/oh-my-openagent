@@ -25,14 +25,22 @@ function getConfigQuestionPermission(): string | null {
   }
 }
 
-function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
-  return (agentResult[getAgentListDisplayName(key)] ?? agentResult[getAgentDisplayName(key)] ?? agentResult[key]) as
+function agentByKey(
+  agentResult: Record<string, unknown>,
+  key: string,
+  pluginConfig?: OhMyOpenCodeConfig,
+): AgentWithPermission | undefined {
+  return (agentResult[getAgentListDisplayName(key, pluginConfig?.agents)] ?? agentResult[getAgentDisplayName(key, pluginConfig?.agents)] ?? agentResult[key]) as
     | AgentWithPermission
     | undefined;
 }
 
-function denyTaskForAgent(agentResult: Record<string, unknown>, key: string): void {
-  const agent = agentByKey(agentResult, key);
+function denyTaskForAgent(
+  agentResult: Record<string, unknown>,
+  key: string,
+  pluginConfig: OhMyOpenCodeConfig,
+): void {
+  const agent = agentByKey(agentResult, key, pluginConfig);
   if (!agent) return;
   agent.permission = { ...agent.permission, task: "deny" };
 }
@@ -76,18 +84,18 @@ export function applyToolConfig(params: {
     "allow";
 
   for (const agentKey of TASK_DENIED_SUBAGENT_KEYS) {
-    denyTaskForAgent(params.agentResult, agentKey);
+    denyTaskForAgent(params.agentResult, agentKey, params.pluginConfig);
   }
 
-  const librarian = agentByKey(params.agentResult, "librarian");
+  const librarian = agentByKey(params.agentResult, "librarian", params.pluginConfig);
   if (librarian) {
     librarian.permission = { ...librarian.permission, "grep_app_*": "allow" };
   }
-  const looker = agentByKey(params.agentResult, "multimodal-looker");
+  const looker = agentByKey(params.agentResult, "multimodal-looker", params.pluginConfig);
   if (looker) {
     looker.permission = { ...looker.permission, task: "deny", look_at: "deny" };
   }
-  const atlas = agentByKey(params.agentResult, "atlas");
+  const atlas = agentByKey(params.agentResult, "atlas", params.pluginConfig);
   if (atlas) {
     atlas.permission = {
       ...atlas.permission,
@@ -98,7 +106,7 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  const sisyphus = agentByKey(params.agentResult, "sisyphus");
+  const sisyphus = agentByKey(params.agentResult, "sisyphus", params.pluginConfig);
   if (sisyphus) {
     sisyphus.permission = {
       ...sisyphus.permission,
@@ -110,7 +118,7 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  const hephaestus = agentByKey(params.agentResult, "hephaestus");
+  const hephaestus = agentByKey(params.agentResult, "hephaestus", params.pluginConfig);
   if (hephaestus) {
     hephaestus.permission = {
       ...hephaestus.permission,
@@ -121,7 +129,7 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  const prometheus = agentByKey(params.agentResult, "prometheus");
+  const prometheus = agentByKey(params.agentResult, "prometheus", params.pluginConfig);
   if (prometheus) {
     prometheus.permission = {
       ...prometheus.permission,
@@ -135,7 +143,7 @@ export function applyToolConfig(params: {
       interactive_bash: "deny",
     };
   }
-  const junior = agentByKey(params.agentResult, "sisyphus-junior");
+  const junior = agentByKey(params.agentResult, "sisyphus-junior", params.pluginConfig);
   if (junior) {
     junior.permission = {
       ...junior.permission,
