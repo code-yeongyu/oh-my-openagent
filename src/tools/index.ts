@@ -9,9 +9,11 @@ import {
 } from "./lsp"
 
 
+
 export { createAstGrepTools } from "./ast-grep"
 export { createGlobTools } from "./glob"
 export { createGrepTools } from "./grep"
+export { createHandoffTools } from "./handoff"
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { createSessionManagerTools } from "./session-manager"
 export { sessionExists } from "./session-manager/storage"
