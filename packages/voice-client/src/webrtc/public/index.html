@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Client — WebRTC Prototype</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: monospace;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.1rem; color: #888; margin-bottom: 1.5rem; letter-spacing: 0.05em; }
+    .row { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .label { width: 7rem; color: #666; font-size: 0.85rem; flex-shrink: 0; }
+
+    #status {
+      display: inline-block;
+      padding: 0.2rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      background: #333;
+      color: #aaa;
+      transition: background 0.2s, color 0.2s;
+    }
+    #status[data-state="live"]        { background: #1a3d1a; color: #4caf50; }
+    #status[data-state="connected"]   { background: #1a2d3d; color: #4a9eff; }
+    #status[data-state="connecting"]  { background: #2d2a1a; color: #ffa726; }
+    #status[data-state="disconnected"]{ background: #3d1a1a; color: #ef5350; }
+    #status[data-state="error"]       { background: #3d1a1a; color: #ef5350; }
+    #status[data-state="mic-error"]   { background: #3d1a1a; color: #ff8a65; }
+
+    .meter-track {
+      flex: 1;
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #level-bar {
+      height: 100%;
+      width: 0%;
+      background: #4caf50;
+      border-radius: 4px;
+      transition: width 0.05s linear;
+    }
+
+    #vad-indicator {
+      padding: 0.25rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      background: #222;
+      color: #555;
+      letter-spacing: 0.08em;
+      transition: background 0.1s, color 0.1s;
+    }
+    #vad-indicator[data-active="1"] {
+      background: #1a3d1a;
+      color: #66bb6a;
+    }
+
+    #log-area {
+      margin-top: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      color: #666;
+      min-height: 8rem;
+      white-space: pre;
+      line-height: 1.6;
+      overflow-y: auto;
+      max-height: 14rem;
+    }
+    .hint {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: #444;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <h1>voice client — webrtc prototype</h1>
+
+  <div class="row">
+    <span class="label">connection</span>
+    <span id="status" data-state="connecting">connecting</span>
+  </div>
+
+  <div class="row">
+    <span class="label">mic level</span>
+    <div class="meter-track"><div id="level-bar"></div></div>
+  </div>
+
+  <div class="row">
+    <span class="label">voice activity</span>
+    <span id="vad-indicator" data-active="0">VAD IDLE</span>
+  </div>
+
+  <div id="log-area"></div>
+
+  <p class="hint">
+    Grant microphone permission when prompted. The level meter tracks RMS amplitude.
+    VAD activates after 3 consecutive frames above threshold and deactivates after 10 below.
+    Speaking while audio plays triggers barge-in and cuts playback immediately.
+    Server echoes a 1kHz beep for the first 5 frames to verify the full audio loop.
+  </p>
+
+  <script src="/public/main.js"></script>
+</body>
+</html>
