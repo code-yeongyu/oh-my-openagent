@@ -24,6 +24,8 @@ export interface SkillLoadOptions {
   opencodeOnly?: boolean
   /** Pre-merged skills to use instead of discovering */
   skills?: LoadedSkill[]
+  /** Lazily-resolved skill list. When set, getSkills() prefers this over the static `skills` array so plugin-registered skills (whose paths only exist in opencode's in-memory merged config) are picked up at execute time. Falls back to `skills` / discovery when undefined. */
+  getLoadedSkills?: () => Promise<LoadedSkill[]>
   /** Pre-discovered commands to use instead of discovering */
   commands?: CommandInfo[]
   /** MCP manager for querying skill-embedded MCP servers */

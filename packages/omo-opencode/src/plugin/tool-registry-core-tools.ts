@@ -84,7 +84,7 @@ export function createCoreTools(args: {
   })
 
   const getSessionIDForMcp = (): string | undefined => getMainSessionID()
-  const getLoadedSkillsForMcp = createRuntimeSkillsResolver({
+  const getLoadedSkills = createRuntimeSkillsResolver({
     baseSkills: skillContext.mergedSkills,
     readRuntimeHostSkills: () => readRuntimeHostSkills(ctx.client),
     buildMergedSkills: async (hostSkills) =>
@@ -92,7 +92,7 @@ export function createCoreTools(args: {
   })
   const skillMcpTool = factories.createSkillMcpTool({
     manager: managers.skillMcpManager,
-    getLoadedSkills: getLoadedSkillsForMcp,
+    getLoadedSkills,
     getSessionID: getSessionIDForMcp,
   })
   const commands = factories.discoverCommandsSync(ctx.directory, {
@@ -103,6 +103,7 @@ export function createCoreTools(args: {
     directory: ctx.directory,
     commands,
     skills: skillContext.mergedSkills,
+    getLoadedSkills,
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,

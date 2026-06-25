@@ -33,13 +33,20 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       clearSkillCache()
     }
 
-    const discovered = (await getAllSkills({
-      disabledSkills: options?.disabledSkills,
-      browserProvider: options?.browserProvider,
-      teamModeEnabled: options?.teamModeEnabled,
-      directory: options.directory,
-    })) ?? []
-    const allSkills = options.skills ? [...options.skills] : discovered
+    let allSkills: LoadedSkill[]
+    if (options.getLoadedSkills) {
+      // Runtime resolver path: picks up plugin-registered skills whose paths
+      // only exist in opencode's in-memory merged config (not on disk).
+      allSkills = await options.getLoadedSkills()
+    } else {
+      const discovered = (await getAllSkills({
+        disabledSkills: options?.disabledSkills,
+        browserProvider: options?.browserProvider,
+        teamModeEnabled: options?.teamModeEnabled,
+        directory: options.directory,
+      })) ?? []
+      allSkills = options.skills ? [...options.skills] : discovered
+    }
 
     if (options.nativeSkills) {
       try {
