@@ -61,22 +61,31 @@ function result(text: string, isFinal: boolean): DeepgramResult {
 function createConnection(messages: DeepgramResult[]): FakeConnection {
   const messageHandlers: MessageHandler[] = [];
   const closeHandlers: CloseHandler[] = [];
-  const errorHandlers: ErrorHandler[] = [];
 
-  return {
-    closeCalls: 0,
-    finalized: false,
-    mediaChunks: [],
-    on(event, handler) {
-      if (event === "message") messageHandlers.push(handler);
-      if (event === "close") closeHandlers.push(handler);
-      if (event === "error") errorHandlers.push(handler);
-    },
-    connect() {},
-    async waitForOpen() {},
-    sendMedia(chunk) {
+  class InlineConnection implements FakeConnection {
+    closeCalls = 0;
+    finalized = false;
+    mediaChunks: Array<ArrayBuffer> = [];
+
+    on(event: "message", handler: MessageHandler): void;
+    on(event: "close", handler: CloseHandler): void;
+    on(event: "error", handler: ErrorHandler): void;
+    on(
+      event: "message" | "close" | "error",
+      handler: MessageHandler | CloseHandler | ErrorHandler,
+    ): void {
+      if (event === "message") messageHandlers.push(handler as MessageHandler);
+      if (event === "close") closeHandlers.push(handler as CloseHandler);
+    }
+
+    connect() {}
+
+    async waitForOpen() {}
+
+    sendMedia(chunk: ArrayBuffer) {
       this.mediaChunks.push(chunk);
-    },
+    }
+
     sendFinalize() {
       this.finalized = true;
       queueMicrotask(() => {
@@ -87,12 +96,15 @@ function createConnection(messages: DeepgramResult[]): FakeConnection {
           for (const handler of closeHandlers) handler();
         }
       });
-    },
+    }
+
     close() {
       this.closeCalls += 1;
       for (const handler of closeHandlers) handler();
-    },
-  };
+    }
+  }
+
+  return new InlineConnection();
 }
 
 function createAdapter(
@@ -167,7 +179,14 @@ describe("DeepgramSttAdapter", () => {
     const adapter = new DeepgramSttAdapter({ apiKey: "test" }, factory);
     const sample = await writeSampleFile("connect-fails");
 
-    await expect(collectEvents(adapter, sample)).rejects.toThrow("deepgram connect failed: socket denied");
+    let thrown: Error | undefined;
+    try {
+      await collectEvents(adapter, sample);
+    } catch (error) {
+      if (error instanceof Error) thrown = error;
+    }
+
+    expect(thrown?.message).toBe("deepgram connect failed: socket denied");
   });
 
   test("#given multilingual nova config #when adapter connects #then params are passed verbatim", async () => {
