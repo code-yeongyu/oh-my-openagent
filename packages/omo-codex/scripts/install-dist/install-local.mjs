@@ -15,7 +15,7 @@ var __export = (target, all) => {
 };
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 
-// packages/utils/src/xdg-data-dir.ts
+// ../../../../../packages/utils/src/xdg-data-dir.ts
 import { accessSync as accessSync2, constants as constants2, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -40,7 +40,7 @@ function resolveWritableDirectory(preferredDir, fallbackSuffix, osProvider) {
 }
 var init_xdg_data_dir = () => {};
 
-// packages/utils/src/atomic-write.ts
+// ../../../../../packages/utils/src/atomic-write.ts
 import {
   closeSync,
   fsyncSync,
@@ -94,7 +94,7 @@ var init_atomic_write = __esm(() => {
   ]);
 });
 
-// packages/telemetry-core/src/activity-state.ts
+// ../../../../../packages/telemetry-core/src/activity-state.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
 import { basename as basename6, join as join29 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
@@ -175,10 +175,10 @@ var init_activity_state = __esm(() => {
   init_xdg_data_dir();
 });
 
-// packages/telemetry-core/src/constants.ts
+// ../../../../../packages/telemetry-core/src/constants.ts
 var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
 
-// packages/telemetry-core/src/diagnostics.ts
+// ../../../../../packages/telemetry-core/src/diagnostics.ts
 import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
 import { join as join30 } from "node:path";
 function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
@@ -296,7 +296,7 @@ var init_diagnostics = __esm(() => {
   DIAGNOSTICS_MAX_BYTES = 256 * 1024;
 });
 
-// packages/telemetry-core/src/env.ts
+// ../../../../../packages/telemetry-core/src/env.ts
 function normalizeEnvValue(value) {
   return value?.trim().toLowerCase();
 }
@@ -336,7 +336,7 @@ var init_env = __esm(() => {
   SEND_OPT_OUT_VALUES = ["0", "false", "no", "yes"];
 });
 
-// packages/telemetry-core/src/machine-id.ts
+// ../../../../../packages/telemetry-core/src/machine-id.ts
 import { createHash as createHash2 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
@@ -347,7 +347,7 @@ function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetr
 }
 var init_machine_id = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
 import { dirname as dirname8, posix, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
@@ -384,7 +384,7 @@ function normalizeWindowsPath(path2) {
 }
 var init_module_node = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/featureFlagUtils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/featureFlagUtils.mjs
 function getFlagDetailFromFlagAndPayload(key, value, payload) {
   return {
     key,
@@ -452,7 +452,7 @@ var normalizeFlagsResponse = (flagsResponse) => {
 };
 var init_featureFlagUtils = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/types.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/types.mjs
 var types_PostHogPersistedProperty;
 var init_types = __esm(() => {
   types_PostHogPersistedProperty = /* @__PURE__ */ function(PostHogPersistedProperty) {
@@ -489,7 +489,7 @@ var init_types = __esm(() => {
   }({});
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/gzip.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/gzip.mjs
 function isGzipSupported() {
   return "CompressionStream" in globalThis && "TextEncoder" in globalThis && "Response" in globalThis && typeof Response.prototype.blob == "function";
 }
@@ -557,7 +557,7 @@ var init_gzip = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bot-detection.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bot-detection.mjs
 var DEFAULT_BLOCKED_UA_STRS, isBlockedUA = function(ua, customBlockedUserAgents = []) {
   if (!ua)
     return false;
@@ -649,10 +649,10 @@ var init_bot_detection = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/string-utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/string-utils.mjs
 var init_string_utils = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/type-utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/type-utils.mjs
 function isPrimitive(value) {
   return value === null || typeof value != "object";
 }
@@ -688,7 +688,7 @@ var init_type_utils = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/number-utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/number-utils.mjs
 function clampToRange(value, min, max, logger3, fallbackValue) {
   if (min > max) {
     logger3.warn("min cannot be greater than max.");
@@ -711,7 +711,7 @@ var init_number_utils = __esm(() => {
   init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bucketed-rate-limiter.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/bucketed-rate-limiter.mjs
 class BucketedRateLimiter {
   constructor(options) {
     this._buckets = {};
@@ -758,7 +758,7 @@ var init_bucketed_rate_limiter = __esm(() => {
   init_number_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/vendor/uuidv7.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/vendor/uuidv7.mjs
 class UUID {
   constructor(bytes) {
     this.bytes = bytes;
@@ -933,7 +933,7 @@ var init_uuidv7 = __esm(() => {
   /*! For license information please see uuidv7.mjs.LICENSE.txt */
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/promise-queue.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/promise-queue.mjs
 class PromiseQueue {
   add(promise) {
     const promiseUUID = uuidv7();
@@ -963,7 +963,7 @@ var init_promise_queue = __esm(() => {
   init_uuidv7();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/logger.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/logger.mjs
 function createConsole(consoleLike = console) {
   const lockedMethods = {
     log: consoleLike.log.bind(consoleLike),
@@ -1005,7 +1005,7 @@ var _createLogger = (prefix, maybeCall, consoleLike) => {
 }, passThrough = (fn) => fn();
 var init_logger = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/user-agent-utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/user-agent-utils.mjs
 var MOBILE = "Mobile", IOS = "iOS", ANDROID = "Android", TABLET = "Tablet", ANDROID_TABLET, APPLE = "Apple", APPLE_WATCH, SAFARI = "Safari", BLACKBERRY = "BlackBerry", SAMSUNG = "Samsung", SAMSUNG_BROWSER, SAMSUNG_INTERNET, CHROME = "Chrome", CHROME_OS, CHROME_IOS, INTERNET_EXPLORER = "Internet Explorer", INTERNET_EXPLORER_MOBILE, OPERA = "Opera", OPERA_MINI, EDGE = "Edge", MICROSOFT_EDGE, FIREFOX = "Firefox", FIREFOX_IOS, NINTENDO = "Nintendo", PLAYSTATION = "PlayStation", XBOX = "Xbox", ANDROID_MOBILE, MOBILE_SAFARI, WINDOWS = "Windows", WINDOWS_PHONE, GENERIC = "Generic", GENERIC_MOBILE, GENERIC_TABLET, KONQUEROR = "Konqueror", OCULUS_BROWSER = "Oculus Browser", VIVALDI = "Vivaldi", YANDEX = "Yandex", WHALE = "Whale", DUCKDUCKGO = "DuckDuckGo", PALE_MOON = "Pale Moon", WATERFOX = "Waterfox", BRAVE = "Brave", BROWSER_VERSION_REGEX_SUFFIX = "(\\d+(\\.\\d+)?)", DEFAULT_BROWSER_VERSION_REGEX, XBOX_REGEX, PLAYSTATION_REGEX, NINTENDO_REGEX, BLACKBERRY_REGEX, windowsVersionMap, versionRegexes, osMatchers;
 var init_user_agent_utils = __esm(() => {
   init_string_utils();
@@ -1271,7 +1271,7 @@ var init_user_agent_utils = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/index.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/utils/index.mjs
 function removeTrailingSlash(url) {
   return url?.replace(/\/+$/, "");
 }
@@ -1320,7 +1320,7 @@ var init_utils = __esm(() => {
   init_user_agent_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/logs-utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/logs-utils.mjs
 var OTLP_SEVERITY_MAP, DEFAULT_OTLP_SEVERITY;
 var init_logs_utils = __esm(() => {
   init_utils();
@@ -1353,25 +1353,25 @@ var init_logs_utils = __esm(() => {
   DEFAULT_OTLP_SEVERITY = OTLP_SEVERITY_MAP.info;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/index.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/logs/index.mjs
 var init_logs = __esm(() => {
   init_logs_utils();
   init_types();
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/surveys/validation.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/surveys/validation.mjs
 var init_validation = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/cookie.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/cookie.mjs
 var init_cookie = __esm(() => {
   init_utils();
   init_uuidv7();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/eventemitter.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/eventemitter.mjs
 class SimpleEventEmitter {
   constructor() {
     this.events = {};
@@ -1394,7 +1394,7 @@ class SimpleEventEmitter {
 }
 var init_eventemitter = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/chunk-ids.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/chunk-ids.mjs
 function getFilenameToChunkIdMap(stackParser) {
   const chunkIdMap = globalThis._posthogChunkIds;
   if (!chunkIdMap)
@@ -1432,7 +1432,7 @@ function getFilenameToChunkIdMap(stackParser) {
 var parsedStackResults, lastKeysCount, cachedFilenameChunkIds;
 var init_chunk_ids = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/error-properties-builder.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/error-properties-builder.mjs
 class ErrorPropertiesBuilder {
   constructor(coercers, stackParser, modifiers = []) {
     this.coercers = coercers;
@@ -1558,7 +1558,7 @@ var init_error_properties_builder = __esm(() => {
   init_chunk_ids();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/base.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/base.mjs
 function createFrame(platform, filename, func, lineno, colno) {
   const frame = {
     platform,
@@ -1577,7 +1577,7 @@ var init_base = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/safari.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/safari.mjs
 var extractSafariExtensionDetails = (func, filename) => {
   const isSafariExtension = func.indexOf("safari-extension") !== -1;
   const isSafariWebExtension = func.indexOf("safari-web-extension") !== -1;
@@ -1593,7 +1593,7 @@ var init_safari = __esm(() => {
   init_base();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/chrome.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/chrome.mjs
 var chromeRegexNoFnName, chromeRegex, chromeEvalRegex, chromeStackLineParser = (line, platform) => {
   const noFnParts = chromeRegexNoFnName.exec(line);
   if (noFnParts) {
@@ -1623,7 +1623,7 @@ var init_chrome = __esm(() => {
   chromeEvalRegex = /\((\S*)(?::(\d+))(?::(\d+))\)/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/gecko.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/gecko.mjs
 var geckoREgex, geckoEvalRegex, geckoStackLineParser = (line, platform) => {
   const parts = geckoREgex.exec(line);
   if (parts) {
@@ -1650,7 +1650,7 @@ var init_gecko = __esm(() => {
   geckoEvalRegex = /(\S+) line (\d+)(?: > eval line \d+)* > eval/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
 var winjsRegex, winjsStackLineParser = (line, platform) => {
   const parts = winjsRegex.exec(line);
   return parts ? createFrame(platform, parts[2], parts[1] || UNKNOWN_FUNCTION, +parts[3], parts[4] ? +parts[4] : undefined) : undefined;
@@ -1660,7 +1660,7 @@ var init_winjs = __esm(() => {
   winjsRegex = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:[-a-z]+):.*?):(\d+)(?::(\d+))?\)?\s*$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
 var opera10Regex, opera10StackLineParser = (line, platform) => {
   const parts = opera10Regex.exec(line);
   return parts ? createFrame(platform, parts[2], parts[3] || UNKNOWN_FUNCTION, +parts[1]) : undefined;
@@ -1674,7 +1674,7 @@ var init_opera = __esm(() => {
   opera11Regex = / line (\d+), column (\d+)\s*(?:in (?:<anonymous function: ([^>]+)>|([^)]+))\(.*\))? in (.*):\s*$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
 function filenameIsInApp(filename, isNative = false) {
   const isInternal = isNative || filename && !filename.startsWith("/") && !filename.match(/^[A-Z]:/) && !filename.startsWith(".") && !filename.match(/^[a-zA-Z]([a-zA-Z0-9.\-+])*:\/\//);
   return !isInternal && filename !== undefined && !filename.includes("node_modules/");
@@ -1746,7 +1746,7 @@ var init_node = __esm(() => {
   FULL_MATCH = /at (?:async )?(?:(.+?)\s+\()?(?:(.+):(\d+):(\d+)?|([^)]+))\)?/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/index.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/parsers/index.mjs
 function reverseAndStripFrames(stack) {
   if (!stack.length)
     return [];
@@ -1800,7 +1800,7 @@ var init_parsers = __esm(() => {
   WEBPACK_ERROR_REGEXP = /\(error: (.*)\)/;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
 class DOMExceptionCoercer {
   match(err) {
     return this.isDOMException(err) || this.isDOMError(err);
@@ -1834,7 +1834,7 @@ var init_dom_exception_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-coercer.mjs
 class ErrorCoercer {
   match(err) {
     return isPlainError(err);
@@ -1865,7 +1865,7 @@ var init_error_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
 class ErrorEventCoercer {
   constructor() {}
   match(err) {
@@ -1887,7 +1887,7 @@ var init_error_event_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/string-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/string-coercer.mjs
 class StringCoercer {
   match(input) {
     return typeof input == "string";
@@ -1920,7 +1920,7 @@ var init_string_coercer = __esm(() => {
   ERROR_TYPES_PATTERN = /^(?:[Uu]ncaught (?:exception: )?)?(?:((?:Eval|Internal|Range|Reference|Syntax|Type|URI|)Error): )?(.*)$/i;
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/types.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/types.mjs
 var severityLevels;
 var init_types2 = __esm(() => {
   severityLevels = [
@@ -1933,7 +1933,7 @@ var init_types2 = __esm(() => {
   ];
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/utils.mjs
 function extractExceptionKeysForMessage(err, maxLength = 40) {
   const keys = Object.keys(err);
   keys.sort();
@@ -1951,7 +1951,7 @@ function extractExceptionKeysForMessage(err, maxLength = 40) {
 }
 var init_utils2 = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/object-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/object-coercer.mjs
 class ObjectCoercer {
   match(candidate) {
     return typeof candidate == "object" && candidate !== null;
@@ -2010,7 +2010,7 @@ var init_object_coercer = __esm(() => {
   init_utils2();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/event-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/event-coercer.mjs
 class EventCoercer {
   match(err) {
     return isEvent(err);
@@ -2030,7 +2030,7 @@ var init_event_coercer = __esm(() => {
   init_utils2();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/primitive-coercer.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/primitive-coercer.mjs
 class PrimitiveCoercer {
   match(candidate) {
     return isPrimitive(candidate);
@@ -2048,7 +2048,7 @@ var init_primitive_coercer = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
 class PromiseRejectionEventCoercer {
   match(err) {
     return isBuiltin(err, "PromiseRejectionEvent") || this.isCustomEventWrappingRejection(err);
@@ -2088,7 +2088,7 @@ var init_promise_rejection_event = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/index.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/coercers/index.mjs
 var init_coercers = __esm(() => {
   init_dom_exception_coercer();
   init_error_coercer();
@@ -2100,7 +2100,7 @@ var init_coercers = __esm(() => {
   init_promise_rejection_event();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/utils.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/utils.mjs
 class ReduceableCache {
   constructor(_maxSize) {
     this._maxSize = _maxSize;
@@ -2127,7 +2127,7 @@ class ReduceableCache {
 }
 var init_utils3 = () => {};
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
 function resolveExceptionStepsConfig(config) {
   if (!config)
     return {
@@ -2289,7 +2289,7 @@ var init_exception_steps = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/error-tracking/index.mjs
 var exports_error_tracking = {};
 __export(exports_error_tracking, {
   winjsStackLineParser: () => winjsStackLineParser,
@@ -2326,7 +2326,7 @@ var init_error_tracking = __esm(() => {
   init_exception_steps();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core-stateless.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core-stateless.mjs
 async function logFlushError(err) {
   if (err instanceof PostHogFetchHttpError) {
     let text = "";
@@ -3127,7 +3127,7 @@ var init_posthog_core_stateless = __esm(() => {
   };
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/posthog-core.mjs
 var init_posthog_core = __esm(() => {
   init_featureFlagUtils();
   init_types();
@@ -3136,12 +3136,12 @@ var init_posthog_core = __esm(() => {
   init_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/tracing-headers.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/tracing-headers.mjs
 var init_tracing_headers = __esm(() => {
   init_type_utils();
 });
 
-// node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/index.mjs
+// ../../../../../node_modules/.bun/@posthog+core@1.30.3/node_modules/@posthog/core/dist/index.mjs
 var init_dist = __esm(() => {
   init_featureFlagUtils();
   init_gzip();
@@ -3158,7 +3158,7 @@ var init_dist = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 async function addSourceContext(frames) {
@@ -3377,7 +3377,7 @@ var init_context_lines_node = __esm(() => {
   LRU_FILE_CONTENTS_FS_READ_FAILED = new exports_error_tracking.ReduceableCache(20);
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
 import { isAbsolute as isAbsolute5, relative as relative4, sep as sep8 } from "node:path";
 function createRelativePathModifier(basePath = process.cwd()) {
   const isWindows = sep8 === "\\";
@@ -3394,11 +3394,11 @@ function createRelativePathModifier(basePath = process.cwd()) {
 }
 var init_relative_path_node = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/version.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/version.mjs
 var version = "5.35.12";
 var init_version = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/types.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/types.mjs
 var FeatureFlagError2;
 var init_types3 = __esm(() => {
   FeatureFlagError2 = {
@@ -3409,7 +3409,7 @@ var init_types3 = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
 class FeatureFlagEvaluations {
   constructor(init) {
     this._host = init.host;
@@ -3543,7 +3543,7 @@ var init_feature_flag_evaluations = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/crypto.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/crypto.mjs
 async function hashSHA1(text) {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle)
@@ -3554,7 +3554,7 @@ async function hashSHA1(text) {
 }
 var init_crypto = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
 class FeatureFlagsPoller {
   constructor({ pollingInterval, personalApiKey, projectApiKey, timeout, host, customHeaders, ...options }) {
     this.debugMode = false;
@@ -4455,7 +4455,7 @@ var init_feature_flags = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
 function makeUncaughtExceptionHandler(captureFn, onFatalFn) {
   let calledFatalError = false;
   return Object.assign((error) => {
@@ -4488,7 +4488,7 @@ function addUnhandledRejectionListener(captureFn) {
 }
 var init_autocapture = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
 class ErrorTracking {
   constructor(client, options, _logger) {
     this.client = client;
@@ -4560,7 +4560,7 @@ var init_error_tracking2 = __esm(() => {
   init_dist();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/storage-memory.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/storage-memory.mjs
 class PostHogMemoryStorage {
   getProperty(key) {
     return this._memoryStorage[key];
@@ -4574,7 +4574,7 @@ class PostHogMemoryStorage {
 }
 var init_storage_memory = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/client.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/client.mjs
 function emitDeprecationWarningOnce(id, message) {
   if (_emittedDeprecations.has(id))
     return;
@@ -5567,7 +5567,7 @@ var init_client = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/context/context.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/context/context.mjs
 import { AsyncLocalStorage } from "node:async_hooks";
 
 class PostHogContext {
@@ -5599,7 +5599,7 @@ class PostHogContext {
 }
 var init_context = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
 function createEventProcessor(_posthog, { organization, projectId, prefix, severityAllowList = [
   "error"
 ], sendExceptionsToPostHog = true } = {}) {
@@ -5670,16 +5670,16 @@ var init_sentry_integration = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
 var init_tracing_headers2 = () => {};
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/express.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/express.mjs
 var init_express = __esm(() => {
   init_error_tracking2();
   init_tracing_headers2();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/exports.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/exports.mjs
 var init_exports = __esm(() => {
   init_feature_flag_evaluations();
   init_dist();
@@ -5688,7 +5688,7 @@ var init_exports = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/entrypoints/index.node.mjs
+// ../../../../../node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/entrypoints/index.node.mjs
 var PostHog;
 var init_index_node = __esm(() => {
   init_module_node();
@@ -5721,7 +5721,7 @@ var init_index_node = __esm(() => {
   };
 });
 
-// packages/telemetry-core/src/posthog-client.ts
+// ../../../../../packages/telemetry-core/src/posthog-client.ts
 class PostHogTelemetryTransport {
   #client;
   constructor(apiKey, options) {
@@ -5885,14 +5885,14 @@ var init_posthog_client = __esm(() => {
   };
 });
 
-// packages/telemetry-core/src/record-daily-active.ts
+// ../../../../../packages/telemetry-core/src/record-daily-active.ts
 var init_record_daily_active = __esm(() => {
   init_activity_state();
   init_posthog_client();
   init_machine_id();
 });
 
-// packages/telemetry-core/src/index.ts
+// ../../../../../packages/telemetry-core/src/index.ts
 var init_src = __esm(() => {
   init_activity_state();
   init_diagnostics();
@@ -6130,7 +6130,7 @@ import { readFile as readFile19 } from "node:fs/promises";
 import { dirname as dirname10, join as join35, resolve as resolve11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
-// packages/utils/src/runtime/spawn.ts
+// ../../../../../packages/utils/src/runtime/spawn.ts
 import {
   spawn as nodeSpawn,
   spawnSync as nodeSpawnSync
@@ -6284,7 +6284,7 @@ function spawn(cmdOrOpts, opts) {
     throw new Error("spawn requires a command");
   return wrapNodeProcess(nodeSpawn(bin, args, createNodeSpawnOptions(options)));
 }
-// packages/utils/src/runtime/which.ts
+// ../../../../../packages/utils/src/runtime/which.ts
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
 var runtime2 = globalThis;
@@ -6348,7 +6348,7 @@ function bunWhich(commandName) {
   }
   return null;
 }
-// packages/utils/src/runtime/git-bash.ts
+// ../../../../../packages/utils/src/runtime/git-bash.ts
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 var GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH";
@@ -7044,13 +7044,13 @@ async function collectPackageJsonPaths(directory, root, paths) {
 import { readFile as readFile5, writeFile as writeFile3 } from "node:fs/promises";
 import { join as join9, sep as sep3 } from "node:path";
 
-// packages/utils/src/codegraph/resolve.ts
+// ../../../../../packages/utils/src/codegraph/resolve.ts
 import { existsSync as existsSync2 } from "node:fs";
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { basename as basename2, dirname as dirname3, join as join8 } from "node:path";
 import { createRequire } from "node:module";
 
-// packages/utils/src/codegraph/node-support.ts
+// ../../../../../packages/utils/src/codegraph/node-support.ts
 var CODEGRAPH_MIN_NODE_MAJOR = 20;
 var CODEGRAPH_BLOCKED_NODE_MAJOR = 25;
 var CODEGRAPH_UNSAFE_NODE_ENV = "CODEGRAPH_ALLOW_UNSAFE_NODE";
@@ -7074,7 +7074,7 @@ function parseNodeMajor(version) {
   return Number.isNaN(major) ? 0 : major;
 }
 
-// packages/utils/src/codegraph/resolve.ts
+// ../../../../../packages/utils/src/codegraph/resolve.ts
 var CODEGRAPH_NODE_CANDIDATES = ["node24", "node22", "node20", "node"];
 var CODEGRAPH_NODE_PATH_CANDIDATES = [
   "/opt/homebrew/opt/node@24/bin/node",
@@ -8219,27 +8219,47 @@ function isRootSetting2(line, key) {
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
 var CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION = 1e4;
 function ensureCodexMultiAgentV2Config(config) {
-  const normalizedConfig = removeLegacyAgentsMaxThreadsSetting(removeFeatureFlagSetting(config, "multi_agent_v2"));
+  const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
+  const normalizedConfig = removeLegacyAgentsMaxThreadsSetting(featureFlag.config);
   const section = findTomlSection(normalizedConfig, CODEX_MULTI_AGENT_V2_HEADER);
   const maxThreadsValue = CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION.toString();
   if (!section) {
+    const enabledSetting = featureFlag.value === false ? `enabled = false
+` : "";
     return appendBlock(normalizedConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
+`);
+  }
+  const withPreservedDisable = featureFlag.value === false ? replaceOrInsertSetting(normalizedConfig, section, "enabled", "false") : normalizedConfig;
+  const updatedSection = featureFlag.value === false ? findTomlSection(withPreservedDisable, CODEX_MULTI_AGENT_V2_HEADER) : section;
+  if (!updatedSection) {
+    return appendBlock(withPreservedDisable, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+enabled = false
 max_concurrent_threads_per_session = ${maxThreadsValue}
 `);
   }
-  return replaceOrInsertSetting(normalizedConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+  return replaceOrInsertSetting(withPreservedDisable, updatedSection, "max_concurrent_threads_per_session", maxThreadsValue);
 }
 function removeFeatureFlagSetting(config, featureName) {
   const section = findTomlSection(config, "features");
   if (!section)
-    return config;
-  return removeSetting(config, section, featureName);
+    return { config, value: null };
+  return {
+    config: removeSetting(config, section, featureName),
+    value: readBooleanSetting(section.text, featureName)
+  };
 }
 function removeLegacyAgentsMaxThreadsSetting(config) {
   const section = findTomlSection(config, "agents");
   if (!section)
     return config;
   return removeSetting(config, section, "max_threads");
+}
+function readBooleanSetting(sectionText, key) {
+  const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*(true|false)\\s*(?:#.*)?$`, "m").exec(sectionText);
+  if (!match)
+    return null;
+  return match[1] === "true";
 }
 
 // packages/omo-codex/src/install/codex-config-toml.ts
@@ -9364,13 +9384,13 @@ async function seedAndMigrateOmoSot(input) {
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
 import { join as join28 } from "node:path";
 
-// packages/utils/src/deep-merge.ts
+// ../../../../../packages/utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-// packages/utils/src/record-type-guard.ts
+// ../../../../../packages/utils/src/record-type-guard.ts
 function isRecord(value) {
   return typeof value === "object" && value !== null;
 }
-// node_modules/.bun/js-yaml@4.2.0/node_modules/js-yaml/dist/js-yaml.mjs
+// ../../../../../node_modules/.bun/js-yaml@4.2.0/node_modules/js-yaml/dist/js-yaml.mjs
 /*! js-yaml 4.2.0 https://github.com/nodeca/js-yaml @license MIT */
 var __create = Object.create;
 var __defProp2 = Object.defineProperty;
@@ -12121,7 +12141,7 @@ var import_js_yaml = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin((exp
 }))(), 1);
 var { Type, Schema, FAILSAFE_SCHEMA, JSON_SCHEMA, CORE_SCHEMA, DEFAULT_SCHEMA, load, loadAll, dump, YAMLException, types, safeLoad, safeLoadAll, safeDump } = import_js_yaml.default;
 var index_vite_proxy_tmp_default = import_js_yaml.default;
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
 var CharacterCodes;
 (function(CharacterCodes2) {
   CharacterCodes2[CharacterCodes2["lineFeed"] = 10] = "lineFeed";
@@ -12206,7 +12226,7 @@ var CharacterCodes;
   CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
 })(CharacterCodes || (CharacterCodes = {}));
 
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
 var cachedSpaces = new Array(20).fill(0).map((_, index) => {
   return " ".repeat(index);
 });
@@ -12240,7 +12260,7 @@ var cachedBreakLinesWithSpaces = {
   }
 };
 
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
 var ParseOptions;
 (function(ParseOptions2) {
   ParseOptions2.DEFAULT = {
@@ -12248,7 +12268,7 @@ var ParseOptions;
   };
 })(ParseOptions || (ParseOptions = {}));
 
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
 var ScanError;
 (function(ScanError2) {
   ScanError2[ScanError2["None"] = 0] = "None";
@@ -12299,25 +12319,25 @@ var ParseErrorCode;
   ParseErrorCode2[ParseErrorCode2["InvalidCharacter"] = 16] = "InvalidCharacter";
 })(ParseErrorCode || (ParseErrorCode = {}));
 
-// packages/utils/src/jsonc-parser.ts
+// ../../../../../packages/utils/src/jsonc-parser.ts
 var pluginConfigFileDetectionCache = new Map;
 
-// packages/utils/src/index.ts
+// ../../../../../packages/utils/src/index.ts
 init_xdg_data_dir();
 init_atomic_write();
 
-// packages/utils/src/logging/logger.ts
+// ../../../../../packages/utils/src/logging/logger.ts
 var DEFAULT_MAX_LOG_FILE_SIZE_BYTES = 50 * 1024 * 1024;
-// packages/utils/src/logger.ts
+// ../../../../../packages/utils/src/logger.ts
 var sharedSubunitLogger = () => {};
 function log(message, data) {
   sharedSubunitLogger(message, data);
 }
-// packages/utils/src/omo-config.ts
+// ../../../../../packages/utils/src/omo-config.ts
 var HARNESS_IDS = ["codex", "opencode", "omo"];
-// packages/utils/src/omo-config/loader.ts
+// ../../../../../packages/utils/src/omo-config/loader.ts
 var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
-// packages/utils/src/ast-grep/sg-manifest.ts
+// ../../../../../packages/utils/src/ast-grep/sg-manifest.ts
 function normalizeRuntimePlatform(platform = process.platform) {
   if (platform === "darwin" || platform === "linux" || platform === "win32")
     return platform;
@@ -12331,7 +12351,7 @@ function normalizeRuntimeArch(arch = process.arch) {
 function runtimeSlug(platform = process.platform, arch = process.arch) {
   return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
 }
-// packages/utils/src/ast-grep/install-script.ts
+// ../../../../../packages/utils/src/ast-grep/install-script.ts
 import { spawn as spawn3 } from "node:child_process";
 import { existsSync as existsSync4 } from "node:fs";
 import { join as join27 } from "node:path";
@@ -12433,15 +12453,15 @@ async function runAstGrepSkillInstall(options) {
     return { kind: "failed", reason: String(error) };
   }
 }
-// packages/utils/src/codegraph/provision.ts
+// ../../../../../packages/utils/src/codegraph/provision.ts
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
-// packages/utils/src/command-executor/execute-command.ts
+// ../../../../../packages/utils/src/command-executor/execute-command.ts
 import { exec } from "node:child_process";
 import { promisify as promisify2 } from "node:util";
 var execAsync = promisify2(exec);
-// packages/utils/src/internal-initiator-marker.ts
+// ../../../../../packages/utils/src/internal-initiator-marker.ts
 var INTERNAL_INITIATOR_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_INITIATOR\s*-->/;
 var INTERNAL_NOREPLY_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_NOREPLY\s*-->/;
 function hasInternalInitiatorMarker(text) {
@@ -12475,7 +12495,7 @@ function isTerminalNoReplyUserMessage(message) {
   const textParts = (message.parts ?? []).filter(isTextPartLike);
   return textParts.some(isNoReplyTextPart);
 }
-// packages/utils/src/migration/agent-names.ts
+// ../../../../../packages/utils/src/migration/agent-names.ts
 var BUILTIN_AGENT_NAMES = new Set([
   "sisyphus",
   "oracle",
@@ -12488,15 +12508,15 @@ var BUILTIN_AGENT_NAMES = new Set([
   "atlas",
   "build"
 ]);
-// packages/utils/src/migration/model-versions.ts
+// ../../../../../packages/utils/src/migration/model-versions.ts
 var CURRENT_USER_SELECTABLE_MODELS = new Set([
   "anthropic/claude-opus-4-5",
   "anthropic/claude-opus-4-6",
   "anthropic/claude-sonnet-4-5"
 ]);
-// packages/utils/src/write-file-atomically.ts
+// ../../../../../packages/utils/src/write-file-atomically.ts
 init_atomic_write();
-// packages/utils/src/session-idle-settle.ts
+// ../../../../../packages/utils/src/session-idle-settle.ts
 var DEFAULT_SESSION_IDLE_SETTLE_MS = 150;
 var DEFAULT_SESSION_STATUS_TIMEOUT_MS = 5000;
 function settleAfterSessionIdle(ms = DEFAULT_SESSION_IDLE_SETTLE_MS) {
@@ -12548,7 +12568,7 @@ async function isSessionActive(client, sessionID, statusTimeoutMs = DEFAULT_SESS
   }
 }
 
-// packages/utils/src/prompt-async-gate/prompt-message-state.ts
+// ../../../../../packages/utils/src/prompt-async-gate/prompt-message-state.ts
 function messageRole(message) {
   if (!isRecord(message)) {
     return;
@@ -12718,7 +12738,7 @@ function messageHasSubstantiveAssistantOutput(message) {
   return isRecord(message) && Array.isArray(message.parts) && message.parts.some(partHasSubstantiveAssistantOutput);
 }
 
-// packages/utils/src/prompt-async-gate/message-inspection-error.ts
+// ../../../../../packages/utils/src/prompt-async-gate/message-inspection-error.ts
 function isPromptMessageInspectionAborted(error) {
   if (error instanceof Error && error.name === "MessageAbortedError") {
     return true;
@@ -12726,7 +12746,7 @@ function isPromptMessageInspectionAborted(error) {
   return isRecord(error) && error.name === "MessageAbortedError";
 }
 
-// packages/utils/src/prompt-async-gate/timing.ts
+// ../../../../../packages/utils/src/prompt-async-gate/timing.ts
 var DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS = 5000;
 var promptGateMessagesFetchTimeoutMsForTesting;
 function getPromptGateMessagesFetchTimeoutMs() {
@@ -12751,7 +12771,7 @@ async function withDispatchTimeout(operation, dispatchTimeoutMs, operationName) 
   }
 }
 
-// packages/utils/src/prompt-async-gate/pending-tool-turn.ts
+// ../../../../../packages/utils/src/prompt-async-gate/pending-tool-turn.ts
 function getPromptQuery(input) {
   if (!isRecord(input)) {
     return { directory: "" };
@@ -12843,7 +12863,7 @@ async function sessionLatestAssistantBlocksInternalPrompt(args) {
   }
 }
 
-// packages/utils/src/prompt-async-gate/recent-dispatches.ts
+// ../../../../../packages/utils/src/prompt-async-gate/recent-dispatches.ts
 var recentPromptDispatches = new Map;
 function recentDispatchKey(sessionID, dedupeKey) {
   return `${sessionID}\x00${dedupeKey}`;
@@ -12871,7 +12891,7 @@ function rememberRecentPromptDispatch(args) {
   });
 }
 
-// packages/utils/src/prompt-async-gate/reservations.ts
+// ../../../../../packages/utils/src/prompt-async-gate/reservations.ts
 var promptAsyncReservations = new Map;
 var expiredReservationHandler;
 function setExpiredReservationHandler(handler) {
@@ -12918,7 +12938,7 @@ function finishPromptReservation(sessionID, reservation, dispatchAttempted, post
   promptAsyncReservations.delete(sessionID);
 }
 
-// packages/utils/src/prompt-async-gate/session-idle-dispatch.ts
+// ../../../../../packages/utils/src/prompt-async-gate/session-idle-dispatch.ts
 async function dispatchAfterSessionIdle(args) {
   const {
     sessionName,
@@ -13015,7 +13035,7 @@ async function dispatchAfterSessionIdle(args) {
   }
 }
 
-// packages/utils/src/prompt-async-gate/queue.ts
+// ../../../../../packages/utils/src/prompt-async-gate/queue.ts
 var promptQueues = new Map;
 var promptQueueDraining = new Set;
 var promptQueueInFlight = new Map;
