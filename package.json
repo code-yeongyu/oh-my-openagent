@@ -27,7 +27,8 @@
     "packages/agents-md-core",
     "packages/shared-skills",
     "packages/omo-codex",
-    "packages/omo-opencode"
+    "packages/omo-opencode",
+    "packages/voice-client"
   ],
   "bin": {
     "oh-my-opencode": "bin/oh-my-opencode.js",
