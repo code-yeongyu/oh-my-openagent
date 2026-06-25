@@ -335,6 +335,11 @@ describe("createMouseAgentWithOverrides", () => {
     })
   })
 
+  type AgentConfigWithModelConfig = {
+    thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+    reasoningEffort?: "low" | "medium" | "high" | "xhigh"
+  }
+
   describe("model-specific thinking/reasoning config", () => {
     test("Claude model gets thinking config", () => {
       //#given
@@ -344,8 +349,8 @@ describe("createMouseAgentWithOverrides", () => {
       const result = createMouseAgentWithOverrides(override)
 
       //#then
-      expect((result as any).thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-      expect((result as any).reasoningEffort).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+      expect((result as AgentConfigWithModelConfig).reasoningEffort).toBeUndefined()
     })
 
     test("Google Vertex Anthropic model gets thinking config", () => {
@@ -356,7 +361,7 @@ describe("createMouseAgentWithOverrides", () => {
       const result = createMouseAgentWithOverrides(override)
 
       //#then
-      expect((result as any).thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+      expect((result as AgentConfigWithModelConfig).thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
     })
 
     test("GPT model gets reasoningEffort config", () => {
@@ -367,8 +372,8 @@ describe("createMouseAgentWithOverrides", () => {
       const result = createMouseAgentWithOverrides(override)
 
       //#then
-      expect((result as any).reasoningEffort).toBe("medium")
-      expect((result as any).thinking).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).reasoningEffort).toBe("medium")
+      expect((result as AgentConfigWithModelConfig).thinking).toBeUndefined()
     })
 
     test("Gemini model gets NO thinking or reasoning config", () => {
@@ -379,8 +384,8 @@ describe("createMouseAgentWithOverrides", () => {
       const result = createMouseAgentWithOverrides(override)
 
       //#then
-      expect((result as any).thinking).toBeUndefined()
-      expect((result as any).reasoningEffort).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).thinking).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).reasoningEffort).toBeUndefined()
     })
 
     test("Google Gemini Pro model gets NO thinking config", () => {
@@ -391,8 +396,8 @@ describe("createMouseAgentWithOverrides", () => {
       const result = createMouseAgentWithOverrides(override)
 
       //#then
-      expect((result as any).thinking).toBeUndefined()
-      expect((result as any).reasoningEffort).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).thinking).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).reasoningEffort).toBeUndefined()
     })
 
     test("unknown provider model gets NO thinking config", () => {
@@ -403,8 +408,8 @@ describe("createMouseAgentWithOverrides", () => {
       const result = createMouseAgentWithOverrides(override)
 
       //#then
-      expect((result as any).thinking).toBeUndefined()
-      expect((result as any).reasoningEffort).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).thinking).toBeUndefined()
+      expect((result as AgentConfigWithModelConfig).reasoningEffort).toBeUndefined()
     })
   })
 })
