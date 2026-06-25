@@ -88,6 +88,7 @@ interface MockClient {
 }
 
 describe("executeCompact lock management", () => {
+  let autoCompactState: AutoCompactState
   let mockClient: MockClient
   let fakeTimeouts: FakeTimeouts
   const sessionID = "test-session-123"
