@@ -376,7 +376,7 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
     categories: {
       source: { model: DEEPSEEK_FLASH },
       "deep-jack": { model: DEEPSEEK_FLASH },
-      "matrix-bend": { model: DEEPSEEK_FLASH },
+      "matrix-bend": { model: MIMO_V25 },
       "red-pill": { model: DEEPSEEK_FLASH },
       construct: { model: MIMO_V25 },
       "blue-pill": { model: MIMO_V25 },
