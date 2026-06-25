@@ -9,17 +9,15 @@ multi_agent = true
 plugin_hooks = true
 plugins = true
 
-[agents]
-max_threads = 1000
-
 [features.multi_agent_v2]
 enabled = false
-max_concurrent_threads_per_session = 1000
+max_concurrent_threads_per_session = 10000
 
 [marketplaces.debug]
-last_updated = "2026-06-25T09:45:02Z"
+last_updated = "2026-06-25T09:53:05Z"
 source_type = "local"
 source = "/repo/packages/omo-codex"
 
 [plugins."omo@debug"]
 enabled = true
+
