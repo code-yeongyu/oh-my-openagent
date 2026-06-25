@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import * as fs from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
 	buildAutoWorkflowContext,
@@ -24,6 +25,7 @@ describe("codex workflow selector hook", () => {
 		} else {
 			process.env["OMO_CODEX_AUTO_WORKFLOW"] = originalAutoWorkflowFlag;
 		}
+		vi.restoreAllMocks();
 	});
 
 	it("#given auto workflow is disabled #when prompt asks for debugging #then hook stays quiet", () => {
@@ -40,6 +42,24 @@ describe("codex workflow selector hook", () => {
 		// then
 		expect(output).toBe("");
 		expect(buildAutoWorkflowContext(payload.prompt, {})).toBeNull();
+	});
+
+	it("#given auto workflow is disabled #when transcript path is present #then hook does not read transcript", () => {
+		// given
+		delete process.env["OMO_CODEX_AUTO_WORKFLOW"];
+		const readFileSync = vi.spyOn(fs, "readFileSync");
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "Fix this flaky test and diagnose why CI is failing",
+			transcript_path: "/tmp/should-not-be-read.jsonl",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+
+		// then
+		expect(output).toBe("");
+		expect(readFileSync).not.toHaveBeenCalled();
 	});
 
 	it("#given auto workflow is enabled #when prompt asks for debugging #then hook selects ulw-loop guidance", () => {
@@ -199,6 +219,28 @@ describe("codex workflow selector hook", () => {
 
 		// then
 		expect(output).toBe("");
+	});
+
+	it("#given context-pressure marker outside transcript tail #when prompt asks for debugging #then hook scans only bounded tail", () => {
+		// given
+		process.env["OMO_CODEX_AUTO_WORKFLOW"] = "1";
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "Fix this failing test",
+			transcript_path: writeTranscript(
+				"Codex ran out of room in the model's context window.",
+				"x".repeat(520_000),
+			),
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.additionalContext).toContain(
+			"<lazycodex-auto-workflow>",
+		);
 	});
 
 	it("#given malformed or empty input #when hook runs #then exits with empty output", () => {
