@@ -1,14 +1,13 @@
-import { checkAstGrepCli, checkAstGrepNapi, checkCommentChecker } from "./dependencies"
+import { checkAstGrepCli, checkCommentChecker } from "./dependencies"
 import { getGhCliInfo } from "./tools-gh"
 import { getInstalledLspServers } from "./tools-lsp"
 import { getBuiltinMcpInfo, getUserMcpInfo } from "./tools-mcp"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue, ToolsSummary } from "../types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, DoctorIssue, ToolsSummary } from "../framework/types"
 
 export async function gatherToolsSummary(): Promise<ToolsSummary> {
-  const [astGrepCliInfo, astGrepNapiInfo, commentCheckerInfo, ghInfo] = await Promise.all([
+  const [astGrepCliInfo, commentCheckerInfo, ghInfo] = await Promise.all([
     checkAstGrepCli(),
-    checkAstGrepNapi(),
     checkCommentChecker(),
     getGhCliInfo(),
   ])
@@ -20,7 +19,6 @@ export async function gatherToolsSummary(): Promise<ToolsSummary> {
   return {
     lspServers,
     astGrepCli: astGrepCliInfo.installed,
-    astGrepNapi: astGrepNapiInfo.installed,
     commentChecker: commentCheckerInfo.installed,
     ghCli: {
       installed: ghInfo.installed,
@@ -32,16 +30,16 @@ export async function gatherToolsSummary(): Promise<ToolsSummary> {
   }
 }
 
-function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
+export function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
   const issues: DoctorIssue[] = []
 
-  if (!summary.astGrepCli && !summary.astGrepNapi) {
+  if (!summary.astGrepCli) {
     issues.push({
       title: "AST-Grep unavailable",
-      description: "Neither AST-Grep CLI nor NAPI backend is available.",
-      fix: "Install @ast-grep/cli globally or add @ast-grep/napi",
+      description: "AST-Grep CLI is not available.",
+      fix: "The ast-grep skill resolves sg automatically; run omo doctor or lazycodex-ai doctor to check provisioning.",
       severity: "warning",
-      affects: ["ast_grep_search", "ast_grep_replace"],
+      affects: ["ast-grep skill"],
     })
   }
 
@@ -105,7 +103,7 @@ export async function checkTools(): Promise<CheckResult> {
     status: issues.length === 0 ? "pass" : "warn",
     message: issues.length === 0 ? "All tools checks passed" : `${issues.length} tools issue(s) detected`,
     details: [
-      `AST-Grep: cli=${summary.astGrepCli ? "yes" : "no"}, napi=${summary.astGrepNapi ? "yes" : "no"}`,
+      `AST-Grep CLI: ${summary.astGrepCli ? "yes" : "no"}`,
       `Comment checker: ${summary.commentChecker ? "yes" : "no"}`,
       `LSP: ${summary.lspServers.length > 0 ? `${summary.lspServers.length} server(s)` : "none"}`,
       `GH CLI: ${summary.ghCli.installed ? "installed" : "missing"}${summary.ghCli.authenticated ? " (authenticated)" : ""}`,

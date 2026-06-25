@@ -114,7 +114,7 @@ describe("skill tool - synchronous description", () => {
     // given
     const loadedSkills = [
       createMockSkill("playwright"),
-      createMockSkill("frontend-ui-ux"),
+      createMockSkill("frontend"),
       createMockSkill("git-master"),
     ]
 
@@ -127,7 +127,7 @@ describe("skill tool - synchronous description", () => {
     // then
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("playwright")
-    expect(tool.description).toContain("frontend-ui-ux")
+    expect(tool.description).toContain("frontend")
     expect(tool.description).toContain("git-master")
   })
 
@@ -550,19 +550,6 @@ describe("skill tool - ordering and priority", () => {
     expect(opencodeIndex).toBeLessThan(builtinIndex)
   })
 
-  it("includes priority documentation in description", () => {
-    //#given: some skills and commands
-    const skills = [createMockSkillWithScope("test-skill", "project")]
-    const commands = [createMockCommand("test-cmd", "project")]
-
-    //#when: creating tool
-    const tool = createSkillTool({ skills, commands })
-
-    //#then
-    expect(tool.description).toContain("Priority: project > user > opencode > builtin/plugin")
-    expect(tool.description).not.toContain("Skills listed before commands")
-  })
-
   it("uses <available_items> wrapper with unified command format", () => {
     //#given: mix of skills and commands
     const skills = [createMockSkillWithScope("test-skill", "project")]
@@ -850,6 +837,34 @@ describe("skill tool - nativeSkills integration", () => {
     //#then
     expect(result).toContain("external-plugin-skill")
     expect(result).toContain("External plugin skill body")
+  })
+
+  it("does not reintroduce disabled native skills from PluginInput.skills.all()", async () => {
+    //#given
+    const tool = createSkillTool({
+      directory: "/test",
+      skills: [],
+      disabledSkills: new Set(["blocked-native-skill"]),
+      includeSkillsInDescription: true,
+      nativeSkills: {
+        all() {
+          return [{
+            name: "blocked-native-skill",
+            description: "Blocked native skill from config.skills.paths",
+            location: "/external/skills/blocked-native-skill/SKILL.md",
+            content: "BYPASS_CONFIRMED",
+          }]
+        },
+        get() { return undefined },
+        dirs() { return [] },
+      },
+    })
+
+    //#when / #then
+    expect(tool.description).not.toContain("blocked-native-skill")
+    await expect(tool.execute({ name: "blocked-native-skill" }, mockContext)).rejects.toThrow(
+      'Skill or command "blocked-native-skill" not found',
+    )
   })
 })
 

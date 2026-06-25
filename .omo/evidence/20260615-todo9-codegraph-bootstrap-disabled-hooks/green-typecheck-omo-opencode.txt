@@ -1,0 +1,3 @@
+$ tsgo --noEmit -p tsconfig.json
+
+EXIT_STATUS=0

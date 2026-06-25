@@ -15,8 +15,10 @@ const mockAutoMigrate = mock((): MigrationResult => ({
   configPath: null,
 }))
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockShowToast = mock((_arg: any) => Promise.resolve())
+const mockShowToast = mock(
+  (_arg: { body: { title: string; message: string; variant: string; duration: number } }) =>
+    Promise.resolve(),
+)
 const mockLog = mock(() => {})
 
 afterAll(() => {

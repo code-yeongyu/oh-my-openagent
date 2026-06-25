@@ -41,12 +41,12 @@ The refactor splits packages into strict layers by runtime boundary:
 
 **Current extraction status:**
 
-- 7 Core packages are now extracted under `packages/`: `utils`, `model-core`, `rules-engine`, `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `boulder-state`.
-- `omo` consumes all 7 via workspace dependencies plus per-file re-export shims at the original `src/` locations.
+- 18 Core packages are now extracted under `packages/`: `utils`, `model-core`, `prompts-core`, `rules-engine`, `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, and `delegate-core`.
+- `omo` consumes these packages via workspace dependencies, with adapter shims left at original `packages/omo-opencode/src/` locations where OpenCode-facing import paths or runtime wiring still need stable anchors.
 - `pi-extensions` and `codex-plugins` are not yet migrated to consume these packages. That migration is the next phase.
-- The `lsp-tools-mcp` package is now vendored in-tree. `lsp-core` extraction is `[~]` deferred pending the next MCP package layering step.
+- The `lsp-tools-mcp` and `lsp-daemon` packages are vendored in-tree and now consume `lsp-core` plus `mcp-stdio-core` instead of deep-importing each other's source internals.
 
-Layering achieved: Core (7 pure-TS packages) → Adapter (`omo` plugin) → Platform binaries. Future Pi and Codex adapters will consume the same Core layer.
+Layering achieved: Core (19 pure-TS packages) → MCP packages → Adapters (`omo` OpenCode plugin and Codex Light) → Platform binaries. Future Pi and external Codex repositories can consume the same Core layer.
 
 The Pi Engine DI abstraction was deferred. It can be revisited once the adapter migration is complete.
 

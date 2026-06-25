@@ -131,13 +131,14 @@ export function applyToolConfig(params: {
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
+      bash: "deny",
+      interactive_bash: "deny",
     };
   }
   const junior = agentByKey(params.agentResult, "sisyphus-junior");
   if (junior) {
     junior.permission = {
       ...junior.permission,
-      task: "allow",
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,

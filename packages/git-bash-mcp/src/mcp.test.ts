@@ -6,11 +6,13 @@ import type { RunGitBashCommand } from "./runner";
 type WhichBashPayload = {
   readonly source: string;
   readonly path: string;
+  readonly checkedPaths?: readonly string[];
 };
 
 type DiagnosePayload = {
   readonly enabled: boolean;
   readonly status: string;
+  readonly resolution?: { readonly checkedPaths?: readonly string[] };
 };
 
 type RunPayload = {
@@ -42,6 +44,36 @@ describe("git_bash MCP", () => {
     expect(isErrorFromResponse(response)).toBe(false);
     expect(payload.source).toBe("env");
     expect(payload.path).toBe("C:\\Tools\\Git\\bin\\bash.exe");
+    expect(payload.checkedPaths).toEqual(["C:\\Tools\\Git\\bin\\bash.exe"]);
+  });
+
+  it("#given simulated Windows resolved via PATH #when diagnose is called #then resolution lists every probed path", async () => {
+    const system32Bash = "C:\\Windows\\System32\\bash.exe";
+    const gitBash = "D:\\Git\\bin\\bash.exe";
+    const response = await handleGitBashMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "diagnose",
+        method: "tools/call",
+        params: { name: "diagnose", arguments: {} },
+      },
+      {
+        platform: "win32",
+        env: {},
+        exists: (path) => path === system32Bash || path === gitBash,
+        where: () => [system32Bash, gitBash],
+      },
+    );
+
+    const payload = diagnosePayloadFromResponse(response);
+    expect(isErrorFromResponse(response)).toBe(false);
+    expect(payload.enabled).toBe(true);
+    expect(payload.resolution?.checkedPaths).toEqual([
+      "C:\\Program Files\\Git\\bin\\bash.exe",
+      "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+      system32Bash,
+      gitBash,
+    ]);
   });
 
   it("#given non-Windows platform #when diagnose is called #then reports disabled state", async () => {
@@ -150,16 +182,29 @@ function whichBashPayloadFromResponse(response: Awaited<ReturnType<typeof handle
   if (typeof path !== "string" || typeof source !== "string") {
     throw new MalformedMcpPayloadError("Expected which_bash payload with string path and source");
   }
-  return { path, source };
+  return { path, source, checkedPaths: stringArrayField(payload, "checkedPaths") };
 }
 
 function diagnosePayloadFromResponse(response: Awaited<ReturnType<typeof handleGitBashMcpRequest>>): DiagnosePayload {
   const payload = jsonObjectFromResponse(response);
-  const { enabled, status } = payload;
+  const { enabled, status, resolution } = payload;
   if (typeof enabled !== "boolean" || typeof status !== "string") {
     throw new MalformedMcpPayloadError("Expected diagnose payload with boolean enabled and string status");
   }
-  return { enabled, status };
+  const resolutionRecord = typeof resolution === "object" && resolution !== null && !Array.isArray(resolution)
+    ? Object.fromEntries(Object.entries(resolution))
+    : undefined;
+  return {
+    enabled,
+    status,
+    resolution: resolutionRecord === undefined ? undefined : { checkedPaths: stringArrayField(resolutionRecord, "checkedPaths") },
+  };
+}
+
+function stringArrayField(record: Record<string, unknown>, key: string): readonly string[] | undefined {
+  const value = record[key];
+  if (!Array.isArray(value)) return undefined;
+  return value.every((entry): entry is string => typeof entry === "string") ? value : undefined;
 }
 
 function runPayloadFromResponse(response: Awaited<ReturnType<typeof handleGitBashMcpRequest>>): RunPayload {

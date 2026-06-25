@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promi
 import { basename, join, relative, sep } from "node:path";
 import test from "node:test";
 
-import { installCachedPlugin } from "./install/cache.mjs";
+import { installCachedPlugin } from "./install-dist/install-local.mjs";
 import { makeTempDir } from "./install-test-fixtures.mjs";
 
 test("#given source plugin has an npm lockfile #when caching plugin #then lockfile is preserved for deterministic install", async () => {

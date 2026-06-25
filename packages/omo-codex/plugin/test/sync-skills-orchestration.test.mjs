@@ -20,6 +20,10 @@ async function readSkill(skillName) {
 	return readFile(join(root, "skills", skillName, "SKILL.md"), "utf8");
 }
 
+async function readSharedSkill(skillName) {
+	return readFile(join(root, "../../shared-skills/skills", skillName, "SKILL.md"), "utf8");
+}
+
 function patternFromParts(parts, flags) {
 	return new RegExp(parts.join(""), flags);
 }
@@ -115,12 +119,12 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 | OpenCode example | Codex tool to use |
 | --- | --- |
-| \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ...","fork_turns":"none"})\` |
-| \`background_output(task_id="...")\` | \`wait_agent(...)\` for mailbox signals; after a timeout, run one \`list_agents\` check for the named child if reassurance is needed |
+| \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent({"task_name":"...","message":"TASK: act as an explorer. ..."})\` |
+| \`background_output(task_id="...")\` | \`wait_agent(...)\` for mailbox signals |
 
-Codex full-history forks inherit parent context, so role-specific behavior must be described in a self-contained \`message\` and usually should use a non-full-history fork mode such as \`fork_turns="none"\`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+Obsolete generated compatibility prose.
 
-For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`wait_agent\` timeout only means no new mailbox update arrived. Treat a running child or latest \`WORKING:\` message as alive. Do not use \`list_agents\` as a polling loop. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
+More obsolete generated compatibility prose.
 
 When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
 
@@ -135,9 +139,10 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	// then
 	assert.match(adapted, /multi_agent_v1\.spawn_agent/);
 	assert.match(adapted, /fork_context":false/);
+	assert.match(adapted, /"agent_type":"explorer"/);
 	assert.match(adapted, /multi_agent_v1\.wait_agent/);
-	assert.doesNotMatch(adapted, /fork_turns/);
-	assert.doesNotMatch(adapted, /list_agents/);
+	assert.doesNotMatch(adapted, /task_name/);
+	assert.doesNotMatch(adapted, /Obsolete generated compatibility prose/);
 });
 
 test("#given generated guidance before a template export #when adapting a skill #then the export wrapper is preserved", () => {
@@ -212,4 +217,23 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
 	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
+});
+
+test("#given PR and review skills #when synced for Codex #then worktree lifecycle is mandatory", async () => {
+	const startWork = await readSkill("start-work");
+	const reviewWork = await readSkill("review-work");
+	const sharedStartWork = await readSharedSkill("start-work");
+
+	assert.match(startWork, /PR creation, PR handoff, branch handoff, or merge/);
+	assert.match(startWork, /Finish the PR\/branch lifecycle from its task-owned worktree/);
+	assert.match(startWork, /merge by default unless explicitly opted out/);
+	assert.match(startWork, /No PR\/branch implementation or review in the main worktree/);
+
+	assert.match(sharedStartWork, /required for PR\/branch work/);
+	assert.match(sharedStartWork, /No PR\/branch implementation, review, or merge in the main worktree/);
+	assert.doesNotMatch(sharedStartWork, /If worktree mode was used/);
+	assert.doesNotMatch(sharedStartWork, /merge or hand off exactly as requested/);
+
+	assert.match(reviewWork, /dedicated review worktree attached to that branch/);
+	assert.match(reviewWork, /Never\s+checkout, test, or edit the review branch in the main worktree/);
 });

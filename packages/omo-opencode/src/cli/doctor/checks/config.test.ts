@@ -62,6 +62,49 @@ describe("config check", () => {
       }
     })
 
+    it("reports invalid ancestor plugin config from the current directory", async () => {
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalHome = process.env.HOME
+      const originalCwd = process.cwd()
+      const testRootDir = join(
+        tmpdir(),
+        `omo-doctor-layered-config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
+      const projectDir = join(testRootDir, "project")
+      const childDir = join(projectDir, "child", "deep")
+
+      try {
+        mkdirSync(childDir, { recursive: true })
+        mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+        process.env.HOME = testRootDir
+        process.env.OPENCODE_CONFIG_DIR = join(testRootDir, "empty-user-config")
+        writeFileSync(
+          join(projectDir, ".opencode", "oh-my-openagent.json"),
+          JSON.stringify({ agents: { sisyphus: { model: 123 } } }, null, 2) + "\n",
+          "utf-8",
+        )
+        process.chdir(childDir)
+
+        const result = await config.checkConfig()
+
+        expect(result.status).toBe("fail")
+        expect(result.issues.some((issue) => issue.description.includes("agents.sisyphus.model"))).toBe(true)
+      } finally {
+        process.chdir(originalCwd)
+        rmSync(testRootDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+        if (originalHome === undefined) {
+          delete process.env.HOME
+        } else {
+          process.env.HOME = originalHome
+        }
+      }
+    })
+
     it("does not flag configured custom providers as unavailable when they exist in opencode.json", async () => {
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
       const originalXdgConfig = process.env.XDG_CONFIG_HOME

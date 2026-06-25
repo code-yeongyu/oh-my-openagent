@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-16 files. Full Claude Code plugin compatibility layer. Discovers and loads ALL plugin components (commands, agents, skills, hooks, MCP servers, LSP servers) from `.opencode/plugins/` and `~/.claude/plugins/`.
+This module is the full Claude Code plugin compatibility layer. It discovers and loads ALL plugin components (commands, agents, skills, hooks, MCP servers, LSP servers) from `.opencode/plugins/` and `~/.claude/plugins/`. Shared manifest/discovery/load primitives are extracted to [`packages/claude-code-compat-core/`](../../../../../packages/claude-code-compat-core); this directory keeps OpenCode-specific integration and error surfacing.
 
 ## WHY IT EXISTS
 

@@ -179,13 +179,18 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
             state.pendingFallbackModel = undefined
             state.pendingFallbackPromptMayHaveBeenAccepted = false
           } else {
-          log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
-            sessionID,
-            pendingFallbackModel: state.pendingFallbackModel,
-          })
-          return
+            log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
+              sessionID,
+              pendingFallbackModel: state.pendingFallbackModel,
+            })
+            return
           }
         }
+      }
+
+      if (classifyErrorType(error) === "quota_exceeded") {
+        await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
+        sessionRetryInFlight.delete(sessionID)
       }
 
       await dispatchFallbackRetry(deps, helpers, {

@@ -5,6 +5,7 @@ export type ModelVariant =
   | "kimi"
   | "glm"
   | "planner"
+  | "codex"
   | "opus-4-7"
   | "minimax"
 

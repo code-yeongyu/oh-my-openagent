@@ -2,10 +2,10 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
-import { loadTeamSpec } from "../team-registry/loader"
+import { loadTeamSpec } from "@oh-my-opencode/team-core/team-registry/loader"
 import { aggregateStatus } from "../team-runtime/status"
-import { discoverTeamSpecs } from "../team-registry/paths"
-import { listActiveTeams } from "../team-state-store/store"
+import { discoverTeamSpecs } from "@oh-my-opencode/team-core/team-registry/paths"
+import { listActiveTeams } from "@oh-my-opencode/team-core/team-state-store/store"
 
 type QueryToolDeps = {
   aggregateStatus: typeof aggregateStatus

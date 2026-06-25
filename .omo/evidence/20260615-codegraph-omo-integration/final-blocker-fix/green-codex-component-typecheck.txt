@@ -1,0 +1,2 @@
+$ bun run typecheck
+$ tsc --noEmit

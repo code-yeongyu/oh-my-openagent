@@ -182,134 +182,35 @@ A `tsconfig.json` with `"strict": true` alone is **not** strict. The reference e
 
 ---
 
-## THE 250 PURE LOC CEILING (NON-NEGOTIABLE)
+## CODE SMELLS — AUTOMATIC REVIEW TRIGGERS
 
-**A source file whose pure LOC (non-blank, non-comment lines) exceeds 250 is architecturally broken.** Not a style preference. Not a soft suggestion. **A defect.**
+Most smells below are design review triggers: STOP, re-examine the code, and either fix the smell or justify carrying it with a SPECIFIC reason. **The 250 pure LOC ceiling is stricter: >250 is a DEFECT. Refactor before adding lines except for rare SIZE_OK or pure-data-table exceptions.**
 
-A file past this line is telling you, loudly:
+Full rationale, measurement methods, workaround detection, and split examples: **[`references/code-smells.md`](references/code-smells.md)**.
 
-- The module is doing more than one thing.
-- Multiple cohesive units got merged "to save a file".
-- Re-exports, barrels, and orchestrators got fused into pure-logic units.
-- Every future reader pays a tax to find what they need.
+### Smell 1 — File exceeds 250 pure LOC
 
-### Why 250 and not 500 or 1000
+A source file past 250 non-blank, non-comment lines has outgrown a single reviewer's working memory. The module is almost certainly doing more than one thing. Measure: `awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l`.
 
-At 250 pure LOC a file still fits in one screen on a 32-inch monitor with a 14pt font. A reviewer can hold the whole thing in working memory and spot a cross-cutting bug. At 500 LOC they cannot. At 1000 LOC they stop trying. The number is **the cognitive ceiling of a single human reviewer who has not memorized the file.**
+**When detected:** Name what the file owns in one short noun phrase. If the answer needs "and", the file needs splitting. Load `/refactor` and split by responsibility. If the file genuinely cannot be split (generated parser, indivisible state machine), mark with `// allow: SIZE_OK — <reason>`.
 
-### Measuring pure LOC
+### Smell 2 — Function with more than 3 parameters
 
-```bash
-# Quick (line-comment + blank exclusion - good enough for Python, Rust, TypeScript):
-awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l
+More than 3 arguments signals the function is doing too much, or that related parameters belong in a typed struct. **Workarounds count as the same smell** — passing `dict`/`Record<string, unknown>`/`map[string]any`/`**kwargs`/`...args` to smuggle parameters through one argument, or a throwaway "config" object with 6+ fields that exists solely to wrap what would otherwise be positional args (genuine reusable domain types like `HttpClientConfig` are fine).
 
-# Authoritative (handles block comments correctly):
-cloc --by-file <file>   # the "code" column is the number that matters
-```
+**When detected:** Group related parameters into a typed value object with a domain name. If 4+ independent inputs are genuinely required, the justification must be SPECIFIC. See [`references/code-smells.md` Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters) for examples in every language.
 
-### Required behavior
+### Smell 3 — Redundant verification after a destructive action
 
-**Creating a file that will exceed 250 pure LOC.** STOP. Split it **before the first commit**. Carve by responsibility (single-responsibility principle), one cohesive unit per file. Use a barrel (`__init__.py`, `mod.rs`, `index.ts`) for re-exports ONLY. **Never** for logic.
+Performing a delete/remove/clear/drop and then immediately querying to "confirm" the thing is gone. **The operation's contract IS the verification.** Re-checking is AI-generated defensive bloat that wastes cycles and teaches the reader the operation is unreliable — which it is not. Same smell: calling a setter then getting to "confirm", writing a file then reading it back, inserting a row then SELECT-ing it, pushing to an array then checking `.length`.
 
-**Editing a file that already exceeds 250 pure LOC and your edit adds lines.** STOP. Refactor the unit you are touching into its own file BEFORE adding the new lines. The split is part of THIS task, not a follow-up someone will never do.
+**When detected:** Delete the verification code. Trust the operation's contract. If the operation can genuinely fail silently, fix the operation — do not paper over it with a post-check. See [`references/code-smells.md` Smell 3](references/code-smells.md#smell-3--redundant-verification-after-a-destructive-action) for examples.
 
-**Reading a file that exceeds 250 pure LOC while implementing a feature.** Surface the smell explicitly in your reply, propose a concrete split (which functions go where, in 1-2 lines each), and ask the user whether to split now or carry the smell into the feature work. Do not silently keep going.
+### Smell 4 — Negative-form names and conditions
 
-### Forbidden escapes
+Naming variables, functions, or flags by the **absence** of a quality (`isNotValid`, `noErrors`, `cannotProceed`, `DisableLogging`) instead of its **presence** (`isValid`, `isClean`, `canProceed`, `LoggingEnabled`). Every negation forces the reader to invert mentally; two negations (`if !isNotReady`) become a logic puzzle nobody reviews confidently.
 
-- Counting comments and blank lines toward the budget. **Pure LOC means code lines.** Period.
-- Splitting by token count (`foo_1.py`, `module_part_A.rs`, `service-2.ts`). **REJECT.** Split by what each file DOES. Name each file after the concept it owns.
-- Catch-all dump files: `utils.py`, `helpers.ts`, `lib.rs` (as a logic dump), `common.py`, `shared.ts`. **REJECT.** These just relocate the smell.
-- "It's generated, so it's fine." Only true if the file lives in `dist/`, `target/`, `__generated__/`, or wherever the build authoritatively rewrites. Hand-edited "I will regenerate it later" files do NOT qualify.
-- "It's a test file with many cases." Split by SUT or by behavior cluster. One file per cohesive `describe` group.
-- "230 pure LOC, close enough." A 230-LOC file about to grow is already over the line. Split now. **Do not race to the ceiling.**
-
-### Acceptable exceptions (rare, require justification)
-
-A file may legitimately exceed 250 pure LOC if **and only if** it is:
-
-- A **truly indivisible single-responsibility unit** (e.g., a generated parser table, a state machine whose states share a single closure, a `derive` macro implementation). Mark the first 5 lines with a comment such as `# noqa: SIZE_OK - generated parser table, 612 states share branch tables` (Python) / `// allow: SIZE_OK - state machine, removing any state breaks the transition matrix` (Rust/TS), and explain WHY no split is possible.
-- A **pure data table** (translation strings, error code lookup, brand color palette). Tables of data are not logic.
-
-**`# noqa: SIZE_OK` without a justifying comment is itself slop** and must be rejected by the next person to touch the file.
-
-### Concrete split examples
-
-#### Python - BEFORE (`user_service.py`, 412 pure LOC, broken)
-
-```python
-# user_service.py - DOES TOO MUCH
-class UserRepository: ...        # 90 LOC of SQLAlchemy
-class UserValidator: ...         # 60 LOC of Pydantic + business rules
-class PasswordHasher: ...        # 40 LOC of bcrypt wrapper
-class EmailSender: ...           # 50 LOC of httpx2 client
-class UserService: ...           # 130 LOC orchestrating the four above
-def _build_query(...): ...       # 25 LOC helper
-def _format_email(...): ...      # 17 LOC helper
-```
-
-#### Python - AFTER (split by responsibility)
-
-```
-src/myapp/users/
-├── __init__.py              # barrel: re-exports UserService only (5 LOC)
-├── repository.py            # UserRepository                 (~95 LOC)
-├── validator.py             # UserValidator                  (~65 LOC)
-├── password.py              # PasswordHasher                 (~45 LOC)
-├── notifier.py              # EmailSender (renamed - the role, not the verb)
-├── service.py               # UserService (orchestrator)     (~135 LOC)
-└── _queries.py              # _build_query (private)         (~30 LOC)
-```
-
-Every file is < 250 pure LOC. Each owns one concept. The barrel exposes the only public name. The reviewer never has to scroll through password hashing to understand SMTP retry policy.
-
-#### Rust - BEFORE (`auth.rs`, 380 pure LOC)
-
-```rust
-// auth.rs - DOES TOO MUCH
-pub struct Session { ... }                      // 40 LOC
-impl Session { ... }                            // 90 LOC of methods
-pub struct TokenIssuer { ... }                  // 30 LOC
-impl TokenIssuer { ... }                        // 70 LOC
-pub struct RateLimiter { ... }                  // 50 LOC
-impl RateLimiter { ... }                        // 70 LOC
-fn parse_authorization_header(...) { ... }      // 30 LOC
-```
-
-#### Rust - AFTER
-
-```
-src/auth/
-├── mod.rs              # re-exports Session, TokenIssuer, RateLimiter (8 LOC)
-├── session.rs          # Session + impl                         (~130 LOC)
-├── token.rs            # TokenIssuer + impl                     (~100 LOC)
-├── rate_limit.rs       # RateLimiter + impl                     (~120 LOC)
-└── header.rs           # parse_authorization_header             (~35 LOC)
-```
-
-#### TypeScript - BEFORE (`api/orders.ts`, 510 pure LOC)
-
-```typescript
-// api/orders.ts - DOES TOO MUCH
-export const OrderSchema = z.object({ ... })          // 30 LOC
-type Order = z.infer<typeof OrderSchema>
-export class OrderRepository { ... }                  // 110 LOC
-export class PricingEngine { ... }                    // 130 LOC
-export class TaxCalculator { ... }                    // 90 LOC
-export class OrderService { ... }                     // 150 LOC
-```
-
-#### TypeScript - AFTER
-
-```
-src/orders/
-├── index.ts                    # barrel (6 LOC)
-├── schema.ts                   # OrderSchema + Order type      (~35 LOC)
-├── repository.ts               # OrderRepository               (~115 LOC)
-├── pricing.ts                  # PricingEngine                 (~135 LOC)
-├── tax.ts                      # TaxCalculator                 (~95 LOC)
-└── service.ts                  # OrderService (orchestrator)   (~155 LOC)
-```
+**When detected:** Rename to the positive form and invert the branch logic. Negation IS appropriate in guard clauses (`if !authorized { return }`) and filters (`items.filter(|x| !x.is_expired())`) — the negative form is the intent there. See [`references/code-smells.md` Smell 4](references/code-smells.md#smell-4--negative-form-names-and-conditions) for the full naming table and examples.
 
 ---
 
@@ -341,8 +242,8 @@ bun run scripts/typescript/check-no-excuse-rules.ts <changed paths>
 | Pure LOC | Verdict | Required action |
 |---|---|---|
 | ≤ 200 | Healthy | continue |
-| 200 - 250 | **Warning band** - the file is approaching the ceiling. State that fact explicitly in the next message and propose a split if the next planned edit will add lines. |
-| > 250 | **DEFECT** - the architecture is wrong. Do NOT commit. Refactor into smaller cohesive units **now**, in this same task. |
+| 200 - 250 | **Warning band** | State that fact and propose a split if the next edit will add lines. |
+| > 250 | **DEFECT** | Do NOT commit new lines to this file. Refactor now: split the touched unit before adding lines, except for rare SIZE_OK or pure-data-table exceptions. |
 
 ### Step 3 — architectural self-review (always, even at 80 LOC)
 
@@ -355,15 +256,18 @@ After every code-writing session, answer these out loud (in your reply) before d
 5. **Defensive layer?** Any null check, try/except, or `isinstance` guarding a value the type system already proves? If yes, delete.
 6. **Helpers for one-off?** Any function, class, or trait introduced for a single caller that will never get a second caller? If yes, inline.
 7. **Tests?** Is the behavior I just introduced locked by a test that would fail if I revert this commit?
+8. **Parameter bloat?** Any function I wrote or modified that takes more than 3 parameters — or smuggles them through a dict/kwargs/`...args`/throwaway options object? If yes, group related params into a typed value object. See [Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters).
+9. **Redundant verification?** Did I perform a destructive action (delete, remove, clear) and then immediately re-query to "confirm" it worked? Did I call a setter then a getter to "verify"? If yes, delete the verification — the operation's contract IS the proof. See [Smell 3](references/code-smells.md#smell-3--redundant-verification-after-a-destructive-action).
+10. **Negative naming?** Any variable, function, or flag named by the absence of a quality (`isNotValid`, `noErrors`, `DisableX`) when a positive name (`isValid`, `isClean`, `EnableX`) would work? If yes, rename to positive form and invert the branch. See [Smell 4](references/code-smells.md#smell-4--negative-form-names-and-conditions).
 
 **If any answer fails, fix it before declaring done.** This loop is the difference between "the code compiles" and "the code is correct."
 
 ### Step 4 — if you need to refactor right now, invoke the right skill
 
-- The file you just wrote (or an adjacent one) is over 250 pure LOC, or step 3 surfaced more than two issues: **load the `refactor` skill** and execute its safe-refactor protocol (codemap, plan, LSP-driven edits, test after each step). Do not improvise a refactor under time pressure - the refactor skill exists precisely so you do not corrupt behavior while reshaping structure.
-- You inherited a branch with AI-generated patterns (broad `except`, redundant null checks, vague TODOs, oversized modules, dead helpers): **load the `remove-ai-slops` skill** to do a categorized branch-scope cleanup with regression tests pinned first.
+- Any code smell from the [CODE SMELLS section](#code-smells--automatic-review-triggers) fired (250+ LOC, >3 params, redundant verification, negative naming), or step 3 surfaced more than two issues: **load the `refactor` skill** and execute its safe-refactor protocol (codemap, plan, LSP-driven edits, test after each step). Do not improvise a refactor under time pressure — the refactor skill exists precisely so you do not corrupt behavior while reshaping structure.
+- You inherited a branch with AI-generated patterns (broad `except`, redundant null checks, vague TODOs, oversized modules, dead helpers, redundant post-action verification): **load the `remove-ai-slops` skill** to do a categorized branch-scope cleanup with regression tests pinned first.
 
-These two skills are not optional cosmetics. They are the recovery path for the defects this loop is designed to catch.
+These two skills are not optional cosmetics. They are the recovery path for the smells this loop is designed to catch.
 
 ---
 
@@ -371,8 +275,8 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 
 | Trigger | Skill to load | Why |
 |---|---|---|
-| File exceeds 250 pure LOC, OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
-| Recent branch contains AI-authored code that smells (broad except, dead helpers, vague comments, oversized files), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Tests pinned FIRST, then categorized parallel cleanup, then quality gates. Behavior-preserving. |
+| Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification), OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
+| Recent branch contains AI-authored patterns (broad except, dead helpers, vague comments, oversized files, redundant post-action verification), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Tests pinned FIRST, then categorized parallel cleanup, then quality gates. Behavior-preserving. |
 | Rust code touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive | `references/rust-ub/` | Full UB taxonomy + Miri strictness escalation. Every `unsafe` block must survive Miri Level 3 (strict provenance + symbolic alignment + preemption) before it ships. |
 
 ---

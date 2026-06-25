@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Sibling to `claude-code-mcp-loader`. Loads Claude Code agent definitions from `.opencode/agents/`, `~/.claude/agents/`, and inline `opencode.json` config, then translates them to OpenCode `AgentConfig`. 12 files.
+Sibling to `claude-code-mcp-loader`. Loads Claude Code agent definitions from `.opencode/agents/`, `~/.claude/agents/`, and inline `opencode.json` config, then translates them to OpenCode `AgentConfig`. Shared parsing and compatibility primitives are extracted to [`packages/claude-code-compat-core/`](../../../../../packages/claude-code-compat-core); this directory is the OpenCode adapter shim.
 
 ## LOAD PIPELINE
 

@@ -5,59 +5,13 @@ import {
 } from "../../shared/prompt-async-gate/pending-tool-turn"
 import {
   latestAssistantTurnHasFreshToolActivity,
+  latestAssistantTurnHasStaleUnknownSubstantiveOutput,
   latestAssistantTurnHasToolBlock,
   latestAssistantTurnIsCompletedEmptyNoProgress,
 } from "./parent-wake-history-state"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 import { getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
-
-export type ParentWakeSessionMessage = {
-  readonly info?: {
-    readonly role?: string
-    readonly finish?: string
-    readonly error?: unknown
-    readonly time?: {
-      readonly created?: unknown
-      readonly updated?: unknown
-      readonly completed?: unknown
-      readonly start?: unknown
-      readonly end?: unknown
-    }
-  }
-  readonly role?: string
-  readonly finish?: string
-  readonly error?: unknown
-  readonly time?: {
-    readonly created?: unknown
-    readonly updated?: unknown
-    readonly completed?: unknown
-    readonly start?: unknown
-    readonly end?: unknown
-  }
-  readonly parts?: readonly {
-    readonly type?: string
-    readonly text?: string
-    readonly synthetic?: boolean
-    readonly content?: unknown
-    readonly time?: {
-      readonly created?: unknown
-      readonly updated?: unknown
-      readonly completed?: unknown
-      readonly start?: unknown
-      readonly end?: unknown
-    }
-    readonly state?: {
-      readonly status?: unknown
-      readonly time?: {
-        readonly created?: unknown
-        readonly updated?: unknown
-        readonly completed?: unknown
-        readonly start?: unknown
-        readonly end?: unknown
-      }
-    }
-  }[]
-}
+import type { ParentWakeSessionMessage } from "./parent-wake-session-message"
 
 export type ToolWaitDeferralDecision = {
   readonly defer: boolean
@@ -113,12 +67,28 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     return { defer: true, skipPromptGateToolStateCheck: false }
   }
   const messages = [...input.messages]
+  let strippedOwnAdmittedDeposit = false
+  if (input.wake.noReplyAdmittedAt !== undefined) {
+    while (messages.length > 0) {
+      const last = messages[messages.length - 1]
+      if (
+        !last
+        || getParentWakeMessageRole(last) !== "user"
+        || !isSyntheticOrInternalUserMessage(last)
+        || !parentWakeMessageContainsNotification(last, input.wake)
+      ) {
+        break
+      }
+      messages.pop()
+      strippedOwnAdmittedDeposit = true
+    }
+  }
   const latestAssistantBlocksPrompt = latestAssistantTurnBlocksInternalPrompt(messages)
   const latestAssistantHasUnansweredQuestion = latestAssistantTurnHasUnansweredQuestion(messages)
   if (!latestAssistantBlocksPrompt) {
     delete input.wake.toolCallDeferralStartedAt
     delete input.wake.allowEmptyAssistantTurnRetry
-    return { defer: false, skipPromptGateToolStateCheck: false }
+    return { defer: false, skipPromptGateToolStateCheck: strippedOwnAdmittedDeposit }
   }
   const now = input.now ?? Date.now()
   input.wake.toolCallDeferralStartedAt ??= now
@@ -137,8 +107,20 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     && latestAssistantTurnHasToolBlock(messages)
     && !latestAssistantTurnHasFreshToolActivity(messages, now, input.toolCallDeferMaxMs)
   ) {
-    delete input.wake.toolCallDeferralStartedAt
-    log("[background-agent] Retrying parent wake after stale tool-call deferral:", { sessionID: input.sessionID })
+    // A reply dispatch here would fork a concurrent assistant turn: the turn is
+    // still mid-flight, only its busy signals are quiet (silent tool, blind
+    // instance-scoped status). Defer so the wake is admitted as noReply at most
+    // and resumed by the idle/consumption machinery (ses_14a3ab27bffe incident).
+    log("[background-agent] Holding parent wake during stale tool-call deferral:", { sessionID: input.sessionID })
+    return { defer: true, skipPromptGateToolStateCheck: true }
+  }
+  if (
+    now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs
+    && latestAssistantTurnHasStaleUnknownSubstantiveOutput(messages, now, input.toolCallDeferMaxMs)
+  ) {
+    log("[background-agent] Retrying parent wake after stale unknown-finish assistant output:", {
+      sessionID: input.sessionID,
+    })
     return { defer: false, skipPromptGateToolStateCheck: true }
   }
   log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
@@ -168,6 +150,23 @@ export function hasRecordedParentWakePromptMessage(input: {
       return true
     }
     return createdAt >= dispatchedAt && parentWakeMessageHasOutput(message)
+  })
+}
+
+export function hasAssistantOutputAfterParentWakeAdmission(input: {
+  readonly messages: readonly ParentWakeSessionMessage[] | undefined
+  readonly wake: PendingParentWake
+}): boolean {
+  const admittedAt = input.wake.noReplyAdmittedAt
+  if (admittedAt === undefined || !input.messages) {
+    return false
+  }
+  return input.messages.some((message) => {
+    if (getParentWakeMessageRole(message) !== "assistant") {
+      return false
+    }
+    const createdAt = getParentWakeMessageCreatedAt(message)
+    return createdAt !== undefined && createdAt >= admittedAt && parentWakeMessageHasOutput(message)
   })
 }
 

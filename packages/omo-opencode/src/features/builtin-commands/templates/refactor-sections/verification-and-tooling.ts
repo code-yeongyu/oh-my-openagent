@@ -78,7 +78,7 @@ All existing tests pass. No new errors introduced.
 
 ## ALWAYS DO
 - Understand before changing
-- Preview before applying (ast_grep dryRun=true)
+- Preview structural rewrites before applying them
 - Verify after every change
 - Follow existing codebase patterns
 - Keep todos updated in real-time
@@ -107,8 +107,8 @@ Leverage LSP tools for precision analysis. Key patterns:
 - **Continuous verification**: \`lsp_diagnostics\` after every change
 
 ## AST-Grep
-Use \`ast_grep_search\` and \`ast_grep_replace\` for structural transformations.
-**Critical**: Always \`dryRun=true\` first, review, then execute.
+Use the \`ast-grep\` skill helper or \`sg\` CLI for structural transformations.
+**Critical**: Always preview first, review, then execute.
 
 ## Agents
 - \`explore\`: Parallel codebase pattern discovery

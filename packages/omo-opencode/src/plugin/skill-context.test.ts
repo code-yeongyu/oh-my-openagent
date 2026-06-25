@@ -242,6 +242,70 @@ describe("createSkillContext", () => {
     }
   })
 
+  it("sources host skill MCPs from the runtime hostSkills arg (not on-disk config)", async () => {
+    // given - a skill with an embedded mcp, registered only via the runtime
+    // hostSkills arg (as a plugin like claude-bridge injects at runtime), with
+    // NOTHING on disk.
+    const runtimeSkillsDir = join(testDirectory, "runtime-skills")
+    const runtimeSkillDir = join(runtimeSkillsDir, "runtime-host-skill")
+    mkdirSync(runtimeSkillDir, { recursive: true })
+    writeFileSync(
+      join(runtimeSkillDir, "SKILL.md"),
+      [
+        "---",
+        "name: runtime-host-skill",
+        "description: Skill injected via runtime config skills.paths",
+        "mcp:",
+        "  testmcp:",
+        "    command: echo",
+        '    args: ["hi"]',
+        "---",
+        "Body.",
+        "",
+      ].join("\n"),
+    )
+
+    // on-disk config returns nothing: proves the runtime arg is the source.
+    const readOpencodeConfigSkillsSpy = spyOn(
+      skillLoader,
+      "readOpencodeConfigSkills",
+    ).mockReturnValue(undefined)
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+
+    try {
+      // when - hostSkills is provided, as createTools does from the runtime config
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+        hostSkills: { paths: [runtimeSkillsDir] },
+      })
+
+      // then - the skill is discovered AND its embedded mcp survives into mergedSkills
+      const skill = result.mergedSkills.find((s) => s.name === "runtime-host-skill")
+      expect(skill).toBeDefined()
+      expect(Boolean(skill?.mcpConfig && "testmcp" in skill.mcpConfig)).toBe(true)
+      // and the on-disk reader was bypassed entirely
+      expect(readOpencodeConfigSkillsSpy).not.toHaveBeenCalled()
+    } finally {
+      readOpencodeConfigSkillsSpy.mockRestore()
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverProjectClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverOpencodeProjectSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
+
   it("excludes discovered dev-browser skill when browser provider is playwright", async () => {
     // given
     const discoveredDevBrowserSkill = {

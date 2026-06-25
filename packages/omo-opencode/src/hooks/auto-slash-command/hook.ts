@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import {
   detectSlashCommand,
   extractPromptText,
@@ -21,9 +22,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
 const COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS = 100
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 function getDeletedSessionID(properties: unknown): string | null {
   return resolveSessionEventID(properties) ?? null

@@ -1,14 +1,14 @@
 import {
 	type TelemetryDiagnosticErrorKind,
 	type TelemetryDiagnosticEvent,
-	writeTelemetryDiagnostic,
-} from "./diagnostics.js";
+} from "@oh-my-opencode/telemetry-core";
 import {
 	createPluginPostHog,
 	getPostHogDistinctId,
 	type PostHogActivityReason,
 	type PostHogClient,
 } from "./posthog.js";
+import { writeComponentTelemetryDiagnostic } from "./product-identity.js";
 
 export type CodexSessionStartInput = {
 	session_id: string;
@@ -32,7 +32,7 @@ function writeHookDiagnostic(
 	error: unknown,
 	errorKind: TelemetryDiagnosticErrorKind,
 ): void {
-	writeTelemetryDiagnostic({
+	writeComponentTelemetryDiagnostic({
 		event,
 		source: "plugin",
 		error,

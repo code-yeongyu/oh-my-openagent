@@ -88,10 +88,10 @@ afterEach(async () => {
     for (const managed of state.clients.values()) {
       try {
         await managed.client.close()
-      } catch {}
+      } catch {} // no-excuse-ok: catch — best-effort teardown; mock client may already be closed
       try {
         await managed.transport.close()
-      } catch {}
+      } catch {} // no-excuse-ok: catch — best-effort teardown; mock transport may already be closed
     }
     state.clients.clear()
     state.pendingConnections.clear()

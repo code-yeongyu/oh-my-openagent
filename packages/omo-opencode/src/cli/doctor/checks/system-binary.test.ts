@@ -1,7 +1,29 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { extractSemverFromOutput } from "../../../shared/extract-semver"
+
+const DOCTOR_CHECKS_DIR = import.meta.dir
+const RAW_BUN_RUNTIME_RE = /(?<!runtime\.)\bBun\.(?:version|which)\b/
+
+describe("findOpenCodeBinary node fallback safety", () => {
+  it("#given doctor runs under node fallback #when check sources are audited #then they avoid raw Bun globals", () => {
+    // given
+    const sources = readdirSync(DOCTOR_CHECKS_DIR)
+      .filter((fileName) => fileName.endsWith(".ts") && !fileName.endsWith(".test.ts"))
+      .map((fileName) => ({ fileName, source: readFileSync(join(DOCTOR_CHECKS_DIR, fileName), "utf8") }))
+
+    // when
+    const offenders = sources
+      .filter(({ source }) => RAW_BUN_RUNTIME_RE.test(source))
+      .map(({ fileName }) => fileName)
+
+    // then
+    expect(offenders).toEqual([])
+  })
+})
 
 describe("extractSemverFromOutput", () => {
   describe("#given clean version output #when extractSemverFromOutput #then returns the semver token", () => {

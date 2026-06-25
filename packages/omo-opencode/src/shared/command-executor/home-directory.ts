@@ -1,5 +1,1 @@
-import { homedir } from "node:os"
-
-export function getHomeDirectory(): string {
-	return process.env.HOME || process.env.USERPROFILE || homedir()
-}
+export * from "@oh-my-opencode/utils/command-executor/home-directory"

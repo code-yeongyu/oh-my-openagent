@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "4.8.1",
+	"version": "4.13.0",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -19,7 +19,30 @@
 		"skills"
 	],
 	"skills": "./skills/",
-	"hooks": "./hooks/hooks.json",
+	"hooks": [
+		"./hooks/session-start-loading-project-rules.json",
+		"./hooks/session-start-recording-session-telemetry.json",
+		"./hooks/session-start-checking-auto-update.json",
+		"./hooks/session-start-checking-bootstrap-provisioning.json",
+		"./hooks/session-start-checking-codegraph-bootstrap.json",
+		"./hooks/user-prompt-submit-loading-project-rules.json",
+		"./hooks/user-prompt-submit-selecting-lazycodex-workflow.json",
+		"./hooks/user-prompt-submit-checking-ultrawork-trigger.json",
+		"./hooks/user-prompt-submit-checking-ulw-loop-steering.json",
+		"./hooks/pre-tool-use-recommending-git-bash-mcp.json",
+		"./hooks/pre-tool-use-enforcing-unlimited-goal-budget.json",
+		"./hooks/post-tool-use-checking-comments.json",
+		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
+		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
+		"./hooks/post-tool-use-matching-project-rules.json",
+		"./hooks/post-tool-use-checking-thread-title-hygiene.json",
+		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
+		"./hooks/post-compact-resetting-project-rule-cache.json",
+		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",
+		"./hooks/stop-checking-start-work-continuation.json",
+		"./hooks/subagent-stop-checking-start-work-continuation.json",
+		"./hooks/subagent-stop-verifying-lazycodex-executor-evidence.json"
+	],
 	"mcpServers": "./.mcp.json",
 	"interface": {
 		"displayName": "OMO",

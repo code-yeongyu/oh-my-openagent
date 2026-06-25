@@ -36,6 +36,6 @@ PAYLOAD='{"cwd":"/tmp","hook_event_name":"UserPromptSubmit","model":"gpt-5.5","p
 npm run build
 echo "$PAYLOAD" | node dist/cli.js hook user-prompt-submit | head -3
 
-# pattern boundary check (must be empty)
-echo '{"hook_event_name":"UserPromptSubmit","prompt":"refactor ulw_helper.ts"}' | node dist/cli.js hook user-prompt-submit | wc -c
+# substring check (must print 1)
+echo '{"hook_event_name":"UserPromptSubmit","prompt":"refactor ulw_helper.ts"}' | node dist/cli.js hook user-prompt-submit | grep -c '<ultrawork-mode>'
 ```

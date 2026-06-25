@@ -45,4 +45,4 @@ Conventions for human contributors and AI agents working on this repository.
 ## Build and Hooks
 
 - Build output goes to `dist/`.
-- `hooks/hooks.json` runs `node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit`.
+- `hooks/hooks.json` runs `node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit --with-ultrawork`.

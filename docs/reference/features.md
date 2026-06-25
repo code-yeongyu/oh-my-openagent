@@ -71,6 +71,32 @@ task(subagent_type="explore", load_skills=[], prompt="Find auth implementations"
 background_output(task_id="bg_abc123")
 ```
 
+#### Background Agent Work Directories
+
+Background agents inherit the session working directory from OpenCode and OMO when
+the task tool starts them. OMO does not force the model's own shell commands to
+stay inside that directory after launch. If a model decides to clone a repo,
+download docs, or create scratch files under `/tmp` or macOS `/var/folders/...`,
+the filesystem prompt comes from that command, not from a separate OMO storage
+root.
+
+`APP_DIR` is an OpenCode process environment value. Treat it as process context,
+not as a guarantee that every background agent artifact will land there.
+
+For projects that must keep all agent scratch work under the repository, add a
+project `AGENTS.md` rule with an explicit writable path:
+
+```md
+Use ./.omo/session-work/ for clones, downloaded docs, scratch files, and
+temporary outputs. Do not write under /tmp, /var, or other OS temp directories
+unless the user approves it.
+```
+
+If you use tmux panes for background agents, each pane still follows the same
+model instructions. A project rule is more reliable than repeating the
+constraint in one prompt, because every subagent receives the rule with the
+project context.
+
 #### Visual Multi-Agent with Tmux
 
 Enable `tmux.enabled` to see background agents in separate tmux panes:
@@ -104,8 +130,8 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 
 ### Architecture Snapshot (current)
 
-- **Feature modules**: `src/features/` has 20 modules.
-- **Tool system**: `src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
+- **Feature modules**: `packages/omo-opencode/src/features/` has 20 modules.
+- **Tool system**: `packages/omo-opencode/src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
 - **Hook system**: 5-tier composition is **54 base hooks**. With team mode it becomes **61** (extra tool guard + transforms + direct team session event handlers).
 - **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
@@ -286,21 +312,141 @@ The system automatically recovers from common session failures without user inte
 - **JSON parse errors**: Recovers from malformed tool outputs
 
 Recovery happens transparently during agent execution. You see the result, not the failure.
-## Skills
+## Commands
 
-Skills provide specialized workflows with embedded MCP servers and detailed instructions. A Skill is a mechanism that injects **specialized knowledge (Context)** and **tools (MCP)** for specific domains into agents.
+Commands are slash-triggered workflows that execute predefined templates.
 
-### Built-in Skills
+### Built-in Commands
 
-| Skill              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **git-master**     | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering, style detection), Rebase Surgeon (history rewriting, conflict resolution, branch cleanup), History Archaeologist (finding when/where specific changes were introduced). |
-| **playwright**     | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
-| **agent-browser**  | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
-| **dev-browser**    | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
-| **frontend-ui-ux** | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                   |
-| **review-work**    | "review work", "review my work", "QA my work"         | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                      |
-| **$omo:remove-ai-slops**| "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                             |
+| Command              | Description                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
+| `/ralph-loop`        | Start self-referential development loop until completion                                   |
+| `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
+| `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
+| `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
+| `/start-work`        | Start Sisyphus work session from Prometheus plan                                           |
+| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
+| `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
+
+### /init-deep
+
+**Purpose**: Generate hierarchical AGENTS.md files throughout your project
+
+**Usage**:
+
+```
+/init-deep [--create-new] [--max-depth=N]
+```
+
+Creates directory-specific context files that agents automatically read:
+
+```
+project/
+├── AGENTS.md                        # Project-wide context
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # src-specific context
+│   └── components/
+│       └── AGENTS.md                # Component-specific context
+```
+
+### /ralph-loop
+
+**Purpose**: Self-referential development loop that runs until task completion
+
+**Named after**: Anthropic's Ralph Wiggum plugin
+
+**Usage**:
+
+```
+/ralph-loop "Build a REST API with authentication"
+/ralph-loop "Refactor the payment module" --max-iterations=50
+```
+
+**Behavior**:
+
+- Agent works continuously toward the goal
+- Detects `<promise>DONE</promise>` to know when complete
+- Auto-continues if agent stops without completion
+- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
+
+**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+
+### /ulw-loop
+
+**Purpose**: Same as ralph-loop but with ultrawork mode active
+
+Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+
+### /refactor
+
+**Purpose**: Intelligent refactoring with full toolchain
+
+**Usage**:
+
+```
+/refactor <target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
+```
+
+**Features**:
+
+- LSP-powered rename and navigation
+- AST-grep for pattern matching
+- Architecture analysis before changes
+- TDD verification after changes
+- Codemap generation
+
+### /start-work
+
+**Purpose**: Start execution from a Prometheus-generated plan
+
+**Usage**:
+
+```
+/start-work [plan-name]
+```
+
+Uses atlas agent to execute planned tasks systematically.
+
+### /stop-continuation
+
+**Purpose**: Stop all continuation mechanisms for this session
+
+Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
+
+### /handoff
+
+**Purpose**: Create a detailed context summary for continuing work in a new session
+
+Generates a structured handoff document capturing the current state, what was done, what remains, and relevant file paths — enabling seamless continuation in a fresh session.
+
+### Custom Commands
+
+Load custom commands from:
+
+- `.opencode/command/*.md` (project, OpenCode native)
+- `~/.config/opencode/command/*.md` (user, OpenCode native)
+- `.claude/commands/*.md` (project, Claude Code compat)
+- `~/.config/opencode/commands/*.md` (user, Claude Code compat)
+
+## Skill Sets
+
+Skill sets provide specialized workflows with embedded MCP servers and detailed instructions. They are automatically activated by matching task intent, so you do not need to study or preload everything before working. When you want to force one deliberately, call it by name in the prompt, slash command, or `load_skills` list.
+
+### Built-in Skill Sets
+
+| Skill set              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **git-master**         | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced).                              |
+| **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
+| **agent-browser**      | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
+| **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
+| **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
+| **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                     |
+| **ulw-research**       | `ulw-research`, `ultraresearch`, deep research requests | Maximum-saturation research. Runs parallel explore/librarian swarms across code, docs, web, and OSS repos; recursively follows `EXPAND` leads until convergence; proves contested claims by running code; and returns cited synthesis. `ultraresearch` is the legacy alias.                                                                   |
+| **$omo:remove-ai-slops** | "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                           |
+
+`ulw-research` is intentionally explicit. Ordinary questions and normal implementation context-gathering will not trigger a saturation swarm. Use `ulw-research` or `ultraresearch` when the research itself is the deliverable and every claim needs a citation, a proof artifact, or an execution-backed verdict.
 
 #### git-master Core Principles
 
@@ -325,7 +471,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 /git-master who wrote this authentication code?
 ```
 
-#### frontend-ui-ux Design Process
+#### frontend Design Process
 
 - **Design Process**: Purpose, Tone, Constraints, Differentiation
 - **Aesthetic Direction**: Choose extreme - brutalist, maximalist, retro-futuristic, luxury, playful
@@ -426,7 +572,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 #### The Designer (UI Implementation)
 
 - **Category**: `visual-engineering`
-- **load_skills**: `["frontend-ui-ux", "playwright"]`
+- **load_skills**: `["frontend", "playwright"]`
 - **Effect**: Implements aesthetic UI and verifies rendering results directly in browser.
 
 #### The Architect (Design Review)
@@ -465,126 +611,9 @@ When delegating, **clear and specific** prompts are essential. Include these 7 e
 > **MUST NOT DO**: Modify existing desktop layout
 > **EXPECTED**: Buttons align vertically on mobile
 
-## Commands
-
-Commands are slash-triggered workflows that execute predefined templates.
-
-### Built-in Commands
-
-| Command              | Description                                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
-| `/ralph-loop`        | Start self-referential development loop until completion                                   |
-| `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
-| `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
-| `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
-| `/start-work`        | Start Sisyphus work session from Prometheus plan                                           |
-| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
-| `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
-
-### /init-deep
-
-**Purpose**: Generate hierarchical AGENTS.md files throughout your project
-
-**Usage**:
-
-```
-/init-deep [--create-new] [--max-depth=N]
-```
-
-Creates directory-specific context files that agents automatically read:
-
-```
-project/
-├── AGENTS.md              # Project-wide context
-├── src/
-│   ├── AGENTS.md          # src-specific context
-│   └── components/
-│       └── AGENTS.md      # Component-specific context
-```
-
-### /ralph-loop
-
-**Purpose**: Self-referential development loop that runs until task completion
-
-**Named after**: Anthropic's Ralph Wiggum plugin
-
-**Usage**:
-
-```
-/ralph-loop "Build a REST API with authentication"
-/ralph-loop "Refactor the payment module" --max-iterations=50
-```
-
-**Behavior**:
-
-- Agent works continuously toward the goal
-- Detects `<promise>DONE</promise>` to know when complete
-- Auto-continues if agent stops without completion
-- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
-
-**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
-
-### /ulw-loop
-
-**Purpose**: Same as ralph-loop but with ultrawork mode active
-
-Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
-
-### /refactor
-
-**Purpose**: Intelligent refactoring with full toolchain
-
-**Usage**:
-
-```
-/refactor <target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
-```
-
-**Features**:
-
-- LSP-powered rename and navigation
-- AST-grep for pattern matching
-- Architecture analysis before changes
-- TDD verification after changes
-- Codemap generation
-
-### /start-work
-
-**Purpose**: Start execution from a Prometheus-generated plan
-
-**Usage**:
-
-```
-/start-work [plan-name]
-```
-
-Uses atlas agent to execute planned tasks systematically.
-
-### /stop-continuation
-
-**Purpose**: Stop all continuation mechanisms for this session
-
-Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
-
-### /handoff
-
-**Purpose**: Create a detailed context summary for continuing work in a new session
-
-Generates a structured handoff document capturing the current state, what was done, what remains, and relevant file paths — enabling seamless continuation in a fresh session.
-
-### Custom Commands
-
-Load custom commands from:
-
-- `.opencode/command/*.md` (project, OpenCode native)
-- `~/.config/opencode/command/*.md` (user, OpenCode native)
-- `.claude/commands/*.md` (project, Claude Code compat)
-- `~/.config/opencode/commands/*.md` (user, Claude Code compat)
-
 ## Tools
 
-Tool registration is config-gated. `src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
+Tool registration is config-gated. `packages/omo-opencode/src/tools/` has 16 directories, and exposed tools range from **20 minimum to 39 maximum**.
 
 ### Code Search Tools
 
@@ -612,14 +641,9 @@ Hashline IDs use characters from `ZPMQVRWSNKTXJBYH`.
 | **lsp_find_references** | Find all usages across workspace            |
 | **lsp_symbols**         | Get file outline or workspace symbol search |
 
-### AST-Grep Tools
+### AST-Grep Skill
 
-These user-facing tool names are served by the built-in local `ast_grep` MCP backed by `packages/ast-grep-mcp/`.
-
-| Tool                 | Description                                  |
-| -------------------- | -------------------------------------------- |
-| **ast_grep_search**  | AST-aware code pattern search (25 languages) |
-| **ast_grep_replace** | AST-aware code replacement                   |
+AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the `skill` tool when you need structural matching, then use its `sg` helper commands for search or rewrite workflows.
 
 ### Delegation Tools
 
@@ -651,6 +675,32 @@ These user-facing tool names are served by the built-in local `ast_grep` MCP bac
 | **session_read**   | Read messages and history from a session |
 | **session_search** | Full-text search across session messages |
 | **session_info**   | Get session metadata and statistics      |
+
+#### Finding older sessions hidden by `/sessions`
+
+OpenCode's built-in `/sessions` picker can omit older sessions even when they still exist in the local session store. Use OMO's session tools to find the ID, then continue it from the TUI.
+
+```ts
+session_list({
+  from_date: "2026-01-01T00:00:00Z",
+  to_date: "2026-02-11T00:00:00Z",
+  project_path: "/absolute/path/to/project",
+  limit: 50,
+})
+```
+
+After you find the session ID, type this in OpenCode:
+
+```text
+/continue <session_id>
+```
+
+If you remember text from the conversation but not the date, search first and then read the matching session:
+
+```ts
+session_search({ query: "migration bug", limit: 20 })
+session_read({ session_id: "ses_...", limit: 200 })
+```
 
 ### Task Management Tools
 
@@ -762,7 +812,7 @@ Current composition counts:
 - Continuation: 7
 - Skill: 2
 - Total base: 54
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 61
+- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `packages/omo-opencode/src/plugin/event.ts` = 61
 
 ### Hook Events
 
@@ -813,7 +863,6 @@ Current composition counts:
 
 | Hook                                        | Event           | Description                                                                                                                                                                                                                                                 |
 | ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **session-recovery**                        | Event           | Recovers from session errors — missing tool results, thinking block issues, empty messages.                                                                                                                                                                 |
 | **anthropic-context-window-limit-recovery** | Event           | Handles Claude context window limits gracefully.                                                                                                                                                                                                            |
 | **runtime-fallback**                        | Event + Message | Automatically switches to backup models on retryable API errors (e.g., 429, 500, 502, 503, 504), provider key misconfiguration errors (e.g., missing API key), and provider retry signals. `message.updated` retry-signal detection requires `timeout_seconds > 0`; structured `session.status` retry events can still trigger fallback. |
 | **model-fallback**                          | Event + Message | Manages model fallback chain when primary model is unavailable.                                                                                                                                                                                             |
@@ -907,7 +956,7 @@ Disable specific hooks in config:
 
 The plugin uses a three-tier MCP architecture:
 
-1. Built-in MCPs from `src/mcp/` (remote plus local stdio)
+1. Built-in MCPs from `packages/omo-opencode/src/mcp/` (remote plus local stdio)
 2. Claude Code `.mcp.json` loader with `${VAR}` expansion
 3. Skill-embedded MCP servers declared in `SKILL.md` frontmatter
 
@@ -954,7 +1003,6 @@ The three tiers of MCP servers and where they come from:
 | **context7**  | Official documentation lookup for any library/framework                                       |
 | **grep_app**  | Ultra-fast code search across public GitHub repos. Great for finding implementation examples. |
 | **lsp**       | Local LSP tools for diagnostics, symbols, references, and renames                             |
-| **ast_grep**  | Local AST-aware search and rewrite tools                                                      |
 
 ### Skill-Embedded MCPs
 
@@ -1046,12 +1094,12 @@ Auto-injects AGENTS.md when reading files. Walks from file directory to project 
 
 ```
 project/
-├── AGENTS.md              # Injected first
-├── src/
-│   ├── AGENTS.md          # Injected second
+├── AGENTS.md                        # Injected first
+├── packages/omo-opencode/src/
+│   ├── AGENTS.md                    # Injected second
 │   └── components/
-│       ├── AGENTS.md      # Injected third
-│       └── Button.tsx     # Reading this injects all 3
+│       ├── AGENTS.md                # Injected third
+│       └── Button.tsx               # Reading this injects all 3
 ```
 
 ### Conditional Rules

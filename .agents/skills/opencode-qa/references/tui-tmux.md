@@ -14,6 +14,23 @@ Launching the real TUI would create sessions in the real ~/.local/share/opencode
 
 - `scripts/tui-smoke.sh --self-test` launches the TUI under tmux in an isolated sandbox, polls capture-pane for a render marker (version string / "Ask anything" / footer), sends a sentinel keystroke, then kills the tmux session and confirms the real DB is untouched.
 
+## Browser-rendered TUI visual evidence
+
+For PR evidence or any TUI visual QA claim, keep the tmux transcript and add a
+browser-rendered screenshot using the repository helper:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "OpenCode TUI QA" \
+  --from-file .omo/evidence/<slug>/opencode-tui-pane.txt \
+  --evidence-dir .omo/evidence/<slug>/opencode-web-terminal
+```
+
+The helper replays the terminal frame into `terminal.html`, captures
+`terminal.png` with Chrome when available, writes `metadata.json`, and records
+the cleanup receipt. This is the required TUI visual evidence pattern when the
+review needs to see the screen, while `scripts/tui-smoke.sh` remains the
+isolation/smoke authority.
+
 ## Manual tmux recipe (fenced) - for ad hoc smoke
 
 ```
