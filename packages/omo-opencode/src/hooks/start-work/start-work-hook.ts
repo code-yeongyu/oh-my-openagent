@@ -17,7 +17,7 @@ import { createWorktreeActiveBlock } from "./worktree-block"
 import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
-const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
+const START_WORK_TEMPLATE_MARKER = "You are starting an Atlas work session."
 const CONTEXT_INFO_MARKER = "<!-- omo-start-work-context -->"
 
 interface StartWorkHookInput {
