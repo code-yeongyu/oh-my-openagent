@@ -45,6 +45,15 @@ const defaults = {
   sampleRate: 44100,
 } as const;
 
+type CartesiaSampleRate = 8000 | 16000 | 22050 | 24000 | 44100 | 48000;
+
+function cartesiaSampleRate(value: number): CartesiaSampleRate {
+  if ([8000, 16000, 22050, 24000, 44100, 48000].includes(value)) {
+    return value as CartesiaSampleRate;
+  }
+  return defaults.sampleRate;
+}
+
 function createDefaultClient(config: CartesiaTtsConfig): CartesiaLikeClient {
   const client = new Cartesia({ apiKey: config.apiKey });
   return {
@@ -60,9 +69,9 @@ function createDefaultClient(config: CartesiaTtsConfig): CartesiaLikeClient {
               context_id: payload.contextId,
               language: payload.language,
               output_format: {
-                container: params.container,
+                container: "raw",
                 encoding: params.encoding,
-                sample_rate: params.sampleRate,
+                sample_rate: cartesiaSampleRate(params.sampleRate),
               },
             }),
           continue: (payload) =>
@@ -73,9 +82,9 @@ function createDefaultClient(config: CartesiaTtsConfig): CartesiaLikeClient {
               context_id: payload.contextId,
               language: payload.language,
               output_format: {
-                container: params.container,
+                container: "raw",
                 encoding: params.encoding,
-                sample_rate: params.sampleRate,
+                sample_rate: cartesiaSampleRate(params.sampleRate),
               },
             }),
           cancel: ({ contextId }) => ws.cancelContext(contextId),

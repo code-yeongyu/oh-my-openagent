@@ -130,7 +130,7 @@ describe("CartesiaTtsAdapter", () => {
     const result = collect(adapter.synthesize("Ciao mondo."));
 
     // then
-    await expect(result).rejects.toThrow("Cartesia TTS websocket connection failed: boom");
+    return expect(result).rejects.toThrow("Cartesia TTS websocket connection failed: boom");
   });
 
   test("#given streaming chunks complete sentence #when streamSynthesize runs #then sends one clause request", async () => {
