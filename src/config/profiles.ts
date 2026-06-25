@@ -1,6 +1,6 @@
 import type { MatrixxConfig } from "./schema/matrixx-config"
 
-export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate", "go-trio"] as const
+export const PROFILE_NAMES = ["free", "budget", "economy", "balanced", "performance", "go", "xiaomi-ultimate", "go-ultimate", "go-trio", "go-duo"] as const
 export type ProfileName = (typeof PROFILE_NAMES)[number]
 
 const OPUS = "anthropic/claude-opus-4-6"
@@ -303,6 +303,85 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
       "blue-pill": { model: DEEPSEEK_FLASH },
       broadcast: { model: DEEPSEEK_FLASH },
       "bullet-time": { model: DEEPSEEK_FLASH },
+    },
+  },
+
+  /* go-duo — 2-model profile: deepseek-v4-flash for reasoning/analysis/DSL
+     (incl. Sati — UI tradeoffs benefit from deeper reasoning),
+     mimo-v2.5 for general code. The 9/5 split is intentional: deepseek
+     covers 9 reasoning-heavy roles, mimo covers 5 general-code/utility
+     roles. Self-contained: fallback chain stays within
+     {mimo-v2.5, deepseek-v4-flash}. */
+  "go-duo": {
+    agents: {
+      /* Tier 1 — Reasoning / analysis / DSL / UI: deepseek-v4-flash (9 agents) */
+      morpheus: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      oracle: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      seraph: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      architect: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      merovingian: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      smith: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      cipher: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      sentinel: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      sati: {
+        model: DEEPSEEK_FLASH,
+        fallbackChain: [{ providers: ["opencode-go"], model: MIMO_V25 }],
+      },
+      /* Tier 2 — General code: mimo-v2.5 (5 agents) */
+      keymaker: {
+        model: MIMO_V25,
+        fallbackChain: [{ providers: ["opencode-go"], model: DEEPSEEK_FLASH }],
+      },
+      trinity: {
+        model: MIMO_V25,
+        fallbackChain: [{ providers: ["opencode-go"], model: DEEPSEEK_FLASH }],
+      },
+      construct: {
+        model: MIMO_V25,
+        fallbackChain: [{ providers: ["opencode-go"], model: DEEPSEEK_FLASH }],
+      },
+      operator: {
+        model: MIMO_V25,
+        fallbackChain: [{ providers: ["opencode-go"], model: DEEPSEEK_FLASH }],
+      },
+      mouse: {
+        model: MIMO_V25,
+        fallbackChain: [{ providers: ["opencode-go"], model: DEEPSEEK_FLASH }],
+      },
+    },
+    categories: {
+      source: { model: DEEPSEEK_FLASH },
+      "deep-jack": { model: DEEPSEEK_FLASH },
+      "matrix-bend": { model: DEEPSEEK_FLASH },
+      "red-pill": { model: DEEPSEEK_FLASH },
+      construct: { model: MIMO_V25 },
+      "blue-pill": { model: MIMO_V25 },
+      broadcast: { model: MIMO_V25 },
+      "bullet-time": { model: MIMO_V25 },
     },
   },
 }

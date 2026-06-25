@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, it, test } from "bun:test"
 import { expandProfile, PROFILE_NAMES } from "./profiles"
 
 describe("expandProfile", () => {
@@ -427,8 +427,122 @@ describe("expandProfile", () => {
     })
   })
 
+  describe("go-duo profile", () => {
+    //#given the go-duo profile exists in the registry
+    const result = expandProfile("go-duo")
+
+    it("contains the full agent roster (14 agents)", () => {
+      //#then all 14 built-in agents are present
+      expect(Object.keys(result.agents ?? {})).toHaveLength(14)
+    })
+
+    it("contains the full category roster (8 categories)", () => {
+      //#then all 8 categories are present
+      expect(Object.keys(result.categories ?? {})).toHaveLength(8)
+    })
+
+    it("assigns Sati to deepseek-v4-flash (UI reasoning)", () => {
+      //#then Sati is on the deepseek tier (UI tradeoffs benefit from deeper reasoning)
+      expect(result.agents?.sati?.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    it("assigns Oracle to deepseek-v4-flash (reasoning)", () => {
+      //#then Oracle is on the deepseek tier
+      expect(result.agents?.oracle?.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    it("assigns Cipher to deepseek-v4-flash (DSL)", () => {
+      //#then Cipher is on the deepseek tier
+      expect(result.agents?.cipher?.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    it("assigns source category to deepseek-v4-flash", () => {
+      //#then reasoning-heavy category uses deepseek
+      expect(result.categories?.source?.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    it("assigns blue-pill category to mimo-v2.5", () => {
+      //#then utility category uses mimo
+      expect(result.categories?.["blue-pill"]?.model).toBe("opencode-go/mimo-v2.5")
+    })
+
+    it("contains only the two allowed models across all agents", () => {
+      //#given the closed allow-set
+      const allowed = new Set([
+        "opencode-go/mimo-v2.5",
+        "opencode-go/deepseek-v4-flash",
+      ])
+      //#then every agent's model is in the set
+      for (const [name, override] of Object.entries(result.agents ?? {})) {
+        expect({ name, model: override.model }).toEqual({
+          name,
+          model: expect.stringMatching(
+            /^opencode-go\/(mimo-v2\.5|deepseek-v4-flash)$/,
+          ),
+        })
+      }
+      //#then no other models leak in
+      const allModels = Object.values(result.agents ?? {}).map((o) => o.model)
+      for (const m of allModels) {
+        expect(allowed.has(m ?? "")).toBe(true)
+      }
+    })
+
+    it("contains only the two allowed models across all categories", () => {
+      //#given the closed allow-set
+      const allowed = new Set([
+        "opencode-go/mimo-v2.5",
+        "opencode-go/deepseek-v4-flash",
+      ])
+      //#then no other category models leak in
+      const allModels = Object.values(result.categories ?? {}).map((o) => o.model)
+      for (const m of allModels) {
+        expect(allowed.has(m ?? "")).toBe(true)
+      }
+    })
+
+    it("pins fallbackChain for every agent to the OTHER go-duo model", () => {
+      //#then no agent falls through to a non-go-duo model
+      for (const [name, override] of Object.entries(result.agents ?? {})) {
+        const primary = override.model
+        const chain = override.fallbackChain ?? []
+        expect(chain.length).toBeGreaterThan(0)
+        const first = chain[0]
+        //#then fallback points to the OTHER model
+        if (primary === "opencode-go/mimo-v2.5") {
+          expect(first?.model).toBe("opencode-go/deepseek-v4-flash")
+        } else if (primary === "opencode-go/deepseek-v4-flash") {
+          expect(first?.model).toBe("opencode-go/mimo-v2.5")
+        } else {
+          throw new Error(
+            `Agent ${name} primary model ${primary} is not in go-duo set`,
+          )
+        }
+        //#then fallback is on the opencode-go provider
+        expect(first?.providers).toEqual(["opencode-go"])
+      }
+    })
+
+    it("distributes agents 9 deepseek / 5 mimo (intentional imbalance)", () => {
+      //#then the count matches the documented split
+      const deepseek = Object.values(result.agents ?? {}).filter(
+        (o) => o.model === "opencode-go/deepseek-v4-flash",
+      )
+      const mimo = Object.values(result.agents ?? {}).filter(
+        (o) => o.model === "opencode-go/mimo-v2.5",
+      )
+      expect(deepseek).toHaveLength(9)
+      expect(mimo).toHaveLength(5)
+    })
+
+    it("is registered as a valid profile name in PROFILE_NAMES", () => {
+      //#then "go-duo" is one of the 10 profile names
+      expect(PROFILE_NAMES).toContain("go-duo")
+    })
+  })
+
   describe("PROFILE_NAMES", () => {
-    test("should export all eight profile names", () => {
+    test("should export all profile names", () => {
       //#given
       //#when
       //#then
@@ -441,7 +555,8 @@ describe("expandProfile", () => {
       expect(PROFILE_NAMES).toContain("xiaomi-ultimate")
       expect(PROFILE_NAMES).toContain("go-ultimate")
       expect(PROFILE_NAMES).toContain("go-trio")
-      expect(PROFILE_NAMES).toHaveLength(9)
+      expect(PROFILE_NAMES).toContain("go-duo")
+      expect(PROFILE_NAMES).toHaveLength(10)
     })
   })
 })
