@@ -12,7 +12,7 @@ describe("createWriteExistingFileGuardHook", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "write-guard-test-"))
     ctx = { directory: tempDir }
-    hook = createWriteExistingFileGuardHook(ctx as any)
+    hook = createWriteExistingFileGuardHook(ctx as unknown as Record<string, unknown>)
   })
 
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("createWriteExistingFileGuardHook", () => {
       const output = { args: { filePath: nonExistingFile, content: "hello" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -41,7 +41,7 @@ describe("createWriteExistingFileGuardHook", () => {
       const output = { args: { filePath: existingFile, content: "new content" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
       //#then
       await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -55,7 +55,7 @@ describe("createWriteExistingFileGuardHook", () => {
       const output = { args: { filePath: existingFile, content: "new content" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
       //#then
       await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -69,7 +69,7 @@ describe("createWriteExistingFileGuardHook", () => {
       const output = { args: { filePath: existingFile, content: "new content" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -81,7 +81,7 @@ describe("createWriteExistingFileGuardHook", () => {
       const output = { args: { command: "ls" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -96,7 +96,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { path: existingFile, content: "new content" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -110,7 +110,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { file_path: existingFile, content: "new content" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -123,7 +123,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { path: nonExistingFile, content: "hello" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).resolves.toBeUndefined()
@@ -136,7 +136,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { file_path: nonExistingFile, content: "hello" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).resolves.toBeUndefined()
@@ -152,7 +152,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: "existing-file.txt", content: "new content" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -164,7 +164,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: "new-file.txt", content: "hello" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).resolves.toBeUndefined()
@@ -180,7 +180,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: "subdir/existing.txt", content: "new content" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -191,12 +191,12 @@ describe("createWriteExistingFileGuardHook", () => {
         const existingFile = path.join(tempDir, "test-file.txt")
         fs.writeFileSync(existingFile, "content")
         const differentCtx = { directory: tempDir }
-        const differentHook = createWriteExistingFileGuardHook(differentCtx as any)
+        const differentHook = createWriteExistingFileGuardHook(differentCtx as unknown as Record<string, unknown>)
         const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
         const output = { args: { filePath: "test-file.txt", content: "new" } }
 
         //#when
-        const result = differentHook["tool.execute.before"]?.(input as any, output as any)
+        const result = differentHook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
        //#then
        await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -213,7 +213,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: planFile, content: "# Updated Plan" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).resolves.toBeUndefined()
@@ -229,7 +229,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: notesFile, content: "# Updated Notes" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).resolves.toBeUndefined()
@@ -245,7 +245,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: ".matrixx/plan.md", content: "# Updated" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).resolves.toBeUndefined()
@@ -261,7 +261,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: textFile, content: "new content" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -277,7 +277,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: evilFile, content: "# Hacked" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
@@ -294,7 +294,7 @@ describe("createWriteExistingFileGuardHook", () => {
         const output = { args: { filePath: regularFile, content: "# Updated" } }
 
         //#when
-        const result = hook["tool.execute.before"]?.(input as any, output as any)
+        const result = hook["tool.execute.before"]?.(input as unknown as Record<string, unknown>, output as unknown as Record<string, unknown>)
 
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")

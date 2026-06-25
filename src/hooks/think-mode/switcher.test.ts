@@ -470,7 +470,7 @@ describe("think-mode switcher", () => {
 
         // #and when checking if already high
         expect(isAlreadyHighVariant(modelID)).toBe(false)
-        expect(isAlreadyHighVariant(highVariant!)).toBe(true)
+        expect(isAlreadyHighVariant(highVariant as string)).toBe(true)
 
         // #and when getting thinking config for custom provider
         const config = getThinkingConfig(providerID, modelID)
@@ -489,10 +489,10 @@ describe("think-mode switcher", () => {
         expect(high).toBe("vertex_ai/claude-opus-4-6-high")
 
         // #and should be recognized as already high
-        expect(isAlreadyHighVariant(high!)).toBe(true)
+        expect(isAlreadyHighVariant(high as string)).toBe(true)
 
         // #and switching again should return null (already high)
-        expect(getHighVariant(high!)).toBeNull()
+        expect(getHighVariant(high as string)).toBeNull()
       })
     })
   })

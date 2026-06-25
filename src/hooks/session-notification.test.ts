@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { createSessionNotification } from "./session-notification"
 import * as utils from "./session-notification-utils"
@@ -8,7 +9,7 @@ describe("session-notification", () => {
 
   function createMockPluginInput() {
     return {
-      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
+      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
         // given - track notification commands (osascript, notify-send, powershell)
         const cmdStr = typeof cmd === "string" 
           ? cmd 
@@ -25,7 +26,7 @@ describe("session-notification", () => {
         },
       },
       directory: "/tmp/test",
-    } as any
+    } as unknown as PluginInput
   }
 
   beforeEach(() => {

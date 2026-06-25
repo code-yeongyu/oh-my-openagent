@@ -249,7 +249,7 @@ describe("matrix-loop", () => {
       const hook = createMatrixLoopHook(createMockPluginInput())
       hook.startLoop("session-123", "Build something", { maxIterations: 2 })
 
-      const state = hook.getState()!
+      const state = hook.getState() as MatrixLoopState
       state.iteration = 2
       writeState(TEST_DIR, state)
 
@@ -1131,7 +1131,7 @@ Original task: Build something`
       })
       hook.startLoop("session-123", "Build API")
 
-      const state = hook.getState()!
+      const state = hook.getState() as MatrixLoopState
       state.verification_failed_count = 2
       writeState(TEST_DIR, state)
 
@@ -1182,7 +1182,7 @@ Original task: Build something`
           },
         },
       }
-      const hook = createMatrixLoopHook(errorMock as any, {
+      const hook = createMatrixLoopHook(errorMock as Parameters<typeof createMatrixLoopHook>[0], {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         apiTimeout: 100,
       })

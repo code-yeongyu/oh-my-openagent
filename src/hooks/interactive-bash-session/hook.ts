@@ -76,10 +76,10 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
     const sessionName = extractSessionNameFromTokens(tokens, subCommand);
 
     if (isNewSession && isOmoSession(sessionName)) {
-      state.tmuxSessions.add(sessionName!);
+      state.tmuxSessions.add(sessionName as string);
       stateChanged = true;
     } else if (isKillSession && isOmoSession(sessionName)) {
-      state.tmuxSessions.delete(sessionName!);
+      state.tmuxSessions.delete(sessionName as string);
       stateChanged = true;
     } else if (isKillServer) {
       state.tmuxSessions.clear();

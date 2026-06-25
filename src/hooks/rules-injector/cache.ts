@@ -15,7 +15,7 @@ export function createSessionCacheStore(): {
     if (!sessionCaches.has(sessionID)) {
       sessionCaches.set(sessionID, loadInjectedRules(sessionID));
     }
-    return sessionCaches.get(sessionID)!;
+    return sessionCaches.get(sessionID) as SessionInjectedRulesCache;
   }
 
   function clearSessionCache(sessionID: string): void {

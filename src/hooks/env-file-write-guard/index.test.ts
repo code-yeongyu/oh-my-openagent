@@ -10,20 +10,20 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: ".env", content: "API_KEY=secret" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
-      //#then
+      //then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
     })
 
     test("blocks write to .env.local file", async () => {
-      //#given
+      //given
       const hook = createEnvFileWriteGuardHook()
       const input = { tool: "write", sessionID: "ses_1", callID: "call_1" }
       const output = { args: { filePath: "config/.env.local", content: "SECRET=xyz" } }
 
-      //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      //when
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -36,7 +36,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: "certs/server.pem", content: "-----BEGIN" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -49,7 +49,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: "private.key", content: "key data" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -62,7 +62,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: "credentials.json", oldString: "a", newString: "b" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -75,7 +75,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: "~/.ssh/id_rsa", content: "key" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -88,7 +88,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: "src/index.ts", content: "code" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -104,7 +104,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: ".env.example", content: "KEY=placeholder" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -117,7 +117,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { command: "cat .env" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -134,7 +134,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: ".env.example", content: "PLACEHOLDER=value" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -147,7 +147,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: ".env", content: "SECRET=value" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).resolves.toBeUndefined()
@@ -160,7 +160,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { filePath: ".npmrc", edits: [] } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -173,7 +173,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { file_path: ".env", content: "SECRET=abc" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
@@ -186,7 +186,7 @@ describe("createEnvFileWriteGuardHook", () => {
       const output = { args: { path: "service-account-prod.json", content: "{}" } }
 
       //#when
-      const result = hook["tool.execute.before"]?.(input as any, output as any)
+      const result = hook["tool.execute.before"]?.(input, output)
 
       //#then
       await expect(result).rejects.toThrow("SENSITIVE FILE GUARD")
