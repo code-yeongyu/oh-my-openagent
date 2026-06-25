@@ -74,7 +74,7 @@ ${tableRows}
 ${resumeSection}`
         }
 
-        const task = manager.getTask(args.taskId!)
+        const task = manager.getTask(args.taskId as string)
         if (!task) {
           return `[ERROR] Task not found: ${args.taskId}`
         }

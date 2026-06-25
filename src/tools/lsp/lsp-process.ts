@@ -92,7 +92,7 @@ function wrapNodeProcess(proc: ChildProcess): UnifiedProcess {
       read(): Promise<ReadResult> {
         return new Promise((resolve) => {
           if (chunks.length > 0) {
-            resolve({ done: false, value: chunks.shift()! })
+            resolve({ done: false, value: chunks.shift() as Uint8Array })
           } else if (streamEnded) {
             resolve({ done: true, value: undefined })
           } else {

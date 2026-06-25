@@ -36,8 +36,10 @@ describe("formatLoadedCommand", () => {
     expect(result).not.toContain("$ARGUMENTS")
   })
 
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: test description with literal ${user_message}
   it("substitutes ${user_message} with userMessage", async () => {
     //#given
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: test expects literal ${user_message}
     const command = makeCommand("Context: ${user_message}")
 
     //#when
@@ -45,11 +47,14 @@ describe("formatLoadedCommand", () => {
 
     //#then
     expect(result).toContain("Context: my context")
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: test assertion checks for literal ${user_message}
     expect(result).not.toContain("${user_message}")
   })
 
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: test description with literal ${user_message}
   it("handles both $ARGUMENTS and ${user_message} in same template", async () => {
     //#given
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: test expects literal ${user_message} and $ARGUMENTS
     const command = makeCommand("Args: $ARGUMENTS and msg: ${user_message}")
 
     //#when

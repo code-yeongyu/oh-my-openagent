@@ -122,7 +122,7 @@ export class LSPClientTransport {
       throw new Error(`LSP server already exited (code: ${this.proc?.exitCode})${stderr ? `\nstderr: ${stderr}` : ""}`)
     }
 
-    let timeoutId: ReturnType<typeof setTimeout>
+    let timeoutId!: ReturnType<typeof setTimeout>
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         const stderr = this.stderrBuffer.slice(-5).join("\n")
@@ -134,10 +134,10 @@ export class LSPClientTransport {
 
     try {
       const result = await Promise.race([requestPromise, timeoutPromise])
-      clearTimeout(timeoutId!)
+      clearTimeout(timeoutId as ReturnType<typeof setTimeout>)
       return result
     } catch (error) {
-      clearTimeout(timeoutId!)
+      clearTimeout(timeoutId as ReturnType<typeof setTimeout>)
       throw error
     }
   }
