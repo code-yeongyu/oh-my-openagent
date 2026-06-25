@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, test, expect } = require("bun:test")
+import { describe, expect, test } from "bun:test"
 
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import type { BackgroundTask } from "./types"

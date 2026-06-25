@@ -1,4 +1,3 @@
-declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 const { mock, spyOn } = require("bun:test")
 
@@ -1565,7 +1564,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     function createMockClient() {
       return {
         session: {
-          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          create: async (_args?: unknown) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
           get: async () => ({ data: { directory: "/test/dir" } }),
           prompt: async () => ({}),
           promptAsync: async () => ({}),
@@ -1672,7 +1671,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   describe("task transitions pending→running when slot available", () => {
     test("does not override parent session permission when creating child session", async () => {
       // given
-      const createCalls: any[] = []
+      const createCalls: unknown[] = []
       const parentPermission = [
         { permission: "question", action: "allow" as const, pattern: "*" },
         { permission: "plan_enter", action: "deny" as const, pattern: "*" },
@@ -1680,7 +1679,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const customClient = {
         session: {
-          create: async (args?: any) => {
+          create: async (args?: unknown) => {
             createCalls.push(args)
             return { data: { id: `ses_${crypto.randomUUID()}` } }
           },
@@ -2124,7 +2123,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await manager.launch(input)
       const task2 = await manager.launch(input)
 
-      const queuedAt = task2.queuedAt!
+      const queuedAt = task2.queuedAt as Date
 
       // Wait for first task to complete and second to start
       await new Promise(resolve => setTimeout(resolve, 50))

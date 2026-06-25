@@ -1,4 +1,4 @@
-declare const require: (name: string) => any
+declare const require: (name: string) => unknown
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 
 import type { ConcurrencyManager } from "../background-agent/concurrency"
@@ -6,6 +6,9 @@ import type { ConcurrencyManager } from "../background-agent/concurrency"
 type TaskToastManagerClass = typeof import("./manager").TaskToastManager
 
 describe("TaskToastManager", () => {
+  interface MockClient {
+    tui: { showToast: (...args: unknown[]) => Promise<unknown> }
+  }
   let TaskToastManager: TaskToastManagerClass
   let mockClient: {
     tui: {
@@ -28,8 +31,7 @@ describe("TaskToastManager", () => {
     const mod = await import("./manager")
     TaskToastManager = mod.TaskToastManager
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    toastManager = new TaskToastManager(mockClient as any, mockConcurrencyManager)
+    toastManager = new TaskToastManager(mockClient as unknown as MockClient, mockConcurrencyManager)
   })
 
   afterEach(() => {
@@ -115,8 +117,7 @@ describe("TaskToastManager", () => {
         getQueuedCount: mock(() => 1),
       } as unknown as ConcurrencyManager
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const managerWithConcurrency = new TaskToastManager(mockClient as any, mockConcurrencyWithCounts)
+      const managerWithConcurrency = new TaskToastManager(mockClient as unknown as MockClient, mockConcurrencyWithCounts)
 
       // when - a task is added
       managerWithConcurrency.addTask({

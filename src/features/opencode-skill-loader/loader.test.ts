@@ -126,7 +126,9 @@ Skill with env vars.
         const skill = skills.find(s => s.name === "env-skill")
 
         // then
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: test expects literal ${...} in env var assertions
         expect(skill?.mcpConfig?.["api-server"]?.env?.API_KEY).toBe("${API_KEY}")
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: test expects literal ${...} in env var assertions
         expect(skill?.mcpConfig?.["api-server"]?.env?.DB_PATH).toBe("${HOME}/data.db")
       } finally {
         process.chdir(originalCwd)

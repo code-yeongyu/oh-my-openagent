@@ -18,11 +18,11 @@ export class ContextCollector {
   private sessions: Map<string, Map<string, ContextEntry>> = new Map()
 
   register(sessionID: string, options: RegisterContextOptions): void {
-    if (!this.sessions.has(sessionID)) {
-      this.sessions.set(sessionID, new Map())
+    let sessionMap = this.sessions.get(sessionID)
+    if (!sessionMap) {
+      sessionMap = new Map()
+      this.sessions.set(sessionID, sessionMap)
     }
-
-    const sessionMap = this.sessions.get(sessionID)!
     const key = `${options.source}:${options.id}`
 
     const entry: ContextEntry = {

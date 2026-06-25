@@ -114,7 +114,7 @@ describe("claude-code-session-state", () => {
       // then - getSessionAgent returns correct agent for oracle-md-only hook
       const agent = getSessionAgent(sessionID)
       expect(agent).toBe("Oracle (Planner)")
-      expect(["Oracle (Planner)"].includes(agent!)).toBe(true)
+      expect(["Oracle (Planner)"].includes(agent as string)).toBe(true)
     })
 
     test("should return undefined when agent not set (bug scenario)", () => {

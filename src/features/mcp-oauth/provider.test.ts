@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { createHash } from "node:crypto"
 import type { OAuthTokenData } from "./storage"
 
-const realProvider = await import(("./provider?real=1") as any)
+const realProvider = await import("./provider?real=1" as string)
 mock.module("./provider", () => realProvider)
 
 const { McpOAuthProvider, generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl } = realProvider

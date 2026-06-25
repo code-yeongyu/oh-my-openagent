@@ -74,6 +74,16 @@ mock.module('../../shared/tmux', () => {
 
 const trackedSessions = new Set<string>()
 
+interface MockPluginContext {
+  serverUrl: URL
+  client: {
+    session: {
+      status: ReturnType<typeof mock>
+      messages: ReturnType<typeof mock>
+    }
+  }
+}
+
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
   sessionMessagesResult?: { data?: unknown[] }
@@ -100,7 +110,7 @@ function createMockContext(overrides?: {
         }),
       },
     },
-  } as any
+  } as unknown as MockPluginContext
 }
 
 function createSessionCreatedEvent(
