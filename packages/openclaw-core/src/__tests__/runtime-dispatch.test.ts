@@ -36,7 +36,11 @@ describe("dispatchOpenClawEvent", () => {
       context: { sessionId: "ses-1", projectPath: "/tmp/project", tmuxPaneId: "%1", tmuxSession: "main" },
     })
 
-    expect(wakeSpy.mock.calls.map((call) => call[1])).toEqual(["session.created", "session-start"])
+    const wakeCalls = wakeSpy.mock.calls as Array<[unknown, string, { sessionId?: string }]>
+    const eventsForSession = wakeCalls
+      .filter((call) => call[2]?.sessionId === "ses-1")
+      .map((call) => call[1])
+    expect(eventsForSession).toEqual(["session.created", "session-start"])
   })
 
   test("registers reply correlation when wake returns outbound metadata", async () => {

@@ -46,6 +46,11 @@ function createEventHandlerManagers(
 	overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["managers"] {
 	return cast<EventHandlerArgs["managers"]>({
+		backgroundManager: {
+			getAllDescendantTasks: () => [],
+			hasPendingParentNotificationWork: () => false,
+			setOnParentNotificationWorkSettled: () => {},
+		},
 		tmuxSessionManager: {
 			onEvent: () => {},
 			onSessionCreated: async () => {},
@@ -1346,6 +1351,252 @@ describe("createEventHandler - event forwarding", () => {
 			projectPath: "/tmp/project-idle",
 			tmuxPaneId: "%3",
 		})
+	})
+
+	it("does not dispatch OpenClaw for main session.idle while descendant background tasks are active", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_busy")
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [{ id: "bg_1", status: "running" }],
+					hasPendingParentNotificationWork: () => false,
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_busy" },
+			},
+		}))
+
+		expect(openClawSpy).not.toHaveBeenCalled()
+	})
+
+	it("retries deferred OpenClaw session.idle after descendant background tasks settle", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_task_settled")
+		let activeTasks = [{ id: "bg_1", status: "running" }]
+		let onParentNotificationWorkSettled: ((sessionID: string) => void | Promise<void>) | undefined
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => activeTasks,
+					hasPendingParentNotificationWork: () => false,
+					setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => {
+						onParentNotificationWorkSettled = callback
+					},
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_task_settled" },
+			},
+		}))
+		expect(openClawSpy).not.toHaveBeenCalled()
+
+		activeTasks = []
+		await onParentNotificationWorkSettled?.("ses_openclaw_task_settled")
+
+		expect(openClawSpy).toHaveBeenCalledTimes(1)
+		expect(openClawSpy.mock.calls[0]?.[0]?.rawEvent).toBe("session.idle")
+	})
+
+	it("does not dispatch OpenClaw for main session.idle while parent notification work is unsettled", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_unsettled")
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [],
+					hasPendingParentNotificationWork: () => true,
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_unsettled" },
+			},
+		}))
+
+		expect(openClawSpy).not.toHaveBeenCalled()
+	})
+
+	it("retries deferred OpenClaw session.idle when parent notification work settles", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_retry")
+		let hasPendingNotificationWork = true
+		let onParentNotificationWorkSettled: ((sessionID: string) => void | Promise<void>) | undefined
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [],
+					hasPendingParentNotificationWork: () => hasPendingNotificationWork,
+					setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => {
+						onParentNotificationWorkSettled = callback
+					},
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_retry" },
+			},
+		}))
+		expect(openClawSpy).not.toHaveBeenCalled()
+
+		hasPendingNotificationWork = false
+		await onParentNotificationWorkSettled?.("ses_openclaw_retry")
+
+		const call = openClawSpy.mock.calls[0]?.[0] as
+			| {
+				rawEvent?: string
+				context?: { sessionId?: string; projectPath?: string; tmuxPaneId?: string }
+			  }
+			| undefined
+		expect(openClawSpy).toHaveBeenCalledTimes(1)
+		expect(call?.rawEvent).toBe("session.idle")
+		expect(call?.context).toEqual({
+			sessionId: "ses_openclaw_retry",
+			projectPath: "/tmp/project-idle",
+			tmuxPaneId: undefined,
+		})
+	})
+
+	it("does not retry stale deferred OpenClaw session.idle after the session is deleted", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_deleted")
+		let hasPendingNotificationWork = true
+		let onParentNotificationWorkSettled: ((sessionID: string) => void | Promise<void>) | undefined
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [],
+					hasPendingParentNotificationWork: () => hasPendingNotificationWork,
+					setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => {
+						onParentNotificationWorkSettled = callback
+					},
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_deleted" },
+			},
+		}))
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.deleted",
+				properties: { info: { id: "ses_openclaw_deleted" } },
+			},
+		}))
+
+		hasPendingNotificationWork = false
+		await onParentNotificationWorkSettled?.("ses_openclaw_deleted")
+
+		expect(openClawSpy).toHaveBeenCalledTimes(1)
+		expect(openClawSpy.mock.calls[0]?.[0]?.rawEvent).toBe("session.deleted")
+	})
+
+	it("does not retry stale deferred OpenClaw session.idle after an active info session event", async () => {
+		const openClawSpy = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
+		openClawSpy.mockResolvedValue(null)
+		setMainSession("ses_openclaw_active_info")
+		let hasPendingNotificationWork = true
+		let onParentNotificationWorkSettled: ((sessionID: string) => void | Promise<void>) | undefined
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp/project-idle" }),
+			pluginConfig: asPluginConfig({ openclaw: { enabled: true, gateways: {}, hooks: {} } }),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				backgroundManager: {
+					getAllDescendantTasks: () => [],
+					hasPendingParentNotificationWork: () => hasPendingNotificationWork,
+					setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => {
+						onParentNotificationWorkSettled = callback
+					},
+				},
+				skillMcpManager: { disconnectSession: async () => {} },
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.idle",
+				properties: { sessionID: "ses_openclaw_active_info" },
+			},
+		}))
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.updated",
+				properties: { info: { sessionID: "ses_openclaw_active_info", role: "user" } },
+			},
+		}))
+
+		hasPendingNotificationWork = false
+		await onParentNotificationWorkSettled?.("ses_openclaw_active_info")
+
+		expect(openClawSpy).not.toHaveBeenCalled()
 	})
 
 	it("clears stored prompt params on session.deleted", async () => {

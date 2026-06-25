@@ -260,6 +260,7 @@ export class BackgroundManager {
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onSubagentSessionDeleted?: OnSubagentSessionDeleted
   private onShutdown?: () => void | Promise<void>
+  private onParentNotificationWorkSettled?: (sessionID: string) => void | Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -1147,6 +1148,19 @@ The fallback retry session is now created and can be inspected directly.
     return result
   }
 
+  hasPendingParentNotificationWork(sessionID: string): boolean {
+    const hasQueuedNotification = this.notificationQueueByParent.has(sessionID)
+    const hasBufferedNotification = (this.pendingNotifications.get(sessionID)?.length ?? 0) > 0
+    const hasParentWakeWork = this.hasPendingParentWake(sessionID)
+    return hasQueuedNotification || hasBufferedNotification || hasParentWakeWork
+  }
+
+  setOnParentNotificationWorkSettled(
+    callback: ((sessionID: string) => void | Promise<void>) | undefined,
+  ): void {
+    this.onParentNotificationWorkSettled = callback
+  }
+
   findBySession(sessionID: string): BackgroundTask | undefined {
     for (const task of this.tasks.values()) {
       if (task.sessionId === sessionID) {
@@ -1532,6 +1546,7 @@ The fallback retry session is now created and can be inspected directly.
   private clearDispatchedParentWake(sessionID: string): void {
     this.clearParentWakeTextDeltaBuffers(sessionID)
     this.parentWakeNotifier.clearDispatchedParentWake(sessionID)
+    this.emitParentNotificationWorkSettled(sessionID)
   }
 
   private async requeueDispatchedParentWake(sessionID: string, reason: string): Promise<boolean> {
@@ -2224,6 +2239,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
     const notificationContent = pendingNotifications.join("\n\n")
     this.pendingNotifications.delete(sessionID)
+    this.emitParentNotificationWorkSettled(sessionID)
     this.queuePendingParentWake(sessionID, notificationContent, {}, false, PENDING_PARENT_WAKE_DEBOUNCE_MS)
   }
 
@@ -2495,6 +2511,19 @@ The task was re-queued on a fallback model after a retryable failure.
 
   private unregisterProcessCleanup(): void {
     unregisterManagerForCleanup(this)
+  }
+
+  private emitParentNotificationWorkSettled(sessionID: string): void {
+    if (this.hasPendingParentNotificationWork(sessionID)) {
+      return
+    }
+
+    void Promise.resolve(this.onParentNotificationWorkSettled?.(sessionID)).catch((error) => {
+      log("[background-agent] Error in parent notification settlement callback:", {
+        sessionID,
+        error,
+      })
+    })
   }
 
   /**
@@ -3176,6 +3205,8 @@ The task was re-queued on a fallback model after a retryable failure.
       if (this.notificationQueueByParent.get(parentSessionID) === current) {
         this.notificationQueueByParent.delete(parentSessionID)
       }
+
+      this.emitParentNotificationWorkSettled(parentSessionID)
     }
 
     const current = previous
