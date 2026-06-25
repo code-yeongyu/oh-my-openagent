@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-lsp",
-	"version": "4.8.1",
+	"version": "4.13.0",
 	"description": "Codex plugin that exposes Language Server Protocol tools and post-edit diagnostics.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -39,7 +39,7 @@
 		"bootstrap": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
 		"prebuild": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
 		"build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
-		"pretest": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
+		"pretest": "npm run build --silent",
 		"test": "node scripts/test.mjs",
 		"test:watch": "vitest",
 		"pretypecheck": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
@@ -53,10 +53,10 @@
 		"@code-yeongyu/lsp-daemon": "file:../../../../lsp-daemon"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.15",
-		"@types/node": "^25.7.0",
+		"@biomejs/biome": "2.4.16",
+		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.5"
+		"vitest": "^4.1.8"
 	},
 	"engines": {
 		"node": ">=20.0.0"

@@ -1,0 +1,54 @@
+{
+  "name": "@oh-my-opencode/claude-code-compat-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Claude Code compatibility loaders shared by oh-my-opencode harness adapters.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./claude-code-plugin-loader": {
+      "types": "./src/features/claude-code-plugin-loader/index.ts",
+      "import": "./src/features/claude-code-plugin-loader/index.ts"
+    },
+    "./claude-code-plugin-loader/*": {
+      "types": "./src/features/claude-code-plugin-loader/*.ts",
+      "import": "./src/features/claude-code-plugin-loader/*.ts"
+    },
+    "./claude-code-mcp-loader": {
+      "types": "./src/features/claude-code-mcp-loader/index.ts",
+      "import": "./src/features/claude-code-mcp-loader/index.ts"
+    },
+    "./claude-code-mcp-loader/*": {
+      "types": "./src/features/claude-code-mcp-loader/*.ts",
+      "import": "./src/features/claude-code-mcp-loader/*.ts"
+    },
+    "./claude-code-command-loader": {
+      "types": "./src/features/claude-code-command-loader/index.ts",
+      "import": "./src/features/claude-code-command-loader/index.ts"
+    },
+    "./claude-code-command-loader/*": {
+      "types": "./src/features/claude-code-command-loader/*.ts",
+      "import": "./src/features/claude-code-command-loader/*.ts"
+    },
+    "./claude-code-agent-loader": {
+      "types": "./src/features/claude-code-agent-loader/index.ts",
+      "import": "./src/features/claude-code-agent-loader/index.ts"
+    },
+    "./claude-code-agent-loader/*": {
+      "types": "./src/features/claude-code-agent-loader/*.ts",
+      "import": "./src/features/claude-code-agent-loader/*.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/model-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
+  }
+}

@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { SpawnedProcess } from "../../shared/spawn-with-windows-hide"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
-import { spawnWithTimeout } from "./spawn-with-timeout"
+import { spawnWithTimeout } from "./framework/spawn-with-timeout"
 
 describe("spawnWithTimeout", () => {
   describe("#given a command that completes quickly", () => {

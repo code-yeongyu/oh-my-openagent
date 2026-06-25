@@ -10,8 +10,13 @@ import {
   loadOpencodeProjectCommands,
 } from "../features/claude-code-command-loader";
 import { loadBuiltinCommands } from "../features/builtin-commands";
+import { resolveActiveBuiltinSkills } from "../features/builtin-skills";
+import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader";
 import {
+  builtinSkillsToCommandDefinitionRecord,
   discoverConfigSourceSkills,
+  isDisabledSkillAlias,
+  isDisabledSkillName,
   loadGlobalAgentsSkills,
   loadProjectAgentsSkills,
   loadUserSkills,
@@ -27,6 +32,8 @@ import {
 } from "../shared";
 import type { PluginComponents } from "./plugin-components-loader";
 import { adaptHostSkillConfig } from "../shared/host-skill-config";
+import { collectDisabledSkillAliases } from "../plugin/skill-context";
+import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
@@ -34,10 +41,22 @@ export async function applyCommandConfig(params: {
   ctx: { directory: string };
   pluginComponents: PluginComponents;
 }): Promise<void> {
+  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
     useRegisteredAgents: true,
     teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
   });
+  const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
+    resolveActiveBuiltinSkills({
+      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+      disabledSkills,
+      teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+      systemMcpNames: getSystemMcpServerNames(),
+    }),
+  );
+  for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
+    delete builtinSkillCommands[disabledCommand];
+  }
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
@@ -84,31 +103,61 @@ export async function applyCommandConfig(params: {
   ]);
 
   params.config.command = {
+    ...builtinSkillCommands,
     ...builtinCommands,
-    ...skillsToCommandDefinitionRecord(configSourceSkills),
-    ...skillsToCommandDefinitionRecord(hostConfigSkills),
+    ...skillsToCommandDefinitionRecord(filterDisabledLoadedSkills(configSourceSkills, disabledSkills)),
+    ...skillsToCommandDefinitionRecord(filterDisabledLoadedSkills(hostConfigSkills, disabledSkills)),
     ...userCommands,
-    ...userSkills,
-    ...globalAgentsSkills,
+    ...filterDisabledSkillCommandRecord(userSkills, disabledSkills),
+    ...filterDisabledSkillCommandRecord(globalAgentsSkills, disabledSkills),
     ...opencodeGlobalCommands,
-    ...opencodeGlobalSkills,
+    ...filterDisabledSkillCommandRecord(opencodeGlobalSkills, disabledSkills),
     ...systemCommands,
     ...projectCommands,
-    ...projectSkills,
-    ...projectAgentsSkills,
+    ...filterDisabledSkillCommandRecord(projectSkills, disabledSkills),
+    ...filterDisabledSkillCommandRecord(projectAgentsSkills, disabledSkills),
     ...opencodeProjectCommands,
-    ...opencodeProjectSkills,
+    ...filterDisabledSkillCommandRecord(opencodeProjectSkills, disabledSkills),
     ...params.pluginComponents.commands,
-    ...params.pluginComponents.skills,
+    ...filterDisabledSkillCommandRecord(params.pluginComponents.skills, disabledSkills),
   };
 
-  remapCommandAgentFields(params.config.command as Record<string, Record<string, unknown>>);
+  remapCommandAgentFields(
+    params.config.command as Record<string, Record<string, unknown>>,
+    params.pluginConfig.agents,
+  );
 }
 
-function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
+function filterDisabledLoadedSkills(
+  skills: LoadedSkill[],
+  disabledSkills: ReadonlySet<string>,
+): LoadedSkill[] {
+  if (disabledSkills.size === 0) return skills;
+  return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills));
+}
+
+function filterDisabledSkillCommandRecord<T>(
+  commands: Record<string, T>,
+  disabledSkills: ReadonlySet<string>,
+): Record<string, T> {
+  if (disabledSkills.size === 0) return commands;
+
+  const activeCommands: Record<string, T> = {};
+  for (const [name, command] of Object.entries(commands)) {
+    if (!isDisabledSkillName(name, disabledSkills)) {
+      activeCommands[name] = command;
+    }
+  }
+  return activeCommands;
+}
+
+function remapCommandAgentFields(
+  commands: Record<string, Record<string, unknown>>,
+  overrides?: Record<string, { displayName?: string } | undefined>,
+): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent));
+      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent), overrides);
     }
   }
 }

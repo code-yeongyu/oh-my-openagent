@@ -23,9 +23,13 @@ describe("shared skills package manifest", () => {
       private: true,
       description: "Cross-harness SKILL.md files shared between OMO and Codex",
       exports: {
-        ".": "./index.mjs",
+        ".": {
+          types: "./index.d.ts",
+          import: "./index.mjs",
+        },
       },
-      files: ["index.mjs", "skills"],
+      types: "./index.d.ts",
+      files: ["index.d.ts", "index.mjs", "skills"],
     })
   })
 

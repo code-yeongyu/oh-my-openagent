@@ -81,11 +81,23 @@ export class TmuxPollingManager {
         const status = allStatuses[sessionId]
         const elapsedMs = now - tracked.createdAt.getTime()
         if (!tracked.attachActivated && !status) {
-          log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+          if (elapsedMs <= SESSION_TIMEOUT_MS) {
+            log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+              sessionId,
+              paneId: tracked.paneId,
+              elapsedMs,
+            })
+            continue
+          }
+          log("[tmux-session-manager] never-activated pane exceeded hard timeout; closing", {
             sessionId,
             paneId: tracked.paneId,
             elapsedMs,
           })
+          if (!tracked.closePending) {
+            tracked.closePending = true
+            sessionsToClose.push(sessionId)
+          }
           continue
         }
 

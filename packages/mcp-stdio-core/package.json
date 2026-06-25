@@ -1,0 +1,41 @@
+{
+  "name": "@oh-my-opencode/mcp-stdio-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Shared JSON-RPC stdio framing and dispatch primitives for oh-my-opencode MCP servers.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./responses": {
+      "types": "./src/responses.ts",
+      "import": "./src/responses.ts"
+    },
+    "./record": {
+      "types": "./src/record.ts",
+      "import": "./src/record.ts"
+    },
+    "./server": {
+      "types": "./src/server.ts",
+      "import": "./src/server.ts"
+    },
+    "./transport": {
+      "types": "./src/transport.ts",
+      "import": "./src/transport.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "import": "./src/types.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "devDependencies": {
+    "bun-types": "1.3.12"
+  }
+}

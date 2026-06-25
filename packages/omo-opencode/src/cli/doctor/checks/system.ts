@@ -1,12 +1,14 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../constants"
-import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
+import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../framework/constants"
+import type { CheckResult, DoctorIssue, SystemInfo } from "../framework/types"
 import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared/jsonc-parser"
-import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { ACCEPTED_PACKAGE_NAMES, PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+
+const runtime = globalThis as typeof globalThis & { Bun?: { version?: string } }
 
 interface SystemCheckDeps {
   findOpenCodeBinary: typeof findOpenCodeBinary
@@ -62,6 +64,15 @@ function buildMessage(status: CheckResult["status"], issues: DoctorIssue[]): str
   return `${issues.length} system warning(s) detected`
 }
 
+function getLoadedPackageName(installedPackagePath: string): string {
+  const parts = installedPackagePath.split(/[\\/]/)
+  const nodeModulesIndex = parts.lastIndexOf("node_modules")
+  const packageName = nodeModulesIndex >= 0 ? parts[nodeModulesIndex + 1] : undefined
+  return packageName !== undefined && ACCEPTED_PACKAGE_NAMES.some((acceptedName) => acceptedName === packageName)
+    ? packageName
+    : PUBLISHED_PACKAGE_NAME
+}
+
 export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Promise<SystemInfo> {
   const [binaryInfo, pluginInfo] = await Promise.all([
     deps.findOpenCodeBinary(),
@@ -77,7 +88,7 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
     opencodePath: binaryInfo?.path ?? null,
     pluginVersion,
     loadedVersion: loadedInfo.loadedVersion,
-    bunVersion: Bun.version,
+    bunVersion: runtime.Bun?.version ?? "unavailable",
     configPath: pluginInfo.configPath,
     configValid: isConfigValid(pluginInfo.configPath, deps),
     isLocalDev: pluginInfo.isLocalDev,
@@ -161,7 +172,7 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-        fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${PUBLISHED_PACKAGE_NAME}@${installTag}`,
+      fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${getLoadedPackageName(loadedInfo.installedPackagePath)}@${installTag}`,
       severity: "warning",
       affects: ["plugin features"],
     })

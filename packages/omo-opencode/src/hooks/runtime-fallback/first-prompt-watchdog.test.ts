@@ -4,19 +4,75 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { createFirstPromptWatchdog, observeEventForWatchdog, type FirstPromptWatchdog } from "./first-prompt-watchdog"
 
-// Real timers are unavoidable here (bun:test has no built-in fake-timer API),
-// so margins are sized generously to survive a loaded CI runner. Specifically:
-//   - SAFE_WAIT_BEFORE_FIRE_MS must be << WATCHDOG_MS so the cancel call lands
-//     before the timer fires even with significant scheduler delay
-//     (margin: WATCHDOG_MS - SAFE_WAIT_BEFORE_FIRE_MS >= 60ms here).
-//   - SAFE_WAIT_AFTER_FIRE_MS must be >> WATCHDOG_MS so we conclusively
-//     observe whether the timer fired (margin: ~2.5x WATCHDOG_MS).
 const WATCHDOG_MS = 100
 const SAFE_WAIT_BEFORE_FIRE_MS = 40
 const SAFE_WAIT_AFTER_FIRE_MS = 250
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+type FakeTimers = {
+  advanceBy: (ms: number) => Promise<void>
+  restore: () => void
+}
+
+function installFakeTimers(): FakeTimers {
+  const originalSetTimeout = globalThis.setTimeout
+  const originalClearTimeout = globalThis.clearTimeout
+  const originalDateNow = Date.now
+  const callbacks = new Map<ReturnType<typeof setTimeout>, () => void | Promise<void>>()
+  const dueTimes = new Map<ReturnType<typeof setTimeout>, number>()
+  let now = Date.now()
+
+  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]): ReturnType<typeof setTimeout> => {
+    if (typeof handler !== "function") {
+      throw new Error("String timer handlers are not supported in tests")
+    }
+
+    const timer = originalSetTimeout(() => {}, 0)
+    originalClearTimeout(timer)
+    callbacks.set(timer, () => handler(...args))
+    dueTimes.set(timer, now + Math.max(0, delay ?? 0))
+    return timer
+  }) as typeof setTimeout
+
+  globalThis.clearTimeout = ((timer: ReturnType<typeof setTimeout>): void => {
+    callbacks.delete(timer)
+    dueTimes.delete(timer)
+  }) as typeof clearTimeout
+  Date.now = () => now
+
+  return {
+    async advanceBy(ms) {
+      const target = now + ms
+      while (true) {
+        const nextTimer = nextTimerDueBefore(target)
+        if (!nextTimer) break
+        now = dueTimes.get(nextTimer) ?? now
+        const callback = callbacks.get(nextTimer)
+        callbacks.delete(nextTimer)
+        dueTimes.delete(nextTimer)
+        await callback?.()
+        await flushMicrotasks()
+      }
+      now = target
+      await flushMicrotasks()
+    },
+    restore() {
+      globalThis.setTimeout = originalSetTimeout
+      globalThis.clearTimeout = originalClearTimeout
+      Date.now = originalDateNow
+    },
+  }
+
+  function nextTimerDueBefore(target: number): ReturnType<typeof setTimeout> | undefined {
+    return [...dueTimes.entries()]
+      .filter(([, dueAt]) => dueAt <= target)
+      .sort((left, right) => left[1] - right[1])[0]?.[0]
+  }
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve()
+  }
 }
 
 function createContext(): RuntimeFallbackPluginInput {
@@ -45,6 +101,7 @@ function createDeps(pluginConfig: HookDeps["pluginConfig"] = undefined): HookDep
       cooldown_seconds: 60,
       timeout_seconds: 30,
       notify_on_fallback: false,
+      restore_primary_after_cooldown: false,
     },
     options: undefined,
     pluginConfig,
@@ -96,11 +153,23 @@ const PLUGIN_CONFIG_WITH_FALLBACK = {
 }
 
 describe("first-prompt-watchdog", () => {
+  let fakeTimers: FakeTimers | undefined
+
+  function getFakeTimers(): FakeTimers {
+    if (!fakeTimers) {
+      throw new Error("Fake timers must be installed before advancing watchdog time")
+    }
+    return fakeTimers
+  }
+
   beforeEach(() => {
     subagentSessions.clear()
+    fakeTimers = installFakeTimers()
   })
 
   afterEach(() => {
+    fakeTimers?.restore()
+    fakeTimers = undefined
     subagentSessions.clear()
   })
 
@@ -115,7 +184,7 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
@@ -138,9 +207,9 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
     watchdog.onAssistantProgress(sessionID)
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([])
@@ -160,7 +229,7 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
     observeEventForWatchdog(
       {
         type: "message.part.updated",
@@ -176,7 +245,7 @@ describe("first-prompt-watchdog", () => {
       },
       watchdog,
     )
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([])
@@ -196,7 +265,7 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
     observeEventForWatchdog(
       {
         type: "message.part.delta",
@@ -204,7 +273,7 @@ describe("first-prompt-watchdog", () => {
       },
       watchdog,
     )
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([])
@@ -224,7 +293,7 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([])
@@ -244,9 +313,9 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
     watchdog.onSessionTerminal(sessionID)
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([])
@@ -266,7 +335,7 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
     expect(calls.abort).toEqual([])

@@ -1,18 +1,120 @@
 {
-	"aiSlopCleaner": { "status": "passed", "evidence": "no slop detected after cleaner run" },
-	"verification": {
-		"status": "passed",
-		"commands": ["npm test", "npm run build"],
-		"evidence": "all tests pass + build green"
-	},
 	"codeReview": {
+		"by": "lazycodex-code-reviewer",
 		"recommendation": "APPROVE",
-		"architectStatus": "CLEAR",
-		"evidence": "review synthesis: ship it"
+		"codeQualityStatus": "CLEAR",
+		"reportPath": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/code-review.md",
+		"evidence": "Reviewed changed validator, type contract, and tests; no blocking code-quality issues remain.",
+		"blockers": []
+	},
+	"manualQa": {
+		"by": "lazycodex-qa-executor",
+		"status": "passed",
+		"evidence": "Executed CLI, HTTP, browser screenshot, and data-diff validation scenarios with artifact-backed outcomes.",
+		"surfaceEvidence": [
+			{
+				"id": "surface-cli-pass",
+				"criterionRef": "C1",
+				"surface": "cli",
+				"invocation": "node dist/quality-gate.js validate sample-quality-gate.json",
+				"verdict": "passed",
+				"artifactRefs": ["artifact-cli-pass"]
+			},
+			{
+				"id": "surface-http-pass",
+				"criterionRef": "C2",
+				"surface": "http",
+				"invocation": "curl -i http://127.0.0.1:8787/quality-gate",
+				"verdict": "passed",
+				"artifactRefs": ["artifact-http-dump"]
+			},
+			{
+				"id": "surface-browser-pass",
+				"criterionRef": "C3",
+				"surface": "browser",
+				"invocation": "page.goto('http://127.0.0.1:8787/quality-gate'); page.screenshot()",
+				"verdict": "passed",
+				"artifactRefs": ["artifact-browser-shot"]
+			},
+			{
+				"id": "surface-data-pass",
+				"criterionRef": "C4",
+				"surface": "data",
+				"invocation": "diff -u before.json after.json",
+				"verdict": "passed",
+				"artifactRefs": ["artifact-data-diff"]
+			}
+		],
+		"adversarialCases": [
+			{
+				"id": "adv-malformed-input",
+				"criterionRef": "C5",
+				"scenario": "malformed gate input omits manual QA evidence",
+				"expectedBehavior": "validator rejects the gate with ULW_LOOP_QUALITY_GATE_INVALID",
+				"verdict": "passed",
+				"artifactRefs": ["artifact-cli-reject"]
+			},
+			{
+				"id": "adv-stale-state",
+				"criterionRef": "C6",
+				"scenario": "legacy ledger entry contains an old quality gate object",
+				"expectedBehavior": "ledger remains readable because qualityGate is stored as unknown",
+				"verdict": "passed",
+				"artifactRefs": ["artifact-data-diff"]
+			}
+		],
+		"artifactRefs": [
+			{
+				"id": "artifact-cli-pass",
+				"kind": "cli-transcript",
+				"description": "CLI transcript for valid quality gate acceptance.",
+				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt"
+			},
+			{
+				"id": "artifact-cli-reject",
+				"kind": "log",
+				"description": "Log proving malformed quality gate rejection.",
+				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt"
+			},
+			{
+				"id": "artifact-http-dump",
+				"kind": "http-dump",
+				"description": "HTTP dump for quality gate endpoint validation.",
+				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/http-dump.txt"
+			},
+			{
+				"id": "artifact-browser-shot",
+				"kind": "screenshot",
+				"description": "Browser screenshot captured for the quality gate scenario.",
+				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/browser-screenshot.txt"
+			},
+			{
+				"id": "artifact-data-diff",
+				"kind": "data-diff",
+				"description": "Data diff proving stale-state compatibility.",
+				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/data-diff.txt"
+			}
+		]
+	},
+	"gateReview": {
+		"by": "lazycodex-gate-reviewer",
+		"recommendation": "APPROVE",
+		"reportPath": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md",
+		"evidence": "Rechecked reviewer reports, manual QA artifacts, and criteria coverage; gate is approved.",
+		"blockers": []
+	},
+	"iteration": {
+		"fullRerun": true,
+		"status": "passed",
+		"rerunCommands": ["bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/quality-gate.test.ts"],
+		"evidence": "Full focused rerun passed after validator update."
 	},
 	"criteriaCoverage": {
 		"totalCriteria": 9,
 		"passCount": 9,
-		"adversarialClassesCovered": ["malformed_input", "prompt_injection", "stale_state"]
+		"originalIntent": "User wanted the final quality gate to accept only artifact-backed completion.",
+		"desiredOutcome": "The validator rejects weak gates and stores a complete, review-backed approval record.",
+		"userOutcomeReview": "From the user's perspective, every intended outcome is covered by evidence and review artifacts.",
+		"adversarialClassesCovered": ["malformed_input", "stale_state", "dirty_worktree", "misleading_success_output"]
 	}
 }

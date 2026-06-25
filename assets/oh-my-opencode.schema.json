@@ -45,20 +45,7 @@
     "disabled_skills": {
       "type": "array",
       "items": {
-        "type": "string",
-        "enum": [
-          "playwright",
-          "agent-browser",
-          "dev-browser",
-          "frontend-ui-ux",
-          "git-master",
-          "review-work",
-          "remove-ai-slops",
-          "init-deep",
-          "security-research",
-          "security-review",
-          "team-mode"
-        ]
+        "type": "string"
       }
     },
     "disabled_hooks": {
@@ -388,7 +375,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -744,7 +738,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -1100,7 +1101,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -1456,7 +1464,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -1815,7 +1830,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -2171,7 +2193,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -2527,7 +2556,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -2883,7 +2919,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -3239,7 +3282,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -3595,7 +3645,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -3951,7 +4008,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -4307,7 +4371,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -4663,7 +4734,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -5019,7 +5097,14 @@
                   ]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
             },
             "maxTokens": {
               "type": "number"
@@ -5376,7 +5461,14 @@
                 ]
               }
             },
-            "additionalProperties": false
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ask",
+                "allow",
+                "deny"
+              ]
+            }
           },
           "maxTokens": {
             "type": "number"
@@ -5769,9 +5861,6 @@
         "aggressive_truncation": {
           "type": "boolean"
         },
-        "auto_resume": {
-          "type": "boolean"
-        },
         "preemptive_compaction": {
           "type": "boolean"
         },
@@ -5917,6 +6006,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
+        },
+        "disable_live_parent_wake_routing": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -6098,6 +6190,9 @@
               "minimum": 0
             },
             "notify_on_fallback": {
+              "type": "boolean"
+            },
+            "restore_primary_after_cooldown": {
               "type": "boolean"
             }
           },
@@ -6368,6 +6463,119 @@
       },
       "additionalProperties": false
     },
+    "monitor": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "live_mode_enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "allowed_commands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_monitors_per_session": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "max_runtime_ms": {
+          "default": 1800000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "batch_max_lines": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "batch_max_bytes": {
+          "default": 16384,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 9007199254740991
+        },
+        "flush_interval_ms": {
+          "default": 1000,
+          "type": "integer",
+          "minimum": 250,
+          "maximum": 9007199254740991
+        },
+        "ring_max_lines": {
+          "default": 1000,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "line_max_bytes": {
+          "default": 8192,
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 9007199254740991
+        },
+        "pattern_max_length": {
+          "default": 512,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "enabled",
+        "live_mode_enabled",
+        "max_monitors_per_session",
+        "max_runtime_ms",
+        "batch_max_lines",
+        "batch_max_bytes",
+        "flush_interval_ms",
+        "ring_max_lines",
+        "line_max_bytes",
+        "pattern_max_length"
+      ],
+      "additionalProperties": false
+    },
+    "codegraph": {
+      "type": "object",
+      "properties": {
+        "auto_init": {
+          "default": true,
+          "type": "boolean"
+        },
+        "auto_provision": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "install_dir": {
+          "type": "string"
+        },
+        "telemetry": {
+          "type": "boolean"
+        },
+        "watch_debounce_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "auto_init",
+        "auto_provision",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "team_mode": {
       "type": "object",
       "properties": {
@@ -6454,8 +6662,6 @@
             "type": "string",
             "enum": [
               "ultrawork",
-              "search",
-              "analyze",
               "team",
               "hyperplan",
               "hyperplan-ultrawork"
@@ -6468,8 +6674,6 @@
             "type": "string",
             "enum": [
               "ultrawork",
-              "search",
-              "analyze",
               "team",
               "hyperplan",
               "hyperplan-ultrawork"
@@ -6610,6 +6814,36 @@
         "main_pane_min_width",
         "agent_pane_min_width",
         "isolation"
+      ],
+      "additionalProperties": false
+    },
+    "tui": {
+      "default": {
+        "sidebar": {
+          "enabled": true
+        }
+      },
+      "type": "object",
+      "properties": {
+        "sidebar": {
+          "default": {
+            "enabled": true
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "sidebar"
       ],
       "additionalProperties": false
     },

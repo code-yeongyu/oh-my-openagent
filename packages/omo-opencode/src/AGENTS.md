@@ -1,10 +1,27 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-06-08
+**Generated:** 2026-06-23
+
+## STOP. THIS IS THE OPENCODE PLUGIN. QA IS MANDATORY. EVERY SINGLE TIME YOU CHANGE ANYTHING HERE.
+
+> **EVERYTHING UNDER THIS `src/` IS WIRED DIRECTLY INTO OPENCODE. IF YOU EDIT A HOOK, A TOOL, AN AGENT, A FEATURE, A CONFIG SCHEMA, AN MCP, A CLI COMMAND, A PLUGIN HANDLER, OR ANYTHING ELSE IN HERE, YOU MUST QA IT AGAINST REAL OPENCODE. ALWAYS. EVERY SINGLE TIME. NO EXCEPTIONS.**
+
+**"It typechecks" is NOT QA. "`bun test` is green" is NOT QA.** YOU MUST DRIVE REAL OPENCODE AND RECORD THE EVIDENCE TO DISK. NO EVIDENCE == NO QA == NO COMMIT == NO PUSH.
+
+**ALWAYS RUN THE `opencode-qa` SKILL** (`.agents/skills/opencode-qa/`) to map the EXPECTED IMPACT and the FULL CHANGE SCOPE of your edit:
+
+1. **MAP THE BLAST RADIUS** with the skill router (CLI / server + SSE hook proof / TUI smoke / DB inspection), BEFORE and AFTER your change.
+2. **ISOLATE EVERYTHING.** Any QA that SPAWNS opencode MUST run in an isolated XDG sandbox (`XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_STATE_HOME` / `XDG_CACHE_HOME` pointed at temp dirs). **NEVER pollute the real `~/.local/share/opencode/opencode.db`.** PROVE it: `SELECT count(*) FROM session` unchanged before vs after.
+3. **PROVE THE HOOK / EVENT FIRED.** Changed a lifecycle hook? Prove the matching event hit the wire (`scripts/sse-hook-probe.sh --event <name>`). Changed a tool? Drive it via `opencode run --format json` and assert on the structured events.
+4. **USE tmux** for TUI smoke (`scripts/tui-smoke.sh`) and interactive driving; assert REAL behavior via `opencode run` or the server API + SSE, not the TUI pane.
+
+**RECORD THE EVIDENCE UNDER `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (one organized subfolder per change): WHY THERE IS NO REGRESSION (before/after + isolation proof + exact commands and output) and PROOF THAT EVERY INTENDED CHANGE LANDED (new behavior observed on real opencode). See the root [`AGENTS.md`](../../../AGENTS.md) "STOP. QA IS MANDATORY" section for the full mandate, which also covers the Codex side.
+
+**ALWAYS. EVERY TIME. NO EXCEPTIONS.**
 
 ## OVERVIEW
 
-Entry `index.ts` orchestrates a 7-step initialization. Total: ~1314 source files + 730 tests across the directories below. Cross-cutting helpers live in `shared/`; module boundaries are established by 120 barrel `index.ts` files.
+Entry `index.ts` orchestrates a staged initialization across the directories below. Cross-cutting adapter helpers live in `shared/`; barrel `index.ts` files establish module boundaries. Several former implementation directories now act partly as OpenCode-facing shims over extracted Core packages.
 
 ## KEY FILES
 
@@ -55,7 +72,7 @@ Counts verified from each composer's return object. Numbers in brackets show cou
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 23: preemptiveCompaction, sessionRecovery,
+  │   ├─ createSessionHooks()     # 22: preemptiveCompaction,
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
@@ -71,8 +88,8 @@ createHooks()
   │   │                             jsonErrorRecovery, readImageResizer, todoDescriptionOverride,
   │   │                             webfetchRedirectGuard, fsyncSkipWarning,
   │   │                             notepadWriteGuard, planFormatValidator [+ teamToolGating]
-  │   └─ createTransformHooks()   # 5 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
-  │                                  contextInjectorMessagesTransform, thinkingBlockValidator,
+  │   └─ createTransformHooks()   # 4 [+2 with team-mode]: claudeCodeHooks, keywordDetector,
+  │                                  contextInjectorMessagesTransform,
   │                                  toolPairValidator [+ teamModeStatusInjector, teamMailboxInjector]
   ├─→ createContinuationHooks()   # 7: stopContinuationGuard, compactionContextInjector,
   │                                  compactionTodoPreserver, todoContinuationEnforcer (boulder),
@@ -84,27 +101,27 @@ createHooks()
     team-member-error-handler, team-member-status-handler
 ```
 
-Total: 54 base, 61 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
+Total: 53 base, 60 with team-mode. Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 
-| Subdir | Files (.ts) | LOC | Purpose | Has AGENTS.md |
-|--------|-------------|-----|---------|---------------|
-| `agents/` | 104 | ~20k | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
-| `hooks/` | 596 | ~78k | ~55 lifecycle hooks across 61 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
-| `tools/` | 317 | ~45k | 13 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
-| `features/` | 404 | ~71k | 21 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
-| `shared/` | 297 | ~33k | Cross-cutting utilities (179 non-test), barrel-exported | yes |
-| `cli/` | 158 | ~18k | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
-| `plugin/` | 58 | ~12k | 12 OpenCode hook handlers + hook composition | yes |
-| `config/` | 41 | ~2k | 32 Zod v4 schema files | yes |
-| `plugin-handlers/` | 27 | ~6k | 6-phase config loading pipeline | yes |
-| `openclaw/` | 26 | ~3k | Bidirectional Discord/Telegram/HTTP integration | yes |
-| `__tests__/` | 22 | ~300 | Plugin-level integration tests + perf fixtures | — |
-| `mcp/` | 8 | ~260 | 5 built-in MCPs (3 remote + local stdio lsp + ast_grep) | yes |
-| `testing/` | 3 | ~225 | Test utilities + `create-plugin-module.ts` | — |
-| `help/` | 4 | ~200 | CLI help schema definitions (acp, doctor, sandbox, status) | — |
-| `locales/` | 3 | ~150 | i18n strings (en, zh): toasts + model-fallback labels | — |
+| Subdir | Purpose | Has AGENTS.md |
+|--------|---------|---------------|
+| `agents/` | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
+| `hooks/` | 53-60 lifecycle hooks across 60 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, todo-continuation-enforcer) |
+| `tools/` | 14 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
+| `features/` | 23 feature modules (some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
+| `shared/` | Cross-cutting adapter utilities plus shims over extracted Core packages, barrel-exported | yes |
+| `cli/` | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
+| `plugin/` | 12 OpenCode hook handlers + hook composition | yes |
+| `config/` | Zod v4 schema files | yes |
+| `plugin-handlers/` | 6-phase config loading pipeline | yes |
+| `openclaw/` | Bidirectional Discord/Telegram/HTTP integration | yes |
+| `__tests__/` | Plugin-level integration tests + perf fixtures | — |
+| `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + codegraph) | yes |
+| `testing/` | Test utilities + `create-plugin-module.ts` | — |
+| `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | — |
+| `locales/` | i18n strings (en, zh): toasts + model-fallback labels | — |
 
 ## NOTES
 

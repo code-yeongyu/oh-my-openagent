@@ -1,6 +1,9 @@
 import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { discoverSkills } from "../../features/opencode-skill-loader"
-import { getAllSkills } from "../../features/opencode-skill-loader/skill-discovery"
+import {
+  getAllSkills,
+  isDisabledSkillAlias,
+} from "../../features/opencode-skill-loader/skill-discovery"
 import {
   extractSkillTemplate,
   injectGitMasterConfig,
@@ -61,7 +64,7 @@ export async function resolveSkillContent(
   // OMO wins on collisions, matching the existing mergeNativeSkills semantics.
   const baseSkills: LoadedSkill[] = [...(await getAllSkills(options))]
   const nativeEntries = await loadNativeSkillEntries(options.nativeSkills, options.nativeSkillEntries)
-  mergeNativeSkills(baseSkills, nativeEntries)
+  mergeNativeSkills(baseSkills, nativeEntries, options.disabledSkills)
 
   const resolved = new Map<string, string>()
   const notFound: string[] = []
@@ -78,8 +81,11 @@ export async function resolveSkillContent(
 
   for (const name of skills) {
     let skill = matchSkillByName(baseSkills, name)
-    if (!skill && options.browserProvider === undefined && !options.disabledSkills?.has(name)) {
+    if (!skill && options.browserProvider === undefined) {
       skill = matchSkillByName(await getUnfilteredDiscoveredSkills(), name)
+      if (skill && options.disabledSkills && isDisabledSkillAlias(skill, options.disabledSkills)) {
+        skill = undefined
+      }
     }
     if (!skill) {
       notFound.push(name)

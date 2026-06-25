@@ -20,6 +20,11 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
     expect(getAtlasPromptSource("opencode-go/kimi-k2.5")).toBe("kimi")
   })
 
+  test("Kimi K2.7 routes to its own variant, ahead of generic kimi", () => {
+    expect(getAtlasPromptSource("opencode-go/kimi-k2.7")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/k2p7")).toBe("kimi-k2-7")
+  })
+
   test("Claude Opus 4.7 routes to opus-4-7", () => {
     expect(getAtlasPromptSource("anthropic/claude-opus-4-7")).toBe("opus-4-7")
     expect(getAtlasPromptSource("github-copilot/claude-opus-4.7")).toBe("opus-4-7")
@@ -31,13 +36,17 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
     expect(getAtlasPromptSource("anthropic/claude-haiku-4-5")).toBe("default")
   })
 
+  test("GLM models route to glm", () => {
+    expect(getAtlasPromptSource("zai-coding-plan/glm-5.1")).toBe("glm")
+    expect(getAtlasPromptSource("zai/glm-5.2")).toBe("glm")
+  })
+
   test("undefined model falls through to default", () => {
     expect(getAtlasPromptSource(undefined)).toBe("default")
   })
 
   test("unrecognized model falls through to default", () => {
     expect(getAtlasPromptSource("opencode-go/big-pickle")).toBe("default")
-    expect(getAtlasPromptSource("zai-coding-plan/glm-5.1")).toBe("default")
   })
 
   test("GPT detection takes priority over Claude family naming", () => {

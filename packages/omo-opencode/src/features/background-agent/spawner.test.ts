@@ -7,6 +7,19 @@ import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt
 import { buildFallbackBody, createTask, isAgentNotFoundError, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
 
+type PromptRequest = {
+  path?: { id?: string }
+  query?: { directory?: string }
+  body: {
+    agent?: string
+    parts?: unknown
+    tools?: Record<string, boolean>
+    model?: { providerID: string; modelID: string }
+    variant?: string
+    options?: unknown
+  }
+}
+
 /**
  * Poll until `fn()` returns true or timeout elapses.
  * Replaces fixed `setTimeout(resolve, 50)` waits that cause flaky CI failures
@@ -34,14 +47,14 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
   test("retries with 'general' agent when promptAsync fails with Agent not found", async () => {
     //#given
-    const promptCalls: any[] = []
+    const promptCalls: PromptRequest[] = []
     let callCount = 0
 
     const client = {
       session: {
         get: async () => ({ data: { directory: "/tmp/test" } }),
         create: async () => ({ data: { id: "session-fallback" } }),
-        promptAsync: async (args: any) => {
+        promptAsync: async (args: PromptRequest) => {
           callCount++
           promptCalls.push({ body: { ...args.body }, path: { ...args.path } })
           if (callCount === 1) {
@@ -123,13 +136,13 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
   test("does not retry for non-agent-not-found errors", async () => {
     //#given
-    const promptCalls: any[] = []
+    const promptCalls: PromptRequest[] = []
 
     const client = {
       session: {
         get: async () => ({ data: { directory: "/tmp/test" } }),
         create: async () => ({ data: { id: "session-fallback" } }),
-        promptAsync: async (args: any) => {
+        promptAsync: async (args: PromptRequest) => {
           promptCalls.push(args)
           throw new Error("Connection timeout")
         },
@@ -230,14 +243,14 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
   test("retries on agent.name/undefined error variant", async () => {
     //#given
-    const promptCalls: any[] = []
+    const promptCalls: PromptRequest[] = []
     let callCount = 0
 
     const client = {
       session: {
         get: async () => ({ data: { directory: "/tmp/test" } }),
         create: async () => ({ data: { id: "session-fallback" } }),
-        promptAsync: async (args: any) => {
+        promptAsync: async (args: PromptRequest) => {
           callCount++
           promptCalls.push({ body: { ...args.body } })
           if (callCount === 1) {
@@ -293,14 +306,14 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
   test("detects agent error from plain object with message field", async () => {
     //#given
-    const promptCalls: any[] = []
+    const promptCalls: PromptRequest[] = []
     let callCount = 0
 
     const client = {
       session: {
         get: async () => ({ data: { directory: "/tmp/test" } }),
         create: async () => ({ data: { id: "session-fallback" } }),
-        promptAsync: async (args: any) => {
+        promptAsync: async (args: PromptRequest) => {
           callCount++
           promptCalls.push({ body: { ...args.body } })
           if (callCount === 1) {
@@ -361,12 +374,12 @@ describe("background-agent spawner fallback model promotion", () => {
 
   test("passes promoted fallback model settings through supported prompt channels", async () => {
     //#given
-    let promptArgs: any
+    let promptArgs!: PromptRequest
     const client = {
       session: {
         get: mock(async () => ({ data: { directory: "/tmp/test" } })),
         create: mock(async () => ({ data: { id: "session-123" } })),
-        promptAsync: mock(async (input: any) => {
+        promptAsync: mock(async (input: PromptRequest) => {
           promptArgs = input
           return { data: {} }
         }),
@@ -443,13 +456,13 @@ describe("background-agent spawner fallback model promotion", () => {
 
   test("keeps agent when explicit model is configured", async () => {
     //#given
-    const promptCalls: any[] = []
+    const promptCalls: PromptRequest[] = []
 
     const client = {
       session: {
         get: async () => ({ data: { directory: "/parent/dir" } }),
         create: async () => ({ data: { id: "ses_child" } }),
-        promptAsync: async (args?: any) => {
+        promptAsync: async (args: PromptRequest) => {
           promptCalls.push(args)
           return {}
         },

@@ -7,6 +7,16 @@ import { fileURLToPath } from "node:url"
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const commandRoots = [".opencode/command", ".agents/command"] as const
 const skillRoots = [".opencode/skills", ".agents/skills"] as const
+const codexHookComponentRuntimePaths = [
+  "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
+  "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
+  "packages/omo-codex/plugin/components/lsp/dist/cli.js",
+  "packages/omo-codex/plugin/components/rules/dist/cli.js",
+  "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js",
+  "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
+  "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
+  "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
+] as const
 const packageLayoutTestTimeoutMs = 60_000
 const packDryRunTimeoutMs = 15_000
 
@@ -131,7 +141,11 @@ describe("published package layout", () => {
       cwd: repositoryRoot,
       encoding: "utf8",
     })
-    const gitmodules = existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
+    const trackedGitmodulesPath = execFileSync("git", ["ls-files", "--", ".gitmodules"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    }).trim()
+    const gitmodules = trackedGitmodulesPath && existsSync(gitmodulesPath) ? Bun.file(gitmodulesPath).text() : Promise.resolve("")
 
     // then
     expect(trackedEntries).not.toContain("160000")
@@ -149,6 +163,45 @@ describe("published package layout", () => {
     // then
     expect(packedPaths.has(expectedPackageRootManifest)).toBe(true)
   }, packDryRunTimeoutMs)
+
+  test("#given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not", async () => {
+    // given
+    const expectedGeneratedInstaller = "packages/omo-codex/scripts/install-dist/install-local.mjs"
+    const obsoleteForkPrefix = "packages/omo-codex/scripts/install/"
+
+    // when
+    const packedPaths = await packDryRunPaths()
+    const packedObsoleteForks = [...packedPaths].filter((packagePath) => packagePath.startsWith(obsoleteForkPrefix))
+
+    // then
+    expect(packedPaths.has(expectedGeneratedInstaller)).toBe(true)
+    expect(packedObsoleteForks).toEqual([])
+  }, packDryRunTimeoutMs)
+
+  test("#given Codex hook component runtimes #when packing package #then every hook command target ships", async () => {
+    // given
+    const expectedRuntimePaths = codexHookComponentRuntimePaths
+
+    // when
+    const packedPaths = await packDryRunPaths()
+    const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+
+    // then
+    expect(missingRuntimePaths).toEqual([])
+  }, packDryRunTimeoutMs)
+
+  test("#given Codex installer source tree #when checking obsolete forks #then hand-written install mjs files are absent", () => {
+    // given
+    const obsoleteForkRoot = join(repositoryRoot, "packages/omo-codex/scripts/install")
+
+    // when
+    const obsoleteForks = existsSync(obsoleteForkRoot)
+      ? collectPackagePathsRecursively(obsoleteForkRoot).filter((packagePath) => packagePath.endsWith(".mjs"))
+      : []
+
+    // then
+    expect(obsoleteForks).toEqual([])
+  })
 
   test("#given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship", async () => {
     // given

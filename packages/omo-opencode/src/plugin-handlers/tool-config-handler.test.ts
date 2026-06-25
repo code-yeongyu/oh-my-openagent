@@ -306,6 +306,45 @@ describe("applyToolConfig", () => {
     })
   })
 
+  describe("#given sisyphus-junior with permission.task=deny from factory", () => {
+    describe("#when applyToolConfig runs", () => {
+      it("#then should NOT clobber task:deny to allow (sub-bug of #5193)", () => {
+        // given a sisyphus-junior agent with permission.task === "deny" (factory output)
+        const params = createParams({ agents: ["sisyphus-junior"] });
+        (params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
+          task: "deny",
+        };
+
+        // when applyToolConfig runs
+        applyToolConfig(params);
+
+        // then task remains "deny" (NOT overwritten to "allow")
+        const junior = params.agentResult["sisyphus-junior"] as {
+          permission: Record<string, unknown>;
+        };
+        expect(junior.permission.task).toBe("deny");
+      });
+
+      it("#then should still add task_*:allow and teammate:allow to sisyphus-junior", () => {
+        // given
+        const params = createParams({ agents: ["sisyphus-junior"] });
+        (params.agentResult["sisyphus-junior"] as { permission: Record<string, unknown> }).permission = {
+          task: "deny",
+        };
+
+        // when
+        applyToolConfig(params);
+
+        // then
+        const junior = params.agentResult["sisyphus-junior"] as {
+          permission: Record<string, unknown>;
+        };
+        expect(junior.permission["task_*"]).toBe("allow");
+        expect(junior.permission.teammate).toBe("allow");
+      });
+    });
+  });
+
   describe("#given disabled_tools includes 'question'", () => {
     let originalConfigContent: string | undefined
     let originalCliRunMode: string | undefined
@@ -385,6 +424,61 @@ describe("applyToolConfig", () => {
           expect(agent.permission.question).toBe("allow")
         },
       )
+    })
+  })
+
+  describe("#given prometheus agent", () => {
+    describe("#when applying tool config", () => {
+      it("#then should deny bash for prometheus", () => {
+        const params = createParams({ agents: ["prometheus"] })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult.prometheus as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.bash).toBe("deny")
+      })
+
+      it("#then should deny interactive_bash for prometheus", () => {
+        const params = createParams({ agents: ["prometheus"] })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult.prometheus as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.interactive_bash).toBe("deny")
+      })
+
+      it("#then should preserve other prometheus permissions", () => {
+        const params = createParams({ agents: ["prometheus"] })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult.prometheus as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.call_omo_agent).toBe("deny")
+        expect(agent.permission.task).toBe("allow")
+        expect(agent.permission["task_*"]).toBe("allow")
+        expect(agent.permission.teammate).toBe("allow")
+      })
+
+      it("#then should NOT deny bash for other agents", () => {
+        const otherAgents = ["atlas", "sisyphus", "hephaestus", "sisyphus-junior"]
+        const params = createParams({ agents: otherAgents })
+
+        applyToolConfig(params)
+
+        for (const agentName of otherAgents) {
+          const agent = params.agentResult[agentName] as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.bash).toBeUndefined()
+          expect(agent.permission.interactive_bash).toBeUndefined()
+        }
+      })
     })
   })
 })

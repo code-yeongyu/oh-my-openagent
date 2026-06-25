@@ -2,6 +2,8 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 
 import {
   isClaudeFable5Model,
+  isClaudeFableOrMythosModel,
+  isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
@@ -9,11 +11,14 @@ import {
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isKimiK27Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
 export {
   isClaudeFable5Model,
+  isClaudeFableOrMythosModel,
+  isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
@@ -21,21 +26,23 @@ export {
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isKimiK27Model,
   isMiniMaxModel,
 };
 
 const CLAUDE_THINKING_BUDGET_TOKENS = 32000;
 
 /**
- * Anthropic Opus 4.7+ rejects thinking.type "enabled"; it requires adaptive
- * thinking plus an effort, which OpenCode core derives from the model variant.
- * For those models emit no thinking config and let core drive it (issue #4614).
- * All other Claude models keep the explicit enabled-thinking budget.
+ * Anthropic Opus 4.7+, Fable, and Mythos models reject thinking.type "enabled";
+ * they require adaptive thinking plus an effort, which OpenCode core derives from
+ * the model variant. For those models emit no thinking config and let core drive
+ * it (issue #4614; opencode core #31546). All other Claude models keep the
+ * explicit enabled-thinking budget.
  */
 export function buildClaudeThinkingConfig(
   model: string,
 ): { thinking: { type: "enabled"; budgetTokens: number } } | Record<string, never> {
-  if (isClaudeOpus47OrLaterModel(model)) {
+  if (isClaudeOpus47OrLaterModel(model) || isClaudeFableOrMythosModel(model)) {
     return {};
   }
   return { thinking: { type: "enabled", budgetTokens: CLAUDE_THINKING_BUDGET_TOKENS } };
@@ -115,7 +122,7 @@ function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model;
 }
 
-const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:(?:3[.-])?codex|[4-9]|\d{2,})/i;
 
 export function isGptNativeSisyphusModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
