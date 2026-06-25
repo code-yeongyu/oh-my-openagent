@@ -59,11 +59,103 @@ const defaultFactory: DeepgramClientFactory = (apiKey) => {
   };
 };
 
+export interface StreamLiveOptions {
+  signal?: AbortSignal;
+}
+
 export class DeepgramSttAdapter implements SttStub {
   constructor(
     private readonly config: DeepgramSttConfig,
     private readonly clientFactory: DeepgramClientFactory = defaultFactory,
   ) {}
+
+  async *streamLive(
+    frames: AsyncIterable<ArrayBuffer>,
+    options?: StreamLiveOptions,
+  ): AsyncIterable<SttEvent> {
+    const startedAt = performance.now();
+    const events: SttEvent[] = [];
+    let connection: DeepgramConnection | undefined;
+    let done = false;
+    let failure: Error | undefined;
+    let wake: (() => void) | undefined;
+
+    const notify = () => {
+      wake?.();
+      wake = undefined;
+    };
+    const complete = () => {
+      done = true;
+      notify();
+    };
+    const fail = (error: Error) => {
+      failure = error;
+      notify();
+    };
+    const push = (event: SttEvent) => {
+      events.push(event);
+      notify();
+    };
+    const nextEvent = async (): Promise<SttEvent | undefined> => {
+      while (events.length === 0 && !done && !failure) {
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+        });
+      }
+      if (failure) throw failure;
+      return events.shift();
+    };
+    const throwIfAborted = () => {
+      if (options?.signal?.aborted) {
+        const err = new Error("AbortError");
+        err.name = "AbortError";
+        throw err;
+      }
+    };
+
+    try {
+      throwIfAborted();
+      const client = this.clientFactory(this.config.apiKey);
+      try {
+        connection = await client.listen.v1.connect(this.connectParams());
+      } catch (error) {
+        throw new Error(`deepgram connect failed: ${this.errorMessage(error)}`);
+      }
+
+      connection.on("message", (message) => {
+        const event = this.toSttEvent(message, startedAt);
+        if (!event) return;
+        push(event);
+      });
+      connection.on("close", complete);
+      connection.on("error", fail);
+      connection.connect();
+      await connection.waitForOpen();
+
+      const conn = connection;
+      const pumpFrames = (async () => {
+        try {
+          for await (const frame of frames) {
+            throwIfAborted();
+            conn.sendMedia(frame);
+          }
+          conn.sendFinalize({ type: "Finalize" });
+        } catch (error) {
+          fail(error instanceof Error ? error : new Error(String(error)));
+        }
+      })();
+      void pumpFrames;
+
+      while (true) {
+        throwIfAborted();
+        const event = await nextEvent();
+        if (!event) return;
+        yield event;
+      }
+    } finally {
+      connection?.close();
+    }
+  }
 
   async *transcribe(sample: AudioSample): AsyncIterable<SttEvent> {
     const startedAt = performance.now();
