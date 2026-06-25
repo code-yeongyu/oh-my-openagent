@@ -11,7 +11,7 @@ import { applyToolConfig } from "./tool-config-handler";
 export { resolveCategoryConfig } from "./category-config-resolver";
 
 export interface ConfigHandlerDeps {
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: unknown };
   pluginConfig: MatrixxConfig;
   modelCacheState: ModelCacheState;
 }

@@ -29,7 +29,7 @@ function hasConfiguredDefaultAgent(config: Record<string, unknown>): boolean {
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: MatrixxConfig;
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: unknown };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
   const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(

@@ -37,32 +37,32 @@ afterAll(() => {
 })
 
 beforeEach(() => {
-  spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+  spyOn(agents, "createBuiltinAgents").mockResolvedValue({
     morpheus: { name: "morpheus", prompt: "test", mode: "primary" },
   })
 
-  spyOn(commandLoader, "loadUserCommands" as any).mockResolvedValue({})
-  spyOn(commandLoader, "loadProjectCommands" as any).mockResolvedValue({})
-  spyOn(commandLoader, "loadOpencodeGlobalCommands" as any).mockResolvedValue({})
-  spyOn(commandLoader, "loadOpencodeProjectCommands" as any).mockResolvedValue({})
+  spyOn(commandLoader, "loadUserCommands").mockResolvedValue({})
+  spyOn(commandLoader, "loadProjectCommands").mockResolvedValue({})
+  spyOn(commandLoader, "loadOpencodeGlobalCommands").mockResolvedValue({})
+  spyOn(commandLoader, "loadOpencodeProjectCommands").mockResolvedValue({})
 
-  spyOn(builtinCommands, "loadBuiltinCommands" as any).mockReturnValue({})
+  spyOn(builtinCommands, "loadBuiltinCommands").mockReturnValue({})
 
-  spyOn(skillLoader, "loadUserSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "loadProjectSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "loadOpencodeGlobalSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "loadOpencodeProjectSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "discoverUserClaudeSkills" as any).mockResolvedValue([])
-  spyOn(skillLoader, "discoverProjectClaudeSkills" as any).mockResolvedValue([])
-  spyOn(skillLoader, "discoverOpencodeGlobalSkills" as any).mockResolvedValue([])
-  spyOn(skillLoader, "discoverOpencodeProjectSkills" as any).mockResolvedValue([])
+  spyOn(skillLoader, "loadUserSkills").mockResolvedValue({})
+  spyOn(skillLoader, "loadProjectSkills").mockResolvedValue({})
+  spyOn(skillLoader, "loadOpencodeGlobalSkills").mockResolvedValue({})
+  spyOn(skillLoader, "loadOpencodeProjectSkills").mockResolvedValue({})
+  spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+  spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+  spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+  spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
 
-  spyOn(agentLoader, "loadUserAgents" as any).mockReturnValue({})
-  spyOn(agentLoader, "loadProjectAgents" as any).mockReturnValue({})
+  spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
+  spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
 
-  spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({ servers: {} })
+  spyOn(mcpLoader, "loadMcpConfigs").mockResolvedValue({ servers: {} })
 
-  spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
+  spyOn(pluginLoader, "loadAllPluginComponents").mockResolvedValue({
     commands: {},
     skills: {},
     agents: {},
@@ -72,49 +72,49 @@ beforeEach(() => {
     errors: [],
   })
 
-  spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
+  spyOn(mcpModule, "createBuiltinMcps").mockReturnValue({})
 
-  spyOn(shared, "log" as any).mockImplementation(() => {})
-  spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set(["anthropic/claude-opus-4-6"]))
-  spyOn(shared, "readConnectedProvidersCache" as any).mockReturnValue(null)
+  spyOn(shared, "log").mockImplementation(() => {})
+  spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set(["anthropic/claude-opus-4-6"]))
+  spyOn(shared, "readConnectedProvidersCache").mockReturnValue(null)
 
-  spyOn(configDir, "getOpenCodeConfigPaths" as any).mockReturnValue({
+  spyOn(configDir, "getOpenCodeConfigPaths").mockReturnValue({
     global: "/tmp/.config/opencode",
     project: "/tmp/.opencode",
   })
 
-  spyOn(permissionCompat, "migrateAgentConfig" as any).mockImplementation((config: Record<string, unknown>) => config)
+  spyOn(permissionCompat, "migrateAgentConfig").mockImplementation((config: Record<string, unknown>) => config)
 
-  spyOn(modelResolver, "resolveModelWithFallback" as any).mockReturnValue({ model: "anthropic/claude-opus-4-6" })
+  spyOn(modelResolver, "resolveModelWithFallback").mockReturnValue({ model: "anthropic/claude-opus-4-6" })
 })
 
 afterEach(() => {
-  (agents.createBuiltinAgents as any)?.mockRestore?.()
-  ;(mouse.createMouseAgentWithOverrides as any)?.mockRestore?.()
-  ;(commandLoader.loadUserCommands as any)?.mockRestore?.()
-  ;(commandLoader.loadProjectCommands as any)?.mockRestore?.()
-  ;(commandLoader.loadOpencodeGlobalCommands as any)?.mockRestore?.()
-  ;(commandLoader.loadOpencodeProjectCommands as any)?.mockRestore?.()
-  ;(builtinCommands.loadBuiltinCommands as any)?.mockRestore?.()
-  ;(skillLoader.loadUserSkills as any)?.mockRestore?.()
-  ;(skillLoader.loadProjectSkills as any)?.mockRestore?.()
-  ;(skillLoader.loadOpencodeGlobalSkills as any)?.mockRestore?.()
-  ;(skillLoader.loadOpencodeProjectSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverUserClaudeSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverProjectClaudeSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverOpencodeGlobalSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverOpencodeProjectSkills as any)?.mockRestore?.()
-  ;(agentLoader.loadUserAgents as any)?.mockRestore?.()
-  ;(agentLoader.loadProjectAgents as any)?.mockRestore?.()
-  ;(mcpLoader.loadMcpConfigs as any)?.mockRestore?.()
-  ;(pluginLoader.loadAllPluginComponents as any)?.mockRestore?.()
-  ;(mcpModule.createBuiltinMcps as any)?.mockRestore?.()
-  ;(shared.log as any)?.mockRestore?.()
-  ;(shared.fetchAvailableModels as any)?.mockRestore?.()
-  ;(shared.readConnectedProvidersCache as any)?.mockRestore?.()
-  ;(configDir.getOpenCodeConfigPaths as any)?.mockRestore?.()
-  ;(permissionCompat.migrateAgentConfig as any)?.mockRestore?.()
-  ;(modelResolver.resolveModelWithFallback as any)?.mockRestore?.()
+  (agents.createBuiltinAgents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(mouse.createMouseAgentWithOverrides as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(commandLoader.loadUserCommands as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(commandLoader.loadProjectCommands as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(commandLoader.loadOpencodeGlobalCommands as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(commandLoader.loadOpencodeProjectCommands as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(builtinCommands.loadBuiltinCommands as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.loadUserSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.loadProjectSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.loadOpencodeGlobalSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.loadOpencodeProjectSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.discoverUserClaudeSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.discoverProjectClaudeSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.discoverOpencodeGlobalSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(skillLoader.discoverOpencodeProjectSkills as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(agentLoader.loadUserAgents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(agentLoader.loadProjectAgents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(mcpLoader.loadMcpConfigs as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(pluginLoader.loadAllPluginComponents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(mcpModule.createBuiltinMcps as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(shared.log as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(shared.fetchAvailableModels as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(shared.readConnectedProvidersCache as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(configDir.getOpenCodeConfigPaths as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(permissionCompat.migrateAgentConfig as unknown as { mockRestore?: () => void })?.mockRestore?.()
+  ;(modelResolver.resolveModelWithFallback as unknown as { mockRestore?: () => void })?.mockRestore?.()
 })
 
 describe("Mouse model inheritance", () => {
@@ -670,7 +670,7 @@ describe("Oracle direct override priority over category", () => {
 describe("Plan agent model inheritance from oracle", () => {
   test("plan agent inherits oracle config", async () => {
     //#given - oracle resolves to claude-opus-4-6 with model settings
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+    spyOn(shared, "resolveModelPipeline").mockReturnValue({
       model: "anthropic/claude-opus-4-6",
       provenance: "provider-fallback",
       variant: "max",
@@ -714,7 +714,7 @@ describe("Plan agent model inheritance from oracle", () => {
 
   test("plan agent inherits temperature, reasoningEffort, and other model settings from oracle", async () => {
     //#given - oracle configured with category that has temperature and reasoningEffort
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+    spyOn(shared, "resolveModelPipeline").mockReturnValue({
       model: "openai/gpt-5.2",
       provenance: "override",
       variant: "high",
@@ -769,7 +769,7 @@ describe("Plan agent model inheritance from oracle", () => {
 
   test("plan agent user override takes priority over oracle inherited settings", async () => {
     //#given - oracle resolves to opus, but user has plan override for gpt-5.2
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+    spyOn(shared, "resolveModelPipeline").mockReturnValue({
       model: "anthropic/claude-opus-4-6",
       provenance: "provider-fallback",
       variant: "max",
@@ -812,7 +812,7 @@ describe("Plan agent model inheritance from oracle", () => {
 
   test("plan agent does NOT inherit prompt, description, or color from oracle", async () => {
     //#given
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+    spyOn(shared, "resolveModelPipeline").mockReturnValue({
       model: "anthropic/claude-opus-4-6",
       provenance: "provider-fallback",
       variant: "max",
@@ -854,7 +854,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // Passing client to fetchAvailableModels during config handler causes deadlock:
     // - Plugin init waits for server response (client.provider.list())
     // - Server waits for plugin init to complete before handling requests
-    const fetchSpy = spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set<string>())
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set<string>())
 
     const pluginConfig: MatrixxConfig = {
       morpheus_agent: {
@@ -894,8 +894,8 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
 describe("config-handler plugin loading error boundary (#1559)", () => {
   test("returns empty defaults when loadAllPluginComponents throws", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
+    ;(pluginLoader.loadAllPluginComponents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents").mockRejectedValue(new Error("crash"))
     const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
@@ -919,8 +919,8 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("returns empty defaults when loadAllPluginComponents times out", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockImplementation(
+    ;(pluginLoader.loadAllPluginComponents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents").mockImplementation(
       () => new Promise(() => {})
     )
     const pluginConfig: MatrixxConfig = {
@@ -948,8 +948,8 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("logs error when loadAllPluginComponents fails", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
+    ;(pluginLoader.loadAllPluginComponents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents").mockRejectedValue(new Error("crash"))
     const logSpy = shared.log as ReturnType<typeof spyOn>
     const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
@@ -978,8 +978,8 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("passes through plugin data on successful load (identity test)", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
+    ;(pluginLoader.loadAllPluginComponents as unknown as { mockRestore?: () => void })?.mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents").mockResolvedValue({
       commands: { "test-cmd": { description: "test", template: "test" } },
       skills: {},
       agents: {},

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
-
+import type { MatrixxConfig } from "../config"
+import type { CreatedHooks } from "../create-hooks"
 import { createChatMessageHandler } from "./chat-message"
+import type { PluginContext } from "./types"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -11,8 +13,8 @@ function createMockHandlerArgs(overrides?: {
 }) {
   const appliedSessions: string[] = []
   return {
-    ctx: { client: { tui: { showToast: async () => {} } } } as any,
-    pluginConfig: (overrides?.pluginConfig ?? {}) as any,
+    ctx: { client: { tui: { showToast: async () => {} } } } as unknown as PluginContext,
+    pluginConfig: (overrides?.pluginConfig ?? {}) as MatrixxConfig,
     firstMessageVariantGate: {
       shouldOverride: () => overrides?.shouldOverride ?? false,
       markApplied: (sessionID: string) => { appliedSessions.push(sessionID) },
@@ -22,8 +24,8 @@ function createMockHandlerArgs(overrides?: {
       keywordDetector: null,
       autoSlashCommand: null,
       startWork: null,
-      ralphLoop: null,
-    } as any,
+      matrixLoop: null,
+    } as Partial<CreatedHooks>,
     _appliedSessions: appliedSessions,
   }
 }

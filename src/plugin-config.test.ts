@@ -312,7 +312,7 @@ describe("parseConfigPartially", () => {
       const result = parseConfigPartially({});
 
       expect(result).not.toBeNull();
-      expect(Object.keys(result!).length).toBe(0);
+      expect(Object.keys(result as Record<string, unknown>).length).toBe(0);
     });
   });
 
