@@ -11,6 +11,10 @@
   },
   "scripts": {
     "test": "bun test",
+    "test:voice-regression": "bun run src/regression/cli.ts",
     "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.106.0"
   }
 }
