@@ -3,8 +3,8 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
-import { setSessionTools } from "../../shared/session-tools-store"
 import { setSessionTemperature } from "../../shared/session-temperature-store"
+import { setSessionTools } from "../../shared/session-tools-store"
 import { isPlanFamily } from "./constants"
 import { formatDetailedError } from "./error-formatting"
 import type { DelegateTaskArgs, OpencodeClient } from "./types"

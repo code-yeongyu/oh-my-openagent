@@ -1,4 +1,4 @@
-declare const require: (name: string) => any
+declare const require: (name: string) => unknown
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
@@ -21,8 +21,8 @@ describe("resolveCategoryExecution", () => {
 	})
 
 	const createMockExecutorContext = (): ExecutorContext => ({
-		client: {} as any,
-		manager: {} as any,
+		client: {} as unknown as ExecutorContext["client"],
+		manager: {} as unknown as ExecutorContext["manager"],
 		directory: "/tmp/test",
 		userCategories: {},
 		sisyphusJuniorModel: undefined,

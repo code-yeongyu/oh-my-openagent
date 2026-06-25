@@ -1,4 +1,4 @@
-declare const require: (name: string) => any
+declare const require: (name: string) => unknown
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 
 import * as logger from "../../shared/logger"

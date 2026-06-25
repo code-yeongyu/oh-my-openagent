@@ -2,7 +2,7 @@ const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("
 
 describe("executeSyncContinuation - toast cleanup error paths", () => {
   let removeTaskCalls: string[] = []
-  let addTaskCalls: any[] = []
+  let addTaskCalls: unknown[] = []
   let resetToastManager: (() => void) | null = null
 
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       tui: { showToast: mock(() => Promise.resolve()) },
     })
 
-    spyOn(toastManager, "addTask").mockImplementation((task: any) => {
+    spyOn(toastManager, "addTask").mockImplementation((task: unknown) => {
       addTaskCalls.push(task)
     })
     spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
@@ -94,7 +94,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with fetchSyncResult throwing
-    let error: any = null
+    let error: unknown = null
     let _result: string | null = null
     try {
       _result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
@@ -156,7 +156,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with pollSyncSession throwing
-    let error: any = null
+    let error: unknown = null
     let _result: string | null = null
     try {
       _result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
@@ -257,7 +257,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async (_ctx: any, _client: any, input: any) => {
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: unknown) => {
         if (input.toastManager && input.taskId) {
           input.toastManager.removeTask(input.taskId)
         }
@@ -343,7 +343,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with null toastManager
-    let error: any = null
+    let error: unknown = null
     let _result: string | null = null
     try {
       _result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)

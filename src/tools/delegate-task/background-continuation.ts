@@ -16,7 +16,7 @@ export async function executeBackgroundContinuation(
 
   try {
     const task = await manager.resume({
-      sessionId: taskID!,
+      sessionId: taskID as string,
       prompt: args.prompt,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,

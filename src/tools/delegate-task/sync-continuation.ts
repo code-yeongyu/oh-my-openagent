@@ -38,7 +38,7 @@ export async function executeSyncContinuation(
 
   try {
     try {
-      const messagesResp = await client.session.messages({ path: { id: continuationID! } })
+      const messagesResp = await client.session.messages({ path: { id: continuationID as string } })
       const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
       anchorMessageCount = messages.length
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -51,7 +51,7 @@ export async function executeSyncContinuation(
         }
       }
     } catch {
-      const resumeMessageDir = getMessageDir(continuationID!)
+      const resumeMessageDir = getMessageDir(continuationID as string)
       const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
       resumeAgent = resumeMessage?.agent
       resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
@@ -87,10 +87,10 @@ export async function executeSyncContinuation(
       delegate_agent: true,
       question: false,
     }
-    setSessionTools(continuationID!, tools)
+    setSessionTools(continuationID as string, tools)
 
     await promptWithModelSuggestionRetry(client, {
-      path: { id: continuationID! },
+      path: { id: continuationID as string },
       body: {
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
@@ -109,7 +109,7 @@ export async function executeSyncContinuation(
 
     try {
       const pollError = await deps.pollSyncSession(ctx, client, {
-        sessionID: continuationID!,
+        sessionID: continuationID as string,
         agentToUse: resumeAgent ?? "continue",
         toastManager,
         taskId,
@@ -119,7 +119,7 @@ export async function executeSyncContinuation(
         return pollError
       }
 
-      const result = await deps.fetchSyncResult(client, continuationID!, anchorMessageCount, {
+      const result = await deps.fetchSyncResult(client, continuationID as string, anchorMessageCount, {
         deliverableTag: getDeliverableTag(resumeAgent),
         finalTextOnly: true,
       })

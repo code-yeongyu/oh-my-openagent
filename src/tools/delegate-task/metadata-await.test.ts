@@ -40,7 +40,7 @@ describe("task tool metadata awaiting", () => {
         }),
         getTask: () => undefined,
       },
-    } as any
+    } as unknown as Record<string, unknown>
 
     const parentContext = {
       sessionID: "ses_parent",

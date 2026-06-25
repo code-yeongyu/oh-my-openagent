@@ -1,7 +1,8 @@
-declare const require: (name: string) => any
+declare const require: (name: string) => unknown
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 
 import type { CategoryConfig } from "../../config/schema"
+import type { LaunchInput } from "../../features/background-agent/types"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { __resetModelCache } from "../../shared/model-availability"
@@ -10,6 +11,14 @@ import * as executor from "./executor"
 import { __resetTimingConfig, __setTimingConfig } from "./timing"
 import { resolveCategoryConfig } from "./tools"
 import type { DelegateTaskArgs } from "./types"
+
+interface CapturedPromptBody {
+  model?: { providerID: string; modelID: string; variant?: string }
+  variant?: string
+  system?: string
+  tools?: { task?: boolean }
+}
+
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -969,10 +978,10 @@ describe("morpheus-task", () => {
     test("passes variant to background model payload", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-variant",
@@ -1036,10 +1045,10 @@ describe("morpheus-task", () => {
     test("DEFAULT_CATEGORIES variant passes to background WITHOUT userCategories", async () => {
       // given - NO userCategories, testing DEFAULT_CATEGORIES only
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-default-variant",
@@ -1102,11 +1111,11 @@ describe("morpheus-task", () => {
      test("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
        // given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
        const { createDelegateTask } = require("./tools")
-       let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
        const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -1251,11 +1260,11 @@ describe("morpheus-task", () => {
      test("empty array [] is allowed and proceeds without skill content", async () => {
        // given
        const { createDelegateTask } = require("./tools")
-       let promptBody: any
+      let promptBody: CapturedPromptBody = {}
        
        const mockManager = { launch: async () => ({}) }
        
-       const promptMock = async (input: any) => {
+      const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -1411,7 +1420,7 @@ describe("morpheus-task", () => {
     //#given a session with a previous message that has variant "max"
     const { createDelegateTask } = require("./tools")
 
-    const promptMock = mock(async (_input: any) => {
+    const promptMock = mock(async (_input: unknown) => {
       return { data: {} }
     })
 
@@ -1723,11 +1732,11 @@ describe("morpheus-task", () => {
      test("sync mode passes category model to prompt", async () => {
        // given
        const { createDelegateTask } = require("./tools")
-       let promptBody: any
+       let promptBody: CapturedPromptBody = {}
 
        const mockManager = { launch: async () => ({}) }
        
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -2277,10 +2286,10 @@ describe("morpheus-task", () => {
       cacheSpy.mockReturnValue(null)
 
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-fallback",
@@ -2342,10 +2351,10 @@ describe("morpheus-task", () => {
     test("category delegation ignores UI-selected (Kimi) system default model", async () => {
       // given - OpenCode system default model is Kimi (selected from UI)
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-ui-model",
@@ -2407,10 +2416,10 @@ describe("morpheus-task", () => {
     test("mouse model override takes precedence over category model", async () => {
       // given - mouse override model differs from category default
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-override",
@@ -2469,10 +2478,10 @@ describe("morpheus-task", () => {
     test("explicit category model takes precedence over mouse model", async () => {
       // given - explicit category model differs from mouse override
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-category-precedence",
@@ -2535,10 +2544,10 @@ describe("morpheus-task", () => {
     test("mouse model override works with quick category (#1295)", async () => {
       // given - user configures agents.matrixx-junior.model but uses quick category
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-1295-quick",
@@ -2597,10 +2606,10 @@ describe("morpheus-task", () => {
     test("mouse model override works with user-defined category (#1295)", async () => {
       // given - user has a custom category with no model requirement
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-1295-custom",
@@ -2662,11 +2671,11 @@ describe("morpheus-task", () => {
     test("should resolve agent-browser skill when browserProvider is passed", async () => {
       // given - task configured with browserProvider: "agent-browser"
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
        const mockManager = { launch: async () => ({}) }
        
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3229,10 +3238,10 @@ describe("morpheus-task", () => {
     test("background mode passes matched agent model to manager.launch", async () => {
       // given - agent with model registered, using subagent_type with run_in_background=true
       const { createDelegateTask } = require("./tools")
-      let launchInput: any
+      let launchInput: Partial<LaunchInput> = {}
 
       const mockManager = {
-        launch: async (input: any) => {
+        launch: async (input: LaunchInput) => {
           launchInput = input
           return {
             id: "task-explore",
@@ -3296,11 +3305,11 @@ describe("morpheus-task", () => {
     test("sync mode passes matched agent model to session.prompt", async () => {
       // given - agent with model registered, using subagent_type with run_in_background=false
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
       const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3361,11 +3370,11 @@ describe("morpheus-task", () => {
     test("agent without model resolves via fallback chain", async () => {
       // given - agent registered without model field, fallback chain should resolve
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
       const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3423,11 +3432,11 @@ describe("morpheus-task", () => {
     test("agentOverrides model takes priority over matchedAgent.model (#1357)", async () => {
       // given - user configured oracle to use a specific model in matrixx.json
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
       const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3491,11 +3500,11 @@ describe("morpheus-task", () => {
     test("agentOverrides variant is applied when model is overridden (#1357)", async () => {
       // given - user configured oracle with model and variant
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
       const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3556,11 +3565,11 @@ describe("morpheus-task", () => {
     test("fallback chain resolves model when no override and no matchedAgent.model (#1357)", async () => {
       // given - agent registered without model, no override, but AGENT_MODEL_REQUIREMENTS has fallback
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
 
       const mockManager = { launch: async () => ({}) }
 
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3627,11 +3636,11 @@ describe("morpheus-task", () => {
     test("plan subagent should have task permission enabled", async () => {
       //#given - morpheus delegates to plan agent
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
       
        const mockManager = { launch: async () => ({}) }
        
-       const promptMock = async (input: any) => {
+       const promptMock = async (input: { body: CapturedPromptBody }) => {
          promptBody = input.body
          return { data: {} }
        }
@@ -3683,8 +3692,8 @@ describe("morpheus-task", () => {
     test("oracle subagent should have task permission (plan family)", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
-      const promptMock = async (input: any) => { promptBody = input.body; return { data: {} } }
+      let promptBody: CapturedPromptBody = {}
+      const promptMock = async (input: { body: CapturedPromptBody }) => { promptBody = input.body; return { data: {} } }
        const mockClient = {
          app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
@@ -3713,7 +3722,7 @@ describe("morpheus-task", () => {
     test("non-plan subagent should NOT have task permission", async () => {
       //#given - morpheus delegates to oracle (non-plan)
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
+      let promptBody: CapturedPromptBody = {}
       
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
@@ -3722,11 +3731,11 @@ describe("morpheus-task", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_oracle_no_delegate" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: CapturedPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
-          promptAsync: async (input: any) => {
+          promptAsync: async (input: { body: CapturedPromptBody }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -3771,7 +3780,7 @@ describe("morpheus-task", () => {
     test("sync session title follows OpenCode format: '{description} (@{agent} subagent)'", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      let createBody: any
+      let createBody: { title?: string } = {}
 
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
@@ -3780,7 +3789,7 @@ describe("morpheus-task", () => {
          model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async (input: any) => {
+          create: async (input: { body: { title?: string } }) => {
              createBody = input.body
              return { data: { id: "ses_title_test" } }
            },

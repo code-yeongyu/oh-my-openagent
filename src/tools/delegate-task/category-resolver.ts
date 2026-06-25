@@ -29,7 +29,7 @@ export async function resolveCategoryExecution(
 
   const availableModels = await getAvailableModelsForDelegateTask(client)
 
-  const categoryName = args.category!
+  const categoryName = args.category as string
   const enabledCategories = mergeCategories(userCategories)
   const categoryExists = enabledCategories[categoryName] !== undefined
 
@@ -73,13 +73,13 @@ Available categories: ${allCategoryNames}`,
     }
   }
 
-  const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
+  const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category as string]
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string; temperature?: number } | undefined
 
   const overrideModel = sisyphusJuniorModel
-  const explicitCategoryModel = userCategories?.[args.category!]?.model
+  const explicitCategoryModel = userCategories?.[args.category as string]?.model
 
   if (!requirement) {
     // Precedence: explicit category model > sisyphus-junior default > category resolved model
@@ -133,7 +133,7 @@ Available categories: ${allCategoryNames}`,
       modelInfo = { model: actualModel, type, source }
 
       const parsedModel = parseModelString(actualModel)
-      const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
+      const variantToUse = userCategories?.[args.category as string]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
         ? (variantToUse ? { ...parsedModel, variant: variantToUse, temperature: resolved.config.temperature } : { ...parsedModel, temperature: resolved.config.temperature })
         : undefined
