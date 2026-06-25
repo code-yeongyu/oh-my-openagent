@@ -1,4 +1,4 @@
-import { CartesiaClient } from "@cartesia/cartesia-js";
+import Cartesia from "@cartesia/cartesia-js";
 import type { TtsEvent, TtsStub } from "../../harness/types";
 import { detectClauseBoundary } from "./clause-detector";
 import type { CartesiaTtsConfig, ClauseBoundary } from "./types";
@@ -46,7 +46,48 @@ const defaults = {
 } as const;
 
 function createDefaultClient(config: CartesiaTtsConfig): CartesiaLikeClient {
-  return new CartesiaClient({ token: config.apiKey }) as CartesiaLikeClient;
+  const client = new Cartesia({ apiKey: config.apiKey });
+  return {
+    tts: {
+      websocket: async (params) => {
+        const ws = await client.tts.websocket();
+        return {
+          send: (payload) =>
+            ws.generate({
+              model_id: payload.modelId,
+              voice: payload.voice,
+              transcript: payload.transcript,
+              context_id: payload.contextId,
+              language: payload.language,
+              output_format: {
+                container: params.container,
+                encoding: params.encoding,
+                sample_rate: params.sampleRate,
+              },
+            }),
+          continue: (payload) =>
+            ws.generate({
+              model_id: payload.modelId,
+              voice: payload.voice,
+              transcript: payload.transcript,
+              context_id: payload.contextId,
+              language: payload.language,
+              output_format: {
+                container: params.container,
+                encoding: params.encoding,
+                sample_rate: params.sampleRate,
+              },
+            }),
+          cancel: ({ contextId }) => ws.cancelContext(contextId),
+          disconnect: () => ws.close({ code: 1000, reason: "done" }),
+        };
+      },
+    },
+  };
+}
+
+async function* singleText(text: string): AsyncIterable<string> {
+  yield text;
 }
 
 function createContextId(): string {
@@ -92,7 +133,7 @@ export class CartesiaTtsAdapter implements TtsStub {
   ) {}
 
   async *synthesize(text: string, options: SynthesizeOptions = {}): AsyncIterable<TtsEvent> {
-    yield* this.streamSynthesize([text], options);
+    yield* this.streamSynthesize(singleText(text), options);
   }
 
   async *streamSynthesize(textStream: AsyncIterable<string>, options: SynthesizeOptions = {}): AsyncIterable<TtsEvent> {
