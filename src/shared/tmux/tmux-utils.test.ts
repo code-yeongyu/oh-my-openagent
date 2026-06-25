@@ -68,7 +68,7 @@ describe("isServerRunning", () => {
 
   test("returns true when server responds OK", async () => {
     // given
-    globalThis.fetch = mock(async () => ({ ok: true })) as any
+    globalThis.fetch = mock(async () => ({ ok: true })) as unknown as typeof globalThis.fetch
 
     // when
     const result = await isServerRunning("http://localhost:4096")
@@ -81,7 +81,7 @@ describe("isServerRunning", () => {
     // given
     globalThis.fetch = mock(async () => {
       throw new Error("ECONNREFUSED")
-    }) as any
+    }) as unknown as typeof globalThis.fetch
 
     // when
     const result = await isServerRunning("http://localhost:4096")
@@ -92,7 +92,7 @@ describe("isServerRunning", () => {
 
   test("returns false when fetch returns not ok", async () => {
     // given
-    globalThis.fetch = mock(async () => ({ ok: false })) as any
+    globalThis.fetch = mock(async () => ({ ok: false })) as unknown as typeof globalThis.fetch
 
     // when
     const result = await isServerRunning("http://localhost:4096")
@@ -103,8 +103,8 @@ describe("isServerRunning", () => {
 
   test("caches successful result", async () => {
     // given
-    const fetchMock = mock(async () => ({ ok: true })) as any
-    globalThis.fetch = fetchMock
+    const fetchMock = mock(async () => ({ ok: true }))
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
 
     // when
     await isServerRunning("http://localhost:4096")
@@ -118,8 +118,8 @@ describe("isServerRunning", () => {
     // given
     const fetchMock = mock(async () => {
       throw new Error("ECONNREFUSED")
-    }) as any
-    globalThis.fetch = fetchMock
+    })
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
 
     // when
     await isServerRunning("http://localhost:4096")
@@ -131,8 +131,8 @@ describe("isServerRunning", () => {
 
   test("uses different cache for different URLs", async () => {
     // given
-    const fetchMock = mock(async () => ({ ok: true })) as any
-    globalThis.fetch = fetchMock
+    const fetchMock = mock(async () => ({ ok: true }))
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
 
     // when
     await isServerRunning("http://localhost:4096")
@@ -152,8 +152,8 @@ describe("resetServerCheck", () => {
   test("allows re-checking after reset", async () => {
     // given
     const originalFetch = globalThis.fetch
-    const fetchMock = mock(async () => ({ ok: true })) as any
-    globalThis.fetch = fetchMock
+    const fetchMock = mock(async () => ({ ok: true }))
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
 
     // when
     await isServerRunning("http://localhost:4096")

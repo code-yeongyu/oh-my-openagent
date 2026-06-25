@@ -41,7 +41,7 @@ describe("migrateAgentNames", () => {
     }
 
     // when: Migrate agent names
-    const { migrated, changed } = migrateAgentNames(agents)
+    const { migrated } = migrateAgentNames(agents)
 
     // then: Case-insensitive lookup should migrate correctly
     expect(migrated.morpheus).toEqual({ model: "test" })
@@ -545,7 +545,7 @@ describe("migrateModelVersions", () => {
     }
 
     // when: Migrate model versions
-    const { migrated, changed } = migrateModelVersions(agents)
+    const { changed } = migrateModelVersions(agents)
 
     // then: Config should remain unchanged
     expect(changed).toBe(false)
@@ -1158,7 +1158,7 @@ describe("migrateModelVersions with applied migrations", () => {
     }
 
     // when: Migrate model versions
-    const { migrated, changed, newMigrations } = migrateModelVersions(configs, new Set())
+    const { changed, newMigrations } = migrateModelVersions(configs, new Set())
 
     // then: No migrations
     expect(changed).toBe(false)

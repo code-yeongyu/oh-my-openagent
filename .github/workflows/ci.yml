@@ -81,7 +81,6 @@ jobs:
           bun test src/tools/skill/tools.test.ts
           bun test src/features/claude-code-mcp-loader/loader.test.ts
           bun test src/hooks/anthropic-context-window-limit-recovery/empty-content-recovery-sdk.test.ts
-          bun test src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts
           bun test src/hooks/anthropic-context-window-limit-recovery/recovery-hook.test.ts
           bun test src/hooks/anthropic-context-window-limit-recovery/storage.test.ts
           bun test src/cli/run/integration.test.ts
@@ -131,7 +130,6 @@ jobs:
               -e 'src/tools/skill/tools.test.ts' \
               -e 'src/features/claude-code-mcp-loader/loader.test.ts' \
               -e 'src/hooks/anthropic-context-window-limit-recovery/empty-content-recovery-sdk.test.ts' \
-              -e 'src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts' \
               -e 'src/hooks/anthropic-context-window-limit-recovery/recovery-hook.test.ts' \
               -e 'src/hooks/anthropic-context-window-limit-recovery/storage.test.ts' \
               -e 'src/cli/run/integration.test.ts' \

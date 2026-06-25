@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
 import { log } from "../../shared/logger"
-import { attemptDeduplicationRecovery } from "./deduplication-recovery"
 import { executeCompact, getLastAssistant } from "./executor"
 import { parseAnthropicTokenLimitError } from "./parser"
 import type { AutoCompactState, ParsedTokenLimitError } from "./types"
@@ -63,10 +62,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         autoCompactState.pendingCompact.add(sessionID)
         autoCompactState.errorDataBySession.set(sessionID, parsed)
 
-        if (autoCompactState.compactionInProgress.has(sessionID)) {
-          await attemptDeduplicationRecovery(sessionID, parsed, experimental, ctx.client)
-          return
-        }
+        if (autoCompactState.compactionInProgress.has(sessionID)) return
 
         const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
         const providerID = parsed.providerID ?? (lastAssistant?.providerID as string | undefined)

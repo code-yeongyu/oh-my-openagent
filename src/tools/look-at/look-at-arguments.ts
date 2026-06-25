@@ -16,7 +16,7 @@ export function validateArgs(args: LookAtArgs): string | null {
   const hasFilePath = Boolean(args.file_path && args.file_path.length > 0)
   const hasImageData = Boolean(args.image_data && args.image_data.length > 0)
 
-  if (hasFilePath && /^https?:\/\//i.test(args.file_path!)) {
+  if (hasFilePath && /^https?:\/\//i.test(args.file_path as string)) {
     return "Error: Remote URLs are not supported for file_path. Download the file first or use a local path."
   }
   if (!hasFilePath && !hasImageData) {

@@ -17,7 +17,7 @@ src/
 ├── plugin-state.ts                   # Model cache state (context limits, anthropic 1M flag, 12 lines)
 ├── agents/                           # 11 AI agents (32 files) — see agents/AGENTS.md
 ├── cli/                              # CLI installer, doctor (107+ files) — see cli/AGENTS.md
-├── config/                           # Zod schema (21 component files) — see config/AGENTS.md
+├── config/                           # Zod schema — see config/AGENTS.md
 ├── features/                         # Background agents, skills, commands (18 dirs) — see features/AGENTS.md
 ├── hooks/                            # 41 lifecycle hooks (36 dirs) — see hooks/AGENTS.md
 ├── mcp/                              # Built-in MCPs (6 files) — see mcp/AGENTS.md

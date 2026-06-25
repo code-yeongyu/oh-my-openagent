@@ -12,7 +12,7 @@ export async function executeUnstableAgentTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: { providerID: string; modelID: string; variant?: string; temperature?: number } | undefined,
   systemContent: string | undefined,
   actualModel: string | undefined
 ): Promise<string> {

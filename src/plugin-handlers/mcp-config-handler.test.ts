@@ -9,19 +9,21 @@ import * as shared from "../shared"
 
 let loadMcpConfigsSpy: ReturnType<typeof spyOn>
 let createBuiltinMcpsSpy: ReturnType<typeof spyOn>
+let logSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
-  loadMcpConfigsSpy = spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({
+  loadMcpConfigsSpy = spyOn(mcpLoader, "loadMcpConfigs").mockResolvedValue({
     servers: {},
+    loadedServers: [],
   })
-  createBuiltinMcpsSpy = spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
-  spyOn(shared, "log" as any).mockImplementation(() => {})
+  createBuiltinMcpsSpy = spyOn(mcpModule, "createBuiltinMcps").mockReturnValue({})
+  logSpy = spyOn(shared, "log").mockImplementation(() => {})
 })
 
 afterEach(() => {
   loadMcpConfigsSpy.mockRestore()
   createBuiltinMcpsSpy.mockRestore()
-  ;(shared.log as any)?.mockRestore?.()
+  logSpy.mockRestore()
 })
 
 function createPluginConfig(overrides: Partial<MatrixxConfig> = {}): MatrixxConfig {
@@ -54,6 +56,7 @@ describe("applyMcpConfig", () => {
         firecrawl: { type: "remote", url: "https://firecrawl.example.com", enabled: true },
         exa: { type: "remote", url: "https://exa.example.com", enabled: true },
       },
+      loadedServers: [],
     })
 
     const config: Record<string, unknown> = { mcp: userMcp }
@@ -79,10 +82,11 @@ describe("applyMcpConfig", () => {
       servers: {
         playwright: { type: "local", command: ["npx", "@playwright/mcp"], enabled: true },
       },
+      loadedServers: [],
     })
 
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["playwright"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: ["playwright"] })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -107,7 +111,7 @@ describe("applyMcpConfig", () => {
   test("passes disabled_mcps to loadMcpConfigs", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["firecrawl", "exa"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: ["firecrawl", "exa"] })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -127,6 +131,7 @@ describe("applyMcpConfig", () => {
       servers: {
         firecrawl: { type: "remote", url: "https://firecrawl.example.com", enabled: true },
       },
+      loadedServers: [],
     })
 
     const config: Record<string, unknown> = { mcp: userMcp }
@@ -145,7 +150,7 @@ describe("applyMcpConfig", () => {
   test("deletes plugin MCPs that are in disabled_mcps", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["plugin:custom"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: ["plugin:custom"] })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")

@@ -31,6 +31,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
+    "ci": "bash script/run-ci.sh",
     "test": "bun test"
   },
   "keywords": [

@@ -16,6 +16,7 @@ interface ResolveCategoryConfigResult {
   config: CategoryConfig
   promptAppend: string
   model: string | undefined
+  temperature: number | undefined
 }
 
 /**
@@ -71,5 +72,5 @@ export function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend, model }
+  return { config, promptAppend, model, temperature: config.temperature }
 }

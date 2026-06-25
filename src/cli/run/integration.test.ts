@@ -84,7 +84,7 @@ describe("integration: --json mode", () => {
 
     // then
     expect(mockStdout.writes).toHaveLength(1)
-    const emitted = mockStdout.writes[0]!
+    const emitted = mockStdout.writes[0] as string
     expect(() => JSON.parse(emitted)).not.toThrow()
     const parsed = JSON.parse(emitted) as RunResult
     expect(parsed.sessionId).toBe("test-session")
@@ -245,7 +245,7 @@ describe("integration: option combinations", () => {
 
     // then - json emits result AND on-complete hook runs
     expect(mockStdout.writes).toHaveLength(1)
-    const emitted = mockStdout.writes[0]!
+    const emitted = mockStdout.writes[0] as string
     expect(() => JSON.parse(emitted)).not.toThrow()
     expect(spawnSpy).toHaveBeenCalledTimes(1)
     const [args] = spawnSpy.mock.calls[0] as Parameters<typeof Bun.spawn>

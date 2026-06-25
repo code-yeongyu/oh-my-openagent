@@ -21,17 +21,17 @@ let loadOpencodeProjectSkillsSpy: ReturnType<typeof spyOn>
 let skillsToCommandDefinitionRecordSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
-  loadBuiltinCommandsSpy = spyOn(builtinCommandsModule, "loadBuiltinCommands" as any).mockReturnValue({})
-  loadUserCommandsSpy = spyOn(ccCommandLoaderModule, "loadUserCommands" as any).mockResolvedValue({})
-  loadProjectCommandsSpy = spyOn(ccCommandLoaderModule, "loadProjectCommands" as any).mockResolvedValue({})
-  loadOpencodeGlobalCommandsSpy = spyOn(ccCommandLoaderModule, "loadOpencodeGlobalCommands" as any).mockResolvedValue({})
-  loadOpencodeProjectCommandsSpy = spyOn(ccCommandLoaderModule, "loadOpencodeProjectCommands" as any).mockResolvedValue({})
-  discoverConfigSourceSkillsSpy = spyOn(opencodeSkillLoaderModule, "discoverConfigSourceSkills" as any).mockResolvedValue([])
-  loadUserSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadUserSkills" as any).mockResolvedValue({})
-  loadProjectSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadProjectSkills" as any).mockResolvedValue({})
-  loadOpencodeGlobalSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadOpencodeGlobalSkills" as any).mockResolvedValue({})
-  loadOpencodeProjectSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadOpencodeProjectSkills" as any).mockResolvedValue({})
-  skillsToCommandDefinitionRecordSpy = spyOn(skillDefinitionRecordModule, "skillsToCommandDefinitionRecord" as any).mockReturnValue({})
+  loadBuiltinCommandsSpy = spyOn(builtinCommandsModule, "loadBuiltinCommands").mockReturnValue({})
+  loadUserCommandsSpy = spyOn(ccCommandLoaderModule, "loadUserCommands").mockResolvedValue({})
+  loadProjectCommandsSpy = spyOn(ccCommandLoaderModule, "loadProjectCommands").mockResolvedValue({})
+  loadOpencodeGlobalCommandsSpy = spyOn(ccCommandLoaderModule, "loadOpencodeGlobalCommands").mockResolvedValue({})
+  loadOpencodeProjectCommandsSpy = spyOn(ccCommandLoaderModule, "loadOpencodeProjectCommands").mockResolvedValue({})
+  discoverConfigSourceSkillsSpy = spyOn(opencodeSkillLoaderModule, "discoverConfigSourceSkills").mockResolvedValue([])
+  loadUserSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadUserSkills").mockResolvedValue({})
+  loadProjectSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadProjectSkills").mockResolvedValue({})
+  loadOpencodeGlobalSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadOpencodeGlobalSkills").mockResolvedValue({})
+  loadOpencodeProjectSkillsSpy = spyOn(opencodeSkillLoaderModule, "loadOpencodeProjectSkills").mockResolvedValue({})
+  skillsToCommandDefinitionRecordSpy = spyOn(skillDefinitionRecordModule, "skillsToCommandDefinitionRecord").mockReturnValue({})
 })
 
 afterEach(() => {

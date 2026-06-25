@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createLookAt, normalizeArgs, validateArgs } from "./tools"
 
@@ -9,7 +10,7 @@ describe("look-at tool", () => {
     // then should normalize to file_path
     test("normalizes path to file_path for LLM compatibility", () => {
       const args = { path: "/some/file.png", goal: "analyze" }
-      const normalized = normalizeArgs(args as any)
+      const normalized = normalizeArgs(args as Record<string, unknown>)
       expect(normalized.file_path).toBe("/some/file.png")
       expect(normalized.goal).toBe("analyze")
     })
@@ -28,7 +29,7 @@ describe("look-at tool", () => {
     // then prefer file_path
     test("prefers file_path over path when both provided", () => {
       const args = { file_path: "/preferred.png", path: "/fallback.png", goal: "test" }
-      const normalized = normalizeArgs(args as any)
+      const normalized = normalizeArgs(args as Record<string, unknown>)
       expect(normalized.file_path).toBe("/preferred.png")
     })
 
@@ -37,7 +38,7 @@ describe("look-at tool", () => {
     // then preserve image_data in normalized args
     test("preserves image_data when provided", () => {
       const args = { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "analyze" }
-      const normalized = normalizeArgs(args as any)
+      const normalized = normalizeArgs(args as Record<string, unknown>)
       expect(normalized.image_data).toBe("data:image/png;base64,iVBORw0KGgo=")
       expect(normalized.file_path).toBeUndefined()
     })
@@ -64,7 +65,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when neither file_path nor image_data provided", () => {
-      const args = { goal: "analyze" } as any
+      const args: Record<string, string> = { goal: "analyze" }
       const error = validateArgs(args)
       expect(error).toContain("file_path")
       expect(error).toContain("image_data")
@@ -83,7 +84,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when goal is missing", () => {
-      const args = { file_path: "/some/path.png" } as any
+      const args: Record<string, string> = { file_path: "/some/path.png" }
       const error = validateArgs(args)
       expect(error).toContain("goal")
       expect(error).toContain("required")
@@ -154,7 +155,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -187,7 +188,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -220,7 +221,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -243,7 +244,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then model info should be passed to sync prompt
     test("passes construct model to sync prompt when available", async () => {
-      let promptBody: any
+      let promptBody: { model: { providerID: string; modelID: string } }
 
       const mockClient = {
         app: {
@@ -260,7 +261,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_model_passthrough" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: { model: { providerID: string; modelID: string } } }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -275,7 +276,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -326,7 +327,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -371,7 +372,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -409,7 +410,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -433,7 +434,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then should send data URL to sync prompt
     test("sends data URL when image_data provided", async () => {
-      let promptBody: any
+      let promptBody: { parts: Array<{ type: string; url?: string; mime?: string; filename?: string }> }
 
       const mockClient = {
         app: {
@@ -442,7 +443,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_image_data_test" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: { parts: Array<{ type: string; url?: string; mime?: string; filename?: string }> } }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -457,7 +458,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -471,7 +472,7 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      const filePart = promptBody.parts.find((p) => p.type === "file")
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:image/png;base64")
       expect(filePart.mime).toBe("image/png")
@@ -482,7 +483,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then should detect mime type and create proper data URL
     test("handles raw base64 without data URI prefix", async () => {
-      let promptBody: any
+      let promptBody: { parts: Array<{ type: string; url?: string; mime?: string; filename?: string }> }
 
       const mockClient = {
         app: {
@@ -491,7 +492,7 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_raw_base64_test" } }),
-          prompt: async (input: any) => {
+          prompt: async (input: { body: { parts: Array<{ type: string; url?: string; mime?: string; filename?: string }> } }) => {
             promptBody = input.body
             return { data: {} }
           },
@@ -506,7 +507,7 @@ describe("look-at tool", () => {
       const tool = createLookAt({
         client: mockClient,
         directory: "/project",
-      } as any)
+      } as unknown as PluginInput)
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -520,7 +521,7 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      const filePart = promptBody.parts.find((p) => p.type === "file")
       expect(filePart).toBeDefined()
       expect(filePart.url).toContain("data:")
       expect(filePart.url).toContain("base64")

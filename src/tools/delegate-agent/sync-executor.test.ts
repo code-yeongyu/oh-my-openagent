@@ -1,5 +1,7 @@
 const { describe, test, expect, mock } = require("bun:test")
 
+import type { PluginInput } from "@opencode-ai/plugin"
+
 describe("executeSync", () => {
   test("passes question=false via tools parameter to block question tool", async () => {
     //#given
@@ -11,8 +13,8 @@ describe("executeSync", () => {
       processMessages: mock(async () => "agent response"),
     }
 
-    let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    let promptArgs: { body: { tools: Record<string, boolean> } }
+    const promptAsync = mock(async (input: { body: { tools: Record<string, boolean> } }) => {
       promptArgs = input
       return { data: {} }
     })
@@ -38,7 +40,7 @@ describe("executeSync", () => {
     }
 
     //#when
-    await executeSync(args, toolContext, ctx as any, deps)
+    await executeSync(args, toolContext, ctx as unknown as PluginInput, deps)
 
     //#then
     expect(promptAsync).toHaveBeenCalled()
@@ -55,8 +57,8 @@ describe("executeSync", () => {
       processMessages: mock(async () => "agent response"),
     }
 
-    let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    let promptArgs: { body: { tools: Record<string, boolean> } }
+    const promptAsync = mock(async (input: { body: { tools: Record<string, boolean> } }) => {
       promptArgs = input
       return { data: {} }
     })
@@ -82,7 +84,7 @@ describe("executeSync", () => {
     }
 
     //#when
-    await executeSync(args, toolContext, ctx as any, deps)
+    await executeSync(args, toolContext, ctx as unknown as PluginInput, deps)
 
     //#then
     expect(promptAsync).toHaveBeenCalled()

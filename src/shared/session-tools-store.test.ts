@@ -63,7 +63,7 @@ describe("session-tools-store", () => {
     setSessionTools(sessionID, tools)
 
     //#when
-    const result = getSessionTools(sessionID)!
+    const result = getSessionTools(sessionID) as Record<string, boolean>
     result.question = true
 
     //#then

@@ -79,6 +79,7 @@ async function createClient(params: {
       `      ${info.serverName}:\n` +
       `        url: https://mcp.example.com/mcp\n` +
       `        headers:\n` +
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: string in generated doc output, not a template
       "          Authorization: Bearer ${API_KEY}\n\n" +
       `  Stdio:\n` +
       `    mcp:\n` +

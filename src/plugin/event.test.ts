@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test"
-
+import type { MatrixxConfig } from "../config"
+import type { CreatedHooks } from "../create-hooks"
+import type { Managers } from "../create-managers"
 import { createEventHandler } from "./event"
+import type { PluginContext } from "./types"
 
 type EventInput = { event: { type: string; properties?: Record<string, unknown> } }
 
@@ -15,8 +18,8 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 		}
 
 		const eventHandler = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: {} as unknown as PluginContext,
+			pluginConfig: {} as unknown as MatrixxConfig,
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
@@ -26,9 +29,9 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
+			} as unknown as Managers,
 			hooks: {
-				autoUpdateChecker: { event: mockDispatchToHooks as any },
+				autoUpdateChecker: { event: mockDispatchToHooks },
 			backgroundNotificationHook: { event: async () => {} },
 			sessionNotification: async () => {},
 			todoContinuationEnforcer: { handler: async () => {} },
@@ -46,7 +49,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 			stopContinuationGuard: { event: async () => {} },
 			compactionTodoPreserver: { event: async () => {} },
 			atlasHook: { handler: async () => {} },
-		} as any,
+		} as unknown as CreatedHooks,
 	})
 
 	const sessionId = "ses_test123"
@@ -91,8 +94,8 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 		}
 
 		const eventHandler = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: {} as unknown as PluginContext,
+			pluginConfig: {} as unknown as MatrixxConfig,
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
@@ -102,9 +105,9 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
+			} as unknown as Managers,
 			hooks: {
-				autoUpdateChecker: { event: mockDispatchToHooks as any },
+				autoUpdateChecker: { event: mockDispatchToHooks },
 				backgroundNotificationHook: { event: async () => {} },
 				sessionNotification: async () => {},
 				todoContinuationEnforcer: { handler: async () => {} },
@@ -122,7 +125,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 				stopContinuationGuard: { event: async () => {} },
 				compactionTodoPreserver: { event: async () => {} },
 				atlasHook: { handler: async () => {} },
-			} as any,
+			} as unknown as CreatedHooks,
 		})
 
 		const sessionId = "ses_test456"
@@ -160,8 +163,8 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 	it("both maps pruned on every event", async () => {
 		//#given
 		const eventHandler = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: {} as unknown as PluginContext,
+			pluginConfig: {} as unknown as MatrixxConfig,
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
@@ -171,7 +174,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
+			} as unknown as Managers,
 			hooks: {
 				autoUpdateChecker: { event: async () => {} },
 				backgroundNotificationHook: { event: async () => {} },
@@ -191,7 +194,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 				stopContinuationGuard: { event: async () => {} },
 				compactionTodoPreserver: { event: async () => {} },
 				atlasHook: { handler: async () => {} },
-			} as any,
+			} as unknown as CreatedHooks,
 		})
 
 		// Trigger some synthetic idles
@@ -248,8 +251,8 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 		// We verify by checking that a new idle event for same session is dispatched
 		const dispatchCalls: EventInput[] = []
 		const eventHandlerWithMock = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: {} as unknown as PluginContext,
+			pluginConfig: {} as unknown as MatrixxConfig,
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
@@ -259,7 +262,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
+			} as unknown as Managers,
 			hooks: {
 				autoUpdateChecker: {
 					event: async (input: EventInput) => {
@@ -303,8 +306,8 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 		//#given
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createEventHandler({
-			ctx: {} as any,
-			pluginConfig: {} as any,
+			ctx: {} as unknown as PluginContext,
+			pluginConfig: {} as unknown as MatrixxConfig,
 			firstMessageVariantGate: {
 				markSessionCreated: () => {},
 				clear: () => {},
@@ -314,7 +317,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 					onSessionCreated: async () => {},
 					onSessionDeleted: async () => {},
 				},
-			} as any,
+			} as unknown as Managers,
 			hooks: {
 				autoUpdateChecker: {
 					event: async (input: EventInput) => {
@@ -340,7 +343,7 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 				stopContinuationGuard: { event: async () => {} },
 				compactionTodoPreserver: { event: async () => {} },
 				atlasHook: { handler: async () => {} },
-			} as any,
+			} as unknown as CreatedHooks,
 		})
 
 		const sessionId = "ses_outside_window"

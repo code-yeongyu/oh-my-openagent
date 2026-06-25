@@ -2,7 +2,7 @@ const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("
 
 describe("executeSyncTask - cleanup on error paths", () => {
   let removeTaskCalls: string[] = []
-  let addTaskCalls: any[] = []
+  let addTaskCalls: unknown[] = []
   let deleteCalls: string[] = []
   let addCalls: string[] = []
   let resetToastManager: (() => void) | null = null
@@ -32,7 +32,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
       tui: { showToast: mock(() => Promise.resolve()) },
     })
 
-    spyOn(toastManager, "addTask").mockImplementation((task: any) => {
+    spyOn(toastManager, "addTask").mockImplementation((task: unknown) => {
       addTaskCalls.push(task)
     })
     spyOn(toastManager, "removeTask").mockImplementation((id: string) => {

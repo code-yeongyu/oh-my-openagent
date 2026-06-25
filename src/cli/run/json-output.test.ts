@@ -84,7 +84,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      const emitted = mockStdout.writes[0]!
+      const emitted = mockStdout.writes[0] as string
       expect(() => JSON.parse(emitted)).not.toThrow()
     })
 
@@ -106,7 +106,7 @@ describe("createJsonOutputManager", () => {
       manager.emitResult(result)
 
       // then
-      const emitted = mockStdout.writes[0]!
+      const emitted = mockStdout.writes[0] as string
       const parsed = JSON.parse(emitted) as RunResult
       expect(parsed).toEqual(result)
       expect(parsed.sessionId).toBe("test-session")
@@ -136,7 +136,7 @@ describe("createJsonOutputManager", () => {
 
       // then
       expect(mockStdout.writes).toHaveLength(1)
-      expect(mockStdout.writes[0]!).toBe(`${JSON.stringify(result)}\n`)
+      expect(mockStdout.writes[0] as string).toBe(`${JSON.stringify(result)}\n`)
 
       mockStdout.write("after emit")
       expect(mockStdout.writes).toHaveLength(2)

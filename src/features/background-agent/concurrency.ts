@@ -78,7 +78,8 @@ export class ConcurrencyManager {
 
     // Try to hand off to a waiting entry (skip any settled entries from cancelWaiters)
     while (queue && queue.length > 0) {
-      const next = queue.shift()!
+      const next = queue.shift()
+      if (!next) continue
       if (!next.settled) {
         // Hand off the slot to this waiter (count stays the same)
         next.resolve()

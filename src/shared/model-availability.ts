@@ -116,7 +116,7 @@ export function isModelAvailable(
 	return fuzzyMatchModel(targetModel, availableModels) !== null
 }
 
-export async function getConnectedProviders(client: any): Promise<string[]> {
+export async function getConnectedProviders(client: { provider?: { list?: () => Promise<{ data?: { connected?: string[] } }> }; model?: { list?: () => Promise<unknown> } }): Promise<string[]> {
 	if (!client?.provider?.list) {
 		log("[getConnectedProviders] client.provider.list not available")
 		return []
@@ -134,7 +134,7 @@ export async function getConnectedProviders(client: any): Promise<string[]> {
 }
 
 export async function fetchAvailableModels(
-	client?: any,
+	client?: { provider?: { list?: () => Promise<{ data?: { connected?: string[] } }> }; model?: { list?: () => Promise<unknown> } },
 	options?: { connectedProviders?: string[] | null }
 ): Promise<Set<string>> {
 	let connectedProviders = options?.connectedProviders ?? null

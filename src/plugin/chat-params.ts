@@ -58,6 +58,8 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
   return isRecord(raw.options)
 }
 
+import { clearSessionTemperature, getSessionTemperature } from "../shared/session-temperature-store"
+
 export function createChatParamsHandler(args: {
   anthropicEffort: { "chat.params"?: (input: ChatParamsInput, output: ChatParamsOutput) => Promise<void> } | null
 }): (input: unknown, output: unknown) => Promise<void> {
@@ -67,5 +69,12 @@ export function createChatParamsHandler(args: {
     if (!isChatParamsOutput(output)) return
 
     await args.anthropicEffort?.["chat.params"]?.(normalizedInput, output)
+
+    // Inject category temperature (one-shot — set before first prompt, cleared after read)
+    const categoryTemp = getSessionTemperature(normalizedInput.sessionID)
+    if (categoryTemp !== undefined) {
+      output.temperature = categoryTemp
+      clearSessionTemperature(normalizedInput.sessionID)
+    }
   }
 }

@@ -22,12 +22,13 @@ export const lsp_symbols: ToolDefinition = tool({
       const scope = args.scope ?? "document"
 
       if (scope === "workspace") {
-        if (!args.query) {
+        const query = args.query
+        if (!query) {
           return "Error: 'query' is required for workspace scope"
         }
 
         const result = await withLspClient(args.filePath, async (client) => {
-          return (await client.workspaceSymbols(args.query!)) as SymbolInfo[] | null
+          return (await client.workspaceSymbols(query)) as SymbolInfo[] | null
         })
 
         if (!result || result.length === 0) {

@@ -3,6 +3,8 @@ import { createEventState } from "./events"
 import { pollForCompletion } from "./poll-for-completion"
 import type { ChildSession, RunContext, SessionStatus, Todo } from "./types"
 
+type MockSession = Record<"todo" | "children" | "status", ReturnType<typeof mock>>
+
 const createMockContext = (overrides: {
   todo?: Todo[]
   childrenBySession?: Record<string, ChildSession[]>
@@ -114,7 +116,7 @@ describe("pollForCompletion", () => {
     let todoCallCount = 0
     let busyInserted = false
 
-    ;(ctx.client.session as any).todo = mock(async () => {
+    ;(ctx.client.session as unknown as MockSession).todo = mock(async () => {
       todoCallCount++
       if (todoCallCount === 1 && !busyInserted) {
         busyInserted = true
@@ -123,10 +125,10 @@ describe("pollForCompletion", () => {
       }
       return { data: [] }
     })
-    ;(ctx.client.session as any).children = mock(() =>
+    ;(ctx.client.session as unknown as MockSession).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(ctx.client.session as any).status = mock(() =>
+    ;(ctx.client.session as unknown as MockSession).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 
@@ -264,17 +266,17 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
     let pollTick = 0
 
-    ;(ctx.client.session as any).todo = mock(async () => {
+    ;(ctx.client.session as unknown as MockSession).todo = mock(async () => {
       pollTick++
       if (pollTick === 2) {
         eventState.currentTool = "task"
       }
       return { data: [] }
     })
-    ;(ctx.client.session as any).children = mock(() =>
+    ;(ctx.client.session as unknown as MockSession).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(ctx.client.session as any).status = mock(() =>
+    ;(ctx.client.session as unknown as MockSession).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 

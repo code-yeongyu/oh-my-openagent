@@ -70,7 +70,7 @@ export function createCategorySkillReminderHook(
         toolCallCount: 0,
       })
     }
-    return sessionStates.get(sessionID)!
+    return sessionStates.get(sessionID) as SessionState
   }
 
   function isTargetAgent(sessionID: string, inputAgent?: string): boolean {

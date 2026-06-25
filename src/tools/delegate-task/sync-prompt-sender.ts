@@ -3,6 +3,7 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
+import { setSessionTemperature } from "../../shared/session-temperature-store"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isPlanFamily } from "./constants"
 import { formatDetailedError } from "./error-formatting"
@@ -35,7 +36,7 @@ export async function sendSyncPrompt(
     agentToUse: string
     args: DelegateTaskArgs
     systemContent: string | undefined
-    categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+    categoryModel: { providerID: string; modelID: string; variant?: string; temperature?: number } | undefined
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
   },
@@ -49,6 +50,10 @@ export async function sendSyncPrompt(
     ...getAgentToolRestrictions(input.agentToUse),
   }
   setSessionTools(input.sessionID, tools)
+
+  if (input.categoryModel?.temperature !== undefined) {
+    setSessionTemperature(input.sessionID, input.categoryModel.temperature)
+  }
 
   const promptArgs = {
     path: { id: input.sessionID },

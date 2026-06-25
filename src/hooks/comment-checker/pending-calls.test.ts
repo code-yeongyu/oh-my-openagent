@@ -10,7 +10,7 @@ describe("pending-calls cleanup interval", () => {
     globalThis.setInterval = ((
       _handler: TimerHandler,
       timeout?: number,
-      ..._args: any[]
+      ..._args: unknown[]
     ) => {
       setIntervalCalls.push(timeout as number)
       return {

@@ -1128,29 +1128,7 @@ Opt-in experimental features that may change or be removed in future versions. U
   "experimental": {
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
-    "auto_resume": true,
-    "dynamic_context_pruning": {
-      "enabled": false,
-      "notification": "detailed",
-      "turn_protection": {
-        "enabled": true,
-        "turns": 3
-      },
-      "protected_tools": ["task", "todowrite", "lsp_rename"],
-      "strategies": {
-        "deduplication": {
-          "enabled": true
-        },
-        "supersede_writes": {
-          "enabled": true,
-          "aggressive": false
-        },
-        "purge_errors": {
-          "enabled": true,
-          "turns": 5
-        }
-      }
-    }
+    "auto_resume": true
   }
 }
 ```
@@ -1160,73 +1138,6 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `truncate_all_tool_outputs` | `false` | Truncates ALL tool outputs instead of just whitelisted tools (Grep, Glob, LSP, AST-grep). Tool output truncator is enabled by default - disable via `disabled_hooks`.                         |
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts last user message and continues.                             |
-| `dynamic_context_pruning`    | See below | Dynamic context pruning configuration for managing context window usage automatically. See [Dynamic Context Pruning](#dynamic-context-pruning) below.                              |
-
-### Dynamic Context Pruning
-
-Dynamic context pruning automatically manages context window by intelligently pruning old tool outputs. This feature helps maintain performance in long sessions.
-
-```json
-{
-  "experimental": {
-    "dynamic_context_pruning": {
-      "enabled": false,
-      "notification": "detailed",
-      "turn_protection": {
-        "enabled": true,
-        "turns": 3
-      },
-      "protected_tools": ["task", "todowrite", "todoread", "lsp_rename", "session_read", "session_write", "session_search"],
-      "strategies": {
-        "deduplication": {
-          "enabled": true
-        },
-        "supersede_writes": {
-          "enabled": true,
-          "aggressive": false
-        },
-        "purge_errors": {
-          "enabled": true,
-          "turns": 5
-        }
-      }
-    }
-  }
-}
-```
-
-| Option            | Default | Description                                                                               |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------- |
-| `enabled`         | `false`  | Enable dynamic context pruning                                                               |
-| `notification`     | `detailed` | Notification level: `off`, `minimal`, or `detailed`                                        |
-| `turn_protection` | See below | Turn protection settings - prevent pruning recent tool outputs                                 |
-
-#### Turn Protection
-
-| Option    | Default | Description                                                  |
-| --------- | ------- | ------------------------------------------------------------ |
-| `enabled` | `true`  | Enable turn protection                                         |
-| `turns`   | `3`     | Number of recent turns to protect from pruning (1-10)           |
-
-#### Protected Tools
-
-Tools that should never be pruned (default):
-
-```json
-["task", "todowrite", "todoread", "lsp_rename", "session_read", "session_write", "session_search"]
-```
-
-#### Pruning Strategies
-
-| Strategy            | Option       | Default | Description                                                                  |
-| ------------------- | ------------ | ------- | ---------------------------------------------------------------------------- |
-| **deduplication**   | `enabled`    | `true`  | Remove duplicate tool calls (same tool + same args)                              |
-| **supersede_writes**| `enabled`    | `true`  | Prune write inputs when file subsequently read                                   |
-|                     | `aggressive` | `false` | Aggressive mode: prune any write if ANY subsequent read                         |
-| **purge_errors**   | `enabled`    | `true`  | Prune errored tool inputs after N turns                                        |
-|                     | `turns`      | `5`     | Number of turns before pruning errors (1-20)                                    |
-
-**Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 
 ## Environment Variables
 

@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { _resetForTesting, setMainSession, subagentSessions } from "../../features/claude-code-session-state"
@@ -10,7 +11,19 @@ import {
   MAX_CONSECUTIVE_FAILURES,
 } from "./constants"
 
-type TimerCallback = (...args: any[]) => void
+type TimerCallback = (...args: unknown[]) => void
+
+type MockPromptOpts = {
+  path: { id: string }
+  body: {
+    agent?: string
+    model?: { providerID?: string; modelID?: string }
+    parts: Array<{ text: string }>
+  }
+}
+type MockToastOpts = {
+  body: { title: string; message: string }
+}
 
 interface FakeTimers {
   advanceBy: (ms: number, advanceClock?: boolean) => Promise<void>
@@ -25,7 +38,7 @@ function createFakeTimers(): FakeTimers {
   let clockNow = originalNow
   let timerNow = 0
   let nextId = 1
-  const timers = new Map<number, { id: number; time: number; interval: number | null; callback: TimerCallback; args: any[] }>()
+  const timers = new Map<number, { id: number; time: number; interval: number | null; callback: TimerCallback; args: unknown[] }>()
   const cleared = new Set<number>()
 
   const original = {
@@ -41,7 +54,7 @@ function createFakeTimers(): FakeTimers {
     return delay < 0 ? 0 : delay
   }
 
-  const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: any[]) => {
+  const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: unknown[]) => {
     const id = nextId++
     timers.set(id, {
       id,
@@ -59,7 +72,7 @@ function createFakeTimers(): FakeTimers {
     timers.delete(id)
   }
 
-  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
     const normalized = normalizeDelay(delay)
     if (normalized < FAKE_MIN_DELAY_MS) {
       return original.setTimeout(callback, delay, ...args)
@@ -70,7 +83,7 @@ function createFakeTimers(): FakeTimers {
     return schedule(callback, normalized, null, args) as unknown as ReturnType<typeof setTimeout>
   }) as typeof setTimeout
 
-  globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+  globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
     const interval = normalizeDelay(delay)
     if (interval < FAKE_MIN_DELAY_MS) {
       return original.setInterval(callback, delay, ...args)
@@ -106,7 +119,7 @@ function createFakeTimers(): FakeTimers {
       clockNow += clamped
     }
     while (true) {
-      let next: { id: number; time: number; interval: number | null; callback: TimerCallback; args: any[] } | undefined
+      let next: { id: number; time: number; interval: number | null; callback: TimerCallback; args: unknown[] } | undefined
       for (const timer of timers.values()) {
         if (timer.time <= target && (!next || timer.time < next.time)) {
           next = timer
@@ -188,7 +201,7 @@ describe("todo-continuation-enforcer", () => {
             { id: "2", content: "Task 2", status: "completed", priority: "medium" },
           ]}),
           messages: async () => ({ data: mockMessages }),
-          prompt: async (opts: any) => {
+          prompt: async (opts: MockPromptOpts) => {
             promptCalls.push({
               sessionID: opts.path.id,
               agent: opts.body.agent,
@@ -197,7 +210,7 @@ describe("todo-continuation-enforcer", () => {
             })
             return {}
           },
-          promptAsync: async (opts: any) => {
+          promptAsync: async (opts: MockPromptOpts) => {
             promptCalls.push({
               sessionID: opts.path.id,
               agent: opts.body.agent,
@@ -208,7 +221,7 @@ describe("todo-continuation-enforcer", () => {
           },
         },
         tui: {
-          showToast: async (opts: any) => {
+          showToast: async (opts: MockToastOpts) => {
             toastCalls.push({
               title: opts.body.title,
               message: opts.body.message,
@@ -218,7 +231,7 @@ describe("todo-continuation-enforcer", () => {
         },
       },
       directory: "/tmp/test",
-    } as any
+    } as unknown as PluginInput
   }
 
   function createMockBackgroundManager(runningTasks: boolean = false): BackgroundManager {
@@ -226,7 +239,7 @@ describe("todo-continuation-enforcer", () => {
       getTasksByParentSession: () => runningTasks
         ? [{ status: "running" }]
         : [],
-    } as any
+    } as unknown as BackgroundManager
   }
 
   beforeEach(() => {
@@ -763,7 +776,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     let resolvePrompt: (() => void) | undefined
     const mockInput = createMockPluginInput()
-    mockInput.client.session.promptAsync = async (opts: any) => {
+    mockInput.client.session.promptAsync = async (opts: MockPromptOpts) => {
       promptCalls.push({
         sessionID: opts.path.id,
         agent: opts.body.agent,
@@ -1325,7 +1338,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
           messages: async () => ({ data: mockMessagesWithAssistant }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1334,7 +1347,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1347,7 +1360,7 @@ describe("todo-continuation-enforcer", () => {
          tui: { showToast: async () => ({}) },
        },
        directory: "/tmp/test",
-     } as any
+     } as unknown as PluginInput
 
      const hook = createTodoContinuationEnforcer(mockInput, {
        backgroundManager: createMockBackgroundManager(false),
@@ -1386,7 +1399,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesWithCompaction }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1395,7 +1408,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1408,7 +1421,7 @@ describe("todo-continuation-enforcer", () => {
          tui: { showToast: async () => ({}) },
        },
        directory: "/tmp/test",
-     } as any
+     } as unknown as PluginInput
 
      const hook = createTodoContinuationEnforcer(mockInput, {
        backgroundManager: createMockBackgroundManager(false),
@@ -1439,7 +1452,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesOnlyCompaction }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1448,7 +1461,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1461,7 +1474,7 @@ describe("todo-continuation-enforcer", () => {
          tui: { showToast: async () => ({}) },
        },
        directory: "/tmp/test",
-     } as any
+     } as unknown as PluginInput
 
      const hook = createTodoContinuationEnforcer(mockInput, {})
 
@@ -1494,7 +1507,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesOracleCompacted }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1503,7 +1516,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1516,7 +1529,7 @@ describe("todo-continuation-enforcer", () => {
          tui: { showToast: async () => ({}) },
        },
        directory: "/tmp/test",
-     } as any
+     } as unknown as PluginInput
 
      const hook = createTodoContinuationEnforcer(mockInput, {})
 
@@ -1549,7 +1562,7 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
            messages: async () => ({ data: mockMessagesNoAgent }),
-           prompt: async (opts: any) => {
+           prompt: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1558,7 +1571,7 @@ describe("todo-continuation-enforcer", () => {
              })
              return {}
            },
-           promptAsync: async (opts: any) => {
+           promptAsync: async (opts: MockPromptOpts) => {
              promptCalls.push({
                sessionID: opts.path.id,
                agent: opts.body.agent,
@@ -1571,7 +1584,7 @@ describe("todo-continuation-enforcer", () => {
          tui: { showToast: async () => ({}) },
        },
        directory: "/tmp/test",
-     } as any
+     } as unknown as PluginInput
 
      const hook = createTodoContinuationEnforcer(mockInput, {
        skipAgents: [],

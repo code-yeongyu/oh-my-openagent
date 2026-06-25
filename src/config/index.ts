@@ -7,7 +7,6 @@ export type {
   AgentOverrides,
   BuiltinCommandName,
   DependencyAuditConfig,
-  DynamicContextPruningConfig,
   EnvFileGuardConfig,
   ExperimentalConfig,
   HookName,

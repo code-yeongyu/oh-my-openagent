@@ -46,7 +46,7 @@ export async function checkAstGrepCli(): Promise<DependencyInfo> {
     }
   }
 
-  const version = await getBinaryVersion(binary.path!)
+  const version = binary.path ? await getBinaryVersion(binary.path) : null
 
   return {
     name: "AST-Grep CLI",

@@ -199,8 +199,19 @@ describe("syncTaskToTodo", () => {
   });
 });
 
+interface MockPluginContext {
+  client: {
+    session: {
+      todo: {
+        mockResolvedValue: (...args: unknown[]) => void;
+        mockRejectedValue: (...args: unknown[]) => void;
+      };
+    };
+  };
+}
+
 describe("syncTaskTodoUpdate", () => {
-  let mockCtx: any;
+  let mockCtx: MockPluginContext;
 
   beforeEach(() => {
     mockCtx = {
@@ -283,7 +294,7 @@ describe("syncTaskTodoUpdate", () => {
 });
 
 describe("syncAllTasksToTodos", () => {
-  let mockCtx: any;
+  let mockCtx: MockPluginContext;
 
   beforeEach(() => {
     mockCtx = {

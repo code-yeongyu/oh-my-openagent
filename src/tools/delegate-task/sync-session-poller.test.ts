@@ -1,4 +1,4 @@
-declare const require: (name: string) => any
+declare const require: (name: string) => unknown
 const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 
 import { __resetTimingConfig, __setTimingConfig } from "./timing"
@@ -331,7 +331,7 @@ describe("pollSyncSession", () => {
       const { isSessionComplete } = require("./sync-session-poller")
 
       //#given - empty messages array
-      const messages: any[] = []
+      const messages: unknown[] = []
 
       //#when
       const result = isSessionComplete(messages)

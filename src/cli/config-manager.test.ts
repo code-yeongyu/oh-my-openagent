@@ -169,12 +169,19 @@ describe("fetchNpmDistTags", () => {
   })
 })
 
+interface AntigravityTestModel {
+  name: string
+  limit: { context: number; output: number }
+  modalities: { input: string[]; output: string[] }
+  variants?: Record<string, { thinkingLevel?: string }>
+}
+
 describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
   test("all models include full spec (limit + modalities + Antigravity label)", () => {
-    const google = (ANTIGRAVITY_PROVIDER_CONFIG as any).google
+    const google = ANTIGRAVITY_PROVIDER_CONFIG.google
     expect(google).toBeTruthy()
 
-    const models = google.models as Record<string, any>
+    const models = google.models as Record<string, AntigravityTestModel>
     expect(models).toBeTruthy()
 
     const required = [
@@ -203,7 +210,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
 
   test("Gemini models have variant definitions", () => {
     // #given the antigravity provider config
-    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+    const models = ANTIGRAVITY_PROVIDER_CONFIG.google.models as Record<string, AntigravityTestModel>
 
     // #when checking Gemini Pro variants
     const pro = models["antigravity-gemini-3-pro"]
@@ -224,7 +231,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
 
   test("Claude thinking models have variant definitions", () => {
     // #given the antigravity provider config
-    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+    const models = ANTIGRAVITY_PROVIDER_CONFIG.google.models as Record<string, AntigravityTestModel>
 
     // #when checking Claude thinking variants
     const sonnetThinking = models["antigravity-claude-sonnet-4-5-thinking"]

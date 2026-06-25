@@ -578,7 +578,10 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(
+  manager as { getOrCreateClientWithRetry: (...args: unknown[]) => Promise<unknown> },
+  "getOrCreateClientWithRetry",
+)
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when
@@ -611,7 +614,10 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(
+  manager as { getOrCreateClientWithRetry: (...args: unknown[]) => Promise<unknown> },
+  "getOrCreateClientWithRetry",
+)
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when / #then
@@ -642,7 +648,10 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(
+  manager as { getOrCreateClientWithRetry: (...args: unknown[]) => Promise<unknown> },
+  "getOrCreateClientWithRetry",
+)
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when / #then
@@ -799,7 +808,10 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(
+  manager as { getOrCreateClientWithRetry: (...args: unknown[]) => Promise<unknown> },
+  "getOrCreateClientWithRetry",
+)
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when
@@ -831,7 +843,10 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(
+  manager as { getOrCreateClientWithRetry: (...args: unknown[]) => Promise<unknown> },
+  "getOrCreateClientWithRetry",
+)
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when / #then

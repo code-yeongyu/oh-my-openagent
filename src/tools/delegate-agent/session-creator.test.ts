@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
 import { createOrGetSession } from "./session-creator"
 
@@ -36,12 +37,12 @@ describe("delegate-agent createOrGetSession", () => {
     }
 
     // when
-    const result = await createOrGetSession(args as any, toolContext as any, ctx as any)
+    const result = await createOrGetSession(args, toolContext, ctx as unknown as PluginInput)
 
     // then
     expect(result).toEqual({ sessionID: "ses_child", isNew: true })
     expect(createCalls).toHaveLength(1)
-    const createBody = (createCalls[0] as any)?.body
+    const createBody = (createCalls[0] as { body?: Record<string, unknown> })?.body
     expect(createBody?.parentID).toBe("ses_parent")
     expect(createBody?.permission).toBeUndefined()
     expect(subagentSessions.has("ses_child")).toBe(true)

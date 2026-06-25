@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
-const mockFindPluginEntry = mock(() => null as any)
+const mockFindPluginEntry = mock(() => null)
 const mockGetCachedVersion = mock(() => null as string | null)
 const mockGetLatestVersion = mock(async () => null as string | null)
 const mockUpdatePinnedVersion = mock(() => false)
@@ -60,7 +60,7 @@ mock.module("./background-update-check", () => {
   }
 
   async function runBackgroundUpdateCheck(
-    ctx: any,
+    ctx: { directory: string },
     autoUpdate: boolean,
     getToastMessage: (isUpdate: boolean, latestVersion?: string) => string
   ): Promise<void> {
@@ -117,7 +117,7 @@ mock.module("./background-update-check", () => {
 const { runBackgroundUpdateCheck } = await import("./background-update-check")
 
 describe("runBackgroundUpdateCheck", () => {
-  const mockCtx = { directory: "/test" } as any
+  const mockCtx = { directory: "/test" }
   const mockGetToastMessage = (isUpdate: boolean, version?: string) =>
     isUpdate ? `Update to ${version}` : "Up to date"
 

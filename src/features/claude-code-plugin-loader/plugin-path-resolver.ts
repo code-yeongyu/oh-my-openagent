@@ -1,3 +1,4 @@
+// biome-ignore lint/suspicious/noTemplateCurlyInString: intentional string constant for template matching
 const CLAUDE_PLUGIN_ROOT_VAR = "${CLAUDE_PLUGIN_ROOT}"
 
 function resolvePluginPath(path: string, pluginRoot: string): string {

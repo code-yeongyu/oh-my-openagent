@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { BackgroundManager } from "../../features/background-agent"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
 import type { MissionState } from "../../features/mission-state"
 import {
@@ -856,7 +857,7 @@ describe("architect hook", () => {
        const mockInput = createMockPluginInput()
        const hook = createAtlasHook(mockInput, {
          directory: TEST_DIR,
-         backgroundManager: mockBackgroundManager as any,
+         backgroundManager: mockBackgroundManager as unknown as BackgroundManager,
        })
 
        // when

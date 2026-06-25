@@ -10,8 +10,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs: unknown
+    const promptAsync = bunMock(async (input: unknown) => {
       promptArgs = input
       return { data: {} }
     })
@@ -49,8 +49,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs: unknown
+    const promptAsync = bunMock(async (input: unknown) => {
       promptArgs = input
       return { data: {} }
     })
@@ -89,8 +89,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs: unknown
+    const promptAsync = bunMock(async (input: unknown) => {
       promptArgs = input
       return { data: {} }
     })
@@ -129,8 +129,8 @@ bunDescribe("sendSyncPrompt", () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
-    let promptArgs: any
-    const promptAsync = bunMock(async (input: any) => {
+    let promptArgs: unknown
+    const promptAsync = bunMock(async (input: unknown) => {
       promptArgs = input
       return { data: {} }
     })

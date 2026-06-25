@@ -53,21 +53,21 @@ describe("collectGitDiffStats", () => {
     expect(execFileSyncSpy).toHaveBeenCalledTimes(3)
 
     const [firstCallFile, firstCallArgs, firstCallOpts] = execFileSyncSpy.mock
-      .calls[0]! as unknown as [string, string[], { cwd?: string }]
+      .calls[0] as unknown as [string, string[], { cwd?: string }]
     expect(firstCallFile).toBe("git")
     expect(firstCallArgs).toEqual(["diff", "--numstat", "HEAD"])
     expect(firstCallOpts.cwd).toBe(directory)
     expect(firstCallArgs.join(" ")).not.toContain(directory)
 
     const [secondCallFile, secondCallArgs, secondCallOpts] = execFileSyncSpy.mock
-      .calls[1]! as unknown as [string, string[], { cwd?: string }]
+      .calls[1] as unknown as [string, string[], { cwd?: string }]
     expect(secondCallFile).toBe("git")
     expect(secondCallArgs).toEqual(["status", "--porcelain"])
     expect(secondCallOpts.cwd).toBe(directory)
     expect(secondCallArgs.join(" ")).not.toContain(directory)
 
     const [thirdCallFile, thirdCallArgs, thirdCallOpts] = execFileSyncSpy.mock
-      .calls[2]! as unknown as [string, string[], { cwd?: string }]
+      .calls[2] as unknown as [string, string[], { cwd?: string }]
     expect(thirdCallFile).toBe("git")
     expect(thirdCallArgs).toEqual(["ls-files", "--others", "--exclude-standard"])
     expect(thirdCallOpts.cwd).toBe(directory)

@@ -3,7 +3,7 @@ import * as shared from "./logger"
 import { safeCreateHook } from "./safe-create-hook"
 
 afterEach(() => {
-  ;(shared.log as any)?.mockRestore?.()
+  ;(shared.log as { mockRestore?: () => void })?.mockRestore?.()
 })
 
 describe("safeCreateHook", () => {
@@ -62,7 +62,7 @@ describe("safeCreateHook", () => {
 
   test("returns null for factory returning undefined", () => {
     //#given
-    const factory = () => undefined as any
+    const factory: () => undefined = () => undefined
 
     //#when
     const result = safeCreateHook("test-hook", factory)

@@ -1,7 +1,6 @@
-declare const require: (name: string) => any
-const { describe, it, expect, beforeEach, afterEach, beforeAll } = require("bun:test")
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test"
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -42,9 +41,9 @@ describe("fetchAvailableModels", () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  function writeModelsCache(data: Record<string, any>) {
+  function writeModelsCache(data: Record<string, unknown>) {
     const cacheDir = join(tempDir, "opencode")
-    require("node:fs").mkdirSync(cacheDir, { recursive: true })
+    mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
   }
 
@@ -491,9 +490,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 
-	function writeModelsCache(data: Record<string, any>) {
+	function writeModelsCache(data: Record<string, unknown>) {
 		const cacheDir = join(tempDir, "opencode")
-		require("node:fs").mkdirSync(cacheDir, { recursive: true })
+		mkdirSync(cacheDir, { recursive: true })
 		writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
 	}
 
@@ -658,18 +657,18 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 
-	function writeProviderModelsCache(data: { models: Record<string, string[] | any[]>; connected: string[] }) {
+	function writeProviderModelsCache(data: { models: Record<string, string[] | unknown[]>; connected: string[] }) {
 		const cacheDir = join(tempDir, "matrixx")
-		require("node:fs").mkdirSync(cacheDir, { recursive: true })
+		mkdirSync(cacheDir, { recursive: true })
 		writeFileSync(join(cacheDir, "provider-models.json"), JSON.stringify({
 			...data,
 			updatedAt: new Date().toISOString()
 		}))
 	}
 
-	function writeModelsCache(data: Record<string, any>) {
+	function writeModelsCache(data: Record<string, unknown>) {
 		const cacheDir = join(tempDir, "opencode")
-		require("node:fs").mkdirSync(cacheDir, { recursive: true })
+		mkdirSync(cacheDir, { recursive: true })
 		writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
 	}
 

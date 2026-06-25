@@ -11,7 +11,7 @@ export async function executeBackgroundTask(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   agentToUse: string,
-  categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
+  categoryModel: { providerID: string; modelID: string; variant?: string; temperature?: number } | undefined,
   systemContent: string | undefined
 ): Promise<string> {
   const { manager } = executorCtx

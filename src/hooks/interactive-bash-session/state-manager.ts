@@ -12,7 +12,7 @@ export function getOrCreateState(sessionID: string, sessionStates: Map<string, I
     };
     sessionStates.set(sessionID, state);
   }
-  return sessionStates.get(sessionID)!;
+  return sessionStates.get(sessionID) as InteractiveBashSessionState;
 }
 
 export function isOmoSession(sessionName: string | null): boolean {

@@ -4,6 +4,7 @@ import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { getAgentToolRestrictions, log, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
+import { setSessionTemperature } from "../../shared/session-temperature-store"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
 import { subagentSessions } from "../claude-code-session-state"
@@ -347,6 +348,11 @@ export class BackgroundManager {
       ? { providerID: input.model.providerID, modelID: input.model.modelID }
       : undefined
     const launchVariant = input.model?.variant
+    const launchTemperature = input.model?.temperature
+
+    if (launchTemperature !== undefined) {
+      setSessionTemperature(sessionID, launchTemperature)
+    }
 
     promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
@@ -635,7 +641,7 @@ export class BackgroundManager {
             question: false,
             ...getAgentToolRestrictions(existingTask.agent),
           }
-          setSessionTools(existingTask.sessionID!, tools)
+          setSessionTools(existingTask.sessionID as string, tools)
           return tools
         })(),
         parts: [{ type: "text", text: input.prompt }],
@@ -983,12 +989,10 @@ export class BackgroundManager {
       // - "tool" with .state.output property (tool call results)
       // - "text" with .text property (final text output)
       // - "step-start"/"step-finish" (metadata, no content)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hasContent = messages.some((m: any) => {
+      const hasContent = messages.some((m: { info?: { role?: string }; parts?: Array<Record<string, unknown>> }) => {
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) => 
+      return parts.some((p: { type?: string; text?: string; content?: string | unknown[] }) => 
         // Text content (final output)
         (p.type === "text" && p.text && p.text.trim().length > 0) ||
         // Reasoning content (thinking blocks)

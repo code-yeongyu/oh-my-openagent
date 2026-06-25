@@ -30,7 +30,7 @@ export function resolveCompactionModel(
   }
 
   return {
-    providerID: modelParts[0]!,
+    providerID: modelParts[0] as string,
     modelID: modelParts.slice(1).join("/"),
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from "bun:test"
 import { handleMessagePartUpdated, handleSessionStatus, handleTuiToast } from "./event-handlers"
 import { createEventState } from "./events"
-import type { RunContext } from "./types"
+import type { EventPayload, RunContext } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   sessionID,
@@ -23,7 +23,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with idle status
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, payload as EventPayload, state)
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
@@ -44,7 +44,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with busy status
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, payload as EventPayload, state)
 
     //#then - state.mainSessionIdle === false
     expect(state.mainSessionIdle).toBe(false)
@@ -65,7 +65,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with different session ID
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, payload as EventPayload, state)
 
     //#then - state.mainSessionIdle remains unchanged
     expect(state.mainSessionIdle).toBe(true)
@@ -86,7 +86,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with camelCase sessionId
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, payload as EventPayload, state)
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
@@ -114,7 +114,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
@@ -142,7 +142,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(false)
@@ -170,7 +170,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.currentTool).toBe("read")
@@ -200,7 +200,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.currentTool).toBeNull()
@@ -225,7 +225,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
@@ -250,7 +250,7 @@ describe("handleTuiToast", () => {
     }
 
     //#when
-    handleTuiToast(ctx, payload as any, state)
+    handleTuiToast(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.mainSessionError).toBe(true)
@@ -271,7 +271,7 @@ describe("handleTuiToast", () => {
     }
 
     //#when
-    handleTuiToast(ctx, payload as any, state)
+    handleTuiToast(ctx, payload as EventPayload, state)
 
     //#then
     expect(state.mainSessionError).toBe(false)

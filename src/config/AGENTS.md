@@ -2,12 +2,12 @@
 
 ## OVERVIEW
 
-Zod schema definitions for plugin configuration. 21 component files composing `MatrixxConfigSchema` with multi-level inheritance and JSONC support.
+Zod schema definitions for plugin configuration. Schema component files composing `MatrixxConfigSchema` with multi-level inheritance and JSONC support.
 
 ## STRUCTURE
 ```
 config/
-├── schema/                    # 21 schema component files
+├── schema/                    # schema component files
 │   ├── matrixx-config.ts         # Root schema composition (57 lines)
 │   ├── agent-names.ts         # BuiltinAgentNameSchema (11 agents), BuiltinSkillNameSchema
 │   ├── agent-overrides.ts     # AgentOverrideConfigSchema (model, variant, temp, thinking...)
@@ -15,7 +15,6 @@ config/
 │   ├── hooks.ts               # HookNameSchema (100+ hook names)
 │   ├── commands.ts            # BuiltinCommandNameSchema
 │   ├── experimental.ts        # ExperimentalConfigSchema
-│   ├── dynamic-context-pruning.ts # DynamicContextPruningConfigSchema (55 lines)
 │   ├── background-task.ts     # BackgroundTaskConfigSchema
 │   ├── claude-code.ts         # ClaudeCodeConfigSchema
 │   ├── comment-checker.ts     # CommentCheckerConfigSchema

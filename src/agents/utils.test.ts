@@ -1028,11 +1028,13 @@ describe("buildAgent with category and skills", () => {
 })
 
 describe("override.category expansion in createBuiltinAgents", () => {
+  type OverrideMap = Record<string, { category: string; variant?: string; reasoningEffort?: string }>
+
   test("standard agent override with category expands category properties", async () => {
     // #given
     const overrides = {
-      merovingian: { category: "source" } as any,
-    }
+      merovingian: { category: "source" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1046,8 +1048,8 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("standard agent override with category AND direct variant - direct wins", async () => {
     // #given - source has variant=xhigh, but direct override says "max"
     const overrides = {
-      merovingian: { category: "source", variant: "max" } as any,
-    }
+      merovingian: { category: "source", variant: "max" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1066,8 +1068,8 @@ describe("override.category expansion in createBuiltinAgents", () => {
       },
     }
     const overrides = {
-      merovingian: { category: "test-cat", reasoningEffort: "low" } as any,
-    }
+      merovingian: { category: "test-cat", reasoningEffort: "low" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, categories)
@@ -1086,8 +1088,8 @@ describe("override.category expansion in createBuiltinAgents", () => {
       },
     }
     const overrides = {
-      merovingian: { category: "reasoning-cat" } as any,
-    }
+      merovingian: { category: "reasoning-cat" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, categories)
@@ -1100,8 +1102,8 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("morpheus override with category expands category properties", async () => {
     // #given
     const overrides = {
-      morpheus: { category: "source" } as any,
-    }
+      morpheus: { category: "source" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1115,8 +1117,8 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("architect override with category expands category properties", async () => {
     // #given
     const overrides = {
-      architect: { category: "source" } as any,
-    }
+      architect: { category: "source" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1130,8 +1132,8 @@ describe("override.category expansion in createBuiltinAgents", () => {
   test("override with non-existent category has no effect on config", async () => {
     // #given
     const overrides = {
-      merovingian: { category: "non-existent-category" } as any,
-    }
+      merovingian: { category: "non-existent-category" },
+    } satisfies OverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1144,11 +1146,13 @@ describe("override.category expansion in createBuiltinAgents", () => {
 })
 
 describe("agent override tools migration", () => {
+  type ToolsOverrideMap = Record<string, { tools: Record<string, boolean> }>
+
   test("tools: { x: false } is migrated to permission: { x: deny }", async () => {
     // #given
     const overrides = {
-      trinity: { tools: { "jetbrains_*": false } } as any,
-    }
+      trinity: { tools: { "jetbrains_*": false } },
+    } satisfies ToolsOverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1162,8 +1166,8 @@ describe("agent override tools migration", () => {
   test("tools: { x: true } is migrated to permission: { x: allow }", async () => {
     // #given
     const overrides = {
-      operator: { tools: { "jetbrains_get_*": true } } as any,
-    }
+      operator: { tools: { "jetbrains_get_*": true } },
+    } satisfies ToolsOverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
@@ -1177,15 +1181,15 @@ describe("agent override tools migration", () => {
   test("tools config is removed after migration", async () => {
     // #given
     const overrides = {
-      trinity: { tools: { "some_tool": false } } as any,
-    }
+      trinity: { tools: { "some_tool": false } },
+    } satisfies ToolsOverrideMap
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.trinity).toBeDefined()
-    expect((agents.trinity as any).tools).toBeUndefined()
+    expect(agents.trinity.tools).toBeUndefined()
   })
 })
 

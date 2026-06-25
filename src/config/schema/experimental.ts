@@ -1,5 +1,4 @@
 import { z } from "zod"
-import { DynamicContextPruningConfigSchema } from "./dynamic-context-pruning"
 
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
@@ -7,8 +6,6 @@ export const ExperimentalConfigSchema = z.object({
   preemptive_compaction: z.boolean().optional(),
   /** Truncate all tool outputs, not just whitelisted tools (default: false). Tool output truncator is enabled by default - disable via disabled_hooks. */
   truncate_all_tool_outputs: z.boolean().optional(),
-  /** Dynamic context pruning configuration */
-  dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
   /** Enable experimental task system for Todowrite disabler hook */
   task_system: z.boolean().optional(),
   /** Timeout in ms for loadAllPluginComponents during config handler init (default: 10000, min: 1000) */

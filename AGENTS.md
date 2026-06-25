@@ -128,7 +128,7 @@ matrixx/
 │   ├── shared/   → 80+ utilities
 │   ├── mcp/      → 6 built-in MCPs (websearch, context7, grep_app, ...)
 │   ├── cli/      → CLI installer, doctor, config-manager
-│   ├── config/   → Zod schema (21 components)
+│   ├── config/   → Zod schema
 │   ├── plugin/   → Hook composition (create-core/continuation/skill-hooks)
 │   └── plugin-handlers/ → Config-loading pipeline (6 phases)
 ├── bin/                            # Platform-detecting CLI wrappers
@@ -201,7 +201,7 @@ MatrixxPlugin(ctx)
 | New MCP | `src/mcp/` | Add to `createBuiltinMcps()` |
 | New built-in skill | `src/features/builtin-skills/skills/` | Export from `skills/index.ts`; add to `createBuiltinSkills()` |
 | New command | `src/features/builtin-commands/` | Add template + register in `commands.ts` |
-| Schema field | `src/config/schema/` (21 component files) | Run `bun run build:schema` to regenerate `dist/matrixx.schema.json` AND `assets/matrixx.schema.json` |
+| Schema field | `src/config/schema/` | Run `bun run build:schema` to regenerate `dist/matrixx.schema.json` AND `assets/matrixx.schema.json` |
 | New skill (user-facing) | `.opencode/skills/<name>/SKILL.md` | Loaded by OpenCode for the current dev session — not the plugin |
 
 ## OPENCODE PLUGIN API (`@opencode-ai/plugin` v1.3.15)
@@ -286,7 +286,7 @@ For full model/temp/fallback details see the per-agent file or `src/agents/AGENT
 
 ## CONFIG SYSTEM
 
-- Zod schema: 21 component files in `src/config/schema/`
+- Zod schema in `src/config/schema/`
 - Project (`matrixx.json`/`.jsonc`) → User (`~/.config/opencode/matrixx.json`) → Defaults
 - JSONC: comments + trailing commas via `jsonc-parser` (use `src/shared/jsonc-parser.ts`, not raw `JSON.parse`)
 - Legacy config auto-migrated by `src/shared/migration/` (agent names, hook names, model versions)
