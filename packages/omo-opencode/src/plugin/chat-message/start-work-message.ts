@@ -8,7 +8,7 @@ import type {
   WorkStartingCommand,
 } from "./types"
 
-const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
+const START_WORK_TEMPLATE_MARKER = "You are starting an Atlas work session."
 
 export function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
   if (typeof value !== "object" || value === null) return false
