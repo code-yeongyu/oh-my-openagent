@@ -30,17 +30,18 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
   const sessionStates = new Map<string, AgentUsageState>();
 
   function getOrCreateState(sessionID: string): AgentUsageState {
-    if (!sessionStates.has(sessionID)) {
-      const persisted = loadAgentUsageState(sessionID);
-      const state: AgentUsageState = persisted ?? {
-        sessionID,
-        agentUsed: false,
-        reminderCount: 0,
-        updatedAt: Date.now(),
-      };
-      sessionStates.set(sessionID, state);
-    }
-    return sessionStates.get(sessionID)!;
+    const existing = sessionStates.get(sessionID);
+    if (existing) return existing;
+
+    const persisted = loadAgentUsageState(sessionID);
+    const state: AgentUsageState = persisted ?? {
+      sessionID,
+      agentUsed: false,
+      reminderCount: 0,
+      updatedAt: Date.now(),
+    };
+    sessionStates.set(sessionID, state);
+    return state;
   }
 
   function markAgentUsed(sessionID: string): void {

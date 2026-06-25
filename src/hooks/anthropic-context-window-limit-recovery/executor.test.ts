@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import * as messagesReader from "../session-recovery/storage/messages-reader"
 import { executeCompact } from "./executor"
 import * as storage from "./storage"
-import type { AutoCompactState } from "./types"
 
-type TimerCallback = (...args: any[]) => void
+type TimerCallback = (...args: unknown[]) => void
+type ToastCall = [{ body: { title: string } }]
 
 interface FakeTimeouts {
   advanceBy: (ms: number) => Promise<void>
@@ -14,7 +14,7 @@ interface FakeTimeouts {
 function createFakeTimeouts(): FakeTimeouts {
   let now = 0
   let nextId = 1
-  const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: any[] }>()
+  const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: unknown[] }>()
   const cleared = new Set<number>()
 
   const original = {
@@ -27,7 +27,7 @@ function createFakeTimeouts(): FakeTimeouts {
     return delay < 0 ? 0 : delay
   }
 
-  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
     const id = nextId++
     timers.set(id, {
       id,
@@ -47,7 +47,7 @@ function createFakeTimeouts(): FakeTimeouts {
   const advanceBy = async (ms: number) => {
     const target = now + Math.max(0, ms)
     while (true) {
-      let next: { id: number; time: number; callback: TimerCallback; args: any[] } | undefined
+      let next: { id: number; time: number; callback: TimerCallback; args: unknown[] } | undefined
       for (const timer of timers.values()) {
         if (timer.time <= target && (!next || timer.time < next.time)) {
           next = timer
@@ -75,9 +75,20 @@ function createFakeTimeouts(): FakeTimeouts {
   return { advanceBy, restore }
 }
 
+interface MockClient {
+  session: {
+    messages: ReturnType<typeof mock>;
+    summarize: ReturnType<typeof mock>;
+    revert: ReturnType<typeof mock>;
+    promptAsync: ReturnType<typeof mock>;
+  };
+  tui: {
+    showToast: ReturnType<typeof mock>;
+  };
+}
+
 describe("executeCompact lock management", () => {
-  let autoCompactState: AutoCompactState
-  let mockClient: any
+  let mockClient: MockClient
   let fakeTimeouts: FakeTimeouts
   const sessionID = "test-session-123"
   const directory = "/test/dir"
@@ -223,9 +234,9 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // then: Toast should be shown
-    const toastCalls = (mockClient.tui.showToast as any).mock.calls
+    const toastCalls = mockClient.tui.showToast.mock.calls as unknown as ToastCall[]
     const blockedToast = toastCalls.find(
-      (call: any) => call[0]?.body?.title === "Compact In Progress",
+      (call: ToastCall) => call[0]?.body?.title === "Compact In Progress",
     )
     expect(blockedToast).toBeDefined()
 
@@ -255,9 +266,9 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // then: Should show failure toast
-    const toastCalls = (mockClient.tui.showToast as any).mock.calls
+    const toastCalls = mockClient.tui.showToast.mock.calls as unknown as ToastCall[]
     const failureToast = toastCalls.find(
-      (call: any) => call[0]?.body?.title === "Auto Compact Failed",
+      (call: ToastCall) => call[0]?.body?.title === "Auto Compact Failed",
     )
     expect(failureToast).toBeDefined()
 

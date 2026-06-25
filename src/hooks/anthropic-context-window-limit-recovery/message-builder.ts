@@ -9,8 +9,6 @@ import {
 } from "../session-recovery/storage"
 import { replaceEmptyTextPartsAsync } from "../session-recovery/storage/empty-text"
 import { injectTextPartAsync } from "../session-recovery/storage/text-part-injector"
-import type { Client } from "./client"
-
 export const PLACEHOLDER_TEXT = "[user interrupted]"
 
 type OpencodeClient = PluginInput["client"]
@@ -150,12 +148,11 @@ export function formatBytes(bytes: number): string {
 
 export async function getLastAssistant(
   sessionID: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
+  client: OpencodeClient,
   directory: string,
 ): Promise<Record<string, unknown> | null> {
   try {
-    const resp = await (client as Client).session.messages({
+    const resp = await client.session.messages({
       path: { id: sessionID },
       query: { directory },
     })

@@ -15,7 +15,7 @@ function getSessionCache(
   if (!sessionCaches.has(sessionID)) {
     sessionCaches.set(sessionID, loadInjectedPaths(sessionID));
   }
-  return sessionCaches.get(sessionID)!;
+  return sessionCaches.get(sessionID) as Set<string>;
 }
 
 export async function processFilePathForAgentsInjection(input: {

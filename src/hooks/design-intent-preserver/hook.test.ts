@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { createDesignIntentPreserverHook } from "./index"
 
 describe("design-intent-preserver", () => {
@@ -22,7 +23,7 @@ describe("design-intent-preserver", () => {
     return {
       client: {},
       directory: tempDir,
-    } as any
+    } as unknown as PluginInput
   }
 
   function createMockOutput(text: string) {

@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin";
 import type { ExperimentalConfig } from "../../config";
 import type { Client } from "./client";
 import {
@@ -14,8 +15,7 @@ export async function executeCompact(
   sessionID: string,
   msg: Record<string, unknown>,
   autoCompactState: AutoCompactState,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: any,
+  client: PluginInput["client"],
   directory: string,
   experimental?: ExperimentalConfig,
 ): Promise<void> {
