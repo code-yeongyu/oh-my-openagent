@@ -92,6 +92,7 @@ export function createRecoveryLogic(
         sessionID,
         source: "compaction-context-injector",
         queueBehavior: "defer",
+        checkStatus: reason === "no-text-tail",
         input: {
           path: { id: sessionID },
           body: {

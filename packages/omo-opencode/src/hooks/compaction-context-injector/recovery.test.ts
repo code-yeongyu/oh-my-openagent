@@ -578,4 +578,82 @@ describe("createCompactionContextInjector recovery", () => {
       modelID: "gpt-5",
     })
   })
+
+  it("#given session.status reports active during compaction.autocontinue #when restore is invoked #then recovery prompt is still dispatched", async () => {
+    //#given a session that reports status="running" via session.status (real OpenCode behavior post-compact)
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const sessionID = "ses_active_during_compaction_autocontinue"
+    setCompactionAgentConfigCheckpoint(sessionID, {
+      agent: "atlas",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      tools: { bash: true },
+    })
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: incompletePromptConfig }),
+          promptAsync: promptAsyncRecorder.promptAsync,
+          status: async () => ({ data: { [sessionID]: { type: "running" } } }),
+        },
+      },
+      directory: "/tmp/test",
+    }
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when compaction.autocontinue path fires restore
+    await injector.restore(sessionID)
+
+    //#then recovery dispatch fires despite session being active (post-compact recovery is a privileged window)
+    expect(promptAsyncRecorder.calls).toHaveLength(1)
+    expect(promptAsyncRecorder.calls[0]?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+  })
+
+  it("#given session.status reports active during session.compacted #when event fires #then recovery prompt is still dispatched", async () => {
+    //#given checkpoint set and session.status returns "busy" (another real OpenCode post-compact state)
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const sessionID = "ses_active_during_session_compacted"
+    setCompactionAgentConfigCheckpoint(sessionID, {
+      agent: "atlas",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      tools: { bash: true },
+    })
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: incompletePromptConfig }),
+          promptAsync: promptAsyncRecorder.promptAsync,
+          status: async () => ({ data: { [sessionID]: { type: "busy" } } }),
+        },
+      },
+      directory: "/tmp/test",
+    }
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when session.compacted event fires
+    await injector.event({
+      event: { type: "session.compacted", properties: { sessionID } },
+    })
+
+    //#then recovery dispatch fires despite session being active
+    expect(promptAsyncRecorder.calls).toHaveLength(1)
+    expect(promptAsyncRecorder.calls[0]?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+  })
 })
