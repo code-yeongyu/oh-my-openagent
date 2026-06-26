@@ -7,7 +7,12 @@ export const sharedSkillsRoot = join(here, "..");
 export const frontendSkillRoot = join(sharedSkillsRoot, "skills", "frontend");
 export const upstreamsRoot = join(sharedSkillsRoot, "upstreams");
 
-export const designOriginals = ["README.md", "_INDEX.md", "design-system-architecture.md", "react-dev-tooling-skill.md"];
+export const designOriginals = [
+	"README.md",
+	"_INDEX.md",
+	"design-system-architecture.md",
+	"react-dev-tooling-skill.md",
+];
 
 export const brandStems = [
 	"airbnb", "airtable", "apple", "binance", "bmw", "bugatti", "cal", "claude", "clay", "clickhouse",
