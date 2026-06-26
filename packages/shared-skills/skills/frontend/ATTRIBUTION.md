@@ -184,6 +184,7 @@ SOFTWARE.
 
 `frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`,
 `design-system-architecture.md`, `react-dev-tooling-skill.md`,
+`aside.md`, `motherduck.md`,
 `frontend/references/perfection/README.md`, `react-perf-tooling.md`, and
 `frontend/scripts/perfection/lighthouse-audit.py` are original to this project and require
 no third-party attribution. The perfection docs and script only invoke third-party tools
