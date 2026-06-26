@@ -25,6 +25,24 @@ function captureUserDisabledMcps(
   return disabled;
 }
 
+function removeBuiltinCollisions(
+  externalMcp: Record<string, unknown>,
+  builtinMcp: Record<string, unknown>
+): Record<string, unknown> {
+  const filtered = { ...externalMcp };
+
+  for (const name of Object.keys(builtinMcp)) {
+    if (name in filtered) {
+      delete filtered[name];
+      log(
+        `warning: MCP server "${name}" from Claude Code .mcp.json was ignored because OMO provides a built-in MCP with that name`
+      );
+    }
+  }
+
+  return filtered;
+}
+
 export async function applyMcpConfig(params: {
   config: Record<string, unknown>;
   ctx: { directory: string };
@@ -47,9 +65,13 @@ export async function applyMcpConfig(params: {
     }
   }
 
+  const builtinMcp = createBuiltinMcps(disabledMcps, params.pluginConfig, {
+    cwd: params.ctx.directory,
+  });
+  const externalMcp = removeBuiltinCollisions(mcpResult.servers, builtinMcp);
   const merged = {
-    ...createBuiltinMcps(disabledMcps, params.pluginConfig, { cwd: params.ctx.directory }),
-    ...mcpResult.servers,
+    ...externalMcp,
+    ...builtinMcp,
     ...(userMcp ?? {}),
     ...params.pluginComponents.mcpServers,
   } as Record<string, McpEntry>;

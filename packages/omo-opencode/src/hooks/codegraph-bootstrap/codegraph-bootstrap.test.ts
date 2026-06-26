@@ -241,17 +241,26 @@ describe("createCodegraphBootstrapHook", () => {
     }
   })
 
-  test("#given CodeGraph is missing and auto provision is enabled on unsupported Node #when background work runs #then it does not provision or mutate the project", async () => {
+  test("#given CodeGraph is missing and auto provision is enabled on unsupported Node #when background work runs #then it provisions through the shared lock dir", async () => {
     // given
     const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-provision-"))
     const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-provision-home-"))
+    const installDir = join(homeDir, ".omo", "codegraph")
     const events: string[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
-      { auto_provision: true, enabled: true },
+      { auto_provision: true, enabled: true, install_dir: installDir },
       {
-        ensureProvisioned: async () => {
-          throw new Error("codegraph provisioning should not run")
+        buildEnv: () => ({
+          CODEGRAPH_INSTALL_DIR: installDir,
+          CODEGRAPH_NO_DOWNLOAD: "1",
+          CODEGRAPH_TELEMETRY: "0",
+          DO_NOT_TRACK: "1",
+        }),
+        ensureGitignored: () => true,
+        ensureProvisioned: async (options) => {
+          events.push(`provision-lock:${options.lockDir}`)
+          return { binPath: "/provisioned/codegraph", provisioned: true }
         },
         log: (message) => {
           events.push(`log:${message}`)
@@ -259,8 +268,10 @@ describe("createCodegraphBootstrapHook", () => {
         nodeSupport: () => ({ major: 26, override: false, reason: "too-new", supported: false }),
         prepareWorkspace: (projectRoot) => prepareCodegraphWorkspace(projectRoot, { homeDir }),
         resolveCommand: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
-        runCommand: async () => {
-          throw new Error("codegraph command should not run")
+        runCommand: async (_projectRoot, command, args) => {
+          events.push(`run:${command}:${args.join(" ")}`)
+          if (args[0] === "status") return { exitCode: 0, stdout: "not initialized", timedOut: false }
+          return { exitCode: 0, stdout: "", timedOut: false }
         },
         schedule: (task) => {
           void task()
@@ -274,9 +285,57 @@ describe("createCodegraphBootstrapHook", () => {
       await waitForBackground()
 
       // then
-      expect(events).toContain("log:[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap")
-      expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
-      expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
+      expect(events).toContain(`provision-lock:${join(installDir, ".locks")}`)
+      expect(events).toContain("run:/provisioned/codegraph:status --json")
+      expect(events).toContain("run:/provisioned/codegraph:init")
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+      rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a provisioned CodeGraph binary but the host Node is unsupported #when background work runs #then it still runs bootstrap", async () => {
+    // given
+    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-provisioned-node-"))
+    const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-provisioned-node-home-"))
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: workspace },
+      { auto_provision: false, enabled: true },
+      {
+        buildEnv: () => ({ CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph" }),
+        ensureGitignored: () => true,
+        log: (message) => {
+          events.push(`log:${message}`)
+        },
+        nodeSupport: () => ({ major: 26, override: false, reason: "too-new", supported: false }),
+        prepareWorkspace: (projectRoot) => prepareCodegraphWorkspace(projectRoot, { homeDir }),
+        resolveCommand: () => ({
+          argsPrefix: [],
+          command: "/home/test/.omo/codegraph/bin/codegraph",
+          exists: true,
+          source: "provisioned",
+        }),
+        runCommand: async (_projectRoot, command, args) => {
+          events.push(`run:${command}:${args.join(" ")}`)
+          if (args[0] === "status") return { exitCode: 0, stdout: "not initialized", timedOut: false }
+          return { exitCode: 0, stdout: "", timedOut: false }
+        },
+        schedule: (task) => {
+          void task()
+        },
+      },
+    )
+
+    try {
+      // when
+      hook.event({ event: { type: "session.created", properties: { worktree: workspace } } })
+      await waitForBackground()
+
+      // then
+      expect(events).toContain("run:/home/test/.omo/codegraph/bin/codegraph:status --json")
+      expect(events).toContain("run:/home/test/.omo/codegraph/bin/codegraph:init")
+      expect(events).not.toContain("log:[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap")
     } finally {
       rmSync(workspace, { recursive: true, force: true })
       rmSync(homeDir, { recursive: true, force: true })

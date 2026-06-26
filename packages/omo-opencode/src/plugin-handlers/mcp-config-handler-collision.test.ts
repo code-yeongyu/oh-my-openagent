@@ -138,4 +138,32 @@ describe("applyMcpConfig collision handling", () => {
       'warning: MCP server "sharedServer" from user config overrides Claude Code .mcp.json'
     )
   })
+
+  test("built-in MCP wins on collision with Claude Code project MCP", async () => {
+    //#given
+    createBuiltinMcpsSpy.mockReturnValue({
+      codegraph: { type: "local", command: ["node", "/built-in/codegraph.js"], enabled: true },
+    })
+
+    loadMcpConfigsSpy.mockResolvedValue({
+      servers: {
+        codegraph: { type: "local", command: ["codegraph", "serve", "--mcp"], enabled: true },
+      },
+      loadedServers: [],
+    })
+
+    const config: Record<string, unknown> = { mcp: {} }
+    const pluginConfig = createPluginConfig()
+
+    //#when
+    const { applyMcpConfig } = await importFreshMcpConfigHandlerModule()
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then
+    const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
+    expect(mergedMcp.codegraph.command).toEqual(["node", "/built-in/codegraph.js"])
+    expect(logSpy).toHaveBeenCalledWith(
+      'warning: MCP server "codegraph" from Claude Code .mcp.json was ignored because OMO provides a built-in MCP with that name'
+    )
+  })
 })

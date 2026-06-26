@@ -12,7 +12,7 @@ import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 const INSTALL_CODEX_CODEGRAPH_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
 describe("install-codex CodeGraph MCP policy", () => {
-  test("#given unavailable CodeGraph Node runtime #when installing omo #then disables only the codegraph MCP policy", async () => {
+  test("#given unavailable host Node runtime #when installing omo #then keeps the codegraph MCP discoverable", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-codegraph-node-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-codegraph-node-"))
@@ -32,7 +32,7 @@ describe("install-codex CodeGraph MCP policy", () => {
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
     expect(configContent).toMatch(/\[plugins\."omo@sisyphuslabs"\][\s\S]*?enabled = true/)
-    expect(configContent).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.codegraph\][\s\S]*?enabled = false/)
+    expect(configContent).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.codegraph\][\s\S]*?enabled = true/)
     expect(configContent).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/)
   }, { timeout: INSTALL_CODEX_CODEGRAPH_TEST_TIMEOUT_MS })
 })

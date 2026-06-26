@@ -7172,15 +7172,6 @@ function resolveCodegraphNodeRuntime(options = {}) {
   const env = options.env ?? process.env;
   return defaultNodeRuntime(env, options.fileExists ?? existsSync2, options.which ?? bunWhich, options.nodeVersion ?? defaultNodeVersion);
 }
-function resolveCodegraphNodeSupport(options = {}) {
-  const env = options.env ?? process.env;
-  const nodeVersion = options.nodeVersion ?? defaultNodeVersion;
-  const runtime3 = resolveCodegraphNodeRuntime({ ...options, env, nodeVersion });
-  if (runtime3 === null) {
-    return evaluateCodegraphNodeSupport({ env, nodeVersion: "0.0.0" });
-  }
-  return evaluateCodegraphNodeSupport({ env, nodeVersion: nodeVersion(runtime3) ?? "0.0.0" });
-}
 
 // packages/omo-codex/src/install/codex-cache-mcp-manifest.ts
 var CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
@@ -13492,7 +13483,7 @@ async function runCodexInstaller(options = {}) {
     marketplaceSource: codexMarketplaceSource(marketplaceRoot),
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     platform,
-    codegraphMcpEnabled: options.codegraphMcpEnabled ?? resolveCodegraphNodeSupport({ env: env3 }).supported,
+    codegraphMcpEnabled: options.codegraphMcpEnabled ?? true,
     gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
