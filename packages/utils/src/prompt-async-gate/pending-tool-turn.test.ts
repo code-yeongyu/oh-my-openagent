@@ -205,7 +205,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     expect(blocks).toBe(false)
   })
 
-  test("#given latest message is an internal continuation user turn #when checking prompt safety #then internal prompts stay blocked", () => {
+  test("#given completed assistant is followed by an orphaned reply-required internal wake #when checking prompt safety #then internal prompts are admitted", () => {
     // given
     const messages = [
       {
@@ -229,7 +229,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
 
     // then
-    expect(blocks).toBe(true)
+    expect(blocks).toBe(false)
   })
 
   test("#given internal continuation gets only an empty unknown assistant turn #when checking prompt safety #then internal prompts stay blocked", () => {
@@ -348,7 +348,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     expect(blocks).toBe(false)
   })
 
-  test("#given a reply-expecting internal tail sits behind a noReply tail #when checking prompt safety #then internal prompts stay blocked", () => {
+  test("#given a reply-expecting internal tail sits behind a noReply tail after completion #when checking prompt safety #then internal prompts are admitted", () => {
     // given
     const messages = [
       {
@@ -373,7 +373,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
 
     // then
-    expect(blocks).toBe(true)
+    expect(blocks).toBe(false)
   })
 
   test("#given an actively waiting assistant sits behind a noReply tail #when checking prompt safety #then internal prompts stay blocked", () => {
