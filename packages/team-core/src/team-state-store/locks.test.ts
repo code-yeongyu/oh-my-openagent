@@ -145,6 +145,37 @@ test("lock open rethrows EPERM when the lock path does not exist", async () => {
   await rm(rootDirectory, { recursive: true, force: true })
 })
 
+test("lock release retries transient EPERM before removing the lock file", async () => {
+  // given
+  const { reapStaleLock } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-release-eperm-")
+  const lockPath = join(rootDirectory, "lock")
+  await writeFile(lockPath, "owner\n123\n456\n")
+  const delayCalls: number[] = []
+  let unlinkCalls = 0
+
+  // when
+  const result = reapStaleLock(lockPath, {
+    delay: async (ms: number) => {
+      delayCalls.push(ms)
+    },
+    unlink: async (path: PathLike) => {
+      unlinkCalls += 1
+      if (unlinkCalls < 3) {
+        throw createErrnoError("EPERM")
+      }
+      await rm(path, { force: true })
+    },
+  })
+
+  // then
+  await expect(result).resolves.toBeUndefined()
+  expect(unlinkCalls).toBe(3)
+  expect(delayCalls).toEqual([25, 25])
+  await expect(readFile(lockPath, "utf8")).rejects.toThrow()
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
 test("atomicWrite syncs temp files through a writable handle", async () => {
   // given
   const rootDirectory = await createTempDirectory("locks-atomic-writable-")

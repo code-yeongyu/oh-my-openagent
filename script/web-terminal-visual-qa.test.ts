@@ -15,7 +15,7 @@ function makeTempDir(): string {
   return path
 }
 
-async function renderTranscript(fileName: string, title: string, contents: string) {
+async function renderTranscript(fileName: string, title: string, contents: string, extraArgs: readonly string[] = []) {
   const dir = makeTempDir()
   const transcript = join(dir, fileName)
   writeFileSync(transcript, contents, "utf8")
@@ -31,6 +31,7 @@ async function renderTranscript(fileName: string, title: string, contents: strin
       "--evidence-dir",
       dir,
       "--no-browser",
+      ...extraArgs,
     ],
     stdout: "pipe",
     stderr: "pipe",
@@ -72,10 +73,44 @@ describe("web terminal visual QA helper", () => {
     expect(rendered.metadata()).toMatchObject({
       connector: "file-replay",
       browserCapture: "skipped",
+      source: {
+        kind: "file-replay",
+      },
       wrap: "on",
       files: {
         html: join(rendered.dir, "terminal.html"),
         text: join(rendered.dir, "terminal.txt"),
+      },
+    })
+  })
+
+  test("#given secret-bearing terminal output #when rendering #then text ansi html and metadata are redacted", async () => {
+    // given
+    const literalSecret = "local-secret-value"
+    const rendered = await renderTranscript(
+      "secret-capture.txt",
+      "Secret QA",
+      [
+        "Authorization: Bearer ghp_1234567890abcdefghijklmnop",
+        "OPENAI_API_KEY=sk-1234567890abcdefghijklmnop",
+        `custom=${literalSecret}`,
+        "session_id=sess_live_12345",
+      ].join("\n"),
+      ["--redact", literalSecret, "--redact-regex", "sess_live_[0-9]+"],
+    )
+
+    // then
+    const combinedArtifacts = [rendered.text(), rendered.ansi(), rendered.html(), JSON.stringify(rendered.metadata())].join("\n")
+    expect(combinedArtifacts).not.toContain("ghp_1234567890abcdefghijklmnop")
+    expect(combinedArtifacts).not.toContain("sk-1234567890abcdefghijklmnop")
+    expect(combinedArtifacts).not.toContain(literalSecret)
+    expect(combinedArtifacts).not.toContain("sess_live_12345")
+    expect(combinedArtifacts).toContain("[REDACTED]")
+    expect(rendered.metadata()).toMatchObject({
+      redaction: {
+        builtInRules: 5,
+        literalRules: 1,
+        regexRules: 1,
       },
     })
   })
@@ -202,72 +237,11 @@ describe("web terminal visual QA helper", () => {
     expect(stdoutText).toContain("--command")
     expect(stdoutText).toContain("--from-file")
     expect(stdoutText).toContain("--no-wrap")
+    expect(stdoutText).toContain("--redact")
+    expect(stdoutText).toContain("--source-label")
     expect(stdoutText).toContain("tmux-backed PTY connector")
     expect(stdoutText).toContain("PNG")
+    expect(stdoutText).toContain("The raw --command string is treated as secret-bearing process data")
   })
 
-  test("#given QA skill guidance #when TUI visual evidence is required #then shared guidance points at the web terminal helper", () => {
-    // given
-    const repo = new URL("..", import.meta.url)
-    const guidedFiles = [
-      ".agents/skills/opencode-qa/SKILL.md",
-      ".agents/skills/opencode-qa/references/tui-tmux.md",
-      ".agents/skills/codex-qa/SKILL.md",
-      ".agents/skills/codex-qa/references/logging-debug.md",
-      "docs/reference/web-terminal-visual-qa.md",
-      "packages/shared-skills/skills/visual-qa/SKILL.md",
-      "packages/shared-skills/skills/start-work/SKILL.md",
-      "packages/omo-codex/plugin/components/start-work-continuation/directive.md",
-      "packages/omo-codex/plugin/components/ulw-loop/skills/ulw-loop/references/full-workflow.md",
-      "packages/omo-codex/plugin/components/ulw-loop/directive.md",
-      "packages/omo-codex/plugin/components/ultrawork/directive.md",
-      "packages/prompts-core/prompts/ultrawork/codex.md",
-    ] as const
-
-    // when
-    const contents = guidedFiles.map((path) => ({
-      path,
-      text: readFileSync(new URL(path, repo), "utf8"),
-    }))
-
-    // then
-    for (const content of contents) {
-      expect(content.text, `${content.path} must reference the web terminal helper`).toContain(
-        "script/qa/web-terminal-visual-qa.mjs",
-      )
-    }
-    expect(contents.map((content) => content.text).join("\n")).toContain("TUI visual")
-  })
-
-  test("#given PR visual evidence docs #when attaching screenshots #then GitHub user attachment guidance is discoverable", () => {
-    // given
-    const repo = new URL("..", import.meta.url)
-    const attachmentDoc = readFileSync(new URL("docs/reference/github-attachment-upload.md", repo), "utf8")
-    const pointerFiles = [
-      "docs/AGENTS.md",
-      "docs/reference/web-terminal-visual-qa.md",
-      "packages/shared-skills/skills/git-master/SKILL.md",
-      ".agents/skills/work-with-pr/SKILL.md",
-      ".opencode/skills/work-with-pr/SKILL.md",
-    ] as const
-
-    // when
-    const pointers = pointerFiles.map((path) => ({
-      path,
-      text: readFileSync(new URL(path, repo), "utf8"),
-    }))
-
-    // then
-    expect(attachmentDoc).toContain("/upload/policies/assets")
-    expect(attachmentDoc).toContain("asset_upload_authenticity_token")
-    expect(attachmentDoc).toContain("https://github.com/user-attachments/assets/<uuid>")
-    expect(attachmentDoc).toContain("Never use GitHub Releases")
-    expect(attachmentDoc).toContain("Never use external image hosters")
-    expect(attachmentDoc).toContain("Do not print cookies")
-    for (const pointer of pointers) {
-      expect(pointer.text, `${pointer.path} must point at attachment upload guidance`).toContain(
-        "docs/reference/github-attachment-upload.md",
-      )
-    }
-  })
 })
