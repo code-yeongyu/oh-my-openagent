@@ -340,11 +340,19 @@ main() {
   ' "$SRC_VERSION")
   note "source plugin version: $SRC_VERSION (upgrade target: $UPG_VERSION)"
 
-  step "STEP 1: build plugin + fresh marketplace sync -> $MKT"
+  step "STEP 1: build runtime dists + plugin + fresh marketplace sync -> $MKT"
   local build_log="$FINAL/step1-build-sync.log"
-  if ! (cd "$REPO_ROOT" && bun run --cwd packages/omo-codex/plugin build) >"$build_log" 2>&1; then
+  if ! (
+    cd "$REPO_ROOT" &&
+      bun run build:git-bash-mcp &&
+      bun run build:lsp-tools-mcp &&
+      bun run build:lsp-daemon &&
+      bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm &&
+      bun run build:cli-node &&
+      bun run --cwd packages/omo-codex/plugin build
+  ) >"$build_log" 2>&1; then
     tail -40 "$build_log"
-    fatal "plugin build failed (see $build_log)"
+    fatal "runtime/plugin build failed (see $build_log)"
   fi
   if ! (cd "$REPO_ROOT" && env -u LAZYCODEX_RELEASE_VERSION bun run script/sync-lazycodex-marketplace.ts "$REPO_ROOT" "$MKT") >>"$build_log" 2>&1; then
     tail -40 "$build_log"
@@ -352,11 +360,13 @@ main() {
   fi
   if [ -f "$MKT/.agents/plugins/marketplace.json" ] &&
     [ -f "$MKT/plugins/omo/.codex-plugin/plugin.json" ] &&
+    [ -s "$MKT/plugins/omo/dist/cli/index.js" ] &&
+    [ -s "$MKT/plugins/omo/dist/cli-node/index.js" ] &&
     [ -s "$MKT/plugins/omo/components/bootstrap/dist/cli.js" ] &&
     [ -s "$MKT/plugins/omo/skills/ast-grep/SKILL.md" ]; then
-    pass 1 "plugin build + fresh sync produced a validated marketplace tree at $MKT" "step1-build-sync.log"
+    pass 1 "runtime/plugin build + fresh sync produced a validated marketplace tree with root CLI runtimes at $MKT" "step1-build-sync.log"
   else
-    fail 1 "plugin build + fresh sync produced a validated marketplace tree at $MKT" "step1-build-sync.log"
+    fail 1 "runtime/plugin build + fresh sync produced a validated marketplace tree with root CLI runtimes at $MKT" "step1-build-sync.log"
   fi
 
   step "STEP 2: fresh isolated CODEX_HOME + auth borrow + stripped-PATH shim"
@@ -406,6 +416,11 @@ EOF
     cat "$add_json" "$FINAL/step3-plugin-add.stderr.txt" 2>/dev/null
     fail 3b "plugin add installed omo@$MARKETPLACE_NAME (expected v$SRC_VERSION)" "step3-plugin-add.json"
   fi
+  if [ -n "$IROOT" ] && [ -s "$IROOT/dist/cli/index.js" ] && [ -s "$IROOT/dist/cli-node/index.js" ]; then
+    pass 3c "installed marketplace payload contains root dist/cli and dist/cli-node runtimes" "step3-plugin-add.json"
+  else
+    fail 3c "installed marketplace payload contains root dist/cli and dist/cli-node runtimes" "step3-plugin-add.json"
+  fi
   CODEX_HOME="$QAHOME" command codex plugin list --json >"$FINAL/step3-plugin-list.json" 2>/dev/null || true
 
   step "STEP 4: drive the startup hooks review in tmux (session mkbs-qa-main)"
@@ -443,6 +458,23 @@ EOF
     fi
   else
     fail 5b "bootstrap state.json appeared with lastStatus within 120s" "step5-state.json"
+  fi
+
+  local omo_bin="$QAHOME/bin/omo"
+  local omo_version_log="$FINAL/step5-omo-version.txt"
+  if [ -x "$omo_bin" ]; then
+    pass 5g "bootstrap linked the top-level omo runtime wrapper at $omo_bin" "step5-omo-version.txt"
+  else
+    fail 5g "bootstrap linked the top-level omo runtime wrapper at $omo_bin" "step5-omo-version.txt"
+  fi
+  if [ -x "$omo_bin" ] && env PATH="$STRIPPED_PATH" CODEX_HOME="$QAHOME" OMO_RUNTIME=node "$omo_bin" --version >"$omo_version_log" 2>&1; then
+    if [ -s "$omo_version_log" ]; then
+      pass 5h "top-level omo wrapper executes the bundled node fallback CLI under OMO_RUNTIME=node" "step5-omo-version.txt"
+    else
+      fail 5h "top-level omo wrapper produced non-empty --version output under OMO_RUNTIME=node" "step5-omo-version.txt"
+    fi
+  else
+    fail 5h "top-level omo wrapper executes the bundled node fallback CLI under OMO_RUNTIME=node" "step5-omo-version.txt"
   fi
 
   local sg_bin="$QAHOME/runtime/ast-grep/$("$NODE_BIN" -p process.platform)-$("$NODE_BIN" -p process.arch)/sg"
@@ -605,6 +637,16 @@ EOF
   else
     cp "$state_json" "$FINAL/step8-state.json" 2>/dev/null || true
     fail 8c "bootstrap re-ran after upgrade (completedForVersion did not reach $UPG_VERSION)" "step8-state.json"
+  fi
+  local upgraded_omo_log="$FINAL/step8-omo-version.txt"
+  if [ -n "$IROOT2" ] &&
+    [ -f "$QAHOME/bin/omo" ] &&
+    grep -Fq "$IROOT2/dist/cli/index.js" "$QAHOME/bin/omo" &&
+    env PATH="$STRIPPED_PATH" CODEX_HOME="$QAHOME" OMO_RUNTIME=node "$QAHOME/bin/omo" --version >"$upgraded_omo_log" 2>&1 &&
+    [ -s "$upgraded_omo_log" ]; then
+    pass 8d "upgrade bootstrap relinked the top-level omo wrapper to the upgraded root runtime" "step8-omo-version.txt"
+  else
+    fail 8d "upgrade bootstrap relinked the top-level omo wrapper to the upgraded root runtime" "step8-omo-version.txt"
   fi
   ls -la "$QAHOME/bin" >"$FINAL/step8-bin-links-after-upgrade.txt" 2>/dev/null || true
   kill_session mkbs-qa-upg
