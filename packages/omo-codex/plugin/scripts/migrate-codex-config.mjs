@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
+import { removeStaleContext7PlaceholderMcpServer } from "./migrate-codex-config/context7-placeholder-guard.mjs";
 import { removeUnsupportedRootMultiAgentMode } from "./migrate-codex-config/multi-agent-mode-guard.mjs";
 import { forceDisableMultiAgentV2 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
 import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
@@ -62,7 +63,11 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 	const multiAgentModeChanged = afterMultiAgentModeGuard !== config;
 	if (multiAgentModeChanged) config = afterMultiAgentModeGuard;
 
-	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged;
+	const afterContext7PlaceholderGuard = removeStaleContext7PlaceholderMcpServer(config);
+	const context7PlaceholderChanged = afterContext7PlaceholderGuard !== config;
+	if (context7PlaceholderChanged) config = afterContext7PlaceholderGuard;
+
+	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged || context7PlaceholderChanged;
 	if (changed) {
 		await mkdir(dirname(configPath), { recursive: true });
 		await writeFile(configPath, `${config.trimEnd()}\n`);
