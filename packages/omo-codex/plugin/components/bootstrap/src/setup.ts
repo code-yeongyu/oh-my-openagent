@@ -211,10 +211,8 @@ async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: Boot
 	await linkRuntimeWrapperStep(options, binDir, degraded);
 }
 
-// The marketplace payload intentionally ships without <pluginRoot>/dist/cli
-// (thin payload), so linkRootRuntimeBin returning null is the expected
-// degraded mode there: record the omo-cli ledger entry and log the same
-// warning install-local.mjs prints instead of leaving a broken `omo` link.
+// Older marketplace payloads may not have <pluginRoot>/dist/cli. Keep that
+// degraded path explicit instead of leaving a broken `omo` link.
 async function linkRuntimeWrapperStep(
 	options: WorkerSetupOptions,
 	binDir: string,

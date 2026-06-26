@@ -8,6 +8,8 @@ import { join } from "node:path"
 import { CODEGRAPH_PROVISION_MANIFEST } from "./codegraph/manifest"
 import { ensureCodegraphProvisioned } from "./codegraph/provision"
 
+const ARCHIVE_EXTRACTION_TEST_TIMEOUT_MS = 15_000
+
 function tempDir(name: string): string {
   return join(tmpdir(), `omo-${name}-${crypto.randomUUID()}`)
 }
@@ -81,7 +83,7 @@ describe("ensureCodegraphProvisioned", () => {
     expect(readFileSync(join(installDir, "bin", "codegraph"), "utf8")).toContain("codegraph fixture")
 
     rmSync(installDir, { force: true, recursive: true })
-  })
+  }, { timeout: ARCHIVE_EXTRACTION_TEST_TIMEOUT_MS })
 
   it("declares pinned Windows npm package assets in the default manifest", () => {
     // given

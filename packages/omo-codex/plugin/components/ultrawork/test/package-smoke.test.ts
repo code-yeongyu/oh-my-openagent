@@ -15,7 +15,8 @@ function normalizeGuidance(value: string): string {
 function expectSparkshellToolStrategyContract(value: string): void {
 	const guidance = normalizeGuidance(value);
 
-	expect(guidance).toMatch(/`omo sparkshell <command>`[^.]*\bfirst\b/);
+	expect(value).toContain("`omo sparkshell <command> [args...]`");
+	expect(guidance).toMatch(/`omo sparkshell <command> \[args\.\.\.\]`[^.]*\bfirst\b/);
 	expect(guidance).toMatch(/\brepo-wide inspection\b/);
 	expect(guidance).toMatch(/\bcli smoke tests\b/);
 	expect(guidance).toMatch(/\bgit\/history\b/);
@@ -23,6 +24,10 @@ function expectSparkshellToolStrategyContract(value: string): void {
 	expect(guidance).toMatch(/\braw\b[^.]*`rg`\/`grep`\/`cat`\/`git`[^.]*\bfallbacks?\b/);
 	expect(guidance).toMatch(/\bsparkshell is unavailable\b/);
 	expect(guidance).toMatch(/\btoo narrow\b/);
+	expect(value).toContain("`omo sparkshell rg --files`");
+	expect(guidance).toMatch(/\bseparate argv tokens\b/);
+	expect(value).toContain("not `omo sparkshell 'rg --files'`");
+	expect(guidance).toMatch(/\bone executable name\b/);
 	expect(guidance).toMatch(/--shell[^.]*\bmetacharacters\b[^.]*\bpipelines\b/);
 	expect(guidance).toMatch(/--tmux-pane[^.]*\bonly\b[^.]*\binspect(?:ing)?\b[^.]*\bexisting (?:tmux )?pane\b/);
 	expect(guidance).toMatch(/--tmux-pane[^.]*\bnever\b[^.]*\blaunch(?:ing)? ordinary commands\b/);
