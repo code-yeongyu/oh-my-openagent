@@ -4,13 +4,13 @@
 
 ## OVERVIEW
 
-Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Pure data — no logic, no transform inside the package. The only code is `index.mjs`, which exports `sharedSkillsRootPath()` returning the absolute path to `skills/`. Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
+Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`. Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
 
-## SKILLS (17 under `skills/<name>/`)
+## SKILLS (20 under `skills/<name>/`)
 
-`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup` (shared) + `lcx-report-bug`, `lcx-contribute-bug-fix`, `lcx-doctor` (Codex-only, `lcx-` prefix).
+`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `ultraresearch`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing` (shared) + `lcx-report-bug`, `lcx-contribute-bug-fix`, `lcx-doctor` (Codex-only, `lcx-` prefix).
 
-Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (5 skills carry the Codex agent role declaration).
+Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (6 skills carry the Codex agent role declaration).
 
 ## PIPELINE
 
@@ -20,7 +20,7 @@ skills/ (source)
   ├─ skills-loader-core → loadSkillsFromDir(sharedSkillsRootPath(), scope:"shared")   # OpenCode runtime
   └─ omo-codex/plugin/scripts/sync-skills.mjs → plugin/skills/             # copy + adaptSkillForCodex()
         (inserts Codex Harness Tool Compatibility sections; overlays start-work/review-work;
-         filters out *.test.* ) → ships to ~/.codex/.../skills/
+         filters out tests, caches, and source metadata) → ships to ~/.codex/.../skills/
 ```
 
 ## FRONTEND THIRD-PARTY REFS — SUBMODULE-ONLY + BUILD-MATERIALIZE (DMCA-safe)
@@ -50,7 +50,7 @@ upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submod
 ## NOTES
 
 - **No generator builds the skills** — they are authored by hand; the build step is a plain `cp -R`.
-- **Test files (`*.test.ts/.mjs`) are excluded** when Codex copies skills.
+- **Test files, caches, and source metadata are excluded** when Codex copies skills.
 - **`lcx-` prefix = Codex-only** (no OpenCode counterpart). Frontmatter has NO `location:` field (unlike `.agents/skills/`).
 - **Packaging is pinned** by `omo-opencode/src/shared-skills-package.test.ts` (workspace inclusion + `files` entries + every skill parses).
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).
