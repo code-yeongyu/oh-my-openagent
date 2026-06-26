@@ -577,18 +577,23 @@ test("#given an annotated managed section #when forcing disable runs again #then
 	assert.match(rerun, /enabled = false/);
 });
 
-test("#given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then returns config unchanged", () => {
+test("#given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table", () => {
 	const config = [
 		'model = "gpt-5.5"',
 		"",
 		"[features]",
 		"multi_agent_v2 = false",
+		"plugins = true",
 		"",
 	].join("\n");
 
 	const result = forceDisableMultiAgentV2(config);
+	const parsed = parseTomlWithPython(result);
 
-	assert.equal(result, config);
+	assert.doesNotMatch(result, /^\s*multi_agent_v2\s*=/m);
+	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
+	assert.equal(parsed.features.plugins, true);
+	assert.equal(parsed.features.multi_agent_v2.enabled, false);
 });
 
 test("#given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged", () => {
