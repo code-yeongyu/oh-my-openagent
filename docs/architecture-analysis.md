@@ -22,12 +22,12 @@ Matrixx is built on the philosophy that **software development is a team sport, 
 |-------|------|-------|------|-----------|
 | **Morpheus** | Main orchestrator (user-facing) | Claude Opus 4.6 | normal | Delegates by default, only works directly for trivial tasks |
 | **Keymaker** | Autonomous deep worker | GPT 5.3 Codex | normal | "KEEP GOING" — explores before assuming, never asks permission |
-| **Atlas/Architect** | Master orchestrator (subagent) | Claude Opus 4.6 | normal | Pure conductor — denied write tools, delegates ALL work via `task()` |
-| **Merovingian** | Strategic advisor (Oracle) | Claude Opus 4.6 | expensive | Read-only, pragmatic minimalism, "one clear path" |
+| **Atlas/Architect** | Master orchestrator (subagent) | Claude Sonnet 4.6 | normal | Pure conductor — denied write tools, delegates ALL work via `task()` |
+| **Merovingian** | Strategic advisor (Oracle) | Claude Sonnet 4.6 | expensive | Read-only, pragmatic minimalism, "one clear path" |
 | **Oracle** | Planning agent | dynamic | expensive | Interview mode → plan generation → structured output with RED-GREEN-REFACTOR |
 | **Cipher** | DSL engineering specialist | varies | normal | 11 DSL skills, delegates codegen to language-specific experts |
 | **Sentinel** | Security auditor | varies | normal | Read-only, 9 security skills, phased scanning (SAST/DAST/crypto/infra) |
-| **Sati** | Frontend specialist | Claude Sonnet | normal | Self-contained (no delegation), 8 frontend skills, browser verification |
+| **Sati** | Frontend specialist | Claude Sonnet 4.6 | normal | Self-contained (no delegation), 8 frontend skills, browser verification |
 | **Seraph** | Pre-planning consultant | varies | normal | Classifies intent, identifies ambiguities, prevents AI failure patterns |
 | **Smith** | Plan reviewer | varies | normal | Approval-biased, validates executability, outputs [OKAY] or [REJECT] |
 | **Operator** | External research (Librarian) | varies | cheap | Web search, documentation, mandatory citations for all claims |
@@ -337,15 +337,15 @@ The cost tiers (free → cheap → normal → expensive) ensure agents are used 
 |---|---|---|---|---|---|---|
 | **Stars** | ~100 | ~500 | 6,089 ⭐ | 29 | 186 | 3 |
 | **Agent Count** | **14** | 11 | 7+1 | 9 | 4 | 0 (skills only) |
-| **Hook Count** | ~41 | 54+ (61 w/ Team Mode) | Unknown | Similar to oh-my | Unknown | Unknown |
-| **Built-in Skills** | 10+ | Shared library | LazySkills TUI | Limited | None | 14 |
+| **Hook Count** | ~52 | 54+ (61 w/ Team Mode) | Unknown | Similar to oh-my | Unknown | Unknown |
+| **Built-in Skills** | 31 | Shared library | LazySkills TUI | Limited | None | 14 |
 | **TDD Enforcement** | ✅ Mandatory (opt-in) | ❌ | ❌ | ❌ | ❌ | ✅ test-driven skill |
 | **Quality Gate** | ✅ 4-step checklist | ❌ | ❌ | ❌ | ❌ | ✅ verification skill |
 | **Security Auditing** | ✅ Sentinel + 9 skills | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Code Review** | ✅ 5-agent parallel | ❌ | ❌ | ❌ | ❌ | ✅ code-review skill |
 | **Parallel Agents** | ✅ Background tasks | ✅ Team Mode (up to 8) | ✅ Background agents | ✅ Parallel | ❌ Sequential | N/A |
 | **Self-Loop** | Matrix Loop + todo continuation | Ralph Loop | Deepwork workflow | upup-loop | Mission Loop | N/A |
-| **Config System** | Zod v4 + JSONC + 8 profiles | Zod + JSONC | Presets | Zod + JSONC | JSON | None |
+| **Config System** | Zod v4 + JSONC + 10 profiles | Zod + JSONC | Presets | Zod + JSONC | JSON | None |
 | **MCP Servers** | 4 (websearch, context7, grep_app, document-reader) | 5 (+codegraph, git_bash) | 5 | 5 | Unknown | None |
 | **Platform Packages** | 7 + 4 baseline | Multiple editions | ❌ | ❌ | ❌ | ❌ |
 | **Test Coverage** | 262 files (~144k LOC) | Unknown | Unknown | Unknown | Unknown | Unknown |
