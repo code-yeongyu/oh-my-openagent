@@ -192,6 +192,13 @@ describe("applyUserPromptUlwLoopSteering - error swallowing", () => {
 		const out = await applyUserPromptUlwLoopSteering(payload("OMO_ULW_LOOP_STEER: {bad", "/tmp"));
 		expect(out).toBe("");
 	});
+
+	it("#given malformed steering and standalone ultrawork enabled #when prompt contains OMO_ULW #then hook does not fall through to ultrawork", async () => {
+		const out = await applyUserPromptUlwLoopSteering(payload("OMO_ULW_LOOP_STEER: {bad", "/tmp"), {
+			includeUltraworkDirective: true,
+		});
+		expect(out).toBe("");
+	});
 });
 
 describe("runUlwLoopHookCli (stdin/stdout integration)", () => {
