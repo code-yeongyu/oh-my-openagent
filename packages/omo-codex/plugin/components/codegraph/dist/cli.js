@@ -1095,6 +1095,7 @@ var SETTING_HARNESS_SUPPORT = {
 
 // ../../utils/src/omo-config/env-overrides.ts
 var CODEGRAPH_ENV_KEYS = [
+  ["auto_init", "AUTO_INIT", "boolean"],
   ["auto_provision", "AUTO_PROVISION", "boolean"],
   ["enabled", "ENABLED", "boolean"],
   ["install_dir", "INSTALL_DIR", "string"],
@@ -1120,6 +1121,10 @@ function parseEnvValue(value, kind) {
 }
 function setCodegraphSetting(config, key, value) {
   switch (key) {
+    case "auto_init":
+      if (typeof value === "boolean")
+        config.auto_init = value;
+      return;
     case "auto_provision":
       if (typeof value === "boolean")
         config.auto_provision = value;
@@ -1217,13 +1222,7 @@ var BUILT_IN_DEFAULTS = {
   }
 };
 var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
-var CODEGRAPH_SETTING_KEYS = [
-  "auto_provision",
-  "enabled",
-  "install_dir",
-  "telemetry",
-  "watch_debounce_ms"
-];
+var CODEGRAPH_SETTING_KEYS = ["auto_init", "auto_provision", "enabled", "install_dir", "telemetry", "watch_debounce_ms"];
 function isRecord2(value) {
   return isPlainObject(value);
 }
@@ -1284,6 +1283,10 @@ function validateCodegraphValue(key, value) {
 }
 function setCodegraphSetting2(config, key, value) {
   switch (key) {
+    case "auto_init":
+      if (typeof value === "boolean")
+        config.auto_init = value;
+      return;
     case "auto_provision":
       if (typeof value === "boolean")
         config.auto_provision = value;
@@ -1959,6 +1962,9 @@ async function runCodegraphSessionStartWorker(options = {}) {
   if (config.codegraph?.enabled === false) {
     return finish("skipped-disabled", { projectRoot }, logOutcome);
   }
+  if (config.codegraph?.auto_init === false && !codegraphStateExists(projectRoot)) {
+    return finish("skipped-status", { error: "codegraph is not initialized and auto_init is disabled", projectRoot }, logOutcome);
+  }
   const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
   const bootstrapConfig = {
     ...config.codegraph ?? {},
@@ -2016,6 +2022,9 @@ function codegraphEnvForConfig(config, homeDir) {
 }
 function canUseResolvedCommand(resolved, nodeSupport) {
   return !codegraphCommandRequiresSupportedLocalNode(resolved) || nodeSupport.supported;
+}
+function codegraphStateExists(projectRoot) {
+  return existsSync6(join7(projectRoot, ".codegraph"));
 }
 function decideStartupAction(status) {
   if (status.timedOut)
@@ -2591,6 +2600,8 @@ ${stderr}`.trim();
 }
 // ../../codegraph-mcp/src/proxy.ts
 import { PassThrough } from "node:stream";
+var INCOMPLETE_REFRESH_MESSAGE = "CodeGraph project refresh did not complete";
+
 class CodegraphProxyWriteError extends Error {
   streamName;
   name = "CodegraphProxyWriteError";
@@ -2683,7 +2694,14 @@ async function forwardClientToCodegraph(options, state) {
     const projectPath = projectPathFromToolCall(message.payload);
     if (projectPath !== null) {
       try {
-        await options.synchronizer.refresh(projectPath, options.autoInit);
+        const refreshed = await options.synchronizer.refresh(projectPath, false);
+        if (!refreshed) {
+          const parsed = isPlainRecord(message.payload) ? message.payload : {};
+          writeStdioJsonRpcResponse(state.clientOutput, errorResponse(jsonRpcId(parsed["id"]), -32001, INCOMPLETE_REFRESH_MESSAGE), message.responseMode);
+          if (key !== null)
+            state.responseModes.delete(key);
+          continue;
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : messageFromError(error);
         const parsed = isPlainRecord(message.payload) ? message.payload : {};
