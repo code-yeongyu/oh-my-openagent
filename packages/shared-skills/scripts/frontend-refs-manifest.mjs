@@ -10,10 +10,10 @@ export const upstreamsRoot = join(sharedSkillsRoot, "upstreams");
 export const designOriginals = [
 	"README.md",
 	"_INDEX.md",
-	"design-system-architecture.md",
-	"react-dev-tooling-skill.md",
 	"aside.md",
+	"design-system-architecture.md",
 	"motherduck.md",
+	"react-dev-tooling-skill.md",
 ];
 
 export const brandStems = [
