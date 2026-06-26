@@ -17,6 +17,11 @@ type ProxyRun = {
   readonly synchronizer?: CodegraphProjectSynchronizer
 }
 
+const REFRESH_REJECTION_SCENARIOS = [
+  { id: 7, label: "fails", message: "sync lock timed out", synchronizer: () => rejectionSynchronizer("throw") },
+  { id: 27, label: "returns false", message: "CodeGraph project refresh did not complete", synchronizer: () => rejectionSynchronizer("false") },
+] as const
+
 describe("CodeGraph MCP proxy", () => {
   test("#given a framed client and newline-only child #when proxied #then child receives newline JSON and client receives a frame", async () => {
     const forwarded: string[] = []
@@ -94,38 +99,32 @@ describe("CodeGraph MCP proxy", () => {
     expect(forwarded.join("")).toContain('"projectPath":"/repo/b"')
   })
 
-  test("#given secondary refresh fails #when proxied #then stale call is rejected and never forwarded", async () => {
-    const forwarded: string[] = []
-    const output = captureOutput()
+  for (const scenario of REFRESH_REJECTION_SCENARIOS) {
+    for (const mode of ["line", "framed"] as const) {
+      test(`#given secondary refresh ${scenario.label} for a ${mode} request #when proxied #then stale call is rejected and never forwarded`, async () => {
+        const forwarded: string[] = [], output = captureOutput()
+        const request = toolCall(scenario.id)
 
-    await runProxy({
-      input: Readable.from([line(toolCall(7))]),
-      output: output.stream,
-      server: fakeServer(forwarded),
-      synchronizer: failingSynchronizer(),
-    })
+        await runProxy({
+          input: Readable.from([mode === "line" ? line(request) : framed(request)]),
+          output: output.stream,
+          server: fakeServer(forwarded),
+          synchronizer: scenario.synchronizer(),
+        })
 
-    expect(forwarded).toEqual([])
-    expect(output.chunks.join("")).toContain('"code":-32001')
-    expect(output.chunks.join("")).toContain("sync lock timed out")
-  })
-
-  test("#given a framed secondary refresh fails #when proxied #then stale call is rejected in framed mode", async () => {
-    const forwarded: string[] = []
-    const output = captureOutput()
-
-    await runProxy({
-      input: Readable.from([framed(toolCall(17))]),
-      output: output.stream,
-      server: fakeServer(forwarded),
-      synchronizer: failingSynchronizer(),
-    })
-
-    expect(forwarded).toEqual([])
-    expect(output.chunks.join("")).toStartWith("Content-Length: ")
-    expect(output.chunks.join("")).toContain('"code":-32001')
-    expect(output.chunks.join("")).toContain("sync lock timed out")
-  })
+        const response = output.chunks.join("")
+        expect(forwarded).toEqual([])
+        if (mode === "line") {
+          expect(response).toBe(line({ jsonrpc: "2.0", id: scenario.id, error: { code: -32001, message: scenario.message } }))
+        } else {
+          expect(response).toStartWith("Content-Length: ")
+          expect(response).toContain(`"id":${scenario.id}`)
+          expect(response).toContain('"code":-32001')
+          expect(response).toContain(scenario.message)
+        }
+      })
+    }
+  }
 
   test("#given the child exits before client input completes #when proxied #then the proxy settles with the child exit code", async () => {
     const clientInput = new PassThrough()
@@ -212,10 +211,10 @@ function readySynchronizer(): CodegraphProjectSynchronizer {
   }
 }
 
-function failingSynchronizer(): CodegraphProjectSynchronizer {
+function rejectionSynchronizer(result: "false" | "throw"): CodegraphProjectSynchronizer {
   return {
     initialize: () => Promise.resolve(),
-    refresh: () => Promise.reject(new Error("sync lock timed out")),
+    refresh: () => (result === "false" ? Promise.resolve(false) : Promise.reject(new Error("sync lock timed out"))),
   }
 }
 

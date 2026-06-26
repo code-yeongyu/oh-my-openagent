@@ -35,6 +35,8 @@ type ClientInputRelay = {
   readonly stop: () => void
 }
 
+const INCOMPLETE_REFRESH_MESSAGE = "CodeGraph project refresh did not complete"
+
 class CodegraphProxyWriteError extends Error {
   override readonly name = "CodegraphProxyWriteError"
 
@@ -145,7 +147,17 @@ async function forwardClientToCodegraph(options: ClientForwardOptions, state: Pr
     const projectPath = projectPathFromToolCall(message.payload)
     if (projectPath !== null) {
       try {
-        await options.synchronizer.refresh(projectPath, options.autoInit)
+        const refreshed = await options.synchronizer.refresh(projectPath, options.autoInit)
+        if (!refreshed) {
+          const parsed = isPlainRecord(message.payload) ? message.payload : {}
+          writeStdioJsonRpcResponse(
+            state.clientOutput,
+            errorResponse(jsonRpcId(parsed["id"]), -32001, INCOMPLETE_REFRESH_MESSAGE),
+            message.responseMode,
+          )
+          if (key !== null) state.responseModes.delete(key)
+          continue
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : messageFromError(error)
         const parsed = isPlainRecord(message.payload) ? message.payload : {}
