@@ -99,5 +99,10 @@ function isDirectInvocation(argvPath: string | undefined): boolean {
   const modulePath = fileURLToPath(import.meta.url)
   const moduleName = basename(modulePath)
   if (moduleName !== "cli.js" && moduleName !== "cli.ts") return false
-  return realpathSync(resolve(argvPath)) === realpathSync(modulePath)
+  try {
+    return realpathSync(resolve(argvPath)) === realpathSync(modulePath)
+  } catch (error) {
+    if (error instanceof Error) return false
+    throw error
+  }
 }

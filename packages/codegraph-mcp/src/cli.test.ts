@@ -8,6 +8,21 @@ import {
 } from "./cli.js"
 
 describe("CodeGraph MCP CLI environment", () => {
+  test("#given a missing argv entry path #when CLI module is imported #then import does not throw", async () => {
+    const moduleUrl = new URL("./cli.ts", import.meta.url).href
+    const script = `process.argv[1] = "/missing/codegraph-cli-entry"; await import(${JSON.stringify(moduleUrl)})`
+
+    const child = Bun.spawn([process.execPath, "-e", script], {
+      stderr: "pipe",
+      stdout: "pipe",
+      timeout: 5_000,
+    })
+    const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
+
+    expect(stderr).toBe("")
+    expect(exitCode).toBe(0)
+  })
+
   test("#given OpenCode configured CODEGRAPH_INSTALL_DIR #when CLI env is built #then custom install dir survives safe defaults", () => {
     const homeDir = "/home/alice"
     const installDir = "/workspace/.cache/codegraph"
