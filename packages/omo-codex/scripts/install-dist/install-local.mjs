@@ -7160,6 +7160,7 @@ function resolveCodegraphNodeSupport(options = {}) {
 
 // packages/omo-codex/src/install/codex-cache-mcp-manifest.ts
 var CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
+var CONTEXT7_API_KEY_ENV = "CONTEXT7_API_KEY";
 async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot, options = {}) {
   const manifestPath = join9(pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
@@ -7169,7 +7170,7 @@ async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot, opt
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed.mcpServers))
     return;
   let changed = false;
-  for (const server of Object.values(parsed.mcpServers)) {
+  for (const [serverName, server] of Object.entries(parsed.mcpServers)) {
     if (!isPlainRecord(server))
       continue;
     if (server.cwd === "." || server.cwd === "./") {
@@ -7177,24 +7178,29 @@ async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot, opt
       changed = true;
     }
     const currentArgs = server.args;
-    if (!Array.isArray(currentArgs))
-      continue;
-    const nextArgs = currentArgs.map((arg) => {
-      if (typeof arg !== "string")
+    if (Array.isArray(currentArgs)) {
+      const nextArgs = currentArgs.map((arg) => {
+        if (typeof arg !== "string")
+          return arg;
+        const bundledMcpRuntimeArg = resolveBundledMcpRuntimeArg(pluginRoot, arg);
+        if (bundledMcpRuntimeArg !== null)
+          return bundledMcpRuntimeArg;
+        if (CODEGRAPH_RELATIVE_ARGS.has(arg))
+          return join9(pluginRoot, "components", "codegraph", "dist", "serve.js");
+        if (arg.startsWith("./") || arg.startsWith("../"))
+          return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg);
         return arg;
-      const bundledMcpRuntimeArg = resolveBundledMcpRuntimeArg(pluginRoot, arg);
-      if (bundledMcpRuntimeArg !== null)
-        return bundledMcpRuntimeArg;
-      if (CODEGRAPH_RELATIVE_ARGS.has(arg))
-        return join9(pluginRoot, "components", "codegraph", "dist", "serve.js");
-      if (arg.startsWith("./") || arg.startsWith("../"))
-        return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg);
-      return arg;
-    });
-    if (nextArgs.some((value, index) => value !== currentArgs[index])) {
-      server.args = nextArgs;
+      });
+      if (nextArgs.some((value, index) => value !== currentArgs[index])) {
+        server.args = nextArgs;
+        changed = true;
+      }
+    }
+    if (serverName === "context7" && sanitizeContext7Auth(server)) {
       changed = true;
     }
+    if (!Array.isArray(currentArgs))
+      continue;
     if (server === parsed.mcpServers.codegraph) {
       const runtime3 = options.codegraphNodeRuntime?.() ?? resolveCodegraphNodeRuntime();
       if (runtime3 !== null && server.command === "node") {
@@ -7206,6 +7212,58 @@ async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot, opt
   if (changed)
     await writeFile3(manifestPath, `${JSON.stringify(parsed, null, "\t")}
 `);
+}
+function sanitizeContext7Auth(server) {
+  let changed = false;
+  const currentArgs = server.args;
+  if (Array.isArray(currentArgs)) {
+    const nextArgs = removeContext7ApiKeyArgs(currentArgs);
+    if (nextArgs.some((value, index) => value !== currentArgs[index]) || nextArgs.length !== currentArgs.length) {
+      server.args = nextArgs;
+      changed = true;
+    }
+  }
+  const beforeEnv = JSON.stringify(server.env);
+  const nextEnv = sanitizeContext7Env(server.env);
+  if (Object.keys(nextEnv).length > 0) {
+    server.env = nextEnv;
+  } else {
+    delete server.env;
+  }
+  return changed || JSON.stringify(server.env) !== beforeEnv;
+}
+function removeContext7ApiKeyArgs(args) {
+  const nextArgs = [];
+  for (let index = 0;index < args.length; index += 1) {
+    const arg = args[index];
+    const value = args[index + 1];
+    if (typeof arg === "string" && isContext7ApiKeyFlag(arg) && (isPlaceholderContext7ApiKey(value) || value === undefined)) {
+      index += 1;
+      continue;
+    }
+    nextArgs.push(arg);
+  }
+  return nextArgs;
+}
+function sanitizeContext7Env(value) {
+  const nextEnv = {};
+  if (isPlainRecord(value)) {
+    for (const [key, envValue] of Object.entries(value)) {
+      if (key === CONTEXT7_API_KEY_ENV && isPlaceholderContext7ApiKey(envValue))
+        continue;
+      nextEnv[key] = envValue;
+    }
+  }
+  return nextEnv;
+}
+function isContext7ApiKeyFlag(value) {
+  return value === "--api-key" || value === "--apiKey";
+}
+function isPlaceholderContext7ApiKey(value) {
+  if (typeof value !== "string")
+    return false;
+  const normalized = value.trim().toLowerCase().replace(/[<>"'`]/g, "").replace(/[\s_-]+/g, " ");
+  return normalized.length === 0 || normalized === "your api key";
 }
 async function rewriteCachedManifestRoot(pluginRoot, fromRoot, toRoot) {
   const manifestPath = join9(pluginRoot, ".mcp.json");
