@@ -250,9 +250,41 @@ bun "$SKILL_DIR/scripts/cli.ts" image-diff <reference.png> <actual.png>
 
    It judges whether layout geometry, spacing, design tokens (color, type, radius, shadow), and the design itself are identical to the target, region by region. Anything off by more than rounding is a finding.
 
-2. Code-level design-system fidelity (code oracle). Call the code-quality reviewer named EXACTLY `lazycodex-clone-fidelity-reviewer` (spawn it by that agent name). It verifies the implementation is a RIGOROUS design-system build - a real component tree, real design tokens, reused primitives, extensible state variants, and responsive rules - and is NOT a pasted image, a screenshot or background-image substitute, or a hardcoded one-off that merely looks right in one screenshot. If that named reviewer is not installed in this harness, fall back to an inline rigorous code review against the SAME criteria.
+2. Code-level design-system fidelity (code oracle). Dispatch through your harness's own subagent tool.
 
-RULE (mandatory, non-negotiable): the reference-fidelity task is NOT done until BOTH the pixel-compare AND the `lazycodex-clone-fidelity-reviewer` (or its inline fallback) confirm that the **layer structure, the design system, and the design itself** match the target. If EITHER fails, it is a MANDATORY retry: re-implement the gaps and re-run BOTH verifications from the top. Repeat the retry loop until both pass on the same revision. Never declare reference-fidelity complete on a single pass, on visual-only evidence, or on code-only evidence - both oracles must confirm on the same build.
+   **OpenCode:**
+
+   `````
+   task(subagent_type="oracle",
+     run_in_background=true,
+     load_skills=[],
+     description="Clone/design-system fidelity review",
+     prompt="""
+   TASK: Act as a clone / design-system fidelity reviewer. Read-only.
+
+   Be skeptical but fair. The executor may have overstated success and may have faked the design — inspect the diff, source code, and reference artifacts before approving.
+
+   Input: goal, success criteria, changed files, full diff, reference/target design (screenshots, Figma exports, source-site captures), evidence paths.
+
+   Review for:
+   1. Real component tree: live, reused primitives and extensible state variants render the UI, NOT a pasted screenshot, raster image, or `background-image` standing in for live DOM elements.
+   2. Token-driven styling: design tokens drive colors, spacing, and typography, NOT hardcoded one-off pixel or hex values.
+   3. Layer and layout structure: the DOM hierarchy and layout match the target structure.
+   4. Visual fidelity: the rendered design itself matches the reference.
+
+   Return:
+   - recommendation: APPROVE or REQUEST_CHANGES.
+   - blockers: concrete issues with file/line references; empty if APPROVE.
+   - reportPath: evidence artifacts you inspected.
+
+   Do NOT suggest or implement fixes.
+   """
+   )
+   `````
+
+   **Codex:** `multi_agent_v1.spawn_agent({"message":"TASK: Act as a clone / design-system fidelity reviewer. ...","agent_type":"lazycodex-clone-fidelity-reviewer","fork_context":false})`
+
+RULE (mandatory, non-negotiable): the reference-fidelity task is NOT done until BOTH the pixel-compare AND the code-level design-system fidelity reviewer confirm that the **layer structure, the design system, and the design itself** match the target. If EITHER fails, it is a MANDATORY retry: re-implement the gaps and re-run BOTH verifications from the top. Repeat the retry loop until both pass on the same revision. Never declare reference-fidelity complete on a single pass, on visual-only evidence, or on code-only evidence - both oracles must confirm on the same build.
 
 ## Reference evidence is not the verdict
 
