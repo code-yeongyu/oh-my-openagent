@@ -13,15 +13,18 @@ import {
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import { log } from "../../shared/logger"
 import { syncBackgroundLaunchSessionTracking } from "./background-launch-session-tracking"
-import { shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
+import { classifyFinalWaveVerdict, shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
+import { readFinalWavePlanState } from "./final-wave-plan-state"
 import { HOOK_NAME } from "./hook-name"
 import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
 import { resolvePreferredSessionId, resolveTaskContext } from "./task-context"
 import { isTrackedTaskChecked } from "./tool-execute-after-plan-tasks"
 import type { PendingTaskRef, SessionState, ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 import {
+  buildAdvanceDirective,
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
+  buildMissingVerdictEscalation,
   buildOrchestratorReminder,
   buildStandaloneVerificationReminder,
 } from "./verification-reminders"
@@ -42,6 +45,8 @@ export async function handleSubagentCompletionAfter(input: {
   toolInput: ToolExecuteAfterInput
   toolOutput: ToolExecuteAfterOutput
   metadataSessionId: string | undefined
+  /** True when the gate fired from a non-`task` plugin tool retrieval (e.g. `background_output`), not a fresh `task` completion. */
+  isPluginToolRetrieval?: boolean
 }): Promise<void> {
   const {
     ctx,
@@ -53,6 +58,7 @@ export async function handleSubagentCompletionAfter(input: {
     toolInput,
     toolOutput,
     metadataSessionId,
+    isPluginToolRetrieval = false,
   } = input
   const outputStr = typeof toolOutput.output === "string" ? toolOutput.output : ""
   const pendingTaskRef = toolInput.callID ? pendingTaskRefs.get(toolInput.callID) : undefined
@@ -184,21 +190,74 @@ export async function handleSubagentCompletionAfter(input: {
       })
     : false
 
-  if (sessionState) {
-    sessionState.waitingForFinalWaveApproval = shouldPauseForApproval
+  const finalWavePlanState = readFinalWavePlanState(planPath)
+  const isFinalWaveTask = currentTask?.key.startsWith("final-wave:") === true
+    || ((finalWavePlanState?.pendingImplementationTaskCount ?? 1) === 0
+      && (finalWavePlanState?.pendingFinalWaveTaskCount ?? 0) > 0)
+  const isMissingFinalWaveVerdict = isFinalWaveTask
+    && classifyFinalWaveVerdict(originalResponse) === "missing"
 
-    if (shouldPauseForApproval && sessionState.pendingRetryTimer) {
+  if (sessionState) {
+    if (sessionState.activeContinuationPlanPath !== undefined
+      && sessionState.activeContinuationPlanPath !== planPath) {
+      sessionState.verifiedTaskKeys = undefined
+    }
+
+    sessionState.waitingForFinalWaveApproval = shouldPauseForApproval || isMissingFinalWaveVerdict
+
+    if ((shouldPauseForApproval || isMissingFinalWaveVerdict) && sessionState.pendingRetryTimer) {
       clearTimeout(sessionState.pendingRetryTimer)
       sessionState.pendingRetryTimer = undefined
     }
   }
 
-  const leadReminder = shouldPauseForApproval
-    ? buildFinalWaveApprovalReminder(workScopedBoulderState.plan_name, progress, preferredSessionId)
-    : buildCompletionGate(workScopedBoulderState.plan_name, preferredSessionId)
-  const followupReminder = shouldPauseForApproval
-    ? null
-    : buildOrchestratorReminder(workScopedBoulderState.plan_name, progress, preferredSessionId, autoCommit, false)
+  const isAlreadyVerified = currentTask && !isFinalWaveTask
+    ? isTrackedTaskChecked(planPath, currentTask.key)
+      || sessionState?.verifiedTaskKeys?.has(currentTask.key) === true
+      || (isPluginToolRetrieval && trackedTaskSession !== null)
+    : false
+
+  let leadReminder: string
+  let followupReminder: string | null
+  if (isMissingFinalWaveVerdict) {
+    await ctx.client.tui
+      .showToast({
+        body: {
+          title: "Final review incomplete",
+          message: "A reviewer returned no clear verdict. Boulder paused - confirm or re-run the review.",
+          variant: "warning" as const,
+          duration: 10000,
+        },
+      })
+      .catch(() => {})
+    leadReminder = buildMissingVerdictEscalation(
+      workScopedBoulderState.plan_name,
+      currentTask?.label ?? "the final-wave task",
+      preferredSessionId,
+    )
+    followupReminder = null
+  } else if (shouldPauseForApproval) {
+    leadReminder = buildFinalWaveApprovalReminder(workScopedBoulderState.plan_name, progress, preferredSessionId)
+    followupReminder = null
+  } else if (isAlreadyVerified) {
+    leadReminder = buildAdvanceDirective(workScopedBoulderState.plan_name)
+    followupReminder = null
+  } else {
+    if (currentTask && sessionState && !isFinalWaveTask) {
+      if (!sessionState.verifiedTaskKeys) {
+        sessionState.verifiedTaskKeys = new Set<string>()
+      }
+      sessionState.verifiedTaskKeys.add(currentTask.key)
+    }
+    leadReminder = buildCompletionGate(workScopedBoulderState.plan_name, preferredSessionId)
+    followupReminder = buildOrchestratorReminder(
+      workScopedBoulderState.plan_name,
+      progress,
+      preferredSessionId,
+      autoCommit,
+      false,
+    )
+  }
 
   toolOutput.output = `
 <system-reminder>
@@ -225,6 +284,8 @@ ${
     progress: `${progress.completed}/${progress.total}`,
     fileCount: gitStats.length,
     preferredSessionId,
-    waitingForFinalWaveApproval: shouldPauseForApproval,
+    waitingForFinalWaveApproval: shouldPauseForApproval || isMissingFinalWaveVerdict,
+    isMissingFinalWaveVerdict,
+    isAlreadyVerified,
   })
 }
