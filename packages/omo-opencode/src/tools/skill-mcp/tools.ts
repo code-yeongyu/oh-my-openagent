@@ -78,7 +78,8 @@ function formatBuiltinMcpHint(mcpName: string): string | null {
   if (!nativeTools) return null
   return (
     `"${mcpName}" is a builtin MCP, not a skill MCP.\n` +
-    `Use the native tools directly:\n` +
+    `skill_mcp can only call MCP servers declared by loaded skills; do not retry this builtin through skill_mcp.\n` +
+    `Use the native builtin tool names when OpenCode exposes them:\n` +
     nativeTools.map((toolName) => `  - ${toolName}`).join("\n")
   )
 }
