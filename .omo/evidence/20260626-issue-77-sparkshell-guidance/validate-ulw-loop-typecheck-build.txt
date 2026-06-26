@@ -1,0 +1,3 @@
+
+> @code-yeongyu/codex-ulw-loop@4.13.0 typecheck
+> tsc --noEmit
