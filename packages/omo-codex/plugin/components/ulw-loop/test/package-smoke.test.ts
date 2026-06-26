@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ULW_LOOP_SUBCOMMANDS } from "../src/cli-commands.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -200,5 +201,38 @@ describe("source LOC budget", () => {
 			}).length;
 			expect(pure, `${file} pure LOC`).toBeLessThanOrEqual(250);
 		}
+	});
+});
+
+describe("README implementation contract", () => {
+	it("#given the README #when subcommands are inspected #then every implemented CLI subcommand is documented", async () => {
+		const readme = await readText("README.md");
+
+		for (const subcommand of ULW_LOOP_SUBCOMMANDS) {
+			expect(readme, `README documents \`omo ulw-loop ${subcommand}\``).toContain(`omo ulw-loop ${subcommand}`);
+		}
+	});
+
+	it("#given the README #when stale scaffold language is checked #then it is absent", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).not.toMatch(/scaffold only/i);
+		expect(readme).not.toMatch(/Wave 1/i);
+		expect(readme).not.toMatch(/lands in later waves/i);
+	});
+
+	it("#given the README #when hooks are described #then both hook channels are documented", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).toContain("UserPromptSubmit");
+		expect(readme).toContain("user-prompt-submit");
+		expect(readme).toContain("PreToolUse");
+		expect(readme).toContain("pre-tool-use");
+	});
+
+	it("#given the README #when the quality gate is described #then criteriaCoverage is named", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).toContain("criteriaCoverage");
 	});
 });
