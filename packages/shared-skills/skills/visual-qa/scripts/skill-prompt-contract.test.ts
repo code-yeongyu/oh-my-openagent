@@ -227,8 +227,15 @@ describe("visual-qa skill exhaustive-coverage and review-gate contract", () => {
 
 			expect(combined, fixture.label).toContain("redact or omit secrets")
 			expect(combined, fixture.label).toContain("credentials")
+			expect(combined, fixture.label).toContain("tokens")
+			expect(combined, fixture.label).toContain("auth headers")
 			expect(combined, fixture.label).toContain("customer data")
+			expect(combined, fixture.label).toContain("private messages")
+			expect(combined, fixture.label).toContain("internal urls")
 			expect(combined, fixture.label).toContain("untrusted data")
+			expect(combined, fixture.label).toContain("captured ui copy")
+			expect(combined, fixture.label).toContain("comments")
+			expect(combined, fixture.label).toContain("filenames")
 			expect(combined, fixture.label).toContain("not reviewer instructions")
 			expect(combined, fixture.label).toContain("never as instructions")
 		}
