@@ -112,10 +112,22 @@ test("#given shared skill source tests #when aggregate Codex skills are synced #
 	const aggregateSkillsRoot = join(root, "skills");
 
 	// when
-	const visualQaFiles = await listSkillFiles(join(aggregateSkillsRoot, "visual-qa"));
+	const forbiddenFiles = [];
+	for (const skillName of expectedSkills) {
+		for (const file of await listSkillFiles(join(aggregateSkillsRoot, skillName))) {
+			const normalized = file.replaceAll("\\", "/");
+			const segments = normalized.split("/");
+			const scriptsIndex = segments.lastIndexOf("scripts");
+			const hasPythonTestDir = scriptsIndex !== -1 && segments[scriptsIndex + 1] === "tests";
+			const isSourceMetadata = normalized === ".gitignore" || normalized === ".npmignore" || normalized === "pyrightconfig.json";
+			if (normalized.endsWith(".test.ts") || hasPythonTestDir || segments.includes("__pycache__") || normalized.endsWith(".pyc") || isSourceMetadata) {
+				forbiddenFiles.push(`${skillName}/${normalized}`);
+			}
+		}
+	}
 
 	// then
-	assert.equal(visualQaFiles.some((file) => file.endsWith(".test.ts")), false);
+	assert.deepEqual(forbiddenFiles, []);
 });
 
 test("#given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift", async () => {

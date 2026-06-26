@@ -12,6 +12,11 @@ import {
   renderAnsiToHtml,
   stripAnsi,
 } from "./web-terminal-renderer.mjs";
+import {
+  BUILT_IN_REDACTION_RULE_COUNT,
+  compileRedactions,
+  redactEvidence,
+} from "./web-terminal-redaction.mjs";
 
 const HELP = `web-terminal-visual-qa
 
@@ -32,15 +37,33 @@ Inputs:
   --no-wrap              Preserve long lines with horizontal scrolling.
   --evidence-dir <path>  Directory for terminal.txt, terminal-ansi.txt, terminal.html, terminal.png, metadata.json.
   --chrome-bin <path>    Chrome/Chromium executable for PNG capture.
+  --source-label <text>  Safe label for --command metadata. The raw command is never written to metadata.
+  --redact <literal>     Literal secret value to redact before writing evidence. Repeatable.
+  --redact-regex <expr>  JavaScript regex source to redact before writing evidence. Repeatable.
   --no-browser           Skip PNG capture, but still write HTML/text/metadata.
 
 Connector notes:
   --command uses tmux as the tmux-backed PTY connector on macOS/Linux and on Windows environments that provide tmux.
   Windows-native ConPTY live mode should plug into this same metadata contract later; until then use --from-file or Git Bash/tmux.
+
+Secret handling:
+  Terminal evidence is redacted before terminal.txt, terminal-ansi.txt, terminal.html, and terminal.png are written.
+  Built-in rules cover common Authorization headers, token/password/key assignments, and GitHub/OpenAI-style tokens.
+  Add --redact for exact local values and --redact-regex for project-specific patterns.
+  The raw --command string is treated as secret-bearing process data and is never stored in metadata.json.
 `;
 
 function parseArgs(argv) {
-  const args = { cols: 140, rows: 40, dwellMs: 3000, cwd: process.cwd(), browser: true, wrap: true };
+  const args = {
+    cols: 140,
+    rows: 40,
+    dwellMs: 3000,
+    cwd: process.cwd(),
+    browser: true,
+    wrap: true,
+    redactions: [],
+    redactRegexes: [],
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") return { ...args, help: true };
@@ -65,6 +88,9 @@ function parseArgs(argv) {
     else if (arg === "--cwd") args.cwd = next;
     else if (arg === "--evidence-dir") args.evidenceDir = next;
     else if (arg === "--chrome-bin") args.chromeBin = next;
+    else if (arg === "--source-label") args.sourceLabel = next;
+    else if (arg === "--redact") args.redactions.push(next);
+    else if (arg === "--redact-regex") args.redactRegexes.push(next);
     else if (arg === "--cols") args.cols = parsePositiveInt(arg, next);
     else if (arg === "--rows") args.rows = parsePositiveInt(arg, next);
     else if (arg === "--dwell-ms") args.dwellMs = parsePositiveInt(arg, next);
@@ -95,6 +121,11 @@ function screenshotSize({ cols, rows }) {
     width: Math.max(900, Math.min(1440, Math.round(cols * 8.2 + 120))),
     height: Math.max(520, Math.min(1200, Math.round(rows * 18 + 120))),
   };
+}
+
+function sourceMetadata(args) {
+  if (args.fromFile) return { kind: "file-replay", path: resolve(args.fromFile) };
+  return { kind: "command", label: args.sourceLabel || "redacted command" };
 }
 
 function writeHtml({ title, ansi, outPath, cols, wrap }) {
@@ -190,17 +221,24 @@ function main() {
   const pngPath = join(evidenceDir, "terminal.png");
   const metadataPath = join(evidenceDir, "metadata.json");
   const capture = args.fromFile ? captureFromFile(args.fromFile) : runTmuxCommand(args);
-  const text = stripAnsi(capture.ansi);
+  const redactionRules = compileRedactions(args);
+  const safeAnsi = redactEvidence(capture.ansi, redactionRules);
+  const text = stripAnsi(safeAnsi);
   writeFileSync(textPath, text, "utf8");
-  writeFileSync(ansiPath, capture.ansi, "utf8");
-  writeHtml({ title: args.title, ansi: capture.ansi, outPath: htmlPath, cols: args.cols, wrap: args.wrap });
+  writeFileSync(ansiPath, safeAnsi, "utf8");
+  writeHtml({ title: args.title, ansi: safeAnsi, outPath: htmlPath, cols: args.cols, wrap: args.wrap });
   const size = screenshotSize({ cols: args.cols, rows: args.rows });
   const browser = args.browser ? capturePng({ chromeBin: args.chromeBin, htmlPath, pngPath, ...size }) : { status: "skipped" };
   const metadata = {
     title: args.title,
     connector: capture.connector,
     browserCapture: browser.status,
-    source: args.fromFile ? resolve(args.fromFile) : args.command,
+    source: sourceMetadata(args),
+    redaction: {
+      builtInRules: BUILT_IN_REDACTION_RULE_COUNT,
+      literalRules: args.redactions.length,
+      regexRules: args.redactRegexes.length,
+    },
     wrap: args.wrap ? "on" : "off",
     dimensions: { cols: args.cols, rows: args.rows, screenshotWidth: size.width, screenshotHeight: size.height },
     cleanup: capture.cleanup,

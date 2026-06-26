@@ -96,6 +96,7 @@ interface UserPromptSubmitHookOutput {
 
 export function runUserPromptSubmitHook(input: unknown): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
+	if (!isAutoWorkflowEnabled(env)) return "";
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
 	if (hasAutoWorkflowContextAlreadyInTranscript(input.transcript_path))
 		return "";
@@ -189,9 +190,7 @@ function isContextPressureTranscript(
 ): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		return isContextPressureRecoveryPrompt(
-			readFileSync(transcriptPath, "utf8"),
-		);
+		return isContextPressureRecoveryPrompt(readTranscriptTail(transcriptPath));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;
