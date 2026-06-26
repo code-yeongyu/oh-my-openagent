@@ -83,7 +83,6 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 
 | File | Aesthetic |
 |---|---|
-| `aside.md` | AI browser agent. Dark-mode squircle UI, AsideDisplay variable font, sky-blue brand accent. |
 | `cursor.md` | AI-first code editor. Sleek dark interface, gradient accents. |
 | `expo.md` | React Native platform. Dark theme, tight letter-spacing, code-centric. |
 | `lovable.md` | AI full-stack builder. Playful gradients, friendly dev aesthetic. |
@@ -103,7 +102,6 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 | `posthog.md` | Product analytics. Playful hedgehog branding, developer-friendly dark UI. |
 | `sanity.md` | Headless CMS. Red accent, content-first editorial layout. |
 | `sentry.md` | Error monitoring. Dark dashboard, data-dense, pink-purple accent. |
-| `motherduck.md` | Serverless DuckDB data warehouse. Warm cream canvas, duck-yellow brand accent, Aeonik Fono display type. |
 | `supabase.md` | Open-source Firebase alternative. Dark emerald theme, code-first. |
 
 ### Productivity & SaaS (7)
