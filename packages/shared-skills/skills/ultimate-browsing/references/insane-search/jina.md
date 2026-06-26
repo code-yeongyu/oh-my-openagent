@@ -69,7 +69,7 @@ curl -H "X-With-Links: true" "https://r.jina.ai/{URL}"
 ### 캐시 제어
 
 ```bash
-# 캐시 우회 (실시간 필요 시)
+# 캐시 건너뛰기 (실시간 필요 시)
 curl -H "X-No-Cache: true" "https://r.jina.ai/{URL}"
 
 # 캐시 TTL 지정 (초)

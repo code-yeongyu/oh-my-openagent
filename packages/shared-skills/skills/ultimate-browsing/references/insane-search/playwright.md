@@ -116,7 +116,7 @@ const ctx = await chromium.launchPersistentContext(profileDir, {
 | `needs_real_tls_stack` + `needs_js_exec` | Approach 2 (real_chrome) | Akamai Bot Manager |
 | `needs_js_exec` only | Approach 1 (MCP) | Cloudflare Turnstile |
 | `needs_real_tls_stack` only | Approach 2 (real_chrome) | 일부 DataDome 설정 |
-| 둘 다 없음 | curl 체인에서 해결. Playwright 안 씀 | F5 BIG-IP (TLS만 우회 필요) |
+| 둘 다 없음 | curl 체인에서 해결. Playwright 안 씀 | F5 BIG-IP (TLS만 대응 필요) |
 
 `device_class="mobile"`이 지정되면 real_chrome → mobile 변종으로 swap.
 

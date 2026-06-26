@@ -1,6 +1,6 @@
 # TLS 임퍼소네이션 — curl_cffi
 
-> TLS 핑거프린트(JA3/JA4) 기반 WAF를 우회하는 핵심 방법.
+> TLS 핑거프린트(JA3/JA4) 기반 WAF에 대응하는 핵심 방법.
 > 일반 curl/requests는 OpenSSL 핑거프린트라 즉시 차단되지만,
 > curl_cffi는 실제 브라우저(Chrome/Safari/Firefox)의 TLS 핑거프린트를 복제한다.
 
@@ -152,7 +152,7 @@ resp = requests.get(
 )
 ```
 
-WAF 벤더들이 아직 HTTP/3 핑거프린트를 적극 활용하지 않아 우회 효과가 높다.
+WAF 벤더들이 아직 HTTP/3 핑거프린트를 적극 활용하지 않아 대응 효과가 높다.
 
 ## 대안 라이브러리
 
@@ -175,9 +175,9 @@ resp = client.get("https://example.com")
 
 | 방어 수단 | curl_cffi | 대응 |
 |-----------|-----------|------|
-| TLS/JA3 핑거프린트 | 우회 가능 | 핵심 기능 |
-| HTTP/2 SETTINGS 핑거프린트 | 우회 가능 | impersonate에 포함 |
-| HTTP/3 QUIC 핑거프린트 | 우회 가능 (v0.15+) | 신규 |
+| TLS/JA3 핑거프린트 | 대응 가능 | 핵심 기능 |
+| HTTP/2 SETTINGS 핑거프린트 | 대응 가능 | impersonate에 포함 |
+| HTTP/3 QUIC 핑거프린트 | 대응 가능 (v0.15+) | 신규 |
 | JS 챌린지 (Turnstile 등) | **불가** | → nodriver 또는 Playwright |
 | CAPTCHA | **불가** | → 2captcha/CapSolver |
 | IP 평판 (데이터센터) | **불가** | → 프록시/VPN |
