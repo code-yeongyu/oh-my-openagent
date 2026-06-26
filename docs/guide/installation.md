@@ -738,6 +738,8 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 The Codex CLI Light edition is fully independent of the OpenCode plugin. You can install both side-by-side. They share no runtime state, no config files, and no model selection. Each emits its own daily telemetry event.
 
+Compatibility note: LazyCodex is the Codex-platform OmO install path for `oh-my-openagent`. The bundled Codex-native subagents in `~/.codex/agents` are expected. Do not enable duplicate Codex-layer OmO/LazyCodex installs in a single `CODEX_HOME`; keep one `omo@sisyphuslabs` Codex plugin source active there. If the setup looks confused, run `npx lazycodex-ai doctor` before deleting cache or config state.
+
 #### Codex troubleshooting
 
 | Symptom | Fix |
