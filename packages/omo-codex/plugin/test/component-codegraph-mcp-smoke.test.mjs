@@ -17,6 +17,8 @@ test("#given built CodeGraph MCP wrapper #when an MCP client initializes #then t
 			fakeBinaryPath,
 			[
 				"#!/usr/bin/env node",
+				"if (process.argv[2] === 'status') { process.stdout.write('{\"initialized\":false}\\n'); process.exit(0); }",
+				"if (process.argv[2] === 'init') process.exit(0);",
 				"const readline = require('node:readline');",
 				"const rl = readline.createInterface({ input: process.stdin });",
 				"rl.on('line', (line) => {",

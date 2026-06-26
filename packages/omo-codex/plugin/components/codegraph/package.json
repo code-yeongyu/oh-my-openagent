@@ -19,13 +19,14 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@oh-my-opencode/codegraph-mcp": "file:../../../../codegraph-mcp",
 		"@oh-my-opencode/utils": "file:../../../../utils",
 		"@types/node": "^25.9.3",
 		"bun-types": "^1.3.1",
 		"typescript": "^6.0.3"
 	},
 	"optionalDependencies": {
-		"@colbymchenry/codegraph": "1.0.1"
+		"@colbymchenry/codegraph": "1.1.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"

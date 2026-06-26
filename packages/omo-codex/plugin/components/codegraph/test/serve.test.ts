@@ -216,7 +216,7 @@ describe("runCodegraphServe", () => {
 		});
 	});
 
-	it("#given built serve entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once", () => {
+	it("#given an uninitialized workspace #when the built serve entry starts #then it initializes before exposing MCP", () => {
 		// given
 		const tempRoot = createFakeCodegraphRoot();
 		try {
@@ -226,13 +226,17 @@ describe("runCodegraphServe", () => {
 			// then
 			expect(result.status).toBe(0);
 			expect(result.stderr).toBe("");
-			expect(readInvocations(tempRoot)).toEqual(['["serve","--mcp"]']);
+			expect(readInvocations(tempRoot)).toEqual([
+				'["status","--json"]',
+				'["init"]',
+				'["serve","--mcp"]',
+			]);
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });
 		}
 	});
 
-	it("#given built cli entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once", () => {
+	it("#given built cli entry #when invoked with an uninitialized workspace #then it initializes before serve", () => {
 		// given
 		const tempRoot = createFakeCodegraphRoot();
 		try {
@@ -242,7 +246,11 @@ describe("runCodegraphServe", () => {
 			// then
 			expect(result.status).toBe(0);
 			expect(result.stderr).toBe("");
-			expect(readInvocations(tempRoot)).toEqual(['["serve","--mcp"]']);
+			expect(readInvocations(tempRoot)).toEqual([
+				'["status","--json"]',
+				'["init"]',
+				'["serve","--mcp"]',
+			]);
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });
 		}
@@ -258,6 +266,7 @@ function createFakeCodegraphRoot(): string {
 			"#!/usr/bin/env node",
 			"const fs = require('node:fs');",
 			"fs.appendFileSync(process.env.CODEGRAPH_FAKE_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');",
+			"if (process.argv[2] === 'status') process.stdout.write('{\"initialized\":false}\\n');",
 			"",
 		].join("\n"),
 	);

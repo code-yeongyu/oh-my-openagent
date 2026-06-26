@@ -85,6 +85,7 @@ test("#given built MCP-only CodeGraph entries #when executed with a fake binary 
 				"#!/usr/bin/env node",
 				"const fs = require('node:fs');",
 				"fs.appendFileSync(process.env.CODEGRAPH_FAKE_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');",
+				"if (process.argv[2] === 'status') process.stdout.write('{\"initialized\":false}\\n');",
 				"",
 			].join("\n"),
 		);
@@ -98,7 +99,11 @@ test("#given built MCP-only CodeGraph entries #when executed with a fake binary 
 		assert.equal(serveResult.stderr, "");
 		assert.equal(cliResult.stderr, "");
 		assert.deepEqual(readFileSync(invocationLogPath, "utf8").trim().split("\n"), [
+			'["status","--json"]',
+			'["init"]',
 			'["serve","--mcp"]',
+			'["status","--json"]',
+			'["init"]',
 			'["serve","--mcp"]',
 		]);
 	} finally {
