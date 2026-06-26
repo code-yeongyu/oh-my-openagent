@@ -188,3 +188,58 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
     expect(result).toContain("brainstorming")
   })
 })
+
+import { pruneParentContext, isSimpleOrCheaperModel, hasExplicitExecutionSteps } from "./prompt-builder"
+
+describe("prompt-builder helpers", () => {
+  describe("pruneParentContext", () => {
+    test("should truncate verbose tool output blocks", () => {
+      const verbosePrompt = "Task: Fix the bug\n=== grep output ===\nFile1.ts\nFile2.ts\nLine 100: code\n=== end grep ===\nSome other instructions."
+      const result = pruneParentContext(verbosePrompt)
+      expect(result).toContain("[Tool output truncated for token budget]")
+      expect(result).not.toContain("File1.ts")
+    })
+
+    test("should truncate long XML tool outputs", () => {
+      const longText = "a".repeat(600)
+      const xmlPrompt = `<tool_output>${longText}</tool_output>`
+      const result = pruneParentContext(xmlPrompt)
+      expect(result).toContain("[Tool output truncated for token budget]")
+    })
+
+    test("should truncate long bash code blocks", () => {
+      const longBash = "echo 'test'\n".repeat(100)
+      const bashPrompt = `\`\`\`bash\n${longBash}\`\`\``
+      const result = pruneParentContext(bashPrompt)
+      expect(result).toContain("[Terminal log output truncated for token budget]")
+    })
+  })
+
+  describe("isSimpleOrCheaperModel", () => {
+    test("should identify cheaper models correctly", () => {
+      expect(isSimpleOrCheaperModel({ providerID: "google", modelID: "gemini-1.5-flash" })).toBe(true)
+      expect(isSimpleOrCheaperModel({ providerID: "anthropic", modelID: "claude-3-5-haiku" })).toBe(true)
+      expect(isSimpleOrCheaperModel({ providerID: "anthropic", modelID: "claude-3-5-sonnet" })).toBe(false)
+      expect(isSimpleOrCheaperModel({ providerID: "openai", modelID: "o1-preview" })).toBe(false)
+    })
+  })
+
+  describe("hasExplicitExecutionSteps", () => {
+    test("should return true for numbered steps", () => {
+      expect(hasExplicitExecutionSteps("First, do X.\n1. Edit index.ts\n2. Run tests")).toBe(true)
+    })
+
+    test("should return true for step labels", () => {
+      expect(hasExplicitExecutionSteps("Step 1: Check code")).toBe(true)
+    })
+
+    test("should return true for Chinese step indicators", () => {
+      expect(hasExplicitExecutionSteps("具体操作步骤是：修改文件")).toBe(true)
+    })
+
+    test("should return false for open-ended queries", () => {
+      expect(hasExplicitExecutionSteps("Please refactor this entire codebase.")).toBe(false)
+    })
+  })
+})
+

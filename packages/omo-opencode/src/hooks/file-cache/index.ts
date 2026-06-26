@@ -1,0 +1,1 @@
+export { createFileCacheHook } from "./hook"

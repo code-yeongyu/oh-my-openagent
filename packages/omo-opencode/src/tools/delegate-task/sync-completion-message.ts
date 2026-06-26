@@ -3,10 +3,6 @@ import type { ParentContext } from "./executor-types"
 import { formatDuration } from "./time-formatter"
 import type { DelegatedModelConfig, DelegateTaskArgs } from "./types"
 
-function formatModelID(model: DelegatedModelConfig | ParentContext["model"] | undefined): string | undefined {
-  return model ? `${model.providerID}/${model.modelID}` : undefined
-}
-
 export function buildRecoveredSyncTaskCompletion(input: {
   readonly activeSessionID: string
   readonly agentToUse: string
@@ -17,14 +13,13 @@ export function buildRecoveredSyncTaskCompletion(input: {
   readonly textContent: string
 }): string {
   const duration = formatDuration(input.startTime)
-  const actualModelStr = formatModelID(input.effectiveCategoryModel)
-  const parentModelStr = formatModelID(input.parentContext.model)
-  let modelRoutingNote = ""
-  if (actualModelStr && parentModelStr && actualModelStr !== parentModelStr) {
-    modelRoutingNote = `\n⚠️  Model fallback used: requested ${parentModelStr}, executed ${actualModelStr}`
-  }
+  const modelID = input.effectiveCategoryModel?.modelID ?? "?"
+  const isFree = modelID.toLowerCase().includes("free")
+  const cost = isFree ? "🆓" : ""
 
-  return `Task completed in ${duration}.\n\n---\n\n${input.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock({
+  const header = `✓ ${input.agentToUse} · ${modelID} ${cost} · ${duration}`
+
+  return `${header}\n\n${input.textContent || "(No text output)"}\n\n${buildTaskMetadataBlock({
     sessionId: input.activeSessionID,
     taskId: input.activeSessionID,
     agent: input.agentToUse,
@@ -42,24 +37,14 @@ export function buildSyncTaskCompletion(input: {
   readonly textContent: string
 }): string {
   const duration = formatDuration(input.startTime)
-  const actualModelStr = formatModelID(input.effectiveCategoryModel)
-  const parentModelStr = formatModelID(input.parentContext.model)
-  let modelRoutingNote = ""
-  if (actualModelStr && parentModelStr && actualModelStr !== parentModelStr) {
-    modelRoutingNote = `\n⚠️  Model routing: parent used ${parentModelStr}, this subagent used ${actualModelStr} (via category: ${input.args.category ?? "unknown"})`
-  } else if (actualModelStr) {
-    modelRoutingNote = `\nModel: ${actualModelStr}${input.args.category ? ` (category: ${input.args.category})` : ""}`
-  }
+  const modelID = input.effectiveCategoryModel?.modelID ?? "?"
+  const isFree = modelID.toLowerCase().includes("free")
+  const cost = isFree ? "🆓" : ""
+  const category = input.args.category ?? "auto"
 
-  return `Task completed in ${duration}.
+  const header = `✓ ${input.agentToUse} · ${modelID} ${cost} · ${duration}`
 
-Agent: ${input.agentToUse}${input.args.category ? ` (category: ${input.args.category})` : ""}${modelRoutingNote}
-
----
-
-${input.textContent || "(No text output)"}
-
-${buildTaskMetadataBlock({
+  return `${header}\n\n${input.textContent || "(No text output)"}\n\n${buildTaskMetadataBlock({
     sessionId: input.activeSessionID,
     taskId: input.activeSessionID,
     agent: input.agentToUse,

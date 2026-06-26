@@ -22,6 +22,10 @@ export interface ResolvedMember {
   model: DelegatedModelConfig | undefined
   fallbackChain: FallbackEntry[] | undefined
   systemContent: string
+  /** "dynamic" = re-resolve model per message, "static" = use creation-time model. */
+  modelResolutionMode: "static" | "dynamic"
+  /** Category for re-resolution when modelResolutionMode is "dynamic". */
+  resolutionCategory?: string
 }
 
 function createBaseDelegateTaskArgs(prompt: string): Pick<DelegateTaskArgs, "description" | "load_skills" | "prompt" | "run_in_background"> {
@@ -93,6 +97,8 @@ export async function resolveMember(
           maxPromptTokens: execution.maxPromptTokens,
           model: execution.categoryModel,
         }),
+        modelResolutionMode: "dynamic",
+        resolutionCategory: member.category,
       }
     }
 
@@ -123,6 +129,7 @@ export async function resolveMember(
         agentToUse: execution.agentToUse,
         model: execution.categoryModel,
       }),
+      modelResolutionMode: "static",
     }
   } catch (error) {
     throw new TeamMemberResolutionError(member.name, normalizeResolutionError(error))

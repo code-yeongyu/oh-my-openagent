@@ -109,7 +109,7 @@ export function handleMessagePartDelta(ctx: RunContext, payload: EventPayload, s
 
   if (partType === "reasoning") {
     ensureThinkBlockOpen(state)
-    const padded = writePaddedText(delta, state.thinkingAtLineStart)
+    const padded = writePaddedText(delta, state.thinkingAtLineStart, `  ${pc.dim("│")} `)
     process.stdout.write(pc.dim(padded.output))
     state.thinkingAtLineStart = padded.atLineStart
     state.lastReasoningText += delta

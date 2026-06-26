@@ -21,6 +21,8 @@ import {
   createFsyncSkipWarningHook,
   createNotepadWriteGuardHook,
   createPlanFormatValidatorHook,
+  createEnforcedDelegationHook,
+  createFileCacheHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -49,6 +51,8 @@ export type ToolGuardHooks = {
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
   planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
+  enforcedDelegation: ReturnType<typeof createEnforcedDelegationHook> | null
+  fileCache: ReturnType<typeof createFileCacheHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -157,6 +161,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
+  const enforcedDelegation = isHookEnabled("enforced-delegation")
+    ? safeHook("enforced-delegation", () => createEnforcedDelegationHook(ctx, pluginConfig))
+    : null
+
+  const fileCache = isHookEnabled("file-cache")
+    ? safeHook("file-cache", () => createFileCacheHook(ctx, pluginConfig))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -176,5 +188,7 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
+    enforcedDelegation,
+    fileCache,
   }
 }

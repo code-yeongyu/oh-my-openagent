@@ -14,3 +14,7 @@ export function box(props: Readonly<Record<string, unknown>>, children: readonly
 export function text(props: Readonly<Record<string, unknown>>, value: string): ViewNode {
   return { kind: "text", props, text: value }
 }
+
+export function spacer(height: number = 1): ViewNode {
+  return { kind: "box", props: { height }, children: [] }
+}

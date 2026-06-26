@@ -245,6 +245,8 @@ export async function createTeamRun(
             subagent_type: resolvedMember.agentToUse,
             ...(member.kind === "category" ? { category: member.category } : {}),
             ...(persistedModel ? { model: persistedModel } : {}),
+            modelResolutionMode: resolvedMember.modelResolutionMode,
+            ...(resolvedMember.resolutionCategory ? { resolutionCategory: resolvedMember.resolutionCategory } : {}),
           }), config)
         } catch (error) {
           failure = error instanceof Error ? error : new Error(String(error))

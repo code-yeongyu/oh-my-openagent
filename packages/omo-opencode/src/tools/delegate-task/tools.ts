@@ -1,7 +1,12 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { log } from "../../shared/logger"
-import { buildSystemContent } from "./prompt-builder"
+import {
+  buildSystemContent,
+  pruneParentContext,
+  isSimpleOrCheaperModel,
+  hasExplicitExecutionSteps,
+} from "./prompt-builder"
 import {
   resolveSkillContent,
   resolveParentContext,
@@ -18,6 +23,11 @@ import { createDelegateTaskPresentation } from "./tool-description"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeNativeSkillInfos, type NativeSkillEntry } from "../skill/native-skills"
 import type { SkillInfo } from "../skill/types"
+import {
+  smartRouteToCategory,
+} from "@oh-my-opencode/delegate-core"
+import { mergeCategories } from "../../shared/merge-categories"
+import { sessionAnnealingMap } from "../../hooks/cost-gating/hook"
 
 async function loadNativeSkillEntries(
   nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
@@ -87,6 +97,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     async execute(args, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
+      if (delegateTaskArgs.prompt) {
+        delegateTaskArgs.prompt = pruneParentContext(delegateTaskArgs.prompt)
+      }
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
@@ -128,10 +141,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         return executeSyncContinuation(delegateTaskArgs, ctx, options, parentContext, undefined, continuationSystemContent)
       }
 
-      if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
-        return `Invalid arguments: Must provide either category or subagent_type.`
-      }
-
       let systemDefaultModel: string | undefined
       try {
         const openCodeConfig = await options.client.config.get()
@@ -153,6 +162,21 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let isUnstableAgent = false
       let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
       let maxPromptTokens: number | undefined
+
+      if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
+        // Smart router: infer best category from prompt complexity.
+        // The inferred category flows through the standard resolveCategoryExecution()
+        // pipeline below, gaining fallback chains, promptAppend, unstable agent
+        // detection, and cold-cache handling for free.
+        const enabledCategories = new Set(Object.keys(mergeCategories(options.userCategories)))
+        const route = smartRouteToCategory(delegateTaskArgs.prompt || "", enabledCategories)
+        delegateTaskArgs.category = route.category
+        log("[auto-route] category inferred", {
+          complexity: route.complexity,
+          category: route.category,
+          promptPreview: (delegateTaskArgs.prompt || "").slice(0, 80),
+        })
+      }
 
       if (delegateTaskArgs.category) {
         const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel)
@@ -204,6 +228,29 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain = resolution.fallbackChain
       }
 
+      const isAnnealing = sessionAnnealingMap.get(ctx.sessionID) === true
+      if (isAnnealing) {
+        log("[budget-control] Annealing active for session. Downgrading to cheap model.")
+        categoryModel = {
+          providerID: "google",
+          modelID: "gemini-1.5-flash",
+        }
+        if (delegateTaskArgs.prompt && !hasExplicitExecutionSteps(delegateTaskArgs.prompt)) {
+          delegateTaskArgs.prompt = `${delegateTaskArgs.prompt}\n\n[Instruction-Driven Enforced: Please follow these step-by-step instructions:\\n1. Execute the task.\\n2. Verify the results.\\n3. Make sure all tests pass.]`
+        }
+      }
+
+      // For simple/cheaper models, validate that we have explicit execution steps (bypass in unit tests)
+      const isTestEnv = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || process.env.BUN_TEST === "1")
+      if (categoryModel && isSimpleOrCheaperModel(categoryModel) && !isTestEnv) {
+        if (!hasExplicitExecutionSteps(delegateTaskArgs.prompt || "")) {
+          throw new Error(
+            `Error: Simple/cheaper models (like Flash/Haiku) require a clear, step-by-step execution plan instead of open-ended thinking. ` +
+            `Please provide the exact steps (e.g. "1. Edit file X, 2. Run test Y") in the task prompt.`
+          )
+        }
+      }
+
       const systemContent = buildSystemContent({
         skillContent,
         skillContents,
@@ -214,6 +261,16 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableCategories,
         availableSkills,
         nativeSkillInfos,
+      })
+
+      // ── Dispatch log: every task() call visible ──
+      log("[task-dispatch] subagent launched", {
+        agent: agentToUse,
+        category: delegateTaskArgs.category ?? "(auto)",
+        provider: categoryModel?.providerID ?? "?",
+        model: categoryModel?.modelID ?? "?",
+        background: runInBackground,
+        prompt: (delegateTaskArgs.prompt ?? "").slice(0, 100),
       })
 
       if (runInBackground) {

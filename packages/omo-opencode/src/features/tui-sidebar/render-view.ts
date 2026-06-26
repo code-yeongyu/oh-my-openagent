@@ -1,5 +1,5 @@
-import { LABEL_MAX } from "./constants"
-import { box, text } from "./element-helpers"
+import { LABEL_MAX, ROSTER_LABEL_WIDTH } from "./constants"
+import { box, spacer, text } from "./element-helpers"
 import type { ViewNode } from "./element-helpers"
 import { assertNever } from "./state-types"
 import type {
@@ -20,19 +20,78 @@ type ThemeLike = {
   readonly info?: unknown
   readonly accent?: unknown
   readonly borderSubtle?: unknown
+  readonly backgroundPanel?: unknown
+  readonly backgroundSelected?: unknown
+}
+
+const STATUS_DOTS: Record<string, string> = {
+  running: "●",
+  pending: "○",
+  idle: "◌",
+  completed: "✓",
+  errored: "✗",
+}
+
+function statusDot(status: string): string {
+  return STATUS_DOTS[status] ?? " "
+}
+
+function statusColor(status: string, theme: ThemeLike): unknown {
+  switch (status) {
+    case "running":
+    case "busy":
+      return theme.accent
+    case "completed":
+      return theme.success
+    case "errored":
+    case "error":
+      return theme.error
+    case "retry":
+      return theme.warning
+    case "idle":
+    case "pending":
+    case "cancelled":
+      return theme.textMuted
+    default:
+      return theme.text
+  }
+}
+
+function progressBar(done: number, total: number, width: number = 10): string {
+  if (total <= 0) return "░".repeat(width)
+  const filled = Math.round((done / total) * width)
+  return "█".repeat(filled) + "░".repeat(width - filled)
+}
+
+function activeSummary(view: { readonly agents: AgentsState; readonly jobs: JobBoardState; readonly loop: LoopState }): string {
+  const parts: string[] = []
+  if (view.agents.kind === "list") parts.push(`${view.agents.agents.length} agents`)
+  if (view.jobs.kind === "list") parts.push(`${view.jobs.jobs.length} jobs`)
+  if (view.loop.kind === "live") parts.push(`${view.loop.goalsDone}/${view.loop.goalsTotal} goals`)
+  return parts.join(" · ")
 }
 
 export function buildViewNodes(view: SidebarView, theme: ThemeLike): ViewNode[] {
   switch (view.kind) {
-    case "active":
-      return [
-        box({ flexDirection: "column", gap: 1 }, [
-          ...configBannerNodes(view.configBanner, theme),
-          ...loopNodes(view.loop, theme),
-          ...agentNodes(view.agents, theme),
-          ...jobNodes(view.jobs, theme),
-        ]),
-      ]
+    case "active": {
+      const sections: ViewNode[] = []
+      const summary = activeSummary(view)
+      if (summary) {
+        sections.push(text({ fg: theme.textMuted, attributes: ["dim"] }, summary))
+        sections.push(spacer())
+      }
+      sections.push(...configBannerNodes(view.configBanner, theme))
+      if (view.loop.kind !== "none") {
+        sections.push(...loopNodes(view.loop, theme))
+        sections.push(spacer())
+      }
+      if (view.agents.kind !== "none") {
+        sections.push(...agentNodes(view.agents, theme))
+        sections.push(spacer())
+      }
+      sections.push(...jobNodes(view.jobs, theme))
+      return [box({ flexDirection: "column", gap: 0 }, sections)]
+    }
     case "broken":
       return brokenNodes(view.messages, theme)
     case "idle":
@@ -69,7 +128,19 @@ function configBannerNodes(banner: ConfigBanner, theme: ThemeLike): ViewNode[] {
     case "none":
       return []
     case "invalid":
-      return [text({ fg: theme.warning }, "config invalid - run doctor")]
+      return [
+        box({
+          borderStyle: "single",
+          borderColor: theme.warning,
+          flexDirection: "column",
+          paddingX: 1,
+          paddingY: 0,
+        }, [
+          text({ fg: theme.warning, attributes: ["bold"] }, "⚠ config invalid"),
+          text({ fg: theme.textMuted }, "  run `omo doctor` to fix"),
+        ]),
+        spacer(),
+      ]
     default:
       return assertNever(banner)
   }
@@ -92,12 +163,17 @@ function loopNodes(loop: LoopState, theme: ThemeLike): ViewNode[] {
       return []
     case "live":
       return [
-        section("ULW", theme, [
-          text({ fg: theme.text }, `goals ${loop.goalsDone}/${loop.goalsTotal}`),
-          text({ fg: theme.success }, `pass ${loop.pass}`),
-          text({ fg: theme.error }, `fail ${loop.fail}`),
-          text({ fg: theme.textMuted }, `pending ${loop.pending} blocked ${loop.blocked}`),
-          text({ fg: theme.accent }, `active ${truncate(activeGoalLabel(loop.activeGoal))}`),
+        box({
+          borderStyle: "single",
+          borderColor: theme.accent,
+          flexDirection: "column",
+          paddingX: 1,
+          paddingY: 0,
+        }, [
+          text({ fg: theme.accent, attributes: ["bold"] }, "▸ ULW"),
+          text({ fg: theme.text }, `${progressBar(loop.goalsDone, loop.goalsTotal)} ${loop.goalsDone}/${loop.goalsTotal}`),
+          text({ fg: theme.text }, `✓${loop.pass}  ✗${loop.fail}  ○${loop.pending}  ◌${loop.blocked}`),
+          text({ fg: theme.accent }, `▶ ${truncate(activeGoalLabel(loop.activeGoal))}`),
         ]),
       ]
     default:
@@ -111,12 +187,10 @@ function loopLines(loop: LoopState): string[] {
       return []
     case "live":
       return [
-        "ULW",
+        "▸ ULW",
         `goals ${loop.goalsDone}/${loop.goalsTotal}`,
-        `pass ${loop.pass}`,
-        `fail ${loop.fail}`,
-        `pending ${loop.pending} blocked ${loop.blocked}`,
-        `active ${activeGoalLabel(loop.activeGoal)}`,
+        `✓${loop.pass}  ✗${loop.fail}  ○${loop.pending}  ◌${loop.blocked}`,
+        `▶ ${activeGoalLabel(loop.activeGoal)}`,
       ]
     default:
       return assertNever(loop)
@@ -127,14 +201,25 @@ function agentNodes(agents: AgentsState, theme: ThemeLike): ViewNode[] {
   switch (agents.kind) {
     case "none":
       return []
-    case "list":
+    case "list": {
+      const hasRunning = agents.agents.some((a) => a.status === "running" || a.status === "busy")
       return [
-        section(
-          "Agents",
-          theme,
-          agents.agents.map((agent) => text({ fg: theme.text }, `${truncate(agent.name)} ${agent.status}`)),
-        ),
+        box({
+          borderStyle: "single",
+          borderColor: hasRunning ? theme.accent : theme.borderSubtle,
+          flexDirection: "column",
+          paddingX: 1,
+          paddingY: 0,
+        }, [
+          text({ fg: theme.info, attributes: ["bold"] }, `▸ Agents (${agents.agents.length})`),
+          ...agents.agents.map((a) => {
+            const rawStatus = a.status ?? ""
+            const dot = statusDot(rawStatus)
+            return text({ fg: statusColor(rawStatus, theme) }, `${dot} ${truncate(a.name)}`)
+          }),
+        ]),
       ]
+    }
     default:
       return assertNever(agents)
   }
@@ -145,7 +230,7 @@ function agentLines(agents: AgentsState): string[] {
     case "none":
       return []
     case "list":
-      return ["Agents", ...agents.agents.map((agent) => `${agent.name} ${agent.status}`)]
+      return ["▸ Agents", ...agents.agents.map((agent) => `${agent.name} ${agent.status}`)]
     default:
       return assertNever(agents)
   }
@@ -155,16 +240,26 @@ function jobNodes(jobs: JobBoardState, theme: ThemeLike): ViewNode[] {
   switch (jobs.kind) {
     case "none":
       return []
-    case "list":
+    case "list": {
+      const hasRunning = jobs.jobs.some((j) => j.status === "running")
       return [
-        section(
-          "Jobs",
-          theme,
-          jobs.jobs.map((job) =>
-            text({ fg: theme.text }, `${truncate(job.title)} ${job.status} ${job.toolCalls ?? 0} ${job.lastTool ?? "none"}`),
-          ),
-        ),
+        box({
+          borderStyle: "single",
+          borderColor: hasRunning ? theme.accent : theme.borderSubtle,
+          flexDirection: "column",
+          paddingX: 1,
+          paddingY: 0,
+        }, [
+          text({ fg: theme.info, attributes: ["bold"] }, `▸ Jobs (${jobs.jobs.length})`),
+          ...jobs.jobs.map((job) => {
+            const dot = statusDot(job.status)
+            const calls = job.toolCalls != null ? ` (${job.toolCalls})` : ""
+            const tool = job.lastTool ? ` → ${job.lastTool}` : ""
+            return text({ fg: statusColor(job.status, theme) }, `${dot} ${truncate(job.title)}${calls}${tool}`)
+          }),
+        ]),
       ]
+    }
     default:
       return assertNever(jobs)
   }
@@ -176,7 +271,7 @@ function jobLines(jobs: JobBoardState): string[] {
       return []
     case "list":
       return jobs.jobs.flatMap((job) => [
-        "Jobs",
+        "▸ Jobs",
         `${job.title} ${job.status} calls ${job.toolCalls ?? 0} last ${job.lastTool ?? "none"}`,
       ])
     default:
@@ -186,15 +281,57 @@ function jobLines(jobs: JobBoardState): string[] {
 
 function brokenNodes(messages: readonly string[], theme: ThemeLike): ViewNode[] {
   return [
-    section("Config", theme, [
-      text({ fg: theme.error }, "config invalid - run doctor"),
-      ...messages.map((message) => text({ fg: theme.textMuted }, truncate(message))),
+    box({
+      borderStyle: "single",
+      borderColor: theme.error,
+      flexDirection: "column",
+      paddingX: 1,
+      paddingY: 0,
+    }, [
+      text({ fg: theme.error, attributes: ["bold"] }, "⚠ Config Error"),
+      ...messages.map((message) => text({ fg: theme.textMuted }, `  ${truncate(message)}`)),
+      spacer(),
+      text({ fg: theme.textMuted, attributes: ["dim"] }, "  run `omo doctor` to fix"),
     ]),
   ]
 }
 
 function idleNodes(roster: RosterState, theme: ThemeLike): ViewNode[] {
-  return [section("Models", theme, rosterLines(roster).map((line) => text({ fg: theme.text }, line)))]
+  return [
+    box({
+      borderStyle: "single",
+      borderColor: theme.borderSubtle,
+      flexDirection: "column",
+      paddingX: 1,
+      paddingY: 0,
+    }, [
+      text({ fg: theme.info, attributes: ["bold"] }, "▸ Models"),
+      ...rosterLines(roster).map((line) => text({ fg: theme.text }, line)),
+    ]),
+  ]
+}
+
+function getStringWidth(str: string): number {
+  let width = 0
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i)
+    if (
+      (code >= 0x3000 && code <= 0x9fff) || // CJK symbols and ideographs
+      (code >= 0xac00 && code <= 0xd7af) || // Hangul
+      (code >= 0xff01 && code <= 0xff60)    // Fullwidth ASCII
+    ) {
+      width += 2
+    } else {
+      width += 1
+    }
+  }
+  return width
+}
+
+function padEndWidth(str: string, targetWidth: number, padChar = " "): string {
+  const width = getStringWidth(str)
+  if (width >= targetWidth) return str
+  return str + padChar.repeat(targetWidth - width)
 }
 
 function rosterLines(roster: RosterState): string[] {
@@ -202,15 +339,21 @@ function rosterLines(roster: RosterState): string[] {
     case "empty":
       return ["No configured models"]
     case "rows":
-      return roster.rows.map((row) => `${row.label} ${row.model}`)
+      return roster.rows.map((row) => `  ${padEndWidth(row.label, ROSTER_LABEL_WIDTH)} ${row.model}`)
     default:
       return assertNever(roster)
   }
 }
 
-function section(title: string, theme: ThemeLike, children: readonly ViewNode[]): ViewNode {
-  return box({ borderStyle: "single", borderColor: theme.borderSubtle, flexDirection: "column", padding: 1 }, [
-    text({ fg: theme.info }, title),
+function sectionCompact(title: string, theme: ThemeLike, children: readonly ViewNode[]): ViewNode {
+  return box({
+    borderStyle: "single",
+    borderColor: theme.borderSubtle,
+    flexDirection: "column",
+    paddingX: 1,
+    paddingY: 0,
+  }, [
+    text({ fg: theme.info, attributes: ["bold"] }, title),
     ...children,
   ])
 }

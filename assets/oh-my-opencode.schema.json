@@ -6903,6 +6903,21 @@
       ],
       "additionalProperties": false
     },
+    "cost_gating_threshold_tokens": {
+      "type": "number"
+    },
+    "enforce_subagent_threshold_tokens": {
+      "type": "number"
+    },
+    "enable_cost_degradation": {
+      "type": "boolean"
+    },
+    "max_session_budget_usd": {
+      "type": "number"
+    },
+    "sandbox_verify_command": {
+      "type": "string"
+    },
     "_migrations": {
       "type": "array",
       "items": {

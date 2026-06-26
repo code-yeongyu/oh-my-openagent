@@ -47,8 +47,8 @@ describe("tui sidebar renderView", () => {
     expect(description.indexOf("ULW")).toBeLessThan(description.indexOf("Agents"))
     expect(description.indexOf("Agents")).toBeLessThan(description.indexOf("Jobs"))
     expect(description).toContain("0/1")
-    expect(description).toContain("pass 1")
-    expect(description).toContain("fail 1")
+    expect(description).toContain("✓")
+    expect(description).toContain("✗")
     expect(description).toContain("fixer")
     expect(description).toContain("explore repo")
     expect(nodes[0]?.kind).toBe("box")
@@ -65,8 +65,8 @@ describe("tui sidebar renderView", () => {
     const description = describeView(view)
 
     // then
-    expect(description).toContain("active private")
-    expect(description).not.toContain("active none")
+    expect(description).toContain("▶ private")
+    expect(description).not.toContain("▶ none")
   })
 
   it("#given broken view #when describing #then it includes config invalid and run doctor", () => {
@@ -104,5 +104,32 @@ describe("tui sidebar renderView", () => {
     expect(description).toContain("sisyphus")
     expect(description).toContain("gpt-5.5")
     expect(nodes[0]?.kind).toBe("box")
+  })
+
+  it("#given idle roster with CJK label #when describing #then it pads correctly based on visual width", () => {
+    // given
+    const view: SidebarView = {
+      kind: "idle",
+      roster: {
+        kind: "rows",
+        rows: [
+          { label: "西西弗斯", model: "gpt-5.5" },
+          { label: "sisyphus", model: "gpt-5.5" },
+        ],
+      },
+    }
+
+    // when
+    const description = describeView(view)
+    const lines = description.split("\n")
+
+    // then
+    const line1 = lines.find((l) => l.includes("西西弗斯")) ?? ""
+    const line2 = lines.find((l) => l.includes("sisyphus")) ?? ""
+
+    // "西西弗斯" length is 4, visual width is 8. Visual padding is 6 spaces. Total string prefix length = 2 (indent) + 4 (chars) + 6 (spaces) + 1 (space) = 13.
+    // "sisyphus" length is 8, visual width is 8. Visual padding is 6 spaces. Total string prefix length = 2 (indent) + 8 (chars) + 6 (spaces) + 1 (space) = 17.
+    expect(line1.indexOf("gpt-5.5")).toBe(13)
+    expect(line2.indexOf("gpt-5.5")).toBe(17)
   })
 })

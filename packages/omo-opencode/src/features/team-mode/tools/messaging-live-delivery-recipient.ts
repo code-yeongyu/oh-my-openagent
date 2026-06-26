@@ -2,7 +2,7 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../../hooks/shared/prompt-async-gate"
 import { log } from "../../../shared/logger"
 import { isAmbiguousPostDispatchPromptFailure } from "../../../shared/prompt-failure-classifier"
-import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
+import { applyMemberSessionRouting, buildMemberPromptBody, resolveDynamicMemberModel } from "../member-session-routing"
 import { buildEnvelope } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { commitDeliveryReservation } from "@oh-my-opencode/team-core/team-mailbox/reservation"
 import type { Message, RuntimeState } from "@oh-my-opencode/team-core/types"
@@ -78,7 +78,9 @@ export async function deliverLiveToRecipient(input: {
     return
   }
 
-  applyMemberSessionRouting(recipientSessionId, recipientMember)
+  const resolvedModel = resolveDynamicMemberModel(recipientMember, envelope)
+
+  applyMemberSessionRouting(recipientSessionId, recipientMember, resolvedModel)
 
   try {
     const promptResult = await dispatchInternalPrompt({
@@ -89,7 +91,7 @@ export async function deliverLiveToRecipient(input: {
       queueBehavior: "defer",
       input: {
         path: { id: recipientSessionId },
-        body: buildMemberPromptBody(recipientMember, envelope),
+        body: buildMemberPromptBody(recipientMember, envelope, resolvedModel),
         query: { directory: recipientMember.worktreePath ?? directory },
       },
     })

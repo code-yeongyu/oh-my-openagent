@@ -25,6 +25,7 @@ export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 export { createMonitorTools } from "./monitor"
 export { createDelegateTask } from "./delegate-task"
+export { createDelegateTaskDag } from "./delegate-task-dag/tool"
 export {
   createTaskCreateTool,
   createTaskGetTool,

@@ -76,6 +76,7 @@ type PluginValidation = {
         readonly enabled?: boolean
       }
     }
+    readonly agent_order?: readonly string[]
   }
 }
 
@@ -90,14 +91,14 @@ async function loadRosterRows(directory: string): Promise<readonly RosterRow[]> 
   return resolver(directory)
 }
 
-async function readView(directory: string): Promise<SidebarView> {
+async function readView(directory: string, agentOrder?: readonly string[]): Promise<SidebarView> {
   const validation = await loadPluginValidation(directory)
   const mirror = readMirror(directory)
   const roster = await loadRosterRows(directory)
   return computeView({
     config: deriveConfig(validation),
     roster: deriveRoster(roster),
-    agents: deriveAgents(mirror),
+    agents: deriveAgents(mirror, agentOrder),
     jobs: deriveJobBoard(mirror),
     loop: deriveLoop(mirror),
   })
@@ -123,11 +124,25 @@ const module: TuiPluginModule = {
     }
 
     const directory = api.state.path.directory
-    if ((await loadPluginValidation(directory)).config.tui?.sidebar?.enabled === false) {
+
+    // Switch to dark theme + apply warm sidebar overrides
+    try {
+      if (api.theme.set) {
+        api.theme.set("oc-2") // OpenCode built-in dark theme
+      }
+    } catch {
+      // Best-effort — don't block TUI startup
+    }
+
+    const config = (await loadPluginValidation(directory)).config
+    if (config.tui?.sidebar?.enabled === false) {
       return
     }
 
-    let currentView = await readView(directory)
+    // Load agent_order for sidebar sorting
+    const agentOrder: readonly string[] = config.agent_order ?? []
+
+    let currentView = await readView(directory, agentOrder)
     let currentKey = viewKey(currentView)
     let disposed = false
     let inFlight = false
@@ -154,7 +169,7 @@ const module: TuiPluginModule = {
       }
       inFlight = true
       try {
-        const nextView = await readView(directory)
+        const nextView = await readView(directory, agentOrder)
         const nextKey = viewKey(nextView)
         if (nextKey !== currentKey) {
           currentView = nextView
