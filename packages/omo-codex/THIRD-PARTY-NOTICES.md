@@ -7,13 +7,13 @@ payloads, and component NOTICE files.
 
 ## Components
 
-### @colbymchenry/codegraph@1.0.1
+### @colbymchenry/codegraph@1.1.1
 - License: MIT, from npm package metadata and root third-party notice inspection.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
 - Where-bundled: optional runtime dependency of `plugin/components/codegraph`.
 
-### @colbymchenry/codegraph platform bundles@1.0.1
+### @colbymchenry/codegraph platform bundles@1.1.1
 - License: MIT for CodeGraph package metadata; bundled payloads also include a Node.js v24.16.0 runtime and vendored JavaScript/WASM dependencies. The Codex CodeGraph component ships the Node.js runtime license and bundled third-party license text at `plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
 - Copyright: CodeGraph contributors, Node.js contributors, and bundled dependency contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph

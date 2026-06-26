@@ -8,6 +8,7 @@ import type {
 } from "../../../../../utils/src/codegraph/resolve.ts";
 import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparation } from "../../../../../utils/src/codegraph/workspace.ts";
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
+import type { CodegraphVersion } from "../../../../../utils/src/codegraph/version.ts";
 
 export type SessionStartAction = "skipped-disabled" | "spawned";
 export type PostToolUseAction = "emitted-guidance" | "skipped";
@@ -57,7 +58,7 @@ export interface CodegraphSessionStartOutcome {
 
 export interface CodegraphSessionStartDeps {
 	readonly ensureGitignored: (projectRoot: string) => boolean;
-	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: "1.0.1" }) => Promise<CodegraphProvisionResult>;
+	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: CodegraphVersion }) => Promise<CodegraphProvisionResult>;
 	readonly prepareWorkspace: (projectRoot: string, options: { readonly homeDir: string }) => CodegraphWorkspacePreparation;
 	readonly resolveCommand: (options?: ResolveCodegraphCommandOptions) => CodegraphCommandResolution;
 	readonly runCommand: (

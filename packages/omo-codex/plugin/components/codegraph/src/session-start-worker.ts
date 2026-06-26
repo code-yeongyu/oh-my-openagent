@@ -14,6 +14,7 @@ import {
 	type CodegraphCommandResolution,
 } from "../../../../../utils/src/codegraph/resolve.ts";
 import { ensureCodegraphGitignored, prepareCodegraphWorkspace } from "../../../../../utils/src/codegraph/workspace.ts";
+import { CODEGRAPH_VERSION } from "../../../../../utils/src/codegraph/version.ts";
 import type {
 	CodegraphCommandResult,
 	CodegraphConfig,
@@ -25,7 +26,6 @@ import type {
 
 export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 
-const CODEGRAPH_VERSION = "1.0.1";
 const COMMAND_TIMEOUT_MS = 60_000;
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 type CodegraphBootstrapConfig = CodegraphConfig & {

@@ -16,6 +16,7 @@ import {
   type CodegraphWorkspacePreparation,
   type PrepareCodegraphWorkspaceOptions,
   type ResolveCodegraphCommandOptions,
+  CODEGRAPH_VERSION,
 } from "@oh-my-opencode/utils"
 
 import type { CodegraphConfig } from "../../config"
@@ -42,7 +43,7 @@ export interface CodegraphBootstrapDeps {
   readonly ensureProvisioned: (options: {
     readonly installDir?: string
     readonly lockDir: string
-    readonly version: "1.0.1"
+    readonly version: typeof CODEGRAPH_VERSION
   }) => Promise<CodegraphProvisionResult>
   readonly log: (message: string, data?: Record<string, unknown>) => void
   readonly nodeSupport: () => CodegraphNodeSupport
@@ -60,7 +61,6 @@ export interface CodegraphBootstrapDeps {
   readonly schedule: (task: () => Promise<void>) => void
 }
 
-const CODEGRAPH_VERSION = "1.0.1"
 const COMMAND_TIMEOUT_MS = 60_000
 const bootstrappedProjects = new Set<string>()
 

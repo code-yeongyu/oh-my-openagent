@@ -1,37 +1,38 @@
 import type { CodegraphProvisionManifest } from "./provision"
+import { CODEGRAPH_VERSION } from "./version"
 
 export const CODEGRAPH_PROVISION_MANIFEST: CodegraphProvisionManifest = {
   assets: {
     "darwin-arm64": {
       executableName: "codegraph",
-      sha256: "95bb27bf6382b69659e158e0c04d71cc394778951e1317d582be7807e7866908",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-darwin-arm64.tar.gz",
+      sha256: "fac558004b53fc9456c093d4cf46a9f1de767bc7e7a4f5e03ec811ce7c7e1cca",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.1.1/codegraph-darwin-arm64.tar.gz",
     },
     "darwin-x64": {
       executableName: "codegraph",
-      sha256: "3311cc1d1f0f0ad742709b6a43d8a9187b1ef0af0dd30e0b58008dc673e29478",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-darwin-x64.tar.gz",
+      sha256: "d46566fa70438d374b113d27a670335e7dd131f396f7e204a339206182323a7c",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.1.1/codegraph-darwin-x64.tar.gz",
     },
     "linux-arm64": {
       executableName: "codegraph",
-      sha256: "e16f612bc96c2ebccd04574cbed500c9939147c80666ad6bb024398dff7992ae",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-arm64.tar.gz",
+      sha256: "289bc3351a2b5e5b760082ae59b340aac510fa34ebec31da549696425a6c76ec",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.1.1/codegraph-linux-arm64.tar.gz",
     },
     "linux-x64": {
       executableName: "codegraph",
-      sha256: "d45a068f44596a85c7ba7d0ef924eaf7103fbbf3cafbeb668127daff60a52228",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-x64.tar.gz",
+      sha256: "0be7013c579227284e8032f8a369770ad02663d67a13478781590a30dd57ee7f",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.1.1/codegraph-linux-x64.tar.gz",
     },
     "win32-arm64": {
       executableName: "codegraph.cmd",
-      sha256: "8d57ced73b24d35f758f2ede2318e80e1d7241987f37a999e3d80edb6fddf961",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.0.1.tgz",
+      sha256: "87df31584b09a622352acc363ed4cee77ff6614136a6976abb00fcc3c0656b2f",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.1.1.tgz",
     },
     "win32-x64": {
       executableName: "codegraph.cmd",
-      sha256: "52607fe73b05e741fd1087da2ceca9d3c8f565e36bf1a7070600bdbdf3931e32",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.0.1.tgz",
+      sha256: "c4b72afc9055b719642e49c50f99c91e8c8e40b78fbbf9e37f56e29693db6144",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.1.1.tgz",
     },
   },
-  version: "1.0.1",
+  version: CODEGRAPH_VERSION,
 }
