@@ -4,6 +4,7 @@ import { isPlainRecord } from "@oh-my-opencode/utils"
 
 export async function validateLazycodexPluginBundle(pluginRoot: string): Promise<void> {
   const issues: string[] = []
+  await validateRootCliRuntime(pluginRoot, issues)
   await validatePluginMcpManifests(pluginRoot, issues)
   await validatePluginHookCommands(pluginRoot, issues)
   if (issues.length > 0) {
@@ -13,6 +14,15 @@ export async function validateLazycodexPluginBundle(pluginRoot: string): Promise
         .join("\n")}`,
     )
   }
+}
+
+async function validateRootCliRuntime(pluginRoot: string, issues: string[]): Promise<void> {
+  await collectBundleFileIssue(pluginRoot, pluginRoot, "dist/cli/index.js", "missing root CLI runtime path", issues, {
+    allowEscape: false,
+  })
+  await collectBundleFileIssue(pluginRoot, pluginRoot, "dist/cli-node/index.js", "missing root CLI runtime path", issues, {
+    allowEscape: false,
+  })
 }
 
 async function validatePluginMcpManifests(pluginRoot: string, issues: string[]): Promise<void> {
