@@ -5,9 +5,9 @@ export interface TomlSection {
   readonly text: string
 }
 
-export function removeTomlSections(config: string, shouldRemove: (header: string) => boolean): string {
+export function removeTomlSections(config: string, shouldRemove: (header: string, section: TomlSection) => boolean): string {
   return splitTomlSections(config)
-    .filter((section) => section.header === null || !shouldRemove(section.header))
+    .filter((section) => section.header === null || !shouldRemove(section.header, section))
     .map((section) => section.text)
     .join("")
     .replace(/\n{3,}/g, "\n\n")
@@ -58,7 +58,37 @@ export function parseHookStateHeaderKey(header: string): string | null {
 }
 
 function parseTomlHeader(line: string): string | null {
-  const trimmed = line.trim()
+  const trimmed = stripTomlLineComment(line).trim()
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]") || trimmed.startsWith("[[")) return null
   return trimmed.slice(1, -1)
+}
+
+function stripTomlLineComment(line: string): string {
+  let quote: string | null = null
+  let index = 0
+  while (index < line.length) {
+    const char = line[index]
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2
+        continue
+      }
+      if (char === '"') quote = null
+      index += 1
+      continue
+    }
+    if (quote === "'") {
+      if (char === "'") quote = null
+      index += 1
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      index += 1
+      continue
+    }
+    if (char === "#") return line.slice(0, index)
+    index += 1
+  }
+  return line
 }
