@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, rename, rm } from "node:fs/promises"
 import { basename, dirname, join, sep } from "node:path"
 import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
+import { removeCachedManagedNpmBinShims } from "./codex-cache-bins"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
@@ -32,6 +33,7 @@ export async function installCachedPlugin(input: {
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
+    await removeCachedManagedNpmBinShims(tempPath)
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
