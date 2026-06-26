@@ -227,20 +227,6 @@ export function resolveModelPipeline(
           }
         }
 
-        const crossProviderMatch = deps.fuzzyMatchModel(entry.model, availableModels)
-        if (crossProviderMatch) {
-          log("Model resolved via fallback chain (cross-provider fuzzy match)", {
-            model: entry.model,
-            match: crossProviderMatch,
-            variant: entry.variant,
-          })
-          return {
-            model: crossProviderMatch,
-            provenance: "provider-fallback",
-            variant: entry.variant,
-            attempted,
-          }
-        }
       }
       log("No available model found in fallback chain, falling through to system default")
     }
