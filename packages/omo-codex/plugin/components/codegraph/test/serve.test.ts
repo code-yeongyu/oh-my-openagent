@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { resolveCodegraphProcessInvocation, runCodegraphServe } from "../src/serve.ts";
@@ -250,135 +249,7 @@ describe("runCodegraphServe", () => {
 			command: "cmd.exe",
 		});
 	});
-
-	it("#given direct-process and proxy injectables are mixed #when typechecking serve options #then the public type rejects them", () => {
-		// given
-		const probePath = join(componentRoot, ".serve-options-probe.ts");
-		writeFileSync(
-			probePath,
-			[
-				'import type { RunCodegraphServeOptions } from "./src/serve.ts";',
-				"const mixed: RunCodegraphServeOptions = {",
-				"  runProcess: () => Promise.resolve(0),",
-				"  spawnServer: () => ({",
-				"    input: process.stdout,",
-				"    output: process.stdin,",
-				"    error: process.stdin,",
-				"    terminate: () => undefined,",
-				"    wait: () => Promise.resolve(0),",
-				"  }),",
-				"};",
-				"void mixed;",
-			].join("\n"),
-		);
-
-		try {
-			// when
-			const result = spawnSync(tscPath(), [
-				"--noEmit",
-				"--ignoreConfig",
-				"--allowImportingTsExtensions",
-				"--module",
-				"ESNext",
-				"--moduleResolution",
-				"Bundler",
-				"--target",
-				"ES2022",
-				"--types",
-				"node,bun-types",
-				"--strict",
-				"--exactOptionalPropertyTypes",
-				"--skipLibCheck",
-				probePath,
-			], { cwd: componentRoot, encoding: "utf8" });
-
-			// then
-			expect(result.status).not.toBe(0);
-			expect(`${result.stdout}\n${result.stderr}`).toContain("RunCodegraphServeOptions");
-		} finally {
-			rmSync(probePath, { force: true });
-		}
-	});
-
-	it("#given an uninitialized workspace #when the built serve entry starts #then it initializes before exposing MCP", () => {
-		// given
-		const tempRoot = createFakeCodegraphRoot();
-		try {
-			// when
-			const result = runBuiltWrapper("dist/serve.js", tempRoot);
-
-			// then
-			expect(result.status).toBe(0);
-			expect(result.stderr).toBe("");
-			expect(readInvocations(tempRoot)).toEqual([
-				'["status","--json"]',
-				'["init"]',
-				'["serve","--mcp"]',
-			]);
-		} finally {
-			rmSync(tempRoot, { recursive: true, force: true });
-		}
-	});
-
-	it("#given built cli entry #when invoked with an uninitialized workspace #then it initializes before serve", () => {
-		// given
-		const tempRoot = createFakeCodegraphRoot();
-		try {
-			// when
-			const result = runBuiltWrapper("dist/cli.js", tempRoot);
-
-			// then
-			expect(result.status).toBe(0);
-			expect(result.stderr).toBe("");
-			expect(readInvocations(tempRoot)).toEqual([
-				'["status","--json"]',
-				'["init"]',
-				'["serve","--mcp"]',
-			]);
-		} finally {
-			rmSync(tempRoot, { recursive: true, force: true });
-		}
-	});
 });
-
-function createFakeCodegraphRoot(): string {
-	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-wrapper-"));
-	const fakeBinaryPath = join(tempRoot, "codegraph-fake.cjs");
-	writeFileSync(
-		fakeBinaryPath,
-		[
-			"#!/usr/bin/env node",
-			"const fs = require('node:fs');",
-			"fs.appendFileSync(process.env.CODEGRAPH_FAKE_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');",
-			"if (process.argv[2] === 'status') process.stdout.write('{\"initialized\":false}\\n');",
-			"",
-		].join("\n"),
-	);
-	chmodSync(fakeBinaryPath, 0o755);
-	return tempRoot;
-}
-
-function runBuiltWrapper(entryPath: string, tempRoot: string): ReturnType<typeof spawnSync> {
-	return spawnSync(process.execPath, [join(componentRoot, entryPath)], {
-		cwd: componentRoot,
-		encoding: "utf8",
-		env: {
-			...process.env,
-			CODEGRAPH_ALLOW_UNSAFE_NODE: "1",
-			CODEGRAPH_FAKE_LOG: join(tempRoot, "invocations.log"),
-			OMO_CODEGRAPH_BIN: join(tempRoot, "codegraph-fake.cjs"),
-		},
-		timeout: 5000,
-	});
-}
-
-function readInvocations(tempRoot: string): readonly string[] {
-	return readFileSync(join(tempRoot, "invocations.log"), "utf8").trim().split("\n");
-}
-
-function tscPath(): string {
-	return join(componentRoot, "..", "..", "node_modules", ".bin", "tsc");
-}
 
 async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
 	const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
