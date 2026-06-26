@@ -88,7 +88,7 @@ describe("CodeGraph MCP proxy", () => {
         },
         refresh: async (projectPath, autoInit) => {
           events.push(`refreshed:${projectPath}`)
-          expect(autoInit).toBe(true)
+          expect(autoInit).toBe(false)
           return true
         },
       },

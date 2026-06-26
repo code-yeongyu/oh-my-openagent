@@ -147,7 +147,7 @@ async function forwardClientToCodegraph(options: ClientForwardOptions, state: Pr
     const projectPath = projectPathFromToolCall(message.payload)
     if (projectPath !== null) {
       try {
-        const refreshed = await options.synchronizer.refresh(projectPath, options.autoInit)
+        const refreshed = await options.synchronizer.refresh(projectPath, false)
         if (!refreshed) {
           const parsed = isPlainRecord(message.payload) ? message.payload : {}
           writeStdioJsonRpcResponse(
