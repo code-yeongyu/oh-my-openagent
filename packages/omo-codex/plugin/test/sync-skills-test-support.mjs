@@ -6,6 +6,7 @@ export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 
 export const expectedSkills = [
 	"ast-grep",
+	"coding-agent-sessions",
 	"comment-checker",
 	"debugging",
 	"frontend",

@@ -1,0 +1,5 @@
+{
+  "extraPaths": ["scripts"],
+  "include": ["scripts/agent_sessions", "scripts/find-agent-sessions.py"],
+  "exclude": ["**/__pycache__", "scripts/tests"]
+}

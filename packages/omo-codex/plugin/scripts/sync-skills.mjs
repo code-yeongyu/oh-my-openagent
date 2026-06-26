@@ -8,6 +8,8 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sharedSkillsRoot = sharedSkillsRootPath();
 const skillsRoot = join(root, "skills");
 const sourceTestFilePattern = /\.test\.ts$/;
+const ignoredSkillSourceDirNames = new Set([".mypy_cache", ".omo", ".pytest_cache", ".ruff_cache", "__pycache__"]);
+const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json"]);
 const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
@@ -18,6 +20,17 @@ const skillSources = [
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
 const skillDisplayPrefix = "(OmO) ";
+
+function shouldCopySkillSource(source) {
+	const normalized = source.replaceAll("\\", "/");
+	const segments = normalized.split("/");
+	const name = segments.at(-1) ?? "";
+	if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment))) return false;
+	if (ignoredSkillSourceFileNames.has(name)) return false;
+	if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false;
+	const scriptsIndex = segments.lastIndexOf("scripts");
+	return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests";
+}
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
@@ -219,7 +232,7 @@ async function syncSkills() {
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
-			filter: (source) => !sourceTestFilePattern.test(source),
+			filter: shouldCopySkillSource,
 			recursive: true,
 		});
 		await adaptSkillForCodex(skillName);
