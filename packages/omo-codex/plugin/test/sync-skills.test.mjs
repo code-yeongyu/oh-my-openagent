@@ -169,6 +169,20 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
+test("#given synced legacy ultraresearch alias #when inspected #then it points users at ulw-research", async () => {
+	// given
+	const skillRoot = join(root, "skills", "ultraresearch");
+
+	// when
+	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
+	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: ultraresearch\r?\n/m);
+	assert.match(skill, /legacy name for `ulw-research`/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) ultraresearch"/);
+});
+
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {
 	// given
 	const skillRoot = join(root, "skills", "git-master");
