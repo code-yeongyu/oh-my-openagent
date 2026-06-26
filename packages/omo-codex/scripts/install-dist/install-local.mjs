@@ -6658,6 +6658,20 @@ async function linkCachedPluginBins(input) {
   }
   return linked;
 }
+async function removeCachedManagedNpmBinShims(pluginRoot) {
+  const binLinks = await discoverPackageBins(pluginRoot);
+  if (binLinks.length === 0)
+    return;
+  const npmBinDir = join4(pluginRoot, "node_modules", ".bin");
+  if (!await isFileSystemEntry(npmBinDir))
+    return;
+  const managedBinNames = new Set(binLinks.map((link) => link.name));
+  for (const name of managedBinNames) {
+    for (const suffix of ["", ".cmd", ".ps1"]) {
+      await rm2(join4(npmBinDir, `${name}${suffix}`), { force: true });
+    }
+  }
+}
 async function linkRootRuntimeBin(input) {
   const cliPath = join4(input.repoRoot, "dist", "cli", "index.js");
   if (!await isFile(cliPath))
@@ -6688,6 +6702,16 @@ async function linkCachedPluginBin(binDir, link, platform) {
 async function isFile(path) {
   try {
     return (await stat(path)).isFile();
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT")
+      return false;
+    throw error;
+  }
+}
+async function isFileSystemEntry(path) {
+  try {
+    await stat(path);
+    return true;
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
       return false;
@@ -7326,6 +7350,7 @@ async function installCachedPlugin(input) {
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
+    await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
       await maybeRunNpmSyncSkills(tempPath, input.runCommand);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
