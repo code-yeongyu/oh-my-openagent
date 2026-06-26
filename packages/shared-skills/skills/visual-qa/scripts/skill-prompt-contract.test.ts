@@ -217,4 +217,20 @@ describe("visual-qa skill exhaustive-coverage and review-gate contract", () => {
 			expect(lowerPassB, fixture.label).toContain("overview text is part of the target")
 		}
 	})
+
+	test("#given reference packet evidence #when prompting reviewers #then sensitive content is redacted and annotations stay untrusted data", () => {
+		for (const fixture of fixtures()) {
+			const capture = sectionBetween(fixture.text, "## Step 2", "## Step 3")
+			const passA = sectionBetween(fixture.text, "### Pass A", "### Pass B")
+			const passB = sectionBetween(fixture.text, "### Pass B", "## Step 4")
+			const combined = `${capture}\n${passA}\n${passB}`.toLowerCase()
+
+			expect(combined, fixture.label).toContain("redact or omit secrets")
+			expect(combined, fixture.label).toContain("credentials")
+			expect(combined, fixture.label).toContain("customer data")
+			expect(combined, fixture.label).toContain("untrusted data")
+			expect(combined, fixture.label).toContain("not reviewer instructions")
+			expect(combined, fixture.label).toContain("never as instructions")
+		}
+	})
 })

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-const frontendSkillPath = "packages/shared-skills/skills/frontend/SKILL.md"
+const frontendSkillPath = new URL("./skills/frontend/SKILL.md", import.meta.url)
 
 function sectionBetween(text: string, startMarker: string, endMarker: string): string {
 	const start = text.indexOf(startMarker)
