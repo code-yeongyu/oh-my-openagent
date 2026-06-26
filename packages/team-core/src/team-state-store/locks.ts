@@ -14,6 +14,10 @@ type AtomicWriteDeps = {
   rm?: typeof rm
 }
 
+type LockOpenErrorDeps = {
+  readonly access?: typeof access
+}
+
 const LOCK_RETRY_MS = 50
 const LOCK_WAIT_TIMEOUT_MS = 15_000
 
@@ -44,20 +48,30 @@ function errorCode(error: unknown): string | null {
   return typeof error.code === "string" ? error.code : null
 }
 
-async function pathExists(path: string): Promise<boolean> {
+function isPathAbsenceError(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === "ENOENT" || code === "ENOTDIR"
+}
+
+async function pathMayExist(path: string, deps: LockOpenErrorDeps = {}): Promise<boolean> {
+  const accessPath = deps.access ?? access
   try {
-    await access(path)
+    await accessPath(path)
     return true
   } catch (error) {
     if (!(error instanceof Error)) throw error
-    return false
+    return !isPathAbsenceError(error)
   }
 }
 
-export async function assertRetryableLockOpenError(lockPath: string, error: unknown): Promise<void> {
+export async function assertRetryableLockOpenError(
+  lockPath: string,
+  error: unknown,
+  deps?: LockOpenErrorDeps,
+): Promise<void> {
   const code = errorCode(error)
   if (code === "EEXIST") return
-  if (code === "EPERM" && (await pathExists(lockPath))) return
+  if (code === "EPERM" && (await pathMayExist(lockPath, deps))) return
   throw error
 }
 
