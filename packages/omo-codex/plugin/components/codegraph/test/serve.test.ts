@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { resolveServeProcessInvocation, runCodegraphServe } from "../src/serve.ts";
+import { resolveCodegraphProcessInvocation, runCodegraphServe } from "../src/serve.ts";
 
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -63,6 +63,41 @@ describe("runCodegraphServe", () => {
 				stdio: "pipe",
 			},
 		]);
+	});
+
+	it("#given env cwd candidates do not exist #when serving MCP #then it falls back to the real wrapper cwd", async () => {
+		// given
+		const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-cwd-fallback-"));
+		const runCwd = join(tempRoot, "project");
+		const calls: Array<{ readonly cwd: string }> = [];
+
+		try {
+			mkdirSync(runCwd, { recursive: true });
+
+			// when
+			const exitCode = await runCodegraphServe({
+				cwd: runCwd,
+				env: {
+					OMO_CODEGRAPH_PROJECT_CWD: join(tempRoot, "missing-project"),
+					OMO_CODEGRAPH_SESSION_START_CWD: join(tempRoot, "missing-session"),
+					PWD: join(tempRoot, "missing-pwd"),
+				},
+				nodeVersion: "22.14.0",
+				buildEnv: () => ({}),
+				resolve: () => ({ argsPrefix: [], command: "codegraph", exists: true, source: "env" }),
+				runProcess: (_command, _args, options) => {
+					calls.push({ cwd: options.cwd });
+					return Promise.resolve(0);
+				},
+				stderr: { write: () => undefined },
+			});
+
+			// then
+			expect(exitCode).toBe(0);
+			expect(calls).toEqual([{ cwd: realpathSync(runCwd) }]);
+		} finally {
+			rmSync(tempRoot, { recursive: true, force: true });
+		}
 	});
 
 	it("#given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph", async () => {
@@ -193,7 +228,7 @@ describe("runCodegraphServe", () => {
 		const scriptPath = "C:\\Users\\runner\\codegraph-fake.cjs";
 
 		// when
-		const invocation = resolveServeProcessInvocation(scriptPath, ["serve", "--mcp"], "win32");
+		const invocation = resolveCodegraphProcessInvocation(scriptPath, ["serve", "--mcp"], "win32");
 
 		// then
 		expect(invocation).toEqual({
@@ -207,13 +242,62 @@ describe("runCodegraphServe", () => {
 		const shimPath = "C:\\Users\\runner\\.omo\\codegraph\\bin\\codegraph.cmd";
 
 		// when
-		const invocation = resolveServeProcessInvocation(shimPath, ["serve", "--mcp"], "win32");
+		const invocation = resolveCodegraphProcessInvocation(shimPath, ["serve", "--mcp"], "win32");
 
 		// then
 		expect(invocation).toEqual({
 			args: ["/d", "/s", "/c", shimPath, "serve", "--mcp"],
 			command: "cmd.exe",
 		});
+	});
+
+	it("#given direct-process and proxy injectables are mixed #when typechecking serve options #then the public type rejects them", () => {
+		// given
+		const probePath = join(componentRoot, ".serve-options-probe.ts");
+		writeFileSync(
+			probePath,
+			[
+				'import type { RunCodegraphServeOptions } from "./src/serve.ts";',
+				"const mixed: RunCodegraphServeOptions = {",
+				"  runProcess: () => Promise.resolve(0),",
+				"  spawnServer: () => ({",
+				"    input: process.stdout,",
+				"    output: process.stdin,",
+				"    error: process.stdin,",
+				"    terminate: () => undefined,",
+				"    wait: () => Promise.resolve(0),",
+				"  }),",
+				"};",
+				"void mixed;",
+			].join("\n"),
+		);
+
+		try {
+			// when
+			const result = spawnSync(tscPath(), [
+				"--noEmit",
+				"--ignoreConfig",
+				"--allowImportingTsExtensions",
+				"--module",
+				"ESNext",
+				"--moduleResolution",
+				"Bundler",
+				"--target",
+				"ES2022",
+				"--types",
+				"node,bun-types",
+				"--strict",
+				"--exactOptionalPropertyTypes",
+				"--skipLibCheck",
+				probePath,
+			], { cwd: componentRoot, encoding: "utf8" });
+
+			// then
+			expect(result.status).not.toBe(0);
+			expect(`${result.stdout}\n${result.stderr}`).toContain("RunCodegraphServeOptions");
+		} finally {
+			rmSync(probePath, { force: true });
+		}
 	});
 
 	it("#given an uninitialized workspace #when the built serve entry starts #then it initializes before exposing MCP", () => {
@@ -290,6 +374,10 @@ function runBuiltWrapper(entryPath: string, tempRoot: string): ReturnType<typeof
 
 function readInvocations(tempRoot: string): readonly string[] {
 	return readFileSync(join(tempRoot, "invocations.log"), "utf8").trim().split("\n");
+}
+
+function tscPath(): string {
+	return join(componentRoot, "..", "..", "node_modules", ".bin", "tsc");
 }
 
 async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
