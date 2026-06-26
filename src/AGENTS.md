@@ -15,16 +15,16 @@ src/
 ├── plugin-interface.ts               # Plugin interface assembly — 7 OpenCode hooks (66 lines)
 ├── plugin-config.ts                  # Config loading orchestration (user + project merge, 180 lines)
 ├── plugin-state.ts                   # Model cache state (context limits, anthropic 1M flag, 12 lines)
-├── agents/                           # 11 AI agents (32 files) — see agents/AGENTS.md
+├── agents/                           # 14 AI agents (32 files) — see agents/AGENTS.md
 ├── cli/                              # CLI installer, doctor (107+ files) — see cli/AGENTS.md
 ├── config/                           # Zod schema — see config/AGENTS.md
-├── features/                         # Background agents, skills, commands (18 dirs) — see features/AGENTS.md
-├── hooks/                            # 41 lifecycle hooks (36 dirs) — see hooks/AGENTS.md
-├── mcp/                              # Built-in MCPs (6 files) — see mcp/AGENTS.md
+├── features/                         # Background agents, skills, commands (20 dirs) — see features/AGENTS.md
+├── hooks/                            # ~52 lifecycle hooks (49 dirs) — see hooks/AGENTS.md
+├── mcp/                              # Built-in MCPs (4 MCPs) — see mcp/AGENTS.md
 ├── plugin/                           # Plugin interface composition (21 files)
 ├── plugin-handlers/                  # Config loading, plan inheritance (15 files) — see plugin-handlers/AGENTS.md
 ├── shared/                           # Cross-cutting utilities (~85 files) — see shared/AGENTS.md
-└── tools/                            # 26 tools (14 dirs) — see tools/AGENTS.md
+└── tools/                            # 28 tools (16 dirs) — see tools/AGENTS.md
 ```
 
 ## PLUGIN INITIALIZATION (10 steps)
