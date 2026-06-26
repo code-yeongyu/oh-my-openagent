@@ -50,6 +50,9 @@ export async function runCodegraphSessionStartWorker(options: SessionStartWorker
 	if (config.codegraph?.enabled === false) {
 		return finish("skipped-disabled", { projectRoot }, logOutcome);
 	}
+	if (config.codegraph?.auto_init === false && !codegraphStateExists(projectRoot)) {
+		return finish("skipped-status", { error: "codegraph is not initialized and auto_init is disabled", projectRoot }, logOutcome);
+	}
 
 	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
 	const bootstrapConfig: CodegraphBootstrapConfig = {
@@ -132,6 +135,10 @@ function codegraphEnvForConfig(config: CodegraphBootstrapConfig, homeDir: string
 
 function canUseResolvedCommand(resolved: CodegraphCommandResolution, nodeSupport: CodegraphNodeSupport): boolean {
 	return !codegraphCommandRequiresSupportedLocalNode(resolved) || nodeSupport.supported;
+}
+
+function codegraphStateExists(projectRoot: string): boolean {
+	return existsSync(join(projectRoot, ".codegraph"));
 }
 
 function decideStartupAction(status: CodegraphCommandResult): { readonly kind: "init" } | { readonly kind: "skip"; readonly reason: string } | { readonly kind: "sync" } {

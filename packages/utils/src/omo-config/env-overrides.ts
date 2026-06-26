@@ -6,6 +6,7 @@ type MutableCodegraphConfig = {
 }
 
 const CODEGRAPH_ENV_KEYS: readonly [CodegraphSettingKey, string, "boolean" | "number" | "string"][] = [
+  ["auto_init", "AUTO_INIT", "boolean"],
   ["auto_provision", "AUTO_PROVISION", "boolean"],
   ["enabled", "ENABLED", "boolean"],
   ["install_dir", "INSTALL_DIR", "string"],
@@ -31,6 +32,9 @@ function parseEnvValue(value: string, kind: "boolean" | "number" | "string"): bo
 
 function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSettingKey, value: unknown): void {
   switch (key) {
+    case "auto_init":
+      if (typeof value === "boolean") config.auto_init = value
+      return
     case "auto_provision":
       if (typeof value === "boolean") config.auto_provision = value
       return

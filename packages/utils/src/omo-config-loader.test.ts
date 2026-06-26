@@ -131,6 +131,30 @@ describe("loadOmoConfig", () => {
     }
   })
 
+  test("#given codex auto_init setting and env override #when loading config #then auto_init is accepted with env precedence", () => {
+    // given
+    const homeDir = makeTempHome()
+    const cwd = join(homeDir, "repo")
+    mkdirSync(cwd, { recursive: true })
+    writeConfig(homeDir, `{"[codex]":{"codegraph":{"auto_init":false}}}`)
+
+    try {
+      // when
+      const result = loadOmoConfig({
+        harness: "codex",
+        cwd,
+        homeDir,
+        env: { CODEX_CODEGRAPH_AUTO_INIT: "1" },
+      })
+
+      // then
+      expect(result.config.codegraph?.auto_init).toBe(true)
+      expect(result.warnings).not.toContain("config.[codex].codegraph.auto_init is not a supported setting")
+    } finally {
+      rmSync(homeDir, { force: true, recursive: true })
+    }
+  })
+
   test("#given unsupported codex setting #when loading config #then applicability warning is returned", () => {
     // given
     const homeDir = makeTempHome()

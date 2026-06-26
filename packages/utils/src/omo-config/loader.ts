@@ -45,13 +45,7 @@ type MutableOmoConfig = {
   codegraph?: MutableCodegraphConfig
 }
 
-const CODEGRAPH_SETTING_KEYS: readonly CodegraphSettingKey[] = [
-  "auto_provision",
-  "enabled",
-  "install_dir",
-  "telemetry",
-  "watch_debounce_ms",
-]
+const CODEGRAPH_SETTING_KEYS: readonly CodegraphSettingKey[] = ["auto_init", "auto_provision", "enabled", "install_dir", "telemetry", "watch_debounce_ms"]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return isPlainObject(value)
@@ -123,6 +117,9 @@ function validateCodegraphValue(key: CodegraphSettingKey, value: unknown): strin
 
 function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSettingKey, value: unknown): void {
   switch (key) {
+    case "auto_init":
+      if (typeof value === "boolean") config.auto_init = value
+      return
     case "auto_provision":
       if (typeof value === "boolean") config.auto_provision = value
       return

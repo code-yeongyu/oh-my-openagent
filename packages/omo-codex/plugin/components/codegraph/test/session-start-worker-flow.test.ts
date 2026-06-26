@@ -137,6 +137,98 @@ describe("CodeGraph SessionStart worker flow", () => {
 			}
 		}
 	});
+
+	it("#given auto init disabled and CodeGraph state is missing #when worker runs #then it leaves the project untouched", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-disabled-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-disabled-home-"));
+		const calls: string[] = [];
+		const outcomes: unknown[] = [];
+		try {
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				config: { codegraph: { auto_init: false, enabled: true, install_dir: "/tmp/codegraph-install" }, sources: [], trustedCodegraphInstallDir: "/tmp/codegraph-install", warnings: [] },
+				nodeVersion: "22.14.0",
+				cwd: workspace,
+				env: { HOME: homeDir },
+				logOutcome: (outcome) => outcomes.push(outcome),
+				deps: {
+					ensureGitignored: () => {
+						calls.push("ensureGitignored");
+						return true;
+					},
+					ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
+					prepareWorkspace: () => {
+						calls.push("prepareWorkspace");
+						return {
+							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
+							dataRoot: join(homeDir, ".omo/codegraph"),
+							linked: true,
+							mode: "global-linked",
+							projectLink: join(workspace, ".codegraph"),
+						};
+					},
+					resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
+					runCommand: () => {
+						calls.push("runCommand");
+						return Promise.resolve({ exitCode: 0, stdout: '{"initialized":false}', timedOut: false });
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "skipped-status" });
+			expect(calls).toEqual([]);
+			expect(outcomes).toEqual([{ action: "skipped-status", error: "codegraph is not initialized and auto_init is disabled", projectRoot: workspace }]);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
+
+	it("#given auto init disabled and CodeGraph state exists #when worker runs #then it still syncs the project", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-existing-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-existing-home-"));
+		const calls: { readonly args: readonly string[]; readonly command: string }[] = [];
+		const outcomes: unknown[] = [];
+		try {
+			mkdirSync(join(workspace, ".codegraph"), { recursive: true });
+
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				config: { codegraph: { auto_init: false, enabled: true, install_dir: "/tmp/codegraph-install" }, sources: [], trustedCodegraphInstallDir: "/tmp/codegraph-install", warnings: [] },
+				nodeVersion: "22.14.0",
+				cwd: workspace,
+				env: { HOME: homeDir },
+				logOutcome: (outcome) => outcomes.push(outcome),
+				deps: {
+					ensureGitignored: () => true,
+					ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
+					prepareWorkspace: () => ({
+						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
+						dataRoot: join(homeDir, ".omo/codegraph"),
+						linked: false,
+						mode: "in-project",
+						projectLink: join(workspace, ".codegraph"),
+					}),
+					resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
+					runCommand: (_projectRoot, command, args) => {
+						calls.push({ args, command });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":true}' : "", timedOut: false });
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "synced" });
+			expect(calls.map((call) => [...call.args])).toEqual([["status", "--json"], ["sync"]]);
+			expect(outcomes).toEqual([{ action: "synced", exitCode: 0, projectRoot: workspace, source: "path", timedOut: false }]);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
 });
 
 async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
