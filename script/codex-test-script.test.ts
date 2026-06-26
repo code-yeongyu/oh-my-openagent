@@ -69,4 +69,14 @@ describe("Codex compatibility test script", () => {
       "test:codex must build git-bash-mcp before installer tests assert packaged runtime files",
     ).toBe(true)
   })
+
+  test("builds the CodeGraph proxy before the Codex plugin consumes it", () => {
+    const packageManifest = readFileSync(packageManifestPath, "utf8")
+
+    const codegraphBuildIndex = packageManifest.indexOf("bun run build:codegraph-mcp")
+    const pluginBuildIndex = packageManifest.indexOf("bun run --cwd packages/omo-codex/plugin build")
+
+    expect(codegraphBuildIndex).toBeGreaterThanOrEqual(0)
+    expect(pluginBuildIndex).toBeGreaterThan(codegraphBuildIndex)
+  })
 })

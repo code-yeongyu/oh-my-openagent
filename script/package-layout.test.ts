@@ -164,6 +164,13 @@ describe("published package layout", () => {
     expect(packedPaths.has(expectedPackageRootManifest)).toBe(true)
   }, packDryRunTimeoutMs)
 
+  test("#given the shared CodeGraph proxy #when packing the root package #then its runtime ships", async () => {
+    const packedPaths = await packDryRunPaths()
+
+    expect(packedPaths.has("packages/codegraph-mcp/package.json")).toBe(true)
+    expect(packedPaths.has("packages/codegraph-mcp/dist/cli.js")).toBe(true)
+  }, packDryRunTimeoutMs)
+
   test("#given generated Codex installer bundle #when packing package #then generated output ships and stale forks do not", async () => {
     // given
     const expectedGeneratedInstaller = "packages/omo-codex/scripts/install-dist/install-local.mjs"

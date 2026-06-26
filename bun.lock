@@ -28,6 +28,7 @@
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
+        "@oh-my-opencode/codegraph-mcp": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
@@ -84,6 +85,20 @@
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
+      },
+    },
+    "packages/codegraph-mcp": {
+      "name": "@oh-my-opencode/codegraph-mcp",
+      "version": "0.1.0",
+      "bin": {
+        "omo-codegraph-mcp": "./dist/cli.js",
+      },
+      "dependencies": {
+        "@oh-my-opencode/mcp-stdio-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
       },
     },
     "packages/comment-checker-core": {
@@ -374,6 +389,8 @@
     "@oh-my-opencode/boulder-state": ["@oh-my-opencode/boulder-state@workspace:packages/boulder-state"],
 
     "@oh-my-opencode/claude-code-compat-core": ["@oh-my-opencode/claude-code-compat-core@workspace:packages/claude-code-compat-core"],
+
+    "@oh-my-opencode/codegraph-mcp": ["@oh-my-opencode/codegraph-mcp@workspace:packages/codegraph-mcp"],
 
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
 

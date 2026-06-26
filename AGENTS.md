@@ -48,13 +48,13 @@ Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now
 
 OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 53-60 lifecycle hooks (base / +team-mode) across 60 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
 
-**The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree is now the OpenCode-facing shim over 18 Core packages + 3 MCP packages + the Codex adapter. Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
+**The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree is now the OpenCode-facing shim over 18 Core packages + 4 MCP packages + the Codex adapter. Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/                      # workspace root (no root src/ — it moved into packages/omo-opencode)
-├── packages/                        # 37 sibling pkgs, layered: Core → MCP → Skills → Adapters → Platform/Web. See packages/AGENTS.md
+├── packages/                        # 38 sibling pkgs, layered: Core → MCP → Skills → Adapters → Platform/Web. See packages/AGENTS.md
 │   ├── omo-opencode/                # ★ THE OpenCode plugin adapter (formerly root src/). Build entry: src/index.ts
 │   │   └── src/                     # plugin source and OpenCode-facing adapter shims. Full breakdown → packages/omo-opencode/src/AGENTS.md
 │   │       ├── index.ts             # Plugin entry; thin wrapper re-exporting createPluginModule() from src/testing/
@@ -73,7 +73,7 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 │   │       └── generated/ help/ locales/ testing/ __tests__/  # model-capabilities, CLI help schemas, i18n, test factory, perf benchmarks
 │   ├── omo-codex/                   # Codex CLI Light edition (lazycodex); vendored Codex plugin `omo` + TS installer + telemetry
 │   ├── utils/ model-core/ prompts-core/ rules-engine/ agents-md-core/ comment-checker-core/ hashline-core/ boulder-state/ telemetry-core/ lsp-core/ mcp-stdio-core/ tmux-core/ claude-code-compat-core/ skills-loader-core/ mcp-client-core/ openclaw-core/ team-core/ delegate-core/   # 18 Core (pure-TS) pkgs
-│   ├── lsp-tools-mcp/ git-bash-mcp/ lsp-daemon/   # 3 MCP-layer pkgs (stdio); LSP packages consume lsp-core + mcp-stdio-core
+│   ├── codegraph-mcp/ lsp-tools-mcp/ git-bash-mcp/ lsp-daemon/   # 4 MCP-layer pkgs (stdio); shared harness proxies consume Core packages
 │   ├── shared-skills/               # Cross-harness SKILL.md bundle shared by OpenCode + Codex
 │   ├── web/                         # Marketing site (Next.js 15 + Cloudflare Workers); own bun.lock; only @/* alias zone in the repo
 │   └── oh-my-opencode-<os>-<arch>[-variant]/   # 12 platform binaries (bin/ + package.json only; generated, never hand-edited)

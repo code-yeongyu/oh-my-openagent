@@ -25,6 +25,7 @@ const corePackagePaths: readonly string[] = [
 ] as const
 
 const mcpPackagePaths: readonly string[] = [
+  "packages/codegraph-mcp",
   "packages/git-bash-mcp",
   "packages/lsp-daemon",
   "packages/lsp-tools-mcp",

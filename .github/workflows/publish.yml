@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build shared CodeGraph MCP package
+        run: bun run build:codegraph-mcp
+
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
         working-directory: packages/lsp-daemon
@@ -70,6 +73,7 @@ jobs:
           JOB_SUMMARY_TITLE: Release test gate
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
+            - Builds the shared CodeGraph MCP runtime before package-layout tests.
             - Builds vendored LSP packages before release tests.
             - Runs the full root `bun test` suite before publishing.
           JOB_SUMMARY_NEXT: Fix the first failing test or vendored package build before rerunning release.

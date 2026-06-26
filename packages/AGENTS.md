@@ -4,14 +4,14 @@
 
 ## OVERVIEW
 
-37 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own publication / deployment target.
+38 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`codegraph-mcp`, `lsp-tools-mcp`, `lsp-daemon`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own publication / deployment target.
 
 ## ROLE MAP
 
 | Role | Count | Packages |
 |------|-------|----------|
 | **Platform binaries** | 12 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
-| **MCP packages** | 3 | `lsp-tools-mcp`, `git-bash-mcp`, `lsp-daemon` |
+| **MCP packages** | 4 | `codegraph-mcp`, `lsp-tools-mcp`, `git-bash-mcp`, `lsp-daemon` |
 | **Core packages** | 18 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core` |
 | **Adapters** | 2 | `omo-opencode` (OpenCode Ultimate edition; the former root `src/`, build entry for the main npm dist) + `omo-codex` (Codex CLI Light edition; npm/bin alias `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`). See [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md), [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md) |
 | **Skills** | 1 | [`shared-skills`](shared-skills/AGENTS.md) (cross-harness SKILL.md bundle shared between OMO and Codex; shipped via root `files` array) |
@@ -29,6 +29,7 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 
 | Package | Layout | Purpose |
 |---------|--------|---------|
+| [`codegraph-mcp/`](codegraph-mcp/AGENTS.md) | Internal package (`src/`, `dist/`, `tsconfig.json`) | Freshness-preserving stdio proxy shared by OpenCode and Codex. It blocks initial tool discovery until the default graph is ready and refreshes each explicit `projectPath` before forwarding a query. |
 | `lsp-tools-mcp/` | Vendored standalone project (`.github/`, `CHANGELOG.md`, `LICENSE`, `src/`, `test/`, `biome.json`, `vitest.config.ts`) | Serves `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status` tools via stdio MCP. Registered as tier-1 MCP `lsp` in [`packages/omo-opencode/src/mcp/`](omo-opencode/src/mcp/AGENTS.md). Node-targeted, built with `npm` + vitest, and consumes `lsp-core` + `mcp-stdio-core`. |
 | [`git-bash-mcp/`](git-bash-mcp/AGENTS.md) | Internal package (`src/`, `dist/`, `tsconfig.json`) | stdio MCP serving the Windows-only `git_bash` tool for the Codex edition (Bun-targeted, unlike the other two). Tier-1 MCP. |
 | `lsp-daemon/` | Vendored standalone project (`src/`, `test/`, `scripts/`, `biome.json`, `package-lock.json`) | Shared per-user LSP **daemon** over a unix socket (Windows named pipe) + a stdio MCP **proxy** + a tool client, consuming `lsp-core` + `mcp-stdio-core`. Lets multiple Codex sessions share one warm LSP process. Bin `omo-lsp-daemon`. Node-targeted (`npm` + vitest). See [`packages/lsp-daemon/AGENTS.md`](lsp-daemon/AGENTS.md). |
