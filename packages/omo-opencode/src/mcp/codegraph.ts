@@ -99,7 +99,11 @@ export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}
     which,
   })
   const enabled =
-    resolvedCommand.exists && (resolvedCommand.source === "bundled" || resolvedCommand.source === "env" || nodeSupport.supported)
+    resolvedCommand.exists &&
+    (resolvedCommand.source === "bundled" ||
+      resolvedCommand.source === "env" ||
+      resolvedCommand.source === "provisioned" ||
+      nodeSupport.supported)
   const proxy = resolveProxyCommand(options)
   const canProxyProvision = resolvedCommand.source !== "env" && options.config?.auto_provision !== false
 

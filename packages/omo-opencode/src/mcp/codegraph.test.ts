@@ -204,6 +204,32 @@ describe("createCodegraphMcpConfig", () => {
     })
     expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
   })
+
+  it("#given configured install_dir resolves a provisioned CodeGraph #when host Node is unsupported #then the MCP stays enabled", () => {
+    // given
+    const installDir = "/custom/codegraph"
+    const provisionedPath = join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph")
+    const nodePath = "/opt/node26/bin/node"
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: "/workspace/project",
+      config: { auto_provision: false, enabled: true, install_dir: installDir },
+      env: {},
+      fileExists: (filePath) => filePath === provisionedPath,
+      homeDir: "/tmp/omo-codegraph-test-home",
+      nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "26.3.0" : "0.0.0"),
+      proxy: PROXY,
+      requireResolve: () => {
+        throw new Error("bundled package absent")
+      },
+      resolveExecutable: createResolver({ node: nodePath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
+  })
 })
 
 function createResolver(commands: Readonly<Record<string, string>>) {
