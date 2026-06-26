@@ -84,7 +84,7 @@ bun test packages/omo-opencode/src/hooks/atlas/final-wave-approval-gate.test.ts
     expect(verdict).toBe("reject")
   })
 
-  test("prefers approve over reject when both tokens appear", () => {
+  test("returns missing when approve and reject tokens both appear", () => {
     // given
     const output = "VERDICT: REJECT then revised to VERDICT: APPROVE"
 
@@ -92,7 +92,18 @@ bun test packages/omo-opencode/src/hooks/atlas/final-wave-approval-gate.test.ts
     const verdict = classifyFinalWaveVerdict(output)
 
     // then
-    expect(verdict).toBe("approve")
+    expect(verdict).toBe("missing")
+  })
+
+  test("returns missing when the output only repeats the verdict instruction", () => {
+    // given
+    const output = "Please emit VERDICT: APPROVE or VERDICT: REJECT before finishing."
+
+    // when
+    const verdict = classifyFinalWaveVerdict(output)
+
+    // then
+    expect(verdict).toBe("missing")
   })
 })
 

@@ -1,15 +1,18 @@
 import type { SessionState } from "./types"
 import { readFinalWavePlanState } from "./final-wave-plan-state"
 
-const APPROVE_VERDICT_PATTERN = /\bVERDICT:\s*APPROVE\b/i
-const REJECT_VERDICT_PATTERN = /\bVERDICT:\s*REJECT\b/i
+const VERDICT_PATTERN = /\bVERDICT:\s*(APPROVE|REJECT)\b/gi
 
 export function classifyFinalWaveVerdict(output: string): "approve" | "reject" | "missing" {
-  if (APPROVE_VERDICT_PATTERN.test(output)) {
+  const verdicts = [...output.matchAll(VERDICT_PATTERN)].map((match) => match[1]?.toLowerCase())
+  const hasApprove = verdicts.includes("approve")
+  const hasReject = verdicts.includes("reject")
+
+  if (hasApprove && !hasReject) {
     return "approve"
   }
 
-  if (REJECT_VERDICT_PATTERN.test(output)) {
+  if (hasReject && !hasApprove) {
     return "reject"
   }
 
@@ -36,7 +39,7 @@ export function shouldPauseForFinalWaveApproval(input: {
     return false
   }
 
-  if (!APPROVE_VERDICT_PATTERN.test(input.taskOutput)) {
+  if (classifyFinalWaveVerdict(input.taskOutput) !== "approve") {
     return false
   }
 
