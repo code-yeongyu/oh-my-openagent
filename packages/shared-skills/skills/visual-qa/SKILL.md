@@ -267,7 +267,7 @@ bun "$SKILL_DIR/scripts/cli.ts" image-diff <reference.png> <actual.png>
    Input: goal, success criteria, changed files, full diff, reference/target design (screenshots, Figma exports, source-site captures), evidence paths.
 
    Review for:
-   1. Real component tree: live, reused primitives render the UI, NOT a pasted screenshot, raster image, or `background-image` standing in for live DOM elements.
+   1. Real component tree: live, reused primitives and extensible state variants render the UI, NOT a pasted screenshot, raster image, or `background-image` standing in for live DOM elements.
    2. Token-driven styling: design tokens drive colors, spacing, and typography, NOT hardcoded one-off pixel or hex values.
    3. Layer and layout structure: the DOM hierarchy and layout match the target structure.
    4. Visual fidelity: the rendered design itself matches the reference.
