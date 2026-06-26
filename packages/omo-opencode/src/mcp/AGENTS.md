@@ -14,7 +14,7 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | **context7** | remote | `mcp.context7.com/mcp` | `CONTEXT7_API_KEY` (optional) | Library documentation |
 | **grep_app** | remote | `mcp.grep.app` | None | GitHub code search |
 | **lsp** | local (stdio, node/bun) | `node packages/lsp-tools-mcp/dist/cli.js mcp` or `bun packages/lsp-tools-mcp/src/cli.ts mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
-| **codegraph** | local (stdio) | resolved `codegraph serve --mcp` (bundled npm / provisioned `~/.omo/codegraph` / PATH) | `CODEGRAPH_*` (download + telemetry off) | `codegraph_explore`, `codegraph_search`, `codegraph_node`, `codegraph_callers`, `codegraph_callees`, `codegraph_impact`, `codegraph_files`, `codegraph_status` |
+| **codegraph** | local (stdio) | `codegraph-mcp` freshness proxy → resolved CodeGraph 1.1.1 runtime | `CODEGRAPH_*` (download + telemetry off) | `codegraph_explore` by default; upstream's other seven tools remain callable when enabled with `CODEGRAPH_MCP_TOOLS` |
 
 ## VENDORED LSP ARCHITECTURE
 
@@ -42,4 +42,4 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | `context7.ts` | Context7 with optional auth header |
 | `grep-app.ts` | Grep.app (no auth) |
 | `lsp.ts` | Local stdio MCP config for packaged `lsp-tools-mcp` |
-| `codegraph.ts` | Local stdio MCP config; resolves/gates the `codegraph` binary (gated by `config.codegraph.enabled`) |
+| `codegraph.ts` | Local stdio MCP config; resolves the shared freshness proxy and gates CodeGraph availability (gated by `config.codegraph.enabled`) |

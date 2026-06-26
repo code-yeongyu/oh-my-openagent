@@ -6,8 +6,10 @@ import { CODEGRAPH_TELEMETRY_ENV, DO_NOT_TRACK_ENV } from "@oh-my-opencode/utils
 import { createCodegraphMcpConfig } from "./codegraph"
 import type { RuntimeExecutable } from "./runtime-executable"
 
+const PROXY = { command: ["node", "/opt/omo/codegraph-mcp/dist/cli.js"], exists: true } as const
+
 describe("createCodegraphMcpConfig", () => {
-  it("returns a local MCP command that launches codegraph serve --mcp when the binary is present", () => {
+  it("returns the freshness proxy command when the CodeGraph binary is present", () => {
     // given
     const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
     const nodePath = "/opt/node22/bin/node"
@@ -20,18 +22,19 @@ describe("createCodegraphMcpConfig", () => {
       fileExists: () => false,
       homeDir: "/tmp/omo-codegraph-test-home",
       nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "22.14.0" : "26.3.0"),
+      proxy: PROXY,
       resolveExecutable: createResolver({ codegraph: codegraphPath, node: nodePath }),
     })
 
     // then
     expect(config).toMatchObject({
       type: "local",
-      command: [codegraphPath, "serve", "--mcp"],
+      command: PROXY.command,
       enabled: true,
     })
   })
 
-  it("keeps the registration disabled when the codegraph binary is absent", () => {
+  it("keeps the proxy enabled for on-demand provisioning when the codegraph binary is absent", () => {
     // given
     const resolveExecutable = createResolver({})
 
@@ -41,12 +44,13 @@ describe("createCodegraphMcpConfig", () => {
       config: { enabled: true },
       fileExists: () => false,
       homeDir: "/tmp/omo-codegraph-test-home",
+      proxy: PROXY,
       resolveExecutable,
     })
 
     // then
-    expect(config.command).toEqual(["codegraph", "serve", "--mcp"])
-    expect(config.enabled).toBe(false)
+    expect(config.command).toEqual(PROXY.command)
+    expect(config.enabled).toBe(true)
   })
 
   it("keeps the registration disabled when OMO_CODEGRAPH_BIN points to a missing path", () => {
@@ -60,15 +64,16 @@ describe("createCodegraphMcpConfig", () => {
       env: { OMO_CODEGRAPH_BIN: "/nonexistent" },
       fileExists: () => false,
       homeDir: "/tmp/omo-codegraph-test-home",
+      proxy: PROXY,
       resolveExecutable,
     })
 
     // then
-    expect(config.command).toEqual(["/nonexistent", "serve", "--mcp"])
+    expect(config.command).toEqual(PROXY.command)
     expect(config.enabled).toBe(false)
   })
 
-  it("#given only a PATH CodeGraph binary and an unsupported host Node #when creating the MCP config #then it stays disabled", () => {
+  it("#given only a PATH CodeGraph binary and an unsupported host Node #when auto provisioning is enabled #then the proxy remains available", () => {
     // given
     const codegraphPath = "/usr/local/bin/codegraph"
     const nodePath = "/opt/node26/bin/node"
@@ -81,6 +86,7 @@ describe("createCodegraphMcpConfig", () => {
       fileExists: () => false,
       homeDir: "/tmp/omo-codegraph-test-home",
       nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "26.3.0" : "0.0.0"),
+      proxy: PROXY,
       requireResolve: () => {
         throw new Error("bundled package absent")
       },
@@ -88,8 +94,8 @@ describe("createCodegraphMcpConfig", () => {
     })
 
     // then
-    expect(config.command).toEqual([codegraphPath, "serve", "--mcp"])
-    expect(config.enabled).toBe(false)
+    expect(config.command).toEqual(PROXY.command)
+    expect(config.enabled).toBe(true)
   })
 
   it("#given OMO_CODEGRAPH_BIN points at an explicit command #when host Node is unsupported #then the MCP stays enabled", () => {
@@ -104,11 +110,12 @@ describe("createCodegraphMcpConfig", () => {
       fileExists: (filePath) => filePath === codegraphPath,
       homeDir: "/tmp/omo-codegraph-test-home",
       nodeVersionForExecutable: () => "26.3.0",
+      proxy: PROXY,
       resolveExecutable: createResolver({}),
     })
 
     // then
-    expect(config.command).toEqual([codegraphPath, "serve", "--mcp"])
+    expect(config.command).toEqual(PROXY.command)
     expect(config.enabled).toBe(true)
   })
 
@@ -126,13 +133,14 @@ describe("createCodegraphMcpConfig", () => {
       fileExists: (filePath) => filePath === shim || filePath === nodeBin,
       homeDir: "/tmp/omo-codegraph-test-home",
       nodeVersionForExecutable: (candidate) => (candidate === nodeBin ? "22.22.3" : "26.3.0"),
+      proxy: PROXY,
       requireResolve: () => packageJson,
       resolveExecutable: createResolver({}),
     })
 
     // then
     expect(config).toMatchObject({
-      command: [nodeBin, shim, "serve", "--mcp"],
+      command: PROXY.command,
       enabled: true,
       type: "local",
     })
@@ -147,12 +155,24 @@ describe("createCodegraphMcpConfig", () => {
       config: { enabled: true },
       fileExists: () => false,
       homeDir: "/tmp/omo-codegraph-test-home",
+      proxy: PROXY,
       resolveExecutable: createResolver({ codegraph: codegraphPath }),
     })
 
     // then
     expect(config.environment?.[CODEGRAPH_TELEMETRY_ENV]).toBe("0")
     expect(config.environment?.[DO_NOT_TRACK_ENV]).toBe("1")
+  })
+
+  it("passes disabled auto-init policy to the freshness proxy", () => {
+    const config = createCodegraphMcpConfig({
+      config: { auto_init: false, enabled: true },
+      homeDir: "/tmp/omo-codegraph-test-home",
+      proxy: PROXY,
+      resolveExecutable: createResolver({ codegraph: "/opt/omo/codegraph/bin/codegraph" }),
+    })
+
+    expect(config.environment?.OMO_CODEGRAPH_AUTO_INIT).toBe("0")
   })
 
   it("uses configured install_dir for provisioned lookup and MCP environment", () => {
@@ -169,6 +189,7 @@ describe("createCodegraphMcpConfig", () => {
       fileExists: (filePath) => filePath === provisionedPath,
       homeDir: "/tmp/omo-codegraph-test-home",
       nodeVersionForExecutable: (candidate) => (candidate === nodePath ? "22.14.0" : "26.3.0"),
+      proxy: PROXY,
       requireResolve: () => {
         throw new Error("bundled package absent")
       },
@@ -178,7 +199,7 @@ describe("createCodegraphMcpConfig", () => {
     // then
     expect(config).toMatchObject({
       type: "local",
-      command: [provisionedPath, "serve", "--mcp"],
+      command: PROXY.command,
       enabled: true,
     })
     expect(config.environment?.CODEGRAPH_INSTALL_DIR).toBe(installDir)
