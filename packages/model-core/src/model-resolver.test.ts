@@ -413,7 +413,7 @@ describe("resolveModelWithFallback", () => {
       expect(resolved.source).toBe("provider-fallback")
     })
 
-    test("cross-provider fuzzy match when preferred provider unavailable (librarian scenario)", () => {
+    test("skips same-name models from other providers when preferred provider unavailable", () => {
       // given - glm-5 is defined for zai-coding-plan, but only opencode has it
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
@@ -428,14 +428,10 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
       const resolved = expectResolved(result)
 
-      // then - should find glm-5 from opencode via cross-provider fuzzy match
-      expect(resolved.model).toBe("opencode/glm-5")
+      // then - should ignore opencode/glm-5 and use the next matching provider entry
+      expect(resolved.model).toBe("anthropic/claude-sonnet-4-6")
       expect(resolved.source).toBe("provider-fallback")
-      expect(logMock).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
-        model: "glm-5",
-        match: "opencode/glm-5",
-        variant: undefined,
-      })
+      expect(logMock).not.toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", expect.anything())
     })
 
     test("prefers specified provider over cross-provider match", () => {
@@ -457,7 +453,7 @@ describe("resolveModelWithFallback", () => {
       expect(resolved.source).toBe("provider-fallback")
     })
 
-    test("cross-provider match preserves variant from entry", () => {
+    test("does not preserve variant from an entry matched only through a different provider", () => {
       // given - entry has variant, model found via cross-provider
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
@@ -471,9 +467,10 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
       const resolved = expectResolved(result)
 
-      // then - variant should be preserved
-      expect(resolved.model).toBe("opencode/glm-5")
-      expect(resolved.variant).toBe("high")
+      // then - the provider-scoped entry does not match opencode/glm-5
+      expect(resolved.model).toBe("google/gemini-3.1-pro")
+      expect(resolved.source).toBe("system-default")
+      expect(resolved.variant).toBeUndefined()
     })
 
     test("cross-provider match tries next entry if no match found anywhere", () => {
