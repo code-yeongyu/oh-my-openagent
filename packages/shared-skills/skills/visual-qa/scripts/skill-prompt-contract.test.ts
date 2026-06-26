@@ -114,15 +114,20 @@ describe("visual-qa skill prompt contract", () => {
 		expect(doc).toContain("agent-browser --help")
 	})
 
-	test("#given a clone/design-port task #when in clone-coding mode #then dual pixel + code-fidelity verification loops until both pass", () => {
+	test("#given a concrete visual target #when in reference-fidelity mode #then dual pixel + code-fidelity verification loops until both pass", () => {
 		for (const fixture of fixtures()) {
 			const cloneMode = sectionBetween(fixture.text, "## Step 5", "## Reference evidence is not the verdict")
 			const lowerCloneMode = cloneMode.toLowerCase()
 
 			expect(lowerCloneMode, fixture.label).toContain("clone")
+			expect(lowerCloneMode, fixture.label).toContain("imagen")
+			expect(lowerCloneMode, fixture.label).toContain("stitch")
+			expect(lowerCloneMode, fixture.label).toContain("generated mockup")
+			expect(lowerCloneMode, fixture.label).toContain("overview")
 			expect(cloneMode, fixture.label).toContain("pixel-by-pixel")
 			expect(cloneMode, fixture.label).toContain("image-diff")
 			expect(cloneMode, fixture.label).toContain("lazycodex-clone-fidelity-reviewer")
+			expect(lowerCloneMode, fixture.label).toContain("extensible state variants")
 			expect(lowerCloneMode, fixture.label).toContain("retry")
 		}
 	})
@@ -192,6 +197,24 @@ describe("visual-qa skill exhaustive-coverage and review-gate contract", () => {
 			expect(lower, fixture.label).toContain("citation")
 			expect(lower, fixture.label).toContain("every page")
 			expect(lower, fixture.label).toContain("regardless of similarityscore")
+		}
+	})
+
+	test("#given a generated reference packet #when reviewing #then Pass A and B require extensible design-system code and pixel-level reference matching", () => {
+		for (const fixture of fixtures()) {
+			const passA = sectionBetween(fixture.text, "### Pass A", "### Pass B")
+			const passB = sectionBetween(fixture.text, "### Pass B", "## Step 4")
+			const lowerPassA = passA.toLowerCase()
+			const lowerPassB = passB.toLowerCase()
+
+			expect(passA, fixture.label).toContain("REFERENCE PACKET:")
+			expect(passB, fixture.label).toContain("REFERENCE PACKET:")
+			expect(lowerPassA, fixture.label).toContain("reusable tokens/primitives")
+			expect(lowerPassA, fixture.label).toContain("extend to new pages")
+			expect(lowerPassA, fixture.label).toContain("missing overview content")
+			expect(lowerPassB, fixture.label).toContain("pixel-perfectly")
+			expect(lowerPassB, fixture.label).toContain("actual against reference")
+			expect(lowerPassB, fixture.label).toContain("overview text is part of the target")
 		}
 	})
 })
