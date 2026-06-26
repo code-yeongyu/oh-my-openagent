@@ -376,6 +376,36 @@ describe("codex-config-toml", () => {
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
   })
 
+  test("#given legacy boolean MultiAgentV2 flag false #when updating config #then normalizes to a disabled table config", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-false-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[features]",
+        "multi_agent_v2 = false",
+        "plugins = false",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^multi_agent_v2\s*=/m)
+    expect(content).toContain("[features.multi_agent_v2]")
+    expect(content).toMatch(/\[features\.multi_agent_v2\]\nenabled = false\nmax_concurrent_threads_per_session = 10000/)
+  })
+
   test("#given legacy agents max_threads #when updating config #then removes the conflicting legacy thread cap", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))

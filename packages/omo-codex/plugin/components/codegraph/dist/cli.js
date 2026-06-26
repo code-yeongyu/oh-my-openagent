@@ -2211,19 +2211,20 @@ function defaultWorkerCliPath() {
 }
 
 // components/codegraph/src/serve.ts
-import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync7, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
-import { basename as basename4, extname as extname2, join as join8, resolve as resolve3 } from "node:path";
+import { basename as basename4, join as join8, resolve as resolve3 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
-  execPath as processExecPath,
   stdin as processStdin2,
   stderr as processStderr2,
   stdout as processStdout2
 } from "node:process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
+
+// components/codegraph/src/mcp-bridge.ts
+import { spawn as spawn2 } from "node:child_process";
 
 // ../../mcp-stdio-core/src/record.ts
 function isPlainRecord(value) {
@@ -2425,6 +2426,114 @@ function createIdleTimer(idleTimeoutMs, log, onIdleTimeout) {
     closed: () => isClosed
   };
 }
+// components/codegraph/src/serve-invocation.ts
+import { extname as extname2 } from "node:path";
+import { execPath as processExecPath } from "node:process";
+var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
+function resolveServeProcessInvocation(command, args, platform = process.platform) {
+  if (platform !== "win32")
+    return { args: [...args], command };
+  const extension = extname2(command).toLowerCase();
+  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
+    return { args: [command, ...args], command: processExecPath };
+  }
+  if (WINDOWS_CMD_EXTENSIONS2.has(extension)) {
+    return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
+  }
+  return { args: [...args], command };
+}
+
+// components/codegraph/src/mcp-bridge.ts
+class CodegraphBridgeStdioError extends Error {
+  streamName;
+  name = "CodegraphBridgeStdioError";
+  constructor(streamName) {
+    super(`CodeGraph MCP bridge missing child ${streamName}`);
+    this.streamName = streamName;
+  }
+}
+async function runBridgedCodegraphProcess(command, args, options) {
+  const invocation = resolveServeProcessInvocation(command, args);
+  const child = spawn2(invocation.command, invocation.args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: ["pipe", "pipe", "inherit"]
+  });
+  const childInput = child.stdin;
+  const childOutput = child.stdout;
+  if (childInput === null)
+    throw new CodegraphBridgeStdioError("stdin");
+  if (childOutput === null)
+    throw new CodegraphBridgeStdioError("stdout");
+  const responseModes = new Map;
+  let defaultResponseMode = "framed";
+  const childExit = new Promise((resolveExit, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code !== null) {
+        resolveExit(code);
+        return;
+      }
+      resolveExit(signal === null ? 0 : 1);
+    });
+  });
+  const bridgeDone = Promise.all([
+    forwardClientToCodegraph(options.input, childInput, responseModes, (mode) => {
+      defaultResponseMode = mode;
+    }),
+    forwardCodegraphToClient(childOutput, options.output, responseModes, () => defaultResponseMode)
+  ]);
+  const destroyChildPipes = () => {
+    childInput.destroy();
+    childOutput.destroy();
+  };
+  childExit.then(destroyChildPipes, destroyChildPipes);
+  return Promise.race([childExit, bridgeDone.then(() => childExit)]);
+}
+async function forwardClientToCodegraph(input, childInput, responseModes, setDefaultResponseMode) {
+  for await (const message of readStdioJsonRpcMessages(input)) {
+    if (message.kind === "parse_error") {
+      continue;
+    }
+    const responseMode = message.responseMode;
+    setDefaultResponseMode(responseMode);
+    const key = responseModeKey(message.payload);
+    if (key !== null)
+      responseModes.set(key, responseMode);
+    await writeLine(childInput, JSON.stringify(message.payload));
+  }
+  childInput.end();
+}
+async function forwardCodegraphToClient(childOutput, output, responseModes, defaultResponseMode) {
+  for await (const message of readStdioJsonRpcMessages(childOutput)) {
+    if (message.kind === "parse_error") {
+      writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
+      continue;
+    }
+    const key = responseModeKey(message.payload);
+    const responseMode = key === null ? defaultResponseMode() : responseModes.get(key) ?? defaultResponseMode();
+    if (key !== null)
+      responseModes.delete(key);
+    writeStdioJsonRpcResponse(output, message.payload, responseMode);
+  }
+}
+function responseModeKey(payload) {
+  if (!isPlainRecord(payload) || !("id" in payload))
+    return null;
+  const id = jsonRpcId(payload["id"]);
+  return `${typeof id}:${String(id)}`;
+}
+async function writeLine(output, line) {
+  if (output.write(`${line}
+`))
+    return;
+  await new Promise((resolveDrain, reject) => {
+    output.once("drain", resolveDrain);
+    output.once("error", reject);
+  });
+}
+
 // components/codegraph/src/mcp-unavailable.ts
 async function runUnavailableCodegraphMcpServer(options) {
   await runJsonRpcStdioServer({
@@ -2477,12 +2586,13 @@ var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. In
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
 var CODEGRAPH_VERSION2 = "1.0.1";
-var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
-var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
+var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv3;
   const homeDir = options.homeDir ?? homedir10();
-  const config = options.config ?? getCodexOmoConfig({ cwd: options.cwd ?? processCwd3(), env, homeDir });
+  const wrapperCwd = options.cwd ?? processCwd3();
+  const projectCwd = resolveProjectCwd(env, wrapperCwd);
+  const config = options.config ?? getCodexOmoConfig({ cwd: projectCwd, env, homeDir });
   const codegraphConfig = config.codegraph ?? {};
   if (codegraphConfig.enabled === false) {
     return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
@@ -2514,15 +2624,19 @@ async function runCodegraphServe(options = {}) {
   if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
     return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
   }
-  const runProcess = options.runProcess ?? runChildProcess;
+  const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
   const codegraphEnv = codegraphEnvForConfig2(trustedInstallDir, homeDir, options.buildEnv);
   const mergedEnv = {
     ...env,
     ...codegraphEnv
   };
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
+    cwd: projectCwd,
     env: mergedEnv,
-    stdio: "inherit"
+    input: options.stdin ?? processStdin2,
+    output: options.stdout ?? processStdout2,
+    stderr: options.stderr ?? processStderr2,
+    stdio: "pipe"
   });
 }
 async function runUnavailableMcp(reason, options) {
@@ -2564,6 +2678,17 @@ function codegraphEnvForConfig2(trustedInstallDir, homeDir, buildEnv) {
   const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
+function resolveProjectCwd(env, fallback) {
+  for (const key of PROJECT_CWD_ENV_KEYS) {
+    const candidate = env[key]?.trim();
+    if (candidate === undefined || candidate.length === 0)
+      continue;
+    const resolved = resolve3(candidate);
+    if (existsSync7(resolved))
+      return resolved;
+  }
+  return resolve3(fallback);
+}
 function provisionedBinFromInstallDir2(installDir) {
   if (installDir === undefined)
     return null;
@@ -2572,32 +2697,6 @@ function provisionedBinFromInstallDir2(installDir) {
 }
 async function runCodegraphServeCli() {
   process.exitCode = await runCodegraphServe();
-}
-async function runChildProcess(command, args, options) {
-  const invocation = resolveServeProcessInvocation(command, args);
-  const child = spawn2(invocation.command, invocation.args, { env: options.env, stdio: options.stdio });
-  return new Promise((resolve4, reject) => {
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code !== null) {
-        resolve4(code);
-        return;
-      }
-      resolve4(signal === null ? 0 : 1);
-    });
-  });
-}
-function resolveServeProcessInvocation(command, args, platform = process.platform) {
-  if (platform !== "win32")
-    return { args: [...args], command };
-  const extension = extname2(command).toLowerCase();
-  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
-    return { args: [command, ...args], command: processExecPath };
-  }
-  if (WINDOWS_CMD_EXTENSIONS2.has(extension)) {
-    return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
-  }
-  return { args: [...args], command };
 }
 if (isDirectInvocation(process.argv[1])) {
   runCodegraphServeCli().catch((error) => {
