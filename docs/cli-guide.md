@@ -187,7 +187,53 @@ bunx opencode-matrixx auth status
 
 ---
 
-## 8. Configuration Files
+## 8. In-Session Slash Commands
+
+These are slash commands used within OpenCode sessions during active conversations.
+
+### `/end-ultrawork`
+
+Deactivates ultrawork mode and returns to default Matrixx behavior for the current session.
+
+```
+Usage: /end-ultrawork
+Effect: Disables ultrawork mode, stops parallel background agent execution,
+        reverts to standard single-threaded processing
+```
+
+This is useful when ultrawork mode was activated (via `ulw` keyword or auto-detection) and you want to continue the session in normal mode without starting over.
+
+### `/handoff`
+
+Creates a structured context handoff with YAML frontmatter for continuing work in a new session.
+
+```
+Usage: /handoff
+Effect: Creates .matrixx/handoff.md with structured metadata including:
+        - topics, goal, work_completed
+        - current_state, pending_tasks
+        - key_files, important_decisions
+        - explicit_constraints, context_for_continuation
+```
+
+Use this when you need to preserve session state for continuation later. The handoff file can be consumed in a fresh session using `/pickup`.
+
+### `/pickup`
+
+Loads handoff context from a previous session.
+
+```
+Usage: /pickup
+Effect: Reads .matrixx/handoff.md and injects the stored context
+        into the current session, including pending tasks, key files,
+        and important decisions
+```
+
+This enables seamless session-to-session continuity without losing context.
+
+---
+
+## 9. Configuration Files
 
 The CLI searches for configuration files in the following locations (in priority order):
 
@@ -217,7 +263,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### "OpenCode version too old" Error
 
@@ -247,7 +293,7 @@ bunx opencode-matrixx doctor --category authentication
 
 ---
 
-## 10. Non-Interactive Mode
+## 11. Non-Interactive Mode
 
 Use the `--no-tui` option for CI/CD environments.
 
@@ -261,7 +307,7 @@ bunx opencode-matrixx doctor --json > doctor-report.json
 
 ---
 
-## 11. Developer Information
+## 12. Developer Information
 
 ### CLI Structure
 

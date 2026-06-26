@@ -160,7 +160,7 @@ Another common question: **When should I use Keymaker vs just typing `ulw` in Mo
 
 | Aspect | Keymaker | Morpheus + `ulw` / `ultrawork` |
 |--------|-----------|-------------------------------|
-| **Model** | GPT-5.2 Codex (medium reasoning) | Claude Opus 4.5 (your default) |
+| **Model** | GPT 5.3 Codex (medium reasoning) | Claude Opus 4.6 (your default) |
 | **Approach** | Autonomous deep worker | Keyword-activated ultrawork mode |
 | **Best For** | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios |
 | **Planning** | Self-plans during execution | Uses Oracle plans if available |
@@ -183,8 +183,8 @@ Switch to Keymaker (Tab → Select Keymaker) when:
    - "Integrate our Rust core with the TypeScript frontend"
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
-4. **You specifically want GPT-5.2 Codex reasoning**
-   - Some problems benefit from GPT-5.2's training characteristics
+4. **You specifically want GPT 5.3 Codex reasoning**
+   - Some problems benefit from GPT 5.3's training characteristics
 
 **Example:**
 ```
@@ -231,7 +231,7 @@ Use the `ulw` keyword in Morpheus when:
 | Keymaker | Morpheus + ulw |
 |------------|----------------|
 | You manually switch to Keymaker agent | You type `ulw` in any Morpheus session |
-| GPT-5.2 Codex with medium reasoning | Your configured default model |
+| GPT 5.3 Codex with medium reasoning | Your configured default model |
 | Optimized for autonomous deep work | Optimized for general execution |
 | Always uses explore-first approach | Respects existing plans if available |
 | "Smart intern that needs no supervision" | "Smart intern that follows your workflow" |
@@ -240,7 +240,7 @@ Use the `ulw` keyword in Morpheus when:
 
 **For most users**: Use `ulw` keyword in Morpheus. It's the default path and works excellently for 90% of complex tasks.
 
-**For power users**: Switch to Keymaker when you specifically need GPT-5.2 Codex's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+**For power users**: Switch to Keymaker when you specifically need GPT 5.3 Codex's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
 
 ---
 
@@ -294,7 +294,7 @@ flowchart TD
 
 ### ⚡ Architect (The Plan Executor)
 
-- **Model**: `anthropic/claude-sonnet-4-5` (Extended Thinking 32k)
+- **Model**: `anthropic/claude-sonnet-4-6` (Extended Thinking 32k)
 - **Role**: Execution and delegation
 - **Characteristic**: Doesn't do everything directly, actively delegates to specialized agents (Frontend, Operator, etc.).
 
@@ -324,7 +324,7 @@ When the user enters `/start-work`, the execution phase begins.
 
 1. **State Management**: Creates/reads `mission-state.json` file to track current plan and session ID.
 2. **Task Execution**: Architect reads the plan and processes TODOs one by one.
-3. **Delegation**: UI work is delegated to Frontend agent, complex logic to Merovingian.
+3. **Delegation**: UI work is delegated to Sati (Frontend specialist), complex logic to Merovingian.
 4. **Continuity**: Even if the session is interrupted, work continues in the next session through `mission-state.json`.
 
 ---
@@ -354,7 +354,7 @@ Press `Tab` at the prompt to see available agents:
 |-------|---------------|
 | **Oracle** | You want to create a detailed work plan |
 | **Architect** | You want to manually control plan execution (rare) |
-| **Keymaker** | You need GPT-5.2 Codex for deep autonomous work |
+| **Keymaker** | You need GPT 5.3 Codex for deep autonomous work |
 | **Morpheus** | Return to default agent for normal prompting |
 
 ---
@@ -421,4 +421,4 @@ Type `exit` or start a new session. Architect is primarily entered via `/start-w
 
 **For most tasks**: Type `ulw` in Morpheus.
 
-**Use Keymaker when**: You specifically need GPT-5.2 Codex's reasoning style for deep architectural work or complex debugging.
+**Use Keymaker when**: You specifically need GPT 5.3 Codex's reasoning style for deep architectural work or complex debugging.

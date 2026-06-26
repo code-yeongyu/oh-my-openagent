@@ -11,39 +11,45 @@ graph TB
     subgraph PRIMARY["Primary Agents (mode: primary)"]
         MOR["🔴 Morpheus<br/>Claude Opus 4.6<br/><i>Main Orchestrator</i>"]
         KEY["🟡 Keymaker<br/>GPT 5.3 Codex<br/><i>Autonomous Deep Worker</i>"]
-        ARC["🟣 Architect<br/>Claude Sonnet 4.5<br/><i>Plan Execution Orchestrator</i>"]
+        ARC["🟣 Architect<br/>Claude Sonnet 4.6<br/><i>Plan Execution Orchestrator</i>"]
     end
 
     subgraph SPECIALIST["Specialist Agents (mode: all)"]
-        CIP["🔵 Cipher<br/>Claude Opus 4.6<br/><i>DSL Engineering</i><br/>11 skills"]
+        CIP["🔵 Cipher<br/>Claude Sonnet 4.6<br/><i>DSL Engineering</i><br/>11 skills"]
+        SAT["🎨 Sati<br/>Claude Sonnet 4.6<br/><i>Frontend Specialist</i><br/>7 skills"]
     end
 
     subgraph ADVISORS["Advisory Agents (mode: subagent)"]
         ORA["📋 Oracle<br/>Claude Opus 4.6<br/><i>Strategic Planning</i>"]
-        MER["🏛️ Merovingian<br/>GPT 5.2<br/><i>Architecture & Debugging</i>"]
+        MER["🏛️ Merovingian<br/>Claude Sonnet 4.6<br/><i>Architecture & Debugging</i>"]
         SER["👁️ Seraph<br/>Claude Opus 4.6<br/><i>Pre-Planning Analysis</i>"]
-        SMI["⚔️ Smith<br/>GPT 5.2<br/><i>Plan Validation</i>"]
+        SMI["⚔️ Smith<br/>Claude Sonnet 4.6<br/><i>Plan Validation</i>"]
+        SEN["🛡️ Sentinel<br/>Claude Sonnet 4.6<br/><i>Security Auditor</i><br/>9 skills"]
     end
 
     subgraph EXPLORERS["Exploration Agents (mode: subagent)"]
-        TRI["⚡ Trinity<br/>Grok Code Fast<br/><i>Codebase Grep</i>"]
-        OPR["📚 Operator<br/>GLM 4.7<br/><i>Docs & OSS Search</i>"]
-        CON["👀 Construct<br/>Gemini 3 Flash<br/><i>Multimodal Analysis</i>"]
+        TRI["⚡ Trinity<br/>Claude Haiku 4.5<br/><i>Codebase Grep</i>"]
+        OPR["📚 Operator<br/>Claude Haiku 4.5<br/><i>Docs & OSS Search</i>"]
+        CON["👀 Construct<br/>Claude Sonnet 4.6<br/><i>Multimodal Analysis</i>"]
     end
 
     subgraph EXECUTOR["Dynamic Executor"]
-        MOU["🐭 Mouse<br/>Claude Sonnet 4.5<br/><i>Category-Spawned Worker</i>"]
+        MOU["🐭 Mouse<br/>Claude Sonnet 4.6<br/><i>Category-Spawned Worker</i>"]
     end
 
     UI --> MOR
     UI --> KEY
     UI --> ARC
     UI -.->|"@cipher"| CIP
+    UI -.->|"@sati"| SAT
+    UI -.->|"@sentinel"| SEN
 
     MOR ==>|"task(subagent_type)"| ORA
     MOR ==>|"task(subagent_type)"| MER
     MOR ==>|"task(subagent_type)"| SER
     MOR ==>|"task(subagent_type)"| SMI
+    MOR ==>|"task(subagent_type)"| SAT
+    MOR ==>|"task(subagent_type)"| SEN
     MOR ==>|"task(subagent_type)"| TRI
     MOR ==>|"task(subagent_type)"| OPR
     MOR ==>|"task(subagent_type)"| CON
@@ -60,6 +66,8 @@ graph TB
     style TRI fill:#1abc9c,color:#fff
     style OPR fill:#2980b9,color:#fff
     style CON fill:#d35400,color:#fff
+    style SAT fill:#e91e63,color:#fff
+    style SEN fill:#2c3e50,color:#fff
     style MOU fill:#7f8c8d,color:#fff
 ```
 
@@ -169,7 +177,7 @@ flowchart LR
 
 ```mermaid
 graph TD
-    subgraph SKILL_REGISTRY["Skill Registry (15 Built-in Skills)"]
+    subgraph SKILL_REGISTRY["Skill Registry (31 Built-in Skills)"]
         subgraph DSL_SKILLS["Cipher's DSL Skills (11)"]
             S1["dsl-core"]
             S2["dsl-grammar"]
@@ -184,11 +192,13 @@ graph TD
             S11["dsl-composition"]
         end
 
-        subgraph GENERAL_SKILLS["General Skills (4)"]
+        subgraph GENERAL_SKILLS["General Skills (17+)"]
             G1["playwright"]
             G2["git-master"]
             G3["frontend-ui-ux"]
             G4["dev-browser"]
+            G5["security-core"]
+            G6["security-sast"]
         end
     end
 
@@ -209,14 +219,16 @@ graph LR
     subgraph FULL_ACCESS["Full Tool Access"]
         FA1["Morpheus"]
         FA2["Keymaker"]
-        FA3["Mouse"]
+        FA3["Sati"]
+        FA4["Mouse"]
     end
 
     subgraph READ_ONLY["Read-Only (no write/edit/task)"]
         RO1["Oracle"]
         RO2["Merovingian"]
-        RO3["Operator"]
-        RO4["Trinity"]
+        RO3["Sentinel"]
+        RO4["Operator"]
+        RO5["Trinity"]
     end
 
     subgraph VISION_ONLY["Vision Only (read only)"]
@@ -228,7 +240,7 @@ graph LR
         ND2["Mouse"]
     end
 
-    TOOLS["25+ Tools<br/>LSP, AST-Grep, Grep,<br/>Glob, Read, Edit, Write,<br/>Bash, task(), background,<br/>session, look_at, skill"]
+    TOOLS["26+ Tools<br/>LSP, AST-Grep, Grep,<br/>Glob, Read, Edit, Write,<br/>Bash, task(), background,<br/>session, look_at, skill"]
 
     TOOLS --> FULL_ACCESS
     TOOLS -.->|"filtered"| READ_ONLY
@@ -306,6 +318,8 @@ flowchart TD
 | **Plan → Review → Execute** | Morpheus → Oracle → Smith → Mouse | Complex multi-step features |
 | **Pre-Analysis** | Morpheus → Seraph → Oracle | Ambiguous requirements needing scope clarification |
 | **Consultation** | Morpheus → Merovingian | Architecture decisions, debugging after 2+ failures |
+| **Frontend Specialist** | Morpheus → Sati | UI/UX implementation, browser automation, frontend testing |
+| **Security Audit** | Morpheus → Sentinel | Vulnerability scanning, dependency CVEs, code audit |
 | **Specialist Delegation** | Morpheus → Cipher | Domain-specific DSL work |
 | **Category Work** | Morpheus → Mouse[category] | General task execution with category-optimized model |
 | **Session Continuation** | Any agent → same agent (session_id) | Multi-turn follow-up preserving full context |

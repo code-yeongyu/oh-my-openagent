@@ -21,14 +21,14 @@ A Category is an agent configuration preset optimized for specific domains.
 
 | Category | Default Model | Use Cases |
 |----------|---------------|-----------|
-| `visual-engineering` | `google/gemini-3-pro` | Frontend, UI/UX, design, styling, animation |
-| `ultrabrain` | `openai/gpt-5.3-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
-| `deep` | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
-| `artistry` | `google/gemini-3-pro` (max) | Highly creative/artistic tasks, novel ideas |
-| `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks - single file changes, typo fixes, simple modifications |
-| `unspecified-low` | `anthropic/claude-sonnet-4-5` | Tasks that don't fit other categories, low effort required |
-| `unspecified-high` | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required |
-| `writing` | `google/gemini-3-flash` | Documentation, prose, technical writing |
+| `construct` | Claude Sonnet 4.6 | Frontend, UI/UX, design, styling, animation |
+| `source` | Claude Opus 4.6 | Hard logic, backend, core implementation |
+| `deep-jack` | Claude Sonnet 4.6 | Goal-oriented autonomous problem-solving. Thorough research before action. |
+| `matrix-bend` | Claude Sonnet 4.6 | Creative tasks, novel ideas |
+| `bullet-time` | Claude Haiku 4.5 | Quick fixes, trivial tasks — single file changes, typo fixes |
+| `blue-pill` | Claude Sonnet 4.6 | General tasks, moderate effort |
+| `red-pill` | Claude Opus 4.6 | Complex tasks, high effort |
+| `broadcast` | Claude Sonnet 4.6 | Documentation, prose, technical writing |
 
 ### Usage
 
@@ -36,7 +36,7 @@ Specify the `category` parameter when invoking the `task` tool.
 
 ```typescript
 task(
-  category="visual-engineering",
+  category="source",
   prompt="Add a responsive chart component to the dashboard page"
 )
 ```
@@ -53,21 +53,33 @@ When you use a Category, a special agent called **Mouse** performs the work.
 
 A Skill is a mechanism that injects **specialized knowledge (Context)** and **tools (MCP)** for specific domains into agents.
 
-### Built-in Skills
+### Built-in Skills (31 total)
 
-1. **`git-master`**
-   - **Capabilities**: Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies.
-   - **MCP**: None (uses Git commands)
-   - **Usage**: Essential for commits, history searches, branch management.
+**Development & Tools (5):**
+- **`git-master`** — Git expert. Detects commit styles, splits atomic commits, rebase strategies.
+- **`tdd-enforcer`** — TDD workflow enforcement (RED → GREEN → REFACTOR).
+- **`quality-gate`** — Automated quality verification: lint, typecheck, test, build.
+- **`software-dev`** — Structured 6-phase development pipeline (PLAN → BUILD → VERIFY → REVIEW → SECURE → SHIP).
+- **`review-work`** — Post-implementation review orchestrator with 5 parallel agents.
 
-2. **`playwright`**
-   - **Capabilities**: Browser automation. Web page testing, screenshots, scraping.
-   - **MCP**: `@playwright/mcp` (auto-executed)
-   - **Usage**: For post-implementation UI verification, E2E test writing.
+**Frontend & Browser (4):**
+- **`playwright`** — Browser automation. Web page testing, screenshots, scraping. MCP: `@playwright/mcp` (auto-executed)
+- **`dev-browser`** — Browser automation with persistent page state.
+- **`agent-browser`** — Agent-controlled browser automation.
+- **`frontend-ui-ux`** — Designer mindset. Color, typography, motion guidelines.
 
-3. **`frontend-ui-ux`**
-   - **Capabilities**: Injects designer mindset. Color, typography, motion guidelines.
-   - **Usage**: For aesthetic UI work beyond simple implementation.
+**DSL Engineering (11):**
+- **`dsl-core`**, **`dsl-grammar`**, **`dsl-codegen`**, **`dsl-metamodel`**, **`dsl-tooling`**
+- **`dsl-textx-ecosystem`**, **`dsl-pyecore-advanced`**, **`dsl-model-transformation`**
+- **`dsl-testing`**, **`dsl-validation`**, **`dsl-composition`**
+
+**Security (9):**
+- **`security-core`**, **`security-secrets`**, **`security-sast`**, **`security-dast`**
+- **`security-dependencies`**, **`security-api`**, **`security-crypto`**
+- **`security-infra`**, **`security-review`**
+
+**Configuration (1):**
+- **`matrixx-self-config`** — Configure and tune Matrixx for the current user.
 
 ### Usage
 
@@ -110,17 +122,17 @@ This content will be injected into the agent's system prompt.
 You can create powerful specialized agents by combining Categories and Skills.
 
 ### 🎨 The Designer (UI Implementation)
-- **Category**: `visual-engineering`
+- **Category**: `construct`
 - **load_skills**: `["frontend-ui-ux", "playwright"]`
 - **Effect**: Implements aesthetic UI and verifies rendering results directly in browser.
 
 ### 🏗️ The Architect (Design Review)
-- **Category**: `ultrabrain`
+- **Category**: `red-pill`
 - **load_skills**: `[]` (pure reasoning)
-- **Effect**: Leverages GPT-5.2's logical reasoning for in-depth system architecture analysis.
+- **Effect**: Leverages Claude Opus reasoning for in-depth system architecture analysis.
 
 ### ⚡ The Maintainer (Quick Fixes)
-- **Category**: `quick`
+- **Category**: `bullet-time`
 - **load_skills**: `["git-master"]`
 - **Effect**: Uses cost-effective models to quickly fix code and generate clean commits.
 
@@ -178,14 +190,14 @@ You can fine-tune categories in `matrixx.json`.
   "categories": {
     // 1. Define new custom category
     "korean-writer": {
-      "model": "google/gemini-3-flash",
+      "model": "anthropic/claude-sonnet-4-6",
       "temperature": 0.5,
       "prompt_append": "You are a Korean technical writer. Maintain a friendly and clear tone."
     },
     
     // 2. Override existing category (change model)
-    "visual-engineering": {
-      "model": "openai/gpt-5.2", // Can change model
+    "construct": {
+      "model": "openai/gpt-5.3-codex", // Can change model
       "temperature": 0.8
     },
 
