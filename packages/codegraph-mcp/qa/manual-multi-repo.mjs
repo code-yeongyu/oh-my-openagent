@@ -39,6 +39,11 @@ if (codegraphVersion !== "1.1.1") {
   throw new Error(`Expected CodeGraph 1.1.1, got ${codegraphVersion}`)
 }
 
+const repoBInitResult = spawnSync(codegraph, ["init", repoB], { encoding: "utf8", env })
+if (repoBInitResult.status !== 0) {
+  throw new Error(repoBInitResult.stderr || "CodeGraph initialization failed for repo B")
+}
+
 const child = spawn(process.execPath, [resolve("dist/cli.js")], {
   cwd: repoA,
   env,
@@ -164,6 +169,11 @@ try {
     codegraphNoDaemon: env.CODEGRAPH_NO_DAEMON,
     finalChangeFound: true,
     protocolErrors,
+    repoBInitializedBeforeProxyStart: true,
+    repoBInit: {
+      stderr: repoBInitResult.stderr,
+      stdout: repoBInitResult.stdout,
+    },
     responseFrames: { framed: framedResponses, line: lineResponses },
     stderr: stderr.join(""),
     transport,
