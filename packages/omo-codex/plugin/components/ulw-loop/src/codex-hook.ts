@@ -72,7 +72,10 @@ export async function applyUserPromptUlwLoopSteering(
 	try {
 		if (payload.hook_event_name !== "UserPromptSubmit") return "";
 		const proposal = parseUlwLoopSteeringDirective(payload.prompt);
-		if (proposal === null) return options.includeUltraworkDirective ? buildUltraworkDirectiveOutput(payload) : "";
+		if (proposal === null) {
+			if (hasSteeringDirectiveMarker(payload.prompt)) return "";
+			return options.includeUltraworkDirective ? buildUltraworkDirectiveOutput(payload) : "";
+		}
 		const result = await steerUlwLoop(payload.cwd, proposal, payloadScope(payload));
 		if (!result.accepted) return "";
 		return JSON.stringify({
@@ -85,6 +88,10 @@ export async function applyUserPromptUlwLoopSteering(
 		if (error instanceof Error) return "";
 		return "";
 	}
+}
+
+function hasSteeringDirectiveMarker(prompt: string): boolean {
+	return /(?:^|\s)(?:OMO_ULW_LOOP_STEER|omo\.ulw-loop\.steer|omo ulw-loop steer):/u.test(prompt);
 }
 
 function payloadScope(payload: UserPromptSubmitPayload): UlwLoopScope {
