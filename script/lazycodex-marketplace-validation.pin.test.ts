@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { validateLazycodexPluginBundle } from "./lazycodex-marketplace-validation"
@@ -50,6 +50,21 @@ describe("lazycodex marketplace validation guards", () => {
     }
   })
 
+  test("#given previous payload reconstruction #when root runtime dists are optional #then the bundle can still be inspected", async () => {
+    // given
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-previous-payload-"))
+
+    try {
+      // when
+      const validated = validateLazycodexPluginBundle(pluginRoot, { requireRootCliRuntime: false })
+
+      // then
+      await expect(validated).resolves.toBeUndefined()
+    } finally {
+      await rm(pluginRoot, { recursive: true, force: true })
+    }
+  })
+
   test("#given zero-byte root runtime dist #when validating the plugin bundle #then the root omo runtime target is rejected", async () => {
     // given
     const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-zero-root-runtime-"))
@@ -66,6 +81,28 @@ describe("lazycodex marketplace validation guards", () => {
       await expect(validated).rejects.toThrow("dist/cli-node/index.js is zero bytes")
     } finally {
       await rm(pluginRoot, { recursive: true, force: true })
+    }
+  })
+
+  test("#given root runtime symlink escapes the plugin #when validating the plugin bundle #then the root omo runtime target is rejected", async () => {
+    // given
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-symlink-root-runtime-"))
+    const externalRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-external-runtime-"))
+    await mkdir(join(pluginRoot, "dist", "cli"), { recursive: true })
+    await writeFile(join(externalRoot, "index.js"), "console.log('outside')\n")
+    await symlink(join(externalRoot, "index.js"), join(pluginRoot, "dist", "cli", "index.js"))
+    await mkdir(join(pluginRoot, "dist", "cli-node"), { recursive: true })
+    await writeFile(join(pluginRoot, "dist", "cli-node", "index.js"), "console.log('omo node')\n")
+
+    try {
+      // when
+      const validated = validateLazycodexPluginBundle(pluginRoot)
+
+      // then
+      await expect(validated).rejects.toThrow("dist/cli/index.js escapes plugin root")
+    } finally {
+      await rm(pluginRoot, { recursive: true, force: true })
+      await rm(externalRoot, { recursive: true, force: true })
     }
   })
 

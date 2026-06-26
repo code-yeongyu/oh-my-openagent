@@ -25,7 +25,7 @@ const RUNTIME_DISTS: readonly RuntimeDist[] = [
     destinationPath: join("plugins", "omo", "components", "lsp-tools-mcp", "dist"),
   },
   {
-    label: "LSP daemon",
+    label: "LSP daemon dist",
     sourcePath: join("packages", "lsp-daemon", "dist"),
     destinationPath: join("plugins", "omo", "components", "lsp-daemon", "dist"),
   },

@@ -1,10 +1,19 @@
-import { readFile, readdir, stat } from "node:fs/promises"
+import { readFile, readdir, realpath, stat } from "node:fs/promises"
 import { basename, dirname, join, resolve, sep } from "node:path"
 import { isPlainRecord } from "@oh-my-opencode/utils"
 
-export async function validateLazycodexPluginBundle(pluginRoot: string): Promise<void> {
+export interface ValidateLazycodexPluginBundleOptions {
+  readonly requireRootCliRuntime?: boolean
+}
+
+export async function validateLazycodexPluginBundle(
+  pluginRoot: string,
+  options: ValidateLazycodexPluginBundleOptions = {},
+): Promise<void> {
   const issues: string[] = []
-  await validateRootCliRuntime(pluginRoot, issues)
+  if (options.requireRootCliRuntime !== false) {
+    await validateRootCliRuntime(pluginRoot, issues)
+  }
   await validatePluginMcpManifests(pluginRoot, issues)
   await validatePluginHookCommands(pluginRoot, issues)
   if (issues.length > 0) {
@@ -176,6 +185,10 @@ async function collectBundleFileIssue(
     pushIssue(issues, `${message}: ${relativePath}`)
     return
   }
+  if (!options.allowEscape && !(await isRealPathWithinRoot(bundleRoot, targetPath))) {
+    pushIssue(issues, `${message}: ${relativePath} escapes plugin root`)
+    return
+  }
   if (size === 0) {
     pushIssue(issues, `${message}: ${relativePath} is zero bytes`)
   }
@@ -193,5 +206,17 @@ async function fileSize(path: string): Promise<number | undefined> {
   } catch (error) {
     if (error instanceof Error) return undefined
     return undefined
+  }
+}
+
+async function isRealPathWithinRoot(root: string, target: string): Promise<boolean> {
+  try {
+    const rootPath = await realpath(root)
+    const targetPath = await realpath(target)
+    const rootPrefix = rootPath.endsWith(sep) ? rootPath : `${rootPath}${sep}`
+    return targetPath === rootPath || targetPath.startsWith(rootPrefix)
+  } catch (error) {
+    if (error instanceof Error) return false
+    return false
   }
 }

@@ -82,7 +82,9 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
   })
   await rewritePluginMcpManifest(destinationPluginRoot)
   await stampReleaseVersion(destinationPluginRoot, input.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION)
-  await validateLazycodexPluginBundle(destinationPluginRoot)
+  await validateLazycodexPluginBundle(destinationPluginRoot, {
+    requireRootCliRuntime: input.allowMissingBundledDists !== true,
+  })
 }
 
 async function readMarketplaceManifest(path: string): Promise<MarketplaceManifest> {
