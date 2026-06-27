@@ -2,7 +2,6 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
 import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -41,7 +40,7 @@ describe("codex MultiAgentV2 config", () => {
     expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
     expect(parsed.features.multi_agent_v2).toEqual({
       usage_hint_enabled: false,
-      max_concurrent_threads_per_session: 10000,
+      max_concurrent_threads_per_session: 1000,
     })
   })
 
@@ -74,7 +73,7 @@ describe("codex MultiAgentV2 config", () => {
     expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
     expect(parsed.features.multi_agent_v2).toEqual({
       enabled: false,
-      max_concurrent_threads_per_session: 10000,
+      max_concurrent_threads_per_session: 1000,
     })
   })
 })
@@ -86,31 +85,11 @@ interface ParsedCodexConfig {
 }
 
 function parseToml(config: string): ParsedCodexConfig {
-  const result = spawnSync(
-    resolvePython(),
-    [
-      "-c",
-      [
-        "import json, sys, tomllib",
-        "print(json.dumps(tomllib.loads(sys.stdin.read())))",
-      ].join("; "),
-    ],
-    { encoding: "utf8", input: config },
-  )
-  expect(result.status, result.stderr).toBe(0)
-  const parsed: unknown = JSON.parse(result.stdout)
+  const parsed: unknown = Bun.TOML.parse(config)
   if (!isParsedCodexConfig(parsed)) {
     throw new Error("Parsed TOML did not have the expected Codex config shape")
   }
   return parsed
-}
-
-function resolvePython(): string {
-  for (const command of ["python3", "python"]) {
-    const result = spawnSync(command, ["-c", "import tomllib"], { encoding: "utf8" })
-    if (result.status === 0) return command
-  }
-  throw new Error("Python with tomllib is required for TOML parse assertions")
 }
 
 function isParsedCodexConfig(value: unknown): value is ParsedCodexConfig {
