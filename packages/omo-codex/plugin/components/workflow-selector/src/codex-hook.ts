@@ -87,6 +87,8 @@ export type CodexUserPromptSubmitInput = {
 	readonly transcript_path?: string | null;
 };
 
+type TranscriptReader = (transcriptPath: string) => string;
+
 interface UserPromptSubmitHookOutput {
 	readonly hookSpecificOutput: {
 		readonly hookEventName: "UserPromptSubmit";
@@ -94,13 +96,13 @@ interface UserPromptSubmitHookOutput {
 	};
 }
 
-export function runUserPromptSubmitHook(input: unknown): string {
+export function runUserPromptSubmitHook(input: unknown, transcriptReader: TranscriptReader = readTranscriptTail): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
 	if (!isAutoWorkflowEnabled(env)) return "";
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
-	if (hasAutoWorkflowContextAlreadyInTranscript(input.transcript_path))
+	if (hasAutoWorkflowContextAlreadyInTranscript(input.transcript_path, transcriptReader))
 		return "";
-	if (isContextPressureTranscript(input.transcript_path)) return "";
+	if (isContextPressureTranscript(input.transcript_path, transcriptReader)) return "";
 	const autoWorkflowContext = buildAutoWorkflowContext(input.prompt);
 	return autoWorkflowContext === null
 		? ""
@@ -145,10 +147,11 @@ function selectAutoWorkflow(prompt: string): string | null {
 
 function hasAutoWorkflowContextAlreadyInTranscript(
 	transcriptPath: string | null | undefined,
+	transcriptReader: TranscriptReader,
 ): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		const rawTranscript = readTranscriptTail(transcriptPath);
+		const rawTranscript = transcriptReader(transcriptPath);
 		for (const line of rawTranscript.split(/\r?\n/)) {
 			const parsed = parseJsonLine(line);
 			if (!isRecord(parsed)) continue;
@@ -187,10 +190,11 @@ function isContextPressureRecoveryPrompt(prompt: string): boolean {
 
 function isContextPressureTranscript(
 	transcriptPath: string | null | undefined,
+	transcriptReader: TranscriptReader,
 ): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		return isContextPressureRecoveryPrompt(readTranscriptTail(transcriptPath));
+		return isContextPressureRecoveryPrompt(transcriptReader(transcriptPath));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

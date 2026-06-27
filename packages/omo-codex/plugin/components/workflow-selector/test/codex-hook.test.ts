@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -47,7 +46,9 @@ describe("codex workflow selector hook", () => {
 	it("#given auto workflow is disabled #when transcript path is present #then hook does not read transcript", () => {
 		// given
 		delete process.env["OMO_CODEX_AUTO_WORKFLOW"];
-		const readFileSync = vi.spyOn(fs, "readFileSync");
+		const transcriptReader = vi.fn(() => {
+			throw new Error("transcript should not be read");
+		});
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
 			prompt: "Fix this flaky test and diagnose why CI is failing",
@@ -55,11 +56,11 @@ describe("codex workflow selector hook", () => {
 		};
 
 		// when
-		const output = runUserPromptSubmitHook(payload);
+		const output = runUserPromptSubmitHook(payload, transcriptReader);
 
 		// then
 		expect(output).toBe("");
-		expect(readFileSync).not.toHaveBeenCalled();
+		expect(transcriptReader).not.toHaveBeenCalled();
 	});
 
 	it("#given auto workflow is enabled #when prompt asks for debugging #then hook selects ulw-loop guidance", () => {

@@ -77,11 +77,12 @@ printing the command, "should respond", and "looks correct" never
 count.
 
 For TUI visual QA, terminal transcripts alone are not enough when a
-visual surface is being evaluated. Capture the pane and render it with
+visual surface is being evaluated. In this repo, prefer
 `node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --from-file <capture.txt> --evidence-dir <dir>`
-or use the helper's `--command` tmux-backed PTY connector when tmux is
-available. The evidence must include `terminal.png`, `terminal.txt`,
-`terminal.html`, and `metadata.json` with the cleanup receipt.
+or the helper's `--command` tmux-backed PTY connector when available.
+Outside this repo, capture equivalent browser/computer-use rendered
+terminal evidence: screenshot, plain transcript, rendered HTML or action
+log, and cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
