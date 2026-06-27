@@ -36,7 +36,7 @@ async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T
 }
 
 describe("install-codex Git Bash preflight", () => {
-  test("#given Windows without Git Bash and auto install skip env #when installing Codex profile #then rejects before marketplace or config mutation", async () => {
+  test("#given Windows without Git Bash #when installing Codex profile #then rejects before marketplace or config mutation", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-missing-home-"))
     const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-missing-repo-"))
@@ -47,7 +47,6 @@ describe("install-codex Git Bash preflight", () => {
       codexHome,
       repoRoot,
       platform: "win32",
-      env: { OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL: "1" },
       gitBashResolver: () => ({
         found: false,
         checkedPaths: [WINDOWS_GIT_BASH_PATH],
@@ -69,42 +68,44 @@ describe("install-codex Git Bash preflight", () => {
     await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
-  test("#given Windows without Git Bash #when winget succeeds and resolver recovers #then install continues", async () => {
+  test("#given Windows without Git Bash #when installing Codex profile #then winget is not run and install stops with guidance", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-auto-install-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-auto-install-bin-"))
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-no-auto-install-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-no-auto-install-bin-"))
     const runCalls: string[] = []
-    const resolutions = [
-      {
-        found: false,
-        checkedPaths: [WINDOWS_GIT_BASH_PATH],
-        installHint: "install hint before winget",
-      } as const,
-      {
-        found: true,
-        path: WINDOWS_GIT_BASH_PATH,
-        source: "program-files",
-      } as const,
-    ]
+    const missingResolution = {
+      found: false,
+      checkedPaths: [WINDOWS_GIT_BASH_PATH],
+      installHint: [
+        "Git Bash is required.",
+        "winget install --id Git.Git -e --source winget",
+        "OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe",
+        "rerun `npx lazycodex-ai install`",
+      ].join("\n"),
+    } as const
     let resolveCallCount = 0
 
     // when
-    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+    const install = withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
       repoRoot: process.cwd(),
       platform: "win32",
       astGrepInstaller: skipAstGrepInstall,
-      gitBashResolver: () => resolutions[resolveCallCount++] ?? resolutions[resolutions.length - 1],
+      gitBashResolver: () => {
+        resolveCallCount += 1
+        return missingResolution
+      },
       runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
         runCalls.push([command, ...args, options.cwd].join(" "))
       },
     }))
 
     // then
-    expect(runCalls).toContain(`winget install --id Git.Git -e --source winget ${process.cwd()}`)
-    expect(resolveCallCount).toBe(2)
-    expect(result.gitBashPath).toBe(WINDOWS_GIT_BASH_PATH)
+    await expect(install).rejects.toThrow("winget install --id Git.Git -e --source winget")
+    expect(runCalls).toEqual([])
+    expect(resolveCallCount).toBe(1)
+    await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given non-Windows install #when running installer #then winget is never called", async () => {

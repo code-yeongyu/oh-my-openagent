@@ -37,8 +37,6 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
     env,
-    cwd: repoRoot,
-    runCommand,
     resolveGitBash: platform === "win32"
       ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))
       : undefined,
