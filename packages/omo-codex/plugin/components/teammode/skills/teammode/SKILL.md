@@ -121,8 +121,28 @@ members to the hard rules, so you mainly keep the channel open: expect frequent 
 from each member - findings, `WORKING:`/`BLOCKED:` markers, peer digests - rather than one final
 dump, and act on them as they arrive. All member-to-member and member-to-leader traffic is in English;
 when the END user addresses a member, that member replies in the user's own language. Members hand off
-files and memos through the team `artifacts/` directory and reference them by path. Wait for every
-required member's final report before you declare the team done.
+files and memos through the team `artifacts/` directory and reference them by path.
+
+## Let members work - do not rush them
+
+Members heartbeat every few tool calls and message you on every finding, blocker, and finished
+slice (their manual binds them to this). So a member that is quiet between heartbeats is **working,
+not stalled** - a stretch of silence is the normal sound of focused work, not a problem to chase.
+Re-reading `codex_app.read_thread` to check on a calm member, or sending "any update?" / "are you
+done?" / "hurry up" pings, interrupts that member and slows the whole team. Trust the heartbeat and
+let them cook.
+
+Message a member only when one of these is true:
+- you have new information, context, or a correction it needs to do its slice right;
+- you are reassigning, narrowing, or unblocking its scope;
+- a peer's result changes what it should do; or
+- it has gone fully silent well past its heartbeat cadence AND that stall is blocking the team -
+  then send one specific question, not a barrage.
+
+Otherwise stay calm and keep the channel open: read inbound updates as they arrive and act on them.
+A long-running member is alive; a heartbeat you have not received yet is not a failure. Wait for
+every required member's final report before you declare the team done - rushing toward "done" while
+members are still mid-slice just produces half-built work you will have to redo.
 
 ## Worktrees - isolate members who would touch the same files
 
