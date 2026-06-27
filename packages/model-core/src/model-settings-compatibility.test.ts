@@ -258,6 +258,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "Mimo -> MiniMax", modelID: "opencode-go/mimo-v2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -587,6 +588,28 @@ describe("resolveCompatibleModelSettings", () => {
     })
 
     // then
+    expect(result.thinking).toBeUndefined()
+    expect(result.changes[0]?.field).toBe("thinking")
+    expect(result.changes[0]?.reason).toBe("unsupported-by-model-metadata")
+  })
+
+  test("drops thinking for Mimo aliases resolved as MiniMax from heuristics", () => {
+    // given
+    const capabilities = getModelCapabilities({
+      providerID: "opencode-go",
+      modelID: "opencode-go/mimo-v2.5",
+    })
+
+    // when
+    const result = resolveCompatibleModelSettings({
+      providerID: "opencode-go",
+      modelID: "opencode-go/mimo-v2.5",
+      desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
+      capabilities,
+    })
+
+    // then
+    expect(capabilities.family).toBe("minimax")
     expect(result.thinking).toBeUndefined()
     expect(result.changes[0]?.field).toBe("thinking")
     expect(result.changes[0]?.reason).toBe("unsupported-by-model-metadata")

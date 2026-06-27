@@ -71,9 +71,11 @@ export function isKimiK27Model(model: string): boolean {
   return false
 }
 
+const MINIMAX_MODEL_RE = /(?:minimax|^mimo(?:$|[-.]))/
+
 export function isMiniMaxModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
-  return modelName.includes("minimax")
+  return MINIMAX_MODEL_RE.test(modelName)
 }
 
 export function isGlmModel(model: string): boolean {

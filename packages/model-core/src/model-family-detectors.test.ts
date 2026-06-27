@@ -110,6 +110,10 @@ describe("model family detectors", () => {
   test("#given MiniMax model ids #then detects MiniMax family only", () => {
     expect(isMiniMaxModel("opencode/minimax-m2.7")).toBe(true)
     expect(isMiniMaxModel("minimax-m2.7-highspeed")).toBe(true)
+    expect(isMiniMaxModel("opencode-go/mimo-v2.5")).toBe(true)
+    expect(isMiniMaxModel("opencode-go/mimo-v2.5-pro")).toBe(true)
+    expect(isMiniMaxModel("mimo-v2.5")).toBe(true)
+    expect(isMiniMaxModel("mimosa-v1")).toBe(false)
     expect(isMiniMaxModel("moonshotai/kimi-k2.6")).toBe(false)
   })
 })
