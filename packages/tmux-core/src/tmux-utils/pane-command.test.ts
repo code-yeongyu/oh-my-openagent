@@ -27,6 +27,25 @@ describe("buildTmuxAttachCommand", () => {
     expect(cmd).toContain('\\"')
     expect(cmd).toContain("\\$")
   })
+
+  it("passes explicit working directory to opencode attach", () => {
+    const cmd = buildTmuxAttachCommand("http://localhost:3000", "ses_abc123", "/tmp/project")
+
+    expect(cmd).toContain("--dir /tmp/project")
+  })
+
+  it("escapes directory shell metacharacters", () => {
+    const cmd = buildTmuxAttachCommand(
+      "http://localhost:3000",
+      "ses_abc123",
+      '/tmp/project";$(whoami);rm -rf /',
+    )
+
+    expect(cmd).toContain('\\"')
+    expect(cmd).toContain("\\$")
+    expect(cmd).toContain("\\;")
+    expect(cmd).not.toMatch(/[^\\];\s*rm/)
+  })
 })
 
 describe("buildTmuxPlaceholderCommand", () => {
