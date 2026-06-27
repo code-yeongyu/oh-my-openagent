@@ -34,4 +34,20 @@ describe("resolveDoctorTarget", () => {
     // then
     expect(target).toBe("opencode")
   })
+
+  test("#given explicit codex platform #when resolving doctor target #then selects Codex diagnostics", () => {
+    // given / when
+    const target = resolveDoctorTarget("omo", "codex")
+
+    // then
+    expect(target).toBe("codex")
+  })
+
+  test("#given explicit opencode platform from lazycodex invocation #when resolving doctor target #then explicit platform wins", () => {
+    // given / when
+    const target = resolveDoctorTarget("lazycodex-ai", "opencode")
+
+    // then
+    expect(target).toBe("opencode")
+  })
 })

@@ -21,7 +21,7 @@ async function withBundledLspRuntimeForTest(run) {
 	return run();
 }
 
-test("#given Windows without Git Bash and auto install skip env #when installing local marketplace #then rejects before marketplace or config mutation", async () => {
+test("#given Windows without Git Bash #when installing local marketplace #then rejects before marketplace or config mutation", async () => {
 	const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-missing-repo-"));
 	const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-missing-home-"));
 	const commands = [];
@@ -31,7 +31,6 @@ test("#given Windows without Git Bash and auto install skip env #when installing
 			repoRoot,
 			codexHome,
 			platform: "win32",
-			env: { OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL: "1" },
 			gitBashResolver: () => ({
 				found: false,
 				checkedPaths: [windowsGitBashPath],
@@ -53,29 +52,39 @@ test("#given Windows without Git Bash and auto install skip env #when installing
 	await assert.rejects(stat(join(codexHome, "config.toml")), /ENOENT/);
 });
 
-test("#given Windows without Git Bash #when winget succeeds and resolver recovers #then install continues", async () => {
+test("#given Windows without Git Bash #when installing local marketplace #then winget is not run and install stops with guidance", async () => {
 	const runCalls = [];
-	const resolutions = [
-		{ found: false, checkedPaths: [windowsGitBashPath], installHint: "install hint before winget" },
-		{ found: true, path: windowsGitBashPath, source: "program-files" },
-	];
+	const missingResolution = {
+		found: false,
+		checkedPaths: [windowsGitBashPath],
+		installHint: [
+			"Git Bash is required.",
+			"winget install --id Git.Git -e --source winget",
+			"OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe",
+			"rerun `npx lazycodex-ai install`",
+		].join("\n"),
+	};
 	let resolveCallCount = 0;
+	const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-no-auto-home-"));
 
-	const result = await withBundledLspRuntimeForTest(async () => installMarketplaceLocally({
+	await assert.rejects(withBundledLspRuntimeForTest(async () => installMarketplaceLocally({
 		repoRoot: process.cwd(),
-		codexHome: await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-auto-home-")),
-		binDir: await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-auto-bin-")),
+		codexHome,
+		binDir: await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-no-auto-bin-")),
 		platform: "win32",
-		gitBashResolver: () => resolutions[resolveCallCount++] ?? resolutions[resolutions.length - 1],
+		gitBashResolver: () => {
+			resolveCallCount += 1;
+			return missingResolution;
+		},
 		runCommand: async (command, args, options) => {
 			runCalls.push([command, ...args, options.cwd].join(" "));
 		},
 		log: () => {},
-	}));
+	})), /winget install --id Git\.Git -e --source winget/);
 
-	assert.equal(resolveCallCount, 2);
-	assert.match(runCalls.join("\n"), /^winget install --id Git\.Git -e --source winget /m);
-	assert.equal(result.gitBashPath, windowsGitBashPath);
+	assert.equal(resolveCallCount, 1);
+	assert.deepEqual(runCalls, []);
+	await assert.rejects(stat(join(codexHome, "config.toml")), /ENOENT/);
 });
 
 test("#given non-Windows install #when running installer #then winget is never called", async () => {
