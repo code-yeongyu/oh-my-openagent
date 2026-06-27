@@ -10,6 +10,7 @@ import { getMessageDir } from "./message-dir"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { sanitizeSubagentType } from "../delegate-task/subagent-discovery"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { llmSemaphore } from "../shared/semaphore.js"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
@@ -26,6 +27,8 @@ export async function executeBackground(
   model?: DelegatedModelConfig,
 ): Promise<string> {
   try {
+    await llmSemaphore.acquire()
+
     const messageDir = getMessageDir(toolContext.sessionID)
     const { prevMessage, firstMessageAgent } = await resolveMessageContext(
       toolContext.sessionID,
@@ -94,5 +97,7 @@ Do NOT call background_output now. Wait for <system-reminder> notification first
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return `Failed to launch background agent task: ${message}`
+  } finally {
+    llmSemaphore.release()
   }
 }

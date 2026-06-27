@@ -15,6 +15,7 @@ import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
 import type { CallOmoAgentArgs } from "./types"
+import { llmSemaphore } from "../shared/semaphore.js"
 
 type SessionWithPrompt = {
   prompt: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -91,6 +92,8 @@ export async function executeSync(
   let appliedFallbackChain = false
 
   try {
+    await llmSemaphore.acquire()
+
     const session = await deps.createOrGetSession(args, toolContext, ctx, model)
     sessionID = session.sessionID
     createdSessionForExecution = session.isNew
@@ -187,6 +190,8 @@ export async function executeSync(
     spawnReservation?.rollback()
     throw error
   } finally {
+    llmSemaphore.release()
+
     if (sessionID && appliedFallbackChain) {
       deps.clearSessionFallbackChain(sessionID)
     }
