@@ -29,6 +29,8 @@ node script/qa/web-terminal-visual-qa.mjs \
   --redact-regex 'session_[A-Za-z0-9]+'
 ```
 
+Custom `--redact-regex` rules replace the full regex match, even when the expression contains capture groups. Prefix-preserving redaction is reserved for the built-in authorization and key-assignment rules.
+
 Do not rely on screenshots to hide secrets. If a capture might include cookies, auth headers, raw env dumps, launchd environments, provider keys, or browser storage, redact first or summarize the run instead of storing the transcript.
 
 ## Replay An Existing Capture

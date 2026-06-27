@@ -225,6 +225,62 @@ session_id: ses_final_wave_review
 
   })
 
+  test("pauses for escalation when a final-wave reviewer rejects", async () => {
+    // given
+    const sessionID = "atlas-final-wave-session"
+
+    const planPath = join(testDirectory, "final-wave-reject-plan.md")
+    writeFileSync(
+      planPath,
+      `# Plan
+
+## TODOs
+- [x] 1. Ship the implementation
+
+## Final Verification Wave (MANDATORY - after ALL implementation tasks)
+- [x] F1. **Plan Compliance Audit** - \`oracle\`
+- [x] F2. **Code Quality Review** - \`unspecified-high\`
+- [ ] F3. **Real Manual QA** - \`unspecified-high\`
+- [ ] F4. **Scope Fidelity Check** - \`deep\`
+`,
+    )
+
+    const state: BoulderState = {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [sessionID],
+      plan_name: "final-wave-reject-plan",
+      agent: "atlas",
+    }
+    writeBoulderState(testDirectory, state)
+
+    const mockInput = createMockPluginInput()
+    const hook = createAtlasHook(mockInput, { directory: testDirectory, isCallerOrchestrator: async () => true })
+    const toolOutput = {
+      title: "Sisyphus Task",
+      output: `Manual QA could not verify the shipped behavior.
+
+Tasks [3/4 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: REJECT
+
+<task_metadata>
+session_id: ses_final_wave_review
+</task_metadata>`,
+      metadata: {},
+    }
+
+    // when
+    await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then
+    expect(toolOutput.output).toContain("FINAL REVIEW REJECTED")
+    expect(toolOutput.output).toContain("Boulder paused")
+    expect(toolOutput.output).toContain("VERDICT: REJECT")
+    expect(toolOutput.output).not.toContain("COMPLETION GATE")
+    expect(toolOutput.output).not.toContain("STEP 8")
+    expect(mockInput._promptMock).not.toHaveBeenCalled()
+  })
+
   test("keeps normal auto-continue instructions for non-final tasks", async () => {
     // given
     const sessionID = "atlas-non-final-session"
